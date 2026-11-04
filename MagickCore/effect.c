@@ -2933,6 +2933,16 @@ typedef struct _ShadeRow
 
   ShadeImages
     shading;
+
+  CacheView
+    *image_view,
+    *shade_view;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    y;
 } ShadeRow;
 
 static void ShadeRowPixels(const ShadeRow *row,const Quantum *magick_restrict p,
@@ -3025,6 +3035,34 @@ static MagickBooleanType AcquireShadeImages(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType ShadeHeadRow(MagickBooleanType *status,
+  const ShadeRow *row)
+{
+  const Image
+    *const linear_image = row->linear_image,
+    *const shade_image = row->shade_image;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(row->image_view,-1,row->y-1,
+    linear_image->columns+2,3,row->exception);
+  q=QueueCacheViewAuthenticPixels(row->shade_view,0,row->y,shade_image->columns,
+    1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ShadeRowPixels(row,p,q);
+  return(MagickTrue);
+}
+
 MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   const double azimuth,const double elevation,ExceptionInfo *exception)
 {
@@ -3088,34 +3126,12 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
     const ShadeImages
       shading = { linear_image, shade_image, gray };
 
-    const Quantum
-      *magick_restrict p;
+    const ShadeRow
+      row = { linear_image,shade_image,light,shading,image_view,shade_view,
+        exception,y };
 
-    Quantum
-      *magick_restrict q;
-
-    ShadeRow
-      row;
-
-    if (status == MagickFalse)
+    if (ShadeHeadRow(&status,&row) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,-1,y-1,linear_image->columns+2,3,
-      exception);
-    q=QueueCacheViewAuthenticPixels(shade_view,0,y,shade_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    /*
-      Shade this row of pixels.
-    */
-    row.linear_image=linear_image;
-    row.shade_image=shade_image;
-    row.light=light;
-    row.shading=shading;
-    ShadeRowPixels(&row,p,q);
     if (SyncCacheViewAuthenticPixels(shade_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
