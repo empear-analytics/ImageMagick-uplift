@@ -2009,7 +2009,7 @@ typedef struct _InterpolativeResizeInfo
 } InterpolativeResizeInfo;
 
 static void InterpolateResizeRow(MagickBooleanType *status,
-  const InterpolativeResizeInfo *resize,PointInfo offset,Quantum *q)
+  const InterpolativeResizeInfo *resize,const double offset_y,Quantum *q)
 {
   const Image
     *const image = resize->image;
@@ -2029,9 +2029,13 @@ static void InterpolateResizeRow(MagickBooleanType *status,
   ExceptionInfo
     *const exception = resize->exception;
 
+  PointInfo
+    offset;
+
   ssize_t
     x;
 
+  offset.y=offset_y;
   for (x=0; x < (ssize_t) resize_image->columns; x++)
   {
     ssize_t
@@ -2073,11 +2077,7 @@ static void InterpolateResizeLine(MagickBooleanType *status,
   ExceptionInfo
     *const exception = resize->exception;
 
-  PointInfo
-    offset;
-
-  offset.y=((double) y+0.5)*scale.y-0.5;
-  InterpolateResizeRow(status,resize,offset,q);
+  InterpolateResizeRow(status,resize,((double) y+0.5)*scale.y-0.5,q);
   if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
     (*status)=MagickFalse;
 }
