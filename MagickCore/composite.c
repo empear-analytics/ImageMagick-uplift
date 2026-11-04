@@ -951,6 +951,54 @@ static MagickBooleanType SumImageChannels(const Image *image,double *mean,
   return(MagickTrue);
 }
 
+typedef struct _MeanFillLine
+{
+  CacheView
+    *mask_view,
+    *mean_view;
+
+  const Image
+    *mask_image;
+
+  Image
+    *mean_image;
+
+  const double
+    *mean;
+
+  ExceptionInfo
+    *exception;
+} MeanFillLine;
+
+static void FillMeanLine(const MeanFillLine *line,const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  MeanFillInputs
+    row;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(line->mask_view,0,y,line->mean_image->columns,1,
+    line->exception);
+  q=GetCacheViewAuthenticPixels(line->mean_view,0,y,line->mean_image->columns,
+    1,line->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  row.mask_image=line->mask_image;
+  row.mean_image=line->mean_image;
+  FillMeanRow(&row,line->mean,p,q);
+  SyncCompositeRow(line->mean_view,line->exception,status);
+}
+
 static Image *BlendMeanImage(Image *image,const Image *mask_image,
   ExceptionInfo *exception)
 {
@@ -994,29 +1042,10 @@ static Image *BlendMeanImage(Image *image,const Image *mask_image,
 #endif
   for (y=0; y < (ssize_t) mean_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    const MeanFillLine
+      line = { mask_view, mean_view, mask_image, mean_image, mean, exception };
 
-    Quantum
-      *magick_restrict q;
-
-    MeanFillInputs
-      row;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(mask_view,0,y,mean_image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(mean_view,0,y,mean_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.mask_image=mask_image;
-    row.mean_image=mean_image;
-    FillMeanRow(&row,mean,p,q);
-    SyncCompositeRow(mean_view,exception,&status);
+    FillMeanLine(&line,y,&status);
   }
   mask_view=DestroyCacheView(mask_view);
   mean_view=DestroyCacheView(mean_view);
