@@ -1992,7 +1992,8 @@ typedef struct _InterpolativeResizeInfo
     *image;
 
   CacheView
-    *image_view;
+    *image_view,
+    *resize_view;
 
   Image
     *resize_image;
@@ -2060,6 +2061,27 @@ static void InterpolateResizeRow(MagickBooleanType *status,
   }
 }
 
+static void InterpolateResizeLine(MagickBooleanType *status,
+  const InterpolativeResizeInfo *resize,const ssize_t y,Quantum *q)
+{
+  CacheView
+    *const resize_view = resize->resize_view;
+
+  const PointInfo
+    scale = resize->scale;
+
+  ExceptionInfo
+    *const exception = resize->exception;
+
+  PointInfo
+    offset;
+
+  offset.y=((double) y+0.5)*scale.y-0.5;
+  InterpolateResizeRow(status,resize,offset,q);
+  if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *InterpolativeResizeImage(const Image *image,
   const size_t columns,const size_t rows,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -2117,9 +2139,6 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
     InterpolativeResizeInfo
       resize;
 
-    PointInfo
-      offset;
-
     Quantum
       *magick_restrict q;
 
@@ -2129,16 +2148,14 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
       exception);
     if (q == (Quantum *) NULL)
       continue;
-    offset.y=((double) y+0.5)*scale.y-0.5;
     resize.image=image;
     resize.image_view=image_view;
+    resize.resize_view=resize_view;
     resize.resize_image=resize_image;
     resize.method=method;
     resize.scale=scale;
     resize.exception=exception;
-    InterpolateResizeRow(&status,&resize,offset,q);
-    if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
-      status=MagickFalse;
+    InterpolateResizeLine(&status,&resize,y,q);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
