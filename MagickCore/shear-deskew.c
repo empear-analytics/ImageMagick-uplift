@@ -642,15 +642,9 @@ static MagickBooleanType RadonTransform(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    RadonRowSource
-      source;
+    const RadonRowSource
+      source = { image_view,image,threshold,y,exception,source_matrices };
 
-    source.image_view=image_view;
-    source.image=image;
-    source.threshold=threshold;
-    source.y=y;
-    source.exception=exception;
-    source.source_matrices=source_matrices;
     ReadRadonRow(&status,&source,bits);
   }
   RadonProjection(source_matrices,destination_matrices,1,projection);
