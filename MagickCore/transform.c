@@ -649,6 +649,22 @@ static void ClipCropOffset(ssize_t *offset,size_t *extent,
     }
 }
 
+typedef struct _TransformLine
+{
+  const Image
+    *image;
+
+  Image
+    *transform_image;
+
+  CacheView
+    *image_view,
+    *transform_view;
+
+  ExceptionInfo
+    *exception;
+} TransformLine;
+
 static void CopyPixelRow(const Image *image,const Image *destination,
   const Quantum *p,Quantum *q)
 {
@@ -785,6 +801,33 @@ static Image *CropOutsideCanvas(const Image *image,
   return(CropOutsideImage(image,bounding_box,exception));
 }
 
+static MagickBooleanType CropImageLine(const TransformLine *line,
+  const RectangleInfo *page,const ssize_t y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(line->image_view,page->x,page->y+y,
+    line->transform_image->columns,1,line->exception);
+  q=QueueCacheViewAuthenticPixels(line->transform_view,0,y,
+    line->transform_image->columns,1,line->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  CopyPixelRow(line->image,line->transform_image,p,q);
+  if (SyncCacheViewAuthenticPixels(line->transform_view,line->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -851,26 +894,16 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
 #endif
   for (y=0; y < (ssize_t) crop_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    TransformLine
+      line;
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    line.image=image;
+    line.transform_image=crop_image;
+    line.image_view=image_view;
+    line.transform_view=crop_view;
+    line.exception=exception;
+    if (CropImageLine(&line,&page,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,page.x,page.y+y,crop_image->columns,
-      1,exception);
-    q=QueueCacheViewAuthenticPixels(crop_view,0,y,crop_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    CopyPixelRow(image,crop_image,p,q);
-    if (SyncCacheViewAuthenticPixels(crop_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -1135,22 +1168,6 @@ static Image *FinishFlipImage(const Image *image,Image *flip_image,
     flip_image=DestroyImage(flip_image);
   return(flip_image);
 }
-
-typedef struct _TransformLine
-{
-  const Image
-    *image;
-
-  Image
-    *transform_image;
-
-  CacheView
-    *image_view,
-    *transform_view;
-
-  ExceptionInfo
-    *exception;
-} TransformLine;
 
 static MagickBooleanType FlipImageLine(const TransformLine *line,
   const ssize_t y,MagickBooleanType *status)
