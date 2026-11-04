@@ -1350,6 +1350,7 @@ typedef struct _MeanShiftInfo
     *mean_image;
 
   CacheView
+    *mean_view,
     *pixel_view;
 
   ExceptionInfo
@@ -1552,6 +1553,21 @@ static void MeanShiftRow(MagickBooleanType *status,const MeanShiftInfo *shift,
   }
 }
 
+static void MeanShiftLine(MagickBooleanType *status,
+  const MeanShiftInfo *shift,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  CacheView
+    *const mean_view = shift->mean_view;
+
+  ExceptionInfo
+    *const exception = shift->exception;
+
+  MeanShiftRow(status,shift,p,q);
+  if (SyncCacheViewAuthenticPixels(mean_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType AcquireMeanShiftImage(const Image *image,
   Image **mean_image,ExceptionInfo *exception)
 {
@@ -1628,15 +1644,14 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
       }
     shift.image=image;
     shift.mean_image=mean_image;
+    shift.mean_view=mean_view;
     shift.pixel_view=pixel_view;
     shift.exception=exception;
     shift.width=width;
     shift.height=height;
     shift.color_distance=color_distance;
     shift.y=y;
-    MeanShiftRow(&status,&shift,p,q);
-    if (SyncCacheViewAuthenticPixels(mean_view,exception) == MagickFalse)
-      status=MagickFalse;
+    MeanShiftLine(&status,&shift,p,q);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
