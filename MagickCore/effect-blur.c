@@ -474,6 +474,17 @@ typedef struct _AdaptiveEdge
     sigma;
 } AdaptiveEdge;
 
+static void SetBlurProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType PrepareAdaptiveEdge(const AdaptiveEdge *edge,
   Image **edge_image,ExceptionInfo *exception)
 {
@@ -624,17 +635,11 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,AdaptiveBlurImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetBlurProgress(image,AdaptiveBlurImageTag,progress,&status);
       }
   }
   blur_image->type=image->type;
@@ -923,17 +928,11 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,AdaptiveSharpenImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetBlurProgress(image,AdaptiveSharpenImageTag,progress,&status);
       }
   }
   sharp_image->type=image->type;
@@ -1719,17 +1718,11 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,BilateralBlurImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetBlurProgress(image,BilateralBlurImageTag,progress,&status);
       }
   }
   blur_image->type=image->type;
@@ -2521,16 +2514,11 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,BlurImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetBlurProgress(image,BlurImageTag,progress,&status);
       }
   }
   blur_view=DestroyCacheView(blur_view);
@@ -3116,16 +3104,11 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,BlurImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetBlurProgress(image,BlurImageTag,progress,&status);
       }
   }
   blur_view=DestroyCacheView(blur_view);
@@ -3785,17 +3768,11 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SelectiveBlurImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetBlurProgress(image,SelectiveBlurImageTag,progress,&status);
       }
   }
   blur_image->type=image->type;
