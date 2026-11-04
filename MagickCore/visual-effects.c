@@ -1338,6 +1338,88 @@ static MagickBooleanType ReportMorphProgress(const Image *image,
   return(status);
 }
 
+typedef struct _MorphFrameRowInfo
+{
+  CacheView
+    *image_view;
+
+  Image
+    *morph_image;
+
+  ExceptionInfo
+    *exception;
+
+  CacheView
+    *morph_view;
+
+  Image
+    *morph_images;
+
+  double
+    alpha;
+
+  double
+    beta;
+} MorphFrameRowInfo;
+
+static void MorphFrameRow(MagickBooleanType *status,
+  const MorphFrameRowInfo *info,const ssize_t y)
+{
+  CacheView
+    *const image_view = info->image_view;
+
+  Image
+    *const morph_image = info->morph_image;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  CacheView
+    *const morph_view = info->morph_view;
+
+  Image
+    *const morph_images = info->morph_images;
+
+  const double
+    alpha = info->alpha;
+
+  const double
+    beta = info->beta;
+
+  MagickBooleanType
+    sync;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,morph_image->columns,1,
+    exception);
+  q=GetCacheViewAuthenticPixels(morph_view,0,y,morph_images->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) morph_images->columns; x++)
+  {
+    MorphPixelChannels(morph_image,morph_images,p,q,alpha,beta);
+    p+=(ptrdiff_t) GetPixelChannels(morph_image);
+    q+=(ptrdiff_t) GetPixelChannels(morph_images);
+  }
+  sync=SyncCacheViewAuthenticPixels(morph_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
   ExceptionInfo *exception)
 {
@@ -1450,38 +1532,17 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
 #endif
       for (y=0; y < (ssize_t) morph_images->rows; y++)
       {
-        MagickBooleanType
-          sync;
+        MorphFrameRowInfo
+          info;
 
-        const Quantum
-          *magick_restrict p;
-
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        if (status == MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(image_view,0,y,morph_image->columns,1,
-          exception);
-        q=GetCacheViewAuthenticPixels(morph_view,0,y,morph_images->columns,1,
-          exception);
-        if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=0; x < (ssize_t) morph_images->columns; x++)
-        {
-          MorphPixelChannels(morph_image,morph_images,p,q,alpha,beta);
-          p+=(ptrdiff_t) GetPixelChannels(morph_image);
-          q+=(ptrdiff_t) GetPixelChannels(morph_images);
-        }
-        sync=SyncCacheViewAuthenticPixels(morph_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        info.image_view=image_view;
+        info.morph_image=morph_image;
+        info.exception=exception;
+        info.morph_view=morph_view;
+        info.morph_images=morph_images;
+        info.alpha=alpha;
+        info.beta=beta;
+        MorphFrameRow(&status,&info,y);
       }
       morph_view=DestroyCacheView(morph_view);
       image_view=DestroyCacheView(image_view);
