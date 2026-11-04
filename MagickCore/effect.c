@@ -2259,6 +2259,74 @@ static void ApplySpreadCharcoalPreview(const PreviewTile *tile,
   }
 }
 
+static void ApplyAnglePreview(const PreviewTile *tile,Image **preview_image,
+  double *degrees,double *gamma)
+{
+  const Image
+    *const image = tile->image;
+
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  switch (preview)
+  {
+    case RotatePreview:
+    {
+      (*degrees)+=45.0;
+      (*preview_image)=RotateImage(thumbnail,(*degrees),exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"rotate %g",(*degrees));
+      break;
+    }
+    case ShearPreview:
+    {
+      (*degrees)+=5.0;
+      (*preview_image)=ShearImage(thumbnail,(*degrees),(*degrees),exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"shear %gx%g",(*degrees),
+        2.0*(*degrees));
+      break;
+    }
+    case ShadePreview:
+    {
+      (*degrees)+=10.0;
+      (*preview_image)=ShadeImage(thumbnail,MagickTrue,(*degrees),(*degrees),
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"shade %gx%g",(*degrees),
+        (*degrees));
+      break;
+    }
+    case SwirlPreview:
+    {
+      (*preview_image)=SwirlImage(thumbnail,(*degrees),image->interpolate,
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"swirl %g",(*degrees));
+      (*degrees)+=45.0;
+      break;
+    }
+    case ImplodePreview:
+    {
+      (*degrees)+=0.1;
+      (*preview_image)=ImplodeImage(thumbnail,(*degrees),image->interpolate,
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"implode %g",(*degrees));
+      break;
+    }
+    default:
+    {
+      ApplySpreadCharcoalPreview(tile,&(*preview_image),&(*gamma));
+      break;
+    }
+  }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -2358,21 +2426,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     tile.sigma=sigma;
     switch (preview)
     {
-      case RotatePreview:
-      {
-        degrees+=45.0;
-        preview_image=RotateImage(thumbnail,degrees,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"rotate %g",degrees);
-        break;
-      }
-      case ShearPreview:
-      {
-        degrees+=5.0;
-        preview_image=ShearImage(thumbnail,degrees,degrees,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"shear %gx%g",degrees,
-          2.0*degrees);
-        break;
-      }
       case RollPreview:
       {
         x=((i+1)*(ssize_t) thumbnail->columns)/NumberTiles;
@@ -2384,7 +2437,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
       }
       default:
       {
-        ApplySpreadCharcoalPreview(&tile,&preview_image,&gamma);
+        ApplyAnglePreview(&tile,&preview_image,&degrees,&gamma);
         break;
       }
       case GrayscalePreview:
@@ -2422,15 +2475,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           (double) i+1);
         break;
       }
-      case ShadePreview:
-      {
-        degrees+=10.0;
-        preview_image=ShadeImage(thumbnail,MagickTrue,degrees,degrees,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"shade %gx%g",degrees,
-          degrees);
-        break;
-      }
       case SegmentPreview:
       {
         preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
@@ -2441,22 +2485,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           threshold,exception);
         (void) FormatLocaleString(label,MagickPathExtent,"segment %gx%g",
           threshold,threshold);
-        break;
-      }
-      case SwirlPreview:
-      {
-        preview_image=SwirlImage(thumbnail,degrees,image->interpolate,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"swirl %g",degrees);
-        degrees+=45.0;
-        break;
-      }
-      case ImplodePreview:
-      {
-        degrees+=0.1;
-        preview_image=ImplodeImage(thumbnail,degrees,image->interpolate,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"implode %g",degrees);
         break;
       }
       case WavePreview:
