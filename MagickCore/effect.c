@@ -1867,6 +1867,9 @@ typedef struct _PreviewTile
 
   double
     percentage;
+
+  double
+    radius;
 } PreviewTile;
 
 static void ApplyGammaHueSaturationPreview(const PreviewTile *tile,
@@ -1988,6 +1991,69 @@ static void ApplyBrightnessSpiffThresholdPreview(const PreviewTile *tile,
   }
 }
 
+static void ApplyDullSolarizeEdgePreview(const PreviewTile *tile,
+  Image **preview_image,double *gamma)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const ssize_t
+    i = tile->i;
+
+  const double
+    percentage = tile->percentage,
+    radius = tile->radius;
+
+  ssize_t
+    x;
+
+  switch (preview)
+  {
+    case DullPreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      for (x=0; x < i; x++)
+        (void) ContrastImage((*preview_image),MagickFalse,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"+contrast (%.17g)",
+        (double) i+1);
+      break;
+    }
+    case SolarizePreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) SolarizeImage((*preview_image),(double) QuantumRange*percentage/
+        100.0,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"solarize %g",
+        ((double) QuantumRange*percentage)/100.0);
+      break;
+    }
+    case EdgeDetectPreview:
+    {
+      (*preview_image)=EdgeImage(thumbnail,radius,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"edge %g",radius);
+      break;
+    }
+    default:
+    {
+      ApplyBrightnessSpiffThresholdPreview(tile,&(*preview_image),&(*gamma));
+      break;
+    }
+  }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -2081,6 +2147,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     tile.preview=preview;
     tile.i=i;
     tile.percentage=percentage;
+    tile.radius=radius;
     switch (preview)
     {
       case RotatePreview:
@@ -2109,18 +2176,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
       }
       default:
       {
-        ApplyBrightnessSpiffThresholdPreview(&tile,&preview_image,&gamma);
-        break;
-      }
-      case DullPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        for (x=0; x < i; x++)
-          (void) ContrastImage(preview_image,MagickFalse,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"+contrast (%.17g)",
-          (double) i+1);
+        ApplyDullSolarizeEdgePreview(&tile,&preview_image,&gamma);
         break;
       }
       case GrayscalePreview:
@@ -2187,29 +2243,12 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           sigma);
         break;
       }
-      case EdgeDetectPreview:
-      {
-        preview_image=EdgeImage(thumbnail,radius,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"edge %g",radius);
-        break;
-      }
       case SpreadPreview:
       {
         preview_image=SpreadImage(thumbnail,image->interpolate,radius,
           exception);
         (void) FormatLocaleString(label,MagickPathExtent,"spread %g",
           radius+0.5);
-        break;
-      }
-      case SolarizePreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) SolarizeImage(preview_image,(double) QuantumRange*percentage/
-          100.0,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"solarize %g",
-          ((double) QuantumRange*percentage)/100.0);
         break;
       }
       case ShadePreview:
