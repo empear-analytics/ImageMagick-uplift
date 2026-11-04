@@ -1691,8 +1691,7 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
     row.map=map;
     row.y=y;
     OrderedDitherPixels(image,levels,&row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
