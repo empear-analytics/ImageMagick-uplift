@@ -2850,6 +2850,31 @@ static void NegateGrayscaleRow(const NegateInfo *negate,const ssize_t y,
     (*status)=MagickFalse;
 }
 
+static MagickBooleanType NegateImageLine(const NegateInfo *negate,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *image = negate->image;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(negate->image_view,0,y,image->columns,1,
+    negate->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  NegateImageRow(image,q);
+  if (SyncCacheViewAuthenticPixels(negate->image_view,negate->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType NegateImage(Image *image,
   const MagickBooleanType grayscale,ExceptionInfo *exception)
 {
@@ -2899,20 +2924,8 @@ MagickExport MagickBooleanType NegateImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    if (NegateImageLine(&negate,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    NegateImageRow(image,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
