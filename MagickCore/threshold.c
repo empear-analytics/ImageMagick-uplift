@@ -2358,14 +2358,11 @@ MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       WhiteThresholdIntensity(image,&threshold,q);
