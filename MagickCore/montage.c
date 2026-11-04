@@ -799,6 +799,14 @@ static MagickBooleanType SetMontageTileProgress(Image *image,
   return(status);
 }
 
+static void RelinquishMontageStrings(Image *montage)
+{
+  if (montage->montage != (char *) NULL)
+    montage->montage=(char *) RelinquishMagickMemory(montage->montage);
+  if (montage->directory != (char *) NULL)
+    montage->directory=(char *) RelinquishMagickMemory(montage->directory);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1037,11 +1045,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     if ((montage->montage == (char *) NULL) ||
         (montage->directory == (char *) NULL))
       {
-        if (montage->montage != (char *) NULL)
-          montage->montage=(char *) RelinquishMagickMemory(montage->montage);
-        if (montage->directory != (char *) NULL)
-          montage->directory=(char *) RelinquishMagickMemory(
-            montage->directory);
+        RelinquishMontageStrings(montage);
         ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
       }
     GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
