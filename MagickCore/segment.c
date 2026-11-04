@@ -706,6 +706,35 @@ static void ReportClassifyProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
+static void RemoveSmallClusters(const double cluster_threshold,
+  Cluster **head,ssize_t *count,Cluster **last_cluster)
+{
+  Cluster
+    *cluster,
+    *next_cluster;
+
+  for (cluster=(*head); cluster != (Cluster *) NULL; cluster=next_cluster)
+  {
+    next_cluster=cluster->next;
+    if (IsClusterAboveThreshold(cluster,(*count),cluster_threshold) !=
+        MagickFalse)
+      {
+        /*
+          Initialize cluster.
+        */
+        InitializeCluster(cluster,(*count));
+        (*count)++;
+        (*last_cluster)=cluster;
+        continue;
+      }
+    /*
+      Delete cluster.
+    */
+    (*head)=UnlinkCluster((*head),(*last_cluster),cluster,next_cluster);
+    cluster=(Cluster *) RelinquishMagickMemory(cluster);
+  }
+}
+
 typedef struct _ClassifyCountInputs
 {
   const Image
@@ -887,25 +916,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   count=0;
   last_cluster=head;
   next_cluster=head;
-  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
-  {
-    next_cluster=cluster->next;
-    if (IsClusterAboveThreshold(cluster,count,cluster_threshold) != MagickFalse)
-      {
-        /*
-          Initialize cluster.
-        */
-        InitializeCluster(cluster,count);
-        count++;
-        last_cluster=cluster;
-        continue;
-      }
-    /*
-      Delete cluster.
-    */
-    head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
-    cluster=(Cluster *) RelinquishMagickMemory(cluster);
-  }
+  RemoveSmallClusters(cluster_threshold,&head,&count,&last_cluster);
   number_clusters=(size_t) count;
   if (verbose != MagickFalse)
     PrintClusterStatistics(head,cluster_threshold,weighting_exponent,
