@@ -824,6 +824,17 @@ static MagickBooleanType ColorizeImageRow(const ColorizeRow *colorize_row,
   return(MagickTrue);
 }
 
+static void ConformColorizeImage(Image *colorize_image,
+  const PixelInfo *colorize,ExceptionInfo *exception)
+{
+  if ((IsGrayColorspace(colorize_image->colorspace) != MagickFalse) ||
+      (IsPixelInfoGray(colorize) != MagickFalse))
+    (void) SetImageColorspace(colorize_image,sRGBColorspace,exception);
+  if ((colorize_image->alpha_trait == UndefinedPixelTrait) &&
+      (colorize->alpha_trait != UndefinedPixelTrait))
+    (void) SetImageAlpha(colorize_image,OpaqueAlpha,exception);
+}
+
 MagickExport Image *ColorizeImage(const Image *image,const char *blend,
   const PixelInfo *colorize,ExceptionInfo *exception)
 {
@@ -864,12 +875,7 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
       colorize_image=DestroyImage(colorize_image);
       return((Image *) NULL);
     }
-  if ((IsGrayColorspace(colorize_image->colorspace) != MagickFalse) ||
-      (IsPixelInfoGray(colorize) != MagickFalse))
-    (void) SetImageColorspace(colorize_image,sRGBColorspace,exception);
-  if ((colorize_image->alpha_trait == UndefinedPixelTrait) &&
-      (colorize->alpha_trait != UndefinedPixelTrait))
-    (void) SetImageAlpha(colorize_image,OpaqueAlpha,exception);
+  ConformColorizeImage(colorize_image,colorize,exception);
   if (blend == (const char *) NULL)
     return(colorize_image);
   blend_percentage=ParseColorizeBlendPercentage(colorize_image,blend);
