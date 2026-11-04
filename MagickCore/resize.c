@@ -1965,6 +1965,16 @@ static MagickBooleanType SetResizeProgress(const Image *image,
   return(status);
 }
 
+static Image *FinishInterpolativeResize(CacheView *image_view,
+  CacheView *resize_view,Image *resize_image,const MagickBooleanType status)
+{
+  resize_view=DestroyCacheView(resize_view);
+  image_view=DestroyCacheView(image_view);
+  if (status == MagickFalse)
+    resize_image=DestroyImage(resize_image);
+  return(resize_image);
+}
+
 MagickExport Image *InterpolativeResizeImage(const Image *image,
   const size_t columns,const size_t rows,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -2076,11 +2086,7 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
           status=MagickFalse;
       }
   }
-  resize_view=DestroyCacheView(resize_view);
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    resize_image=DestroyImage(resize_image);
-  return(resize_image);
+  return(FinishInterpolativeResize(image_view,resize_view,resize_image,status));
 }
 #if defined(MAGICKCORE_LQR_DELEGATE)
 
