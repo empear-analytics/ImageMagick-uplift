@@ -276,6 +276,17 @@ static MagickBooleanType AddNoiseImageRow(const AddNoiseRow *noise_row,
   return(MagickTrue);
 }
 
+static void SetEffectProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
   const double attenuate,ExceptionInfo *exception)
 {
@@ -352,16 +363,11 @@ MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,AddNoiseImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEffectProgress(image,AddNoiseImageTag,progress,&status);
       }
   }
   noise_view=DestroyCacheView(noise_view);
@@ -580,16 +586,11 @@ MagickExport Image *BlueShiftImage(const Image *image,const double factor,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,BlueShiftImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEffectProgress(image,BlueShiftImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -903,17 +904,11 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ColorizeImageTag,progress,
-          colorize_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEffectProgress(image,ColorizeImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -1218,17 +1213,11 @@ MagickExport Image *ColorMatrixImage(const Image *image,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ColorMatrixImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEffectProgress(image,ColorMatrixImageTag,progress,&status);
       }
   }
   color_view=DestroyCacheView(color_view);
@@ -1449,17 +1438,11 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
       status=MagickFalse;
     if (canvas_image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(canvas_image,ImplodeImageTag,progress,
-          canvas_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEffectProgress(canvas_image,ImplodeImageTag,progress,&status);
       }
   }
   implode_view=DestroyCacheView(implode_view);
@@ -2550,16 +2533,11 @@ MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SepiaToneImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEffectProgress(image,SepiaToneImageTag,progress,&status);
       }
   }
   sepia_view=DestroyCacheView(sepia_view);
@@ -3198,16 +3176,11 @@ MagickExport MagickBooleanType SolarizeImage(Image *image,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SolarizeImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEffectProgress(image,SolarizeImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -3990,17 +3963,11 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
       status=MagickFalse;
     if (canvas_image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(canvas_image,SwirlImageTag,progress,
-          canvas_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEffectProgress(canvas_image,SwirlImageTag,progress,&status);
       }
   }
   swirl_view=DestroyCacheView(swirl_view);
@@ -4205,16 +4172,11 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,TintImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEffectProgress(image,TintImageTag,progress,&status);
       }
   }
   tint_view=DestroyCacheView(tint_view);
@@ -4538,17 +4500,11 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(canvas_image,WaveImageTag,progress,
-          canvas_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEffectProgress(canvas_image,WaveImageTag,progress,&status);
       }
   }
   wave_view=DestroyCacheView(wave_view);
