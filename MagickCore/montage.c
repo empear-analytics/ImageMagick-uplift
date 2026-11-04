@@ -831,6 +831,17 @@ static MagickBooleanType AcquireNextMontage(const ImageInfo *clone_info,
   return(MagickTrue);
 }
 
+static void AppendMontageDirectoryEntry(Image *montage,const char *filename,
+  const size_t extent,ExceptionInfo *exception)
+{
+  if (strchr(filename,(int) '\xff') == (char *) NULL)
+    (void) ConcatenateMagickString(montage->directory,filename,extent);
+  else
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+      "InvalidArgument","'%s'",filename);
+  (void) ConcatenateMagickString(montage->directory,"\xff",extent);
+}
+
 static void RelinquishMontageStrings(Image *montage)
 {
   if (montage->montage != (char *) NULL)
@@ -1087,13 +1098,8 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     tile=0;
     while (tile < MagickMin((ssize_t) tiles_per_page,(ssize_t) number_images))
     {
-      if (strchr(image_list[tile]->filename,(int) '\xff') == (char *) NULL)
-        (void) ConcatenateMagickString(montage->directory,
-          image_list[tile]->filename,extent);
-      else
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-          "InvalidArgument","'%s'",image_list[tile]->filename);
-      (void) ConcatenateMagickString(montage->directory,"\xff",extent);
+      AppendMontageDirectoryEntry(montage,image_list[tile]->filename,extent,
+        exception);
       tile++;
     }
     progress_monitor=SetImageProgressMonitor(montage,(MagickProgressMonitor)
