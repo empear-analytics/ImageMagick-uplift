@@ -1067,6 +1067,17 @@ static MagickBooleanType ApplyRotationShears(const ShearRotation *rotation,
   return(MagickTrue);
 }
 
+static void GetRotationAngle(const double degrees,MagickRealType *angle,
+  size_t *rotations)
+{
+  (*angle)=fmod(degrees,360.0);
+  if ((*angle) < -45.0)
+    (*angle)+=360.0;
+  for ((*rotations)=0; (*angle) > 45.0; (*rotations)++)
+    (*angle)-=90.0;
+  (*rotations)%=4;
+}
+
 MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   ExceptionInfo *exception)
 {
@@ -1103,12 +1114,7 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  angle=fmod(degrees,360.0);
-  if (angle < -45.0)
-    angle+=360.0;
-  for (rotations=0; angle > 45.0; rotations++)
-    angle-=90.0;
-  rotations%=4;
+  GetRotationAngle(degrees,&angle,&rotations);
   /*
     Calculate shear equations.
   */
