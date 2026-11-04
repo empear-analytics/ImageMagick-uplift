@@ -1390,6 +1390,7 @@ typedef struct _MeanShiftInfo
     *mean_image;
 
   CacheView
+    *image_view,
     *mean_view,
     *pixel_view;
 
@@ -1622,6 +1623,45 @@ static MagickBooleanType AcquireMeanShiftImage(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType MeanShiftHead(const MeanShiftInfo *shift,
+  MagickBooleanType *status)
+{
+  const Image
+    *const image = shift->image;
+
+  Image
+    *const mean_image = shift->mean_image;
+
+  CacheView
+    *const image_view = shift->image_view,
+    *const mean_view = shift->mean_view;
+
+  ExceptionInfo
+    *const exception = shift->exception;
+
+  const ssize_t
+    y = shift->y;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(mean_view,0,y,mean_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  MeanShiftLine(status,shift,p,q);
+  return(MagickTrue);
+}
+
 MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
   const size_t height,const double color_distance,ExceptionInfo *exception)
 {
@@ -1663,27 +1703,12 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
 #endif
   for (y=0; y < (ssize_t) mean_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
-
     MeanShiftInfo
       shift;
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(mean_view,0,y,mean_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
     shift.image=image;
     shift.mean_image=mean_image;
+    shift.image_view=image_view;
     shift.mean_view=mean_view;
     shift.pixel_view=pixel_view;
     shift.exception=exception;
@@ -1691,7 +1716,8 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
     shift.height=height;
     shift.color_distance=color_distance;
     shift.y=y;
-    MeanShiftLine(&status,&shift,p,q);
+    if (MeanShiftHead(&shift,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
