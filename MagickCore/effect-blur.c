@@ -3499,17 +3499,26 @@ typedef struct _SelectiveRow
   const Image
     *luminance_image;
 
+  CacheView
+    *blur_view,
+    *image_view,
+    *luminance_view;
+
   MagickRealType
     *kernel;
 
   ssize_t
-    center;
+    center,
+    y;
 
   double
     threshold;
 
   size_t
     width;
+
+  ExceptionInfo
+    *exception;
 } SelectiveRow;
 
 static void BlurSelectiveRow(const SelectiveRow *row,
@@ -3549,6 +3558,41 @@ static void BlurSelectiveRow(const SelectiveRow *row,
     l+=(ptrdiff_t) GetPixelChannels(row->luminance_image);
     q+=(ptrdiff_t) GetPixelChannels(row->blur_image);
   }
+}
+
+static MagickBooleanType BlurSelectiveLine(const SelectiveRow *row,
+  MagickBooleanType *status)
+{
+  MagickBooleanType
+    sync;
+
+  const Quantum
+    *magick_restrict l,
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(row->image_view,-((ssize_t) (row->width-1)/2L),
+    row->y-(ssize_t) ((row->width-1)/2L),row->image->columns+row->width,
+    row->width,row->exception);
+  l=GetCacheViewVirtualPixels(row->luminance_view,-((ssize_t) (row->width-1)/
+    2L),row->y-(ssize_t) ((row->width-1)/2L),row->luminance_image->columns+
+    row->width,row->width,row->exception);
+  q=QueueCacheViewAuthenticPixels(row->blur_view,0,row->y,
+    row->blur_image->columns,1,row->exception);
+  if (IsSelectiveRowMissing(p,l,q) != MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  BlurSelectiveRow(row,p,l,q);
+  sync=SyncCacheViewAuthenticPixels(row->blur_view,row->exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
 }
 
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
@@ -3638,43 +3682,23 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    MagickBooleanType
-      sync;
-
-    const Quantum
-      *magick_restrict l,
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
     SelectiveRow
       row;
 
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,-((ssize_t) (width-1)/2L),y-(ssize_t)
-      ((width-1)/2L),image->columns+width,width,exception);
-    l=GetCacheViewVirtualPixels(luminance_view,-((ssize_t) (width-1)/2L),y-
-      (ssize_t) ((width-1)/2L),luminance_image->columns+width,width,exception);
-    q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
-      exception);
-    if (IsSelectiveRowMissing(p,l,q) != MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
     row.blur_image=blur_image;
     row.luminance_image=luminance_image;
+    row.blur_view=blur_view;
+    row.image_view=image_view;
+    row.luminance_view=luminance_view;
     row.kernel=kernel;
     row.center=center;
+    row.y=y;
     row.threshold=threshold;
     row.width=width;
-    BlurSelectiveRow(&row,p,l,q);
-    sync=SyncCacheViewAuthenticPixels(blur_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
+    row.exception=exception;
+    if (BlurSelectiveLine(&row,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
