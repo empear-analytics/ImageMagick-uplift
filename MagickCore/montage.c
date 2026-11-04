@@ -819,6 +819,18 @@ static void DestroyTileResources(Image *image,const Image *thumbnail,
   DestroyTileImages(image_list,i);
 }
 
+static MagickBooleanType AcquireNextMontage(const ImageInfo *clone_info,
+  Image *montage,ExceptionInfo *exception)
+{
+  AcquireNextImage(clone_info,montage,exception);
+  if (GetNextImageInList(montage) == (Image *) NULL)
+    {
+      montage=DestroyImageList(montage);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void RelinquishMontageStrings(Image *montage)
 {
   if (montage->montage != (char *) NULL)
@@ -1181,12 +1193,8 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
         /*
           Allocate next image structure.
         */
-        AcquireNextImage(clone_info,montage,exception);
-        if (GetNextImageInList(montage) == (Image *) NULL)
-          {
-            montage=DestroyImageList(montage);
-            return((Image *) NULL);
-          }
+        if (AcquireNextMontage(clone_info,montage,exception) == MagickFalse)
+          return((Image *) NULL);
         montage=GetNextImageInList(montage);
         montage->background_color=montage_info->background_color;
         image_list+=tiles_per_page;
