@@ -2228,14 +2228,11 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
     RangeThresholdRow
       row;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.low_black=low_black;
     row.low_white=low_white;
     row.high_white=high_white;
