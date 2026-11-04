@@ -1132,6 +1132,36 @@ static MagickBooleanType OilPaintLine(const OilPaintRowInfo *row,
   return(MagickTrue);
 }
 
+typedef struct _PaintRows
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    y;
+} PaintRows;
+
+static MagickBooleanType GetPaintRow(const PaintRows *rows,
+  Quantum *magick_restrict *q,MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*q)=GetCacheViewAuthenticPixels(rows->image_view,0,rows->y,
+    rows->image->columns,1,rows->exception);
+  if ((*q) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void SyncPaintRow(CacheView *view,ExceptionInfo *exception,
   MagickBooleanType *status)
 {
@@ -1591,20 +1621,17 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    const PaintRows
+      rows = { image,image_view,exception,y };
+
     Quantum
       *magick_restrict q;
 
     TransparentPaintRow
       row;
 
-    if (status == MagickFalse)
+    if (GetPaintRow(&rows,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
     row.target=target;
     row.opacity=opacity;
@@ -1716,6 +1743,9 @@ MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    const PaintRows
+      rows = { image,image_view,exception,y };
+
     MagickBooleanType
       match;
 
@@ -1728,14 +1758,8 @@ MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
     ssize_t
       x;
 
-    if (status == MagickFalse)
+    if (GetPaintRow(&rows,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     GetPixelInfo(image,&pixel);
     for (x=0; x < (ssize_t) image->columns; x++)
     {
