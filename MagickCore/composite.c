@@ -283,6 +283,13 @@ static void SetMagnitudePixel(const BlendGradients *gradients,
   }
 }
 
+static void SyncCompositeRow(CacheView *view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
   ExceptionInfo *exception)
 {
@@ -348,8 +355,7 @@ static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
       q+=(ptrdiff_t) GetPixelChannels(dy_image);
       r+=(ptrdiff_t) GetPixelChannels(magnitude_image);
     }
-    if (SyncCacheViewAuthenticPixels(magnitude_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncCompositeRow(magnitude_view,exception,&status);
   }
   magnitude_view=DestroyCacheView(magnitude_view);
   dy_view=DestroyCacheView(dy_view);
@@ -495,8 +501,7 @@ static Image *BlendMaxMagnitudeImage(const BlendMagnitudePair *magnitudes,
       s+=(ptrdiff_t) GetPixelChannels(dy_image);
       t+=(ptrdiff_t) GetPixelChannels(magnitude_image);
     }
-    if (SyncCacheViewAuthenticPixels(magnitude_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncCompositeRow(magnitude_view,exception,&status);
   }
   magnitude_view=DestroyCacheView(magnitude_view);
   dy_view=DestroyCacheView(dy_view);
@@ -633,8 +638,7 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
     row.attenuate=attenuate;
     row.sign=sign;
     SumBlendRow(&row,p,q,r);
-    if (SyncCacheViewAuthenticPixels(sum_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncCompositeRow(sum_view,exception,&status);
   }
   sum_view=DestroyCacheView(sum_view);
   beta_view=DestroyCacheView(beta_view);
@@ -843,8 +847,7 @@ static MagickBooleanType BlendMaskAlphaChannel(Image *image,
         continue;
       }
     ClearMaskedAlphaRow(image,mask_image,p,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncCompositeRow(image_view,exception,&status);
   }
   mask_view=DestroyCacheView(mask_view);
   image_view=DestroyCacheView(image_view);
@@ -1013,8 +1016,7 @@ static Image *BlendMeanImage(Image *image,const Image *mask_image,
     row.mask_image=mask_image;
     row.mean_image=mean_image;
     FillMeanRow(&row,mean,p,q);
-    if (SyncCacheViewAuthenticPixels(mean_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncCompositeRow(mean_view,exception,&status);
   }
   mask_view=DestroyCacheView(mask_view);
   mean_view=DestroyCacheView(mean_view);
@@ -1571,8 +1573,7 @@ static MagickBooleanType CompositeOverImage(Image *image,
     row.clamp=clamp;
     row.exception=exception;
     CompositeOverRow(&row,p,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncCompositeRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2466,9 +2467,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) source_image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         const Quantum
           *p;
 
@@ -2501,9 +2499,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           p+=(ptrdiff_t) GetPixelChannels(source_image);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncCompositeRow(image_view,exception,&status);
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
             SetCompositeProgress(image,CompositeImageTag,(MagickOffsetType) y,
@@ -2532,9 +2528,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) source_image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         const Quantum
           *p;
 
@@ -2569,9 +2562,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           p+=(ptrdiff_t) GetPixelChannels(source_image);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncCompositeRow(image_view,exception,&status);
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
             SetCompositeProgress(image,CompositeImageTag,(MagickOffsetType) y,
@@ -4323,8 +4314,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         p=pixels;
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncCompositeRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -4587,9 +4577,6 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    MagickBooleanType
-      sync;
-
     const Quantum
       *pixels;
 
@@ -4608,9 +4595,7 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
         continue;
       }
     CopyTextureRow(image,texture_image,pixels,q);
-    sync=SyncCacheViewAuthenticPixels(image_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
+    SyncCompositeRow(image_view,exception,&status);
     if (ReportTextureProgress(image,y) == MagickFalse)
       status=MagickFalse;
   }
