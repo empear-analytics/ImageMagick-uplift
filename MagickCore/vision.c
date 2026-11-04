@@ -806,6 +806,107 @@ static void SetEllipseAngleMetric(CCObjectInfo *object,
       }
 }
 
+typedef struct _ComputeObjectAngleInfo
+{
+  const Image
+    *component_image;
+
+  ExceptionInfo
+    *exception;
+
+  CCObjectInfo
+    *object;
+
+  ssize_t
+    metric_index;
+} ComputeObjectAngleInfo;
+
+static void ComputeObjectAngle(MagickBooleanType *status,
+  const ComputeObjectAngleInfo *info,const ssize_t i)
+{
+  const Image
+    *const component_image = info->component_image;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  CCObjectInfo
+    *const object = info->object;
+
+  const ssize_t
+    metric_index = info->metric_index;
+
+  CCEllipseAngle
+    ellipse_angle;
+
+  CacheView
+    *component_view;
+
+  double
+    M00 = 0.0,
+    M01 = 0.0,
+    M02 = 0.0,
+    M10 = 0.0,
+    M11 = 0.0,
+    M20 = 0.0;
+
+  PointInfo
+    centroid = { 0.0, 0.0 };
+
+  RectangleInfo
+    bounding_box;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    y;
+
+  /*
+    Compute ellipse angle of each object.
+  */
+  if ((*status) == MagickFalse)
+    return;
+  component_view=AcquireAuthenticCacheView(component_image,exception);
+  bounding_box=object[i].bounding_box;
+  if (GetObjectCentroidSums(component_image,component_view,bounding_box,i,
+        &M00,&M10,&M01,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  centroid.x=M10*MagickSafeReciprocal(M00);
+  centroid.y=M01*MagickSafeReciprocal(M00);
+  for (y=0; y < (ssize_t) bounding_box.height; y++)
+  {
+    CCMomentRow
+      moment_row;
+
+    const CCMomentSums
+      moment_sums = { &M11, &M20, &M02, &p };
+
+    if ((*status) == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
+      bounding_box.y+y,bounding_box.width,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        (*status)=MagickFalse;
+        break;
+      }
+    moment_row.component_image=component_image;
+    moment_row.bounding_box=bounding_box;
+    moment_row.i=i;
+    moment_row.centroid=centroid;
+    moment_row.y=y;
+    AccumulateSecondMoments(&moment_row,&moment_sums);
+  }
+  component_view=DestroyCacheView(component_view);
+  ellipse_angle.M11=M11;
+  ellipse_angle.M20=M20;
+  ellipse_angle.M02=M02;
+  ellipse_angle.i=i;
+  ellipse_angle.metric_index=metric_index;
+  SetEllipseAngleMetric(object,&ellipse_angle);
+}
+
 static void AngleThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -822,75 +923,14 @@ static void AngleThreshold(const Image *component_image,
 #endif
   for (i=0; i < (ssize_t) component_image->colors; i++)
   {
-    CCEllipseAngle
-      ellipse_angle;
+    ComputeObjectAngleInfo
+      info;
 
-    CacheView
-      *component_view;
-
-    double
-      M00 = 0.0,
-      M01 = 0.0,
-      M02 = 0.0,
-      M10 = 0.0,
-      M11 = 0.0,
-      M20 = 0.0;
-
-    PointInfo
-      centroid = { 0.0, 0.0 };
-
-    RectangleInfo
-      bounding_box;
-
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      y;
-
-    /*
-      Compute ellipse angle of each object.
-    */
-    if (status == MagickFalse)
-      continue;
-    component_view=AcquireAuthenticCacheView(component_image,exception);
-    bounding_box=object[i].bounding_box;
-    if (GetObjectCentroidSums(component_image,component_view,bounding_box,i,
-          &M00,&M10,&M01,exception) == MagickFalse)
-      status=MagickFalse;
-    centroid.x=M10*MagickSafeReciprocal(M00);
-    centroid.y=M01*MagickSafeReciprocal(M00);
-    for (y=0; y < (ssize_t) bounding_box.height; y++)
-    {
-      CCMomentRow
-        moment_row;
-
-      const CCMomentSums
-        moment_sums = { &M11, &M20, &M02, &p };
-
-      if (status == MagickFalse)
-        continue;
-      p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
-        bounding_box.y+y,bounding_box.width,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      moment_row.component_image=component_image;
-      moment_row.bounding_box=bounding_box;
-      moment_row.i=i;
-      moment_row.centroid=centroid;
-      moment_row.y=y;
-      AccumulateSecondMoments(&moment_row,&moment_sums);
-    }
-    component_view=DestroyCacheView(component_view);
-    ellipse_angle.M11=M11;
-    ellipse_angle.M20=M20;
-    ellipse_angle.M02=M02;
-    ellipse_angle.i=i;
-    ellipse_angle.metric_index=metric_index;
-    SetEllipseAngleMetric(object,&ellipse_angle);
+    info.component_image=component_image;
+    info.exception=exception;
+    info.object=object;
+    info.metric_index=metric_index;
+    ComputeObjectAngle(&status,&info,i);
   }
 }
 
