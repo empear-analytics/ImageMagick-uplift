@@ -200,10 +200,30 @@ static void AddPerimeterPattern(const Quantum *pixels,const size_t foreground,
 }
 
 
-static void CountPerimeterPattern(const Image *component_image,
-  const Quantum *magick_restrict p,const size_t width,const ssize_t i,
-  size_t *pattern)
+typedef struct _CCPerimeterPass
 {
+  const Image
+    *component_image;
+
+  size_t
+    width;
+
+  ssize_t
+    i;
+} CCPerimeterPass;
+
+static void CountPerimeterPattern(const CCPerimeterPass *perimeter_pass,
+  const Quantum *magick_restrict p,size_t *pattern)
+{
+  const Image
+    *const component_image = perimeter_pass->component_image;
+
+  const size_t
+    width = perimeter_pass->width;
+
+  const ssize_t
+    i = perimeter_pass->i;
+
   Quantum
     pixels[4];
 
@@ -299,7 +319,13 @@ static MagickBooleanType CountObjectPerimeterPatterns(
       }
     for (x=(-1); x < (ssize_t) bounding_box.width; x++)
     {
-      CountPerimeterPattern(component_image,p,bounding_box.width,i,pattern);
+      CCPerimeterPass
+        perimeter_pass;
+
+      perimeter_pass.component_image=component_image;
+      perimeter_pass.width=bounding_box.width;
+      perimeter_pass.i=i;
+      CountPerimeterPattern(&perimeter_pass,p,pattern);
       p+=(ptrdiff_t) GetPixelChannels(component_image);
     }
   }
@@ -406,7 +432,13 @@ static void CircularityThreshold(const Image *component_image,
         }
       for (x=(-1); x < (ssize_t) bounding_box.width; x++)
       {
-        CountPerimeterPattern(component_image,p,bounding_box.width,i,pattern);
+        CCPerimeterPass
+          perimeter_pass;
+
+        perimeter_pass.component_image=component_image;
+        perimeter_pass.width=bounding_box.width;
+        perimeter_pass.i=i;
+        CountPerimeterPattern(&perimeter_pass,p,pattern);
         p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
