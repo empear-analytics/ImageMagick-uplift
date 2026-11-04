@@ -641,6 +641,71 @@ static PixelInfo ParseColorizeBlendPercentage(const Image *colorize_image,
   return(blend_percentage);
 }
 
+typedef struct _ColorizeRow
+{
+  CacheView
+    *image_view;
+
+  Image
+    *colorize_image;
+
+  PixelInfo
+    blend_percentage;
+
+  const PixelInfo
+    *colorize;
+
+  ExceptionInfo
+    *exception;
+} ColorizeRow;
+
+static MagickBooleanType ColorizeImageRow(const ColorizeRow *colorize_row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  CacheView
+    *const image_view = colorize_row->image_view;
+
+  Image
+    *const colorize_image = colorize_row->colorize_image;
+
+  const PixelInfo
+    blend_percentage = colorize_row->blend_percentage;
+
+  const PixelInfo
+    *const colorize = colorize_row->colorize;
+
+  ExceptionInfo
+    *const exception = colorize_row->exception;
+
+  MagickBooleanType
+    sync;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,colorize_image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) colorize_image->columns; x++)
+  {
+    ColorizePixelChannels(colorize_image,&blend_percentage,colorize,q);
+    q+=(ptrdiff_t) GetPixelChannels(colorize_image);
+  }
+  sync=SyncCacheViewAuthenticPixels(image_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *ColorizeImage(const Image *image,const char *blend,
   const PixelInfo *colorize,ExceptionInfo *exception)
 {
@@ -702,32 +767,16 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
 #endif
   for (y=0; y < (ssize_t) colorize_image->rows; y++)
   {
-    MagickBooleanType
-      sync;
+    ColorizeRow
+      colorize_row;
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    colorize_row.image_view=image_view;
+    colorize_row.colorize_image=colorize_image;
+    colorize_row.blend_percentage=blend_percentage;
+    colorize_row.colorize=colorize;
+    colorize_row.exception=exception;
+    if (ColorizeImageRow(&colorize_row,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,colorize_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) colorize_image->columns; x++)
-    {
-      ColorizePixelChannels(colorize_image,&blend_percentage,colorize,q);
-      q+=(ptrdiff_t) GetPixelChannels(colorize_image);
-    }
-    sync=SyncCacheViewAuthenticPixels(image_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
