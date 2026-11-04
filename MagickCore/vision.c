@@ -239,11 +239,42 @@ static void CountPerimeterPattern(const Image *component_image,
   AddPerimeterPattern(pixels,foreground,i,pattern);
 }
 
-static MagickBooleanType CountObjectPerimeterPatterns(
-  const Image *component_image,CacheView *component_view,
-  const RectangleInfo bounding_box,const ssize_t i,size_t *pattern,
-  ExceptionInfo *exception)
+typedef struct _CCObjectPerimeter
 {
+  const Image
+    *component_image;
+
+  CacheView
+    *component_view;
+
+  RectangleInfo
+    bounding_box;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} CCObjectPerimeter;
+
+static MagickBooleanType CountObjectPerimeterPatterns(
+  const CCObjectPerimeter *object_perimeter,size_t *pattern)
+{
+  const Image
+    *const component_image = object_perimeter->component_image;
+
+  CacheView
+    *const component_view = object_perimeter->component_view;
+
+  const RectangleInfo
+    bounding_box = object_perimeter->bounding_box;
+
+  const ssize_t
+    i = object_perimeter->i;
+
+  ExceptionInfo
+    *const exception = object_perimeter->exception;
+
   MagickBooleanType
     status;
 
@@ -294,6 +325,9 @@ static void PerimeterThreshold(const Image *component_image,
     CacheView
       *component_view;
 
+    CCObjectPerimeter
+      object_perimeter;
+
     RectangleInfo
       bounding_box;
 
@@ -307,8 +341,12 @@ static void PerimeterThreshold(const Image *component_image,
       continue;
     component_view=AcquireAuthenticCacheView(component_image,exception);
     bounding_box=object[i].bounding_box;
-    if (CountObjectPerimeterPatterns(component_image,component_view,
-          bounding_box,i,pattern,exception) == MagickFalse)
+    object_perimeter.component_image=component_image;
+    object_perimeter.component_view=component_view;
+    object_perimeter.bounding_box=bounding_box;
+    object_perimeter.i=i;
+    object_perimeter.exception=exception;
+    if (CountObjectPerimeterPatterns(&object_perimeter,pattern) == MagickFalse)
       status=MagickFalse;
     component_view=DestroyCacheView(component_view);
     object[i].metric[metric_index]=ceil(MagickSQ1_2*pattern[1]+1.0*pattern[2]+
