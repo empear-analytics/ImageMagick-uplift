@@ -1027,6 +1027,17 @@ static void SelectKuwaharaQuadrant(const KuwaharaQuadrants *quadrants,
   }
 }
 
+static void ReportRowProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 typedef struct _KuwaharaInfo
 {
   Image
@@ -3533,16 +3544,11 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SharpenImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportRowProgress(image,SharpenImageTag,progress,&status);
       }
   }
   unsharp_image->type=image->type;
