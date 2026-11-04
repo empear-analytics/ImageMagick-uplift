@@ -1312,6 +1312,27 @@ static PixelInfo EnhancePixelInfo(const Image *image,
   return(pixel);
 }
 
+static void EnhanceImageRow(const Image *image,Image *enhance_image,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  PixelInfo
+    pixel;
+
+  ssize_t
+    center,
+    x;
+
+  center=(ssize_t) GetPixelChannels(image)*(2*((ssize_t) image->columns+4)+2);
+  GetPixelInfo(image,&pixel);
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    pixel=EnhancePixelInfo(image,p,center);
+    SetPixelViaPixelInfo(enhance_image,&pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(enhance_image);
+  }
+}
+
 MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -1361,20 +1382,11 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    PixelInfo
-      pixel;
-
     const Quantum
       *magick_restrict p;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
-
-    ssize_t
-      center;
 
     if (status == MagickFalse)
       continue;
@@ -1386,15 +1398,7 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
         status=MagickFalse;
         continue;
       }
-    center=(ssize_t) GetPixelChannels(image)*(2*((ssize_t) image->columns+4)+2);
-    GetPixelInfo(image,&pixel);
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      pixel=EnhancePixelInfo(image,p,center);
-      SetPixelViaPixelInfo(enhance_image,&pixel,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(enhance_image);
-    }
+    EnhanceImageRow(image,enhance_image,p,q);
     if (SyncCacheViewAuthenticPixels(enhance_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
