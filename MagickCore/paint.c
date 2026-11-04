@@ -1132,6 +1132,13 @@ static MagickBooleanType OilPaintLine(const OilPaintRowInfo *row,
   return(MagickTrue);
 }
 
+static void SyncPaintRow(CacheView *view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void SetPaintProgress(const Image *image,const char *tag,
   const MagickOffsetType progress,MagickBooleanType *status)
 {
@@ -1604,8 +1611,7 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
     row.invert=invert;
     row.zero=zero;
     TransparentPaintRowPixels(&row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncPaintRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1739,8 +1745,7 @@ MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
         SetPixelAlpha(image,opacity,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncPaintRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
