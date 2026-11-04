@@ -920,6 +920,70 @@ static void TransferScaleScanline(const ScaleTransfer *transfer,
   }
 }
 
+typedef struct _ScaleLoop
+{
+  const Image
+    *image;
+
+  Image
+    *scale_image;
+
+  CacheView
+    *image_view,
+    *scale_view;
+
+  double
+    *scale_scanline,
+    *scanline,
+    *x_vector,
+    *y_vector;
+
+  ExceptionInfo
+    *exception;
+} ScaleLoop;
+
+static MagickBooleanType ScaleYRows(const ScaleLoop *loop,const double alpha,
+  const ScaleRowTargets *targets)
+{
+  const ScaleBlend
+    blend = { loop->x_vector, loop->y_vector, loop->scanline };
+
+  const ScaleReadTargets
+    pending_targets = { targets->n, targets->status, targets->number_rows,
+      targets->next_row };
+
+  ScaleRead
+    pending;
+
+  ScaleRows
+    scale_rows;
+
+  /*
+    Scale Y direction.
+  */
+  scale_rows.image=loop->image;
+  scale_rows.scale_image=loop->scale_image;
+  scale_rows.image_view=loop->image_view;
+  scale_rows.alpha=alpha;
+  scale_rows.x_vector=loop->x_vector;
+  scale_rows.y_vector=loop->y_vector;
+  scale_rows.exception=loop->exception;
+  AccumulateScaleRows(&scale_rows,targets);
+  pending.image=loop->image;
+  pending.image_view=loop->image_view;
+  pending.alpha=alpha;
+  pending.x_vector=loop->x_vector;
+  pending.exception=loop->exception;
+  if (ReadPendingScaleRow(&pending,&pending_targets) == MagickFalse)
+    return(MagickFalse);
+  BlendScaleScanline(loop->image,*targets->span,&blend);
+  (*targets->scale).y-=(*targets->span).y;
+  RestartScaleRow(loop->image,loop->scale_image,targets->scale,
+    targets->next_row);
+  (*targets->span).y=1.0;
+  return(MagickTrue);
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -948,10 +1012,16 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
     scale,
     span;
 
+  ScaleLoop
+    loop;
+
   ssize_t
     n,
     number_rows,
     y;
+
+  const ScaleRowTargets
+    targets = { &n, &status, &number_rows, &span, &scale, &next_row };
 
   /*
     Initialize scaled image attributes.
@@ -1014,6 +1084,15 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   status=MagickTrue;
   image_view=AcquireVirtualCacheView(image,exception);
   scale_view=AcquireAuthenticCacheView(scale_image,exception);
+  loop.image=image;
+  loop.scale_image=scale_image;
+  loop.image_view=image_view;
+  loop.scale_view=scale_view;
+  loop.scale_scanline=scale_scanline;
+  loop.scanline=scanline;
+  loop.x_vector=x_vector;
+  loop.y_vector=y_vector;
+  loop.exception=exception;
   for (y=0; y < (ssize_t) scale_image->rows; y++)
   {
     const Quantum
@@ -1050,45 +1129,8 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
         ImportScaleScanline(image,p,alpha,x_vector);
       }
     else
-      {
-        const ScaleRowTargets
-          targets = { &n, &status, &number_rows, &span, &scale, &next_row };
-
-        const ScaleBlend
-          blend = { x_vector, y_vector, scanline };
-
-        const ScaleReadTargets
-          pending_targets = { &n, &status, &number_rows, &next_row };
-
-        ScaleRead
-          pending;
-
-        ScaleRows
-          scale_rows;
-
-        /*
-          Scale Y direction.
-        */
-        scale_rows.image=image;
-        scale_rows.scale_image=scale_image;
-        scale_rows.image_view=image_view;
-        scale_rows.alpha=alpha;
-        scale_rows.x_vector=x_vector;
-        scale_rows.y_vector=y_vector;
-        scale_rows.exception=exception;
-        AccumulateScaleRows(&scale_rows,&targets);
-        pending.image=image;
-        pending.image_view=image_view;
-        pending.alpha=alpha;
-        pending.x_vector=x_vector;
-        pending.exception=exception;
-        if (ReadPendingScaleRow(&pending,&pending_targets) == MagickFalse)
-          break;
-        BlendScaleScanline(image,span,&blend);
-        scale.y-=span.y;
-        RestartScaleRow(image,scale_image,&scale,&next_row);
-        span.y=1.0;
-      }
+      if (ScaleYRows(&loop,alpha,&targets) == MagickFalse)
+        break;
     transfer.image=image;
     transfer.scale_image=scale_image;
     transfer.alpha=alpha;
