@@ -1975,6 +1975,17 @@ static Image *FinishInterpolativeResize(CacheView *image_view,
   return(resize_image);
 }
 
+static PointInfo GetInterpolativeScale(const Image *image,
+  const Image *resize_image)
+{
+  PointInfo
+    scale;
+
+  scale.x=(double) image->columns/resize_image->columns;
+  scale.y=(double) image->rows/resize_image->rows;
+  return(scale);
+}
+
 MagickExport Image *InterpolativeResizeImage(const Image *image,
   const size_t columns,const size_t rows,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -2022,8 +2033,7 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
   resize_view=AcquireAuthenticCacheView(resize_image,exception);
-  scale.x=(double) image->columns/resize_image->columns;
-  scale.y=(double) image->rows/resize_image->rows;
+  scale=GetInterpolativeScale(image,resize_image);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(progress,status) \
     magick_number_threads(image,resize_image,resize_image->rows,1)
