@@ -1873,6 +1873,9 @@ typedef struct _PreviewTile
 
   double
     radius;
+
+  double
+    sigma;
 } PreviewTile;
 
 static void ApplyGammaHueSaturationPreview(const PreviewTile *tile,
@@ -2135,6 +2138,76 @@ static void ApplyRaiseJpegPreview(const PreviewTile *tile,Image **preview_image,
   }
 }
 
+static void ApplyOilPaintNoiseSharpenBlurPreview(const PreviewTile *tile,
+  Image **preview_image,double *gamma)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const factor = tile->factor,
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const ssize_t
+    i = tile->i;
+
+  const double
+    radius = tile->radius,
+    sigma = tile->sigma;
+
+  switch (preview)
+  {
+    case OilPaintPreview:
+    {
+      (*preview_image)=OilPaintImage(thumbnail,(double) radius,(double) sigma,
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"charcoal %gx%g",
+        radius,sigma);
+      break;
+    }
+    case ReduceNoisePreview:
+    {
+      (*preview_image)=StatisticImage(thumbnail,NonpeakStatistic,(size_t)
+        radius,(size_t) radius,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"noise %g",radius);
+      break;
+    }
+    case AddNoisePreview:
+    {
+      SelectNoiseFactor(i,thumbnail,factor);
+      (*preview_image)=StatisticImage(thumbnail,NonpeakStatistic,(size_t) i,
+        (size_t) i,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"+noise %s",factor);
+      break;
+    }
+    case SharpenPreview:
+    {
+      (*preview_image)=SharpenImage(thumbnail,radius,sigma,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"sharpen %gx%g",
+        radius,sigma);
+      break;
+    }
+    case BlurPreview:
+    {
+      (*preview_image)=BlurImage(thumbnail,radius,sigma,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"blur %gx%g",radius,
+        sigma);
+      break;
+    }
+    default:
+    {
+      ApplyRaiseJpegPreview(tile,&(*preview_image),&(*gamma));
+      break;
+    }
+  }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -2230,6 +2303,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     tile.i=i;
     tile.percentage=percentage;
     tile.radius=radius;
+    tile.sigma=sigma;
     switch (preview)
     {
       case RotatePreview:
@@ -2258,7 +2332,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
       }
       default:
       {
-        ApplyRaiseJpegPreview(&tile,&preview_image,&gamma);
+        ApplyOilPaintNoiseSharpenBlurPreview(&tile,&preview_image,&gamma);
         break;
       }
       case GrayscalePreview:
@@ -2294,35 +2368,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           break;
         (void) FormatLocaleString(label,MagickPathExtent,"despeckle (%.17g)",
           (double) i+1);
-        break;
-      }
-      case ReduceNoisePreview:
-      {
-        preview_image=StatisticImage(thumbnail,NonpeakStatistic,(size_t)
-          radius,(size_t) radius,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"noise %g",radius);
-        break;
-      }
-      case AddNoisePreview:
-      {
-        SelectNoiseFactor(i,thumbnail,factor);
-        preview_image=StatisticImage(thumbnail,NonpeakStatistic,(size_t) i,
-          (size_t) i,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"+noise %s",factor);
-        break;
-      }
-      case SharpenPreview:
-      {
-        preview_image=SharpenImage(thumbnail,radius,sigma,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"sharpen %gx%g",
-          radius,sigma);
-        break;
-      }
-      case BlurPreview:
-      {
-        preview_image=BlurImage(thumbnail,radius,sigma,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"blur %gx%g",radius,
-          sigma);
         break;
       }
       case SpreadPreview:
@@ -2377,14 +2422,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           image->interpolate,exception);
         (void) FormatLocaleString(label,MagickPathExtent,"wave %gx%g",0.5*
           degrees,2.0*degrees);
-        break;
-      }
-      case OilPaintPreview:
-      {
-        preview_image=OilPaintImage(thumbnail,(double) radius,(double) sigma,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"charcoal %gx%g",
-          radius,sigma);
         break;
       }
       case CharcoalDrawingPreview:
