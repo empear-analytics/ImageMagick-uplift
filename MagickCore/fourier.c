@@ -103,6 +103,17 @@ typedef struct _FourierInfo
     width,
     height;
 } FourierInfo;
+
+typedef struct _ComplexRowPointers
+{
+  const Quantum
+    *Ai,
+    *Ar,
+    *Bi,
+    *Br,
+    *Ci,
+    *Cr;
+} ComplexRowPointers;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -131,14 +142,15 @@ typedef struct _FourierInfo
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static inline MagickBooleanType IsComplexRowMissing(const Quantum *Ar,
-  const Quantum *Ai,const Quantum *Br,const Quantum *Bi,const Quantum *Cr,
-  const Quantum *Ci)
+static inline MagickBooleanType IsComplexRowMissing(
+  const ComplexRowPointers *pointers)
 {
-  return(((Ar == (const Quantum *) NULL) || (Ai == (const Quantum *) NULL) ||
-    (Br == (const Quantum *) NULL) || (Bi == (const Quantum *) NULL) ||
-    (Cr == (Quantum *) NULL) || (Ci == (Quantum *) NULL)) ?
-    MagickTrue : MagickFalse);
+  return(((pointers->Ar == (const Quantum *) NULL) ||
+    (pointers->Ai == (const Quantum *) NULL) ||
+    (pointers->Br == (const Quantum *) NULL) ||
+    (pointers->Bi == (const Quantum *) NULL) ||
+    (pointers->Cr == (Quantum *) NULL) ||
+    (pointers->Ci == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
 }
 
 typedef struct _ComplexUnaryOperands
@@ -418,6 +430,9 @@ static MagickBooleanType ComplexImageRow(const ComplexRowInputs *rows,
     *magick_restrict Bi,
     *magick_restrict Br;
 
+  ComplexRowPointers
+    pointers;
+
   Quantum
     *magick_restrict Ci,
     *magick_restrict Cr;
@@ -439,7 +454,13 @@ static MagickBooleanType ComplexImageRow(const ComplexRowInputs *rows,
     rows->exception);
   Ci=QueueCacheViewAuthenticPixels(rows->Ci_view,0,y,rows->columns,1,
     rows->exception);
-  if (IsComplexRowMissing(Ar,Ai,Br,Bi,Cr,Ci) != MagickFalse)
+  pointers.Ai=Ai;
+  pointers.Ar=Ar;
+  pointers.Bi=Bi;
+  pointers.Br=Br;
+  pointers.Ci=Ci;
+  pointers.Cr=Cr;
+  if (IsComplexRowMissing(&pointers) != MagickFalse)
     {
       (*status)=MagickFalse;
       return(MagickFalse);
