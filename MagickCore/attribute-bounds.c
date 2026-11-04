@@ -298,6 +298,23 @@ static double GetPercentBackground(const Image *edge_image)
   return(percent_background);
 }
 
+static CensusInfo GetInitialEdgeCensus(const Image *edge_image,
+  const CacheView *edge_view,ExceptionInfo *exception)
+{
+  CensusInfo
+    edge;
+
+  edge.left=GetEdgeBackgroundCensus(edge_image,edge_view,WestGravity,
+    1,0,0,0,exception);
+  edge.right=GetEdgeBackgroundCensus(edge_image,edge_view,EastGravity,
+    1,0,0,0,exception);
+  edge.top=GetEdgeBackgroundCensus(edge_image,edge_view,NorthGravity,
+    0,1,0,0,exception);
+  edge.bottom=GetEdgeBackgroundCensus(edge_image,edge_view,SouthGravity,
+    0,1,0,0,exception);
+  return(edge);
+}
+
 static RectangleInfo GetEdgeBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -332,14 +349,7 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
   (void) ParseAbsoluteGeometry("0x0+0+0",&edge_image->page);
   (void) memset(&vertex,0,sizeof(vertex));
   edge_view=AcquireVirtualCacheView(edge_image,exception);
-  edge.left=GetEdgeBackgroundCensus(edge_image,edge_view,WestGravity,
-    1,0,0,0,exception);
-  edge.right=GetEdgeBackgroundCensus(edge_image,edge_view,EastGravity,
-    1,0,0,0,exception);
-  edge.top=GetEdgeBackgroundCensus(edge_image,edge_view,NorthGravity,
-    0,1,0,0,exception);
-  edge.bottom=GetEdgeBackgroundCensus(edge_image,edge_view,SouthGravity,
-    0,1,0,0,exception);
+  edge=GetInitialEdgeCensus(edge_image,edge_view,exception);
   percent_background=GetPercentBackground(edge_image);
   background_census=GetMinEdgeBackgroundCensus(&edge);
   for ( ; background_census < percent_background;
