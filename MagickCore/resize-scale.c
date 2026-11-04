@@ -616,9 +616,26 @@ static void AccumulateScaleScanline(const Image *image,const PointInfo scale,
         x_vector[x*(ssize_t) GetPixelChannels(image)+i];
 }
 
-static void BlendScaleScanline(const Image *image,const PointInfo span,
-  const double *x_vector,double *y_vector,double *scanline)
+typedef struct _ScaleBlend
 {
+  const double
+    *x_vector;
+
+  double
+    *y_vector,
+    *scanline;
+} ScaleBlend;
+
+static void BlendScaleScanline(const Image *image,const PointInfo span,
+  const ScaleBlend *blend)
+{
+  const double
+    *const x_vector = blend->x_vector;
+
+  double
+    *const y_vector = blend->y_vector,
+    *const scanline = blend->scanline;
+
   double
     pixel[CompositePixelChannel];
 
@@ -1037,6 +1054,9 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
         const ScaleRowTargets
           targets = { &n, &status, &number_rows, &span, &scale, &next_row };
 
+        const ScaleBlend
+          blend = { x_vector, y_vector, scanline };
+
         const ScaleReadTargets
           pending_targets = { &n, &status, &number_rows, &next_row };
 
@@ -1064,7 +1084,7 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
         pending.exception=exception;
         if (ReadPendingScaleRow(&pending,&pending_targets) == MagickFalse)
           break;
-        BlendScaleScanline(image,span,x_vector,y_vector,scanline);
+        BlendScaleScanline(image,span,&blend);
         scale.y-=span.y;
         RestartScaleRow(image,scale_image,&scale,&next_row);
         span.y=1.0;
