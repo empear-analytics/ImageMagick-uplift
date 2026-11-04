@@ -1847,6 +1847,9 @@ static void RelinquishMontageDirectory(const Image *image,
 
 typedef struct _PreviewTile
 {
+  const Image
+    *image;
+
   Image
     *thumbnail;
 
@@ -2208,6 +2211,54 @@ static void ApplyOilPaintNoiseSharpenBlurPreview(const PreviewTile *tile,
   }
 }
 
+static void ApplySpreadCharcoalPreview(const PreviewTile *tile,
+  Image **preview_image,double *gamma)
+{
+  const Image
+    *const image = tile->image;
+
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const double
+    radius = tile->radius,
+    sigma = tile->sigma;
+
+  switch (preview)
+  {
+    case SpreadPreview:
+    {
+      (*preview_image)=SpreadImage(thumbnail,image->interpolate,radius,
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"spread %g",
+        radius+0.5);
+      break;
+    }
+    case CharcoalDrawingPreview:
+    {
+      (*preview_image)=CharcoalImage(thumbnail,(double) radius,(double) sigma,
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"charcoal %gx%g",
+        radius,sigma);
+      break;
+    }
+    default:
+    {
+      ApplyOilPaintNoiseSharpenBlurPreview(tile,&(*preview_image),&(*gamma));
+      break;
+    }
+  }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -2294,6 +2345,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
         AppendImageToList(&images,thumbnail);
         continue;
       }
+    tile.image=image;
     tile.thumbnail=thumbnail;
     tile.exception=exception;
     tile.factor=factor;
@@ -2332,7 +2384,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
       }
       default:
       {
-        ApplyOilPaintNoiseSharpenBlurPreview(&tile,&preview_image,&gamma);
+        ApplySpreadCharcoalPreview(&tile,&preview_image,&gamma);
         break;
       }
       case GrayscalePreview:
@@ -2368,14 +2420,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           break;
         (void) FormatLocaleString(label,MagickPathExtent,"despeckle (%.17g)",
           (double) i+1);
-        break;
-      }
-      case SpreadPreview:
-      {
-        preview_image=SpreadImage(thumbnail,image->interpolate,radius,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"spread %g",
-          radius+0.5);
         break;
       }
       case ShadePreview:
@@ -2422,14 +2466,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           image->interpolate,exception);
         (void) FormatLocaleString(label,MagickPathExtent,"wave %gx%g",0.5*
           degrees,2.0*degrees);
-        break;
-      }
-      case CharcoalDrawingPreview:
-      {
-        preview_image=CharcoalImage(thumbnail,(double) radius,(double) sigma,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"charcoal %gx%g",
-          radius,sigma);
         break;
       }
     }
