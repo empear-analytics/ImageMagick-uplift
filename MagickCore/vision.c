@@ -3007,10 +3007,10 @@ static Image *DestroyIntegralViews(CacheView *image_view,
 }
 
 
-MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
-{
 #define IntegralImageTag  "Integral/Image"
 
+MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
+{
   CacheView
     *image_view,
     *integral_view;
