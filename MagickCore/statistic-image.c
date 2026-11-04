@@ -726,6 +726,8 @@ static MagickBooleanType AcquireStatisticImage(const Image *image,
   return(MagickTrue);
 }
 
+#define StatisticImageTag  "Statistic/Image"
+
 typedef struct _StatisticRow
 {
   const Image
@@ -805,8 +807,6 @@ static MagickBooleanType StatisticImageLine(const StatisticRow *row,
 MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   const size_t width,const size_t height,ExceptionInfo *exception)
 {
-#define StatisticImageTag  "Statistic/Image"
-
   CacheView
     *image_view,
     *statistic_view;
