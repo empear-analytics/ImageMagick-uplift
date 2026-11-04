@@ -2556,6 +2556,20 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType AcquireDirectClassClone(const Image *image,
+  Image **clone_image,ExceptionInfo *exception)
+{
+  (*clone_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*clone_image) == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass((*clone_image),DirectClass,exception) == MagickFalse)
+    {
+      (*clone_image)=DestroyImage((*clone_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 typedef struct _SpreadInfo
 {
   const Image
@@ -2665,14 +2679,8 @@ MagickExport Image *SpreadImage(const Image *image,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  spread_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (spread_image == (Image *) NULL)
+  if (AcquireDirectClassClone(image,&spread_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(spread_image,DirectClass,exception) == MagickFalse)
-    {
-      spread_image=DestroyImage(spread_image);
-      return((Image *) NULL);
-    }
   /*
     Spread image.
   */
