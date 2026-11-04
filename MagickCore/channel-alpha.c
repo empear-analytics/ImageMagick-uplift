@@ -541,6 +541,15 @@ static void RemoveAlphaRow(MagickBooleanType *status,
     (*status)=MagickFalse;
 }
 
+static void SetShapeAlphaRowStatus(MagickBooleanType *status,
+  const ShapeAlphaRow *row)
+{
+  if ((*status) == MagickFalse)
+    return;
+  if (SetShapeAlphaRow(row) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -787,15 +796,12 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
         ShapeAlphaRow
           row;
 
-        if (status == MagickFalse)
-          continue;
         row.image=image;
         row.image_view=image_view;
         row.y=y;
         row.background=background;
         row.exception=exception;
-        if (SetShapeAlphaRow(&row) == MagickFalse)
-          status=MagickFalse;
+        SetShapeAlphaRowStatus(&status,&row);
       }
       image_view=DestroyCacheView(image_view);
       break;
