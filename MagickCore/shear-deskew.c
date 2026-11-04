@@ -831,6 +831,17 @@ static AffineMatrix GetDeskewAffineMatrix(const double degrees)
   return(affine_matrix);
 }
 
+static Image *DeskewWithoutCrop(Image *clone_image,
+  const AffineMatrix *affine_matrix,ExceptionInfo *exception)
+{
+  Image
+    *deskew_image;
+
+  deskew_image=AffineTransformImage(clone_image,affine_matrix,exception);
+  clone_image=DestroyImage(clone_image);
+  return(deskew_image);
+}
+
 MagickExport Image *DeskewImage(const Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -844,8 +855,7 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
     degrees;
 
   Image
-    *clone_image,
-    *deskew_image;
+    *clone_image;
 
   MagickBooleanType
     status;
@@ -889,11 +899,7 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
   affine_matrix=GetDeskewAffineMatrix(degrees);
   artifact=GetImageArtifact(image,"deskew:auto-crop");
   if (IsStringTrue(artifact) == MagickFalse)
-    {
-      deskew_image=AffineTransformImage(clone_image,&affine_matrix,exception);
-      clone_image=DestroyImage(clone_image);
-      return(deskew_image);
-    }
+    return(DeskewWithoutCrop(clone_image,&affine_matrix,exception));
   /*
     Auto-crop image.
   */
