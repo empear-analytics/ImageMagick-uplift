@@ -550,6 +550,36 @@ static void SetShapeAlphaRowStatus(MagickBooleanType *status,
     (*status)=MagickFalse;
 }
 
+typedef struct _DisassociateAlphaRowsInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} DisassociateAlphaRowsInfo;
+
+static void DisassociateAlphaRows(MagickBooleanType *status,
+  const DisassociateAlphaRowsInfo *info,const ssize_t y)
+{
+  Image
+    *const image = info->image;
+
+  CacheView
+    *const image_view = info->image_view;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  if ((*status) == MagickFalse)
+    return;
+  if (DisassociateAlphaRow(image,image_view,y,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -664,10 +694,13 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        if (status == MagickFalse)
-          continue;
-        if (DisassociateAlphaRow(image,image_view,y,exception) == MagickFalse)
-          status=MagickFalse;
+        DisassociateAlphaRowsInfo
+          info;
+
+        info.image=image;
+        info.image_view=image_view;
+        info.exception=exception;
+        DisassociateAlphaRows(&status,&info,y);
       }
       image_view=DestroyCacheView(image_view);
       image->alpha_trait=UndefinedPixelTrait;
