@@ -1267,6 +1267,51 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
     } \
   r+=(ptrdiff_t) GetPixelChannels(image);
 
+static PixelInfo EnhancePixelInfo(const Image *image,
+  const Quantum *magick_restrict p,const ssize_t center)
+{
+  double
+    distance,
+    distance_squared,
+    mean,
+    total_weight;
+
+  PixelInfo
+    aggregate,
+    pixel;
+
+  const Quantum
+    *magick_restrict r;
+
+  GetPixelInfo(image,&aggregate);
+  total_weight=0.0;
+  GetPixelInfoPixel(image,p+center,&pixel);
+  r=p;
+  EnhancePixel(5.0); EnhancePixel(8.0); EnhancePixel(10.0);
+    EnhancePixel(8.0); EnhancePixel(5.0);
+  r=p+GetPixelChannels(image)*(image->columns+4);
+  EnhancePixel(8.0); EnhancePixel(20.0); EnhancePixel(40.0);
+    EnhancePixel(20.0); EnhancePixel(8.0);
+  r=p+2*GetPixelChannels(image)*(image->columns+4);
+  EnhancePixel(10.0); EnhancePixel(40.0); EnhancePixel(80.0);
+    EnhancePixel(40.0); EnhancePixel(10.0);
+  r=p+3*GetPixelChannels(image)*(image->columns+4);
+  EnhancePixel(8.0); EnhancePixel(20.0); EnhancePixel(40.0);
+    EnhancePixel(20.0); EnhancePixel(8.0);
+  r=p+4*GetPixelChannels(image)*(image->columns+4);
+  EnhancePixel(5.0); EnhancePixel(8.0); EnhancePixel(10.0);
+    EnhancePixel(8.0); EnhancePixel(5.0);
+  if (total_weight > MagickEpsilon)
+    {
+      pixel.red=((aggregate.red+total_weight/2.0)/total_weight);
+      pixel.green=((aggregate.green+total_weight/2.0)/total_weight);
+      pixel.blue=((aggregate.blue+total_weight/2.0)/total_weight);
+      pixel.black=((aggregate.black+total_weight/2.0)/total_weight);
+      pixel.alpha=((aggregate.alpha+total_weight/2.0)/total_weight);
+    }
+  return(pixel);
+}
+
 MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -1345,44 +1390,7 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
     GetPixelInfo(image,&pixel);
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      double
-        distance,
-        distance_squared,
-        mean,
-        total_weight;
-
-      PixelInfo
-        aggregate;
-
-      const Quantum
-        *magick_restrict r;
-
-      GetPixelInfo(image,&aggregate);
-      total_weight=0.0;
-      GetPixelInfoPixel(image,p+center,&pixel);
-      r=p;
-      EnhancePixel(5.0); EnhancePixel(8.0); EnhancePixel(10.0);
-        EnhancePixel(8.0); EnhancePixel(5.0);
-      r=p+GetPixelChannels(image)*(image->columns+4);
-      EnhancePixel(8.0); EnhancePixel(20.0); EnhancePixel(40.0);
-        EnhancePixel(20.0); EnhancePixel(8.0);
-      r=p+2*GetPixelChannels(image)*(image->columns+4);
-      EnhancePixel(10.0); EnhancePixel(40.0); EnhancePixel(80.0);
-        EnhancePixel(40.0); EnhancePixel(10.0);
-      r=p+3*GetPixelChannels(image)*(image->columns+4);
-      EnhancePixel(8.0); EnhancePixel(20.0); EnhancePixel(40.0);
-        EnhancePixel(20.0); EnhancePixel(8.0);
-      r=p+4*GetPixelChannels(image)*(image->columns+4);
-      EnhancePixel(5.0); EnhancePixel(8.0); EnhancePixel(10.0);
-        EnhancePixel(8.0); EnhancePixel(5.0);
-      if (total_weight > MagickEpsilon)
-        {
-          pixel.red=((aggregate.red+total_weight/2.0)/total_weight);
-          pixel.green=((aggregate.green+total_weight/2.0)/total_weight);
-          pixel.blue=((aggregate.blue+total_weight/2.0)/total_weight);
-          pixel.black=((aggregate.black+total_weight/2.0)/total_weight);
-          pixel.alpha=((aggregate.alpha+total_weight/2.0)/total_weight);
-        }
+      pixel=EnhancePixelInfo(image,p,center);
       SetPixelViaPixelInfo(enhance_image,&pixel,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(enhance_image);
