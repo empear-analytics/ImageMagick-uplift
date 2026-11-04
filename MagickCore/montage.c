@@ -850,6 +850,21 @@ static void RelinquishMontageStrings(Image *montage)
     montage->directory=(char *) RelinquishMagickMemory(montage->directory);
 }
 
+static MagickBooleanType AcquireMontageStrings(Image *montage,
+  const size_t extent)
+{
+  montage->montage=AcquireString((char *) NULL);
+  montage->directory=(char *) AcquireQuantumMemory(extent,
+    sizeof(*montage->directory));
+  if ((montage->montage == (char *) NULL) ||
+      (montage->directory == (char *) NULL))
+    {
+      RelinquishMontageStrings(montage);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1075,16 +1090,9 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     /*
       Set montage geometry.
     */
-    montage->montage=AcquireString((char *) NULL);
     extent=GetMontageDirectoryExtent(image_list,tiles_per_page,number_images);
-    montage->directory=(char *) AcquireQuantumMemory(extent,
-      sizeof(*montage->directory));
-    if ((montage->montage == (char *) NULL) ||
-        (montage->directory == (char *) NULL))
-      {
-        RelinquishMontageStrings(montage);
-        ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-      }
+    if (AcquireMontageStrings(montage,extent) == MagickFalse)
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
     y_offset+=(ssize_t) title_offset;
     (void) FormatLocaleString(montage->montage,MagickPathExtent,
