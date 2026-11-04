@@ -222,6 +222,25 @@ static void ActivateClutAlpha(Image *image,const Image *clut_image,
     (void) SetImageAlphaChannel(image,ActivateAlphaChannel,exception);
 }
 
+typedef struct _ToneLine
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} ToneLine;
+
+static void SyncToneRow(const ToneLine *line,MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(line->image_view,line->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void SetToneProgress(const Image *image,const char *tag,
   const MagickOffsetType progress,MagickBooleanType *status)
 {
@@ -283,6 +302,9 @@ MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
     Quantum
       *magick_restrict q;
 
+    const ToneLine
+      line = { image,image_view,exception };
+
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -292,8 +314,7 @@ MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
         continue;
       }
     ClutImageRow(image,clut_map,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncToneRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -676,6 +697,9 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
     Quantum
       *magick_restrict q;
 
+    const ToneLine
+      line = { image,image_view,exception };
+
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -685,8 +709,7 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
         continue;
       }
     ApplyCDLToPixels(image,color_correction,cdl_map,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncToneRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1093,6 +1116,9 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     Quantum
       *magick_restrict q;
 
+    const ToneLine
+      line = { image,image_view,exception };
+
     const StretchMaps
       maps = { black, white, stretch_map };
 
@@ -1105,8 +1131,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
         continue;
       }
     StretchImageRow(image,&maps,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncToneRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1447,6 +1472,9 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
     Quantum
       *magick_restrict q;
 
+    const ToneLine
+      line = { image,image_view,exception };
+
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -1456,8 +1484,7 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
         continue;
       }
     EqualizeImageRow(image,black,white,equalize_map,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncToneRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1630,6 +1657,9 @@ MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
     Quantum
       *magick_restrict q;
 
+    const ToneLine
+      line = { image,image_view,exception };
+
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -1639,8 +1669,7 @@ MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
         continue;
       }
     GammaImageRow(image,gamma_map,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncToneRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1871,6 +1900,9 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
     Quantum
       *magick_restrict q;
 
+    const ToneLine
+      line = { image,image_view,exception };
+
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -1880,8 +1912,7 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
         continue;
       }
     GrayscaleImageRow(image,method,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncToneRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2157,6 +2188,9 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
     Quantum
       *magick_restrict q;
 
+    const ToneLine
+      line = { image,image_view,exception };
+
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -2174,8 +2208,7 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
     clut.cube_size=cube_size;
     clut.width=width;
     HaldClutRow(&status,&clut,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncToneRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2354,6 +2387,9 @@ MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
     Quantum
       *magick_restrict q;
 
+    const ToneLine
+      line = { image,image_view,exception };
+
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -2363,8 +2399,7 @@ MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
         continue;
       }
     LevelImageRow(image,&level,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncToneRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2515,6 +2550,9 @@ MagickExport MagickBooleanType LevelizeImage(Image *image,
     Quantum
       *magick_restrict q;
 
+    const ToneLine
+      line = { image,image_view,exception };
+
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -2524,8 +2562,7 @@ MagickExport MagickBooleanType LevelizeImage(Image *image,
         continue;
       }
     LevelizeImageRow(image,&level,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncToneRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
