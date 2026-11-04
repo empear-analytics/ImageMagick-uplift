@@ -806,6 +806,8 @@ static Image *CompositeFrameImage(const FrameComposite *frame_composite,
   return(frame_image);
 }
 
+#define FrameImageTag  "Frame/Image"
+
 typedef struct _FrameSideLine
 {
   CacheView
@@ -892,8 +894,6 @@ static MagickBooleanType DrawFrameSideLine(const FrameSideLine *line,
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
-#define FrameImageTag  "Frame/Image"
-
   CacheView
     *image_view,
     *frame_view;
