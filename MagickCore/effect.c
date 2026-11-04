@@ -3069,16 +3069,11 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ShadeImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportRowProgress(image,ShadeImageTag,progress,&status);
       }
   }
   shade_view=DestroyCacheView(shade_view);
