@@ -1862,6 +1862,9 @@ typedef struct _PreviewTile
   PreviewType
     preview;
 
+  ssize_t
+    i;
+
   double
     percentage;
 } PreviewTile;
@@ -1918,6 +1921,68 @@ static void ApplyGammaHueSaturationPreview(const PreviewTile *tile,
         percentage);
       (void) ModulateImage((*preview_image),factor,exception);
       (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
+      break;
+    }
+  }
+}
+
+static void ApplyBrightnessSpiffThresholdPreview(const PreviewTile *tile,
+  Image **preview_image,double *gamma)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const factor = tile->factor,
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const ssize_t
+    i = tile->i;
+
+  const double
+    percentage = tile->percentage;
+
+  switch (preview)
+  {
+    case BrightnessPreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) FormatLocaleString(factor,MagickPathExtent,"%g",2.0*percentage);
+      (void) ModulateImage((*preview_image),factor,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
+      break;
+    }
+    case SpiffPreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) != (Image *) NULL)
+        SharpenContrastRepeatedly((*preview_image),i,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"contrast (%.17g)",
+        (double) i+1);
+      break;
+    }
+    case ThresholdPreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) BilevelImage(thumbnail,(double) (percentage*((double)
+        QuantumRange+1.0))/100.0,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"threshold %g",
+        (double) (percentage*((double) QuantumRange+1.0))/100.0);
+      break;
+    }
+    default:
+    {
+      ApplyGammaHueSaturationPreview(tile,&(*preview_image),&(*gamma));
       break;
     }
   }
@@ -2014,6 +2079,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     tile.factor=factor;
     tile.label=label;
     tile.preview=preview;
+    tile.i=i;
     tile.percentage=percentage;
     switch (preview)
     {
@@ -2041,28 +2107,9 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           (double) x,(double) y);
         break;
       }
-      case BrightnessPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) FormatLocaleString(factor,MagickPathExtent,"%g",2.0*percentage);
-        (void) ModulateImage(preview_image,factor,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
-        break;
-      }
       default:
       {
-        ApplyGammaHueSaturationPreview(&tile,&preview_image,&gamma);
-        break;
-      }
-      case SpiffPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image != (Image *) NULL)
-          SharpenContrastRepeatedly(preview_image,i,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"contrast (%.17g)",
-          (double) i+1);
+        ApplyBrightnessSpiffThresholdPreview(&tile,&preview_image,&gamma);
         break;
       }
       case DullPreview:
@@ -2138,17 +2185,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
         preview_image=BlurImage(thumbnail,radius,sigma,exception);
         (void) FormatLocaleString(label,MagickPathExtent,"blur %gx%g",radius,
           sigma);
-        break;
-      }
-      case ThresholdPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) BilevelImage(thumbnail,(double) (percentage*((double)
-          QuantumRange+1.0))/100.0,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"threshold %g",
-          (double) (percentage*((double) QuantumRange+1.0))/100.0);
         break;
       }
       case EdgeDetectPreview:
