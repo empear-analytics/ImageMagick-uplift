@@ -329,6 +329,15 @@ static void HullFirstPassRow(const HullFirstPass *pass,const ssize_t i,
     LowerHullRow(pass,i);
 }
 
+static void HullSecondPassRow(const HullSecondPass *pass,const ssize_t i,
+  const int polarity)
+{
+  if (polarity > 0)
+    RaiseHullEdgeRow(pass,i);
+  else
+    LowerHullEdgeRow(pass,i);
+}
+
 static void Hull(const HullBuffers *hull,const ssize_t x_offset,
   const ssize_t y_offset,const int polarity)
 {
@@ -403,10 +412,7 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
     pass.r=r;
     pass.s=s;
     i=(2*y+1)+y*(ssize_t) columns;
-    if (polarity > 0)
-      RaiseHullEdgeRow(&pass,i);
-    else
-      LowerHullEdgeRow(&pass,i);
+    HullSecondPassRow(&pass,i,polarity);
   }
 }
 
