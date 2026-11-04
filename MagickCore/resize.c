@@ -2108,6 +2108,13 @@ static MagickBooleanType InterpolateResizeHead(
   return(MagickTrue);
 }
 
+static void ReportInterpolativeProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  if (SetResizeProgress(image,tag,progress) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *InterpolativeResizeImage(const Image *image,
   const size_t columns,const size_t rows,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -2174,9 +2181,8 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
         #pragma omp atomic
 #endif
         progress++;
-        if (SetResizeProgress(image,InterpolativeResizeImageTag,progress) ==
-            MagickFalse)
-          status=MagickFalse;
+        ReportInterpolativeProgress(image,InterpolativeResizeImageTag,progress,
+          &status);
       }
   }
   return(FinishInterpolativeResize(image_view,resize_view,resize_image,status));
