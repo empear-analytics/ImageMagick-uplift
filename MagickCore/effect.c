@@ -2327,6 +2327,43 @@ static void ApplyAnglePreview(const PreviewTile *tile,Image **preview_image,
   }
 }
 
+static void ApplyWavePreview(const PreviewTile *tile,Image **preview_image,
+  double *degrees,double *gamma)
+{
+  const Image
+    *const image = tile->image;
+
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  switch (preview)
+  {
+    case WavePreview:
+    {
+      (*degrees)+=5.0;
+      (*preview_image)=WaveImage(thumbnail,0.5*(*degrees),2.0*(*degrees),
+        image->interpolate,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"wave %gx%g",0.5*
+        (*degrees),2.0*(*degrees));
+      break;
+    }
+    default:
+    {
+      ApplyAnglePreview(tile,&(*preview_image),&(*degrees),&(*gamma));
+      break;
+    }
+  }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -2437,7 +2474,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
       }
       default:
       {
-        ApplyAnglePreview(&tile,&preview_image,&degrees,&gamma);
+        ApplyWavePreview(&tile,&preview_image,&degrees,&gamma);
         break;
       }
       case GrayscalePreview:
@@ -2485,15 +2522,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           threshold,exception);
         (void) FormatLocaleString(label,MagickPathExtent,"segment %gx%g",
           threshold,threshold);
-        break;
-      }
-      case WavePreview:
-      {
-        degrees+=5.0;
-        preview_image=WaveImage(thumbnail,0.5*degrees,2.0*degrees,
-          image->interpolate,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"wave %gx%g",0.5*
-          degrees,2.0*degrees);
         break;
       }
     }
