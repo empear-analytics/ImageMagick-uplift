@@ -1578,6 +1578,102 @@ static void RunLocalContrastColumn(MagickBooleanType *status,
   StoreLocalContrastColumn(&column);
 }
 
+typedef struct _LocalContrastRowPass
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view,
+    *contrast_view;
+
+  float
+    *interImage,
+    *scanline;
+
+  ssize_t
+    scanLineSize,
+    width;
+
+  double
+    totalWeight,
+    strength;
+
+  Image
+    *contrast_image;
+
+  ExceptionInfo
+    *exception;
+} LocalContrastRowPass;
+
+static void RunLocalContrastRow(MagickBooleanType *status,
+  const LocalContrastRowPass *pass,const ssize_t y)
+{
+  const Image
+    *const image = pass->image;
+
+  CacheView
+    *const image_view = pass->image_view,
+    *const contrast_view = pass->contrast_view;
+
+  float
+    *const interImage = pass->interImage,
+    *const scanline = pass->scanline;
+
+  const ssize_t
+    scanLineSize = pass->scanLineSize,
+    width = pass->width;
+
+  const double
+    totalWeight = pass->totalWeight,
+    strength = pass->strength;
+
+  Image
+    *const contrast_image = pass->contrast_image;
+
+  ExceptionInfo
+    *const exception = pass->exception;
+
+  const int
+    id = GetOpenMPThreadId();
+
+  const Quantum
+    *magick_restrict p;
+
+  float
+    *pixels;
+
+  LocalContrastRow
+    row;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  pixels=scanline;
+  pixels+=id*scanLineSize;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(contrast_view,0,y,image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  memcpy(pixels,interImage+((size_t) y*(image->columns+(size_t) (2*width))),
+    (image->columns+(size_t) (2*width))*sizeof(float));
+  row.image=image;
+  row.pixels=pixels;
+  row.width=width;
+  row.totalWeight=totalWeight;
+  row.strength=strength;
+  row.contrast_image=contrast_image;
+  ApplyLocalContrastRow(&row,p,q);
+  if (SyncCacheViewAuthenticPixels(contrast_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -1695,44 +1791,21 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
 #endif
     for (y=0; y < (ssize_t) image->rows; y++)
     {
-      const int
-        id = GetOpenMPThreadId();
+      LocalContrastRowPass
+        pass;
 
-      const Quantum
-        *magick_restrict p;
-
-      float
-        *pixels;
-
-      LocalContrastRow
-        row;
-
-      Quantum
-        *magick_restrict q;
-
-      if (status == MagickFalse)
-        continue;
-      pixels=scanline;
-      pixels+=id*scanLineSize;
-      p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-      q=GetCacheViewAuthenticPixels(contrast_view,0,y,image->columns,1,
-        exception);
-      if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-        {
-          status=MagickFalse;
-          continue;
-        }
-      memcpy(pixels,interImage+((size_t) y*(image->columns+(size_t) (2*width))),
-        (image->columns+(size_t) (2*width))*sizeof(float));
-      row.image=image;
-      row.pixels=pixels;
-      row.width=width;
-      row.totalWeight=totalWeight;
-      row.strength=strength;
-      row.contrast_image=contrast_image;
-      ApplyLocalContrastRow(&row,p,q);
-      if (SyncCacheViewAuthenticPixels(contrast_view,exception) == MagickFalse)
-        status=MagickFalse;
+      pass.image=image;
+      pass.image_view=image_view;
+      pass.contrast_view=contrast_view;
+      pass.interImage=interImage;
+      pass.scanline=scanline;
+      pass.scanLineSize=scanLineSize;
+      pass.width=width;
+      pass.totalWeight=totalWeight;
+      pass.strength=strength;
+      pass.contrast_image=contrast_image;
+      pass.exception=exception;
+      RunLocalContrastRow(&status,&pass,y);
     }
   }
   scanline_info=RelinquishVirtualMemory(scanline_info);
