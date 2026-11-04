@@ -206,6 +206,18 @@ static void BilevelPixel(const Image *image,const double threshold,
   }
 }
 
+typedef struct _ThresholdLine
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} ThresholdLine;
+
 static MagickBooleanType SetDirectNonGrayImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -562,6 +574,28 @@ static void ClampPixelRow(const Image *image,Quantum *magick_restrict q)
   }
 }
 
+static MagickBooleanType ClampImageLine(const ThresholdLine *line,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(line->image_view,0,y,line->image->columns,1,
+    line->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ClampPixelRow(line->image,q);
+  if (SyncCacheViewAuthenticPixels(line->image_view,line->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
 {
 #define ClampImageTag  "Clamp/Image"
@@ -596,20 +630,14 @@ MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    ThresholdLine
+      line;
 
-    if (status == MagickFalse)
+    line.image=image;
+    line.image_view=image_view;
+    line.exception=exception;
+    if (ClampImageLine(&line,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    ClampPixelRow(image,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
