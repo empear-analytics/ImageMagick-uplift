@@ -792,12 +792,25 @@ static double DiscoverHistogramThreshold(const Image *image,
   return(threshold);
 }
 
-MagickExport MagickBooleanType AutoThresholdImage(Image *image,
-  const AutoThresholdMethod method,ExceptionInfo *exception)
+static MagickBooleanType ApplyAutoThreshold(Image *image,const double threshold,
+  ExceptionInfo *exception)
 {
   char
     property[MagickPathExtent];
 
+  /*
+    Threshold image.
+  */
+  (void) FormatLocaleString(property,MagickPathExtent,"%g%%",threshold);
+  (void) SetImageProperty(image,"auto-threshold:threshold",property,exception);
+  if (IsStringTrue(GetImageArtifact(image,"auto-threshold:verbose")) != MagickFalse)
+    (void) FormatLocaleFile(stdout,"%.*g%%\n",GetMagickPrecision(),threshold);
+  return(BilevelImage(image,(double) QuantumRange*threshold/100.0,exception));
+}
+
+MagickExport MagickBooleanType AutoThresholdImage(Image *image,
+  const AutoThresholdMethod method,ExceptionInfo *exception)
+{
   double
     *histogram,
     threshold;
@@ -833,12 +846,5 @@ MagickExport MagickBooleanType AutoThresholdImage(Image *image,
     status=MagickFalse;
   if (status == MagickFalse)
     return(MagickFalse);
-  /*
-    Threshold image.
-  */
-  (void) FormatLocaleString(property,MagickPathExtent,"%g%%",threshold);
-  (void) SetImageProperty(image,"auto-threshold:threshold",property,exception);
-  if (IsStringTrue(GetImageArtifact(image,"auto-threshold:verbose")) != MagickFalse)
-    (void) FormatLocaleFile(stdout,"%.*g%%\n",GetMagickPrecision(),threshold);
-  return(BilevelImage(image,(double) QuantumRange*threshold/100.0,exception));
+  return(ApplyAutoThreshold(image,threshold,exception));
 }
