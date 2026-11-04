@@ -1403,6 +1403,20 @@ static void StoreLocalContrastColumn(const LocalContrastColumn *column)
   }
 }
 
+static MagickBooleanType AcquireDirectClassClone(const Image *image,
+  Image **clone_image,ExceptionInfo *exception)
+{
+  (*clone_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*clone_image) == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass((*clone_image),DirectClass,exception) == MagickFalse)
+    {
+      (*clone_image)=DestroyImage((*clone_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -1447,14 +1461,8 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   if (contrast_image != (Image *) NULL)
     return(contrast_image);
 #endif
-  contrast_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (contrast_image == (Image *) NULL)
+  if (AcquireDirectClassClone(image,&contrast_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(contrast_image,DirectClass,exception) == MagickFalse)
-    {
-      contrast_image=DestroyImage(contrast_image);
-      return((Image *) NULL);
-    }
   image_view=AcquireVirtualCacheView(image,exception);
   contrast_view=AcquireAuthenticCacheView(contrast_image,exception);
   scanLineSize=(ssize_t) MagickMax(image->columns,image->rows);
@@ -2556,20 +2564,6 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static MagickBooleanType AcquireDirectClassClone(const Image *image,
-  Image **clone_image,ExceptionInfo *exception)
-{
-  (*clone_image)=CloneImage(image,0,0,MagickTrue,exception);
-  if ((*clone_image) == (Image *) NULL)
-    return(MagickFalse);
-  if (SetImageStorageClass((*clone_image),DirectClass,exception) == MagickFalse)
-    {
-      (*clone_image)=DestroyImage((*clone_image));
-      return(MagickFalse);
-    }
-  return(MagickTrue);
-}
-
 typedef struct _SpreadInfo
 {
   const Image
