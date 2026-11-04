@@ -1119,13 +1119,8 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   shear.y=sin((double) DegreesToRadians(angle));
   if (IsZeroShear(shear) != MagickFalse)
     return(integral_image);
-  if (SetImageStorageClass(integral_image,DirectClass,exception) == MagickFalse)
-    {
-      integral_image=DestroyImage(integral_image);
-      return(integral_image);
-    }
-  if (integral_image->alpha_trait == UndefinedPixelTrait)
-    (void) SetImageAlphaChannel(integral_image,OpaqueAlphaChannel,exception);
+  if (PrepareIntegralImage(&integral_image,exception) == MagickFalse)
+    return(integral_image);
   /*
     Compute maximum bounds for 3 shear operations.
   */
