@@ -806,6 +806,89 @@ static Image *CompositeFrameImage(const FrameComposite *frame_composite,
   return(frame_image);
 }
 
+typedef struct _FrameSideLine
+{
+  CacheView
+    *frame_view;
+
+  Image
+    *frame_image;
+
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    highlight,
+    matte,
+    shadow;
+
+  size_t
+    bevel_width;
+
+  ExceptionInfo
+    *exception;
+} FrameSideLine;
+
+static MagickBooleanType DrawFrameSideLine(const FrameSideLine *line,
+  const ssize_t y,MagickBooleanType *status)
+{
+  CacheView
+    *const frame_view = line->frame_view;
+
+  Image
+    *const frame_image = line->frame_image;
+
+  const Image
+    *const image = line->image;
+
+  const FrameInfo
+    *const frame_info = line->frame_info;
+
+  const PixelInfo
+    highlight = line->highlight,
+    matte = line->matte,
+    shadow = line->shadow;
+
+  const size_t
+    bevel_width = line->bevel_width;
+
+  ExceptionInfo
+    *const exception = line->exception;
+
+  FrameSide
+    frame_side;
+
+  Quantum
+    *magick_restrict q;
+
+  /*
+    Initialize scanline with matte color.
+  */
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(frame_view,0,frame_info->y+y,
+    frame_image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  frame_side.frame_image=frame_image;
+  frame_side.image=image;
+  frame_side.frame_info=frame_info;
+  frame_side.highlight=highlight;
+  frame_side.matte=matte;
+  frame_side.shadow=shadow;
+  frame_side.bevel_width=bevel_width;
+  q=DrawFrameSideRow(&frame_side,q);
+  if (SyncCacheViewAuthenticPixels(frame_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -914,34 +997,12 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    FrameSide
-      frame_side;
+    const FrameSideLine
+      line = { frame_view, frame_image, image, frame_info, highlight, matte,
+        shadow, bevel_width, exception };
 
-    Quantum
-      *magick_restrict q;
-
-    /*
-      Initialize scanline with matte color.
-    */
-    if (status == MagickFalse)
+    if (DrawFrameSideLine(&line,y,&status) == MagickFalse)
       continue;
-    q=QueueCacheViewAuthenticPixels(frame_view,0,frame_info->y+y,
-      frame_image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    frame_side.frame_image=frame_image;
-    frame_side.image=image;
-    frame_side.frame_info=frame_info;
-    frame_side.highlight=highlight;
-    frame_side.matte=matte;
-    frame_side.shadow=shadow;
-    frame_side.bevel_width=bevel_width;
-    q=DrawFrameSideRow(&frame_side,q);
-    if (SyncCacheViewAuthenticPixels(frame_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
