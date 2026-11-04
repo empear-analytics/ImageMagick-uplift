@@ -984,6 +984,26 @@ static MagickBooleanType ScaleYRows(const ScaleLoop *loop,const double alpha,
   return(MagickTrue);
 }
 
+static MagickBooleanType FetchScaleRow(const ScaleLoop *loop,
+  const double alpha,const ScaleRowTargets *targets)
+{
+  const Quantum
+    *magick_restrict p;
+
+  /*
+    Read a new scanline.
+  */
+  p=GetCacheViewVirtualPixels(loop->image_view,0,(*targets->n)++,
+    loop->image->columns,1,loop->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      *targets->status=MagickFalse;
+      return(MagickFalse);
+    }
+  ImportScaleScanline(loop->image,p,alpha,loop->x_vector);
+  return(MagickTrue);
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -1095,9 +1115,6 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   loop.exception=exception;
   for (y=0; y < (ssize_t) scale_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
-
     Quantum
       *magick_restrict q;
 
@@ -1116,17 +1133,8 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
     alpha=1.0;
     if (scale_image->rows == image->rows)
       {
-        /*
-          Read a new scanline.
-        */
-        p=GetCacheViewVirtualPixels(image_view,0,n++,image->columns,1,
-          exception);
-        if (p == (const Quantum *) NULL)
-          {
-            status=MagickFalse;
-            break;
-          }
-        ImportScaleScanline(image,p,alpha,x_vector);
+        if (FetchScaleRow(&loop,alpha,&targets) == MagickFalse)
+          break;
       }
     else
       if (ScaleYRows(&loop,alpha,&targets) == MagickFalse)
