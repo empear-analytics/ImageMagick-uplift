@@ -842,6 +842,43 @@ MagickExport ImageType IdentifyImageGray(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void IdentifyMonochromeRow(const ImageRowScan *scan,const ssize_t y,
+  ImageType *type)
+{
+  const Image
+    *image = scan->image;
+
+  CacheView
+    *image_view = scan->image_view;
+
+  ExceptionInfo
+    *exception = scan->exception;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  if ((*type) == UndefinedType)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*type)=UndefinedType;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (IsPixelMonochrome(image,p) == MagickFalse)
+      {
+        (*type)=UndefinedType;
+        break;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType IdentifyImageMonochrome(const Image *image,
   ExceptionInfo *exception)
 {
@@ -869,29 +906,9 @@ MagickExport MagickBooleanType IdentifyImageMonochrome(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *p;
+    const ImageRowScan scan = { image, image_view, exception };
 
-    ssize_t
-      x;
-
-    if (type == UndefinedType)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        type=UndefinedType;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (IsPixelMonochrome(image,p) == MagickFalse)
-        {
-          type=UndefinedType;
-          break;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    IdentifyMonochromeRow(&scan,y,&type);
   }
   image_view=DestroyCacheView(image_view);
   return(type == BilevelType ? MagickTrue : MagickFalse);
