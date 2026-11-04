@@ -1034,6 +1034,49 @@ static MagickBooleanType UpdateScaleProgress(const ScaleLoop *loop,
   return(MagickTrue);
 }
 
+static MagickBooleanType ScaleNextRow(const ScaleLoop *loop,
+  const ScaleRowTargets *targets,const ssize_t y)
+{
+  double
+    alpha;
+
+  Quantum
+    *magick_restrict q;
+
+  ScaleTransfer
+    transfer;
+
+  if (*targets->status == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(loop->scale_view,0,y,
+    loop->scale_image->columns,1,loop->exception);
+  if (q == (Quantum *) NULL)
+    {
+      *targets->status=MagickFalse;
+      return(MagickFalse);
+    }
+  alpha=1.0;
+  if (loop->scale_image->rows == loop->image->rows)
+    {
+      if (FetchScaleRow(loop,alpha,targets) == MagickFalse)
+        return(MagickFalse);
+    }
+  else
+    if (ScaleYRows(loop,alpha,targets) == MagickFalse)
+      return(MagickFalse);
+  transfer.image=loop->image;
+  transfer.scale_image=loop->scale_image;
+  transfer.alpha=alpha;
+  transfer.scale_scanline=loop->scale_scanline;
+  transfer.scanline=loop->scanline;
+  TransferScaleScanline(&transfer,q);
+  if (SyncScaleRow(loop,targets) == MagickFalse)
+    return(MagickFalse);
+  if (UpdateScaleProgress(loop,y,targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -1042,7 +1085,6 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
     *scale_view;
 
   double
-    alpha,
     *scale_scanline,
     *scanline,
     *x_vector,
@@ -1141,42 +1183,8 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   loop.y_vector=y_vector;
   loop.exception=exception;
   for (y=0; y < (ssize_t) scale_image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    ScaleTransfer
-      transfer;
-
-    if (status == MagickFalse)
+    if (ScaleNextRow(&loop,&targets,y) == MagickFalse)
       break;
-    q=QueueCacheViewAuthenticPixels(scale_view,0,y,scale_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        break;
-      }
-    alpha=1.0;
-    if (scale_image->rows == image->rows)
-      {
-        if (FetchScaleRow(&loop,alpha,&targets) == MagickFalse)
-          break;
-      }
-    else
-      if (ScaleYRows(&loop,alpha,&targets) == MagickFalse)
-        break;
-    transfer.image=image;
-    transfer.scale_image=scale_image;
-    transfer.alpha=alpha;
-    transfer.scale_scanline=scale_scanline;
-    transfer.scanline=scanline;
-    TransferScaleScanline(&transfer,q);
-    if (SyncScaleRow(&loop,&targets) == MagickFalse)
-      break;
-    if (UpdateScaleProgress(&loop,y,&targets) == MagickFalse)
-      break;
-  }
   scale_view=DestroyCacheView(scale_view);
   image_view=DestroyCacheView(image_view);
   /*
