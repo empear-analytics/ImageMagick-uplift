@@ -1283,6 +1283,12 @@ typedef struct _OpaquePaintRow
   Image
     *image;
 
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
   MagickBooleanType
     invert;
 
@@ -1320,6 +1326,28 @@ static void OpaquePaintRowPixels(const OpaquePaintRow *row,
       SetUpdatableFillChannels(image,&conform_fill,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
+}
+
+static MagickBooleanType OpaquePaintLine(const OpaquePaintRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(row->image_view,0,y,row->image->columns,1,
+    row->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  OpaquePaintRowPixels(row,q);
+  if (SyncCacheViewAuthenticPixels(row->image_view,row->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
 }
 
 MagickExport MagickBooleanType OpaquePaintImage(Image *image,
@@ -1371,25 +1399,15 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
     OpaquePaintRow
       row;
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
+    row.image_view=image_view;
+    row.exception=exception;
     row.invert=invert;
     row.conform_fill=conform_fill;
     row.conform_target=conform_target;
     row.zero=zero;
-    OpaquePaintRowPixels(&row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (OpaquePaintLine(&row,y,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
