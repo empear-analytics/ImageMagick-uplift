@@ -1239,8 +1239,6 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
-{
 #define EnhanceImageTag  "Enhance/Image"
 #define EnhancePixel(weight) \
   mean=QuantumScale*((double) GetPixelRed(image,r)+pixel.red)/2.0; \
@@ -1269,6 +1267,8 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
     } \
   r+=(ptrdiff_t) GetPixelChannels(image);
 
+MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
+{
   CacheView
     *enhance_view,
     *image_view;
