@@ -387,6 +387,48 @@ static double FindOTSUThreshold(const double *myu,const double *omega,
   return(threshold);
 }
 
+typedef struct _OTSUBuffers
+{
+  const Image
+    *image;
+
+  double
+    *myu,
+    *omega,
+    *probability,
+    *sigma;
+
+  ExceptionInfo
+    *exception;
+} OTSUBuffers;
+
+static double ThrowOTSUFailure(const OTSUBuffers *buffers)
+{
+  const Image
+    *const image = buffers->image;
+
+  double
+    *myu = buffers->myu,
+    *omega = buffers->omega,
+    *probability = buffers->probability,
+    *sigma = buffers->sigma;
+
+  ExceptionInfo
+    *const exception = buffers->exception;
+
+  if (sigma != (double *) NULL)
+    sigma=(double *) RelinquishMagickMemory(sigma);
+  if (probability != (double *) NULL)
+    probability=(double *) RelinquishMagickMemory(probability);
+  if (omega != (double *) NULL)
+    omega=(double *) RelinquishMagickMemory(omega);
+  if (myu != (double *) NULL)
+    myu=(double *) RelinquishMagickMemory(myu);
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+  return(-1.0);
+}
+
 static double OTSUThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
@@ -410,17 +452,16 @@ static double OTSUThreshold(const Image *image,const double *histogram,
   sigma=(double *) AcquireQuantumMemory(MaxIntensity+1UL,sizeof(*sigma));
   if (IsOTSUBufferMissing(myu,omega,probability,sigma) != MagickFalse)
     {
-      if (sigma != (double *) NULL)
-        sigma=(double *) RelinquishMagickMemory(sigma);
-      if (probability != (double *) NULL)
-        probability=(double *) RelinquishMagickMemory(probability);
-      if (omega != (double *) NULL)
-        omega=(double *) RelinquishMagickMemory(omega);
-      if (myu != (double *) NULL)
-        myu=(double *) RelinquishMagickMemory(myu);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(-1.0);
+      OTSUBuffers
+        failure;
+
+      failure.image=image;
+      failure.myu=myu;
+      failure.omega=omega;
+      failure.probability=probability;
+      failure.sigma=sigma;
+      failure.exception=exception;
+      return(ThrowOTSUFailure(&failure));
     }
   /*
     Calculate probability density.
