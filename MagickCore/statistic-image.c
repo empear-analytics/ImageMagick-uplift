@@ -815,6 +815,14 @@ static void StatisticImageProgress(const Image *image,
     (*status)=MagickFalse;
 }
 
+static Image *FinishStatisticImage(Image *statistic_image,
+  const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    statistic_image=DestroyImage(statistic_image);
+  return(statistic_image);
+}
+
 MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   const size_t width,const size_t height,ExceptionInfo *exception)
 {
@@ -892,7 +900,6 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   statistic_view=DestroyCacheView(statistic_view);
   image_view=DestroyCacheView(image_view);
   pixel_list=DestroyPixelListTLS(pixel_list);
-  if (status == MagickFalse)
-    statistic_image=DestroyImage(statistic_image);
+  statistic_image=FinishStatisticImage(statistic_image,status);
   return(statistic_image);
 }
