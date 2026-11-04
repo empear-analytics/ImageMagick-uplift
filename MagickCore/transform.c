@@ -219,6 +219,17 @@ MagickExport Image *AutoOrientImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetTransformProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void CopyPixelChannelsTo(const Image *image,const Image *destination,
   const Quantum *p,Quantum *q)
 {
@@ -1255,16 +1266,11 @@ MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,FlipImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,FlipImageTag,progress,&status);
       }
   }
   flip_view=DestroyCacheView(flip_view);
