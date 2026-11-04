@@ -1282,6 +1282,43 @@ MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType FlopImageLine(const TransformLine *line,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(line->image_view,0,y,line->image->columns,1,
+    line->exception);
+  q=QueueCacheViewAuthenticPixels(line->transform_view,0,y,
+    line->transform_image->columns,1,line->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  q+=(ptrdiff_t) GetPixelChannels(line->transform_image)*
+    line->transform_image->columns;
+  for (x=0; x < (ssize_t) line->transform_image->columns; x++)
+  {
+    q-=GetPixelChannels(line->transform_image);
+    CopyPixelChannelsTo(line->image,line->transform_image,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(line->image);
+  }
+  if (SyncCacheViewAuthenticPixels(line->transform_view,line->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
 {
 #define FlopImageTag  "Flop/Image"
@@ -1328,34 +1365,16 @@ MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) flop_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    TransformLine
+      line;
 
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    line.image=image;
+    line.transform_image=flop_image;
+    line.image_view=image_view;
+    line.transform_view=flop_view;
+    line.exception=exception;
+    if (FlopImageLine(&line,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(flop_view,0,y,flop_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    q+=(ptrdiff_t) GetPixelChannels(flop_image)*flop_image->columns;
-    for (x=0; x < (ssize_t) flop_image->columns; x++)
-    {
-      q-=GetPixelChannels(flop_image);
-      CopyPixelChannelsTo(image,flop_image,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(flop_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
