@@ -548,6 +548,50 @@ typedef struct
     minima;
 } RangeInfo;
 
+typedef struct _RangeRow
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  const ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} RangeRow;
+
+static MagickBooleanType AccumulateRowRange(const RangeRow *row,
+  const RangeInfo *range_info,RangeInfo *channel_range,
+  MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(row->image_view,0,row->y,row->image->columns,1,
+    row->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  (*channel_range)=(*range_info);
+  for (x=0; x < (ssize_t) row->image->columns; x++)
+  {
+    AccumulateChannelRange(row->image,p,&channel_range->maxima,
+      &channel_range->minima);
+    p+=(ptrdiff_t) GetPixelChannels(row->image);
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
   double *maxima,ExceptionInfo *exception)
 {
@@ -575,30 +619,15 @@ MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    const RangeRow
+      row = { image, image_view, y, exception };
 
     RangeInfo
       channel_range;
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    if (AccumulateRowRange(&row,&range_info,&channel_range,&status) ==
+        MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    channel_range=range_info;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      AccumulateChannelRange(image,p,&channel_range.maxima,
-        &channel_range.minima);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_GetImageRange)
 #endif
