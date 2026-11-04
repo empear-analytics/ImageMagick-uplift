@@ -1084,6 +1084,33 @@ static MagickBooleanType IsImageRowOpaque(const Image *image,const Quantum *p)
   return(status);
 }
 
+static void ScanOpaqueRow(const ImageRowScan *scan,const ssize_t y,
+  MagickBooleanType *opaque)
+{
+  const Image
+    *image = scan->image;
+
+  CacheView
+    *image_view = scan->image_view;
+
+  ExceptionInfo
+    *exception = scan->exception;
+
+  const Quantum
+    *p;
+
+  if ((*opaque) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*opaque)=MagickFalse;
+      return;
+    }
+  if (IsImageRowOpaque(image,p) == MagickFalse)
+    (*opaque)=MagickFalse;
+}
+
 MagickExport MagickBooleanType IsImageOpaque(const Image *image,
   ExceptionInfo *exception)
 {
@@ -1112,19 +1139,9 @@ MagickExport MagickBooleanType IsImageOpaque(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *p;
+    const ImageRowScan scan = { image, image_view, exception };
 
-    if (opaque == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        opaque=MagickFalse;
-        continue;
-      }
-    if (IsImageRowOpaque(image,p) == MagickFalse)
-      opaque=MagickFalse;
+    ScanOpaqueRow(&scan,y,&opaque);
   }
   image_view=DestroyCacheView(image_view);
   return(opaque);
