@@ -2234,8 +2234,7 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
     row.high_white=high_white;
     row.high_black=high_black;
     RangeThresholdPixels(image,&row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
