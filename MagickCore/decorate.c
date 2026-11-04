@@ -902,6 +902,21 @@ static void FrameImageProgress(const Image *image,
     (*status)=MagickFalse;
 }
 
+static MagickBooleanType AcquireFrameImage(const Image *image,
+  const FrameInfo *frame_info,Image **frame_image,ExceptionInfo *exception)
+{
+  *frame_image=CloneImage(image,frame_info->width,frame_info->height,MagickTrue,
+    exception);
+  if (*frame_image == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass(*frame_image,DirectClass,exception) == MagickFalse)
+    {
+      *frame_image=DestroyImage(*frame_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -956,15 +971,9 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   /*
     Initialize framed image attributes.
   */
-  frame_image=CloneImage(image,frame_info->width,frame_info->height,MagickTrue,
-    exception);
-  if (frame_image == (Image *) NULL)
+  if (AcquireFrameImage(image,frame_info,&frame_image,exception) ==
+      MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(frame_image,DirectClass,exception) == MagickFalse)
-    {
-      frame_image=DestroyImage(frame_image);
-      return((Image *) NULL);
-    }
   SetFrameImageAttributes(frame_image,image,exception);
   /*
     Initialize 3D effects color.
