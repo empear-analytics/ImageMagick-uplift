@@ -104,6 +104,13 @@ typedef struct _FourierInfo
     height;
 } FourierInfo;
 
+typedef struct _ForwardFourierPlanes
+{
+  double
+    *magnitude_pixels,
+    *phase_pixels;
+} ForwardFourierPlanes;
+
 typedef struct _RollExtent
 {
   size_t
@@ -1180,7 +1187,7 @@ static MagickBooleanType CheckFourierMemory(const MemoryInfo *source_info,
 }
 
 static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
-  const Image *image,double *magnitude_pixels,double *phase_pixels,
+  const Image *image,const ForwardFourierPlanes *planes,
   ExceptionInfo *exception)
 {
   const char
@@ -1267,16 +1274,16 @@ static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
     for (y=0L; y < (ssize_t) fourier_info->height; y++)
       for (x=0L; x < (ssize_t) fourier_info->center; x++)
       {
-        magnitude_pixels[i]=cabs(forward_pixels[i]);
-        phase_pixels[i]=carg(forward_pixels[i]);
+        planes->magnitude_pixels[i]=cabs(forward_pixels[i]);
+        planes->phase_pixels[i]=carg(forward_pixels[i]);
         i++;
       }
   else
     for (y=0L; y < (ssize_t) fourier_info->height; y++)
       for (x=0L; x < (ssize_t) fourier_info->center; x++)
       {
-        magnitude_pixels[i]=creal(forward_pixels[i]);
-        phase_pixels[i]=cimag(forward_pixels[i]);
+        planes->magnitude_pixels[i]=creal(forward_pixels[i]);
+        planes->phase_pixels[i]=cimag(forward_pixels[i]);
         i++;
       }
   forward_info=(MemoryInfo *) RelinquishVirtualMemory(forward_info);
@@ -1296,6 +1303,9 @@ static MagickBooleanType ForwardFourierTransformChannel(
   double
     *magnitude_pixels,
     *phase_pixels;
+
+  ForwardFourierPlanes
+    planes;
 
   FourierInfo
     fourier_info;
@@ -1336,8 +1346,9 @@ static MagickBooleanType ForwardFourierTransformChannel(
     }
   magnitude_pixels=(double *) GetVirtualMemoryBlob(magnitude_info);
   phase_pixels=(double *) GetVirtualMemoryBlob(phase_info);
-  status=ForwardFourierTransform(&fourier_info,source->image,magnitude_pixels,
-    phase_pixels,exception);
+  planes.magnitude_pixels=magnitude_pixels;
+  planes.phase_pixels=phase_pixels;
+  status=ForwardFourierTransform(&fourier_info,source->image,&planes,exception);
   if (status != MagickFalse)
     status=ForwardFourier(&fourier_info,fourier_image,magnitude_pixels,
       phase_pixels,exception);
