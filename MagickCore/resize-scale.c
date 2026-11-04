@@ -1149,6 +1149,13 @@ static inline MagickBooleanType IsScaleSizeEmpty(const size_t columns,
   return(((columns == 0) || (rows == 0)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsScaleSizeUnchanged(const Image *image,
+  const size_t columns,const size_t rows)
+{
+  return(((columns == image->columns) && (rows == image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
 static Image *ScaleAndFinishImage(const ScaleBuffers *inputs,
   ExceptionInfo *exception)
 {
@@ -1255,7 +1262,7 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (IsScaleSizeEmpty(columns,rows) != MagickFalse)
     ThrowImageException(ImageError,"NegativeOrZeroImageSize");
-  if ((columns == image->columns) && (rows == image->rows))
+  if (IsScaleSizeUnchanged(image,columns,rows) != MagickFalse)
     return(CloneImage(image,0,0,MagickTrue,exception));
   scale_image=CloneImage(image,columns,rows,MagickTrue,exception);
   if (scale_image == (Image *) NULL)
