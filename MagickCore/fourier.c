@@ -377,6 +377,101 @@ static MagickBooleanType CheckComplexSequence(const Image *images,
   return(MagickTrue);
 }
 
+typedef struct _ComplexRowInputs
+{
+  CacheView
+    *Ai_view,
+    *Ar_view,
+    *Bi_view,
+    *Br_view,
+    *Ci_view,
+    *Cr_view;
+
+  const Image
+    *Ai_image,
+    *Ar_image,
+    *Bi_image,
+    *Br_image,
+    *Ci_image,
+    *Cr_image;
+
+  size_t
+    columns,
+    number_channels;
+
+  ComplexOperator
+    op;
+
+  double
+    snr;
+
+  ExceptionInfo
+    *exception;
+} ComplexRowInputs;
+
+static MagickBooleanType ComplexImageRow(const ComplexRowInputs *rows,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict Ai,
+    *magick_restrict Ar,
+    *magick_restrict Bi,
+    *magick_restrict Br;
+
+  Quantum
+    *magick_restrict Ci,
+    *magick_restrict Cr;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  Ar=GetCacheViewVirtualPixels(rows->Ar_view,0,y,rows->columns,1,
+    rows->exception);
+  Ai=GetCacheViewVirtualPixels(rows->Ai_view,0,y,rows->columns,1,
+    rows->exception);
+  Br=GetCacheViewVirtualPixels(rows->Br_view,0,y,rows->columns,1,
+    rows->exception);
+  Bi=GetCacheViewVirtualPixels(rows->Bi_view,0,y,rows->columns,1,
+    rows->exception);
+  Cr=QueueCacheViewAuthenticPixels(rows->Cr_view,0,y,rows->columns,1,
+    rows->exception);
+  Ci=QueueCacheViewAuthenticPixels(rows->Ci_view,0,y,rows->columns,1,
+    rows->exception);
+  if (IsComplexRowMissing(Ar,Ai,Br,Bi,Cr,Ci) != MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) rows->columns; x++)
+  {
+    ComplexChannelOperands
+      channels;
+
+    channels.Ai=Ai;
+    channels.Ar=Ar;
+    channels.Bi=Bi;
+    channels.Br=Br;
+    channels.Ci=Ci;
+    channels.Cr=Cr;
+    channels.number_channels=rows->number_channels;
+    channels.op=rows->op;
+    channels.snr=rows->snr;
+    ApplyComplexOperatorToChannels(&channels);
+    Ar+=(ptrdiff_t) GetPixelChannels(rows->Ar_image);
+    Ai+=(ptrdiff_t) GetPixelChannels(rows->Ai_image);
+    Br+=(ptrdiff_t) GetPixelChannels(rows->Br_image);
+    Bi+=(ptrdiff_t) GetPixelChannels(rows->Bi_image);
+    Cr+=(ptrdiff_t) GetPixelChannels(rows->Cr_image);
+    Ci+=(ptrdiff_t) GetPixelChannels(rows->Ci_image);
+  }
+  if (SyncComplexViews(rows->Ci_view,rows->Cr_view,rows->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -480,56 +575,28 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
 #endif
   for (y=0; y < (ssize_t) rows; y++)
   {
-    const Quantum
-      *magick_restrict Ai,
-      *magick_restrict Ar,
-      *magick_restrict Bi,
-      *magick_restrict Br;
+    ComplexRowInputs
+      rows;
 
-    Quantum
-      *magick_restrict Ci,
-      *magick_restrict Cr;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    rows.Ai_view=Ai_view;
+    rows.Ar_view=Ar_view;
+    rows.Bi_view=Bi_view;
+    rows.Br_view=Br_view;
+    rows.Ci_view=Ci_view;
+    rows.Cr_view=Cr_view;
+    rows.Ai_image=Ai_image;
+    rows.Ar_image=Ar_image;
+    rows.Bi_image=Bi_image;
+    rows.Br_image=Br_image;
+    rows.Ci_image=Ci_image;
+    rows.Cr_image=Cr_image;
+    rows.columns=columns;
+    rows.number_channels=number_channels;
+    rows.op=op;
+    rows.snr=snr;
+    rows.exception=exception;
+    if (ComplexImageRow(&rows,y,&status) == MagickFalse)
       continue;
-    Ar=GetCacheViewVirtualPixels(Ar_view,0,y,columns,1,exception);
-    Ai=GetCacheViewVirtualPixels(Ai_view,0,y,columns,1,exception);
-    Br=GetCacheViewVirtualPixels(Br_view,0,y,columns,1,exception);
-    Bi=GetCacheViewVirtualPixels(Bi_view,0,y,columns,1,exception);
-    Cr=QueueCacheViewAuthenticPixels(Cr_view,0,y,columns,1,exception);
-    Ci=QueueCacheViewAuthenticPixels(Ci_view,0,y,columns,1,exception);
-    if (IsComplexRowMissing(Ar,Ai,Br,Bi,Cr,Ci) != MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      ComplexChannelOperands
-        channels;
-
-      channels.Ai=Ai;
-      channels.Ar=Ar;
-      channels.Bi=Bi;
-      channels.Br=Br;
-      channels.Ci=Ci;
-      channels.Cr=Cr;
-      channels.number_channels=number_channels;
-      channels.op=op;
-      channels.snr=snr;
-      ApplyComplexOperatorToChannels(&channels);
-      Ar+=(ptrdiff_t) GetPixelChannels(Ar_image);
-      Ai+=(ptrdiff_t) GetPixelChannels(Ai_image);
-      Br+=(ptrdiff_t) GetPixelChannels(Br_image);
-      Bi+=(ptrdiff_t) GetPixelChannels(Bi_image);
-      Cr+=(ptrdiff_t) GetPixelChannels(Cr_image);
-      Ci+=(ptrdiff_t) GetPixelChannels(Ci_image);
-    }
-    if (SyncComplexViews(Ci_view,Cr_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
