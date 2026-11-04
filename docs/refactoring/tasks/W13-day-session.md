@@ -13,6 +13,14 @@ catalogue ran at the last commit of each file: 15,900 cases, 0 diverged.
 | `layer.c` | 7.07 -> 7.08 | 2 | LB, V |
 | `shear.c` | 7.62 -> 8.03 | 3 | W, O |
 | `montage.c` | 7.36 -> 7.66 | 7 | E, W, O |
+| `attribute-bounds.c` | 7.66 -> 7.91 | 6 | E, N, P, D (rule 1 set) |
+| `attribute-depth.c` | 7.54 -> 7.56 | 1 | PS 7 |
+| `statistic-image.c` | 8.56 -> 9.09 | 5 | PC, H, PS, E |
+| `decorate.c` | 8.55 -> 9.43 | 5 | PC, H, PS, FI, V |
+| `resize-scale.c` | 8.21 -> **10.0** | 12 | B, LB, H, N, P |
+| `threshold-auto.c` | 8.36 -> **10.0** | 6 | N, E |
+| `resize.c` | 8.65 -> 8.81 | 2 | PC, PS |
+| `shear-deskew.c` | 8.97 -> **10.0** | 5 | PS 7, FI, E |
 | `channel.c`, `resample.c`, `shear-rotate.c` | 6.93, 7.42, 7.63 | 0 | none legal |
 
 **Lesson of the session.** In a file with few functions a new helper switches on *Overall Code
@@ -33,3 +41,30 @@ pass leaks; `ChannelFxImage` returns NULL without destroying the list when `SetI
 fails; `YShearImage` reports progress against `image->rows` over a width loop and
 `IntegralRotateImage`'s 180-degree `progress++` races; `MontageImageList` leaks on allocation
 failure; `ResamplePixelColor` leaves `status` unused.
+
+## Later in the evening: new recipes and amendments to rule on
+
+The second half of the session added playbook text under the mandate; each is in its own
+commit, before the steps that use it. **The owner has ruled on none of these.**
+
+- **Recipe FI, Fill a Struct by Initialiser** (36fa7a40e): a struct local declared bare and filled
+  one `name.m=e;` per member, every member in declaration order from a plain identifier or literal,
+  only read afterwards, becomes `const Name name = { e1, ... };`; `obj_identical.sh` must print
+  IDENTICAL. It deletes no effect but it shortens the function, so it may be the kind of recipe the
+  owner does not want. Used on `decorate.c` (f6aa4bae9) and `shear-deskew.c` (509bdee80, which is
+  worth +0.36 there). Drop by reverting those two commits.
+- **PC step 4 amendment** (c2822f30a): PC's const input struct may be initialised in the body by
+  identifiers; the same idea as FI. Used in `statistic-image.c` (a9798970c) and `resize.c`.
+- **LB step 4 and step 8** (a79714ec1, 02ed2c4b0): a struct filled once before a loop of a function
+  with no OpenMP region may serve blocks of the loop; up to six variables share one `const` struct
+  of addresses. Every `resize-scale.c` step from c5275cf85 to 0f69dbe93 depends on them.
+- **Flat steps under rule 2**: `shear-deskew.c` 07bedb7c3 and 5c98fc269 (the plan's last step takes
+  the file to 10.0 by lowering the mean cc, so these are splits made for the score; each is a real
+  block with its own helper); `resize-scale.c` d1976b334 (H) and bd035f0e6.
+- **Unreached paths checked by reading**: `ReleaseScaleBuffers`, `ThrowKapurFailure`,
+  `ThrowOTSUFailure`.
+
+Whole catalogue after the last commit: 15,900 cases, 0 diverged.
+**Noticed upstream, not changed.** `ScaleImage` passes `span` by value although only `span.y` is set,
+so the copy reads an uninitialised `span.x`; `GetImageBoundingBox`'s `pixel=zero` is dead;
+`ReadRadonRowReversed` sets and returns `status`.
