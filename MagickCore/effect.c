@@ -3112,7 +3112,8 @@ typedef struct _SpreadInfo
     *spread_image;
 
   CacheView
-    *image_view;
+    *image_view,
+    *spread_view;
 
   ExceptionInfo
     *exception;
@@ -3168,6 +3169,39 @@ static void SpreadRow(MagickBooleanType *status,const SpreadInfo *spread,
       break;
     q+=(ptrdiff_t) GetPixelChannels(spread_image);
   }
+}
+
+static MagickBooleanType SpreadHeadRow(MagickBooleanType *status,
+  const SpreadInfo *spread,RandomInfo *random_info)
+{
+  CacheView
+    *const spread_view = spread->spread_view;
+
+  ExceptionInfo
+    *const exception = spread->exception;
+
+  const Image
+    *const spread_image = spread->spread_image;
+
+  const ssize_t
+    y = spread->y;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(spread_view,0,y,spread_image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  SpreadRow(status,spread,random_info,q);
+  if (SyncCacheViewAuthenticPixels(spread_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
 }
 
 MagickExport Image *SpreadImage(const Image *image,
@@ -3233,31 +3267,19 @@ MagickExport Image *SpreadImage(const Image *image,
     const int
       id = GetOpenMPThreadId();
 
-    Quantum
-      *magick_restrict q;
-
     SpreadInfo
       spread;
 
-    if (status == MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(spread_view,0,y,spread_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     spread.image=image;
     spread.spread_image=spread_image;
     spread.image_view=image_view;
+    spread.spread_view=spread_view;
     spread.exception=exception;
     spread.method=method;
     spread.width=width;
     spread.y=y;
-    SpreadRow(&status,&spread,random_info[id],q);
-    if (SyncCacheViewAuthenticPixels(spread_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (SpreadHeadRow(&status,&spread,random_info[id]) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
