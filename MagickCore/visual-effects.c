@@ -428,6 +428,94 @@ static Quantum GetPixelMaximumRGB(const Image *image,
   return(quantum);
 }
 
+typedef struct _BlueShiftRow
+{
+  const Image
+    *image;
+
+  Image
+    *shift_image;
+
+  CacheView
+    *image_view,
+    *shift_view;
+
+  double
+    factor;
+
+  ExceptionInfo
+    *exception;
+} BlueShiftRow;
+
+static MagickBooleanType BlueShiftImageRow(const BlueShiftRow *shift_row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const image = shift_row->image;
+
+  Image
+    *const shift_image = shift_row->shift_image;
+
+  CacheView
+    *const image_view = shift_row->image_view,
+    *const shift_view = shift_row->shift_view;
+
+  const double
+    factor = shift_row->factor;
+
+  ExceptionInfo
+    *const exception = shift_row->exception;
+
+  MagickBooleanType
+    sync;
+
+  PixelInfo
+    pixel;
+
+  Quantum
+    quantum;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(shift_view,0,y,shift_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    quantum=GetPixelMinimumRGB(image,p);
+    pixel.red=0.5*((double) GetPixelRed(image,p)+factor*(double) quantum);
+    pixel.green=0.5*((double) GetPixelGreen(image,p)+factor*(double) quantum);
+    pixel.blue=0.5*((double) GetPixelBlue(image,p)+factor*(double) quantum);
+    quantum=GetPixelMaximumRGB(image,p);
+    pixel.red=0.5*(pixel.red+factor*(double) quantum);
+    pixel.green=0.5*(pixel.green+factor*(double) quantum);
+    pixel.blue=0.5*(pixel.blue+factor*(double) quantum);
+    SetPixelRed(shift_image,ClampToQuantum(pixel.red),q);
+    SetPixelGreen(shift_image,ClampToQuantum(pixel.green),q);
+    SetPixelBlue(shift_image,ClampToQuantum(pixel.blue),q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(shift_image);
+  }
+  sync=SyncCacheViewAuthenticPixels(shift_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *BlueShiftImage(const Image *image,const double factor,
   ExceptionInfo *exception)
 {
@@ -479,53 +567,17 @@ MagickExport Image *BlueShiftImage(const Image *image,const double factor,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    MagickBooleanType
-      sync;
+    BlueShiftRow
+      shift_row;
 
-    PixelInfo
-      pixel;
-
-    Quantum
-      quantum;
-
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    shift_row.image=image;
+    shift_row.shift_image=shift_image;
+    shift_row.image_view=image_view;
+    shift_row.shift_view=shift_view;
+    shift_row.factor=factor;
+    shift_row.exception=exception;
+    if (BlueShiftImageRow(&shift_row,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(shift_view,0,y,shift_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      quantum=GetPixelMinimumRGB(image,p);
-      pixel.red=0.5*((double) GetPixelRed(image,p)+factor*(double) quantum);
-      pixel.green=0.5*((double) GetPixelGreen(image,p)+factor*(double) quantum);
-      pixel.blue=0.5*((double) GetPixelBlue(image,p)+factor*(double) quantum);
-      quantum=GetPixelMaximumRGB(image,p);
-      pixel.red=0.5*(pixel.red+factor*(double) quantum);
-      pixel.green=0.5*(pixel.green+factor*(double) quantum);
-      pixel.blue=0.5*(pixel.blue+factor*(double) quantum);
-      SetPixelRed(shift_image,ClampToQuantum(pixel.red),q);
-      SetPixelGreen(shift_image,ClampToQuantum(pixel.green),q);
-      SetPixelBlue(shift_image,ClampToQuantum(pixel.blue),q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(shift_image);
-    }
-    sync=SyncCacheViewAuthenticPixels(shift_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
