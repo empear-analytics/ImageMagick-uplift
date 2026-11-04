@@ -68,3 +68,40 @@ Whole catalogue after the last commit: 15,900 cases, 0 diverged.
 **Noticed upstream, not changed.** `ScaleImage` passes `span` by value although only `span.y` is set,
 so the copy reads an uninitialised `span.x`; `GetImageBoundingBox`'s `pixel=zero` is dead;
 `ReadRadonRowReversed` sets and returns `status`.
+
+## The night: sharing one helper across all loops (2026-11-04 to 05)
+
+**The lever.** Earlier agents stopped because every second PC head was a clone of the first. One
+helper *called from every loop* is not a clone. The three that worked: the progress tail after
+`omp atomic progress++` (PS), the sync test (PS), and a partial PC head (guard, fetch, failed-fetch
+continue; `q` by pointer, PC step 2). Each function alone often drops the score (a new function in a
+small file), so these go as rule 1 same-recipe sets with the per-function scores in the message.
+
+| File | Score | Commits |
+| --- | --- | ---: |
+| `transform.c` | 5.90 -> 6.26 | 6 |
+| `threshold.c` | 5.50 -> 6.82 | 17 |
+| `enhance-tone.c` | 4.37 -> 5.07 | 5 |
+| `enhance.c` | 5.43 -> 5.83 | 3 |
+| `effect-blur.c` | 5.69 -> 5.95 | 1 |
+| `effect.c` | 5.94 -> 6.17 | 2 |
+| `visual-effects.c` | 3.90 -> 4.23 | 3 |
+| `paint.c` | 6.55 -> 7.02 | 3 |
+| `fourier.c` | 6.27 -> 6.33 | 1 |
+| `statistic-measure.c` | 9.68 -> **10.0** | 2 (+ PC step 2 amendment) |
+| `segment.c`, `statistic-function.c`, `prepress.c`, `histogram.c` | unchanged | 0 |
+
+Whole catalogue at the end of each file: 15,900 cases, 0 diverged.
+
+**For the owner, in addition to the list above.** (1) PC step 2 amendment (e9e484a7d: up to two
+body variables the tail reads, by pointer; a shared variable the head only reads goes by pointer to
+const). (2) `transform.c` and `threshold.c` PS sets rest on rule 1's same-recipe clause; `threshold.c`
+1c4f1fd8f is flat as a plan step. (3) `TransparentPaintImageChroma` (paint.c) is unreached; PS and PC
+there were checked by reading. (4) `prepress.c` would reach 10.0 only by moving a pragma-bearing
+loop. (5) A function-pointer merge would open `LevelColors`/`LevelizeColors`, the `ModulateXXX`
+helpers and the transform skeletons.
+
+**Noticed upstream, not changed.** `BilevelImage` counts progress twice per row; `Classify` carries
+`status` and `progress` from its count loop into the classify loop, so a monitor abort in the first
+skips classification; `DestroyOilPaintClones` assigns the result of `DestroyImage(paint_image)` to
+`linear_image`.
