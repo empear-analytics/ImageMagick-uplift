@@ -901,14 +901,11 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     ColorThresholdRow(image,&start,&stop,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
