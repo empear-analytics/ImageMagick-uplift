@@ -680,6 +680,35 @@ static void InitializeCluster(Cluster *cluster,const ssize_t count)
   cluster->blue.center/=cluster->count;
 }
 
+typedef struct _ClassifyCountInputs
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  Cluster
+    *head;
+
+  ExceptionInfo
+    *exception;
+} ClassifyCountInputs;
+
+static MagickBooleanType CountClassifyRow(const ClassifyCountInputs *inputs,
+  const ssize_t y,ssize_t *count)
+{
+  const Quantum
+    *p;
+
+  p=GetCacheViewVirtualPixels(inputs->image_view,0,y,inputs->image->columns,1,
+    inputs->exception);
+  if (p == (const Quantum *) NULL)
+    return(MagickFalse);
+  (*count)=CountRowClusterPixels(inputs->image,inputs->head,p,(*count));
+  return(MagickTrue);
+}
+
 typedef struct _ClassifyLine
 {
   Image
@@ -811,13 +840,11 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   image_view=AcquireVirtualCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *p;
+    const ClassifyCountInputs
+      inputs = { image, image_view, head, exception };
 
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
+    if (CountClassifyRow(&inputs,y,&count) == MagickFalse)
       break;
-    count=CountRowClusterPixels(image,head,p,count);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
