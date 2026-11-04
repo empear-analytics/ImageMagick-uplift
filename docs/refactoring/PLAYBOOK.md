@@ -4497,6 +4497,18 @@ helper returns a status the caller tests, which here would always lead to the sa
    in the order the block first writes them.
 5. Where the block stood, write the call. The `continue;` that followed the block stays,
    directly after the call. Check every argument against its parameter by reading.
+6. A block that is the whole body of a sequential loop, declarations included, whose
+   inputs would give five or more parameters: bundle the variables it only reads in a
+   struct as Recipe N steps 2 and 3 do (a `typedef struct` above
+   the helper, one member per variable, the variable's exact type and name), declared
+   among the caller's declarations and filled once before the loop (the function has
+   no OpenMP region, so one thread fills and reads it). The helper takes `const Name *`
+   first, then the loop counter by value, then the written variables by pointer
+   (`status`, `progress`), at most four parameters in all, and binds each member once
+   at the top of its body (`const T *const v = name->v;`). The variables the body
+   declares and the caller does not read after it (`p`, `q`, `sync`) move into the
+   helper; the loop keeps its `for` statement and its body becomes the call, with no
+   `continue;` after it (step 1's tail).
 
 **Before:**
 
@@ -4569,6 +4581,10 @@ static void DecodeDelegateEscape(const char **p,char **q)
 - The rewriting of step 3 is mechanical but easy to get wrong in precedence: `*v++` with
   `v` a pointer parameter is `*(*v)++`, not `**v++`. Check each by reading, and let the
   oracle cover the reached paths.
+- Step 6: the struct holds values and pointers the loop never changes (the images, the view,
+  the exception), filled before the first iteration, so every call reads what the body read
+  inline; the counter and the two written variables travel as before. Nothing in a
+  sequential loop runs between the fill and the first call.
 - A block not followed by `continue;` (one after which the loop body goes on) is not this
   recipe. A block that ends the body is (step 1): in C, `continue;` in a loop body
   jumps to the end of that body (C11 6.8.6.2), so falling off the end and running
@@ -4587,7 +4603,12 @@ ends each case with `continue;` of the scan loop, followed by a `continue;` for 
 B, task M116): `image.c`'s `AppendImages`, whose scan loop ends in the extent update
 (stacked: widen and `continue;`; otherwise add the columns and take the taller height),
 writing `width` and `height`; part of the probe that takes the function from 4 bumps
-to 3.
+to 3. Step 6 (2026-11-04, W12, from `vision.c`): `IntegralImage`, whose sequential row
+loop (guard, a fetch that `continue;`s, `IntegrateRow`, a sync test and a progress block)
+needs six parameters as a plain OC helper; with its views, images and exception in a
+struct, the function leaves Bumpy Road and Complex Method, 6.49 to 6.77 in a probe, no
+finding on the helper. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
 
 ---
 
@@ -5839,3 +5860,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-04 | AMEND | PS | Step 2: besides `status`, the block may read or write at most two further shared scalars `v` (declared outside the loop body, in `shared(...)` or no clause, never in `private`, `firstprivate`, `lastprivate` or `reduction`) by plain assignment or a plain increment outside any `atomic` or `critical`; each is passed by pointer like `status`, every use `(*v)`, with the same argument (same memory, points and order, nothing deferred, helper called inside the iteration). Steps 4 and 6 and *Careful* follow; *Careful* says a plain increment that is a race stays a race. Still eight steps | `attribute.c`'s `IdentifyImageGray` and `IdentifyImageMonochrome` (shared `type`) and `resize-sample.c`'s `SampleImage` (non-atomic `progress++`), campaign A, W12: each blocked by one second shared scalar; probes +0.31 and 9.47 to 10.00 | mandate (2026-10-24) |
 | 2026-11-04 | NEW | PC | Extract Parallel Loop Head Returning Success for a Continue: the head of a parallel loop body (guard, fetch with `status=MagickFalse; continue;`, work, sync test) that precedes a pragma-bearing progress tail moves to a `static MagickBooleanType` function, each `continue;` becoming `return(MagickFalse);`, `status` by pointer; the caller writes `if (Helper(...,&status) == MagickFalse) continue;` and keeps the tail | `paint.c`'s `OpaquePaintImage`, `TransparentPaintImage`, `OilPaintImage` (campaign A, W13): T, U, PS and E step 7 refuse a head followed by an atomic progress block; a probe on `OpaquePaintImage`, 6.24 to 6.49 | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | PS | Step 8 (new): a block that also writes two to four variables declared in the loop body and read by the body after it passes their addresses in one `const` struct initialised in the body, Recipe Q step 8's form; step 3 had refused it | `vision.c`'s `MajorAxisThreshold`, `MinorAxisThreshold`, `EccentricityThreshold` (campaign A, W12): the centroid pass and second-moment row loop read and write `status` (PS) and add to four accumulators the body reads afterwards (step 3 refused it; Q and I refuse the shared `status`). A probe: 5.91 to 6.49, the three functions leaving Bumpy Road and Complex Method | mandate (2026-10-24) |
+| 2026-11-04 | AMEND | OC | Step 6 (new): a block that is the whole body of a sequential loop, whose inputs would give five or more parameters, takes its read-only inputs in a struct filled once before the loop (Recipe N steps 2 and 3), then the counter and the written variables by pointer, at most four parameters | `vision.c`'s `IntegralImage` (campaign A, W12): row loop with a guard, a failed fetch `continue;`, a sync test and a progress block; step 1 allowed the body, the six parameters did not. A probe: 6.49 to 6.77, the function leaving Bumpy Road and Complex Method | mandate (2026-10-24) |
