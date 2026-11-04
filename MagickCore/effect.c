@@ -1859,6 +1859,9 @@ typedef struct _PreviewTile
   char
     *label;
 
+  ImageInfo
+    *preview_info;
+
   PreviewType
     preview;
 
@@ -2054,6 +2057,84 @@ static void ApplyDullSolarizeEdgePreview(const PreviewTile *tile,
   }
 }
 
+static void ApplyRaiseJpegPreview(const PreviewTile *tile,Image **preview_image,
+  double *gamma)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const factor = tile->factor,
+    *const label = tile->label;
+
+  ImageInfo
+    *const preview_info = tile->preview_info;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const ssize_t
+    i = tile->i;
+
+  const double
+    percentage = tile->percentage;
+
+  switch (preview)
+  {
+    case RaisePreview:
+    {
+      RectangleInfo
+        raise;
+
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      raise.width=(size_t) (2*i+2);
+      raise.height=(size_t) (2*i+2);
+      raise.x=(i-1)/2;
+      raise.y=(i-1)/2;
+      (void) RaiseImage((*preview_image),&raise,MagickTrue,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,
+        "raise %.17gx%.17g%+.20g%+.20g",(double) raise.width,(double)
+        raise.height,(double) raise.x,(double) raise.y);
+      break;
+    }
+    case JPEGPreview:
+    {
+      char
+        filename[MagickPathExtent];
+
+      int
+        file;
+
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      preview_info->quality=(size_t) percentage;
+      (void) FormatLocaleString(factor,MagickPathExtent,"%.17g",(double)
+        preview_info->quality);
+      file=AcquireUniqueFileResource(filename);
+      if (file != -1)
+        file=close_utf8(file)-1;
+      (void) FormatLocaleString((*preview_image)->filename,MagickPathExtent,
+        "jpeg:%s",filename);
+      (*preview_image)=WriteAndReadQualityPreview(preview_info,(*preview_image),
+        exception);
+      (void) RelinquishUniqueFileResource((*preview_image)->filename);
+      FormatQualityLabel(label,factor,(*preview_image),thumbnail);
+      break;
+    }
+    default:
+    {
+      ApplyDullSolarizeEdgePreview(tile,&(*preview_image),&(*gamma));
+      break;
+    }
+  }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -2144,6 +2225,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     tile.exception=exception;
     tile.factor=factor;
     tile.label=label;
+    tile.preview_info=preview_info;
     tile.preview=preview;
     tile.i=i;
     tile.percentage=percentage;
@@ -2176,7 +2258,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
       }
       default:
       {
-        ApplyDullSolarizeEdgePreview(&tile,&preview_image,&gamma);
+        ApplyRaiseJpegPreview(&tile,&preview_image,&gamma);
         break;
       }
       case GrayscalePreview:
@@ -2260,24 +2342,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           degrees);
         break;
       }
-      case RaisePreview:
-      {
-        RectangleInfo
-          raise;
-
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        raise.width=(size_t) (2*i+2);
-        raise.height=(size_t) (2*i+2);
-        raise.x=(i-1)/2;
-        raise.y=(i-1)/2;
-        (void) RaiseImage(preview_image,&raise,MagickTrue,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,
-          "raise %.17gx%.17g%+.20g%+.20g",(double) raise.width,(double)
-          raise.height,(double) raise.x,(double) raise.y);
-        break;
-      }
       case SegmentPreview:
       {
         preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
@@ -2329,31 +2393,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           exception);
         (void) FormatLocaleString(label,MagickPathExtent,"charcoal %gx%g",
           radius,sigma);
-        break;
-      }
-      case JPEGPreview:
-      {
-        char
-          filename[MagickPathExtent];
-
-        int
-          file;
-
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        preview_info->quality=(size_t) percentage;
-        (void) FormatLocaleString(factor,MagickPathExtent,"%.17g",(double)
-          preview_info->quality);
-        file=AcquireUniqueFileResource(filename);
-        if (file != -1)
-          file=close_utf8(file)-1;
-        (void) FormatLocaleString(preview_image->filename,MagickPathExtent,
-          "jpeg:%s",filename);
-        preview_image=WriteAndReadQualityPreview(preview_info,preview_image,
-          exception);
-        (void) RelinquishUniqueFileResource(preview_image->filename);
-        FormatQualityLabel(label,factor,preview_image,thumbnail);
         break;
       }
     }
