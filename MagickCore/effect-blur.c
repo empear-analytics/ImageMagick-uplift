@@ -3629,6 +3629,24 @@ static MagickBooleanType BlurSelectiveLine(const SelectiveRow *row,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireSelectiveLuminance(const Image *image,
+  Image **luminance_image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  (*luminance_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*luminance_image) == (Image *) NULL)
+    return(MagickFalse);
+  status=TransformImageColorspace((*luminance_image),GRAYColorspace,exception);
+  if (status == MagickFalse)
+    {
+      (*luminance_image)=DestroyImage((*luminance_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
@@ -3685,17 +3703,9 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
       kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
       return((Image *) NULL);
     }
-  luminance_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (luminance_image == (Image *) NULL)
+  if (AcquireSelectiveLuminance(image,&luminance_image,exception) ==
+      MagickFalse)
     {
-      blur_image=DestroyImage(blur_image);
-      kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
-      return((Image *) NULL);
-    }
-  status=TransformImageColorspace(luminance_image,GRAYColorspace,exception);
-  if (status == MagickFalse)
-    {
-      luminance_image=DestroyImage(luminance_image);
       blur_image=DestroyImage(blur_image);
       kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
       return((Image *) NULL);
