@@ -475,6 +475,104 @@ static void AccumulateSecondMoments(const CCMomentRow *moment_row,
   }
 }
 
+typedef struct _CCMomentPass
+{
+  const Image
+    *component_image;
+
+  ExceptionInfo
+    *exception;
+
+  CCObjectInfo
+    *object;
+
+  ssize_t
+    i;
+} CCMomentPass;
+
+typedef struct _CCMomentTargets
+{
+  double
+    *M00,
+    *M11,
+    *M20,
+    *M02;
+} CCMomentTargets;
+
+static void ComputeObjectMoments(const CCMomentPass *moment_pass,
+  const CCMomentTargets *targets,MagickBooleanType *status)
+{
+  const Image
+    *const component_image = moment_pass->component_image;
+
+  ExceptionInfo
+    *const exception = moment_pass->exception;
+
+  CCObjectInfo
+    *const object = moment_pass->object;
+
+  const ssize_t
+    i = moment_pass->i;
+
+  double
+    *const M00 = targets->M00,
+    *const M11 = targets->M11,
+    *const M20 = targets->M20,
+    *const M02 = targets->M02;
+
+  CacheView
+    *component_view;
+
+  double
+    M01 = 0.0,
+    M10 = 0.0;
+
+  PointInfo
+    centroid = { 0.0, 0.0 };
+
+  RectangleInfo
+    bounding_box;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    y;
+
+  component_view=AcquireAuthenticCacheView(component_image,exception);
+  bounding_box=object[i].bounding_box;
+  if (GetObjectCentroidSums(component_image,component_view,bounding_box,i,
+        M00,&M10,&M01,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  centroid.x=M10*MagickSafeReciprocal((*M00));
+  centroid.y=M01*MagickSafeReciprocal((*M00));
+  for (y=0; y < (ssize_t) bounding_box.height; y++)
+  {
+    CCMomentRow
+      moment_row;
+
+    const CCMomentSums
+      moment_sums = { M11, M20, M02, &p };
+
+    if ((*status) == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
+      bounding_box.y+y,bounding_box.width,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        (*status)=MagickFalse;
+        break;
+      }
+    moment_row.component_image=component_image;
+    moment_row.bounding_box=bounding_box;
+    moment_row.i=i;
+    moment_row.centroid=centroid;
+    moment_row.y=y;
+    AccumulateSecondMoments(&moment_row,&moment_sums);
+  }
+  component_view=DestroyCacheView(component_view);
+}
+
 static void MajorAxisThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -491,66 +589,28 @@ static void MajorAxisThreshold(const Image *component_image,
 #endif
   for (i=0; i < (ssize_t) component_image->colors; i++)
   {
-    CacheView
-      *component_view;
+    CCMomentPass
+      moment_pass;
 
     double
       M00 = 0.0,
-      M01 = 0.0,
       M02 = 0.0,
-      M10 = 0.0,
       M11 = 0.0,
       M20 = 0.0;
 
-    PointInfo
-      centroid = { 0.0, 0.0 };
-
-    RectangleInfo
-      bounding_box;
-
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      y;
+    const CCMomentTargets
+      targets = { &M00, &M11, &M20, &M02 };
 
     /*
       Compute ellipse major axis of each object.
     */
     if (status == MagickFalse)
       continue;
-    component_view=AcquireAuthenticCacheView(component_image,exception);
-    bounding_box=object[i].bounding_box;
-    if (GetObjectCentroidSums(component_image,component_view,bounding_box,i,
-          &M00,&M10,&M01,exception) == MagickFalse)
-      status=MagickFalse;
-    centroid.x=M10*MagickSafeReciprocal(M00);
-    centroid.y=M01*MagickSafeReciprocal(M00);
-    for (y=0; y < (ssize_t) bounding_box.height; y++)
-    {
-      CCMomentRow
-        moment_row;
-
-      const CCMomentSums
-        moment_sums = { &M11, &M20, &M02, &p };
-
-      if (status == MagickFalse)
-        continue;
-      p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
-        bounding_box.y+y,bounding_box.width,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      moment_row.component_image=component_image;
-      moment_row.bounding_box=bounding_box;
-      moment_row.i=i;
-      moment_row.centroid=centroid;
-      moment_row.y=y;
-      AccumulateSecondMoments(&moment_row,&moment_sums);
-    }
-    component_view=DestroyCacheView(component_view);
+    moment_pass.component_image=component_image;
+    moment_pass.exception=exception;
+    moment_pass.object=object;
+    moment_pass.i=i;
+    ComputeObjectMoments(&moment_pass,&targets,&status);
     object[i].metric[metric_index]=sqrt((2.0*MagickSafeReciprocal(M00))*
       ((M20+M02)+sqrt(4.0*M11*M11+(M20-M02)*(M20-M02))));
   }
