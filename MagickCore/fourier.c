@@ -104,6 +104,15 @@ typedef struct _FourierInfo
     height;
 } FourierInfo;
 
+typedef struct _ForwardChannelSource
+{
+  const Image
+    *image;
+
+  MagickBooleanType
+    modulus;
+} ForwardChannelSource;
+
 typedef struct _ComplexRowPointers
 {
   const Quantum
@@ -1266,8 +1275,8 @@ static inline MagickBooleanType IsFourierPaddingNeeded(const Image *image)
     ((image->rows % 2) != 0)) ? MagickTrue : MagickFalse);
 }
 
-static MagickBooleanType ForwardFourierTransformChannel(const Image *image,
-  const PixelChannel channel,const MagickBooleanType modulus,
+static MagickBooleanType ForwardFourierTransformChannel(
+  const ForwardChannelSource *source,const PixelChannel channel,
   Image *fourier_image,ExceptionInfo *exception)
 {
   double
@@ -1284,17 +1293,18 @@ static MagickBooleanType ForwardFourierTransformChannel(const Image *image,
     *magnitude_info,
     *phase_info;
 
-  fourier_info.width=image->columns;
-  fourier_info.height=image->rows;
-  if (IsFourierPaddingNeeded(image) != MagickFalse)
+  fourier_info.width=source->image->columns;
+  fourier_info.height=source->image->rows;
+  if (IsFourierPaddingNeeded(source->image) != MagickFalse)
     {
-      size_t extent=image->columns < image->rows ? image->rows : image->columns;
+      size_t extent=source->image->columns < source->image->rows ?
+        source->image->rows : source->image->columns;
       fourier_info.width=(extent & 0x01) == 1 ? extent+1UL : extent;
     }
   fourier_info.height=fourier_info.width;
   fourier_info.center=fourier_info.width/2+1;
   fourier_info.channel=channel;
-  fourier_info.modulus=modulus;
+  fourier_info.modulus=source->modulus;
   magnitude_info=AcquireVirtualMemory(fourier_info.width,(fourier_info.height/2+
     1)*sizeof(*magnitude_pixels));
   phase_info=AcquireVirtualMemory(fourier_info.width,(fourier_info.height/2+1)*
@@ -1306,12 +1316,13 @@ static MagickBooleanType ForwardFourierTransformChannel(const Image *image,
       if (magnitude_info == (MemoryInfo *) NULL)
         magnitude_info=RelinquishVirtualMemory(magnitude_info);
       (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",
+        source->image->filename);
       return(MagickFalse);
     }
   magnitude_pixels=(double *) GetVirtualMemoryBlob(magnitude_info);
   phase_pixels=(double *) GetVirtualMemoryBlob(phase_info);
-  status=ForwardFourierTransform(&fourier_info,image,magnitude_pixels,
+  status=ForwardFourierTransform(&fourier_info,source->image,magnitude_pixels,
     phase_pixels,exception);
   if (status != MagickFalse)
     status=ForwardFourier(&fourier_info,fourier_image,magnitude_pixels,
@@ -1371,6 +1382,9 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
           magnitude_image=DestroyImage(magnitude_image);
         else
           {
+            const ForwardChannelSource
+              source = { image, modulus };
+
             MagickBooleanType
               is_gray,
               status;
@@ -1393,11 +1407,11 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
                   thread_status;
 
                 if (is_gray != MagickFalse)
-                  thread_status=ForwardFourierTransformChannel(image,
-                    GrayPixelChannel,modulus,fourier_image,exception);
+                  thread_status=ForwardFourierTransformChannel(&source,
+                    GrayPixelChannel,fourier_image,exception);
                 else
-                  thread_status=ForwardFourierTransformChannel(image,
-                    RedPixelChannel,modulus,fourier_image,exception);
+                  thread_status=ForwardFourierTransformChannel(&source,
+                    RedPixelChannel,fourier_image,exception);
                 if (thread_status == MagickFalse)
                   status=thread_status;
               }
@@ -1410,8 +1424,8 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
 
                 thread_status=MagickTrue;
                 if (is_gray == MagickFalse)
-                  thread_status=ForwardFourierTransformChannel(image,
-                    GreenPixelChannel,modulus,fourier_image,exception);
+                  thread_status=ForwardFourierTransformChannel(&source,
+                    GreenPixelChannel,fourier_image,exception);
                 if (thread_status == MagickFalse)
                   status=thread_status;
               }
@@ -1424,8 +1438,8 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
 
                 thread_status=MagickTrue;
                 if (is_gray == MagickFalse)
-                  thread_status=ForwardFourierTransformChannel(image,
-                    BluePixelChannel,modulus,fourier_image,exception);
+                  thread_status=ForwardFourierTransformChannel(&source,
+                    BluePixelChannel,fourier_image,exception);
                 if (thread_status == MagickFalse)
                   status=thread_status;
               }
@@ -1438,8 +1452,8 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
 
                 thread_status=MagickTrue;
                 if (image->colorspace == CMYKColorspace)
-                  thread_status=ForwardFourierTransformChannel(image,
-                    BlackPixelChannel,modulus,fourier_image,exception);
+                  thread_status=ForwardFourierTransformChannel(&source,
+                    BlackPixelChannel,fourier_image,exception);
                 if (thread_status == MagickFalse)
                   status=thread_status;
               }
@@ -1452,8 +1466,8 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
 
                 thread_status=MagickTrue;
                 if (image->alpha_trait != UndefinedPixelTrait)
-                  thread_status=ForwardFourierTransformChannel(image,
-                    AlphaPixelChannel,modulus,fourier_image,exception);
+                  thread_status=ForwardFourierTransformChannel(&source,
+                    AlphaPixelChannel,fourier_image,exception);
                 if (thread_status == MagickFalse)
                   status=thread_status;
               }
