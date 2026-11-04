@@ -725,6 +725,58 @@ static ImageType GetIdentifiedGrayType(const Image *image,
   return(type);
 }
 
+typedef struct _ImageRowScan
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} ImageRowScan;
+
+static void IdentifyGrayRow(const ImageRowScan *scan,const ssize_t y,
+  MagickBooleanType *status,ImageType *type)
+{
+  const Image
+    *image = scan->image;
+
+  CacheView
+    *image_view = scan->image_view;
+
+  ExceptionInfo
+    *exception = scan->exception;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (IsPixelGray(image,p) == MagickFalse)
+      {
+        (*status)=MagickFalse;
+        break;
+      }
+    if (((*type) == BilevelType) &&
+        (IsPixelMonochrome(image,p) == MagickFalse))
+      (*type)=GrayscaleType;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport ImageType IdentifyImageGray(const Image *image,
   ExceptionInfo *exception)
 {
@@ -755,31 +807,9 @@ MagickExport ImageType IdentifyImageGray(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *p;
+    const ImageRowScan scan = { image, image_view, exception };
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (IsPixelGray(image,p) == MagickFalse)
-        {
-          status=MagickFalse;
-          break;
-        }
-      if ((type == BilevelType) && (IsPixelMonochrome(image,p) == MagickFalse))
-        type=GrayscaleType;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    IdentifyGrayRow(&scan,y,&status,&type);
   }
   image_view=DestroyCacheView(image_view);
   return(GetIdentifiedGrayType(image,status,type));
