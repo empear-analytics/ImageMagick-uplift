@@ -1452,6 +1452,20 @@ static void InitializeNewCluster(Cluster *cluster,const ExtentPacket red,
   cluster->next=(Cluster *) NULL;
 }
 
+static Cluster *FindLargestBackground(Cluster *background)
+{
+  Cluster
+    *cluster;
+
+  for (cluster=background; cluster->next != (Cluster *) NULL; )
+  {
+    if (cluster->count > background->count)
+      background=cluster;
+    cluster=cluster->next;
+  }
+  return(background);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1611,12 +1625,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     {
       object=FindObjectCluster(head);
       background=head->next;
-      for (cluster=background; cluster->next != (Cluster *) NULL; )
-      {
-        if (cluster->count > background->count)
-          background=cluster;
-        cluster=cluster->next;
-      }
+      background=FindLargestBackground(background);
     }
   SetDynamicThresholdPixel(background,object,pixel);
   /*
