@@ -1074,7 +1074,8 @@ typedef struct _KuwaharaInfo
     *kuwahara_image;
 
   CacheView
-    *image_view;
+    *image_view,
+    *kuwahara_view;
 
   ExceptionInfo
     *exception;
@@ -1169,6 +1170,37 @@ static MagickBooleanType AcquireKuwaharaImage(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType KuwaharaHeadRow(MagickBooleanType *status,
+  const KuwaharaInfo *kuwahara)
+{
+  CacheView
+    *const kuwahara_view = kuwahara->kuwahara_view;
+
+  ExceptionInfo
+    *const exception = kuwahara->exception;
+
+  const Image
+    *const kuwahara_image = kuwahara->kuwahara_image;
+
+  const ssize_t
+    y = kuwahara->y;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(kuwahara_view,0,y,kuwahara_image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  KuwaharaRow(status,kuwahara,q);
+  return(MagickTrue);
+}
+
 MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1230,25 +1262,15 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
     KuwaharaInfo
       kuwahara;
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(kuwahara_view,0,y,kuwahara_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     kuwahara.gaussian_image=gaussian_image;
     kuwahara.kuwahara_image=kuwahara_image;
     kuwahara.image_view=image_view;
+    kuwahara.kuwahara_view=kuwahara_view;
     kuwahara.exception=exception;
     kuwahara.width=width;
     kuwahara.y=y;
-    KuwaharaRow(&status,&kuwahara,q);
+    if (KuwaharaHeadRow(&status,&kuwahara) == MagickFalse)
+      continue;
     if (SyncCacheViewAuthenticPixels(kuwahara_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
