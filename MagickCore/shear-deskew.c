@@ -572,6 +572,15 @@ static void ReadRadonRow(MagickBooleanType *status,
     }
 }
 
+static void ScanRadonRowReversed(MagickBooleanType *status,
+  const RadonRowSource *source,const unsigned short *bits)
+{
+  if ((*status) == MagickFalse)
+    return;
+  if (ReadRadonRowReversed(source,bits) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType RadonTransform(const Image *image,
   const double threshold,size_t *projection,ExceptionInfo *exception)
 {
@@ -620,19 +629,10 @@ static MagickBooleanType RadonTransform(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    RadonRowSource
-      source;
+    const RadonRowSource
+      source = { image_view,image,threshold,y,exception,source_matrices };
 
-    if (status == MagickFalse)
-      continue;
-    source.image_view=image_view;
-    source.image=image;
-    source.threshold=threshold;
-    source.y=y;
-    source.exception=exception;
-    source.source_matrices=source_matrices;
-    if (ReadRadonRowReversed(&source,bits) == MagickFalse)
-      status=MagickFalse;
+    ScanRadonRowReversed(&status,&source,bits);
   }
   RadonProjection(source_matrices,destination_matrices,-1,projection);
   (void) NullMatrix(source_matrices);
