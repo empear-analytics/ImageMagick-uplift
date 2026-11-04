@@ -825,6 +825,17 @@ typedef struct _ColorspaceRowInfo
     *exception;
 } ColorspaceRowInfo;
 
+static void SetColorspaceProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void TransformLinearGrayRowFromsRGB(MagickBooleanType *status,
   const ColorspaceRowInfo *row,const ssize_t y)
 {
@@ -1538,17 +1549,11 @@ static MagickBooleanType sRGBTransformImage(Image *image,
           status=MagickFalse;
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
-            MagickBooleanType
-              proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
             #pragma omp atomic
 #endif
             progress++;
-            proceed=SetImageProgress(image,sRGBTransformImageTag,progress,
-              image->rows);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
+            SetColorspaceProgress(image,sRGBTransformImageTag,progress,&status);
           }
       }
       image_view=DestroyCacheView(image_view);
@@ -2939,17 +2944,11 @@ static MagickBooleanType TransformsRGBImage(Image *image,
           status=MagickFalse;
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
-            MagickBooleanType
-              proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
             #pragma omp atomic
 #endif
             progress++;
-            proceed=SetImageProgress(image,TransformsRGBImageTag,progress,
-              image->rows);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
+            SetColorspaceProgress(image,TransformsRGBImageTag,progress,&status);
           }
       }
       image_view=DestroyCacheView(image_view);
