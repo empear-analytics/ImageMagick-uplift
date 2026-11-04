@@ -996,17 +996,7 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
       (tile_info.x/2));
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        progress++;
-        proceed=SetImageProgress(image,CLAHEImageTag,progress,2*
-          GetPixelChannels(image));
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    UpdateCLAHEProgress(image,&progress,&status);
   }
   image_view=DestroyCacheView(image_view);
   pixel_cache=RelinquishVirtualMemory(pixel_cache);
