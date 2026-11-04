@@ -2966,6 +2966,23 @@ static MagickBooleanType BlurRotationalLine(const RotationalRow *row,
   return(MagickTrue);
 }
 
+static void FillRotationalTables(double *cos_theta,double *sin_theta,
+  const size_t n,const double theta)
+{
+  double
+    offset;
+
+  ssize_t
+    w;
+
+  offset=theta*(double) (n-1)/2.0;
+  for (w=0; w < (ssize_t) n; w++)
+  {
+    cos_theta[w]=cos((double) (theta*w-offset));
+    sin_theta[w]=sin((double) (theta*w-offset));
+  }
+}
+
 MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   ExceptionInfo *exception)
 {
@@ -2977,7 +2994,6 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   double
     blur_radius,
     *cos_theta,
-    offset,
     *sin_theta,
     theta;
 
@@ -2997,7 +3013,6 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
     n;
 
   ssize_t
-    w,
     y;
 
   /*
@@ -3029,12 +3044,7 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
       blur_image=DestroyImage(blur_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  offset=theta*(double) (n-1)/2.0;
-  for (w=0; w < (ssize_t) n; w++)
-  {
-    cos_theta[w]=cos((double) (theta*w-offset));
-    sin_theta[w]=sin((double) (theta*w-offset));
-  }
+  FillRotationalTables(cos_theta,sin_theta,n,theta);
   /*
     Radial blur image.
   */
