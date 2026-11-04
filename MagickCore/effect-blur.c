@@ -2318,6 +2318,33 @@ static MagickBooleanType BlurMotionRow(const MotionRow *row,
   return(status);
 }
 
+static MagickBooleanType BlurMotionLine(const MotionRow *row,
+  CacheView *image_view,CacheView *blur_view,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,row->y,row->image->columns,1,
+    row->exception);
+  q=QueueCacheViewAuthenticPixels(blur_view,0,row->y,row->blur_image->columns,
+    1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  if (BlurMotionRow(row,p,q) == MagickFalse)
+    (*status)=MagickFalse;
+  if (SyncCacheViewAuthenticPixels(blur_view,row->exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -2415,25 +2442,9 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
     MotionRow
       row;
 
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
     row.blur_image=blur_image;
     row.kernel=kernel;
@@ -2442,10 +2453,8 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
     row.width=width;
     row.y=y;
     row.exception=exception;
-    if (BlurMotionRow(&row,p,q) == MagickFalse)
-      status=MagickFalse;
-    if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (BlurMotionLine(&row,image_view,blur_view,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
