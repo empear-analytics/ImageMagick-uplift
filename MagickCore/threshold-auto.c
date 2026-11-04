@@ -240,13 +240,55 @@ static void ComputeKapurBlackEntropy(const KapurSums *kapur,const ssize_t j)
     }
 }
 
+static void ComputeKapurEntropy(const KapurSums *sums,
+  double *white_entropy,const ssize_t j)
+{
+  const double
+    *const histogram = sums->histogram;
+
+  double
+    *const black_entropy = sums->black_entropy,
+    *const cumulative_histogram = sums->cumulative_histogram,
+    epsilon = sums->epsilon;
+
+  double
+    entropy;
+
+  ssize_t
+    i;
+
+  KapurSums
+    kapur;
+
+  /*
+    Black entropy.
+  */
+  kapur.histogram=histogram;
+  kapur.black_entropy=black_entropy;
+  kapur.cumulative_histogram=cumulative_histogram;
+  kapur.epsilon=epsilon;
+  ComputeKapurBlackEntropy(&kapur,j);
+  /*
+    White entropy.
+  */
+  white_entropy[j]=0.0;
+  if ((1.0-cumulative_histogram[j]) > epsilon)
+    {
+      entropy=0.0;
+      for (i=j+1; i <= MaxIntensity; i++)
+        if (histogram[i] > epsilon)
+          entropy-=histogram[i]/(1.0-cumulative_histogram[j])*
+            log(histogram[i]/(1.0-cumulative_histogram[j]));
+      white_entropy[j]=entropy;
+    }
+}
+
 static double KapurThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
   double
     *black_entropy,
     *cumulative_histogram,
-    entropy,
     epsilon,
     *white_entropy;
 
@@ -289,29 +331,13 @@ static double KapurThreshold(const Image *image,const double *histogram,
    for (j=0; j <= MaxIntensity; j++)
    {
      KapurSums
-       kapur;
+       sums;
 
-     /*
-       Black entropy.
-     */
-     kapur.histogram=histogram;
-     kapur.black_entropy=black_entropy;
-     kapur.cumulative_histogram=cumulative_histogram;
-     kapur.epsilon=epsilon;
-     ComputeKapurBlackEntropy(&kapur,j);
-     /*
-       White entropy.
-     */
-     white_entropy[j]=0.0;
-     if ((1.0-cumulative_histogram[j]) > epsilon)
-       {
-         entropy=0.0;
-         for (i=j+1; i <= MaxIntensity; i++)
-           if (histogram[i] > epsilon)
-             entropy-=histogram[i]/(1.0-cumulative_histogram[j])*
-               log(histogram[i]/(1.0-cumulative_histogram[j]));
-         white_entropy[j]=entropy;
-       }
+     sums.histogram=histogram;
+     sums.black_entropy=black_entropy;
+     sums.cumulative_histogram=cumulative_histogram;
+     sums.epsilon=epsilon;
+     ComputeKapurEntropy(&sums,white_entropy,j);
    }
   /*
     Find histogram bin with maximum entropy.
