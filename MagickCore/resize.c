@@ -1986,6 +1986,80 @@ static PointInfo GetInterpolativeScale(const Image *image,
   return(scale);
 }
 
+typedef struct _InterpolativeResizeInfo
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  Image
+    *resize_image;
+
+  PixelInterpolateMethod
+    method;
+
+  PointInfo
+    scale;
+
+  ExceptionInfo
+    *exception;
+} InterpolativeResizeInfo;
+
+static void InterpolateResizeRow(MagickBooleanType *status,
+  const InterpolativeResizeInfo *resize,PointInfo offset,Quantum *q)
+{
+  const Image
+    *const image = resize->image;
+
+  CacheView
+    *const image_view = resize->image_view;
+
+  Image
+    *const resize_image = resize->resize_image;
+
+  const PixelInterpolateMethod
+    method = resize->method;
+
+  const PointInfo
+    scale = resize->scale;
+
+  ExceptionInfo
+    *const exception = resize->exception;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) resize_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel
+        channel;
+
+      PixelTrait
+        resize_traits,
+        traits;
+
+      channel=GetPixelChannelChannel(image,i);
+      traits=GetPixelChannelTraits(image,channel);
+      resize_traits=GetPixelChannelTraits(resize_image,channel);
+      if (IsChannelTraitUndefined(traits,resize_traits) != MagickFalse)
+        continue;
+      offset.x=((double) x+0.5)*scale.x-0.5;
+      (*status)=InterpolatePixelChannels(image,image_view,resize_image,method,
+        offset.x,offset.y,q,exception);
+      if ((*status) == MagickFalse)
+        break;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(resize_image);
+  }
+}
+
 MagickExport Image *InterpolativeResizeImage(const Image *image,
   const size_t columns,const size_t rows,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -2040,14 +2114,14 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
 #endif
   for (y=0; y < (ssize_t) resize_image->rows; y++)
   {
+    InterpolativeResizeInfo
+      resize;
+
     PointInfo
       offset;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -2056,33 +2130,13 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
     if (q == (Quantum *) NULL)
       continue;
     offset.y=((double) y+0.5)*scale.y-0.5;
-    for (x=0; x < (ssize_t) resize_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel
-          channel;
-
-        PixelTrait
-          resize_traits,
-          traits;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        resize_traits=GetPixelChannelTraits(resize_image,channel);
-        if (IsChannelTraitUndefined(traits,resize_traits) != MagickFalse)
-          continue;
-        offset.x=((double) x+0.5)*scale.x-0.5;
-        status=InterpolatePixelChannels(image,image_view,resize_image,method,
-          offset.x,offset.y,q,exception);
-        if (status == MagickFalse)
-          break;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(resize_image);
-    }
+    resize.image=image;
+    resize.image_view=image_view;
+    resize.resize_image=resize_image;
+    resize.method=method;
+    resize.scale=scale;
+    resize.exception=exception;
+    InterpolateResizeRow(&status,&resize,offset,q);
     if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
