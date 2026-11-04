@@ -447,6 +447,81 @@ static void SelectMaxMagnitudePixel(const MaxMagnitudeInputs *selection,
   }
 }
 
+typedef struct _MaxMagnitudeLine
+{
+  CacheView
+    *alpha_view,
+    *beta_view,
+    *dx_view,
+    *dy_view,
+    *magnitude_view;
+
+  const Image
+    *alpha_image,
+    *beta_image,
+    *dx_image,
+    *dy_image;
+
+  Image
+    *magnitude_image;
+
+  ExceptionInfo
+    *exception;
+} MaxMagnitudeLine;
+
+static void SelectMaxMagnitudeLine(const MaxMagnitudeLine *line,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p,
+    *magick_restrict q,
+    *magick_restrict r,
+    *magick_restrict s;
+
+  Quantum
+    *magick_restrict t;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(line->alpha_view,0,y,
+    line->alpha_image->columns,1,line->exception);
+  q=GetCacheViewVirtualPixels(line->beta_view,0,y,line->alpha_image->columns,1,
+    line->exception);
+  r=GetCacheViewVirtualPixels(line->dx_view,0,y,line->alpha_image->columns,1,
+    line->exception);
+  s=GetCacheViewVirtualPixels(line->dy_view,0,y,line->alpha_image->columns,1,
+    line->exception);
+  t=GetCacheViewAuthenticPixels(line->magnitude_view,0,y,
+    line->alpha_image->columns,1,line->exception);
+  if (IsBlendRowsMissing(p,q,r,s,t) != MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) line->alpha_image->columns; x++)
+  {
+    MaxMagnitudeInputs
+      selection;
+
+    selection.alpha_image=line->alpha_image;
+    selection.beta_image=line->beta_image;
+    selection.dx_image=line->dx_image;
+    selection.dy_image=line->dy_image;
+    selection.p=p;
+    selection.q=q;
+    SelectMaxMagnitudePixel(&selection,r,s,t);
+    p+=(ptrdiff_t) GetPixelChannels(line->alpha_image);
+    q+=(ptrdiff_t) GetPixelChannels(line->beta_image);
+    r+=(ptrdiff_t) GetPixelChannels(line->dx_image);
+    s+=(ptrdiff_t) GetPixelChannels(line->dy_image);
+    t+=(ptrdiff_t) GetPixelChannels(line->magnitude_image);
+  }
+  SyncCompositeRow(line->magnitude_view,line->exception,status);
+}
+
 static Image *BlendMaxMagnitudeImage(const BlendMagnitudePair *magnitudes,
   const Image *dx_image,const Image *dy_image,ExceptionInfo *exception)
 {
@@ -487,51 +562,12 @@ static Image *BlendMaxMagnitudeImage(const BlendMagnitudePair *magnitudes,
 #endif
   for (y=0; y < (ssize_t) alpha_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p,
-      *magick_restrict q,
-      *magick_restrict r,
-      *magick_restrict s;
+    const MaxMagnitudeLine
+      line = { alpha_view, beta_view, dx_view, dy_view, magnitude_view,
+        alpha_image, beta_image, dx_image, dy_image, magnitude_image,
+        exception };
 
-    Quantum
-      *magick_restrict t;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(alpha_view,0,y,alpha_image->columns,1,
-      exception);
-    q=GetCacheViewVirtualPixels(beta_view,0,y,alpha_image->columns,1,exception);
-    r=GetCacheViewVirtualPixels(dx_view,0,y,alpha_image->columns,1,exception);
-    s=GetCacheViewVirtualPixels(dy_view,0,y,alpha_image->columns,1,exception);
-    t=GetCacheViewAuthenticPixels(magnitude_view,0,y,alpha_image->columns,1,
-      exception);
-    if (IsBlendRowsMissing(p,q,r,s,t) != MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) alpha_image->columns; x++)
-    {
-      MaxMagnitudeInputs
-        selection;
-
-      selection.alpha_image=alpha_image;
-      selection.beta_image=beta_image;
-      selection.dx_image=dx_image;
-      selection.dy_image=dy_image;
-      selection.p=p;
-      selection.q=q;
-      SelectMaxMagnitudePixel(&selection,r,s,t);
-      p+=(ptrdiff_t) GetPixelChannels(alpha_image);
-      q+=(ptrdiff_t) GetPixelChannels(beta_image);
-      r+=(ptrdiff_t) GetPixelChannels(dx_image);
-      s+=(ptrdiff_t) GetPixelChannels(dy_image);
-      t+=(ptrdiff_t) GetPixelChannels(magnitude_image);
-    }
-    SyncCompositeRow(magnitude_view,exception,&status);
+    SelectMaxMagnitudeLine(&line,y,&status);
   }
   magnitude_view=DestroyCacheView(magnitude_view);
   dy_view=DestroyCacheView(dy_view);
