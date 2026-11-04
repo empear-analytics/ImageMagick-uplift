@@ -1032,6 +1032,35 @@ static void KuwaharaRow(MagickBooleanType *status,const KuwaharaInfo *kuwahara,
   }
 }
 
+typedef struct _KuwaharaImageTargets
+{
+  Image
+    **gaussian_image,
+    **kuwahara_image;
+} KuwaharaImageTargets;
+
+static MagickBooleanType AcquireKuwaharaImage(const Image *image,
+  ExceptionInfo *exception,const KuwaharaImageTargets *targets)
+{
+  Image
+    **const gaussian_image = targets->gaussian_image,
+    **const kuwahara_image = targets->kuwahara_image;
+
+  (*kuwahara_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*kuwahara_image) == (Image *) NULL)
+    {
+      (*gaussian_image)=DestroyImage((*gaussian_image));
+      return(MagickFalse);
+    }
+  if (SetImageStorageClass((*kuwahara_image),DirectClass,exception) == MagickFalse)
+    {
+      (*gaussian_image)=DestroyImage((*gaussian_image));
+      (*kuwahara_image)=DestroyImage((*kuwahara_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1047,6 +1076,9 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
 
   MagickBooleanType
     status;
+
+  KuwaharaImageTargets
+    targets;
 
   MagickOffsetType
     progress;
@@ -1070,18 +1102,10 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   gaussian_image=BlurImage(image,radius,sigma,exception);
   if (gaussian_image == (Image *) NULL)
     return((Image *) NULL);
-  kuwahara_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (kuwahara_image == (Image *) NULL)
-    {
-      gaussian_image=DestroyImage(gaussian_image);
-      return((Image *) NULL);
-    }
-  if (SetImageStorageClass(kuwahara_image,DirectClass,exception) == MagickFalse)
-    {
-      gaussian_image=DestroyImage(gaussian_image);
-      kuwahara_image=DestroyImage(kuwahara_image);
-      return((Image *) NULL);
-    }
+  targets.gaussian_image=(&gaussian_image);
+  targets.kuwahara_image=(&kuwahara_image);
+  if (AcquireKuwaharaImage(image,exception,&targets) == MagickFalse)
+    return((Image *) NULL);
   /*
     Edge preserving noise reduction filter.
   */
