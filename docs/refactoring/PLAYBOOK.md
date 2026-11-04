@@ -4880,8 +4880,8 @@ functions only.
 1. The block lies inside one iteration of the parallel loop body, contains no `#pragma omp`
    line (so no `critical` or `atomic` block moves), no `return` or `goto`, and no `break` or
    `continue` that leaves it (those of a loop or `switch` inside it stay as they are; a
-   block that is a whole loop takes its own `break`s with it). Recipe T step 4's exception
-   for a block that ends the loop body does not apply here.
+   block that is a whole loop takes its own `break`s with it), except in step 7's form.
+   Recipe T step 4's exception for a block that ends the loop body does not apply here.
 2. `status` is the only variable declared outside the loop body that the block writes. It
    is shared: named in the pragma's `shared(...)` clause, or in no data-sharing clause
    (`default` shared). It is not named in `private`, `firstprivate`, `lastprivate` or
@@ -4899,6 +4899,17 @@ functions only.
 6. Where the block stood, write `Helper(...,&status);`, and check every argument against
    its parameter by reading. With more than four parameters, bundle the read-only inputs in
    a `const` struct as Recipe N steps 2 and 3 do; `status` is passed apart, by pointer.
+7. A loop's whole body. The block may be the whole body of the parallel loop, declarations
+   included, with `continue;` statements of that loop (the usual `if (status ==
+   MagickFalse) continue;` first, and `status=MagickFalse; continue;` after a failed pixel
+   fetch), as Recipe E step 7's whole-body form allows: each such `continue;` becomes
+   `return;` of the new function, the loop's counter goes by value, and the body becomes
+   the call alone, `Helper(...,x,&status);`, so both end the iteration at the same point.
+   Step 4's `(*status)` holds at every use, the leading test included. The `#pragma omp`
+   lines and the `for` statement stay; the variables the body declares (`id`, the row
+   pointers, the thread's scratch pointer) move with it, and a call such as
+   `GetOpenMPThreadId()` is made in the helper, by the same thread. A `continue` of a
+   loop nested in the body is that loop's own and does not change.
 
 **Before:**
 
@@ -4950,6 +4961,14 @@ static void InterpolateResizeRow(...,MagickBooleanType *status,...)
   the iteration, never across the region's boundary: the parallel region, its clauses and
   its scheduling are as before. A callee that the block calls is called from the same
   thread as before.
+- Under step 7, the helper is the loop body: it starts where the body started, runs on
+  the same thread, and each `return;` leaves it where the `continue;` left the body, so
+  the next iteration starts at the same point; nothing in the body ran after a
+  `continue;` and nothing in the helper runs after a `return;`. The counter is the
+  thread's own copy of the loop variable, passed by value, and the body never wrote it
+  (a body that does is not this form). `status` is reached through its address as in
+  step 4, so the flag the threads share is read and written at the same points. The
+  helper is called from inside the iteration, never across the region's boundary.
 - The oracle runs single-threaded and cannot see a data race: steps 1 to 3 are checked by
   reading, and the guard's `--calls` moves only the new helper's `+2` and the callees of
   the moved block.
@@ -4963,7 +4982,13 @@ pointer, which no recipe allowed), from campaign A's W12 session: `resize.c`'s
 `InterpolativeResizeImage` (Recipe AS refused it: every candidate block leaves `status`
 alone when a loop runs zero iterations, or its `break` leaves the block), `feature.c`'s
 `MeanShiftImage` and `effect.c`'s `SpreadImage` and `KuwaharaImage` (the same assign-and-test
-`status=Interpolate...` with a `break`). Added by Claude Code (Claude Sonnet 5.5).
+`status=Interpolate...` with a `break`). Added by Claude Code (Claude Sonnet 5.5). Step 7 (2026-11-04, task W12): `effect.c`'s
+`LocalContrastImage`, whose two parallel loop bodies (a column pass and a row pass, each
+opening with `if (status == MagickFalse) continue;` and holding a failed-fetch
+`status=MagickFalse; continue;`) T, LB, OC and W each refused; both bodies as helpers
+over one `const` input struct: 5.02 to 5.19 in a probe, `LocalContrastImage` leaving
+Bumpy Road Ahead (cc 19 to 9, 155 to 104 lines), no finding on either helper. Added by
+Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -5642,3 +5667,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-04 | NEW | PS | Extract Block Through a Pointer to the Loop Status: a block inside a parallel loop body that reads, tests or assigns the shared `status` in ways T and AS refuse moves to a `static void` function taking `MagickBooleanType *status`, every use written `(*status)`; the caller passes `&status`; `status` shared, no pragma inside the block | `resize.c`'s `InterpolativeResizeImage` (campaign A, W12): its column loop assigns and tests `status` from `InterpolatePixelChannels` and may run no iteration; T and J refused it, AS refuses it (a path leaves `status` alone, a `break` leaves the block); the loop as a helper through a `status` pointer probed `resize.c` 7.11 to 8.6; the same site in `feature.c`'s `MeanShiftImage`, `effect.c`'s `SpreadImage` and `KuwaharaImage` | owner |
 | 2026-11-04 | AMEND | SD | Step 1: a group may hold `break;` of the `switch` inside a selection (`if (p == NULL) break;`), as a chain's groups already may; each ends the group where its last `break;` would. *Careful* gives the argument | `effect.c`'s `PreviewImage` (campaign A, W12): fourteen of the 29 groups of `switch (preview)` end a failed `CloneImage` with `if (preview_image == NULL) break;`, so step 1 refused the `switch` the function's cc 56 rests on. Chained functions of the break-free and breaking groups together: 4.51 to 5.00 in a probe, every step raising the score | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | SD | Step 8 (new): a chain whose steps need Z's input struct declares one `tile` local at the top of the block holding the `switch` and fills it once directly before the `switch` (Recipe N step 8's sibling form); the caller's `default:` calls the outermost helper with `&tile`, and each helper passes `tile` on unchanged to the next. *Careful* gives the argument | `effect.c`'s `PreviewImage` (campaign A, W12): the groups read eleven variables, so Z gives a struct; step 2 moves the `default:` group with its struct local and fill, which would give every later helper its own copy of the fill and a second struct. Seven helpers over one `tile`: 5.00 in a probe, no finding on any of them | mandate (2026-10-24) |
+| 2026-11-04 | AMEND | PS | Step 7 (new): the block may be a parallel loop's whole body, declarations included, with `continue;` statements of that loop (Recipe E step 7's whole-body form): each becomes `return;`, the counter goes by value, the body becomes the call alone, `status` through the pointer at every use; step 1 excepts it. *Careful* gives the argument | `effect.c`'s `LocalContrastImage` (campaign A, W12): both loop bodies open with `if (status == MagickFalse) continue;` and hold a failed-fetch `status=MagickFalse; continue;`, which T, LB, OC, W and PS step 1 refuse (the W12 report names the gap). Both bodies as helpers over one input struct: 5.02 to 5.19 in a probe, no finding on either helper | mandate (2026-10-24) |
