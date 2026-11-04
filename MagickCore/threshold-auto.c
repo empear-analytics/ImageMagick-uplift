@@ -159,6 +159,45 @@ static size_t FindKapurThreshold(const double *black_entropy,
   return(threshold);
 }
 
+typedef struct _KapurBuffers
+{
+  const Image
+    *image;
+
+  double
+    *black_entropy,
+    *cumulative_histogram,
+    *white_entropy;
+
+  ExceptionInfo
+    *exception;
+} KapurBuffers;
+
+static double ThrowKapurFailure(const KapurBuffers *buffers)
+{
+  const Image
+    *const image = buffers->image;
+
+  double
+    *black_entropy = buffers->black_entropy,
+    *cumulative_histogram = buffers->cumulative_histogram,
+    *white_entropy = buffers->white_entropy;
+
+  ExceptionInfo
+    *const exception = buffers->exception;
+
+  if (white_entropy != (double *) NULL)
+    white_entropy=(double *) RelinquishMagickMemory(white_entropy);
+  if (black_entropy != (double *) NULL)
+    black_entropy=(double *) RelinquishMagickMemory(black_entropy);
+  if (cumulative_histogram != (double *) NULL)
+    cumulative_histogram=(double *)
+      RelinquishMagickMemory(cumulative_histogram);
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+  return(-1.0);
+}
+
 static double KapurThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
@@ -188,16 +227,15 @@ static double KapurThreshold(const Image *image,const double *histogram,
   if (IsKapurBufferMissing(cumulative_histogram,black_entropy,white_entropy) !=
       MagickFalse)
     {
-      if (white_entropy != (double *) NULL)
-        white_entropy=(double *) RelinquishMagickMemory(white_entropy);
-      if (black_entropy != (double *) NULL)
-        black_entropy=(double *) RelinquishMagickMemory(black_entropy);
-      if (cumulative_histogram != (double *) NULL)
-        cumulative_histogram=(double *)
-          RelinquishMagickMemory(cumulative_histogram);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(-1.0);
+      KapurBuffers
+        failure;
+
+      failure.image=image;
+      failure.cumulative_histogram=cumulative_histogram;
+      failure.black_entropy=black_entropy;
+      failure.white_entropy=white_entropy;
+      failure.exception=exception;
+      return(ThrowKapurFailure(&failure));
     }
    /*
      Entropy for black and white parts of the histogram.
