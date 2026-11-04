@@ -2915,6 +2915,33 @@ static void RelinquishRotationalTables(double *cos_theta,double *sin_theta)
     sin_theta=(double *) RelinquishMagickMemory(sin_theta);
 }
 
+static MagickBooleanType BlurRotationalLine(const RotationalRow *row,
+  CacheView *image_view,CacheView *blur_view,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,row->y,row->image->columns,1,
+    row->exception);
+  q=QueueCacheViewAuthenticPixels(blur_view,0,row->y,row->blur_image->columns,
+    1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  if (BlurRotationalRow(row,p,q) == MagickFalse)
+    (*status)=MagickFalse;
+  if (SyncCacheViewAuthenticPixels(blur_view,row->exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   ExceptionInfo *exception)
 {
@@ -2998,25 +3025,9 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
     RotationalRow
       row;
 
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
     row.blur_image=blur_image;
     row.radial_view=radial_view;
@@ -3027,10 +3038,8 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
     row.n=n;
     row.y=y;
     row.exception=exception;
-    if (BlurRotationalRow(&row,p,q) == MagickFalse)
-      status=MagickFalse;
-    if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (BlurRotationalLine(&row,image_view,blur_view,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
