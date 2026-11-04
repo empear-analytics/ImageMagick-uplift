@@ -959,6 +959,79 @@ static void SelectKuwaharaQuadrant(const KuwaharaQuadrants *quadrants,
   }
 }
 
+typedef struct _KuwaharaInfo
+{
+  Image
+    *gaussian_image,
+    *kuwahara_image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    width;
+
+  ssize_t
+    y;
+} KuwaharaInfo;
+
+static void KuwaharaRow(MagickBooleanType *status,const KuwaharaInfo *kuwahara,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const gaussian_image = kuwahara->gaussian_image,
+    *const kuwahara_image = kuwahara->kuwahara_image;
+
+  CacheView
+    *const image_view = kuwahara->image_view;
+
+  ExceptionInfo
+    *const exception = kuwahara->exception;
+
+  const size_t
+    width = kuwahara->width;
+
+  const ssize_t
+    y = kuwahara->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) gaussian_image->columns; x++)
+  {
+    KuwaharaQuadrants
+      quadrants;
+
+    RectangleInfo
+      target;
+
+    size_t
+      i;
+
+    quadrants.gaussian_image=gaussian_image;
+    quadrants.image_view=image_view;
+    quadrants.width=width;
+    quadrants.x=x;
+    quadrants.y=y;
+    quadrants.exception=exception;
+    SelectKuwaharaQuadrant(&quadrants,&target,&i);
+    if (i < 4)
+      {
+        (*status)=MagickFalse;
+        break;
+      }
+    (*status)=InterpolatePixelChannels(gaussian_image,image_view,kuwahara_image,
+      UndefinedInterpolatePixel,(double) target.x+target.width/2.0,(double)
+      target.y+target.height/2.0,q,exception);
+    if ((*status) == MagickFalse)
+      break;
+    q+=(ptrdiff_t) GetPixelChannels(kuwahara_image);
+  }
+}
+
 MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1022,11 +1095,11 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) gaussian_image->rows; y++)
   {
+    KuwaharaInfo
+      kuwahara;
+
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -1037,36 +1110,13 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) gaussian_image->columns; x++)
-    {
-      KuwaharaQuadrants
-        quadrants;
-
-      RectangleInfo
-        target;
-
-      size_t
-        i;
-
-      quadrants.gaussian_image=gaussian_image;
-      quadrants.image_view=image_view;
-      quadrants.width=width;
-      quadrants.x=x;
-      quadrants.y=y;
-      quadrants.exception=exception;
-      SelectKuwaharaQuadrant(&quadrants,&target,&i);
-      if (i < 4)
-        {
-          status=MagickFalse;
-          break;
-        }
-      status=InterpolatePixelChannels(gaussian_image,image_view,kuwahara_image,
-        UndefinedInterpolatePixel,(double) target.x+target.width/2.0,(double)
-        target.y+target.height/2.0,q,exception);
-      if (status == MagickFalse)
-        break;
-      q+=(ptrdiff_t) GetPixelChannels(kuwahara_image);
-    }
+    kuwahara.gaussian_image=gaussian_image;
+    kuwahara.kuwahara_image=kuwahara_image;
+    kuwahara.image_view=image_view;
+    kuwahara.exception=exception;
+    kuwahara.width=width;
+    kuwahara.y=y;
+    KuwaharaRow(&status,&kuwahara,q);
     if (SyncCacheViewAuthenticPixels(kuwahara_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
