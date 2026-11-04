@@ -4813,6 +4813,115 @@ Code (Claude Sonnet 5.5).
 
 ---
 
+## Recipe PS - Extract Block Through a Pointer to the Loop Status
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Large
+Method* or *Complex Method*, and the block that would fix it sits inside the body of a
+`#pragma omp parallel for` loop and uses the loop's shared `status` in a way the
+local-copy recipes refuse: it assigns it from a call and tests it (`status=
+InterpolatePixelChannels(...); if (status == MagickFalse) break;`), possibly inside a loop
+that may run no iteration, or it reads the value it did not itself assign.
+
+**Not covered by:** Recipe T (the block writes `status` only as `status=MagickFalse;` and
+never reads it) and Recipe AS (the block assigns `status` on every path and never reads the
+shared value first): both give the helper a local `status` and write the result back at the
+end, which is wrong for a block that reads the shared value or may leave it alone. Recipe E
+and Recipe O: E's OpenMP rule refuses any write to a variable declared outside the loop
+body, and O refuses every block inside an OpenMP region. Recipe Q and Recipe K: sequential
+functions only.
+
+**How:**
+
+1. The block lies inside one iteration of the parallel loop body, contains no `#pragma omp`
+   line (so no `critical` or `atomic` block moves), no `return` or `goto`, and no `break` or
+   `continue` that leaves it (those of a loop or `switch` inside it stay as they are; a
+   block that is a whole loop takes its own `break`s with it). Recipe T step 4's exception
+   for a block that ends the loop body does not apply here.
+2. `status` is the only variable declared outside the loop body that the block writes. It
+   is shared: named in the pragma's `shared(...)` clause, or in no data-sharing clause
+   (`default` shared). It is not named in `private`, `firstprivate`, `lastprivate` or
+   `reduction`. The block may read it, test it and assign it in any way.
+3. Every other variable of the loop body that the block writes is declared inside the
+   block, or is not read after it (a row pointer `q` advanced along the row, say; Recipe T
+   step 3).
+4. Cut the block into a new `static void` function directly above the caller. Its first
+   parameter is `MagickBooleanType *status`; in the body every use of `status` becomes
+   `(*status)`, reads included, and `&status` passed to a callee becomes `status`, the same
+   address. Nothing else in the text changes.
+5. Pass every other variable the block reads by value, pointers included, as Recipe T
+   step 6 does; a variable of the loop body that the block writes and the caller does not
+   read after it is declared in the new function (Recipe E step 4).
+6. Where the block stood, write `Helper(...,&status);`, and check every argument against
+   its parameter by reading. With more than four parameters, bundle the read-only inputs in
+   a `const` struct as Recipe N steps 2 and 3 do; `status` is passed apart, by pointer.
+
+**Before:**
+
+```c
+    for (x=0; x < (ssize_t) resize_image->columns; x++)
+    {
+      ...
+        status=InterpolatePixelChannels(image,image_view,resize_image,method,
+          offset.x,offset.y,q,exception);
+        if (status == MagickFalse)
+          break;
+      ...
+      q+=(ptrdiff_t) GetPixelChannels(resize_image);
+    }
+```
+
+**After:**
+
+```c
+static void InterpolateResizeRow(...,MagickBooleanType *status,...)
+{
+  for (x=0; x < (ssize_t) resize_image->columns; x++)
+  {
+    ...
+      (*status)=InterpolatePixelChannels(...);
+      if ((*status) == MagickFalse)
+        break;
+    ...
+  }
+}
+...
+    InterpolateResizeRow(...,&status,...);
+```
+
+**Careful:**
+
+- The helper reads and writes the very variable the caller did: `*status` is the shared
+  `status`, at the same program points, in the same order and with the same values as
+  inline. Nothing is deferred and nothing is copied (unlike Recipe T and AS, which write
+  back at the end), so what another thread sees of the flag, and what this thread reads
+  back from it, is what the original produced; OpenMP gives unsynchronised accesses to
+  the flag no ordering in the first place, as for the leading `if (status == MagickFalse)
+  continue;`. That is why a block that reads the shared value, or leaves it alone on some
+  path (a loop that may run no iteration), is fine here and not under T or AS.
+- Step 2 is what makes passing the address safe: a `private` or `reduction` `status` would
+  be the thread's own copy, and a pointer to it, passed down, is that same copy, but the
+  recipe does not rely on it: it stays with a shared flag. Check the pragma by reading.
+- No `critical` or `atomic` block and no pragma moves, and the helper is called from inside
+  the iteration, never across the region's boundary: the parallel region, its clauses and
+  its scheduling are as before. A callee that the block calls is called from the same
+  thread as before.
+- The oracle runs single-threaded and cannot see a data race: steps 1 to 3 are checked by
+  reading, and the guard's `--calls` moves only the new helper's `+2` and the callees of
+  the moved block.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 checked by
+reading.
+
+**Provenance:** 2026-11-04, owner ("Yes, write it", on the report that `resize.c`'s
+`InterpolativeResizeImage` probed 7.11 to 8.6 with its column loop moved through a `status`
+pointer, which no recipe allowed), from campaign A's W12 session: `resize.c`'s
+`InterpolativeResizeImage` (Recipe AS refused it: every candidate block leaves `status`
+alone when a loop runs zero iterations, or its `break` leaves the block), `feature.c`'s
+`MeanShiftImage` and `effect.c`'s `SpreadImage` and `KuwaharaImage` (the same assign-and-test
+`status=Interpolate...` with a `break`). Added by Claude Code (Claude Sonnet 5.5).
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -5485,3 +5594,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-01 | AMEND | Preprocessor branches | Exception: a branch no configuration compiles (`#if 0`) may move verbatim, token for token, with the code that holds it when a recipe moves that code; the dead text is not edited or renamed, a script checks it stands once in the new place unchanged, and `pp_identical.sh` prints `IDENTICAL`; `#if defined(...)` branches that some configuration compiles stay refused | `distort.c`'s `DistortImage` (campaign A, W11): the `Cylinder2Plane` and `Plane2Cylinder` pixel cases each hold a never-compiled `#if 0` debug block that names `i` and `j`; the rule kept the cases (and with them *Deep, Nested Complexity* at depth 5) in place; a probe with the blocks out of the function gave 3.01 to 3.55 | owner |
 | 2026-11-01 | AMEND | AS | Step 7: a block that reads more than four variables takes them through an input struct as in Recipe N steps 2 and 3, filled directly before the call; a variable written through its address that the callee reads on entry goes by pointer as a parameter; the caller writes `status=Helper(&inputs,...);` | `distort.c`'s `DistortImage` (campaign A, W11): the resample branch reads eight variables (`distort_image`, `resample_filter`, `id`, `s`, `validity`, `invalid`, `exception`) and writes `pixel` through `&pixel`, which `ResamplePixelColor` reads on entry; AS's first use gave 8 arguments, flat 3.01 with the struct form (bumps 16 to 14), 502 cases, 0 diverged | owner |
 | 2026-11-01 | AMEND | H | Step 1: a single `#define` that stands further down the body, after statements, may be hoisted as a run of its own when its name occurs nowhere between the function's signature and that `#define` (checked by script); step 3 excepts it; use only to unblock an extraction that follows; `pp_identical.sh` proves the step | `distort.c`'s `DistortImage` (campaign A, W11): `ScaleFilter` is `#define`d in the middle of the body and used by nine pixel cases; a helper above the function cannot see it, and step 1 took only a run at the top of the body | mandate (2026-10-24) |
+| 2026-11-04 | NEW | PS | Extract Block Through a Pointer to the Loop Status: a block inside a parallel loop body that reads, tests or assigns the shared `status` in ways T and AS refuse moves to a `static void` function taking `MagickBooleanType *status`, every use written `(*status)`; the caller passes `&status`; `status` shared, no pragma inside the block | `resize.c`'s `InterpolativeResizeImage` (campaign A, W12): its column loop assigns and tests `status` from `InterpolatePixelChannels` and may run no iteration; T and J refused it, AS refuses it (a path leaves `status` alone, a `break` leaves the block); the loop as a helper through a `status` pointer probed `resize.c` 7.11 to 8.6; the same site in `feature.c`'s `MeanShiftImage`, `effect.c`'s `SpreadImage` and `KuwaharaImage` | owner |
