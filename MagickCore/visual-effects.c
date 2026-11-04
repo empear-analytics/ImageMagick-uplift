@@ -3039,6 +3039,60 @@ static void SolarizeColormap(Image *image,const double threshold)
   }
 }
 
+typedef struct _SolarizeRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  double
+    threshold;
+
+  ExceptionInfo
+    *exception;
+} SolarizeRow;
+
+static MagickBooleanType SolarizeImageRow(const SolarizeRow *solarize_row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = solarize_row->image;
+
+  CacheView
+    *const image_view = solarize_row->image_view;
+
+  const double
+    threshold = solarize_row->threshold;
+
+  ExceptionInfo
+    *const exception = solarize_row->exception;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    SolarizePixelChannels(image,threshold,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType SolarizeImage(Image *image,
   const double threshold,ExceptionInfo *exception)
 {
@@ -3082,27 +3136,15 @@ MagickExport MagickBooleanType SolarizeImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
+    SolarizeRow
+      solarize_row;
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    solarize_row.image=image;
+    solarize_row.image_view=image_view;
+    solarize_row.threshold=threshold;
+    solarize_row.exception=exception;
+    if (SolarizeImageRow(&solarize_row,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SolarizePixelChannels(image,threshold,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
