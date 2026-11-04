@@ -1136,6 +1136,38 @@ static Image *AppendHoughAccumulator(Image *lines_image,
   return(lines_image);
 }
 
+static Image *RenderHoughImage(const Image *image,const char *path,
+  MatrixInfo *accumulator,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  Image
+    *lines_image = NULL;
+
+  ImageInfo
+    *image_info;
+
+  /*
+    Render lines to image canvas.
+  */
+  image_info=AcquireImageInfo();
+  image_info->background_color=image->background_color;
+  (void) FormatLocaleString(image_info->filename,MagickPathExtent,"%s",path);
+  SetHoughDrawOptions(image,image_info);
+  lines_image=RenderHoughLines(image_info,image->columns,image->rows,exception);
+  artifact=GetImageArtifact(image,"hough-lines:accumulator");
+  lines_image=AppendHoughAccumulator(lines_image,accumulator,artifact,
+    exception);
+  /*
+    Free resources.
+  */
+  accumulator=DestroyMatrixInfo(accumulator);
+  image_info=DestroyImageInfo(image_info);
+  (void) RelinquishUniqueFileResource(path);
+  return(GetFirstImageInList(lines_image));
+}
+
 MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   const size_t height,const size_t threshold,ExceptionInfo *exception)
 {
@@ -1147,9 +1179,6 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   char
     path[MagickPathExtent];
 
-  const char
-    *artifact;
-
   double
     hough_height;
 
@@ -1158,12 +1187,6 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
 
   HoughSegments
     segments;
-
-  Image
-    *lines_image = NULL;
-
-  ImageInfo
-    *image_info;
 
   int
     file;
@@ -1280,24 +1303,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   segments.file=file;
   status=WriteHoughLines(&segments,window,status);
   (void) close_utf8(file);
-  /*
-    Render lines to image canvas.
-  */
-  image_info=AcquireImageInfo();
-  image_info->background_color=image->background_color;
-  (void) FormatLocaleString(image_info->filename,MagickPathExtent,"%s",path);
-  SetHoughDrawOptions(image,image_info);
-  lines_image=RenderHoughLines(image_info,image->columns,image->rows,exception);
-  artifact=GetImageArtifact(image,"hough-lines:accumulator");
-  lines_image=AppendHoughAccumulator(lines_image,accumulator,artifact,
-    exception);
-  /*
-    Free resources.
-  */
-  accumulator=DestroyMatrixInfo(accumulator);
-  image_info=DestroyImageInfo(image_info);
-  (void) RelinquishUniqueFileResource(path);
-  return(GetFirstImageInList(lines_image));
+  return(RenderHoughImage(image,path,accumulator,exception));
 }
 
 /*
