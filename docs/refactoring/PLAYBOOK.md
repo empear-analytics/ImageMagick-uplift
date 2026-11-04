@@ -5095,7 +5095,12 @@ caller must know whether the tail runs). Recipe LB (a `break;`, not a `continue;
 2. Written variables: Recipe PS step 2 (`status` and at most two shared scalars, each by
    pointer). Every other variable of the body that the head writes is declared in the
    head, or is not read by the tail (a row pointer `q`), and is declared in the new
-   function (Recipe E step 4). The tail reads nothing the head wrote except `status`.
+   function (Recipe E step 4). The tail reads nothing the head wrote except `status`
+   and, at most two, variables declared in the body that the tail reads (a struct the
+   head fills and the tail merges): each goes by pointer, `T *v`, every use of it in the
+   head written `(*v)` (`v->m` for a member, `&v->m` for the address of one), the caller
+   passing `&v`. A shared variable the head only reads goes by pointer to `const`, so
+   it is read where the head read it and not earlier in the caller.
 3. Cut the head into a new `static MagickBooleanType` function directly above the
    caller. Each `continue;` becomes `return(MagickFalse);`, the function ends with
    `return(MagickTrue);`, and every use of `status` becomes `(*status)` (Recipe PS step
@@ -5107,8 +5112,8 @@ caller must know whether the tail runs). Recipe LB (a `break;`, not a `continue;
    observable. When every member's value is a plain identifier of the caller, the struct
    may instead be declared `const` with the values as its initialiser, in declaration
    order (Recipe B step 5's form; `const Row row = { image, view, id };`), directly after
-   the body's other declarations, so each thread still initialises its own. `status` and
-   each shared scalar come last, by pointer.
+   the body's other declarations, so each thread still initialises its own. The pointers of step 2
+   stand after the struct; `status` and each shared scalar come last, by pointer.
 5. Where the head stood, write `if (Helper(...,&status) == MagickFalse) continue;`,
    after the struct's declaration and fill when step 4 needs one. The tail stays as it
    is. Check every argument against its parameter by reading.
@@ -5173,6 +5178,12 @@ static MagickBooleanType OpaquePaintLine(const OpaquePaintRow *row,
   (Recipe PS *Careful*); the helper is called from inside the iteration, on the same
   thread, and no pragma moves, so the region, its clauses and the `omp atomic`
   `progress++` are as before.
+- A body variable the tail reads and the head writes (step 2) is the thread's own
+  variable, declared in the body: the pointer names that variable, the head writes it
+  at the same points through `(*v)`, and the tail reads it after the call as it read it
+  after the head. Nothing is copied and no address leaves the iteration. A shared
+  variable the head reads through a pointer to `const` is read at the point the head
+  read it, as before.
 - The oracle runs single-threaded and cannot see a race: steps 1 and 2 are checked by
   reading.
 
@@ -5184,7 +5195,10 @@ and `OilPaintImage` (campaign A, W13), whose parallel loop bodies are a guard, a
 fetch that `continue;`s, a row call and a sync test, followed by an atomic progress
 block; the plateau table recorded that no T, U or LB form moves the head. A probe on
 `OpaquePaintImage`: 6.24 to 6.49, the function leaving Complex Method. Added by Claude
-Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+Code (Claude Sonnet 5.5) under the mandate of 2026-10-24. Step 2's body variables the
+tail reads (2026-11-04, W13): `statistic-measure.c`'s `GetImageRange`, whose head fills
+the row's `channel_range`, which the `omp critical` tail merges; a probe 9.68 to 10.00.
+Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -5974,3 +5988,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-04 | NEW | FI | Fill a Struct by Initialiser: a struct local that an earlier step declared and filled one `name.m=e;` per member (every member, in declaration order, each value a plain identifier or literal), only read afterwards, becomes `const Name name = { e1, ... };`; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `decorate.c`'s `FrameImage` (campaign A, W13): the `top_border` and `bottom_border` fills are 23 assignment lines of a function still in Large Method after PC and PS; a probe of both fills: 8.73 to 8.83, identical object code. No recipe rewrites an existing fill: B, N and PC say how a new one is written; RF deletes | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | LB | Step 4: a block inside a loop's body, in a function with no OpenMP region, may take its input struct filled once before the loop (Recipe OC step 6's form), shared by the loop's blocks and passed on unchanged to a helper's own helpers; nothing from the fill to the loop's end writes a member's variable | `resize-scale.c`'s `ScaleImage` (campaign A, W13): its row loop's body holds four blocks (the Y-direction scale, the single-row fetch, the sync and the progress test) and then is itself a block to move; all read the same nine variables, and a struct filled before each call would add the fill's lines to a function whose Large Method is its length | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | LB | Step 8: up to six written variables share the one struct when the caller declares it `const`, once, with the addresses as its initialiser (Recipe Q step 8's form) and passes it to every helper that writes any of them; the helpers take it as one parameter | `resize-scale.c`'s `ScaleImage` (campaign A, W13): the row loop's body and its Y-direction block write `n`, `status`, `number_rows`, `span`, `scale` and `next_row`, the six addresses `AccumulateScaleRows` already takes in `targets`; step 8 stopped at four. A probe of the Y-direction block (the rest of the body as it stood): 8.46 to 8.53; with the single-row fetch, the sync and the progress test as helpers 8.62, and the body itself as a helper over them 8.78 | mandate (2026-10-24) |
+| 2026-11-04 | AMEND | PC | Step 2: body variables that the head writes and the tail reads (at most two) go by pointer, every use `(*v)`, and a shared variable the head only reads goes by pointer to `const`; step 4 places these pointers between the struct and `status`. Still five steps | `statistic-measure.c`'s `GetImageRange` (campaign A, W13): the head fetches the row, copies the shared `range_info` into the body's `channel_range`, and accumulates into it; the `omp critical` tail then merges it, which PC step 2 refused. A probe: 9.68 to 10.00, no finding on the helper | mandate (2026-10-24) |
