@@ -281,6 +281,23 @@ static inline double GetMinEdgeBackgroundCensus(const CensusInfo *edge)
   return(census);
 }
 
+static double GetPercentBackground(const Image *edge_image)
+{
+  const char
+    *artifact;
+
+  double
+    percent_background;
+
+  percent_background=1.0;
+  artifact=GetImageArtifact(edge_image,"trim:percent-background");
+  if (artifact != (const char *) NULL)
+    percent_background=StringToDouble(artifact,(char **) NULL)/100.0;
+  percent_background=MagickMin(MagickMax(1.0-percent_background,MagickEpsilon),
+    1.0);
+  return(percent_background);
+}
+
 static RectangleInfo GetEdgeBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -290,9 +307,6 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
   CensusInfo
     edge,
     vertex;
-
-  const char
-    *artifact;
 
   double
     background_census,
@@ -326,12 +340,7 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
     0,1,0,0,exception);
   edge.bottom=GetEdgeBackgroundCensus(edge_image,edge_view,SouthGravity,
     0,1,0,0,exception);
-  percent_background=1.0;
-  artifact=GetImageArtifact(edge_image,"trim:percent-background");
-  if (artifact != (const char *) NULL)
-    percent_background=StringToDouble(artifact,(char **) NULL)/100.0;
-  percent_background=MagickMin(MagickMax(1.0-percent_background,MagickEpsilon),
-    1.0);
+  percent_background=GetPercentBackground(edge_image);
   background_census=GetMinEdgeBackgroundCensus(&edge);
   for ( ; background_census < percent_background;
           background_census=GetMinEdgeBackgroundCensus(&edge))
