@@ -1015,7 +1015,7 @@ static void SetForwardFourierPhase(const ForwardFourierPhase *pass,
 }
 
 static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
-  Image *image,double *magnitude,double *phase,ExceptionInfo *exception)
+  Image *image,const ForwardFourierPlanes *planes,ExceptionInfo *exception)
 {
   double
     *magnitude_pixels,
@@ -1071,10 +1071,10 @@ static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
   (void) memset(phase_pixels,0,fourier_info->width*
     fourier_info->height*sizeof(*phase_pixels));
   status=ForwardQuadrantSwap(fourier_info->width,fourier_info->height,
-    magnitude,magnitude_pixels);
+    planes->magnitude_pixels,magnitude_pixels);
   if (status != MagickFalse)
-    status=ForwardQuadrantSwap(fourier_info->width,fourier_info->height,phase,
-      phase_pixels);
+    status=ForwardQuadrantSwap(fourier_info->width,fourier_info->height,
+      planes->phase_pixels,phase_pixels);
   CorrectPhaseLHS(fourier_info->width,fourier_info->height,phase_pixels);
   ScaleForwardFourierPhase(fourier_info,phase_pixels);
   pass.fourier_info=fourier_info;
@@ -1350,8 +1350,7 @@ static MagickBooleanType ForwardFourierTransformChannel(
   planes.phase_pixels=phase_pixels;
   status=ForwardFourierTransform(&fourier_info,source->image,&planes,exception);
   if (status != MagickFalse)
-    status=ForwardFourier(&fourier_info,fourier_image,magnitude_pixels,
-      phase_pixels,exception);
+    status=ForwardFourier(&fourier_info,fourier_image,&planes,exception);
   phase_info=RelinquishVirtualMemory(phase_info);
   magnitude_info=RelinquishVirtualMemory(magnitude_info);
   return(status);
