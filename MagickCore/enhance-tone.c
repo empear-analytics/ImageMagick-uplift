@@ -2802,11 +2802,11 @@ static void NegateColormap(Image *image,const MagickBooleanType grayscale)
   }
 }
 
+#define NegateImageTag  "Negate/Image"
+
 MagickExport MagickBooleanType NegateImage(Image *image,
   const MagickBooleanType grayscale,ExceptionInfo *exception)
 {
-#define NegateImageTag  "Negate/Image"
-
   CacheView
     *image_view;
 
