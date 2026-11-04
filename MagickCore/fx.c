@@ -5325,6 +5325,79 @@ static MagickBooleanType ApplyFxToPixel (const FxPixelInputs * in,
   return(status);
 }
 
+typedef struct _FxRowInputs
+{
+  const Image
+    *image;
+
+  Image
+    *fx_image;
+
+  CacheView
+    *image_view,
+    *fx_view;
+
+  FxInfo
+    *pfx;
+
+  int
+    id;
+} FxRowInputs;
+
+static MagickBooleanType ApplyFxToRow (const FxRowInputs * row,
+  const ssize_t y, MagickBooleanType *status)
+{
+  const Image
+    *const image = row->image;
+
+  Image
+    *const fx_image = row->fx_image;
+
+  FxInfo
+    *const pfx = row->pfx;
+
+  const int
+    id = row->id;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p = GetCacheViewVirtualPixels (row->image_view, 0, y, image->columns, 1, pfx->exception);
+  q = QueueCacheViewAuthenticPixels (row->fx_view, 0, y, fx_image->columns, 1, pfx->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL)) {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+  }
+  for (x=0; x < (ssize_t) fx_image->columns; x++) {
+    FxPixelInputs
+      pixel_in;
+
+    pfx->fxrts[id].thisPixel = (Quantum *)p;
+
+    pixel_in.image=image;
+    pixel_in.fx_image=fx_image;
+    pixel_in.pfx=pfx;
+    pixel_in.id=id;
+    pixel_in.x=x;
+    pixel_in.y=y;
+    if (ApplyFxToPixel (&pixel_in, p, q) == MagickFalse)
+      (*status)=MagickFalse;
+    p+=(ptrdiff_t) GetPixelChannels (image);
+    q+=(ptrdiff_t) GetPixelChannels (fx_image);
+  }
+  if (SyncCacheViewAuthenticPixels(row->fx_view, pfx->exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 /* Following is substitute for FxImage().
 */
 MagickExport Image *FxImage(const Image *image,const char *expression,
@@ -5390,42 +5463,11 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
     const int
       id = GetOpenMPThreadId();
 
-    const Quantum
-      *magick_restrict p;
+    const FxRowInputs
+      row = { image, fx_image, image_view, fx_view, pfx, id };
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    if (ApplyFxToRow (&row, y, &status) == MagickFalse)
       continue;
-    p = GetCacheViewVirtualPixels (image_view, 0, y, image->columns, 1, pfx->exception);
-    q = QueueCacheViewAuthenticPixels (fx_view, 0, y, fx_image->columns, 1, pfx->exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL)) {
-        status=MagickFalse;
-        continue;
-    }
-    for (x=0; x < (ssize_t) fx_image->columns; x++) {
-      FxPixelInputs
-        pixel_in;
-
-      pfx->fxrts[id].thisPixel = (Quantum *)p;
-
-      pixel_in.image=image;
-      pixel_in.fx_image=fx_image;
-      pixel_in.pfx=pfx;
-      pixel_in.id=id;
-      pixel_in.x=x;
-      pixel_in.y=y;
-      if (ApplyFxToPixel (&pixel_in, p, q) == MagickFalse)
-        status=MagickFalse;
-      p+=(ptrdiff_t) GetPixelChannels (image);
-      q+=(ptrdiff_t) GetPixelChannels (fx_image);
-    }
-    if (SyncCacheViewAuthenticPixels(fx_view, pfx->exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
