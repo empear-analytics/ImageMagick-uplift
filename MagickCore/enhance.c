@@ -1333,6 +1333,49 @@ static void EnhanceImageRow(const Image *image,Image *enhance_image,
   }
 }
 
+typedef struct _EnhanceHead
+{
+  const Image
+    *image;
+
+  Image
+    *enhance_image;
+
+  CacheView
+    *image_view,
+    *enhance_view;
+
+  ExceptionInfo
+    *exception;
+} EnhanceHead;
+
+static MagickBooleanType EnhanceImageHead(const EnhanceHead *head,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(head->image_view,-2,y-2,head->image->columns+4,
+    5,head->exception);
+  q=QueueCacheViewAuthenticPixels(head->enhance_view,0,y,
+    head->enhance_image->columns,1,head->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  EnhanceImageRow(head->image,head->enhance_image,p,q);
+  if (SyncCacheViewAuthenticPixels(head->enhance_view,head->exception) ==
+        MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -1382,25 +1425,16 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    EnhanceHead
+      head;
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    head.image=image;
+    head.enhance_image=enhance_image;
+    head.image_view=image_view;
+    head.enhance_view=enhance_view;
+    head.exception=exception;
+    if (EnhanceImageHead(&head,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,-2,y-2,image->columns+4,5,exception);
-    q=QueueCacheViewAuthenticPixels(enhance_view,0,y,enhance_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    EnhanceImageRow(image,enhance_image,p,q);
-    if (SyncCacheViewAuthenticPixels(enhance_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
