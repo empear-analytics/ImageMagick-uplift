@@ -403,16 +403,11 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ChopImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,ChopImageTag,progress,&status);
       }
   }
   /*
@@ -451,16 +446,11 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ChopImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,ChopImageTag,progress,&status);
       }
   }
   chop_view=DestroyCacheView(chop_view);
