@@ -1016,11 +1016,11 @@ static MagickBooleanType SyncScaleRow(const ScaleLoop *loop,
   return(MagickTrue);
 }
 
+#define ScaleImageTag  "Scale/Image"
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
-#define ScaleImageTag  "Scale/Image"
-
   CacheView
     *image_view,
     *scale_view;
