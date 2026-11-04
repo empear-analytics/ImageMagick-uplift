@@ -1103,6 +1103,43 @@ static void ContrastColormap(Image *image,const int sign)
   }
 }
 
+typedef struct _ContrastHead
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  int
+    sign;
+} ContrastHead;
+
+static MagickBooleanType ContrastImageHead(const ContrastHead *head,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(head->image_view,0,y,head->image->columns,1,
+    head->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ContrastImageRow(head->image,head->sign,q);
+  if (SyncCacheViewAuthenticPixels(head->image_view,head->exception) ==
+        MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ContrastImage(Image *image,
   const MagickBooleanType sharpen,ExceptionInfo *exception)
 {
@@ -1149,20 +1186,15 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    ContrastHead
+      head;
 
-    if (status == MagickFalse)
+    head.image=image;
+    head.image_view=image_view;
+    head.exception=exception;
+    head.sign=sign;
+    if (ContrastImageHead(&head,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    ContrastImageRow(image,sign,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
