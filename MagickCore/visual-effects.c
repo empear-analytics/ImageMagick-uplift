@@ -188,6 +188,94 @@ static void AddNoisePixelChannels(const Image *image,
   }
 }
 
+typedef struct _AddNoiseRow
+{
+  const Image
+    *image;
+
+  Image
+    *noise_image;
+
+  CacheView
+    *image_view,
+    *noise_view;
+
+  RandomInfo
+    **random_info;
+
+  NoiseType
+    noise_type;
+
+  double
+    attenuate;
+
+  ExceptionInfo
+    *exception;
+} AddNoiseRow;
+
+static MagickBooleanType AddNoiseImageRow(const AddNoiseRow *noise_row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const image = noise_row->image;
+
+  Image
+    *const noise_image = noise_row->noise_image;
+
+  CacheView
+    *const image_view = noise_row->image_view,
+    *const noise_view = noise_row->noise_view;
+
+  RandomInfo
+    **const random_info = noise_row->random_info;
+
+  const NoiseType
+    noise_type = noise_row->noise_type;
+
+  const double
+    attenuate = noise_row->attenuate;
+
+  ExceptionInfo
+    *const exception = noise_row->exception;
+
+  const int
+    id = GetOpenMPThreadId();
+
+  MagickBooleanType
+    sync;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(noise_view,0,y,noise_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    AddNoisePixelChannels(image,noise_image,p,q,random_info[id],noise_type,
+      attenuate);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(noise_image);
+  }
+  sync=SyncCacheViewAuthenticPixels(noise_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
   const double attenuate,ExceptionInfo *exception)
 {
@@ -249,41 +337,19 @@ MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const int
-      id = GetOpenMPThreadId();
+    AddNoiseRow
+      noise_row;
 
-    MagickBooleanType
-      sync;
-
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    noise_row.image=image;
+    noise_row.noise_image=noise_image;
+    noise_row.image_view=image_view;
+    noise_row.noise_view=noise_view;
+    noise_row.random_info=random_info;
+    noise_row.noise_type=noise_type;
+    noise_row.attenuate=attenuate;
+    noise_row.exception=exception;
+    if (AddNoiseImageRow(&noise_row,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(noise_view,0,y,noise_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      AddNoisePixelChannels(image,noise_image,p,q,random_info[id],noise_type,
-        attenuate);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(noise_image);
-    }
-    sync=SyncCacheViewAuthenticPixels(noise_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
