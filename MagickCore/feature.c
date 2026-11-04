@@ -1189,6 +1189,64 @@ static Image *AppendHoughAccumulator(Image *lines_image,
   return(lines_image);
 }
 
+typedef struct _HoughOutput
+{
+  const Image
+    *image;
+
+  MatrixInfo
+    *accumulator;
+
+  size_t
+    accumulator_width,
+    accumulator_height,
+    threshold;
+} HoughOutput;
+
+static MagickBooleanType WriteHoughFile(const HoughOutput *output,
+  const HoughWindow window,char *path)
+{
+  const Image
+    *const image = output->image;
+
+  MatrixInfo
+    *const accumulator = output->accumulator;
+
+  const size_t
+    accumulator_width = output->accumulator_width,
+    accumulator_height = output->accumulator_height,
+    threshold = output->threshold;
+
+  HoughSegments
+    segments;
+
+  int
+    file;
+
+  MagickBooleanType
+    status;
+
+  size_t
+    line_count;
+
+  file=AcquireUniqueFileResource(path);
+  if (file == -1)
+    return(MagickFalse);
+  status=WriteHoughHeader(image,file,&window,threshold);
+  line_count=image->columns > image->rows ? image->columns/4 : image->rows/4;
+  if (threshold != 0)
+    line_count=threshold;
+  segments.accumulator=accumulator;
+  segments.image=image;
+  segments.accumulator_width=accumulator_width;
+  segments.accumulator_height=accumulator_height;
+  segments.line_count=line_count;
+  segments.file=file;
+  status=WriteHoughLines(&segments,window,status);
+  (void) close_utf8(file);
+  return(MagickTrue);
+}
+
 static Image *RenderHoughImage(const Image *image,const char *path,
   MatrixInfo *accumulator,ExceptionInfo *exception)
 {
@@ -1238,11 +1296,8 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   const HoughWindow
     window = { width, height };
 
-  HoughSegments
-    segments;
-
-  int
-    file;
+  HoughOutput
+    output;
 
   MagickBooleanType
     status;
@@ -1261,8 +1316,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
 
   size_t
     accumulator_height,
-    accumulator_width,
-    line_count;
+    accumulator_width;
 
   /*
     Create the accumulator.
@@ -1338,24 +1392,16 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   /*
     Generate line segments from accumulator.
   */
-  file=AcquireUniqueFileResource(path);
-  if (file == -1)
+  output.image=image;
+  output.accumulator=accumulator;
+  output.accumulator_width=accumulator_width;
+  output.accumulator_height=accumulator_height;
+  output.threshold=threshold;
+  if (WriteHoughFile(&output,window,path) == MagickFalse)
     {
       accumulator=DestroyMatrixInfo(accumulator);
       return((Image *) NULL);
     }
-  status=WriteHoughHeader(image,file,&window,threshold);
-  line_count=image->columns > image->rows ? image->columns/4 : image->rows/4;
-  if (threshold != 0)
-    line_count=threshold;
-  segments.accumulator=accumulator;
-  segments.image=image;
-  segments.accumulator_width=accumulator_width;
-  segments.accumulator_height=accumulator_height;
-  segments.line_count=line_count;
-  segments.file=file;
-  status=WriteHoughLines(&segments,window,status);
-  (void) close_utf8(file);
   return(RenderHoughImage(image,path,accumulator,exception));
 }
 
