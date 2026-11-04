@@ -538,16 +538,87 @@ static void ScanTriangleBelowPeak(const TriangleLine *line,ssize_t *threshold,
   }
 }
 
+typedef struct _TriangleSplit
+{
+  double
+    a,
+    b,
+    c,
+    inverse_ratio,
+    x2;
+
+  const double
+    *histogram;
+
+  ssize_t
+    end,
+    max,
+    start;
+} TriangleSplit;
+
+static ssize_t FindTriangleSplit(const TriangleSplit *split)
+{
+  const double
+    a = split->a,
+    b = split->b,
+    c = split->c,
+    inverse_ratio = split->inverse_ratio,
+    x2 = split->x2;
+
+  const double
+    *histogram = split->histogram;
+
+  const ssize_t
+    end = split->end,
+    max = split->max,
+    start = split->start;
+
+  double
+    distance,
+    max_distance,
+    segment;
+
+  ssize_t
+    i,
+    threshold;
+
+  TriangleLine
+    line;
+
+  threshold=0;
+  max_distance=0.0;
+  if (x2 == (double) start)
+    {
+      line.a=a;
+      line.b=b;
+      line.c=c;
+      line.inverse_ratio=inverse_ratio;
+      line.histogram=histogram;
+      line.max=max;
+      line.start=start;
+      ScanTriangleBelowPeak(&line,&threshold,&max_distance);
+    }
+  else
+    for (i=end; i > max; i--)
+    {
+      segment=inverse_ratio*(a*i+b*histogram[i]+c);
+      distance=sqrt(segment*segment);
+      if ((distance > max_distance) && (segment < 0.0))
+        {
+          threshold=i;
+          max_distance=distance;
+        }
+    }
+  return(threshold);
+}
+
 static double TriangleThreshold(const double *histogram)
 {
   double
     a,
     b,
     c,
-    distance,
     inverse_ratio,
-    max_distance,
-    segment,
     x1,
     x2,
     y1,
@@ -562,8 +633,8 @@ static double TriangleThreshold(const double *histogram)
     start,
     threshold;
 
-  TriangleLine
-    line;
+  TriangleSplit
+    split;
 
   /*
     Compute optimal threshold with triangle algorithm.
@@ -590,30 +661,16 @@ static double TriangleThreshold(const double *histogram)
   b=x2-x1;
   c=(-1.0)*(a*x1+b*y1);
   inverse_ratio=1.0/sqrt(a*a+b*b+c*c);
-  threshold=0;
-  max_distance=0.0;
-  if (x2 == (double) start)
-    {
-      line.a=a;
-      line.b=b;
-      line.c=c;
-      line.inverse_ratio=inverse_ratio;
-      line.histogram=histogram;
-      line.max=max;
-      line.start=start;
-      ScanTriangleBelowPeak(&line,&threshold,&max_distance);
-    }
-  else
-    for (i=end; i > max; i--)
-    {
-      segment=inverse_ratio*(a*i+b*histogram[i]+c);
-      distance=sqrt(segment*segment);
-      if ((distance > max_distance) && (segment < 0.0))
-        {
-          threshold=i;
-          max_distance=distance;
-        }
-    }
+  split.a=a;
+  split.b=b;
+  split.c=c;
+  split.inverse_ratio=inverse_ratio;
+  split.x2=x2;
+  split.histogram=histogram;
+  split.end=end;
+  split.max=max;
+  split.start=start;
+  threshold=FindTriangleSplit(&split);
   return(100.0*threshold/MaxIntensity);
 }
 
