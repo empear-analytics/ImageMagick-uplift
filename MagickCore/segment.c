@@ -680,6 +680,43 @@ static void InitializeCluster(Cluster *cluster,const ssize_t count)
   cluster->blue.center/=cluster->count;
 }
 
+typedef struct _ClassifyLine
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  ClassifyRowInputs
+    inputs;
+} ClassifyLine;
+
+static MagickBooleanType ClassifyImageLine(const ClassifyLine *line,
+  const ssize_t y,MagickStatusType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(line->image_view,0,y,line->image->columns,1,
+    line->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ClassifyRowPixels(line->image,&line->inputs,q);
+  if (SyncCacheViewAuthenticPixels(line->image_view,line->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -850,26 +887,17 @@ static MagickBooleanType Classify(Image *image,short **extrema,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ClassifyRowInputs
-      inputs;
+    ClassifyLine
+      line;
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    line.image=image;
+    line.image_view=image_view;
+    line.exception=exception;
+    line.inputs.head=head;
+    line.inputs.squares=squares;
+    line.inputs.weighting_exponent=weighting_exponent;
+    if (ClassifyImageLine(&line,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    inputs.head=head;
-    inputs.squares=squares;
-    inputs.weighting_exponent=weighting_exponent;
-    ClassifyRowPixels(image,&inputs,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
