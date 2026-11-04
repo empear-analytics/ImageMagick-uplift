@@ -813,6 +813,64 @@ static MagickBooleanType SyncImageToDirectClass(Image *image,
   return(MagickTrue);
 }
 
+typedef struct _ColorspaceRowInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} ColorspaceRowInfo;
+
+static void TransformLinearGrayRowFromsRGB(MagickBooleanType *status,
+  const ColorspaceRowInfo *row,const ssize_t y)
+{
+  Image
+    *const image = row->image;
+
+  CacheView
+    *const image_view = row->image_view;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  MagickBooleanType
+    sync;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MagickRealType
+      gray;
+
+    gray=0.212656*DecodePixelGamma(GetPixelRed(image,q))+0.715158*
+      DecodePixelGamma(GetPixelGreen(image,q))+0.072186*
+      DecodePixelGamma(GetPixelBlue(image,q));
+    SetPixelGray(image,ClampToQuantum(gray),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  sync=SyncCacheViewAuthenticPixels(image_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -931,38 +989,13 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
+        ColorspaceRowInfo
+          row;
 
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        if (status == MagickFalse)
-          continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          MagickRealType
-            gray;
-
-          gray=0.212656*DecodePixelGamma(GetPixelRed(image,q))+0.715158*
-            DecodePixelGamma(GetPixelGreen(image,q))+0.072186*
-            DecodePixelGamma(GetPixelBlue(image,q));
-          SetPixelGray(image,ClampToQuantum(gray),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        row.image=image;
+        row.image_view=image_view;
+        row.exception=exception;
+        TransformLinearGrayRowFromsRGB(&status,&row,y);
       }
       image_view=DestroyCacheView(image_view);
       if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
