@@ -276,6 +276,13 @@ static MagickBooleanType AddNoiseImageRow(const AddNoiseRow *noise_row,
   return(MagickTrue);
 }
 
+static void SyncEffectRow(CacheView *view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void SetEffectProgress(const Image *image,const char *tag,
   const MagickOffsetType progress,MagickBooleanType *status)
 {
@@ -1434,8 +1441,7 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
       p+=(ptrdiff_t) GetPixelChannels(canvas_image);
       q+=(ptrdiff_t) GetPixelChannels(implode_image);
     }
-    if (SyncCacheViewAuthenticPixels(implode_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncEffectRow(implode_view,exception,&status);
     if (canvas_image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2529,8 +2535,7 @@ MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(sepia_image);
     }
-    if (SyncCacheViewAuthenticPixels(sepia_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncEffectRow(sepia_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -3959,8 +3964,7 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
       p+=(ptrdiff_t) GetPixelChannels(canvas_image);
       q+=(ptrdiff_t) GetPixelChannels(swirl_image);
     }
-    if (SyncCacheViewAuthenticPixels(swirl_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncEffectRow(swirl_view,exception,&status);
     if (canvas_image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -4168,8 +4172,7 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(tint_image);
     }
-    if (SyncCacheViewAuthenticPixels(tint_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncEffectRow(tint_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
