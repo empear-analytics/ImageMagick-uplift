@@ -3009,11 +3009,81 @@ static Image *DestroyIntegralViews(CacheView *image_view,
 
 #define IntegralImageTag  "Integral/Image"
 
+typedef struct _CCIntegralRow
+{
+  const Image
+    *image;
+
+  Image
+    *integral_image;
+
+  CacheView
+    *integral_view;
+
+  ExceptionInfo
+    *exception;
+} CCIntegralRow;
+
+static void IntegrateImageRow(const CCIntegralRow *integral_row,const ssize_t y,
+  MagickOffsetType *progress,MagickBooleanType *status)
+{
+  const Image
+    *const image = integral_row->image;
+
+  Image
+    *const integral_image = integral_row->integral_image;
+
+  CacheView
+    *const integral_view = integral_row->integral_view;
+
+  ExceptionInfo
+    *const exception = integral_row->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  MagickBooleanType
+    sync;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(integral_view,0,y-1,integral_image->columns,1,
+    exception);
+  q=GetCacheViewAuthenticPixels(integral_view,0,y,integral_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (p == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  IntegrateRow(integral_image,p,q,y);
+  sync=SyncCacheViewAuthenticPixels(integral_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      (*progress)++;
+      proceed=SetImageProgress(integral_image,IntegralImageTag,*progress,
+        integral_image->rows);
+      if (proceed == MagickFalse)
+        (*status)=MagickFalse;
+    }
+}
+
 MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
     *image_view,
     *integral_view;
+
+  CCIntegralRow
+    integral_row;
 
   Image
     *integral_image;
@@ -3051,43 +3121,11 @@ MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
   progress=0;
   image_view=AcquireVirtualCacheView(integral_image,exception);
   integral_view=AcquireAuthenticCacheView(integral_image,exception);
+  integral_row.image=image;
+  integral_row.integral_image=integral_image;
+  integral_row.integral_view=integral_view;
+  integral_row.exception=exception;
   for (y=0; y < (ssize_t) integral_image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    MagickBooleanType
-      sync;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(integral_view,0,y-1,integral_image->columns,1,
-      exception);
-    q=GetCacheViewAuthenticPixels(integral_view,0,y,integral_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (p == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    IntegrateRow(integral_image,p,q,y);
-    sync=SyncCacheViewAuthenticPixels(integral_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        progress++;
-        proceed=SetImageProgress(integral_image,IntegralImageTag,progress,
-          integral_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
-  }
+    IntegrateImageRow(&integral_row,y,&progress,&status);
   return(DestroyIntegralViews(image_view,integral_view,integral_image,status));
 }
