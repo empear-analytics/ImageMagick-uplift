@@ -580,6 +580,33 @@ static void DisassociateAlphaRows(MagickBooleanType *status,
     (*status)=MagickFalse;
 }
 
+static void ScanOpaqueAlphaRow(MagickBooleanType *status,
+  MagickBooleanType *opaque,const RemoveAlphaRowInfo *info,const ssize_t y)
+{
+  CacheView
+    *const image_view = info->image_view;
+
+  Image
+    *const image = info->image;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  if (((*status) == MagickFalse) || ((*opaque) == MagickFalse))
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  if (IsAlphaRowOpaque(image,p) == MagickFalse)
+    (*opaque)=MagickFalse;
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -742,19 +769,13 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        const Quantum
-          *magick_restrict p;
+        RemoveAlphaRowInfo
+          info;
 
-        if ((status == MagickFalse) || (opaque == MagickFalse))
-          continue;
-        p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-        if (p == (const Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        if (IsAlphaRowOpaque(image,p) == MagickFalse)
-          opaque=MagickFalse;
+        info.image_view=image_view;
+        info.image=image;
+        info.exception=exception;
+        ScanOpaqueAlphaRow(&status,&opaque,&info,y);
       }
       image_view=DestroyCacheView(image_view);
       if (opaque != MagickFalse)
