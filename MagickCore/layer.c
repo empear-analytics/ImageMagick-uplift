@@ -1568,6 +1568,16 @@ static MagickBooleanType MarkDeletedFrame(const MagickBooleanType add_frames,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireBackgroundFrame(const Image *curr,
+  Image **bgnd_image,ExceptionInfo *exception)
+{
+  *bgnd_image=CloneImage(curr->previous,0,0,MagickTrue,exception);
+  if (*bgnd_image == (Image *) NULL)
+    return(MagickFalse);
+  (*bgnd_image)->background_color.alpha_trait=BlendPixelTrait;
+  return(MagickTrue);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1767,8 +1777,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
         /*
           Now compare against a simple background disposal
         */
-        bgnd_image=CloneImage(curr->previous,0,0,MagickTrue,exception);
-        if (bgnd_image == (Image *) NULL)
+        if (AcquireBackgroundFrame(curr,&bgnd_image,exception) == MagickFalse)
           {
             bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
             disposals=(DisposeType *) RelinquishMagickMemory(disposals);
@@ -1776,7 +1785,6 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
             dup_image=DestroyImageIfSet(dup_image);
             return((Image *) NULL);
           }
-        bgnd_image->background_color.alpha_trait=BlendPixelTrait;
         bgnd_bounds=bounds[i-1]; /* interim bounds of the previous image */
         ClearBounds(bgnd_image,&bgnd_bounds,exception);
         try_bounds=CompareImagesBounds(bgnd_image,curr,CompareAnyLayer,exception);
