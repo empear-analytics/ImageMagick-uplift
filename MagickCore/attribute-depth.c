@@ -815,6 +815,15 @@ static MagickBooleanType SetImageRowDepth(const DepthRow *row)
   return(status);
 }
 
+static void SetImageRowDepthStatus(MagickBooleanType *status,
+  const DepthRow *row)
+{
+  if ((*status) == MagickFalse)
+    return;
+  if (SetImageRowDepth(row) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static inline MagickBooleanType IsFloydSteinbergDither(const char *artifact)
 {
   return(((artifact != (const char *) NULL) &&
@@ -964,15 +973,12 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
     DepthRow
       row;
 
-    if (status == MagickFalse)
-      continue;
     row.image=image;
     row.image_view=image_view;
     row.y=y;
     row.range=range;
     row.exception=exception;
-    if (SetImageRowDepth(&row) == MagickFalse)
-      status=MagickFalse;
+    SetImageRowDepthStatus(&status,&row);
   }
   image_view=DestroyCacheView(image_view);
   return(FinishImageDepth(image,depth,status));
