@@ -695,6 +695,17 @@ static void InitializeCluster(Cluster *cluster,const ssize_t count)
   cluster->blue.center/=cluster->count;
 }
 
+static void ReportClassifyProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickStatusType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,2*image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 typedef struct _ClassifyCountInputs
 {
   const Image
@@ -942,16 +953,11 @@ static MagickBooleanType Classify(Image *image,short **extrema,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SegmentImageTag,progress,2*image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportClassifyProgress(image,SegmentImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
