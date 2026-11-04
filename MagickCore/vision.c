@@ -450,10 +450,42 @@ static void CircularityThreshold(const Image *component_image,
   }
 }
 
-static MagickBooleanType GetObjectCentroidSums(const Image *component_image,
-  CacheView *component_view,const RectangleInfo bounding_box,const ssize_t i,
-  double *M00,double *M10,double *M01,ExceptionInfo *exception)
+typedef struct _CCCentroidPass
 {
+  const Image
+    *component_image;
+
+  CacheView
+    *component_view;
+
+  RectangleInfo
+    bounding_box;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} CCCentroidPass;
+
+static MagickBooleanType GetObjectCentroidSums(
+  const CCCentroidPass *centroid_pass,double *M00,double *M10,double *M01)
+{
+  const Image
+    *const component_image = centroid_pass->component_image;
+
+  CacheView
+    *const component_view = centroid_pass->component_view;
+
+  const RectangleInfo
+    bounding_box = centroid_pass->bounding_box;
+
+  const ssize_t
+    i = centroid_pass->i;
+
+  ExceptionInfo
+    *const exception = centroid_pass->exception;
+
   const Quantum
     *magick_restrict p;
 
@@ -593,6 +625,9 @@ static void ComputeObjectMoments(const CCMomentPass *moment_pass,
   CacheView
     *component_view;
 
+  CCCentroidPass
+    centroid_pass;
+
   double
     M01 = 0.0,
     M10 = 0.0;
@@ -611,8 +646,12 @@ static void ComputeObjectMoments(const CCMomentPass *moment_pass,
 
   component_view=AcquireAuthenticCacheView(component_image,exception);
   bounding_box=object[i].bounding_box;
-  if (GetObjectCentroidSums(component_image,component_view,bounding_box,i,
-        M00,&M10,&M01,exception) == MagickFalse)
+  centroid_pass.component_image=component_image;
+  centroid_pass.component_view=component_view;
+  centroid_pass.bounding_box=bounding_box;
+  centroid_pass.i=i;
+  centroid_pass.exception=exception;
+  if (GetObjectCentroidSums(&centroid_pass,M00,&M10,&M01) == MagickFalse)
     (*status)=MagickFalse;
   centroid.x=M10*MagickSafeReciprocal((*M00));
   centroid.y=M01*MagickSafeReciprocal((*M00));
