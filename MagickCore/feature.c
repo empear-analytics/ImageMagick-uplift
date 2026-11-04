@@ -1375,6 +1375,53 @@ typedef struct _MeanShiftTargets
     *mean_pixel;
 } MeanShiftTargets;
 
+typedef struct _MeanShiftSum
+{
+  PointInfo
+    sum_location,
+    previous_location;
+
+  PixelInfo
+    sum_pixel,
+    previous_pixel;
+
+  ssize_t
+    count;
+} MeanShiftSum;
+
+static MagickBooleanType MeanShiftUpdate(const MeanShiftSum *sum,
+  PointInfo *mean_location,PixelInfo *mean_pixel)
+{
+  const PointInfo
+    sum_location = sum->sum_location,
+    previous_location = sum->previous_location;
+
+  const PixelInfo
+    sum_pixel = sum->sum_pixel,
+    previous_pixel = sum->previous_pixel;
+
+  const ssize_t
+    count = sum->count;
+
+  double
+    distance,
+    gamma = 1.0;
+
+  if (count != 0)
+    gamma=MagickSafeReciprocal((double) count);
+  (*mean_location).x=gamma*sum_location.x;
+  (*mean_location).y=gamma*sum_location.y;
+  (*mean_pixel).red=gamma*sum_pixel.red;
+  (*mean_pixel).green=gamma*sum_pixel.green;
+  (*mean_pixel).blue=gamma*sum_pixel.blue;
+  (*mean_pixel).alpha=gamma*sum_pixel.alpha;
+  distance=GetMeanShiftDistance((*mean_location),previous_location,
+    (*mean_pixel),previous_pixel);
+  if (distance <= 3.0)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType MeanShiftStep(const MeanShiftInfo *shift,
   MagickBooleanType *status,const MeanShiftTargets *targets)
 {
@@ -1401,8 +1448,7 @@ static MagickBooleanType MeanShiftStep(const MeanShiftInfo *shift,
     *const mean_pixel = targets->mean_pixel;
 
   double
-    distance,
-    gamma = 1.0;
+    distance;
 
   PixelInfo
     previous_pixel,
@@ -1411,6 +1457,9 @@ static MagickBooleanType MeanShiftStep(const MeanShiftInfo *shift,
   PointInfo
     previous_location,
     sum_location;
+
+  MeanShiftSum
+    sum;
 
   ssize_t
     count,
@@ -1449,19 +1498,12 @@ static MagickBooleanType MeanShiftStep(const MeanShiftInfo *shift,
       count++;
     }
   }
-  if (count != 0)
-    gamma=MagickSafeReciprocal((double) count);
-  (*mean_location).x=gamma*sum_location.x;
-  (*mean_location).y=gamma*sum_location.y;
-  (*mean_pixel).red=gamma*sum_pixel.red;
-  (*mean_pixel).green=gamma*sum_pixel.green;
-  (*mean_pixel).blue=gamma*sum_pixel.blue;
-  (*mean_pixel).alpha=gamma*sum_pixel.alpha;
-  distance=GetMeanShiftDistance((*mean_location),previous_location,
-    (*mean_pixel),previous_pixel);
-  if (distance <= 3.0)
-    return(MagickFalse);
-  return(MagickTrue);
+  sum.sum_location=sum_location;
+  sum.sum_pixel=sum_pixel;
+  sum.count=count;
+  sum.previous_location=previous_location;
+  sum.previous_pixel=previous_pixel;
+  return(MeanShiftUpdate(&sum,mean_location,mean_pixel));
 }
 
 static void MeanShiftRow(MagickBooleanType *status,const MeanShiftInfo *shift,
