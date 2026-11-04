@@ -1138,6 +1138,17 @@ static void ContrastColormap(Image *image,const int sign)
   }
 }
 
+static void SetEnhanceProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 typedef struct _ContrastHead
 {
   const Image
@@ -1232,16 +1243,11 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ContrastImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEnhanceProgress(image,ContrastImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -1472,16 +1478,11 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,EnhanceImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEnhanceProgress(image,EnhanceImageTag,progress,&status);
       }
   }
   enhance_view=DestroyCacheView(enhance_view);
@@ -2192,16 +2193,11 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ModulateImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEnhanceProgress(image,ModulateImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -2509,17 +2505,11 @@ MagickExport MagickBooleanType SigmoidalContrastImage(Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SigmoidalContrastImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetEnhanceProgress(image,SigmoidalContrastImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
