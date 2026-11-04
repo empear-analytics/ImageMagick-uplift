@@ -719,6 +719,90 @@ static MagickBooleanType AcquireAdaptiveSharpenKernel(double **kernel,
   return(MagickTrue);
 }
 
+static MagickBooleanType SharpenAdaptiveLine(const AdaptiveBlurRow *row,
+  CacheView *edge_view,CacheView *sharp_view,MagickBooleanType *status)
+{
+  const Image
+    *const image = row->image;
+
+  Image
+    *const sharp_image = row->blur_image;
+
+  Image
+    *const edge_image = row->edge_image;
+
+  double
+    **const kernel = row->kernel;
+
+  const size_t
+    width = row->width;
+
+  const ssize_t
+    y = row->y;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  const Quantum
+    *magick_restrict r;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  r=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(sharp_view,0,y,sharp_image->columns,1,
+    exception);
+  if ((r == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) sharp_image->columns; x++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      i;
+
+    ssize_t
+      center,
+      j;
+
+    j=GetAdaptiveKernelIndex(edge_image,r,width);
+    p=GetCacheViewVirtualPixels(row->image_view,x-(((ssize_t) width-j)/2L),y-
+      (((ssize_t) width-j)/2L),width-(size_t) j,width-(size_t) j,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    center=(ssize_t) (GetPixelChannels(image)*(width-(size_t) j)*
+     ((width-(size_t) j)/2L)+GetPixelChannels(image)*((width-(size_t) j)/2));
+    for (i=0; i < (ssize_t) GetPixelChannels(sharp_image); i++)
+    {
+      AdaptiveChannel
+        adaptive;
+
+      adaptive.image=image;
+      adaptive.blur_image=sharp_image;
+      adaptive.kernel=kernel;
+      adaptive.p=p;
+      adaptive.width=width;
+      adaptive.j=j;
+      adaptive.center=center;
+      BlurAdaptiveChannel(&adaptive,i,q);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(sharp_image);
+    r+=(ptrdiff_t) GetPixelChannels(edge_image);
+  }
+  if (SyncCacheViewAuthenticPixels(sharp_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -824,63 +908,19 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) sharp_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict r;
+    AdaptiveBlurRow
+      row;
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    row.image=image;
+    row.blur_image=sharp_image;
+    row.edge_image=edge_image;
+    row.image_view=image_view;
+    row.kernel=kernel;
+    row.width=width;
+    row.y=y;
+    row.exception=exception;
+    if (SharpenAdaptiveLine(&row,edge_view,sharp_view,&status) == MagickFalse)
       continue;
-    r=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(sharp_view,0,y,sharp_image->columns,1,
-      exception);
-    if ((r == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) sharp_image->columns; x++)
-    {
-      const Quantum
-        *magick_restrict p;
-
-      ssize_t
-        i;
-
-      ssize_t
-        center,
-        j;
-
-      j=GetAdaptiveKernelIndex(edge_image,r,width);
-      p=GetCacheViewVirtualPixels(image_view,x-(((ssize_t) width-j)/2L),y-
-        (((ssize_t) width-j)/2L),width-(size_t) j,width-(size_t) j,exception);
-      if (p == (const Quantum *) NULL)
-        break;
-      center=(ssize_t) (GetPixelChannels(image)*(width-(size_t) j)*
-       ((width-(size_t) j)/2L)+GetPixelChannels(image)*((width-(size_t) j)/2));
-      for (i=0; i < (ssize_t) GetPixelChannels(sharp_image); i++)
-      {
-        AdaptiveChannel
-          adaptive;
-
-        adaptive.image=image;
-        adaptive.blur_image=sharp_image;
-        adaptive.kernel=kernel;
-        adaptive.p=p;
-        adaptive.width=width;
-        adaptive.j=j;
-        adaptive.center=center;
-        BlurAdaptiveChannel(&adaptive,i,q);
-      }
-      q+=(ptrdiff_t) GetPixelChannels(sharp_image);
-      r+=(ptrdiff_t) GetPixelChannels(edge_image);
-    }
-    if (SyncCacheViewAuthenticPixels(sharp_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
