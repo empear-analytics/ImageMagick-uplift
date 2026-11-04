@@ -1077,6 +1077,46 @@ static MagickBooleanType ScaleNextRow(const ScaleLoop *loop,
   return(MagickTrue);
 }
 
+typedef struct _ScaleBuffers
+{
+  const Image
+    *image;
+
+  Image
+    *scale_image;
+
+  double
+    *scale_scanline,
+    *scanline,
+    *x_vector,
+    *y_vector;
+} ScaleBuffers;
+
+static void ReleaseScaleBuffers(const ScaleBuffers *buffers)
+{
+  const Image
+    *const image = buffers->image;
+
+  Image
+    *scale_image = buffers->scale_image;
+
+  double
+    *scale_scanline = buffers->scale_scanline,
+    *scanline = buffers->scanline,
+    *x_vector = buffers->x_vector,
+    *y_vector = buffers->y_vector;
+
+  if ((image->rows != scale_image->rows) && (scanline != (double *) NULL))
+    scanline=(double *) RelinquishMagickMemory(scanline);
+  if (scale_scanline != (double *) NULL)
+    scale_scanline=(double *) RelinquishMagickMemory(scale_scanline);
+  if (x_vector != (double *) NULL)
+    x_vector=(double *) RelinquishMagickMemory(x_vector);
+  if (y_vector != (double *) NULL)
+    y_vector=(double *) RelinquishMagickMemory(y_vector);
+  scale_image=DestroyImage(scale_image);
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -1149,15 +1189,16 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   if (IsScaleBufferMissing(scanline,scale_scanline,x_vector,y_vector) !=
       MagickFalse)
     {
-      if ((image->rows != scale_image->rows) && (scanline != (double *) NULL))
-        scanline=(double *) RelinquishMagickMemory(scanline);
-      if (scale_scanline != (double *) NULL)
-        scale_scanline=(double *) RelinquishMagickMemory(scale_scanline);
-      if (x_vector != (double *) NULL)
-        x_vector=(double *) RelinquishMagickMemory(x_vector);
-      if (y_vector != (double *) NULL)
-        y_vector=(double *) RelinquishMagickMemory(y_vector);
-      scale_image=DestroyImage(scale_image);
+      ScaleBuffers
+        failure;
+
+      failure.image=image;
+      failure.scale_image=scale_image;
+      failure.scale_scanline=scale_scanline;
+      failure.scanline=scanline;
+      failure.x_vector=x_vector;
+      failure.y_vector=y_vector;
+      ReleaseScaleBuffers(&failure);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
   /*
