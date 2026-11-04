@@ -214,6 +214,13 @@ static inline MagickBooleanType IsGrayImageWithColorClut(const Image *image,
     MagickFalse);
 }
 
+static void SetClutColorspace(Image *image,const Image *clut_image,
+  ExceptionInfo *exception)
+{
+  if (IsGrayImageWithColorClut(image,clut_image) != MagickFalse)
+    (void) SetImageColorspace(image,sRGBColorspace,exception);
+}
+
 static void ActivateClutAlpha(Image *image,const Image *clut_image,
   ExceptionInfo *exception)
 {
@@ -295,8 +302,7 @@ MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsGrayImageWithColorClut(image,clut_image) != MagickFalse)
-    (void) SetImageColorspace(image,sRGBColorspace,exception);
+  SetClutColorspace(image,clut_image,exception);
   clut_map=(PixelInfo *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*clut_map));
   if (clut_map == (PixelInfo *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
