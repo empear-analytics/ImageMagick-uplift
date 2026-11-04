@@ -952,6 +952,39 @@ static void SetStretchProperty(Image *image,const Quantum *black,
     exception);
 }
 
+typedef struct _StretchScan
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  double
+    *histogram;
+
+  ExceptionInfo
+    *exception;
+} StretchScan;
+
+static void ScanStretchHistogramRow(const StretchScan *scan,const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(scan->image_view,0,y,scan->image->columns,1,
+    scan->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  AccumulateStretchHistogram(scan->image,p,scan->histogram);
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -973,6 +1006,9 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     *black,
     *stretch_map,
     *white;
+
+  StretchScan
+    scan;
 
   ssize_t
     i;
@@ -1007,21 +1043,12 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   (void) memset(histogram,0,(MaxMap+1)*GetPixelChannels(image)*
     sizeof(*histogram));
   image_view=AcquireVirtualCacheView(image,exception);
+  scan.image=image;
+  scan.image_view=image_view;
+  scan.histogram=histogram;
+  scan.exception=exception;
   for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    AccumulateStretchHistogram(image,p,histogram);
-  }
+    ScanStretchHistogramRow(&scan,y,&status);
   image_view=DestroyCacheView(image_view);
   /*
     Find the histogram boundaries by locating the black/white levels.
