@@ -809,6 +809,16 @@ static void DestroyTileImages(Image **image_list,const ssize_t last)
       image_list[i]=DestroyImage(image_list[i]);
 }
 
+static void DestroyTileResources(Image *image,const Image *thumbnail,
+  Image **image_list,ssize_t i)
+{
+  if (image != (Image *) NULL)
+    image=DestroyImage(image);
+  if (thumbnail == (Image *) NULL)
+    i--;
+  DestroyTileImages(image_list,i);
+}
+
 static void RelinquishMontageStrings(Image *montage)
 {
   if (montage->montage != (char *) NULL)
@@ -930,11 +940,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   }
   if (i < (ssize_t) number_images)
     {
-      if (image != (Image *) NULL)
-        image=DestroyImage(image);
-      if (thumbnail == (Image *) NULL)
-        i--;
-      DestroyTileImages(image_list,i);
+      DestroyTileResources(image,thumbnail,image_list,i);
       primary_list=(Image **) RelinquishMagickMemory(primary_list);
       return((Image *) NULL);
     }
