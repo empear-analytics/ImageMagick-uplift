@@ -500,6 +500,47 @@ static MagickBooleanType SetMissingAlphaOpaque(Image *image,
   return(status);
 }
 
+typedef struct _RemoveAlphaRowInfo
+{
+  CacheView
+    *image_view;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} RemoveAlphaRowInfo;
+
+static void RemoveAlphaRow(MagickBooleanType *status,
+  const RemoveAlphaRowInfo *info,const ssize_t y)
+{
+  CacheView
+    *const image_view = info->image_view;
+
+  Image
+    *const image = info->image;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  FlattenRowOverBackground(image,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -705,21 +746,13 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        Quantum
-          *magick_restrict q;
+        RemoveAlphaRowInfo
+          info;
 
-        if (status == MagickFalse)
-          continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        FlattenRowOverBackground(image,q);
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-          status=MagickFalse;
+        info.image_view=image_view;
+        info.image=image;
+        info.exception=exception;
+        RemoveAlphaRow(&status,&info,y);
       }
       image_view=DestroyCacheView(image_view);
       image->alpha_trait=image->background_color.alpha_trait;
