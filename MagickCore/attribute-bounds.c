@@ -564,6 +564,23 @@ static RectangleInfo ScanBoundingBoxRow(const BoundingBoxRowScan *row_scan,
   return(bounding_box);
 }
 
+static RectangleInfo GetTrimBounds(const Image *image,const char *artifact)
+{
+  RectangleInfo
+    bounds;
+
+  if (artifact == (const char *) NULL)
+    {
+      bounds.width=(size_t) (image->columns == 1 ? 1 : 0);
+      bounds.height=(size_t) (image->rows == 1 ? 1 : 0);
+      bounds.x=(ssize_t) image->columns;
+      bounds.y=(ssize_t) image->rows;
+    }
+  else
+    bounds=GetTrimEdgesBounds(image,artifact);
+  return(bounds);
+}
+
 MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -597,15 +614,7 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
   if (artifact != (const char *) NULL)
     return(GetEdgeBoundingBox(image,exception));
   artifact=GetImageArtifact(image,"trim:edges");
-  if (artifact == (const char *) NULL)
-    {
-      bounds.width=(size_t) (image->columns == 1 ? 1 : 0);
-      bounds.height=(size_t) (image->rows == 1 ? 1 : 0);
-      bounds.x=(ssize_t) image->columns;
-      bounds.y=(ssize_t) image->rows;
-    }
-  else
-    bounds=GetTrimEdgesBounds(image,artifact);
+  bounds=GetTrimBounds(image,artifact);
   GetPixelInfo(image,&target[0]);
   image_view=AcquireVirtualCacheView(image,exception);
   p=GetCacheViewVirtualPixels(image_view,0,0,1,1,exception);
