@@ -1341,10 +1341,149 @@ static void SetMeanShiftPixel(const Image *mean_image,
   SetPixelAlpha(mean_image,ClampToQuantum(mean_pixel.alpha),q);
 }
 
+typedef struct _MeanShiftInfo
+{
+  const Image
+    *image;
+
+  Image
+    *mean_image;
+
+  CacheView
+    *pixel_view;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    width,
+    height;
+
+  double
+    color_distance;
+
+  ssize_t
+    y;
+} MeanShiftInfo;
+
+static void MeanShiftRow(MagickBooleanType *status,const MeanShiftInfo *shift,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+#define MaxMeanShiftIterations  100
+
+  const Image
+    *const image = shift->image;
+
+  Image
+    *const mean_image = shift->mean_image;
+
+  CacheView
+    *const pixel_view = shift->pixel_view;
+
+  ExceptionInfo
+    *const exception = shift->exception;
+
+  const size_t
+    width = shift->width,
+    height = shift->height;
+
+  const double
+    color_distance = shift->color_distance;
+
+  const ssize_t
+    y = shift->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) mean_image->columns; x++)
+  {
+    PixelInfo
+      mean_pixel,
+      previous_pixel;
+
+    PointInfo
+      mean_location,
+      previous_location;
+
+    ssize_t
+      i;
+
+    GetPixelInfo(image,&mean_pixel);
+    GetPixelInfoPixel(image,p,&mean_pixel);
+    mean_location.x=(double) x;
+    mean_location.y=(double) y;
+    for (i=0; i < MaxMeanShiftIterations; i++)
+    {
+      double
+        distance,
+        gamma = 1.0;
+
+      PixelInfo
+        sum_pixel;
+
+      PointInfo
+        sum_location;
+
+      ssize_t
+        count,
+        v;
+
+      sum_location.x=0.0;
+      sum_location.y=0.0;
+      GetPixelInfo(image,&sum_pixel);
+      previous_location=mean_location;
+      previous_pixel=mean_pixel;
+      count=0;
+      for (v=(-((ssize_t) height/2)); v <= (((ssize_t) height/2)); v++)
+      {
+        ssize_t
+          u;
+
+        for (u=(-((ssize_t) width/2)); u <= (((ssize_t) width/2)); u++)
+        {
+          PixelInfo
+            pixel;
+
+          if ((v*v+u*u) > (ssize_t) ((width/2)*(height/2)))
+            continue;
+          (*status)=GetOneCacheViewVirtualPixelInfo(pixel_view,(ssize_t)
+            MagickRound(mean_location.x+u),(ssize_t) MagickRound(
+            mean_location.y+v),&pixel,exception);
+          distance=GetMeanShiftColorDistance(mean_pixel,pixel);
+          if (!(distance <= (color_distance*color_distance)))
+            continue;
+          sum_location.x+=mean_location.x+u;
+          sum_location.y+=mean_location.y+v;
+          sum_pixel.red+=pixel.red;
+          sum_pixel.green+=pixel.green;
+          sum_pixel.blue+=pixel.blue;
+          sum_pixel.alpha+=pixel.alpha;
+          count++;
+        }
+      }
+      if (count != 0)
+        gamma=MagickSafeReciprocal((double) count);
+      mean_location.x=gamma*sum_location.x;
+      mean_location.y=gamma*sum_location.y;
+      mean_pixel.red=gamma*sum_pixel.red;
+      mean_pixel.green=gamma*sum_pixel.green;
+      mean_pixel.blue=gamma*sum_pixel.blue;
+      mean_pixel.alpha=gamma*sum_pixel.alpha;
+      distance=GetMeanShiftDistance(mean_location,previous_location,
+        mean_pixel,previous_pixel);
+      if (distance <= 3.0)
+        break;
+    }
+    SetMeanShiftPixel(mean_image,mean_pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(mean_image);
+  }
+}
+
 MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
   const size_t height,const double color_distance,ExceptionInfo *exception)
 {
-#define MaxMeanShiftIterations  100
 #define MeanShiftImageTag  "MeanShift/Image"
 
   CacheView
@@ -1392,11 +1531,11 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
     const Quantum
       *magick_restrict p;
 
+    MeanShiftInfo
+      shift;
+
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -1408,89 +1547,15 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) mean_image->columns; x++)
-    {
-      PixelInfo
-        mean_pixel,
-        previous_pixel;
-
-      PointInfo
-        mean_location,
-        previous_location;
-
-      ssize_t
-        i;
-
-      GetPixelInfo(image,&mean_pixel);
-      GetPixelInfoPixel(image,p,&mean_pixel);
-      mean_location.x=(double) x;
-      mean_location.y=(double) y;
-      for (i=0; i < MaxMeanShiftIterations; i++)
-      {
-        double
-          distance,
-          gamma = 1.0;
-
-        PixelInfo
-          sum_pixel;
-
-        PointInfo
-          sum_location;
-
-        ssize_t
-          count,
-          v;
-
-        sum_location.x=0.0;
-        sum_location.y=0.0;
-        GetPixelInfo(image,&sum_pixel);
-        previous_location=mean_location;
-        previous_pixel=mean_pixel;
-        count=0;
-        for (v=(-((ssize_t) height/2)); v <= (((ssize_t) height/2)); v++)
-        {
-          ssize_t
-            u;
-
-          for (u=(-((ssize_t) width/2)); u <= (((ssize_t) width/2)); u++)
-          {
-            PixelInfo
-              pixel;
-
-            if ((v*v+u*u) > (ssize_t) ((width/2)*(height/2)))
-              continue;
-            status=GetOneCacheViewVirtualPixelInfo(pixel_view,(ssize_t)
-              MagickRound(mean_location.x+u),(ssize_t) MagickRound(
-              mean_location.y+v),&pixel,exception);
-            distance=GetMeanShiftColorDistance(mean_pixel,pixel);
-            if (!(distance <= (color_distance*color_distance)))
-              continue;
-            sum_location.x+=mean_location.x+u;
-            sum_location.y+=mean_location.y+v;
-            sum_pixel.red+=pixel.red;
-            sum_pixel.green+=pixel.green;
-            sum_pixel.blue+=pixel.blue;
-            sum_pixel.alpha+=pixel.alpha;
-            count++;
-          }
-        }
-        if (count != 0)
-          gamma=MagickSafeReciprocal((double) count);
-        mean_location.x=gamma*sum_location.x;
-        mean_location.y=gamma*sum_location.y;
-        mean_pixel.red=gamma*sum_pixel.red;
-        mean_pixel.green=gamma*sum_pixel.green;
-        mean_pixel.blue=gamma*sum_pixel.blue;
-        mean_pixel.alpha=gamma*sum_pixel.alpha;
-        distance=GetMeanShiftDistance(mean_location,previous_location,
-          mean_pixel,previous_pixel);
-        if (distance <= 3.0)
-          break;
-      }
-      SetMeanShiftPixel(mean_image,mean_pixel,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(mean_image);
-    }
+    shift.image=image;
+    shift.mean_image=mean_image;
+    shift.pixel_view=pixel_view;
+    shift.exception=exception;
+    shift.width=width;
+    shift.height=height;
+    shift.color_distance=color_distance;
+    shift.y=y;
+    MeanShiftRow(&status,&shift,p,q);
     if (SyncCacheViewAuthenticPixels(mean_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
