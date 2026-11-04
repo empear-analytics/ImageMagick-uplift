@@ -1143,21 +1143,24 @@ static Image *FinishScaleImage(const ScaleBuffers *buffers,
   return(scale_image);
 }
 
-MagickExport Image *ScaleImage(const Image *image,const size_t columns,
-  const size_t rows,ExceptionInfo *exception)
+static Image *ScaleAndFinishImage(const ScaleBuffers *inputs,
+  ExceptionInfo *exception)
 {
+  const Image
+    *const image = inputs->image;
+
+  double
+    *const scale_scanline = inputs->scale_scanline,
+    *const scanline = inputs->scanline,
+    *const x_vector = inputs->x_vector,
+    *const y_vector = inputs->y_vector;
+
+  Image
+    *const scale_image = inputs->scale_image;
+
   CacheView
     *image_view,
     *scale_view;
-
-  double
-    *scale_scanline,
-    *scanline,
-    *x_vector,
-    *y_vector;
-
-  Image
-    *scale_image;
 
   MagickBooleanType
     next_row,
@@ -1180,6 +1183,60 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
 
   const ScaleRowTargets
     targets = { &n, &status, &number_rows, &span, &scale, &next_row };
+
+  /*
+    Scale image.
+  */
+  number_rows=0;
+  next_row=MagickTrue;
+  span.y=1.0;
+  scale.y=(double) scale_image->rows/(double) image->rows;
+  (void) memset(y_vector,0,(size_t) MaxPixelChannels*image->columns*
+    sizeof(*y_vector));
+  n=0;
+  status=MagickTrue;
+  image_view=AcquireVirtualCacheView(image,exception);
+  scale_view=AcquireAuthenticCacheView(scale_image,exception);
+  loop.image=image;
+  loop.scale_image=scale_image;
+  loop.image_view=image_view;
+  loop.scale_view=scale_view;
+  loop.scale_scanline=scale_scanline;
+  loop.scanline=scanline;
+  loop.x_vector=x_vector;
+  loop.y_vector=y_vector;
+  loop.exception=exception;
+  for (y=0; y < (ssize_t) scale_image->rows; y++)
+    if (ScaleNextRow(&loop,&targets,y) == MagickFalse)
+      break;
+  scale_view=DestroyCacheView(scale_view);
+  image_view=DestroyCacheView(image_view);
+  /*
+    Free allocated memory.
+  */
+  buffers.image=image;
+  buffers.scale_image=scale_image;
+  buffers.scale_scanline=scale_scanline;
+  buffers.scanline=scanline;
+  buffers.x_vector=x_vector;
+  buffers.y_vector=y_vector;
+  return(FinishScaleImage(&buffers,status));
+}
+
+MagickExport Image *ScaleImage(const Image *image,const size_t columns,
+  const size_t rows,ExceptionInfo *exception)
+{
+  double
+    *scale_scanline,
+    *scanline,
+    *x_vector,
+    *y_vector;
+
+  Image
+    *scale_image;
+
+  ScaleBuffers
+    inputs;
 
   /*
     Initialize scaled image attributes.
@@ -1230,41 +1287,11 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
       ReleaseScaleBuffers(&failure);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  /*
-    Scale image.
-  */
-  number_rows=0;
-  next_row=MagickTrue;
-  span.y=1.0;
-  scale.y=(double) scale_image->rows/(double) image->rows;
-  (void) memset(y_vector,0,(size_t) MaxPixelChannels*image->columns*
-    sizeof(*y_vector));
-  n=0;
-  status=MagickTrue;
-  image_view=AcquireVirtualCacheView(image,exception);
-  scale_view=AcquireAuthenticCacheView(scale_image,exception);
-  loop.image=image;
-  loop.scale_image=scale_image;
-  loop.image_view=image_view;
-  loop.scale_view=scale_view;
-  loop.scale_scanline=scale_scanline;
-  loop.scanline=scanline;
-  loop.x_vector=x_vector;
-  loop.y_vector=y_vector;
-  loop.exception=exception;
-  for (y=0; y < (ssize_t) scale_image->rows; y++)
-    if (ScaleNextRow(&loop,&targets,y) == MagickFalse)
-      break;
-  scale_view=DestroyCacheView(scale_view);
-  image_view=DestroyCacheView(image_view);
-  /*
-    Free allocated memory.
-  */
-  buffers.image=image;
-  buffers.scale_image=scale_image;
-  buffers.scale_scanline=scale_scanline;
-  buffers.scanline=scanline;
-  buffers.x_vector=x_vector;
-  buffers.y_vector=y_vector;
-  return(FinishScaleImage(&buffers,status));
+  inputs.image=image;
+  inputs.scale_image=scale_image;
+  inputs.scale_scanline=scale_scanline;
+  inputs.scanline=scanline;
+  inputs.x_vector=x_vector;
+  inputs.y_vector=y_vector;
+  return(ScaleAndFinishImage(&inputs,exception));
 }
