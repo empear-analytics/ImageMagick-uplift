@@ -581,6 +581,20 @@ static RectangleInfo GetTrimBounds(const Image *image,const char *artifact)
   return(bounds);
 }
 
+static RectangleInfo FinishBoundingBox(const Image *image,
+  RectangleInfo bounds,ExceptionInfo *exception)
+{
+  if (IsEmptyBoundingBox(bounds) != MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+      "GeometryDoesNotContainImage","`%s'",image->filename);
+  else
+    {
+      bounds.width-=(size_t) (bounds.x-1);
+      bounds.height-=(size_t) (bounds.y-1);
+    }
+  return(bounds);
+}
+
 MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -673,13 +687,5 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
     }
   }
   image_view=DestroyCacheView(image_view);
-  if (IsEmptyBoundingBox(bounds) != MagickFalse)
-    (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-      "GeometryDoesNotContainImage","`%s'",image->filename);
-  else
-    {
-      bounds.width-=(size_t) (bounds.x-1);
-      bounds.height-=(size_t) (bounds.y-1);
-    }
-  return(bounds);
+  return(FinishBoundingBox(image,bounds,exception));
 }
