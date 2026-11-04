@@ -503,6 +503,51 @@ static MagickBooleanType SetCannyEdgeGray(Image *edge_image,
   return(MagickTrue);
 }
 
+typedef struct _ComputeCannyGradientRowInfo
+{
+  CacheView
+    *edge_view;
+
+  Image
+    *edge_image;
+
+  ExceptionInfo
+    *exception;
+
+  MatrixInfo
+    *canny_cache;
+} ComputeCannyGradientRowInfo;
+
+static void ComputeCannyGradientRow(MagickBooleanType *status,
+  const ComputeCannyGradientRowInfo *info,const ssize_t y)
+{
+  CacheView
+    *const edge_view = info->edge_view;
+
+  Image
+    *const edge_image = info->edge_image;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  MatrixInfo
+    *const canny_cache = info->canny_cache;
+
+  const Quantum
+    *magick_restrict p;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns+1,2,
+    exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  SetCannyGradientRow(edge_image,canny_cache,p,y);
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -582,19 +627,14 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) edge_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    ComputeCannyGradientRowInfo
+      info;
 
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns+1,2,
-      exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    SetCannyGradientRow(edge_image,canny_cache,p,y);
+    info.edge_view=edge_view;
+    info.edge_image=edge_image;
+    info.exception=exception;
+    info.canny_cache=canny_cache;
+    ComputeCannyGradientRow(&status,&info,y);
   }
   edge_view=DestroyCacheView(edge_view);
   /*
