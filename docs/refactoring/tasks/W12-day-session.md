@@ -14,7 +14,7 @@ splits you want. that's fine." (2026-11-01).
 | `resize.c` | 7.08 → 7.11 → **8.65** (Recipe PS) | 3 + 3 |
 | `enhance.c` (again) | 4.85 → **4.91** | 1 |
 | `feature.c` | 5.24 → **5.94** (Recipe PS) | 5 |
-| `effect.c` (again) | 4.36 → **4.51** (Recipe PS) | 9 |
+| `effect.c` (again) | 4.36 → 4.51 (Recipe PS and others) → **5.15** (Recipe SD, PS) | 9 + 10 |
 
 Ten refactor commits (the split, eight on `statistic.c`, one on `statistic-measure.c`). Every
 step ran the oracle on its function's cases (0 diverged); the whole catalogue ran after
@@ -64,6 +64,35 @@ each file: 15,900 cases, 0 diverged.
   a failed fetch, then `status=MagickFalse;`) fits no recipe: T, LB, OC and W each refuse
   it, and it is what holds `GetImageRange` at 9.68 and `EvaluateImages` at cc 27.
 
+### `effect.c` `PreviewImage` and `LocalContrastImage`: three amendments under the mandate
+
+`PreviewImage` (cc 56, 397 lines) went to cc 20 and 182 lines through eight Recipe SD steps
+(1cc426fad to 20a08413c, 4.51 to 5.02, 29 cases each), and `LocalContrastImage` (cc 19, 155
+lines) to cc 9 and 118 through its two loop bodies as PS helpers (b95941dff, bb6083ab7; 44
+cases), 5.02 to 5.15: 4.51 to 5.15 in all. They rest on three amendments, each in its own
+commit before the steps that use it, all *Decided by* `mandate (2026-10-24)`, lint clean:
+
+1. **SD step 1** (8e6fde873): a group may hold `break;` inside a selection (14 of the 30
+   cases did), as a chain's groups already may; the inner `switch` ends, the helper returns,
+   and the outer default's `break` ends the outer `switch`.
+2. **SD step 8, new** (8e6fde873): a chain that needs Z's struct declares one `tile` at the
+   top of the loop body and fills it once before the `switch` (N step 8's sibling form), and
+   each helper passes it on as `&(*v)`; without it step 2 would move the default group's struct
+   fill into every later helper.
+3. **PS step 7, new** (5bd094ff0, worded in 388c27f6e): a parallel loop's whole body may move
+   with its `continue;` statements, each becoming `return;`, as E step 7's whole-body form
+   allows: `status` through the pointer, the loop counter by value, the input struct declared
+   and filled in the body (so each thread fills its own), no pragma in the body. I read both
+   `Run...` helpers: neither holds a pragma, `status` is shared by default (the pragmas name no
+   clause), and the thread id is taken in the helper by the same thread. A candidate gap not
+   closed: a struct of out-pointers for SD would open the five `PreviewImage` groups that
+   stay (the four-argument limit).
+
+Close readings: `label` and `factor` (char arrays written by callee calls) are `char *`
+members of the read-only struct, as N's members that point at written buffers are; each SD
+helper's default group passes `tile`, `&(*preview_image)` and `&(*gamma)` on; the `Run...`
+helpers' OpenMP side was read by eye (the oracle is single-threaded).
+
 ### Recipe PS (owner, 2026-11-04): first uses
 
 Recipe PS (Extract Block Through a Pointer to the Loop Status; 97c21e2d8) moves a block of a
@@ -83,7 +112,7 @@ clause) and no pragma moves with the block; steps 1 to 3 are checked by reading.
   Nesting; the file crossed CodeScene's 1,000-line mark (1,084 lines of code now) and the score
   still rose.
 - **`effect.c` 4.36 → 4.51** (fe0fd65b4 `SpreadImage`, 453254f58 `KuwaharaImage`; V, I, N and
-  Hull steps follow).
+  Hull steps follow), then 5.15 (below).
 
 Close readings: `feature.c` commits 2 and 3 apply LB, N and E inside a helper PS created
 (lexically outside any `omp` region, writing the shared flag through the helper's pointer: E
