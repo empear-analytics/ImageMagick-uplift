@@ -3383,6 +3383,58 @@ static void UnsharpRow(const UnsharpPixels *unsharp,
   }
 }
 
+typedef struct _UnsharpHead
+{
+  UnsharpPixels
+    unsharp;
+
+  CacheView
+    *image_view,
+    *unsharp_view;
+
+  ExceptionInfo
+    *exception;
+} UnsharpHead;
+
+static MagickBooleanType UnsharpHeadRow(const UnsharpHead *head,const ssize_t y,
+  MagickBooleanType *status)
+{
+  CacheView
+    *const image_view = head->image_view,
+    *const unsharp_view = head->unsharp_view;
+
+  const Image
+    *const image = head->unsharp.image,
+    *const unsharp_image = head->unsharp.unsharp_image;
+
+  const Quantum
+    *magick_restrict p;
+
+  const UnsharpPixels
+    unsharp = head->unsharp;
+
+  ExceptionInfo
+    *const exception = head->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(unsharp_view,0,y,unsharp_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  UnsharpRow(&unsharp,p,q);
+  if (SyncCacheViewAuthenticPixels(unsharp_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
   const double sigma,const double gain,const double threshold,
   ExceptionInfo *exception)
@@ -3439,28 +3491,12 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    const UnsharpHead
+      head = { { image, unsharp_image, quantum_threshold, gain }, image_view,
+        unsharp_view, exception };
 
-    const UnsharpPixels
-      unsharp = { image, unsharp_image, quantum_threshold, gain };
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    if (UnsharpHeadRow(&head,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(unsharp_view,0,y,unsharp_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    UnsharpRow(&unsharp,p,q);
-    if (SyncCacheViewAuthenticPixels(unsharp_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
