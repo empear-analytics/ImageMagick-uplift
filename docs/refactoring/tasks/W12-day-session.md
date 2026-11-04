@@ -64,6 +64,48 @@ each file: 15,900 cases, 0 diverged.
   a failed fetch, then `status=MagickFalse;`) fits no recipe: T, LB, OC and W each refuse
   it, and it is what holds `GetImageRange` at 9.68 and `EvaluateImages` at cc 27.
 
+### The Recipe PS sweep over the other files (12 commits, 11 kept)
+
+PS and its step 7 applied to loops the earlier recipes refused; each commit records the PS
+conditions checked by reading (the pragma's `shared(status)`, `status` the only outer variable
+written, each `continue` as `return`, no pragma in the moved text). Whole catalogue after
+the last: 15,900 cases, 0 diverged.
+
+| File and function | Score | Cases |
+| --- | --- | ---: |
+| `shear-deskew.c` `RadonTransform` (27c1e00cf) | 8.74 → 8.97, leaves Bumpy Road | 18 |
+| `colorspace.c` `TransformsRGBImage` Log loop (fbc8dc272) | 3.15 → 3.21 | 424 |
+| `colorspace.c` `sRGBTransformImage` LinearGray loop (22d999ccd) | 3.21 → 3.27 | 1,205 |
+| `vision.c` `AngleThreshold` (0cb1ca627) | 5.64 → 5.91, leaves Bumpy Road, Complex Method and Large Method | 4 |
+| `enhance-tone.c` `HaldClutImage` (ef7d98919) | 4.17 → 4.24 | 5 |
+| `visual-effects.c` `MorphImages` (9723b0eb9) | 3.50 → 3.53 | 3 |
+| `channel-alpha.c` `SetImageAlphaChannel` Remove (b598badaa), Shape (ac09858da), Disassociate (bb810647d) | 7.65 → 8.07 | 1,350 |
+| `attribute-depth.c` `GetImageDepth` (ac92e4701) | 7.33 → 7.54 | 309 |
+| `feature.c` `CannyEdgeImage` gradient loop (353f250a7) | 5.94 → 6.08 | 12 |
+
+No case selects `TransformsRGBImage`'s Log branch, so its step was checked with a
+round-trip diff of `-colorspace Log` against the base binary (identical), and the same
+spot diff was run for the LinearGray step. **Close readings (ac09858da, bb810647d, ac92e4701):**
+the helper is only the `if (status == MagickFalse) continue;` guard, one call and its
+`== MagickFalse` test (step 7's small form: the whole body of a small loop): the effect is a
+guard moving out of the function, the bump and cc counts fall and the line count stays or
+rises by two. Step 7 allows it as written; revert them if you rule that is not what it
+means. Probes that did not pay: a second helper of the same shape in `colorspace.c`,
+`vision.c` and `channel-alpha.c` (*Code Duplication*), `channel.c` 6.93 → 6.64,
+`composite.c` 3.01 → 2.99, `quantize.c`, `shear-rotate.c` 7.63 → 7.17–7.43, `compare.c` flat,
+`distort.c`'s column loop (the helper would be about 145 lines); a loop with a progress or
+`omp atomic` block cannot move whole (its early `continue;`s skip the block).
+
+**Not covered by PS, not applied:** a second shared scalar besides `status`
+(`attribute.c` `IdentifyImageGray` also writes the shared `type`: +0.31 probed;
+`IdentifyImageMonochrome` writes only `type`), and `resize-sample.c` `SampleImage` (9.47 →
+10.00 probed), whose loop writes the shared `progress` with a non-atomic `progress++`, an
+upstream race a helper would keep as it is. **Out of campaign A:** the sweep also found
+`matrix.c` `MatrixToImage` (7.45 → 7.76; 23 cases), a file of campaign B; that commit
+(21a5350e6) was taken off this branch to a local branch `w12-matrix-c`, not pushed,
+because the file belongs to the other campaign; image.c (`SetImageMask`, `SyncImage`) and
+annotate.c (`RenderPostscript`) are B's too and were not probed.
+
 ### `effect.c` `PreviewImage` and `LocalContrastImage`: three amendments under the mandate
 
 `PreviewImage` (cc 56, 397 lines) went to cc 20 and 182 lines through eight Recipe SD steps
