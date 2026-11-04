@@ -1004,6 +1004,18 @@ static MagickBooleanType FetchScaleRow(const ScaleLoop *loop,
   return(MagickTrue);
 }
 
+static MagickBooleanType SyncScaleRow(const ScaleLoop *loop,
+  const ScaleRowTargets *targets)
+{
+  if (SyncCacheViewAuthenticPixels(loop->scale_view,loop->exception) ==
+      MagickFalse)
+    {
+      *targets->status=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -1145,11 +1157,8 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
     transfer.scale_scanline=scale_scanline;
     transfer.scanline=scanline;
     TransferScaleScanline(&transfer,q);
-    if (SyncCacheViewAuthenticPixels(scale_view,exception) == MagickFalse)
-      {
-        status=MagickFalse;
-        break;
-      }
+    if (SyncScaleRow(&loop,&targets) == MagickFalse)
+      break;
     proceed=SetImageProgress(image,ScaleImageTag,(MagickOffsetType) y,
       image->rows);
     if (proceed == MagickFalse)
