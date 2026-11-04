@@ -1552,6 +1552,20 @@ static void MeanShiftRow(MagickBooleanType *status,const MeanShiftInfo *shift,
   }
 }
 
+static MagickBooleanType AcquireMeanShiftImage(const Image *image,
+  Image **mean_image,ExceptionInfo *exception)
+{
+  (*mean_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*mean_image) == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass((*mean_image),DirectClass,exception) == MagickFalse)
+    {
+      (*mean_image)=DestroyImage((*mean_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
   const size_t height,const double color_distance,ExceptionInfo *exception)
 {
@@ -1580,14 +1594,8 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  mean_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (mean_image == (Image *) NULL)
+  if (AcquireMeanShiftImage(image,&mean_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(mean_image,DirectClass,exception) == MagickFalse)
-    {
-      mean_image=DestroyImage(mean_image);
-      return((Image *) NULL);
-    }
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
