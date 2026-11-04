@@ -104,6 +104,13 @@ typedef struct _FourierInfo
     height;
 } FourierInfo;
 
+typedef struct _RollExtent
+{
+  size_t
+    width,
+    height;
+} RollExtent;
+
 typedef struct _ForwardChannelSource
 {
   const Image
@@ -699,7 +706,7 @@ static ssize_t RollFourierIndex(const ssize_t y,const ssize_t y_offset,
   return(v);
 }
 
-static MagickBooleanType RollFourier(const size_t width,const size_t height,
+static MagickBooleanType RollFourier(const RollExtent *extent,
   const ssize_t x_offset,const ssize_t y_offset,double *roll_pixels)
 {
   double
@@ -718,21 +725,23 @@ static MagickBooleanType RollFourier(const size_t width,const size_t height,
   /*
     Move zero frequency (DC, average color) from (0,0) to (width/2,height/2).
   */
-  source_info=AcquireVirtualMemory(width,height*sizeof(*source_pixels));
+  source_info=AcquireVirtualMemory(extent->width,extent->height*
+    sizeof(*source_pixels));
   if (source_info == (MemoryInfo *) NULL)
     return(MagickFalse);
   source_pixels=(double *) GetVirtualMemoryBlob(source_info);
   i=0L;
-  for (y=0L; y < (ssize_t) height; y++)
+  for (y=0L; y < (ssize_t) extent->height; y++)
   {
-    v=RollFourierIndex(y,y_offset,height);
-    for (x=0L; x < (ssize_t) width; x++)
+    v=RollFourierIndex(y,y_offset,extent->height);
+    for (x=0L; x < (ssize_t) extent->width; x++)
     {
-      u=RollFourierIndex(x,x_offset,width);
-      source_pixels[v*(ssize_t) width+u]=roll_pixels[i++];
+      u=RollFourierIndex(x,x_offset,extent->width);
+      source_pixels[v*(ssize_t) extent->width+u]=roll_pixels[i++];
     }
   }
-  (void) memcpy(roll_pixels,source_pixels,height*width*sizeof(*source_pixels));
+  (void) memcpy(roll_pixels,source_pixels,extent->height*extent->width*
+    sizeof(*source_pixels));
   source_info=RelinquishVirtualMemory(source_info);
   return(MagickTrue);
 }
@@ -775,6 +784,9 @@ static MagickBooleanType ForwardQuadrantSwap(const size_t width,
   ForwardQuadrant
     quadrant;
 
+  RollExtent
+    extent;
+
   MagickBooleanType
     status;
 
@@ -789,7 +801,9 @@ static MagickBooleanType ForwardQuadrantSwap(const size_t width,
     Swap quadrants.
   */
   center=width/2+1;
-  status=RollFourier(center,height,0L,(ssize_t) height/2L,source_pixels);
+  extent.width=center;
+  extent.height=height;
+  status=RollFourier(&extent,0L,(ssize_t) height/2L,source_pixels);
   if (status == MagickFalse)
     return(MagickFalse);
   for (y=0L; y < (ssize_t) height; y++)
@@ -1520,6 +1534,9 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
 static MagickBooleanType InverseQuadrantSwap(const size_t width,
   const size_t height,const double *source,double *destination)
 {
+  RollExtent
+    extent;
+
   size_t
     center;
 
@@ -1540,7 +1557,9 @@ static MagickBooleanType InverseQuadrantSwap(const size_t width,
       source[y*(ssize_t) width+(ssize_t) width/2L];
   for (x=0L; x < (ssize_t) center; x++)
     destination[x]=source[(ssize_t) center-x-1L];
-  return(RollFourier(center,height,0L,(ssize_t) height/-2L,destination));
+  extent.width=center;
+  extent.height=height;
+  return(RollFourier(&extent,0L,(ssize_t) height/-2L,destination));
 }
 
 static void ScaleInverseFourierPhase(const FourierInfo *fourier_info,
