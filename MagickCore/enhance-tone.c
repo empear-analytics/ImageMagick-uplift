@@ -2804,6 +2804,52 @@ static void NegateColormap(Image *image,const MagickBooleanType grayscale)
 
 #define NegateImageTag  "Negate/Image"
 
+typedef struct _NegateInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} NegateInfo;
+
+static void NegateGrayscaleRow(const NegateInfo *negate,const ssize_t y,
+  MagickBooleanType *status,MagickOffsetType *progress)
+{
+  Image
+    *image = negate->image;
+
+  MagickBooleanType
+    proceed,
+    sync;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(negate->image_view,0,y,image->columns,1,
+    negate->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  NegateGrayImageRow(image,q);
+  sync=SyncCacheViewAuthenticPixels(negate->image_view,negate->exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  if (image->progress_monitor == (MagickProgressMonitor) NULL)
+    return;
+  (*progress)++;
+  proceed=SetImageProgress(image,NegateImageTag,(*progress),image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType NegateImage(Image *image,
   const MagickBooleanType grayscale,ExceptionInfo *exception)
 {
@@ -2815,6 +2861,9 @@ MagickExport MagickBooleanType NegateImage(Image *image,
 
   MagickOffsetType
     progress;
+
+  NegateInfo
+    negate;
 
   ssize_t
     y;
@@ -2831,37 +2880,13 @@ MagickExport MagickBooleanType NegateImage(Image *image,
   status=MagickTrue;
   progress=0;
   image_view=AcquireAuthenticCacheView(image,exception);
+  negate.image=image;
+  negate.image_view=image_view;
+  negate.exception=exception;
   if( grayscale != MagickFalse )
     {
       for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        MagickBooleanType
-          proceed,
-          sync;
-
-        Quantum
-          *magick_restrict q;
-
-        if (status == MagickFalse)
-          continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        NegateGrayImageRow(image,q);
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
-        if (image->progress_monitor == (MagickProgressMonitor) NULL)
-          continue;
-        progress++;
-        proceed=SetImageProgress(image,NegateImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+        NegateGrayscaleRow(&negate,y,&status,&progress);
       image_view=DestroyCacheView(image_view);
       return(MagickTrue);
     }
