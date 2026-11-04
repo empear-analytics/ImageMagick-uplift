@@ -874,20 +874,10 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
     const int
       id = GetOpenMPThreadId();
 
-    StatisticRow
-      row;
+    const StatisticRow
+      row = { image, statistic_image, image_view, statistic_view, exception,
+        type, width, height, center, pixel_list, id };
 
-    row.image=image;
-    row.statistic_image=statistic_image;
-    row.image_view=image_view;
-    row.statistic_view=statistic_view;
-    row.exception=exception;
-    row.type=type;
-    row.width=width;
-    row.height=height;
-    row.center=center;
-    row.pixel_list=pixel_list;
-    row.id=id;
     if (StatisticImageLine(&row,y,&status) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
