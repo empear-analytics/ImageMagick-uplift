@@ -1400,16 +1400,11 @@ MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,FlopImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,FlopImageTag,progress,&status);
       }
   }
   flop_view=DestroyCacheView(flop_view);
