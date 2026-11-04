@@ -301,17 +301,11 @@ MagickExport MagickBooleanType BilevelImage(Image *image,const double threshold,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ThresholdImageTag,progress++,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetThresholdProgress(image,ThresholdImageTag,progress++,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
