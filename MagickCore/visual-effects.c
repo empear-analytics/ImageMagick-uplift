@@ -1543,6 +1543,21 @@ static MagickBooleanType ReportMorphProgress(const Image *image,
   return(status);
 }
 
+static void ReportMorphFrameProgress(const Image *image,const ssize_t n,
+  const size_t number_frames,MagickBooleanType *status)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,MorphImageTag,(MagickOffsetType) n,
+        number_frames);
+      if (proceed == MagickFalse)
+        (*status)=MagickFalse;
+    }
+}
+
 typedef struct _MorphFrameRowInfo
 {
   CacheView
@@ -1677,16 +1692,7 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
             return((Image *) NULL);
           }
         AppendImageToList(&morph_images,morph_image);
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            MagickBooleanType
-              proceed;
-
-            proceed=SetImageProgress(image,MorphImageTag,(MagickOffsetType) n,
-              number_frames);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
-          }
+        ReportMorphFrameProgress(image,n,number_frames,&status);
       }
       return(GetFirstImageInList(morph_images));
     }
