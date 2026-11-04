@@ -256,3 +256,41 @@ under four arguments, at one new type per file. No recipe was added.
   from a probe, not measured; `code_health_review` lists the function under *Large Method*
   before the commit and not after. The message was rewritten to say that; the tree is
   unchanged.
+
+## Recipe PC and the second half of the day (2026-11-04)
+
+Recipe PC (aacff05ea, new, `mandate`) moves the head of a parallel loop body (status guard,
+fetch with its `continue`, work, sync test) into a `static MagickBooleanType` helper when an
+`omp atomic` progress tail has to stay in the caller; each `continue;` becomes
+`return(MagickFalse);`, the caller continues on `MagickFalse`. Read-only inputs go in a
+`const` struct filled in the body before the call, so the fills now run before the guard.
+PS step 8 (38b4f4131) and OC step 6 (875fe9239) are amendments, also under the mandate.
+Whole catalogue at each file's last commit: 15,900 cases, 0 diverged.
+
+| File | Score | Commits | Recipes |
+| --- | --- | ---: | --- |
+| `paint.c` | 6.24 → 6.55 | 2 + PC | PC |
+| `threshold.c` | 5.35 → 5.50 | 1 | PC |
+| `transform.c` | 5.60 → 5.90 | 3 | PC |
+| `segment.c` | 5.70 → 6.44 | 7 | PC, LB, B, PS, D, O, E |
+| `vision.c` | 5.91 → 6.98 | 10 + 2 amendments | PS 8, H, OC 6, B, D |
+| `fourier.c` | 6.02 → 6.27 | 7 | PC, B |
+| `feature.c` | 6.08 → 6.51 | 6 | PC, E, Wa, V, B, Y |
+| `compare.c`, `quantize.c` | 2.54, 5.60 | 0 | none legal |
+
+**For the owner.** (1) PC is a new recipe; PS step 8 and OC step 6 are amendments (the agent
+suggested a new code might be preferable). (2) Flat steps kept under rule 2: vision.c's
+`IntegralImageTag` hoist, `ComputeObjectAngle` (D, whose text says "the score rises") and two
+B steps; fourier.c's five B steps; feature.c's `GetCannyNeighbors`. (3) fourier.c 3ba6b4029
+and vision.c's B trio rely on rule 1's same-recipe set. (4) segment.c d797fb70e passes a
+`MagickStatusType *status` where PC names `MagickBooleanType *`. (5) segment.c ee7667275
+(`GetImageDynamicThreshold`, E) is unreached, verified by guard.
+
+**Noticed upstream, not changed.** `BilevelImage` advances progress twice per row;
+`SimilarityImage`'s `threshold_trigger` is reset inside the loop so its early exit is dead,
+and it writes `progress++` and `status` unprotected; `GetImageDynamicThreshold` leaks on error
+exits and passes `0.2f` where `SegmentImage` passes `0.2`; `Classify` returns `MagickTrue`
+whatever `status` holds; `ForwardFourierTransformChannel` tests `magnitude_info == NULL`
+before relinquishing it; `InverseFourierTransform` calls `LocaleCompare` without a NULL
+check; `IntegralImage` tests `p` twice and never `q`; `HoughLineImage` reports progress under
+`CannyEdgeImageTag`; `TraceEdges` shifts `edge.x` and `edge.y` while scanning neighbours.
