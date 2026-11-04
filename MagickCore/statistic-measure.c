@@ -541,16 +541,16 @@ static void AccumulateChannelRange(const Image *image,
   }
 }
 
+typedef struct
+{
+  double
+    maxima,
+    minima;
+} RangeInfo;
+
 MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
   double *maxima,ExceptionInfo *exception)
 {
-  typedef struct
-  {
-    double
-      maxima,
-      minima;
-  } RangeInfo;
-
   CacheView
     *image_view;
 
