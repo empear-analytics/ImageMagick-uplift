@@ -1556,6 +1556,18 @@ static MagickBooleanType AcquireTransparentFrame(const Image *curr,
   return(MagickTrue);
 }
 
+static MagickBooleanType MarkDeletedFrame(const MagickBooleanType add_frames,
+  const ssize_t i,DisposeType *disposals,RectangleInfo *bounds)
+{
+  if ( add_frames && i>=2 ) {
+    disposals[i-1]=DelDispose;
+    disposals[i]=NoneDispose;
+    bounds[i]=bounds[i-1];
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1698,13 +1710,11 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
         Otherwise mark previous image for deleted, transfering its crop bounds
         to the current image.
       */
-      if ( add_frames && i>=2 ) {
-        disposals[i-1]=DelDispose;
-        disposals[i]=NoneDispose;
-        bounds[i]=bounds[i-1];
-        i++;
-        continue;
-      }
+      if (MarkDeletedFrame(add_frames,i,disposals,bounds) == MagickFalse)
+        {
+          i++;
+          continue;
+        }
     }
     else
       {
