@@ -346,10 +346,22 @@ static void SetClusterColormap(Image *image,const Cluster *head)
   }
 }
 
-static void ClassifyFuzzyPixel(Image *image,const double *squares,
-  const PixelInfo *pixel,const double weighting_exponent,
-  Quantum *magick_restrict q)
+typedef struct _FuzzyWeights
 {
+  const double
+    *squares;
+
+  double
+    weighting_exponent;
+} FuzzyWeights;
+
+static void ClassifyFuzzyPixel(Image *image,const FuzzyWeights *weights,
+  const PixelInfo *pixel,Quantum *magick_restrict q)
+{
+  const double
+    *const squares = weights->squares,
+    weighting_exponent = weights->weighting_exponent;
+
   const PixelInfo
     *magick_restrict p;
 
@@ -493,6 +505,9 @@ static void ClassifyRowPixels(Image *image,const ClassifyRowInputs *inputs,
   const double
     weighting_exponent = inputs->weighting_exponent;
 
+  const FuzzyWeights
+    weights = { squares, weighting_exponent };
+
   Cluster
     *c;
 
@@ -510,7 +525,7 @@ static void ClassifyRowPixels(Image *image,const ClassifyRowInputs *inputs,
     pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,q));
     c=ClassifyPixelByCluster(image,head,pixel,q);
     if (c == (Cluster *) NULL)
-      ClassifyFuzzyPixel(image,squares,&pixel,weighting_exponent,q);
+      ClassifyFuzzyPixel(image,&weights,&pixel,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
