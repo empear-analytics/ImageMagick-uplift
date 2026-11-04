@@ -865,6 +865,22 @@ static MagickBooleanType AcquireMontageStrings(Image *montage,
   return(MagickTrue);
 }
 
+static void GetMontageTileGeometry(const char *geometry,
+  RectangleInfo *extract_info,MagickStatusType *flags,
+  MagickBooleanType *concatenate)
+{
+  if (geometry != (char *) NULL)
+    {
+      /*
+        Initialize tile geometry.
+      */
+      *flags=GetGeometry(geometry,&(*extract_info).x,&(*extract_info).y,
+        &(*extract_info).width,&(*extract_info).height);
+      *concatenate=((*flags & RhoValue) == 0) && ((*flags & SigmaValue) == 0) ?
+        MagickTrue : MagickFalse;
+    }
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1003,16 +1019,8 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   SetGeometry(image_list[0],&extract_info);
   extract_info.x=(ssize_t) montage_info->border_width;
   extract_info.y=(ssize_t) montage_info->border_width;
-  if (montage_info->geometry != (char *) NULL)
-    {
-      /*
-        Initialize tile geometry.
-      */
-      flags=GetGeometry(montage_info->geometry,&extract_info.x,&extract_info.y,
-        &extract_info.width,&extract_info.height);
-      concatenate=((flags & RhoValue) == 0) && ((flags & SigmaValue) == 0) ?
-        MagickTrue : MagickFalse;
-    }
+  GetMontageTileGeometry(montage_info->geometry,&extract_info,&flags,
+    &concatenate);
   border_width=montage_info->border_width;
   bevel_width=0;
   (void) memset(&frame_info,0,sizeof(frame_info));
