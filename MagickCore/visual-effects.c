@@ -1039,6 +1039,13 @@ typedef struct _ColorMatrixRow
 
   const KernelInfo
     *color_matrix;
+
+  CacheView
+    *image_view,
+    *color_view;
+
+  ExceptionInfo
+    *exception;
 } ColorMatrixRow;
 
 static void ApplyColorMatrixRow(const ColorMatrixRow *color_row,
@@ -1083,6 +1090,45 @@ static void ApplyColorMatrixRow(const ColorMatrixRow *color_row,
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(color_image);
   }
+}
+
+static MagickBooleanType ColorMatrixImageRow(
+  const ColorMatrixRow *color_row,double ColorMatrix[][6],const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Image
+    *const image = color_row->image;
+
+  Image
+    *const color_image = color_row->color_image;
+
+  CacheView
+    *const image_view = color_row->image_view,
+    *const color_view = color_row->color_view;
+
+  ExceptionInfo
+    *const exception = color_row->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(color_view,0,y,color_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ApplyColorMatrixRow(color_row,ColorMatrix,p,q);
+  if (SyncCacheViewAuthenticPixels(color_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
 }
 
 MagickExport Image *ColorMatrixImage(const Image *image,
@@ -1156,28 +1202,14 @@ MagickExport Image *ColorMatrixImage(const Image *image,
     ColorMatrixRow
       color_row;
 
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(color_view,0,y,color_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
     color_row.image=image;
     color_row.color_image=color_image;
     color_row.color_matrix=color_matrix;
-    ApplyColorMatrixRow(&color_row,ColorMatrix,p,q);
-    if (SyncCacheViewAuthenticPixels(color_view,exception) == MagickFalse)
-      status=MagickFalse;
+    color_row.image_view=image_view;
+    color_row.color_view=color_view;
+    color_row.exception=exception;
+    if (ColorMatrixImageRow(&color_row,ColorMatrix,y,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
