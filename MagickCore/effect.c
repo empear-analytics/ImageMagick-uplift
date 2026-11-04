@@ -1845,6 +1845,84 @@ static void RelinquishMontageDirectory(const Image *image,
     }
 }
 
+typedef struct _PreviewTile
+{
+  Image
+    *thumbnail;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *factor;
+
+  char
+    *label;
+
+  PreviewType
+    preview;
+
+  double
+    percentage;
+} PreviewTile;
+
+static void ApplyGammaHueSaturationPreview(const PreviewTile *tile,
+  Image **preview_image,double *gamma)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const factor = tile->factor,
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const double
+    percentage = tile->percentage;
+
+  switch (preview)
+  {
+    case GammaPreview:
+    default:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (*gamma)+=0.4;
+      (void) GammaImage((*preview_image),(*gamma),exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"gamma %g",(*gamma));
+      break;
+    }
+    case HuePreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) FormatLocaleString(factor,MagickPathExtent,"100,100,%g",2.0*
+        percentage);
+      (void) ModulateImage((*preview_image),factor,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
+      break;
+    }
+    case SaturationPreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) FormatLocaleString(factor,MagickPathExtent,"100,%g",2.0*
+        percentage);
+      (void) ModulateImage((*preview_image),factor,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
+      break;
+    }
+  }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -1915,6 +1993,9 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   threshold=0.0;
   for (i=0; i < NumberTiles; i++)
   {
+    PreviewTile
+      tile;
+
     thumbnail=ThumbnailImage(image,geometry.width,geometry.height,exception);
     if (thumbnail == (Image *) NULL)
       break;
@@ -1928,6 +2009,12 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
         AppendImageToList(&images,thumbnail);
         continue;
       }
+    tile.thumbnail=thumbnail;
+    tile.exception=exception;
+    tile.factor=factor;
+    tile.label=label;
+    tile.preview=preview;
+    tile.percentage=percentage;
     switch (preview)
     {
       case RotatePreview:
@@ -1954,28 +2041,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           (double) x,(double) y);
         break;
       }
-      case HuePreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) FormatLocaleString(factor,MagickPathExtent,"100,100,%g",2.0*
-          percentage);
-        (void) ModulateImage(preview_image,factor,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
-        break;
-      }
-      case SaturationPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) FormatLocaleString(factor,MagickPathExtent,"100,%g",2.0*
-          percentage);
-        (void) ModulateImage(preview_image,factor,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
-        break;
-      }
       case BrightnessPreview:
       {
         preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
@@ -1986,15 +2051,9 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
         (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
         break;
       }
-      case GammaPreview:
       default:
       {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        gamma+=0.4;
-        (void) GammaImage(preview_image,gamma,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"gamma %g",gamma);
+        ApplyGammaHueSaturationPreview(&tile,&preview_image,&gamma);
         break;
       }
       case SpiffPreview:
