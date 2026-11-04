@@ -808,6 +808,15 @@ static Image *AutoCropDeskewImage(const Image *image,Image *clone_image,
   return(crop_image);
 }
 
+static void SetDeskewAngleArtifact(Image *clone_image,const double degrees)
+{
+  char
+    angle[MagickPathExtent];
+
+  (void) FormatLocaleString(angle,MagickPathExtent,"%.17g",degrees);
+  (void) SetImageArtifact(clone_image,"deskew:angle",angle);
+}
+
 MagickExport Image *DeskewImage(const Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -860,13 +869,7 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
   clone_image=CloneImage(image,0,0,MagickTrue,exception);
   if (clone_image == (Image *) NULL)
     return((Image *) NULL);
-  {
-    char
-      angle[MagickPathExtent];
-
-    (void) FormatLocaleString(angle,MagickPathExtent,"%.17g",degrees);
-    (void) SetImageArtifact(clone_image,"deskew:angle",angle);
-  }
+  SetDeskewAngleArtifact(clone_image,degrees);
   (void) SetImageVirtualPixelMethod(clone_image,BackgroundVirtualPixelMethod,
     exception);
   affine_matrix.sx=cos(DegreesToRadians(fmod((double) degrees,360.0)));
