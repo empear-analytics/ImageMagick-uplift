@@ -891,6 +891,17 @@ static MagickBooleanType DrawFrameSideLine(const FrameSideLine *line,
   return(MagickTrue);
 }
 
+static void FrameImageProgress(const Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,FrameImageTag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -1005,16 +1016,11 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,FrameImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        FrameImageProgress(image,progress,&status);
       }
   }
   height=(size_t) (frame_info->inner_bevel+(ssize_t) frame_info->height-
