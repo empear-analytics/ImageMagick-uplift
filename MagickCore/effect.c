@@ -621,11 +621,120 @@ static void HullAllPolarities(const DespeckleHull *despeckle_hull,
   Hull(&hull,x,y,-1);
 }
 
+typedef struct _DespeckleChannelPass
+{
+  const Image
+    *image;
+
+  Image
+    *despeckle_image;
+
+  CacheView
+    *image_view,
+    *despeckle_view;
+
+  ExceptionInfo
+    *exception;
+
+  Quantum
+    *buffer,
+    *pixels;
+
+  size_t
+    length;
+
+  const ssize_t
+    *X,
+    *Y;
+} DespeckleChannelPass;
+
+static void DespeckleChannel(const DespeckleChannelPass *despeckle,
+  const ssize_t i,MagickBooleanType *status)
+{
+  const Image
+    *const image = despeckle->image;
+
+  Image
+    *const despeckle_image = despeckle->despeckle_image;
+
+  CacheView
+    *const image_view = despeckle->image_view,
+    *const despeckle_view = despeckle->despeckle_view;
+
+  ExceptionInfo
+    *const exception = despeckle->exception;
+
+  Quantum
+    *magick_restrict const buffer = despeckle->buffer,
+    *magick_restrict const pixels = despeckle->pixels;
+
+  const size_t
+    length = despeckle->length;
+
+  const ssize_t
+    *const X = despeckle->X,
+    *const Y = despeckle->Y;
+
+  DespeckleLoad
+    load;
+
+  DespeckleStore
+    store;
+
+  DespeckleHull
+    despeckle_hull;
+
+  PixelChannel
+     channel;
+
+  PixelTrait
+    despeckle_traits,
+    traits;
+
+  ssize_t
+    k;
+
+  if ((*status) == MagickFalse)
+    return;
+  channel=GetPixelChannelChannel(image,i);
+  traits=GetPixelChannelTraits(image,channel);
+  despeckle_traits=GetPixelChannelTraits(despeckle_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (despeckle_traits == UndefinedPixelTrait))
+    return;
+  if ((despeckle_traits & CopyPixelTrait) != 0)
+    return;
+  (void) memset(pixels,0,length*sizeof(*pixels));
+  load.image=image;
+  load.image_view=image_view;
+  load.pixels=pixels;
+  load.i=i;
+  (*status)=LoadDespeckleChannel(&load,(*status),exception);
+  (void) memset(buffer,0,length*sizeof(*buffer));
+  for (k=0; k < 4; k++)
+  {
+    despeckle_hull.image=image;
+    despeckle_hull.pixels=pixels;
+    despeckle_hull.buffer=buffer;
+    HullAllPolarities(&despeckle_hull,X[k],Y[k]);
+  }
+  store.image=image;
+  store.despeckle_image=despeckle_image;
+  store.despeckle_view=despeckle_view;
+  store.channel=channel;
+  store.pixels=pixels;
+  (*status)=StoreDespeckleChannel(&store,(*status),exception);
+  (*status)=ReportDespeckleProgress(image,i,(*status));
+}
+
 MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
     *despeckle_view,
     *image_view;
+
+  DespeckleChannelPass
+    despeckle;
 
   Image
     *despeckle_image;
@@ -701,58 +810,19 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
   status=MagickTrue;
   image_view=AcquireVirtualCacheView(image,exception);
   despeckle_view=AcquireAuthenticCacheView(despeckle_image,exception);
+  despeckle.image=image;
+  despeckle.despeckle_image=despeckle_image;
+  despeckle.image_view=image_view;
+  despeckle.despeckle_view=despeckle_view;
+  despeckle.exception=exception;
+  despeckle.buffer=buffer;
+  despeckle.pixels=pixels;
+  despeckle.length=length;
+  despeckle.X=X;
+  despeckle.Y=Y;
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    DespeckleLoad
-      load;
-
-    DespeckleStore
-      store;
-
-    DespeckleHull
-      despeckle_hull;
-
-    PixelChannel
-       channel;
-
-    PixelTrait
-      despeckle_traits,
-      traits;
-
-    ssize_t
-      k;
-
-    if (status == MagickFalse)
-      continue;
-    channel=GetPixelChannelChannel(image,i);
-    traits=GetPixelChannelTraits(image,channel);
-    despeckle_traits=GetPixelChannelTraits(despeckle_image,channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (despeckle_traits == UndefinedPixelTrait))
-      continue;
-    if ((despeckle_traits & CopyPixelTrait) != 0)
-      continue;
-    (void) memset(pixels,0,length*sizeof(*pixels));
-    load.image=image;
-    load.image_view=image_view;
-    load.pixels=pixels;
-    load.i=i;
-    status=LoadDespeckleChannel(&load,status,exception);
-    (void) memset(buffer,0,length*sizeof(*buffer));
-    for (k=0; k < 4; k++)
-    {
-      despeckle_hull.image=image;
-      despeckle_hull.pixels=pixels;
-      despeckle_hull.buffer=buffer;
-      HullAllPolarities(&despeckle_hull,X[k],Y[k]);
-    }
-    store.image=image;
-    store.despeckle_image=despeckle_image;
-    store.despeckle_view=despeckle_view;
-    store.channel=channel;
-    store.pixels=pixels;
-    status=StoreDespeckleChannel(&store,status,exception);
-    status=ReportDespeckleProgress(image,i,status);
+    DespeckleChannel(&despeckle,i,&status);
   }
   despeckle_view=DestroyCacheView(despeckle_view);
   image_view=DestroyCacheView(image_view);
