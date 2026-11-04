@@ -294,3 +294,31 @@ whatever `status` holds; `ForwardFourierTransformChannel` tests `magnitude_info 
 before relinquishing it; `InverseFourierTransform` calls `LocaleCompare` without a NULL
 check; `IntegralImage` tests `p` twice and never `q`; `HoughLineImage` reports progress under
 `CannyEdgeImageTag`; `TraceEdges` shifts `edge.x` and `edge.y` while scanning neighbours.
+
+### Later the same day: PC and the amendments on the red files
+
+| File | Score | Commits | Recipes |
+| --- | --- | ---: | --- |
+| `visual-effects.c` | 3.53 → 3.90 | 10 | PC, E, O, N |
+| `effect-blur.c` | 5.29 → 5.69 | 10 | PC, E, V |
+| `enhance-tone.c` | 4.24 → 4.37 | 4 | H, OC 6, PC |
+| `enhance.c` | 4.91 → 5.43 | 8 | PC, H, E, Q |
+| `effect.c` | 5.15 → 5.94 | 10 | PC, E, PS, D, N |
+| `colorspace.c`, `distort.c` | 3.27, 3.55 | 0 | none legal |
+
+Whole catalogue after the last commit: 15,900 cases, 0 diverged.
+
+**For the owner.** (1) `visual-effects.c` `MorphImages` (a91bc0426, a7c651f20): the oracle never
+reaches the single-image branch; checked by hand on `rose: -morph 0/1/2/5` with and without
+`-monitor`, identical. (2) `enhance.c` 9ef3d846d reuses the existing `CLAHEPixelLoad` typedef
+where Q step 3 speaks of a new struct (one commit to revert). (3) `effect.c`'s
+`ReportRowProgress` (PS) and its three D(b) reuses lean on the by-reading check of PS steps 1 to 3;
+the oracle does not always set a progress monitor. (4) Flat steps under rule 2: `enhance-tone.c`
+and `enhance.c` H hoists. (5) Not committed, owner call: `GetGrayscaleIntensity` D extractions
+(4.37 to 4.40, four more to 4.44; the function stays Complex and Large) and the `ImplodeImage`
+chain (about 4.05, row helper keeps two bumps; patch in `~/sp_visual/implode_all.patch`).
+
+**Noticed upstream, not changed.** `SelectiveBlurImage` leaks `kernel` when its first
+`CloneImage` fails; `NegateImage`'s grayscale branch returns `MagickTrue` whatever `status`
+holds; `ResampleDistortPixel`'s result overwrites `status`; `MorphImages`' single-image branch
+sets `status` and never reads it.
