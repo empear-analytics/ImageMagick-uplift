@@ -12,6 +12,7 @@ splits you want. that's fine." (2026-11-01).
 | `statistic.c` | 5.84 → 6.55 (split) → **6.73** | 1 + 8 |
 | `statistic-measure.c` (new) | 9.09 → **9.68** | 1 |
 | `resize.c` | 7.08 → **7.11** | 3 |
+| `enhance.c` (again) | 4.85 → **4.91** | 1 |
 
 Ten refactor commits (the split, eight on `statistic.c`, one on `statistic-measure.c`). Every
 step ran the oracle on its function's cases (0 diverged); the whole catalogue ran after
@@ -60,6 +61,22 @@ each file: 15,900 cases, 0 diverged.
 - **Recipe-text gaps found:** a `continue` block mid-body in a parallel loop (`p == NULL` or
   a failed fetch, then `status=MagickFalse;`) fits no recipe: T, LB, OC and W each refuse
   it, and it is what holds `GetImageRange` at 9.68 and `EvaluateImages` at cc 27.
+
+### The Recipe D amendment, first uses (one commit, three probes left out)
+
+`enhance.c` f72f8fa8a, form (b): the progress block of `CLAHEImage`'s second row loop equals
+`UpdateCLAHEProgress`'s body once `progress` and `status` are `(*progress)` and `(*status)`
+(by script, token for token), so it becomes `UpdateCLAHEProgress(image,&progress,&status);`:
+4.85 to 4.91, Bumpy Road gone, cc 16 to 14, 109 to 100 lines, 13 cases, 0 diverged. The W11
+note that the block "cannot reuse the helper" applied to the loop extracted whole, where
+`status` is a plain variable; in place the addresses exist. Not committed: `enhance-tone.c`'s
+`GetGrayscaleIntensity` (the Rec709 block equals `EncodeGrayscaleGamma`'s body and the two
+sRGB decode blocks are identical: 4.17 to 4.20, but cc 11 and 70 lines remain flagged, so no
+finding goes and the amendment's condition fails); `effect-blur.c`'s `AdaptiveSharpenImage`
+(`PrepareAdaptiveEdge` reuse: 5.29 to 5.30, no finding removed; its inner loop differs from
+`BlurAdaptiveRow` in extra parentheses, equal in value, not the same text). A token-level
+scan of seventeen files (vision to resize) found three further whole-body hits, none in a
+function where a finding would go.
 
 ### `resize.c`: Recipe AS does not apply to `InterpolativeResizeImage`
 
