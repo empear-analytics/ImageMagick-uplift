@@ -4922,6 +4922,17 @@ functions only.
    pointers, the thread's scratch pointer) move with it, and a call such as
    `GetOpenMPThreadId()` is made in the helper, by the same thread. A `continue` of a
    loop nested in the body is that loop's own and does not change.
+8. A block that also writes two to four variables declared in the loop body that the
+   body reads after the block (accumulators the block adds to, which step 3 refuses):
+   pass their addresses in one `const` struct, Recipe Q step 8's form. A `typedef
+   struct` directly above the helper holds one pointer member per such variable, named
+   as the variable, in the order the block first writes them; the loop body declares it
+   `const` with the addresses as its initialiser (`const Targets targets = { &a, &b };`),
+   so each thread points at its own variables; the helper takes it after the input
+   struct and before `status`, binds each member once (`T *const v = targets->v;`) and
+   writes `(*v)` at every use, or `v` for `&v` passed on. The input struct, this struct
+   and the pointers together stay within four parameters. Nothing else in the text
+   changes.
 
 **Before:**
 
@@ -4989,6 +5000,10 @@ static void InterpolateResizeRow(...,MagickBooleanType *status,...)
   (a body that does is not this form). `status` is reached through its address as in
   step 4, so the flag the threads share is read and written at the same points. The
   helper is called from inside the iteration, never across the region's boundary.
+- Step 8's variables are declared in the loop body, so each thread's struct points at that
+  thread's own copies: the helper adds to the same variables the caller used, in the same
+  order, and the caller reads them after the call as it read them after the block. No
+  address leaves the iteration and none is shared between threads.
 - The oracle runs single-threaded and cannot see a data race: steps 1 to 3 are checked by
   reading, and the guard's `--calls` moves only the new helper's `+2` and the callees of
   the moved block.
@@ -5015,7 +5030,12 @@ reads and writes the shared `type` (`type=GrayscaleType;`, `type=UndefinedType;`
 `IdentifyImageMonochrome`, whose only shared write is `type`, and `resize-sample.c`'s
 `SampleImage`, whose body also does a non-atomic `progress++`; the sweep found each blocked
 by the one second scalar (probes +0.31 and 9.47 to 10.00). Added by Claude Code
-(Claude Sonnet 5.5) under the mandate of 2026-10-24.
+(Claude Sonnet 5.5) under the mandate of 2026-10-24. Step 8 (2026-11-04, W12, from
+`vision.c`): the second-moment pass of `MajorAxisThreshold`, `MinorAxisThreshold`,
+`EccentricityThreshold` and `ComputeObjectAngle` (a centroid pass and a row loop that add to
+the body's `M00`, `M11`, `M20`, `M02` and read and write `status`); a probe of the three
+loops 5.91 to 6.49, all three leaving Bumpy Road and Complex Method, no finding on the
+helper. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -5818,3 +5838,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-04 | WORDING | PS | Step 7: the body becomes the call preceded by the declaration and fill of its input struct in the body (Recipe N step 7), not the call alone; the probe behind the step shared one struct filled once | `effect.c`'s `LocalContrastImage` (campaign A, W12): the first uses declare each pass's struct inside the loop body, as `KuwaharaImage`'s `kuwahara` and Recipe N step 7 do: 5.02 to 5.10 to 5.15 | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | PS | Step 2: besides `status`, the block may read or write at most two further shared scalars `v` (declared outside the loop body, in `shared(...)` or no clause, never in `private`, `firstprivate`, `lastprivate` or `reduction`) by plain assignment or a plain increment outside any `atomic` or `critical`; each is passed by pointer like `status`, every use `(*v)`, with the same argument (same memory, points and order, nothing deferred, helper called inside the iteration). Steps 4 and 6 and *Careful* follow; *Careful* says a plain increment that is a race stays a race. Still eight steps | `attribute.c`'s `IdentifyImageGray` and `IdentifyImageMonochrome` (shared `type`) and `resize-sample.c`'s `SampleImage` (non-atomic `progress++`), campaign A, W12: each blocked by one second shared scalar; probes +0.31 and 9.47 to 10.00 | mandate (2026-10-24) |
 | 2026-11-04 | NEW | PC | Extract Parallel Loop Head Returning Success for a Continue: the head of a parallel loop body (guard, fetch with `status=MagickFalse; continue;`, work, sync test) that precedes a pragma-bearing progress tail moves to a `static MagickBooleanType` function, each `continue;` becoming `return(MagickFalse);`, `status` by pointer; the caller writes `if (Helper(...,&status) == MagickFalse) continue;` and keeps the tail | `paint.c`'s `OpaquePaintImage`, `TransparentPaintImage`, `OilPaintImage` (campaign A, W13): T, U, PS and E step 7 refuse a head followed by an atomic progress block; a probe on `OpaquePaintImage`, 6.24 to 6.49 | mandate (2026-10-24) |
+| 2026-11-04 | AMEND | PS | Step 8 (new): a block that also writes two to four variables declared in the loop body and read by the body after it passes their addresses in one `const` struct initialised in the body, Recipe Q step 8's form; step 3 had refused it | `vision.c`'s `MajorAxisThreshold`, `MinorAxisThreshold`, `EccentricityThreshold` (campaign A, W12): the centroid pass and second-moment row loop read and write `status` (PS) and add to four accumulators the body reads afterwards (step 3 refused it; Q and I refuse the shared `status`). A probe: 5.91 to 6.49, the three functions leaving Bumpy Road and Complex Method | mandate (2026-10-24) |
