@@ -817,6 +817,20 @@ static void SetDeskewAngleArtifact(Image *clone_image,const double degrees)
   (void) SetImageArtifact(clone_image,"deskew:angle",angle);
 }
 
+static AffineMatrix GetDeskewAffineMatrix(const double degrees)
+{
+  AffineMatrix
+    affine_matrix;
+
+  affine_matrix.sx=cos(DegreesToRadians(fmod((double) degrees,360.0)));
+  affine_matrix.rx=sin(DegreesToRadians(fmod((double) degrees,360.0)));
+  affine_matrix.ry=(-sin(DegreesToRadians(fmod((double) degrees,360.0))));
+  affine_matrix.sy=cos(DegreesToRadians(fmod((double) degrees,360.0)));
+  affine_matrix.tx=0.0;
+  affine_matrix.ty=0.0;
+  return(affine_matrix);
+}
+
 MagickExport Image *DeskewImage(const Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -872,12 +886,7 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
   SetDeskewAngleArtifact(clone_image,degrees);
   (void) SetImageVirtualPixelMethod(clone_image,BackgroundVirtualPixelMethod,
     exception);
-  affine_matrix.sx=cos(DegreesToRadians(fmod((double) degrees,360.0)));
-  affine_matrix.rx=sin(DegreesToRadians(fmod((double) degrees,360.0)));
-  affine_matrix.ry=(-sin(DegreesToRadians(fmod((double) degrees,360.0))));
-  affine_matrix.sy=cos(DegreesToRadians(fmod((double) degrees,360.0)));
-  affine_matrix.tx=0.0;
-  affine_matrix.ty=0.0;
+  affine_matrix=GetDeskewAffineMatrix(degrees);
   artifact=GetImageArtifact(image,"deskew:auto-crop");
   if (IsStringTrue(artifact) == MagickFalse)
     {
