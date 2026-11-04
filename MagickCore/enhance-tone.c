@@ -1012,6 +1012,34 @@ static void ScanStretchHistogramRow(const StretchScan *scan,const ssize_t y,
   AccumulateStretchHistogram(scan->image,p,scan->histogram);
 }
 
+static void FormStretchHistogram(Image *image,double *histogram,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  StretchScan
+    scan;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  (void) memset(histogram,0,(MaxMap+1)*GetPixelChannels(image)*
+    sizeof(*histogram));
+  image_view=AcquireVirtualCacheView(image,exception);
+  scan.image=image;
+  scan.image_view=image_view;
+  scan.histogram=histogram;
+  scan.exception=exception;
+  for (y=0; y < (ssize_t) image->rows; y++)
+    ScanStretchHistogramRow(&scan,y,&status);
+  image_view=DestroyCacheView(image_view);
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -1033,9 +1061,6 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     *black,
     *stretch_map,
     *white;
-
-  StretchScan
-    scan;
 
   ssize_t
     i;
@@ -1066,17 +1091,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   /*
     Form histogram.
   */
-  status=MagickTrue;
-  (void) memset(histogram,0,(MaxMap+1)*GetPixelChannels(image)*
-    sizeof(*histogram));
-  image_view=AcquireVirtualCacheView(image,exception);
-  scan.image=image;
-  scan.image_view=image_view;
-  scan.histogram=histogram;
-  scan.exception=exception;
-  for (y=0; y < (ssize_t) image->rows; y++)
-    ScanStretchHistogramRow(&scan,y,&status);
-  image_view=DestroyCacheView(image_view);
+  FormStretchHistogram(image,histogram,exception);
   /*
     Find the histogram boundaries by locating the black/white levels.
   */
