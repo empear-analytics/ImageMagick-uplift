@@ -1537,6 +1537,27 @@ static void SetBilateralSpatial(const BilateralSpatial *spatial,ssize_t n)
   }
 }
 
+static MagickBooleanType BlurBilateralLine(const BilateralRow *row,
+  CacheView *blur_view,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(blur_view,0,row->y,row->blur_image->columns,1,
+    row->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  BlurBilateralRow(row,q);
+  if (SyncCacheViewAuthenticPixels(blur_view,row->exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
@@ -1621,21 +1642,9 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
     const int
       id = GetOpenMPThreadId();
 
-    Quantum
-      *magick_restrict q;
-
     BilateralRow
       row;
 
-    if (status == MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
     row.blur_image=blur_image;
     row.image_view=image_view;
@@ -1650,9 +1659,8 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
     row.id=id;
     row.y=y;
     row.exception=exception;
-    BlurBilateralRow(&row,q);
-    if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (BlurBilateralLine(&row,blur_view,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
