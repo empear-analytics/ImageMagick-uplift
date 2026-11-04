@@ -290,6 +290,65 @@ static void SyncCompositeRow(CacheView *view,ExceptionInfo *exception,
     (*status)=MagickFalse;
 }
 
+typedef struct _MagnitudeLine
+{
+  CacheView
+    *dx_view,
+    *dy_view,
+    *magnitude_view;
+
+  const Image
+    *dx_image,
+    *dy_image;
+
+  Image
+    *magnitude_image;
+
+  ExceptionInfo
+    *exception;
+} MagnitudeLine;
+
+static void SetMagnitudeLine(const MagnitudeLine *line,const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p,
+    *magick_restrict q;
+
+  Quantum
+    *magick_restrict r;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(line->dx_view,0,y,line->dx_image->columns,1,
+    line->exception);
+  q=GetCacheViewVirtualPixels(line->dy_view,0,y,line->dx_image->columns,1,
+    line->exception);
+  r=GetCacheViewAuthenticPixels(line->magnitude_view,0,y,
+    line->dx_image->columns,1,line->exception);
+  if (IsBlendRowMissing(p,q,r) != MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) line->dx_image->columns; x++)
+  {
+    BlendGradients
+      gradients;
+
+    gradients.dx_image=line->dx_image;
+    gradients.dy_image=line->dy_image;
+    SetMagnitudePixel(&gradients,p,q,r);
+    p+=(ptrdiff_t) GetPixelChannels(line->dx_image);
+    q+=(ptrdiff_t) GetPixelChannels(line->dy_image);
+    r+=(ptrdiff_t) GetPixelChannels(line->magnitude_image);
+  }
+  SyncCompositeRow(line->magnitude_view,line->exception,status);
+}
+
 static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
   ExceptionInfo *exception)
 {
@@ -322,40 +381,11 @@ static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
 #endif
   for (y=0; y < (ssize_t) dx_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p,
-      *magick_restrict q;
+    const MagnitudeLine
+      line = { dx_view, dy_view, magnitude_view, dx_image, dy_image,
+        magnitude_image, exception };
 
-    Quantum
-      *magick_restrict r;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(dx_view,0,y,dx_image->columns,1,exception);
-    q=GetCacheViewVirtualPixels(dy_view,0,y,dx_image->columns,1,exception);
-    r=GetCacheViewAuthenticPixels(magnitude_view,0,y,dx_image->columns,1,
-      exception);
-    if (IsBlendRowMissing(p,q,r) != MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) dx_image->columns; x++)
-    {
-      BlendGradients
-        gradients;
-
-      gradients.dx_image=dx_image;
-      gradients.dy_image=dy_image;
-      SetMagnitudePixel(&gradients,p,q,r);
-      p+=(ptrdiff_t) GetPixelChannels(dx_image);
-      q+=(ptrdiff_t) GetPixelChannels(dy_image);
-      r+=(ptrdiff_t) GetPixelChannels(magnitude_image);
-    }
-    SyncCompositeRow(magnitude_view,exception,&status);
+    SetMagnitudeLine(&line,y,&status);
   }
   magnitude_view=DestroyCacheView(magnitude_view);
   dy_view=DestroyCacheView(dy_view);
