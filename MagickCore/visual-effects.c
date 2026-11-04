@@ -1640,6 +1640,53 @@ static void MorphFrameRow(MagickBooleanType *status,
     (*status)=MagickFalse;
 }
 
+typedef struct _MorphSingleInfo
+{
+  const Image
+    *image;
+
+  size_t
+    number_frames;
+
+  ExceptionInfo
+    *exception;
+} MorphSingleInfo;
+
+static Image *MorphSingleImage(const MorphSingleInfo *single,
+  Image *morph_images,MagickBooleanType *status)
+{
+  const Image
+    *const image = single->image;
+
+  const size_t
+    number_frames = single->number_frames;
+
+  ExceptionInfo
+    *const exception = single->exception;
+
+  Image
+    *morph_image;
+
+  ssize_t
+    n;
+
+  /*
+    Morph single image.
+  */
+  for (n=1; n < (ssize_t) number_frames; n++)
+  {
+    morph_image=CloneImage(image,0,0,MagickTrue,exception);
+    if (morph_image == (Image *) NULL)
+      {
+        morph_images=DestroyImageList(morph_images);
+        return((Image *) NULL);
+      }
+    AppendImageToList(&morph_images,morph_image);
+    ReportMorphFrameProgress(image,n,number_frames,status);
+  }
+  return(GetFirstImageInList(morph_images));
+}
+
 MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
   ExceptionInfo *exception)
 {
@@ -1680,21 +1727,13 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
     return((Image *) NULL);
   if (GetNextImageInList(image) == (Image *) NULL)
     {
-      /*
-        Morph single image.
-      */
-      for (n=1; n < (ssize_t) number_frames; n++)
-      {
-        morph_image=CloneImage(image,0,0,MagickTrue,exception);
-        if (morph_image == (Image *) NULL)
-          {
-            morph_images=DestroyImageList(morph_images);
-            return((Image *) NULL);
-          }
-        AppendImageToList(&morph_images,morph_image);
-        ReportMorphFrameProgress(image,n,number_frames,&status);
-      }
-      return(GetFirstImageInList(morph_images));
+      MorphSingleInfo
+        single;
+
+      single.image=image;
+      single.number_frames=number_frames;
+      single.exception=exception;
+      return(MorphSingleImage(&single,morph_images,&status));
     }
   /*
     Morph image sequence.
