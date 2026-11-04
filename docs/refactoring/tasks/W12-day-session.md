@@ -11,6 +11,7 @@ splits you want. that's fine." (2026-11-01).
 | --- | --- | ---: |
 | `statistic.c` | 5.84 → 6.55 (split) → **6.73** | 1 + 8 |
 | `statistic-measure.c` (new) | 9.09 → **9.68** | 1 |
+| `resize.c` | 7.08 → **7.11** | 3 |
 
 Ten refactor commits (the split, eight on `statistic.c`, one on `statistic-measure.c`). Every
 step ran the oracle on its function's cases (0 diverged); the whole catalogue ran after
@@ -35,6 +36,20 @@ each file: 15,900 cases, 0 diverged.
 
 ### For the owner
 
+- **A ruling that would open `resize.c` and the other `status`-assigning loops:** a recipe
+  that moves a whole block of a parallel loop body into a helper taking `MagickBooleanType
+  *status` and writing and reading it through the pointer (`*status=...`), instead of T's
+  and AS's local copy. The reads and writes then happen at the same points, in the same
+  order, to the same memory as inline, so the argument is the one the skip-guard probe
+  used; what it needs from you is the OpenMP rule, which the playbook sets at E step 5 (a
+  block moves only if every variable it writes is declared inside the loop body) and Q step
+  1 (no OpenMP region at all). Measured: `InterpolativeResizeImage`'s whole channel loop as
+  a helper gives `resize.c` 8.6 (7.11 now), not committed because it is not legal today;
+  `feature.c`'s `MeanShiftImage` and `effect.c`'s `SpreadImage` and `KuwaharaImage` (an
+  assign-and-test `status=Interpolate...` with a `break`) meet the same wall. The oracle
+  runs single-threaded and cannot see a race, so every such step would be checked by
+  reading, as T and AS are.
+
 - **Confirm or revert the `statistic.c` split**, as for `effect.c` and `enhance.c` (#85). The
   Windows build configuration outside this repository still needs `statistic-measure.c`.
 - **Close readings:** `statistic.c` commits 3, 4, 5 and 7 pass the progress macro's tag as a
@@ -45,6 +60,16 @@ each file: 15,900 cases, 0 diverged.
 - **Recipe-text gaps found:** a `continue` block mid-body in a parallel loop (`p == NULL` or
   a failed fetch, then `status=MagickFalse;`) fits no recipe: T, LB, OC and W each refuse
   it, and it is what holds `GetImageRange` at 9.68 and `EvaluateImages` at cc 27.
+
+### `resize.c`: Recipe AS does not apply to `InterpolativeResizeImage`
+
+Three small steps (T on the progress call, E step 7 on the tail, E step 3 on the scale
+assignments: 7.08 to 7.11, 104 to 96 lines). AS step 2 fails on every candidate block: the
+channel loop, the column loop and the body past the guard leave `status` alone when a loop
+runs zero iterations (`GetPixelChannels(image) == 0`) or every channel hits the `continue`,
+and the channel loop's `break` leaves the block (step 1); only `offset.x=...;
+status=InterpolatePixelChannels(...)` meets step 2, needs a nine-variable struct and probes
+7.11 to 7.09. **The lever is a pointer-status form for parallel loops** (below, for the owner).
 
 ### The skip-guard recipe, probed and not added
 
