@@ -139,6 +139,60 @@ typedef struct _CensusInfo
     bottom;
 } CensusInfo;
 
+static double CountRowForeground(const Image *edge_image,const Quantum *p,
+  const PixelInfo background,double census)
+{
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) edge_image->columns; x++)
+  {
+    GetPixelInfoPixel(edge_image,p,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,&background) == MagickFalse)
+      census++;
+    p+=(ptrdiff_t) GetPixelChannels(edge_image);
+  }
+  return(census);
+}
+
+static double CountEdgeForeground(const Image *edge_image,
+  const CacheView *edge_view,const PixelInfo background,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *p;
+
+  double
+    census;
+
+  ssize_t
+    y;
+
+  census=0.0;
+  for (y=0; y < (ssize_t) edge_image->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    census=CountRowForeground(edge_image,p,background,census);
+  }
+  return(census);
+}
+
+static void QueryArtifactColor(const Image *image,const char *key,
+  PixelInfo *color,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,key);
+  if (artifact != (const char *) NULL)
+    (void) QueryColorCompliance(artifact,AllCompliance,color,exception);
+}
+
 static double GetEdgeBackgroundCensus(const Image *image,
   const CacheView *image_view,const GravityType gravity,const size_t width,
   const size_t height,const ssize_t x_offset,const ssize_t y_offset,
@@ -146,9 +200,6 @@ static double GetEdgeBackgroundCensus(const Image *image,
 {
   CacheView
     *edge_view;
-
-  const char
-    *artifact;
 
   const Quantum
     *p;
@@ -160,14 +211,10 @@ static double GetEdgeBackgroundCensus(const Image *image,
     *edge_image;
 
   PixelInfo
-    background,
-    pixel;
+    background;
 
   RectangleInfo
     edge_geometry;
-
-  ssize_t
-    y;
 
   /*
     Determine the percent of image background for this edge.
@@ -206,12 +253,8 @@ static double GetEdgeBackgroundCensus(const Image *image,
   if (p == (const Quantum *) NULL)
     return(0.0);
   GetPixelInfoPixel(image,p,&background);
-  artifact=GetImageArtifact(image,"background");
-  if (artifact != (const char *) NULL)
-    (void) QueryColorCompliance(artifact,AllCompliance,&background,exception);
-  artifact=GetImageArtifact(image,"trim:background-color");
-  if (artifact != (const char *) NULL)
-    (void) QueryColorCompliance(artifact,AllCompliance,&background,exception);
+  QueryArtifactColor(image,"background",&background,exception);
+  QueryArtifactColor(image,"trim:background-color",&background,exception);
   edge_geometry.width=width;
   edge_geometry.height=height;
   edge_geometry.x=x_offset;
@@ -220,24 +263,8 @@ static double GetEdgeBackgroundCensus(const Image *image,
   edge_image=CropImage(image,&edge_geometry,exception);
   if (edge_image == (Image *) NULL)
     return(0.0);
-  census=0.0;
   edge_view=AcquireVirtualCacheView(edge_image,exception);
-  for (y=0; y < (ssize_t) edge_image->rows; y++)
-  {
-    ssize_t
-      x;
-
-    p=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) edge_image->columns; x++)
-    {
-      GetPixelInfoPixel(edge_image,p,&pixel);
-      if (IsFuzzyEquivalencePixelInfo(&pixel,&background) == MagickFalse)
-        census++;
-      p+=(ptrdiff_t) GetPixelChannels(edge_image);
-    }
-  }
+  census=CountEdgeForeground(edge_image,edge_view,background,exception);
   census/=((double) edge_image->columns*edge_image->rows);
   edge_view=DestroyCacheView(edge_view);
   edge_image=DestroyImage(edge_image);
@@ -408,6 +435,135 @@ static inline MagickBooleanType IsBelowLeftOfBounds(const ssize_t x,
     (y > (ssize_t) bounding_box.height)) ? MagickTrue : MagickFalse);
 }
 
+static RectangleInfo GetTrimEdgesBounds(const Image *image,
+  const char *artifact)
+{
+  char
+    *edges,
+    *q,
+    *r;
+
+  RectangleInfo
+    bounds;
+
+  bounds.width=(size_t) image->columns;
+  bounds.height=(size_t) image->rows;
+  bounds.x=0;
+  bounds.y=0;
+  edges=AcquireString(artifact);
+  r=edges;
+  while ((q=StringToken(",",&r)) != (char *) NULL)
+  {
+    if (LocaleCompare(q,"north") == 0)
+      bounds.y=(ssize_t) image->rows;
+    if (LocaleCompare(q,"east") == 0)
+      bounds.width=0;
+    if (LocaleCompare(q,"south") == 0)
+      bounds.height=0;
+    if (LocaleCompare(q,"west") == 0)
+      bounds.x=(ssize_t) image->columns;
+  }
+  edges=DestroyString(edges);
+  return(bounds);
+}
+
+static void GetCornerTargets(const Image *image,const CacheView *image_view,
+  PixelInfo *target,ExceptionInfo *exception)
+{
+  const Quantum
+    *p;
+
+  GetPixelInfo(image,&target[1]);
+  p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,0,1,1,
+    exception);
+  if (p != (const Quantum *) NULL)
+    GetPixelInfoPixel(image,p,&target[1]);
+  GetPixelInfo(image,&target[2]);
+  p=GetCacheViewVirtualPixels(image_view,0,(ssize_t) image->rows-1,1,1,
+    exception);
+  if (p != (const Quantum *) NULL)
+    GetPixelInfoPixel(image,p,&target[2]);
+  GetPixelInfo(image,&target[3]);
+  p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,(ssize_t)
+    image->rows-1,1,1,exception);
+  if (p != (const Quantum *) NULL)
+    GetPixelInfoPixel(image,p,&target[3]);
+}
+
+static inline MagickBooleanType IsBeforeBoundDifferent(const ssize_t position,
+  const ssize_t bound,const PixelInfo *pixel,const PixelInfo *target)
+{
+  return(((position < bound) &&
+    (IsFuzzyEquivalencePixelInfo(pixel,target) == MagickFalse)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsBeyondBoundDifferent(const ssize_t position,
+  const size_t bound,const PixelInfo *pixel,const PixelInfo *target)
+{
+  return(((position > (ssize_t) bound) &&
+    (IsFuzzyEquivalencePixelInfo(pixel,target) == MagickFalse)) ? MagickTrue :
+    MagickFalse);
+}
+
+typedef struct _BoundingBoxRowScan
+{
+  const Image
+    *image;
+
+  PixelInfo
+    zero;
+
+  ssize_t
+    y;
+} BoundingBoxRowScan;
+
+static RectangleInfo ScanBoundingBoxRow(const BoundingBoxRowScan *row_scan,
+  const Quantum *magick_restrict q,const PixelInfo *target,
+  RectangleInfo bounding_box)
+{
+  const Image
+    *image = row_scan->image;
+
+  const PixelInfo
+    zero = row_scan->zero;
+
+  const ssize_t
+    y = row_scan->y;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+    pixel=zero;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      GetPixelInfoPixel(image,q,&pixel);
+      if (IsBeforeBoundDifferent(x,bounding_box.x,&pixel,&target[0]) !=
+          MagickFalse)
+        bounding_box.x=x;
+      if (IsBeyondBoundDifferent(x,bounding_box.width,&pixel,&target[1]) !=
+          MagickFalse)
+        bounding_box.width=(size_t) x;
+      if (IsBeforeBoundDifferent(y,bounding_box.y,&pixel,&target[0]) !=
+          MagickFalse)
+        bounding_box.y=y;
+      if (IsBeyondBoundDifferent(y,bounding_box.height,&pixel,&target[2]) !=
+          MagickFalse)
+        bounding_box.height=(size_t) y;
+      if ((IsBelowLeftOfBounds(x,y,bounding_box) != MagickFalse) &&
+          (IsFuzzyEquivalencePixelInfo(&pixel,&target[3]) == MagickFalse))
+        {
+          bounding_box.width=(size_t) x;
+          bounding_box.height=(size_t) y;
+        }
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  return(bounding_box);
+}
+
 MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -449,31 +605,7 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
       bounds.y=(ssize_t) image->rows;
     }
   else
-    {
-      char
-        *edges,
-        *q,
-        *r;
-
-      bounds.width=(size_t) image->columns;
-      bounds.height=(size_t) image->rows;
-      bounds.x=0;
-      bounds.y=0;
-      edges=AcquireString(artifact);
-      r=edges;
-      while ((q=StringToken(",",&r)) != (char *) NULL)
-      {
-        if (LocaleCompare(q,"north") == 0)
-          bounds.y=(ssize_t) image->rows;
-        if (LocaleCompare(q,"east") == 0)
-          bounds.width=0;
-        if (LocaleCompare(q,"south") == 0)
-          bounds.height=0;
-        if (LocaleCompare(q,"west") == 0)
-          bounds.x=(ssize_t) image->columns;
-      }
-      edges=DestroyString(edges);
-    }
+    bounds=GetTrimEdgesBounds(image,artifact);
   GetPixelInfo(image,&target[0]);
   image_view=AcquireVirtualCacheView(image,exception);
   p=GetCacheViewVirtualPixels(image_view,0,0,1,1,exception);
@@ -483,21 +615,7 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
       return(bounds);
     }
   GetPixelInfoPixel(image,p,&target[0]);
-  GetPixelInfo(image,&target[1]);
-  p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,0,1,1,
-    exception);
-  if (p != (const Quantum *) NULL)
-    GetPixelInfoPixel(image,p,&target[1]);
-  GetPixelInfo(image,&target[2]);
-  p=GetCacheViewVirtualPixels(image_view,0,(ssize_t) image->rows-1,1,1,
-    exception);
-  if (p != (const Quantum *) NULL)
-    GetPixelInfoPixel(image,p,&target[2]);
-  GetPixelInfo(image,&target[3]);
-  p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,(ssize_t)
-    image->rows-1,1,1,exception);
-  if (p != (const Quantum *) NULL)
-    GetPixelInfoPixel(image,p,&target[3]);
+  GetCornerTargets(image,image_view,target,exception);
   status=MagickTrue;
   GetPixelInfo(image,&zero);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -509,14 +627,11 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
     const Quantum
       *magick_restrict q;
 
-    PixelInfo
-      pixel;
+    BoundingBoxRowScan
+      row_scan;
 
     RectangleInfo
       bounding_box;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -530,30 +645,10 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
         status=MagickFalse;
         continue;
       }
-    pixel=zero;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      GetPixelInfoPixel(image,q,&pixel);
-      if ((x < bounding_box.x) &&
-          (IsFuzzyEquivalencePixelInfo(&pixel,&target[0]) == MagickFalse))
-        bounding_box.x=x;
-      if ((x > (ssize_t) bounding_box.width) &&
-          (IsFuzzyEquivalencePixelInfo(&pixel,&target[1]) == MagickFalse))
-        bounding_box.width=(size_t) x;
-      if ((y < bounding_box.y) &&
-          (IsFuzzyEquivalencePixelInfo(&pixel,&target[0]) == MagickFalse))
-        bounding_box.y=y;
-      if ((y > (ssize_t) bounding_box.height) &&
-          (IsFuzzyEquivalencePixelInfo(&pixel,&target[2]) == MagickFalse))
-        bounding_box.height=(size_t) y;
-      if ((IsBelowLeftOfBounds(x,y,bounding_box) != MagickFalse) &&
-          (IsFuzzyEquivalencePixelInfo(&pixel,&target[3]) == MagickFalse))
-        {
-          bounding_box.width=(size_t) x;
-          bounding_box.height=(size_t) y;
-        }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row_scan.image=image;
+    row_scan.zero=zero;
+    row_scan.y=y;
+    bounding_box=ScanBoundingBoxRow(&row_scan,q,target,bounding_box);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
 #  pragma omp critical (MagickCore_GetImageBoundingBox)
 #endif
