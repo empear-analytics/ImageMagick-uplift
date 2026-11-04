@@ -11,8 +11,10 @@ splits you want. that's fine." (2026-11-01).
 | --- | --- | ---: |
 | `statistic.c` | 5.84 → 6.55 (split) → **6.73** | 1 + 8 |
 | `statistic-measure.c` (new) | 9.09 → **9.68** | 1 |
-| `resize.c` | 7.08 → **7.11** | 3 |
+| `resize.c` | 7.08 → 7.11 → **8.65** (Recipe PS) | 3 + 3 |
 | `enhance.c` (again) | 4.85 → **4.91** | 1 |
+| `feature.c` | 5.24 → **5.94** (Recipe PS) | 5 |
+| `effect.c` (again) | 4.36 → **4.51** (Recipe PS) | 9 |
 
 Ten refactor commits (the split, eight on `statistic.c`, one on `statistic-measure.c`). Every
 step ran the oracle on its function's cases (0 diverged); the whole catalogue ran after
@@ -61,6 +63,39 @@ each file: 15,900 cases, 0 diverged.
 - **Recipe-text gaps found:** a `continue` block mid-body in a parallel loop (`p == NULL` or
   a failed fetch, then `status=MagickFalse;`) fits no recipe: T, LB, OC and W each refuse
   it, and it is what holds `GetImageRange` at 9.68 and `EvaluateImages` at cc 27.
+
+### Recipe PS (owner, 2026-11-04): first uses
+
+Recipe PS (Extract Block Through a Pointer to the Loop Status; 97c21e2d8) moves a block of a
+parallel loop body into a helper taking `MagickBooleanType *status`, every use written
+`(*status)`, so the reads and writes of the shared flag happen at the same points, in the
+same order, to the same memory. `status` must be shared (the pragma's `shared(...)` or no
+clause) and no pragma moves with the block; steps 1 to 3 are checked by reading.
+
+- **`resize.c` 7.11 → 8.65** (5e05ad4a7, 5e674e81f, e9fc22e39): the column loop of
+  `InterpolativeResizeImage` (`InterpolateResizeRow`, a const `InterpolativeResizeInfo`) and
+  then the line (offset, row, sync test): the function left Brain Method and Deep, Nested
+  Complexity. The first version passed a `PointInfo` by value with `offset.x` unset: gcc is
+  quiet, MSVC may report C4701 and the Windows builds treat warnings as errors, so the
+  follow-up passes `const double offset_y` and the helper declares its own `offset`.
+- **`feature.c` 5.24 → 5.94** (7fd43ea9a, 88d5c4f86 PS; 765e3dc98 LB, aa6418afc N, 1d9222d6a
+  V inside and around the helpers PS created): `MeanShiftImage` left Brain Method and Deep
+  Nesting; the file crossed CodeScene's 1,000-line mark (1,084 lines of code now) and the score
+  still rose.
+- **`effect.c` 4.36 → 4.51** (fe0fd65b4 `SpreadImage`, 453254f58 `KuwaharaImage`; V, I, N and
+  Hull steps follow).
+
+Close readings: `feature.c` commits 2 and 3 apply LB, N and E inside a helper PS created
+(lexically outside any `omp` region, writing the shared flag through the helper's pointer: E
+and I let writes through pointers the block already uses stay); `feature.c` commit 1 moves the
+function-local `MaxMeanShiftIterations` into the helper with its only user (E step 7's macro
+clause; PS does not say it); `effect.c` c1622ac69 gives `UnsharpRow` the loop body's existing
+`const UnsharpPixels` in place of a new struct (N step 2 allows that when the caller is a
+helper binding the members; here the caller is the loop body); `effect.c` 0c0d3e1ee reuses
+the V helper in a second function (V step 6 plus W step 7), and aa7605841 and 7101ebbb5 are I
+with two written images, whose failure paths no case reaches. A candidate amendment, not made:
+Recipe F for a three-line `static const` table that blocks an extraction (`effect.c`'s
+`DespeckleImage`, 4.51 → 4.57 in a probe, whose hull `k` loop needs `X[4]` and `Y[4]`).
 
 ### The Recipe D amendment, first uses (one commit, three probes left out)
 
@@ -112,6 +147,10 @@ is its progress tail, not its head. A bundle struct of view, exception and statu
 under four arguments, at one new type per file. No recipe was added.
 
 ### Correction made before pushing
+
+- A subagent overwrote three old scratch scripts in the shared scratchpad and deleted copies
+  in `~/sp` (not repository files; nothing in git is affected), and later subagents were told
+  to keep their scripts in a directory of their own.
 
 - Commit f190a8c9b's message gave "72 -> 69 lines" for `EvaluateImage`, numbers inferred
   from a probe, not measured; `code_health_review` lists the function under *Large Method*
