@@ -3162,8 +3162,11 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
 1. The `switch` has a `default:` label, and its controlling expression `e` is a
    variable, or an expression of variables with no call, assignment or increment, that
    no statement inside the `switch` writes. Every *group* (a run of labels and the body
-   after them) ends with a `break;` of this `switch` and contains no other `break` of
-   it, no `continue`, `return` or `goto`: no group falls through into another. The
+   after them) ends with a `break;` of this `switch` and contains no `continue`,
+   `return` or `goto`: no group falls through into another. It contains no other
+   `break` of this `switch` either, except inside a selection (`if (p == NULL) break;`),
+   as a chain's groups may: each such `break;` ends the group where its last `break;`
+   would (*Careful* gives the argument). The
    last group of the `switch` may instead end at its closing brace, without `break;`,
    when it moves and stays the last group of the new `switch` (`default: *q=0;`).
    A *chain*, a run of groups each of which but the last ends in `magick_fallthrough;`
@@ -3203,6 +3206,20 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    stood. A later step on the same `switch` (step 6's chain) moves the caller's
    `default` group as step 2 says; the `default: break;` stays in the innermost
    function. Nothing else is added.
+
+8. A chain with Z's struct. When the groups of the steps need Z's input struct, the
+   struct is declared once, as a local `tile` at the top of the block that holds the
+   `switch` (the loop body, for a `switch` in a loop), and its members, the union of what
+   the steps' groups read, are assigned once, in declaration order, directly before the
+   `switch`, as Recipe N step 8's sibling blocks do; Z step 5's local and assignments
+   are not repeated per step. The caller's `default:` group is the call
+   `Helper(&tile,...);` and `break;`, with no struct of its own. Each helper takes
+   `const Name *tile` first and declares the `const` locals of the members its groups
+   read (Z step 3). A helper whose `default:` group is the call of an earlier step's
+   helper passes `tile` on unchanged, and each written variable `v` as `&(*v)` (Z step
+   4), where the group moved had `&tile` and `&v`. N step 8's condition holds: nothing on
+   any path from the fill to the call writes a variable a member copies; a kept group
+   that writes one and leaves the `switch` before any call does not count.
 
 **Before:**
 
@@ -3343,6 +3360,26 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   constant added later that no label names, where the original, if it named every
   constant, would have. Say so in the commit message.
 
+- Under step 1's `break;` in a selection, a value of `e` that selects such a group ran
+  its body up to the `break;` and then left the `switch`. Now it reaches the outer
+  `default`, whose call runs the new function, whose `switch` selects the same group;
+  the group runs up to the same `break;`, which ends the inner `switch`; nothing
+  follows that `switch` in the function, so it returns, and the outer `default`'s
+  `break;` ends the outer `switch`, where the original `break;` ended the original. It
+  is the argument already made for a chain. A `break;` of a loop or of a `switch`
+  nested in the group is that construct's own and does not count; a `continue`,
+  `return` or `goto` still refuses the group.
+- Under step 8, every helper reads `tile` and nothing else of the caller's: its members
+  were copied from the variables of their names once, directly before the `switch`, and
+  between that point and the call only the `switch` selects a group, so the call sees
+  the values the original group saw. A kept group that writes a member's variable
+  (`thumbnail=...`) is on a path that ends at its own `break;`, before any call. The
+  pointers inside the members keep pointing at the caller's objects, so a write through
+  one (`factor`, `label`, `thumbnail->magick`) lands where it did. The chain's calls
+  pass the same `tile` and the same addresses (`&(*v)` is `v`) down to the helper whose
+  `switch` holds the group, so each written variable is the caller's own, written at
+  the points it was.
+
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), a case for each moved label where one exists, and steps 1 and 5
 checked by reading.
@@ -3363,6 +3400,14 @@ virtual-pixel `hit` switch names all seventeen `VirtualPixelMethod` constants an
 `default` (cc 22 of the function's 34). Its six-label image group alone with a `default`
 is a function of cc 9, so it stays; the vertical-tile and dither groups, then the corner
 and horizontal-tile groups, as two chained functions: 7.30 to 7.34 to 7.37 in probes.
+Step 1's `break;` in a selection and step 8 (2026-11-04, task W12): `effect.c`'s
+`PreviewImage`, whose `switch (preview)` has 29 groups (cc 56 of the function, 397 lines),
+fourteen of them ending a failed `CloneImage` with `if (preview_image == NULL) break;`,
+which step 1 refused. Seven chained functions of three to six groups each, taking one
+`PreviewTile` and `preview_image`, `gamma` and, in the last, `degrees`: 4.51 to 4.56, 4.62, 4.69,
+4.79, 4.85, 4.90 and 5.00 in probes (each step raising the score, no finding on a new
+function). Added by Claude Code (Claude
+Sonnet 5.5) during task W12, under the mandate of 2026-10-24.
 
 ---
 
@@ -5595,3 +5640,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-01 | AMEND | AS | Step 7: a block that reads more than four variables takes them through an input struct as in Recipe N steps 2 and 3, filled directly before the call; a variable written through its address that the callee reads on entry goes by pointer as a parameter; the caller writes `status=Helper(&inputs,...);` | `distort.c`'s `DistortImage` (campaign A, W11): the resample branch reads eight variables (`distort_image`, `resample_filter`, `id`, `s`, `validity`, `invalid`, `exception`) and writes `pixel` through `&pixel`, which `ResamplePixelColor` reads on entry; AS's first use gave 8 arguments, flat 3.01 with the struct form (bumps 16 to 14), 502 cases, 0 diverged | owner |
 | 2026-11-01 | AMEND | H | Step 1: a single `#define` that stands further down the body, after statements, may be hoisted as a run of its own when its name occurs nowhere between the function's signature and that `#define` (checked by script); step 3 excepts it; use only to unblock an extraction that follows; `pp_identical.sh` proves the step | `distort.c`'s `DistortImage` (campaign A, W11): `ScaleFilter` is `#define`d in the middle of the body and used by nine pixel cases; a helper above the function cannot see it, and step 1 took only a run at the top of the body | mandate (2026-10-24) |
 | 2026-11-04 | NEW | PS | Extract Block Through a Pointer to the Loop Status: a block inside a parallel loop body that reads, tests or assigns the shared `status` in ways T and AS refuse moves to a `static void` function taking `MagickBooleanType *status`, every use written `(*status)`; the caller passes `&status`; `status` shared, no pragma inside the block | `resize.c`'s `InterpolativeResizeImage` (campaign A, W12): its column loop assigns and tests `status` from `InterpolatePixelChannels` and may run no iteration; T and J refused it, AS refuses it (a path leaves `status` alone, a `break` leaves the block); the loop as a helper through a `status` pointer probed `resize.c` 7.11 to 8.6; the same site in `feature.c`'s `MeanShiftImage`, `effect.c`'s `SpreadImage` and `KuwaharaImage` | owner |
+| 2026-11-04 | AMEND | SD | Step 1: a group may hold `break;` of the `switch` inside a selection (`if (p == NULL) break;`), as a chain's groups already may; each ends the group where its last `break;` would. *Careful* gives the argument | `effect.c`'s `PreviewImage` (campaign A, W12): fourteen of the 29 groups of `switch (preview)` end a failed `CloneImage` with `if (preview_image == NULL) break;`, so step 1 refused the `switch` the function's cc 56 rests on. Chained functions of the break-free and breaking groups together: 4.51 to 5.00 in a probe, every step raising the score | mandate (2026-10-24) |
+| 2026-11-04 | AMEND | SD | Step 8 (new): a chain whose steps need Z's input struct declares one `tile` local at the top of the block holding the `switch` and fills it once directly before the `switch` (Recipe N step 8's sibling form); the caller's `default:` calls the outermost helper with `&tile`, and each helper passes `tile` on unchanged to the next. *Careful* gives the argument | `effect.c`'s `PreviewImage` (campaign A, W12): the groups read eleven variables, so Z gives a struct; step 2 moves the `default:` group with its struct local and fill, which would give every later helper its own copy of the fill and a second struct. Seven helpers over one `tile`: 5.00 in a probe, no finding on any of them | mandate (2026-10-24) |
