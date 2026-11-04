@@ -2620,6 +2620,18 @@ static void AccumulateChromaMeans(const Image *image,
   }
 }
 
+static MagickStatusType LevelWhiteBalanceVibrance(Image *image,
+  MagickStatusType status,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"white-balance:vibrance");
+  if (artifact != (const char *) NULL)
+    status=LevelVibrance(image,artifact,status,exception);
+  return(status);
+}
+
 MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2627,9 +2639,6 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
 
   CacheView
     *image_view;
-
-  const char
-    *artifact;
 
   double
     a_mean,
@@ -2711,9 +2720,7 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
       }
   }
   image_view=DestroyCacheView(image_view);
-  artifact=GetImageArtifact(image,"white-balance:vibrance");
-  if (artifact != (const char *) NULL)
-    status=LevelVibrance(image,artifact,status,exception);
+  status=LevelWhiteBalanceVibrance(image,status,exception);
   status&=(MagickStatusType) TransformImageColorspace(image,sRGBColorspace,
     exception);
   return(status != 0 ? MagickTrue : MagickFalse);
