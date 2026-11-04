@@ -332,10 +332,26 @@ static CannyInfo SetCannyOrientation(CannyInfo pixel,const double dx,
   return(pixel);
 }
 
-static void GetCannyNeighbors(const MatrixInfo *canny_cache,const ssize_t x,
-  const ssize_t y,const int orientation,CannyInfo *alpha_pixel,
-  CannyInfo *beta_pixel)
+typedef struct _CannyPosition
 {
+  ssize_t
+    x,
+    y;
+
+  int
+    orientation;
+} CannyPosition;
+
+static void GetCannyNeighbors(const MatrixInfo *canny_cache,
+  const CannyPosition *position,CannyInfo *alpha_pixel,CannyInfo *beta_pixel)
+{
+  const ssize_t
+    x = position->x,
+    y = position->y;
+
+  const int
+    orientation = position->orientation;
+
   switch (orientation)
   {
     case 0:
@@ -503,9 +519,14 @@ static CannyInfo SuppressCannyNonMaxima(MatrixInfo *canny_cache,
     beta_pixel,
     pixel;
 
+  CannyPosition
+    position;
+
   (void) GetMatrixElement(canny_cache,x,y,&pixel);
-  GetCannyNeighbors(canny_cache,x,y,pixel.orientation,&alpha_pixel,
-    &beta_pixel);
+  position.x=x;
+  position.y=y;
+  position.orientation=pixel.orientation;
+  GetCannyNeighbors(canny_cache,&position,&alpha_pixel,&beta_pixel);
   pixel.intensity=pixel.magnitude;
   if ((pixel.magnitude < alpha_pixel.magnitude) ||
       (pixel.magnitude < beta_pixel.magnitude))
