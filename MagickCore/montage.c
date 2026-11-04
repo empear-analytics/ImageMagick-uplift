@@ -799,6 +799,16 @@ static MagickBooleanType SetMontageTileProgress(Image *image,
   return(status);
 }
 
+static void DestroyTileImages(Image **image_list,const ssize_t last)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= last; i++)
+    if (image_list[i] != (Image *) NULL)
+      image_list[i]=DestroyImage(image_list[i]);
+}
+
 static void RelinquishMontageStrings(Image *montage)
 {
   if (montage->montage != (char *) NULL)
@@ -924,9 +934,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
         image=DestroyImage(image);
       if (thumbnail == (Image *) NULL)
         i--;
-      for (tile=0; (ssize_t) tile <= i; tile++)
-        if (image_list[tile] != (Image *) NULL)
-          image_list[tile]=DestroyImage(image_list[tile]);
+      DestroyTileImages(image_list,i);
       primary_list=(Image **) RelinquishMagickMemory(primary_list);
       return((Image *) NULL);
     }
