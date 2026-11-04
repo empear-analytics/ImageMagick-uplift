@@ -5632,6 +5632,95 @@ under the mandate of 2026-10-24.
 
 ---
 
+## Recipe FI - Fill a Struct by Initialiser
+
+**Use when:** CodeScene reports *Large Method* (or *Complex Method*, when the fill stands in
+a branch of the function) and the function holds a struct local that an earlier step (Recipe
+N, Q, U, Y, LB, B, TW, PC) declared and then filled member by member, one `name.m=e;` per
+member, directly before its call: `FrameImage`'s `top_border`, twelve assignments and a
+declaration for one `DrawFrameTopBorder(&top_border);`. The statements carry no
+decision; they are the lines the function's length counts.
+
+**Not covered by:** Recipe RF, which deletes a repeated fill; here every value stays and
+is written once. Recipe B step 5, Recipe N step 6 and Recipe PC step 4, which say how a
+*new* struct is declared and filled, not how an existing fill is rewritten. Recipe H, which
+moves preprocessor lines. Recipe I and Recipe PS step 8, whose `const` initialiser holds
+addresses of written variables, not copies of read-only values.
+
+**How:**
+
+1. The struct local `name` is declared with no initialiser, of a `typedef struct` type
+   whose members are scalars, pointers or struct values (no array member), and the
+   statements that follow the declaration, up to the first statement that is not
+   `name.m=e;`, assign every member exactly once, in declaration order (checked by script
+   against the typedef).
+2. Every `e` is a plain identifier or a literal: no call, member access, cast, increment,
+   assignment or macro with a side effect. Each identifier is declared before the
+   struct's declaration (a parameter, a local of an enclosing block, or an earlier
+   declaration of the same block), so the initialiser may name it.
+3. The struct is only read after the fill: it appears afterwards only as `&name` passed to
+   a parameter of type pointer-to-`const`, or in `name.m` reads. Nothing writes it or a
+   member of it.
+4. Replace the declaration and the run of assignments by one declaration
+   `const Name name = { e1, e2, ... };`, the values in declaration order, wrapped at 79
+   columns; a blank line follows where the declarations end, as before the run. The block's
+   other statements, and the call, stay as they were.
+5. Where the struct is declared inside a `#pragma omp parallel` body, it stays in the body:
+   each thread initialises its own.
+6. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`: that proves the
+   members took the values the assignments gave them, member by member, so a swapped
+   pair of same-typed members cannot slip through. Otherwise revert the step.
+7. One function's fills, however many, go in one commit (one recipe, one function).
+
+**Before:**
+
+```c
+      FrameTopBorder
+        top_border;
+
+      top_border.frame_view=frame_view;
+      top_border.frame_image=frame_image;
+      ...
+      top_border.height=height;
+      top_border.exception=exception;
+      DrawFrameTopBorder(&top_border);
+```
+
+**After:**
+
+```c
+      const FrameTopBorder
+        top_border = { frame_view, frame_image, image, frame_info, accentuate,
+          highlight, matte, shadow, trough, bevel_width, height, exception };
+
+      DrawFrameTopBorder(&top_border);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The assignments ran in order, each from an identifier
+  nothing between them wrote (they write only `name`), and the initialiser takes the
+  same identifiers' values at the same point; no value has a side effect (step 2), so
+  evaluation order does not matter. Every member is set, so none is left to zero where
+  it held an indeterminate value before. `const` is only a promise the compiler checks:
+  step 3 says nothing writes the struct, and the pointer-to-`const` parameter says the
+  callee does not.
+- Identical object code under the oracle build's flags (step 6) proves it for this build
+  on every input, reached or not.
+- The step shortens the function's text; it does not hide any of it: each value is
+  still written, once, where it was written before, and a reader sees the members and
+  their values side by side.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`; `refactor_guard.py` and `--calls` see no change.
+
+**Provenance:** 2026-11-04, from `decorate.c`'s `FrameImage` (campaign A, W13): the
+`top_border` and `bottom_border` fills (twelve and eleven assignments) after Recipe PC
+and PS left the function in Large Method; a probe of both: 8.73 to 8.83 with `IDENTICAL`
+object code. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -5870,3 +5959,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-04 | AMEND | PS | Step 8 (new): a block that also writes two to four variables declared in the loop body and read by the body after it passes their addresses in one `const` struct initialised in the body, Recipe Q step 8's form; step 3 had refused it | `vision.c`'s `MajorAxisThreshold`, `MinorAxisThreshold`, `EccentricityThreshold` (campaign A, W12): the centroid pass and second-moment row loop read and write `status` (PS) and add to four accumulators the body reads afterwards (step 3 refused it; Q and I refuse the shared `status`). A probe: 5.91 to 6.49, the three functions leaving Bumpy Road and Complex Method | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | OC | Step 6 (new): a block that is the whole body of a sequential loop, whose inputs would give five or more parameters, takes its read-only inputs in a struct filled once before the loop (Recipe N steps 2 and 3), then the counter and the written variables by pointer, at most four parameters | `vision.c`'s `IntegralImage` (campaign A, W12): row loop with a guard, a failed fetch `continue;`, a sync test and a progress block; step 1 allowed the body, the six parameters did not. A probe: 6.49 to 6.77, the function leaving Bumpy Road and Complex Method | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | PC | Step 4: the input struct may be a `const` local initialised in the body with the members' identifiers in declaration order (Recipe B step 5's form) instead of one assignment per member; each thread still initialises its own, the values are the same | `statistic-image.c`'s `StatisticImage` (campaign A, W13): the head's eleven inputs were eleven assignments plus the declaration, 13 lines of the function's Large Method count; as one initialiser: 8.71 to 8.81 in a probe | mandate (2026-10-24) |
+| 2026-11-04 | NEW | FI | Fill a Struct by Initialiser: a struct local that an earlier step declared and filled one `name.m=e;` per member (every member, in declaration order, each value a plain identifier or literal), only read afterwards, becomes `const Name name = { e1, ... };`; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `decorate.c`'s `FrameImage` (campaign A, W13): the `top_border` and `bottom_border` fills are 23 assignment lines of a function still in Large Method after PC and PS; a probe of both fills: 8.73 to 8.83, identical object code. No recipe rewrites an existing fill: B, N and PC say how a new one is written; RF deletes | mandate (2026-10-24) |
