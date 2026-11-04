@@ -4904,7 +4904,10 @@ functions only.
    MagickFalse) continue;` first, and `status=MagickFalse; continue;` after a failed pixel
    fetch), as Recipe E step 7's whole-body form allows: each such `continue;` becomes
    `return;` of the new function, the loop's counter goes by value, and the body becomes
-   the call alone, `Helper(...,x,&status);`, so both end the iteration at the same point.
+   the call, `Helper(...,x,&status);`, preceded only by the declaration and fill of its
+   input struct when step 6 needs one (declared in the body and filled there, as Recipe
+   N step 7 says, so each thread fills its own), so both end the iteration at the same
+   point.
    Step 4's `(*status)` holds at every use, the leading test included. The `#pragma omp`
    lines and the `for` statement stay; the variables the body declares (`id`, the row
    pointers, the thread's scratch pointer) move with it, and a call such as
@@ -4986,7 +4989,8 @@ alone when a loop runs zero iterations, or its `break` leaves the block), `featu
 `LocalContrastImage`, whose two parallel loop bodies (a column pass and a row pass, each
 opening with `if (status == MagickFalse) continue;` and holding a failed-fetch
 `status=MagickFalse; continue;`) T, LB, OC and W each refused; both bodies as helpers
-over one `const` input struct: 5.02 to 5.19 in a probe, `LocalContrastImage` leaving
+over one `const` input struct filled once: 5.02 to 5.19 in a probe; as built (a struct per
+loop body, filled in the body), 5.02 to 5.10 to 5.15, `LocalContrastImage` leaving
 Bumpy Road Ahead (cc 19 to 9, 155 to 104 lines), no finding on either helper. Added by
 Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
@@ -5668,3 +5672,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-04 | AMEND | SD | Step 1: a group may hold `break;` of the `switch` inside a selection (`if (p == NULL) break;`), as a chain's groups already may; each ends the group where its last `break;` would. *Careful* gives the argument | `effect.c`'s `PreviewImage` (campaign A, W12): fourteen of the 29 groups of `switch (preview)` end a failed `CloneImage` with `if (preview_image == NULL) break;`, so step 1 refused the `switch` the function's cc 56 rests on. Chained functions of the break-free and breaking groups together: 4.51 to 5.00 in a probe, every step raising the score | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | SD | Step 8 (new): a chain whose steps need Z's input struct declares one `tile` local at the top of the block holding the `switch` and fills it once directly before the `switch` (Recipe N step 8's sibling form); the caller's `default:` calls the outermost helper with `&tile`, and each helper passes `tile` on unchanged to the next. *Careful* gives the argument | `effect.c`'s `PreviewImage` (campaign A, W12): the groups read eleven variables, so Z gives a struct; step 2 moves the `default:` group with its struct local and fill, which would give every later helper its own copy of the fill and a second struct. Seven helpers over one `tile`: 5.00 in a probe, no finding on any of them | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | PS | Step 7 (new): the block may be a parallel loop's whole body, declarations included, with `continue;` statements of that loop (Recipe E step 7's whole-body form): each becomes `return;`, the counter goes by value, the body becomes the call alone, `status` through the pointer at every use; step 1 excepts it. *Careful* gives the argument | `effect.c`'s `LocalContrastImage` (campaign A, W12): both loop bodies open with `if (status == MagickFalse) continue;` and hold a failed-fetch `status=MagickFalse; continue;`, which T, LB, OC, W and PS step 1 refuse (the W12 report names the gap). Both bodies as helpers over one input struct: 5.02 to 5.19 in a probe, no finding on either helper | mandate (2026-10-24) |
+| 2026-11-04 | WORDING | PS | Step 7: the body becomes the call preceded by the declaration and fill of its input struct in the body (Recipe N step 7), not the call alone; the probe behind the step shared one struct filled once | `effect.c`'s `LocalContrastImage` (campaign A, W12): the first uses declare each pass's struct inside the loop body, as `KuwaharaImage`'s `kuwahara` and Recipe N step 7 do: 5.02 to 5.10 to 5.15 | mandate (2026-10-24) |
