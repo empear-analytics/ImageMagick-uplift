@@ -2408,6 +2408,39 @@ static void ShadeRowPixels(const ShadeRow *row,const Quantum *magick_restrict p,
   }
 }
 
+typedef struct _ShadeImageTargets
+{
+  Image
+    **linear_image,
+    **shade_image;
+} ShadeImageTargets;
+
+static MagickBooleanType AcquireShadeImages(const Image *image,
+  ExceptionInfo *exception,const ShadeImageTargets *targets)
+{
+  Image
+    **const linear_image = targets->linear_image,
+    **const shade_image = targets->shade_image;
+
+  (*linear_image)=CloneImage(image,0,0,MagickTrue,exception);
+  (*shade_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if (((*linear_image) == (Image *) NULL) || ((*shade_image) == (Image *) NULL))
+    {
+      if ((*linear_image) != (Image *) NULL)
+        (*linear_image)=DestroyImage((*linear_image));
+      if ((*shade_image) != (Image *) NULL)
+        (*shade_image)=DestroyImage((*shade_image));
+      return(MagickFalse);
+    }
+  if (SetImageStorageClass((*shade_image),DirectClass,exception) == MagickFalse)
+    {
+      (*linear_image)=DestroyImage((*linear_image));
+      (*shade_image)=DestroyImage((*shade_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   const double azimuth,const double elevation,ExceptionInfo *exception)
 {
@@ -2428,6 +2461,9 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   PrimaryInfo
     light;
 
+  ShadeImageTargets
+    targets;
+
   ssize_t
     y;
 
@@ -2440,22 +2476,10 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  linear_image=CloneImage(image,0,0,MagickTrue,exception);
-  shade_image=CloneImage(image,0,0,MagickTrue,exception);
-  if ((linear_image == (Image *) NULL) || (shade_image == (Image *) NULL))
-    {
-      if (linear_image != (Image *) NULL)
-        linear_image=DestroyImage(linear_image);
-      if (shade_image != (Image *) NULL)
-        shade_image=DestroyImage(shade_image);
-      return((Image *) NULL);
-    }
-  if (SetImageStorageClass(shade_image,DirectClass,exception) == MagickFalse)
-    {
-      linear_image=DestroyImage(linear_image);
-      shade_image=DestroyImage(shade_image);
-      return((Image *) NULL);
-    }
+  targets.linear_image=(&linear_image);
+  targets.shade_image=(&shade_image);
+  if (AcquireShadeImages(image,exception,&targets) == MagickFalse)
+    return((Image *) NULL);
   /*
     Compute the light vector.
   */
