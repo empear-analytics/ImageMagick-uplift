@@ -4432,6 +4432,17 @@ static MagickBooleanType WaveImageRow(const WaveRow *wave_row,const ssize_t y,
   return(MagickTrue);
 }
 
+static void FillSineMap(float *sine_map,const size_t columns,
+  const double amplitude,const double wave_length)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) columns; i++)
+    sine_map[i]=(float) (fabs(amplitude)+amplitude*sin((double)
+      ((2.0*MagickPI*i)*(double) MagickSafeReciprocal(wave_length))));
+}
+
 MagickExport Image *WaveImage(const Image *image,const double amplitude,
   const double wave_length,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -4454,9 +4465,6 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
 
   MagickOffsetType
     progress;
-
-  ssize_t
-    i;
 
   ssize_t
     y;
@@ -4500,9 +4508,7 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
       wave_image=DestroyImage(wave_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  for (i=0; i < (ssize_t) wave_image->columns; i++)
-    sine_map[i]=(float) (fabs(amplitude)+amplitude*sin((double)
-      ((2.0*MagickPI*i)*(double) MagickSafeReciprocal(wave_length))));
+  FillSineMap(sine_map,wave_image->columns,amplitude,wave_length);
   /*
     Wave image.
   */
