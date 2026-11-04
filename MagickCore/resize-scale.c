@@ -1018,6 +1018,22 @@ static MagickBooleanType SyncScaleRow(const ScaleLoop *loop,
 
 #define ScaleImageTag  "Scale/Image"
 
+static MagickBooleanType UpdateScaleProgress(const ScaleLoop *loop,
+  const ssize_t y,const ScaleRowTargets *targets)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(loop->image,ScaleImageTag,(MagickOffsetType) y,
+    loop->image->rows);
+  if (proceed == MagickFalse)
+    {
+      *targets->status=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -1037,7 +1053,6 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
 
   MagickBooleanType
     next_row,
-    proceed,
     status;
 
   PointInfo
@@ -1159,13 +1174,8 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
     TransferScaleScanline(&transfer,q);
     if (SyncScaleRow(&loop,&targets) == MagickFalse)
       break;
-    proceed=SetImageProgress(image,ScaleImageTag,(MagickOffsetType) y,
-      image->rows);
-    if (proceed == MagickFalse)
-      {
-        status=MagickFalse;
-        break;
-      }
+    if (UpdateScaleProgress(&loop,y,&targets) == MagickFalse)
+      break;
   }
   scale_view=DestroyCacheView(scale_view);
   image_view=DestroyCacheView(image_view);
