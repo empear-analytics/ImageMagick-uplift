@@ -276,6 +276,41 @@ static MagickBooleanType AddNoiseImageRow(const AddNoiseRow *noise_row,
   return(MagickTrue);
 }
 
+typedef struct _EffectRows
+{
+  const Image
+    *image,
+    *effect_image;
+
+  CacheView
+    *image_view,
+    *effect_view;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    y;
+} EffectRows;
+
+static MagickBooleanType GetEffectRows(const EffectRows *rows,
+  const Quantum *magick_restrict *p,Quantum *magick_restrict *q,
+  MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*p)=GetCacheViewVirtualPixels(rows->image_view,0,rows->y,
+    rows->image->columns,1,rows->exception);
+  (*q)=QueueCacheViewAuthenticPixels(rows->effect_view,0,rows->y,
+    rows->effect_image->columns,1,rows->exception);
+  if (((*p) == (const Quantum *) NULL) || ((*q) == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void SyncEffectRow(CacheView *view,ExceptionInfo *exception,
   MagickBooleanType *status)
 {
@@ -1378,6 +1413,9 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
 #endif
   for (y=0; y < (ssize_t) canvas_image->rows; y++)
   {
+    const EffectRows
+      rows = { canvas_image,implode_image,canvas_view,implode_view,exception,y };
+
     const Quantum
       *magick_restrict p;
 
@@ -1393,17 +1431,8 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    if (GetEffectRows(&rows,&p,&q,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(canvas_view,0,y,canvas_image->columns,1,
-      exception);
-    q=QueueCacheViewAuthenticPixels(implode_view,0,y,implode_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
     delta.y=scale.y*((double) y-center.y);
     for (x=0; x < (ssize_t) canvas_image->columns; x++)
     {
@@ -3905,6 +3934,9 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
 #endif
   for (y=0; y < (ssize_t) canvas_image->rows; y++)
   {
+    const EffectRows
+      rows = { canvas_image,swirl_image,canvas_view,swirl_view,exception,y };
+
     double
       distance;
 
@@ -3920,17 +3952,8 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    if (GetEffectRows(&rows,&p,&q,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(canvas_view,0,y,canvas_image->columns,1,
-      exception);
-    q=QueueCacheViewAuthenticPixels(swirl_view,0,y,swirl_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
     delta.y=scale.y*(double) (y-center.y);
     for (x=0; x < (ssize_t) canvas_image->columns; x++)
     {
@@ -4147,6 +4170,9 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    const EffectRows
+      rows = { image,tint_image,image_view,tint_view,exception,y };
+
     const Quantum
       *magick_restrict p;
 
@@ -4156,16 +4182,8 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
     ssize_t
       x;
 
-    if (status == MagickFalse)
+    if (GetEffectRows(&rows,&p,&q,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(tint_view,0,y,tint_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       TintPixel(image,tint_image,&color_vector,p,q);
