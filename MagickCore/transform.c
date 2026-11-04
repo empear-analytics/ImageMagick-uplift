@@ -2270,16 +2270,11 @@ MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,TransposeImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,TransposeImageTag,progress,&status);
       }
   }
   transpose_view=DestroyCacheView(transpose_view);
