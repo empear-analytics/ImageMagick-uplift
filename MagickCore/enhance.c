@@ -896,6 +896,55 @@ static size_t StoreCLAHERow(const Image *image,const unsigned short *pixels,
   return(n);
 }
 
+static void StoreCLAHEPixels(const CLAHEPixelLoad *pixel_load,
+  MagickBooleanType *status,MagickOffsetType *progress)
+{
+  Image
+    *const image = pixel_load->image;
+
+  CacheView
+    *const image_view = pixel_load->image_view;
+
+  const RectangleInfo
+    clahe_info = pixel_load->clahe_info,
+    tile_info = pixel_load->tile_info;
+
+  unsigned short
+    *const pixels = pixel_load->pixels;
+
+  ExceptionInfo
+    *const exception = pixel_load->exception;
+
+  size_t
+    n;
+
+  ssize_t
+    y;
+
+  n=clahe_info.width*(size_t) (tile_info.y/2);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    if ((*status) == MagickFalse)
+      continue;
+    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      {
+        (*status)=MagickFalse;
+        continue;
+      }
+    n+=(size_t) (tile_info.x/2);
+    n=StoreCLAHERow(image,pixels,n,q);
+    n+=(size_t) ((ssize_t) clahe_info.width-(ssize_t) image->columns-
+      (tile_info.x/2));
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      (*status)=MagickFalse;
+    UpdateCLAHEProgress(image,progress,status);
+  }
+}
+
 MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   const size_t height,const size_t number_bins,const double clip_limit,
   ExceptionInfo *exception)
@@ -924,12 +973,6 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   RectangleInfo
     clahe_info,
     tile_info;
-
-  size_t
-    n;
-
-  ssize_t
-    y;
 
   unsigned short
     *pixels;
@@ -983,28 +1026,13 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
     Push CLAHE pixels to CLAHE image.
   */
   image_view=AcquireAuthenticCacheView(image,exception);
-  n=clahe_info.width*(size_t) (tile_info.y/2);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    n+=(size_t) (tile_info.x/2);
-    n=StoreCLAHERow(image,pixels,n,q);
-    n+=(size_t) ((ssize_t) clahe_info.width-(ssize_t) image->columns-
-      (tile_info.x/2));
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-    UpdateCLAHEProgress(image,&progress,&status);
-  }
+  pixel_load.image=image;
+  pixel_load.image_view=image_view;
+  pixel_load.clahe_info=clahe_info;
+  pixel_load.tile_info=tile_info;
+  pixel_load.pixels=pixels;
+  pixel_load.exception=exception;
+  StoreCLAHEPixels(&pixel_load,&status,&progress);
   image_view=DestroyCacheView(image_view);
   pixel_cache=RelinquishVirtualMemory(pixel_cache);
   if (TransformImageColorspace(image,colorspace,exception) == MagickFalse)
