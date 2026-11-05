@@ -3676,6 +3676,18 @@ static MagickBooleanType TranslateTernaryElse (
   return(MagickTrue);
 }
 
+static MagickBooleanType SetInPlaceOperatorTarget (FxInfo * pfx,
+  OperatorE op, int UserSymNdx0, MagickBooleanType * broke)
+{
+  (*broke)=MagickFalse;
+  if (OprInPlace ((int) op)) {
+    if (!SetInPlaceTarget (pfx, UserSymNdx0)) return MagickFalse;
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -3848,9 +3860,11 @@ static MagickBooleanType TranslateExpression (
     if (op == oAssign) {
       if (!AddAssignmentCopyTo (pfx, UserSymNdx0)) return MagickFalse;
       break;
-    } else if (OprInPlace ((int) op)) {
-      if (!SetInPlaceTarget (pfx, UserSymNdx0)) return MagickFalse;
-      break;
+    } else {
+      if (SetInPlaceOperatorTarget (pfx, op, UserSymNdx0, &broke) ==
+          MagickFalse)
+        return MagickFalse;
+      if (broke != MagickFalse) break;
     }
   }
 
