@@ -134,3 +134,14 @@ Upstream, not changed: `SparseColorImage`'s clone and storage-class failure exit
 
 Upstream, not changed: in a `ChannelFxImage` assign operation `destination_channel` takes `i`, the source
 channel index, because `i` is not reparsed; `FloodfillPaintImage` has an unused `pixel` local.
+
+## Lane b, fourth batch: vision.c 7.15 -> 9.31, feature.c 7.40 -> 9.09 (Opus, 26 code commits)
+
+Amendments under the mandate, not yet ruled on: **Recipe TW** (06483388e: one function only, when the other copy
+is the whole body of an existing static helper, the helper's body becomes the fill and call) and **Recipe N step
+1** (d9d90aad9: an orphaned `omp atomic` construct, in no parallel region of the function, may lie inside the
+block and move whole and unchanged; it binds to the enclosing region at run time). **Corrections to commit
+messages:** in 63a152baa and e43e56658 "cc 9 -> 8" was inferred from the Complex Method finding disappearing, not
+read from a tool (read: "leaves Complex Method"); 91302c0fe moves a whole parallel loop under N step 1's form
+but carries the trailer `Recipe: E`. Upstream, not changed: `WriteHoughFile` ignores `WriteHoughLines`' status;
+`SetCannyEdgeGray` destroys only its local copy of `edge_image` on failure.
