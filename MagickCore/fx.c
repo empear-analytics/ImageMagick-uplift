@@ -3688,6 +3688,66 @@ static MagickBooleanType SetInPlaceOperatorTarget (FxInfo * pfx,
   return(MagickTrue);
 }
 
+typedef struct _UserSymbolAssignment
+{
+  FxInfo
+    *pfx;
+
+  const char
+    *strLimit;
+
+  char
+    *chLimit;
+
+  MagickBooleanType
+    *needPopAll,
+    UserSymbol,
+    Assign,
+    Update,
+    IncrDecr;
+} UserSymbolAssignment;
+
+static MagickBooleanType TranslateAssignedExpression (
+  const UserSymbolAssignment * assignment, MagickBooleanType * broke)
+{
+  FxInfo
+    *const pfx = assignment->pfx;
+
+  const char
+    *const strLimit = assignment->strLimit;
+
+  char
+    *const chLimit = assignment->chLimit;
+
+  MagickBooleanType
+    *const needPopAll = assignment->needPopAll;
+
+  const MagickBooleanType
+    UserSymbol = assignment->UserSymbol,
+    Assign = assignment->Assign,
+    Update = assignment->Update,
+    IncrDecr = assignment->IncrDecr;
+
+  (*broke)=MagickFalse;
+  if (IsUserSymbolAssignment(UserSymbol,Assign,Update,IncrDecr) != MagickFalse) {
+
+    if (!TranslateExpression (pfx, strLimit, chLimit, needPopAll)) return MagickFalse;
+    if (!*pfx->pex) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+    if (!*strLimit) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+    if (strchr(strLimit,*chLimit)!=NULL) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -3710,6 +3770,8 @@ static MagickBooleanType TranslateExpression (
     operand1 = { &UserSymbol, &NewUserSymbol, &UserSymNdx1, needPopAll };
 
   ExpressionContext context;
+
+  UserSymbolAssignment assignment;
 
   TernaryT ternary;
   ternary.addr_query = NULL_ADDRESS;
@@ -3776,13 +3838,17 @@ static MagickBooleanType TranslateExpression (
         pfx->token, SetShortExp(pfx));
       return MagickFalse;
     }
-    if (IsUserSymbolAssignment(UserSymbol,Assign,Update,IncrDecr) != MagickFalse) {
-
-      if (!TranslateExpression (pfx, strLimit, chLimit, needPopAll)) return MagickFalse;
-      if (!*pfx->pex) break;
-      if (!*strLimit) break;
-      if (strchr(strLimit,*chLimit)!=NULL) break;
-    }
+    assignment.pfx=pfx;
+    assignment.strLimit=strLimit;
+    assignment.chLimit=chLimit;
+    assignment.needPopAll=needPopAll;
+    assignment.UserSymbol=UserSymbol;
+    assignment.Assign=Assign;
+    assignment.Update=Update;
+    assignment.IncrDecr=IncrDecr;
+    if (TranslateAssignedExpression (&assignment, &broke) == MagickFalse)
+      return MagickFalse;
+    if (broke != MagickFalse) break;
     if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
         MagickFalse) {
       ElementT * pel;
