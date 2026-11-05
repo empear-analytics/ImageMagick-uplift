@@ -649,6 +649,33 @@ static MagickBooleanType AcquireAssignImageColormap(Image *image,
   return(MagickTrue);
 }
 
+typedef struct _QuantizeRowInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} QuantizeRowInfo;
+
+static MagickBooleanType FetchQuantizeRow(const QuantizeRowInfo *row,
+  const ssize_t y,Quantum **q,MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*q)=GetCacheViewAuthenticPixels(row->image_view,0,y,row->image->columns,1,
+    row->exception);
+  if ((*q) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -688,15 +715,11 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const QuantizeRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         AssignImageRowColors(image,cube_info,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
@@ -3379,14 +3402,11 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
       Quantum
         *magick_restrict q;
 
-      if (status == MagickFalse)
+      const QuantizeRowInfo
+        row = { image,image_view,exception };
+
+      if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
         continue;
-      q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-      if (q == (Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
       AssignKmeansRow(image,kmeans_pixels,id,q);
       if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
         status=MagickFalse;
@@ -4458,15 +4478,11 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const QuantizeRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         IndexGrayscaleRow(image,colormap_index,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
@@ -4497,14 +4513,11 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const QuantizeRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     RemapGrayscaleRow(image,colormap_index,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
