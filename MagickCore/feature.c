@@ -1561,19 +1561,36 @@ static Image *RenderHoughVotes(const HoughResult *votes_result)
   return(RenderHoughImage(image,path,accumulator,exception));
 }
 
-MagickExport Image *HoughLineImage(const Image *image,const size_t width,
-  const size_t height,const size_t threshold,ExceptionInfo *exception)
+typedef struct _HoughAccumulator
 {
-#define HoughLineImageTag  "HoughLine/Image"
+  const Image
+    *image;
 
-  CacheView
-    *image_view;
+  MatrixInfo
+    *accumulator;
 
   double
     hough_height;
 
-  const HoughWindow
-    window = { width, height };
+  size_t
+    accumulator_width,
+    accumulator_height,
+    threshold;
+
+  HoughWindow
+    window;
+
+  ExceptionInfo
+    *exception;
+} HoughAccumulator;
+
+static Image *VoteHoughAccumulator(const HoughAccumulator *accumulator_votes)
+{
+  const Image
+    *const image = accumulator_votes->image;
+
+  CacheView
+    *image_view;
 
   HoughResult
     votes_result;
@@ -1584,14 +1601,79 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   MagickOffsetType
     progress;
 
-  MatrixInfo
-    *accumulator;
-
   PointInfo
     center;
 
   ssize_t
     y;
+
+  /*
+    Populate the accumulator_votes->accumulator.
+  */
+  status=MagickTrue;
+  progress=0;
+  center.x=(double) image->columns/2.0;
+  center.y=(double) image->rows/2.0;
+  image_view=AcquireVirtualCacheView(image,accumulator_votes->exception);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    HoughVotes
+      votes;
+
+    if (status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,
+      accumulator_votes->exception);
+    if (p == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    votes.image=image;
+    votes.accumulator=accumulator_votes->accumulator;
+    votes.hough_height=accumulator_votes->hough_height;
+    votes.y=y;
+    VoteHoughRow(&votes,p,center);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetFeatureProgress(image,CannyEdgeImageTag,progress,&status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  votes_result.image=image;
+  votes_result.accumulator=accumulator_votes->accumulator;
+  votes_result.accumulator_width=accumulator_votes->accumulator_width;
+  votes_result.accumulator_height=accumulator_votes->accumulator_height;
+  votes_result.threshold=accumulator_votes->threshold;
+  votes_result.window=accumulator_votes->window;
+  votes_result.status=status;
+  votes_result.exception=accumulator_votes->exception;
+  return(RenderHoughVotes(&votes_result));
+}
+
+MagickExport Image *HoughLineImage(const Image *image,const size_t width,
+  const size_t height,const size_t threshold,ExceptionInfo *exception)
+{
+#define HoughLineImageTag  "HoughLine/Image"
+
+  double
+    hough_height;
+
+  const HoughWindow
+    window = { width, height };
+
+  HoughAccumulator
+    accumulator_votes;
+
+  MatrixInfo
+    *accumulator;
 
   size_t
     accumulator_height,
@@ -1619,54 +1701,15 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
       accumulator=DestroyMatrixInfo(accumulator);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  /*
-    Populate the accumulator.
-  */
-  status=MagickTrue;
-  progress=0;
-  center.x=(double) image->columns/2.0;
-  center.y=(double) image->rows/2.0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    HoughVotes
-      votes;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    votes.image=image;
-    votes.accumulator=accumulator;
-    votes.hough_height=hough_height;
-    votes.y=y;
-    VoteHoughRow(&votes,p,center);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetFeatureProgress(image,CannyEdgeImageTag,progress,&status);
-      }
-  }
-  image_view=DestroyCacheView(image_view);
-  votes_result.image=image;
-  votes_result.accumulator=accumulator;
-  votes_result.accumulator_width=accumulator_width;
-  votes_result.accumulator_height=accumulator_height;
-  votes_result.threshold=threshold;
-  votes_result.window=window;
-  votes_result.status=status;
-  votes_result.exception=exception;
-  return(RenderHoughVotes(&votes_result));
+  accumulator_votes.image=image;
+  accumulator_votes.accumulator=accumulator;
+  accumulator_votes.hough_height=hough_height;
+  accumulator_votes.accumulator_width=accumulator_width;
+  accumulator_votes.accumulator_height=accumulator_height;
+  accumulator_votes.threshold=threshold;
+  accumulator_votes.window=window;
+  accumulator_votes.exception=exception;
+  return(VoteHoughAccumulator(&accumulator_votes));
 }
 
 /*
