@@ -112,3 +112,11 @@ refactored as ordinary code; that was my error.** The commits are on the local b
 **Owner question:** may a function's `#if defined(X)` / `#else` pair move verbatim and unchanged into a helper
 when only one branch is compiled and checked by the oracle (the other compiled only by `pp_identical`-style text
 comparison)? If yes, the branch can be merged as is.
+
+## Lane a, third batch: threshold.c 6.82 -> 8.03, transform.c 6.42 -> 6.62 (Opus, 28 commits)
+
+No playbook text. `threshold.c` leaves Complex Method, Large Method and *Overall Code Complexity*; the last
+needed a measured plan of 13 leaf helpers whose first twelve steps are flat (rule 2, each message says so).
+Upstream, not changed: `OrderedDitherImage` leaks `map` when `SetImageStorageClass` fails; `BlackThresholdImage`
+switches gray images with `SetImageColorspace` where White and Range use `TransformImageColorspace`, and its
+comment says "White threshold image"; `RangeThresholdValue` has a redundant final else-if returning 0 on both arms.
