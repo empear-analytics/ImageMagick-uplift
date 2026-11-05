@@ -1073,6 +1073,13 @@ static MagickBooleanType AcquireEvaluateCanvas(const Image *images,
   return(MagickTrue);
 }
 
+static void SyncEvaluateView(CacheView *evaluate_view,
+  ExceptionInfo *exception,MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(evaluate_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -1199,8 +1206,7 @@ MagickExport Image *EvaluateImages(const Image *images,
         median.op=op;
         EvaluateMedianRow(&median,p,evaluate_pixel,q);
         p=(const Quantum **) RelinquishMagickMemory((void *) p);
-        if (SyncCacheViewAuthenticPixels(evaluate_view,exception) == MagickFalse)
-          status=MagickFalse;
+        SyncEvaluateView(evaluate_view,exception,&status);
         if (images->progress_monitor != (MagickProgressMonitor) NULL)
           {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1278,8 +1284,7 @@ MagickExport Image *EvaluateImages(const Image *images,
         NormalizeEvaluatePixels(image,op,number_images,evaluate_pixel);
         SetEvaluatePixels(image,evaluate_pixel,q);
         p=(const Quantum **) RelinquishMagickMemory((void *) p);
-        if (SyncCacheViewAuthenticPixels(evaluate_view,exception) == MagickFalse)
-          status=MagickFalse;
+        SyncEvaluateView(evaluate_view,exception,&status);
         if (images->progress_monitor != (MagickProgressMonitor) NULL)
           {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1421,8 +1426,7 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
         continue;
       }
     EvaluateRowPixels(image,random_info[id],operation,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncEvaluateView(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1693,8 +1697,7 @@ MagickExport Image *PolynomialImage(const Image *images,
     rows.y=y;
     AccumulatePolynomialImages(&rows,polynomial_pixel,exception);
     SetPolynomialPixels(image,polynomial_pixel,q);
-    if (SyncCacheViewAuthenticPixels(polynomial_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncEvaluateView(polynomial_view,exception,&status);
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
