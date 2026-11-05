@@ -2888,6 +2888,44 @@ static MagickBooleanType TryLeadingOperand (FxInfo * pfx,
   return MagickFalse;
 }
 
+static MagickBooleanType TryFunctionOperand (FxInfo * pfx,
+  MagickBooleanType * needPopAll, MagickBooleanType * result)
+{
+  FunctionE fe;
+  for (fe = FirstFunc; fe < fNull; fe=(FunctionE) (fe+1)) {
+    const char * feStr = Functions[fe-(int) FirstFunc].str;
+    if (LocaleCompare (feStr, pfx->token)==0) {
+      break;
+    }
+  }
+
+  if (fe == fV && pfx->ImgListLen < 2) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Symbol 'v' but fewer than two images at", "'%s'",
+      SetShortExp(pfx));
+    (*result)=MagickFalse;
+    return MagickTrue;
+  }
+
+  if (IsStealth ((int) fe)) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Function", "'%s' not permitted at '%s'",
+      pfx->token, SetShortExp(pfx));
+  }
+
+  if (IsLoopOrIfFunction(fe) != MagickFalse) {
+    *needPopAll = MagickTrue;
+  }
+
+  if (fe != fNull) {
+    (*result)=GetFunction (pfx, fe);
+    return MagickTrue;
+  }
+  return MagickFalse;
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, const OperandSymbols * operand)
 {
@@ -2922,36 +2960,8 @@ static MagickBooleanType GetOperand (
 
     /* Try a function
     */
-    {
-      FunctionE fe;
-      for (fe = FirstFunc; fe < fNull; fe=(FunctionE) (fe+1)) {
-        const char * feStr = Functions[fe-(int) FirstFunc].str;
-        if (LocaleCompare (feStr, pfx->token)==0) {
-          break;
-        }
-      }
-
-      if (fe == fV && pfx->ImgListLen < 2) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Symbol 'v' but fewer than two images at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-
-      if (IsStealth ((int) fe)) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Function", "'%s' not permitted at '%s'",
-          pfx->token, SetShortExp(pfx));
-      }
-
-      if (IsLoopOrIfFunction(fe) != MagickFalse) {
-        *needPopAll = MagickTrue;
-      }
-
-      if (fe != fNull) return (GetFunction (pfx, fe));
-    }
+    if (TryFunctionOperand (pfx, needPopAll, &returned) != MagickFalse)
+      return returned;
 
     /* Try image attribute
     */
