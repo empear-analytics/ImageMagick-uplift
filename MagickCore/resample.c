@@ -637,6 +637,13 @@ static void CountEdgeHits(const ResampleFilter *resample_filter,
   }
 }
 
+static void CountImageHits(const ResampleFilter *resample_filter,
+  const double u0,const double v0,ssize_t *hit)
+{
+  if (IsAreaOutsideImage(resample_filter,u0,v0) != MagickFalse)
+    (*hit)++;
+}
+
 static void CountAreaHits(const ResampleFilter *resample_filter,
   const double u0,const double v0,ssize_t *hit)
 {
@@ -736,8 +743,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
     case GrayVirtualPixelMethod:
     case WhiteVirtualPixelMethod:
     case MaskVirtualPixelMethod:
-      if (IsAreaOutsideImage(resample_filter,u0,v0) != MagickFalse)
-        hit++;
+      CountImageHits(resample_filter,u0,v0,&hit);
       break;
 
     default:
