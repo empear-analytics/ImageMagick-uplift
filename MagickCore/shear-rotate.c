@@ -680,6 +680,66 @@ static void RotateImage270(const RotateInfo *info,MagickBooleanType *status,
   }
 }
 
+static void RotateImage180(const RotateInfo *info,MagickBooleanType *status,
+  MagickOffsetType *progress,RectangleInfo *page)
+{
+  const Image
+    *image = info->image;
+
+  CacheView
+    *image_view = info->image_view;
+
+  Image
+    *rotate_image = info->rotate_image;
+
+  CacheView
+    *rotate_view = info->rotate_view;
+
+  const size_t
+    rotations = info->rotations;
+
+  ExceptionInfo
+    *exception = info->exception;
+
+  switch (rotations)
+  {
+    case 2:
+    {
+      ssize_t
+        y;
+
+      /*
+        Rotate 180 degrees.
+      */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static) shared(status) \
+        magick_number_threads(image,rotate_image,image->rows,2)
+#endif
+      for (y=0; y < (ssize_t) image->rows; y++)
+      {
+        const RotateRowInfo row = { image, image_view, rotate_image,
+          rotate_view, exception };
+
+        RotateRow180(&row,y,status,progress);
+      }
+      (void) SetImageProgress(image,RotateImageTag,(MagickOffsetType)
+        image->rows-1,image->rows);
+      if ((*page).width != 0)
+        (*page).x=(ssize_t) (*page).width-(ssize_t) rotate_image->columns-
+          (*page).x;
+      if ((*page).height != 0)
+        (*page).y=(ssize_t) (*page).height-(ssize_t) rotate_image->rows-
+          (*page).y;
+      break;
+    }
+    default:
+    {
+      RotateImage270(info,&(*status),&(*progress),&(*page));
+      break;
+    }
+  }
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -761,36 +821,9 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
         page.x=(ssize_t) page.width-(ssize_t) rotate_image->columns-page.x;
       break;
     }
-    case 2:
-    {
-      ssize_t
-        y;
-
-      /*
-        Rotate 180 degrees.
-      */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,rotate_image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const RotateRowInfo row = { image, image_view, rotate_image,
-          rotate_view, exception };
-
-        RotateRow180(&row,y,&status,&progress);
-      }
-      (void) SetImageProgress(image,RotateImageTag,(MagickOffsetType)
-        image->rows-1,image->rows);
-      if (page.width != 0)
-        page.x=(ssize_t) page.width-(ssize_t) rotate_image->columns-page.x;
-      if (page.height != 0)
-        page.y=(ssize_t) page.height-(ssize_t) rotate_image->rows-page.y;
-      break;
-    }
     default:
     {
-      RotateImage270(&info,&status,&progress,&page);
+      RotateImage180(&info,&status,&progress,&page);
       break;
     }
   }
