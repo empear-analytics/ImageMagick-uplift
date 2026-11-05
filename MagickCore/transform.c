@@ -1334,6 +1334,13 @@ static MagickBooleanType FlopImageLine(const TransformLine *line,
   return(MagickTrue);
 }
 
+static void SetFlopPage(Image *flop_image,RectangleInfo page)
+{
+  if (page.width != 0)
+    page.x=((ssize_t) page.width-(ssize_t) flop_image->columns-page.x);
+  flop_image->page=page;
+}
+
 MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
 {
 #define FlopImageTag  "Flop/Image"
@@ -1402,9 +1409,7 @@ MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
   flop_view=DestroyCacheView(flop_view);
   image_view=DestroyCacheView(image_view);
   flop_image->type=image->type;
-  if (page.width != 0)
-    page.x=((ssize_t) page.width-(ssize_t) flop_image->columns-page.x);
-  flop_image->page=page;
+  SetFlopPage(flop_image,page);
   if (status != MagickFalse)
     AppendTransformProperty(image,flop_image,"flop %.17gx%.17g",
       exception);
