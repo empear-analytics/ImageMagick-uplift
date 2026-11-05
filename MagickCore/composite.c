@@ -2616,6 +2616,10 @@ typedef struct _DisplaceSetup
   Image
     *image,
     *source_image;
+
+  ssize_t
+    x_offset,
+    y_offset;
 } DisplaceSetup;
 
 static void SetDisplaceScaleArguments(const DisplaceSetup *displace,
@@ -2653,6 +2657,21 @@ static void SetDisplaceScaleDefaults(const DisplaceSetup *displace,
       (*horizontal_scale)=(MagickRealType) (displace->image->columns-1)/2.0;
       (*vertical_scale)=(MagickRealType) (displace->image->rows-1)/2.0;
     }
+}
+
+static void SetDistortCenterX(const DisplaceSetup *displace,PointInfo *center)
+{
+  if ((displace->flags & XValue) == 0)
+    if ((displace->flags & AspectValue) != 0)
+      (*center).x=(MagickRealType) ((displace->image->columns-1)/2.0);
+    else
+      (*center).x=(MagickRealType) (displace->x_offset+(displace->source_image->columns-1)/
+        2.0);
+  else
+    if ((displace->flags & AspectValue) != 0)
+      (*center).x=displace->geometry_info.xi;
+    else
+      (*center).x=(MagickRealType) (displace->x_offset+displace->geometry_info.xi);
 }
 
 MagickExport MagickBooleanType CompositeImage(Image *image,
@@ -3045,6 +3064,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       displace.geometry_info=geometry_info;
       displace.image=image;
       displace.source_image=source_image;
+      displace.x_offset=x_offset;
+      displace.y_offset=y_offset;
       if ((flags & (WidthValue | HeightValue)) == 0 )
         SetDisplaceScaleDefaults(&displace,&horizontal_scale,&vertical_scale);
       else
@@ -3061,17 +3082,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       center.y=(MagickRealType) y_offset;
       if (compose == DistortCompositeOp)
         {
-          if ((flags & XValue) == 0)
-            if ((flags & AspectValue) != 0)
-              center.x=(MagickRealType) ((image->columns-1)/2.0);
-            else
-              center.x=(MagickRealType) (x_offset+(source_image->columns-1)/
-                2.0);
-          else
-            if ((flags & AspectValue) != 0)
-              center.x=geometry_info.xi;
-            else
-              center.x=(MagickRealType) (x_offset+geometry_info.xi);
+          SetDistortCenterX(&displace,&center);
           if ((flags & YValue) == 0)
             if ((flags & AspectValue) != 0)
               center.y=(MagickRealType) ((image->rows-1)/2.0);
