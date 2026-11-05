@@ -1380,6 +1380,24 @@ static void ImplodeRow(const WarpInfo *warp,const Quantum *magick_restrict p,
   }
 }
 
+static MagickBooleanType CloneWarpImage(Image *canvas_image,
+  Image **warp_image,ExceptionInfo *exception)
+{
+  *warp_image=CloneImage(canvas_image,0,0,MagickTrue,exception);
+  if (*warp_image == (Image *) NULL)
+    {
+      canvas_image=DestroyImage(canvas_image);
+      return(MagickFalse);
+    }
+  if (SetImageStorageClass(*warp_image,DirectClass,exception) == MagickFalse)
+    {
+      canvas_image=DestroyImage(canvas_image);
+      *warp_image=DestroyImage(*warp_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void GetImplodeGeometry(const Image *canvas_image,PointInfo *scale,
   PointInfo *center,double *radius)
 {
@@ -1445,18 +1463,8 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
   if ((canvas_image->alpha_trait == UndefinedPixelTrait) &&
       (canvas_image->background_color.alpha != (double) OpaqueAlpha))
     (void) SetImageAlphaChannel(canvas_image,OpaqueAlphaChannel,exception);
-  implode_image=CloneImage(canvas_image,0,0,MagickTrue,exception);
-  if (implode_image == (Image *) NULL)
-    {
-      canvas_image=DestroyImage(canvas_image);
-      return((Image *) NULL);
-    }
-  if (SetImageStorageClass(implode_image,DirectClass,exception) == MagickFalse)
-    {
-      canvas_image=DestroyImage(canvas_image);
-      implode_image=DestroyImage(implode_image);
-      return((Image *) NULL);
-    }
+  if (CloneWarpImage(canvas_image,&implode_image,exception) == MagickFalse)
+    return((Image *) NULL);
   /*
     Compute scaling factor.
   */
