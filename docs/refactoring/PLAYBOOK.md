@@ -3064,6 +3064,11 @@ the block's depth.
    (Recipe PS step 4), and it counts as one of step 4's four parameters. The caller
    writes `if (Helper(...,&status) == MagickFalse) break;`, or `else if (...) break;`
    where the block was an `else` body.
+   The body of a helper of Recipe PS step 7 (the parallel loop's whole body, called once
+   per iteration with the shared `status`'s address) is that loop's body for this form:
+   a block in it passes the helper's `status` on as `status`, and may take the helper's
+   own `const Name *name` unchanged in place of an input struct (Recipe N step 2's
+   pass-through), the other inputs by value.
 2. The block writes at most one variable `v` of the caller that the caller reads after
    it, a plain local whose address the caller takes only as the `v` argument of helpers
    of this recipe (Recipe V step 2). A temporary it writes before reading, and the caller
@@ -3213,6 +3218,11 @@ static MagickBooleanType FillFloodplaneRun(const FloodfillRow *row,ssize_t *x)
   that assigns and tests it) stays that way: the test sits in the helper, on the path
   that ran it before, and the other path's code is not touched, so `status` is read at
   the same points as inline.
+- A Recipe PS step 7 helper is the parallel loop's body, moved: it runs once per
+  iteration, on that iteration's thread, so a block in it lies inside the iteration as
+  the parallel-loop-body form requires, and its `status` parameter already holds the
+  shared flag's address, which the new function receives unchanged. The `name` it
+  passes on is the struct the iteration filled, read through the same pointer.
 - Under step 8 the variables stay the caller's own locals, read and written directly
   everywhere else; only their addresses travel, fixed before the call and dead after
   it, bound once to `*const` locals, so each `*v` is the object `v` named, in the same
@@ -3244,7 +3254,12 @@ interpolates the pixel into `status` and ends the column loop through `break;` w
 Complexity and Bumpy Road Ahead); a column loop as a PS helper keeps two bumps, and PS
 refuses a block that holds the `break;`. A probe of the `else` body as an LB helper
 through a `status` pointer: `SwirlImage` leaves Deep, Nested Complexity, 4.23 to 4.25.
-Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24. PS step 7
+helpers (2026-11-05, W14 lane c): `shear-rotate.c`'s `RotateTileRow270`, the 270-degree
+tile row loop's body, whose tile loop body fetches the tile and ends the tile loop
+through `break;` on a failed fetch; left in place it repeats the 90-degree helper's tile
+loop, which CodeScene reports as *Code Duplication* once that helper exists (7.58 in a
+probe). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -7062,3 +7077,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | PS | Step 7: the loop whose whole body moves may also be a sequential loop nested in the parallel loop's iteration (a tile's row loop inside the tile loop); its `continue;` statements become `return;`, its counter goes by value, and the struct of step 6 is declared in the parallel body and may be filled before that loop (Recipe N steps 7 and 8). *Careful* gives the argument. Still eight steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 90-degree tile row loop's body tests `status`, continues after a failed queue and syncs, at depth 5 of the function; step 7 as written took only the parallel loop's own body. A probe of the whole chain: 7.63 to 10.00, no finding left | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | PC | Step 1: the loop may also be a sequential loop nested in the parallel loop's iteration (a tile's row loop), the head the start of that loop's body and the tail the rest of it, kept because it holds a `#pragma omp critical` construct; the head's and the caller's `continue;` are that loop's own; the struct is declared in the parallel body and may be filled before the loop (Recipe N steps 7 and 8). Still five steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree tile row loop's body tests `status`, queues a row, copies it and syncs under a named critical; PS refuses the pragma and PC step 1 took only the parallel loop's own body. A probe of the whole chain: 7.63 to 10.00 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | HC | Step 2: outside the critical constructs the block may also read, test and assign the shared `status` (Recipe PS step 2's conditions), directly or through `&status` passed to a callee; it goes by pointer, last, `(*status)` at every use and `status` for `&status` (PS step 4), the only text change step 5 makes; inside the constructs `status` is not touched. *Careful* gives the argument. Still six steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree tile row loop holds the named critical sync and sets `status` through its head and sync test, which step 2 refused; a probe of the whole chain: 7.63 to 10.00 | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | LB | Step 1: the body of a Recipe PS step 7 helper (the parallel loop's whole body, called once per iteration with the shared `status`'s address) counts as the parallel loop body for the parallel-loop-body form; a block in it passes `status` on and may take the helper's own `const Name *name` unchanged (Recipe N step 2's pass-through). *Careful* gives the argument. Still eight steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): `RotateTileRow270`'s tile loop body ends the tile loop through `break;` on a failed fetch; left in place it is reported as *Code Duplication* with the 90-degree helper (7.58 in a probe); as an LB helper the chain reaches 10.00 | mandate (2026-10-24) |
