@@ -1110,6 +1110,97 @@ static void SetMontagePage(const MontagePageInfo *page)
   DecorateMontagePage(page);
 }
 
+typedef struct _MontageThumbnailInfo
+{
+  Image
+    **image_list;
+
+  size_t
+    number_images;
+
+  const MontageInfo
+    *montage_info;
+} MontageThumbnailInfo;
+
+typedef struct _MontageThumbnailTargets
+{
+  Image
+    **image;
+
+  MagickProgressMonitor
+    *progress_monitor;
+
+  MagickStatusType
+    *flags;
+} MontageThumbnailTargets;
+
+static MagickBooleanType CreateMontageThumbnails(
+  const MontageThumbnailInfo *thumbnail_info,Image **primary_list,
+  ExceptionInfo *exception,const MontageThumbnailTargets *targets)
+{
+  Image
+    **const image = targets->image;
+
+  MagickProgressMonitor
+    *const progress_monitor = targets->progress_monitor;
+
+  MagickStatusType
+    *const flags = targets->flags;
+
+  Image
+    **const image_list = thumbnail_info->image_list;
+
+  const size_t
+    number_images = thumbnail_info->number_images;
+
+  const MontageInfo
+    *const montage_info = thumbnail_info->montage_info;
+
+  Image
+    *thumbnail;
+
+  MagickBooleanType
+    proceed;
+
+  RectangleInfo
+    geometry;
+
+  ssize_t
+    i;
+
+  *image=image_list[0];
+  thumbnail=NewImageList();
+  for (i=0; i < (ssize_t) number_images; i++)
+  {
+    *image=CloneImage(image_list[i],0,0,MagickTrue,exception);
+    if (*image == (Image *) NULL)
+      break;
+    (void) ParseAbsoluteGeometry("0x0+0+0",&(*image)->page);
+    *progress_monitor=SetImageProgressMonitor(*image,(MagickProgressMonitor)
+      NULL,(*image)->client_data);
+    *flags=ParseRegionGeometry(*image,montage_info->geometry,&geometry,
+      exception);
+    thumbnail=ThumbnailImage(*image,geometry.width,geometry.height,exception);
+    if (thumbnail == (Image *) NULL)
+      break;
+    image_list[i]=thumbnail;
+    (void) SetImageProgressMonitor(*image,*progress_monitor,
+      (*image)->client_data);
+    proceed=SetImageProgress(*image,TileImageTag,(MagickOffsetType) i,
+      number_images);
+    if (proceed == MagickFalse)
+      break;
+    *image=DestroyImage(*image);
+  }
+  if (i < (ssize_t) number_images)
+    {
+      DestroyTileResources(*image,thumbnail,image_list,i);
+      primary_list=(Image **) RelinquishMagickMemory(primary_list);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1128,15 +1219,13 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     **primary_list,
     *montage,
     *texture,
-    *tile_image,
-    *thumbnail;
+    *tile_image;
 
   ImageInfo
     *clone_info;
 
   MagickBooleanType
     concatenate,
-    proceed,
     status;
 
   MagickOffsetType
@@ -1148,12 +1237,17 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   MagickStatusType
     flags;
 
+  MontageThumbnailInfo
+    thumbnail_info;
+
+  const MontageThumbnailTargets
+    thumbnail_targets = { (&image), (&progress_monitor), (&flags) };
+
   ssize_t
     i;
 
   RectangleInfo
     bounds,
-    geometry,
     extract_info;
 
   size_t
@@ -1196,34 +1290,12 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   if (primary_list == (Image **) NULL)
     return((Image *) NULL);
   image_list=primary_list;
-  image=image_list[0];
-  thumbnail=NewImageList();
-  for (i=0; i < (ssize_t) number_images; i++)
-  {
-    image=CloneImage(image_list[i],0,0,MagickTrue,exception);
-    if (image == (Image *) NULL)
-      break;
-    (void) ParseAbsoluteGeometry("0x0+0+0",&image->page);
-    progress_monitor=SetImageProgressMonitor(image,(MagickProgressMonitor) NULL,
-      image->client_data);
-    flags=ParseRegionGeometry(image,montage_info->geometry,&geometry,exception);
-    thumbnail=ThumbnailImage(image,geometry.width,geometry.height,exception);
-    if (thumbnail == (Image *) NULL)
-      break;
-    image_list[i]=thumbnail;
-    (void) SetImageProgressMonitor(image,progress_monitor,image->client_data);
-    proceed=SetImageProgress(image,TileImageTag,(MagickOffsetType) i,
-      number_images);
-    if (proceed == MagickFalse)
-      break;
-    image=DestroyImage(image);
-  }
-  if (i < (ssize_t) number_images)
-    {
-      DestroyTileResources(image,thumbnail,image_list,i);
-      primary_list=(Image **) RelinquishMagickMemory(primary_list);
-      return((Image *) NULL);
-    }
+  thumbnail_info.image_list=image_list;
+  thumbnail_info.number_images=number_images;
+  thumbnail_info.montage_info=montage_info;
+  if (CreateMontageThumbnails(&thumbnail_info,primary_list,exception,
+      &thumbnail_targets) == MagickFalse)
+    return((Image *) NULL);
   /*
     Sort image list by increasing tile number.
   */
