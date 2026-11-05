@@ -825,6 +825,21 @@ typedef struct _ColorspaceRowInfo
     *exception;
 } ColorspaceRowInfo;
 
+static MagickBooleanType FetchColorspaceRow(const ColorspaceRowInfo *row,
+  const ssize_t y,Quantum **q,MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*q)=GetCacheViewAuthenticPixels(row->image_view,0,y,row->image->columns,1,
+    row->exception);
+  if ((*q) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void SetColorspaceProgress(const Image *image,const char *tag,
   const MagickOffsetType progress,MagickBooleanType *status)
 {
@@ -966,15 +981,11 @@ static MagickBooleanType sRGBTransformImage(Image *image,
         ssize_t
           x;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         pixel=zero;
         for (x=0; x < (ssize_t) image->columns; x++)
         {
@@ -1040,15 +1051,11 @@ static MagickBooleanType sRGBTransformImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         for (x=0; x < (ssize_t) image->columns; x++)
         {
           MagickRealType
@@ -1123,15 +1130,11 @@ static MagickBooleanType sRGBTransformImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         for (x=0; x < (ssize_t) image->columns; x++)
         {
           double
@@ -1222,15 +1225,11 @@ static MagickBooleanType sRGBTransformImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         for (x=(ssize_t) image->columns; x != 0; x--)
         {
           double
@@ -1279,15 +1278,11 @@ static MagickBooleanType sRGBTransformImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         for (x=0; x < (ssize_t) image->columns; x++)
         {
           double
@@ -1499,15 +1494,11 @@ static MagickBooleanType sRGBTransformImage(Image *image,
           green,
           red;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         for (x=0; x < (ssize_t) image->columns; x++)
         {
           red=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
@@ -2321,15 +2312,11 @@ static MagickBooleanType TransformsRGBImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         pixel=zero;
         for (x=0; x < (ssize_t) image->columns; x++)
         {
@@ -2367,15 +2354,11 @@ static MagickBooleanType TransformsRGBImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         for (x=0; x < (ssize_t) image->columns; x++)
         {
           MagickRealType
@@ -2418,15 +2401,11 @@ static MagickBooleanType TransformsRGBImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         for (x=0; x < (ssize_t) image->columns; x++)
         {
           MagickRealType
@@ -2503,15 +2482,11 @@ static MagickBooleanType TransformsRGBImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         for (x=0; x < (ssize_t) image->columns; x++)
         {
           double
@@ -2639,15 +2614,11 @@ static MagickBooleanType TransformsRGBImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         for (x=(ssize_t) image->columns; x != 0; x--)
         {
           double
@@ -2864,15 +2835,11 @@ static MagickBooleanType TransformsRGBImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const ColorspaceRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         for (x=0; x < (ssize_t) image->columns; x++)
         {
           size_t
