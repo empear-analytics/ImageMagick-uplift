@@ -3030,6 +3030,55 @@ static void InitializeRec601OrRec709Maps(const Image *image,
   }
 }
 
+static void InitializeTosRGBMaps(const Image *image,
+  TransformPacket *x_map,
+  TransformPacket *y_map,TransformPacket *z_map)
+{
+  ssize_t
+    i;
+
+  switch (image->colorspace)
+  {
+    case OHTAColorspace:
+    {
+      /*
+        Initialize OHTA tables:
+
+          I1 = 0.33333*R+0.33334*G+0.33333*B
+          I2 = 0.50000*R+0.00000*G-0.50000*B
+          I3 =-0.25000*R+0.50000*G-0.25000*B
+          R = I1+1.00000*I2-0.66668*I3
+          G = I1+0.00000*I2+1.33333*I3
+          B = I1-1.00000*I2-0.66668*I3
+
+        I and Q, normally -0.5 through 0.5, must be normalized to the range 0
+        through QuantumRange.
+      */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static)
+#endif
+      for (i=0; i <= (ssize_t) MaxMap; i++)
+      {
+        x_map[i].x=(MagickRealType) (1.0*(double) i);
+        y_map[i].x=(MagickRealType) (0.5*1.00000*(2.0*(double) i-MaxMap));
+        z_map[i].x=(MagickRealType) (-0.5*0.66668*(2.0*(double) i-MaxMap));
+        x_map[i].y=(MagickRealType) (1.0*(double) i);
+        y_map[i].y=(MagickRealType) (0.5*0.00000*(2.0*(double) i-MaxMap));
+        z_map[i].y=(MagickRealType) (0.5*1.33333*(2.0*(double) i-MaxMap));
+        x_map[i].z=(MagickRealType) (1.0*(double) i);
+        y_map[i].z=(MagickRealType) (-0.5*1.00000*(2.0*(double) i-MaxMap));
+        z_map[i].z=(MagickRealType) (-0.5*0.66668*(2.0*(double) i-MaxMap));
+      }
+      break;
+    }
+    default:
+    {
+      InitializeRec601OrRec709Maps(image,x_map,y_map,z_map);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -3051,7 +3100,6 @@ static MagickBooleanType TransformsRGBImage(Image *image,
     progress;
 
   ssize_t
-    i,
     y;
 
   TransformPacket
@@ -3259,46 +3307,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
-  switch (image->colorspace)
-  {
-    case OHTAColorspace:
-    {
-      /*
-        Initialize OHTA tables:
-
-          I1 = 0.33333*R+0.33334*G+0.33333*B
-          I2 = 0.50000*R+0.00000*G-0.50000*B
-          I3 =-0.25000*R+0.50000*G-0.25000*B
-          R = I1+1.00000*I2-0.66668*I3
-          G = I1+0.00000*I2+1.33333*I3
-          B = I1-1.00000*I2-0.66668*I3
-
-        I and Q, normally -0.5 through 0.5, must be normalized to the range 0
-        through QuantumRange.
-      */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=(MagickRealType) (1.0*(double) i);
-        y_map[i].x=(MagickRealType) (0.5*1.00000*(2.0*(double) i-MaxMap));
-        z_map[i].x=(MagickRealType) (-0.5*0.66668*(2.0*(double) i-MaxMap));
-        x_map[i].y=(MagickRealType) (1.0*(double) i);
-        y_map[i].y=(MagickRealType) (0.5*0.00000*(2.0*(double) i-MaxMap));
-        z_map[i].y=(MagickRealType) (0.5*1.33333*(2.0*(double) i-MaxMap));
-        x_map[i].z=(MagickRealType) (1.0*(double) i);
-        y_map[i].z=(MagickRealType) (-0.5*1.00000*(2.0*(double) i-MaxMap));
-        z_map[i].z=(MagickRealType) (-0.5*0.66668*(2.0*(double) i-MaxMap));
-      }
-      break;
-    }
-    default:
-    {
-      InitializeRec601OrRec709Maps(image,x_map,y_map,z_map);
-      break;
-    }
-  }
+  InitializeTosRGBMaps(image,x_map,y_map,z_map);
   /*
     Convert to sRGB.
   */
