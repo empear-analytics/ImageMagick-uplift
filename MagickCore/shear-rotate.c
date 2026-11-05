@@ -456,6 +456,75 @@ static void RotateTileLine90(const RotateTile *tile,const ssize_t y,
     (*status)=MagickFalse;
 }
 
+static void RotateTileRow90(const RotateTiles *tiles,const ssize_t tile_y,
+  MagickBooleanType *status,MagickOffsetType *progress)
+{
+  const Image
+    *image = tiles->image;
+
+  CacheView
+    *image_view = tiles->image_view;
+
+  Image
+    *rotate_image = tiles->rotate_image;
+
+  CacheView
+    *rotate_view = tiles->rotate_view;
+
+  const size_t
+    tile_height = tiles->tile_height,
+    tile_width = tiles->tile_width;
+
+  ExceptionInfo
+    *exception = tiles->exception;
+
+  ssize_t
+    tile_x;
+
+  if ((*status) == MagickFalse)
+    return;
+  tile_x=0;
+  for ( ; tile_x < (ssize_t) image->columns; tile_x+=(ssize_t) tile_width)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    RotateTile
+      tile;
+
+    size_t
+      height,
+      width;
+
+    ssize_t
+      y;
+
+    width=ClipTileExtent(tile_width,tile_x,image->columns);
+    height=ClipTileExtent(tile_height,tile_y,image->rows);
+    p=GetCacheViewVirtualPixels(image_view,tile_x,tile_y,width,height,
+      exception);
+    if (p == (const Quantum *) NULL)
+      {
+        (*status)=MagickFalse;
+        break;
+      }
+    tile.image=image;
+    tile.rotate_image=rotate_image;
+    tile.rotate_view=rotate_view;
+    tile.p=p;
+    tile.height=height;
+    tile.width=width;
+    tile.tile_x=tile_x;
+    tile.tile_y=tile_y;
+    tile.exception=exception;
+    for (y=0; y < (ssize_t) width; y++)
+    {
+      RotateTileLine90(&tile,y,status);
+    }
+  }
+  UpdateRotateTileProgress(image,tile_height,status,progress);
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -515,51 +584,10 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
 #endif
       for (tile_y=0; tile_y < (ssize_t) image->rows; tile_y+=(ssize_t) tile_height)
       {
-        ssize_t
-          tile_x;
+        const RotateTiles tiles = { image, image_view, rotate_image,
+          rotate_view, tile_height, tile_width, exception };
 
-        if (status == MagickFalse)
-          continue;
-        tile_x=0;
-        for ( ; tile_x < (ssize_t) image->columns; tile_x+=(ssize_t) tile_width)
-        {
-          const Quantum
-            *magick_restrict p;
-
-          RotateTile
-            tile;
-
-          size_t
-            height,
-            width;
-
-          ssize_t
-            y;
-
-          width=ClipTileExtent(tile_width,tile_x,image->columns);
-          height=ClipTileExtent(tile_height,tile_y,image->rows);
-          p=GetCacheViewVirtualPixels(image_view,tile_x,tile_y,width,height,
-            exception);
-          if (p == (const Quantum *) NULL)
-            {
-              status=MagickFalse;
-              break;
-            }
-          tile.image=image;
-          tile.rotate_image=rotate_image;
-          tile.rotate_view=rotate_view;
-          tile.p=p;
-          tile.height=height;
-          tile.width=width;
-          tile.tile_x=tile_x;
-          tile.tile_y=tile_y;
-          tile.exception=exception;
-          for (y=0; y < (ssize_t) width; y++)
-          {
-            RotateTileLine90(&tile,y,&status);
-          }
-        }
-        UpdateRotateTileProgress(image,tile_height,&status,&progress);
+        RotateTileRow90(&tiles,tile_y,&status,&progress);
       }
       (void) SetImageProgress(image,RotateImageTag,(MagickOffsetType)
         image->rows-1,image->rows);
