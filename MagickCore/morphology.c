@@ -4457,6 +4457,7 @@ typedef struct _MorphologyStages
   size_t
     method_loop,
     kernel_number,
+    stage_limit,
     kernel_limit;
 
   char
@@ -4553,6 +4554,15 @@ static MagickBooleanType IterateMorphologyKernel(
 
   } /* End Loop 4: Iterate the kernel with primitive */
   return(MagickTrue);
+}
+
+static void ReportStageChanges(const MorphologyStages *stages,
+  const size_t kernel_changed,const ssize_t changed,const size_t stage_loop)
+{
+  if (stages->verbose != MagickFalse && kernel_changed != (size_t)changed)
+    (void) FormatLocaleFile(stderr, "   Total %.17g",(double) kernel_changed);
+  if (stages->verbose != MagickFalse && stage_loop < stages->stage_limit)
+    (void) FormatLocaleFile(stderr, "\n"); /* add end-of-line before looping */
 }
 
 MagickPrivate Image *MorphologyApply(const Image *image,
@@ -4742,6 +4752,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
       stages.verbose=verbose;
       stages.method_loop=method_loop;
       stages.kernel_number=kernel_number;
+      stages.stage_limit=stage_limit;
       stages.kernel_limit=kernel_limit;
       stages.v_info=v_info;
       stages.exception=exception;
@@ -4793,10 +4804,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
             &iteration_targets) == MagickFalse)
           goto error_cleanup;
 
-        if (verbose != MagickFalse && kernel_changed != (size_t)changed)
-          (void) FormatLocaleFile(stderr, "   Total %.17g",(double) kernel_changed);
-        if (verbose != MagickFalse && stage_loop < stage_limit)
-          (void) FormatLocaleFile(stderr, "\n"); /* add end-of-line before looping */
+        ReportStageChanges(&stages,kernel_changed,changed,stage_loop);
 
 #if 0
     (void) FormatLocaleFile(stderr, "--E-- image=0x%lx\n", (unsigned long)image);
