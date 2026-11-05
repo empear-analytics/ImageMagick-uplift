@@ -3128,6 +3128,55 @@ static void MapBarrelDistortion(const DistortMapping *mapping,PointInfo *d,
   }
 }
 
+static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
+  const char *lookup,ExceptionInfo *exception)
+{
+  double
+    *inverse;
+
+  ssize_t
+    i;
+
+  inverse=(double *) AcquireQuantumMemory(6,sizeof(*inverse));
+  if (inverse == (double *) NULL)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","%s","DistortImages");
+      return(MagickFalse);
+    }
+  InvertAffineCoefficients(coeff, inverse);
+  CoefficientsToAffineArgs(inverse);
+  (void) FormatLocaleFile(stderr, "Affine projection:\n");
+  (void) FormatLocaleFile(stderr,
+    "  -distort AffineProjection \\\n    '");
+  for (i=0; i < 5; i++)
+    (void) FormatLocaleFile(stderr, "%.*g,",GetMagickPrecision(),
+      inverse[i]);
+  (void) FormatLocaleFile(stderr, "%.*g'\n",GetMagickPrecision(),
+    inverse[5]);
+  (void) FormatLocaleFile(stderr,
+    "Equivalent scale, rotation(deg), translation:\n");
+  (void) FormatLocaleFile(stderr,"  %.*g,%.*g,%.*g,%.*g\n",
+    GetMagickPrecision(),sqrt(inverse[0]*inverse[0]+
+    inverse[1]*inverse[1]),GetMagickPrecision(),
+    RadiansToDegrees(atan2(inverse[1],inverse[0])),
+    GetMagickPrecision(),inverse[4],GetMagickPrecision(),inverse[5]);
+  inverse=(double *) RelinquishMagickMemory(inverse);
+  (void) FormatLocaleFile(stderr,"Affine distort, FX equivalent:\n");
+  (void) FormatLocaleFile(stderr, "%s", image_gen);
+  (void) FormatLocaleFile(stderr,
+    "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
+  (void) FormatLocaleFile(stderr,"       xx=%+.*g*ii %+.*g*jj %+.*g;\n",
+    GetMagickPrecision(),coeff[0],GetMagickPrecision(),coeff[1],
+    GetMagickPrecision(),coeff[2]);
+  (void) FormatLocaleFile(stderr,"       yy=%+.*g*ii %+.*g*jj %+.*g;\n",
+    GetMagickPrecision(),coeff[3],GetMagickPrecision(),coeff[4],
+    GetMagickPrecision(),coeff[5]);
+  (void) FormatLocaleFile(stderr,"       %s' \\\n",lookup);
+  return(MagickTrue);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3437,46 +3486,8 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       case AffineDistortion:
       case RigidAffineDistortion:
       {
-        double
-          *inverse;
-
-        inverse=(double *) AcquireQuantumMemory(6,sizeof(*inverse));
-        if (inverse == (double *) NULL)
-          {
-            coeff=(double *) RelinquishMagickMemory(coeff);
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","%s","DistortImages");
-            return((Image *) NULL);
-          }
-        InvertAffineCoefficients(coeff, inverse);
-        CoefficientsToAffineArgs(inverse);
-        (void) FormatLocaleFile(stderr, "Affine projection:\n");
-        (void) FormatLocaleFile(stderr,
-          "  -distort AffineProjection \\\n    '");
-        for (i=0; i < 5; i++)
-          (void) FormatLocaleFile(stderr, "%.*g,",GetMagickPrecision(),
-            inverse[i]);
-        (void) FormatLocaleFile(stderr, "%.*g'\n",GetMagickPrecision(),
-          inverse[5]);
-        (void) FormatLocaleFile(stderr,
-          "Equivalent scale, rotation(deg), translation:\n");
-        (void) FormatLocaleFile(stderr,"  %.*g,%.*g,%.*g,%.*g\n",
-          GetMagickPrecision(),sqrt(inverse[0]*inverse[0]+
-          inverse[1]*inverse[1]),GetMagickPrecision(),
-          RadiansToDegrees(atan2(inverse[1],inverse[0])),
-          GetMagickPrecision(),inverse[4],GetMagickPrecision(),inverse[5]);
-        inverse=(double *) RelinquishMagickMemory(inverse);
-        (void) FormatLocaleFile(stderr,"Affine distort, FX equivalent:\n");
-        (void) FormatLocaleFile(stderr, "%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
-        (void) FormatLocaleFile(stderr,"       xx=%+.*g*ii %+.*g*jj %+.*g;\n",
-          GetMagickPrecision(),coeff[0],GetMagickPrecision(),coeff[1],
-          GetMagickPrecision(),coeff[2]);
-        (void) FormatLocaleFile(stderr,"       yy=%+.*g*ii %+.*g*jj %+.*g;\n",
-          GetMagickPrecision(),coeff[3],GetMagickPrecision(),coeff[4],
-          GetMagickPrecision(),coeff[5]);
-        (void) FormatLocaleFile(stderr,"       %s' \\\n",lookup);
+        if (PrintAffineFX(coeff,image_gen,lookup,exception) == MagickFalse)
+          return((Image *) NULL);
         break;
       }
       case PerspectiveDistortion:
