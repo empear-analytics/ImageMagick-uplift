@@ -337,10 +337,26 @@ static void AnnotateMontageTitle(const ImageInfo *image_info,
   draw_clone_info=DestroyDrawInfo(draw_clone_info);
 }
 
-static Image *AddTileFrame(Image *image,const FrameInfo frame_info,
-  const size_t width,const size_t height,const TypeMetric metrics,
-  ExceptionInfo *exception)
+typedef struct _MontageTileFrame
 {
+  FrameInfo
+    frame_info;
+
+  size_t
+    width,
+    height;
+} MontageTileFrame;
+
+static Image *AddTileFrame(Image *image,const MontageTileFrame *frame,
+  const TypeMetric metrics,ExceptionInfo *exception)
+{
+  const FrameInfo
+    frame_info = frame->frame_info;
+
+  const size_t
+    width = frame->width,
+    height = frame->height;
+
   FrameInfo
     frame_clone;
 
@@ -1063,8 +1079,13 @@ static Image *PlaceMontageTile(const MontageTilePlacement *placement,
   if ((placement->montage_info->frame != (char *) NULL) &&
       (placement->bevel_width > 0))
     {
-      image=AddTileFrame(image,placement->frame_info,placement->width,
-        placement->height,placement->metrics,placement->exception);
+      MontageTileFrame
+        frame;
+
+      frame.frame_info=placement->frame_info;
+      frame.width=placement->width;
+      frame.height=placement->height;
+      image=AddTileFrame(image,&frame,placement->metrics,placement->exception);
       x=0;
       y=0;
     }
