@@ -287,3 +287,13 @@ order, into a `static` function of the caller's return type whose body is the sw
 a copy of the function's final `return(R_T);`; the caller's `default:` becomes `return(Helper(...));`. **Review:**
 672d2040f is labelled Recipe N step 1 although the moved tail reads only three inputs and needs no input struct.
 `threshold.c` and `resample.c` unchanged (no legal split or step).
+
+## Lane d, ninth batch: channel.c 6.93 -> 8.06, paint-floodfill.c 8.33 -> 8.35 (Sonnet, 27 code commits)
+
+Amendments under the mandate, not yet ruled on: **Recipe SR step 5** (79d6a9363: in a chain link, `default:
+return(Helper(...));` replaces the if/return/break group when the helper returns only MagickTrue or MagickFalse) and
+**Recipe B step 5** (17adead2c: calls in a loop of a function with no OpenMP region of its own may take a struct
+filled once before the loop, the form OC step 6 and LB step 4 use). **Temporary drop:** 76a617e62 took
+`channel.c` from 6.93 to 6.06 with `--no-verify` as step 1 of a 22-step plan measured end to end (7.81 planned,
+8.06 reached), a larger dip than earlier ones. Upstream, not changed: `ChannelFxImage`'s `;` case and setup failure
+paths leak (`destination_image=GetLastImageInList(...)` then `return NULL`).
