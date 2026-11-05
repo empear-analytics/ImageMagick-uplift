@@ -896,14 +896,9 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
 #endif
   for (y=0; y < (ssize_t) crop_image->rows; y++)
   {
-    TransformLine
-      line;
+    const TransformLine
+      line = { image, crop_image, image_view, crop_view, exception };
 
-    line.image=image;
-    line.transform_image=crop_image;
-    line.image_view=image_view;
-    line.transform_view=crop_view;
-    line.exception=exception;
     if (CropImageLine(&line,&page,y,&status) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
