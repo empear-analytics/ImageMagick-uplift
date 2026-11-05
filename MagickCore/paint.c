@@ -312,6 +312,19 @@ static void SetGradientBoundingBox(GradientInfo *gradient,const Image *image)
     (void) ParseAbsoluteGeometry(artifact,&gradient->bounding_box);
 }
 
+static void SetGradientCenter(GradientInfo *gradient,const Image *image)
+{
+  const char
+    *artifact;
+
+  gradient->center.x=(double) gradient->gradient_vector.x2/2.0;
+  gradient->center.y=(double) gradient->gradient_vector.y2/2.0;
+  artifact=GetImageArtifact(image,"gradient:center");
+  if (artifact != (const char *) NULL)
+    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->center.x,
+      &gradient->center.y);
+}
+
 MagickExport MagickBooleanType GradientImage(Image *image,
   const GradientType type,const SpreadMethod method,const StopInfo *stops,
   const size_t number_stops,ExceptionInfo *exception)
@@ -342,12 +355,7 @@ MagickExport MagickBooleanType GradientImage(Image *image,
   gradient->type=type;
   SetGradientBoundingBox(gradient,image);
   SetGradientVector(gradient,image,type);
-  gradient->center.x=(double) gradient->gradient_vector.x2/2.0;
-  gradient->center.y=(double) gradient->gradient_vector.y2/2.0;
-  artifact=GetImageArtifact(image,"gradient:center");
-  if (artifact != (const char *) NULL)
-    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->center.x,
-      &gradient->center.y);
+  SetGradientCenter(gradient,image);
   artifact=GetImageArtifact(image,"gradient:angle");
   if ((type == LinearGradient) && (artifact != (const char *) NULL))
     SetGradientAngleVector(gradient,image);
