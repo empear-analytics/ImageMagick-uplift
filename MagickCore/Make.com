@@ -56,6 +56,8 @@ $call Make delegate.c
 $call Make deprecate.c
 $call Make display.c
 $call Make distort.c
+$call Make distort-affine.c
+$call Make distort-resize.c
 $call Make distribute-cache.c
 $call Make draw.c
 $call Make effect.c

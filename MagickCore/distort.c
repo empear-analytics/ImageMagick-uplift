@@ -272,63 +272,6 @@ static double poly_basis_dy(ssize_t n, double x, double y)
   */
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%     A f f i n e T r a n s f o r m I m a g e                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  AffineTransformImage() transforms an image as dictated by the affine matrix.
-%  It allocates the memory necessary for the new Image structure and returns
-%  a pointer to the new image.
-%
-%  The format of the AffineTransformImage method is:
-%
-%      Image *AffineTransformImage(const Image *image,
-%        AffineMatrix *affine_matrix,ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image: the image.
-%
-%    o affine_matrix: the affine matrix.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-MagickExport Image *AffineTransformImage(const Image *image,
-  const AffineMatrix *affine_matrix,ExceptionInfo *exception)
-{
-  double
-    distort[6];
-
-  Image
-    *deskew_image;
-
-  /*
-    Affine transform image.
-  */
-  assert(image->signature == MagickCoreSignature);
-  assert(affine_matrix != (AffineMatrix *) NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  distort[0]=affine_matrix->sx;
-  distort[1]=affine_matrix->rx;
-  distort[2]=affine_matrix->ry;
-  distort[3]=affine_matrix->sy;
-  distort[4]=affine_matrix->tx;
-  distort[5]=affine_matrix->ty;
-  deskew_image=DistortImage(image,AffineProjectionDistortion,6,distort,
-    MagickTrue,exception);
-  return(deskew_image);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2152,183 +2095,6 @@ static double *GenerateCoefficients(const Image *image,
   return(GenerateAffineFamilyCoefficients(coeff,method,&context));
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-+   D i s t o r t R e s i z e I m a g e                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  DistortResizeImage() resize image using the equivalent but slower image
-%  distortion operator.  The filter is applied using a EWA cylindrical
-%  resampling. But like resize the final image size is limited to whole pixels
-%  with no effects by virtual-pixels on the result.
-%
-%  Note that images containing a transparency channel will be twice as slow to
-%  resize as images one without transparency.
-%
-%  The format of the DistortResizeImage method is:
-%
-%      Image *DistortResizeImage(const Image *image,const size_t columns,
-%        const size_t rows,ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image: the image.
-%
-%    o columns: the number of columns in the resized image.
-%
-%    o rows: the number of rows in the resized image.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-static Image *DistortResizeAlphaImage(const Image *image,Image *tmp_image,
-  const double *distort_args,ExceptionInfo *exception)
-{
-  /*
-    Basically we need to separate Virtual-Pixel alpha in the resized
-    image, so only the actual original images alpha channel is used.
-
-    distort alpha channel separately
-  */
-  Image
-    *resize_alpha,
-    *resize_image;
-
-  (void) SetImageAlphaChannel(tmp_image,ExtractAlphaChannel,exception);
-  (void) SetImageAlphaChannel(tmp_image,OpaqueAlphaChannel,exception);
-  resize_alpha=DistortImage(tmp_image,AffineDistortion,12,distort_args,
-    MagickTrue,exception),
-  tmp_image=DestroyImage(tmp_image);
-  if (resize_alpha == (Image *) NULL)
-    return((Image *) NULL);
-
-  /* distort the actual image containing alpha + VP alpha */
-  tmp_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (tmp_image == (Image *) NULL)
-    return((Image *) NULL);
-  (void) SetImageVirtualPixelMethod(tmp_image,
-    TransparentVirtualPixelMethod,exception);
-  resize_image=DistortImage(tmp_image,AffineDistortion,12,distort_args,
-    MagickTrue,exception),
-  tmp_image=DestroyImage(tmp_image);
-  if (resize_image == (Image *) NULL)
-    {
-      resize_alpha=DestroyImage(resize_alpha);
-      return((Image *) NULL);
-    }
-  /* replace resize images alpha with the separately distorted alpha */
-  (void) SetImageAlphaChannel(resize_image,OffAlphaChannel,exception);
-  (void) SetImageAlphaChannel(resize_alpha,OffAlphaChannel,exception);
-  (void) CompositeImage(resize_image,resize_alpha,CopyAlphaCompositeOp,
-    MagickTrue,0,0,exception);
-  resize_alpha=DestroyImage(resize_alpha);
-  resize_image->alpha_trait=image->alpha_trait;
-  resize_image->compose=image->compose;
-  return(resize_image);
-}
-
-static Image *CropDistortResizeImage(Image *resize_image,
-  const size_t columns,const size_t rows,ExceptionInfo *exception)
-{
-  Image
-    *tmp_image;
-
-  RectangleInfo
-    crop_area;
-
-  /*
-    Clean up the results of the Distortion
-  */
-  crop_area.width=columns;
-  crop_area.height=rows;
-  crop_area.x=0;
-  crop_area.y=0;
-
-  tmp_image=resize_image;
-  resize_image=CropImage(tmp_image,&crop_area,exception);
-  tmp_image=DestroyImage(tmp_image);
-  if (resize_image != (Image *) NULL)
-    {
-      resize_image->page.width=0;
-      resize_image->page.height=0;
-    }
-  return(resize_image);
-}
-
-MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
-  const size_t rows,ExceptionInfo *exception)
-{
-#define DistortResizeImageTag  "Distort/Image"
-
-  Image
-    *resize_image,
-    *tmp_image;
-
-  double
-    distort_args[12];
-
-  VirtualPixelMethod
-    vp_save;
-
-  /*
-    Distort resize image.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((columns == 0) || (rows == 0))
-    return((Image *) NULL);
-  /* Do not short-circuit this resize if final image size is unchanged */
-
-  (void) memset(distort_args,0,sizeof(distort_args));
-  distort_args[4]=(double) image->columns;
-  distort_args[6]=(double) columns;
-  distort_args[9]=(double) image->rows;
-  distort_args[11]=(double) rows;
-
-  vp_save=GetImageVirtualPixelMethod(image);
-
-  tmp_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (tmp_image == (Image *) NULL)
-    return((Image *) NULL);
-  (void) SetImageVirtualPixelMethod(tmp_image,TransparentVirtualPixelMethod,
-    exception);
-
-  if ((image->alpha_trait & BlendPixelTrait) == 0)
-    {
-      /*
-        Image has no alpha channel, so we are free to use it.
-      */
-      (void) SetImageAlphaChannel(tmp_image,SetAlphaChannel,exception);
-      resize_image=DistortImage(tmp_image,AffineDistortion,12,distort_args,
-        MagickTrue,exception),
-      tmp_image=DestroyImage(tmp_image);
-      if (resize_image == (Image *) NULL)
-        return((Image *) NULL);
-      (void) SetImageAlphaChannel(resize_image,OffAlphaChannel,exception);
-    }
-  else
-    {
-      /*
-        Image has transparency so handle colors and alpha separately.
-      */
-      resize_image=DistortResizeAlphaImage(image,tmp_image,distort_args,
-        exception);
-      if (resize_image == (Image *) NULL)
-        return((Image *) NULL);
-    }
-  (void) SetImageVirtualPixelMethod(resize_image,vp_save,exception);
-  return(CropDistortResizeImage(resize_image,columns,rows,exception));
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4297,85 +4063,6 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   return(distort_image);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   R o t a t e I m a g e                                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  RotateImage() creates a new image that is a rotated copy of an existing
-%  one.  Positive angles rotate counter-clockwise (right-hand rule), while
-%  negative angles rotate clockwise.  Rotated images are usually larger than
-%  the originals and have 'empty' triangular corners.  X axis.  Empty
-%  triangles left over from shearing the image are filled with the background
-%  color defined by member 'background_color' of the image.  RotateImage
-%  allocates the memory necessary for the new Image structure and returns a
-%  pointer to the new image.
-%
-%  The format of the RotateImage method is:
-%
-%      Image *RotateImage(const Image *image,const double degrees,
-%        ExceptionInfo *exception)
-%
-%  A description of each parameter follows.
-%
-%    o image: the image.
-%
-%    o degrees: Specifies the number of degrees to rotate the image.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-MagickExport Image *RotateImage(const Image *image,const double degrees,
-  ExceptionInfo *exception)
-{
-  Image
-    *distort_image,
-    *rotate_image;
-
-  double
-    angle;
-
-  PointInfo
-    shear;
-
-  size_t
-    rotations;
-
-  /*
-    Adjust rotation angle.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  angle=fmod(degrees,360.0);
-  while (angle < -45.0)
-    angle+=360.0;
-  for (rotations=0; angle > 45.0; rotations++)
-    angle-=90.0;
-  rotations%=4;
-  shear.x=(-tan((double) DegreesToRadians(angle)/2.0));
-  shear.y=sin((double) DegreesToRadians(angle));
-  if ((fabs(shear.x) < MagickEpsilon) && (fabs(shear.y) < MagickEpsilon))
-    return(IntegralRotateImage(image,rotations,exception));
-  distort_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (distort_image == (Image *) NULL)
-    return((Image *) NULL);
-  (void) SetImageVirtualPixelMethod(distort_image,BackgroundVirtualPixelMethod,
-    exception);
-  rotate_image=DistortImage(distort_image,ScaleRotateTranslateDistortion,1,
-    &degrees,MagickTrue,exception);
-  distort_image=DestroyImage(distort_image);
-  return(rotate_image);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4855,12 +4542,345 @@ static PixelInfo InverseSparseColor(const SparseColorWeights *inverse,
   return(pixel);
 }
 
+#define SparseColorTag  "Distort/SparseColor"
+
+static PixelInfo ClampSparseColor(const Image *image,
+  Image *sparse_image,PixelInfo pixel)
+{
+  if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.red=(MagickRealType) ClampPixel((double) QuantumRange*
+      pixel.red);
+  if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.green=(MagickRealType) ClampPixel((double) QuantumRange*
+      pixel.green);
+  if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.blue=(MagickRealType) ClampPixel((double) QuantumRange*
+      pixel.blue);
+  if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    pixel.black=(MagickRealType) ClampPixel((double) QuantumRange*
+      pixel.black);
+  if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (image->alpha_trait != UndefinedPixelTrait))
+    pixel.alpha=(MagickRealType) ClampPixel((double) QuantumRange*
+      pixel.alpha);
+  return(pixel);
+}
+
+typedef struct _SparseColorPixelInput
+{
+  SparseColorMethod
+    sparse_method;
+
+  const Image
+    *image;
+
+  Image
+    *sparse_image;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  size_t
+    number_colors;
+
+  double
+    *coeff;
+
+  ssize_t
+    i,
+    j;
+} SparseColorPixelInput;
+
+static void SparseColorPixel(const SparseColorPixelInput *pixel_input,
+  PixelInfo *pixel)
+{
+  switch (pixel_input->sparse_method)
+  {
+    case BilinearColorInterpolate:
+    {
+      SparseColorPlane
+        plane;
+
+      plane.sparse_image=pixel_input->sparse_image;
+      plane.coeff=pixel_input->coeff;
+      plane.i=pixel_input->i;
+      plane.j=pixel_input->j;
+      (*pixel)=BilinearSparseColor(&plane,pixel_input->image,(*pixel));
+      break;
+    }
+    case InverseColorInterpolate:
+    case ShepardsColorInterpolate:
+    { /* Inverse (Squared) Distance weights average (IDW) */
+      SparseColorWeights
+        inverse;
+
+      inverse.image=pixel_input->image;
+      inverse.sparse_image=pixel_input->sparse_image;
+      inverse.number_arguments=pixel_input->number_arguments;
+      inverse.arguments=pixel_input->arguments;
+      inverse.number_colors=pixel_input->number_colors;
+      inverse.coeff=pixel_input->coeff;
+      inverse.i=pixel_input->i;
+      inverse.j=pixel_input->j;
+      (*pixel)=InverseSparseColor(&inverse,(*pixel));
+      break;
+    }
+    case ManhattanColorInterpolate:
+    {
+      SparseColorPoint
+        point;
+
+      point.image=pixel_input->image;
+      point.sparse_image=pixel_input->sparse_image;
+      point.number_arguments=pixel_input->number_arguments;
+      point.arguments=pixel_input->arguments;
+      point.number_colors=pixel_input->number_colors;
+      point.i=pixel_input->i;
+      point.j=pixel_input->j;
+      ManhattanSparseColor(&point,&(*pixel));
+      break;
+    }
+    case VoronoiColorInterpolate:
+    default:
+    {
+      SparseColorPoint
+        point;
+
+      point.image=pixel_input->image;
+      point.sparse_image=pixel_input->sparse_image;
+      point.number_arguments=pixel_input->number_arguments;
+      point.arguments=pixel_input->arguments;
+      point.number_colors=pixel_input->number_colors;
+      point.i=pixel_input->i;
+      point.j=pixel_input->j;
+      (*pixel)=VoronoiSparseColor(&point,(*pixel));
+      break;
+    }
+  }
+}
+
+typedef struct _SparseColorRowInput
+{
+  SparseColorMethod
+    sparse_method;
+
+  const Image
+    *image;
+
+  Image
+    *sparse_image;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  size_t
+    number_colors;
+
+  double
+    *coeff;
+} SparseColorRowInput;
+
+static void SparseColorRow(const SparseColorRowInput *row,const ssize_t j,
+  Quantum *q,PixelInfo pixel)
+{
+  const SparseColorMethod
+    sparse_method = row->sparse_method;
+
+  const Image
+    *const image = row->image;
+
+  Image
+    *const sparse_image = row->sparse_image;
+
+  const size_t
+    number_arguments = row->number_arguments;
+
+  const double
+    *const arguments = row->arguments;
+
+  const size_t
+    number_colors = row->number_colors;
+
+  double
+    *const coeff = row->coeff;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) sparse_image->columns; i++)
+  {
+    GetPixelInfoPixel(sparse_image,q,&pixel);
+    switch (sparse_method)
+    {
+      case BarycentricColorInterpolate:
+      {
+        SparseColorPlane
+          plane;
+
+        plane.sparse_image=sparse_image;
+        plane.coeff=coeff;
+        plane.i=i;
+        plane.j=j;
+        pixel=BarycentricSparseColor(&plane,pixel);
+        break;
+      }
+      default:
+      {
+        SparseColorPixelInput
+          pixel_input;
+
+        pixel_input.sparse_method=sparse_method;
+        pixel_input.image=image;
+        pixel_input.sparse_image=sparse_image;
+        pixel_input.number_arguments=number_arguments;
+        pixel_input.arguments=arguments;
+        pixel_input.number_colors=number_colors;
+        pixel_input.coeff=coeff;
+        pixel_input.i=i;
+        pixel_input.j=j;
+        SparseColorPixel(&pixel_input,&pixel);
+        break;
+      }
+    }
+    /* set the color directly back into the source image */
+    pixel=ClampSparseColor(image,sparse_image,pixel);
+    SetPixelViaPixelInfo(sparse_image,&pixel,q);
+    q+=(ptrdiff_t) GetPixelChannels(sparse_image);
+  }
+}
+
+static MagickBooleanType CloneSparseColorImage(const Image *image,
+  Image **sparse_image,ExceptionInfo *exception)
+{
+  (*sparse_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*sparse_image) == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass((*sparse_image),DirectClass,exception) == MagickFalse)
+    { /* if image is ColorMapped - change it to DirectClass */
+      (*sparse_image)=DestroyImage((*sparse_image));
+      return(MagickFalse);
+    }
+  if (IsGrayColorspace((*sparse_image)->colorspace) != MagickFalse)
+    (void) SetImageColorspace((*sparse_image),sRGBColorspace,exception);
+  return(MagickTrue);
+}
+
+typedef struct _SparseColorRender
+{
+  const Image
+    *image;
+
+  SparseColorMethod
+    sparse_method;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  size_t
+    number_colors;
+
+  double
+    *coeff;
+} SparseColorRender;
+
+static Image *RenderSparseColorImage(const SparseColorRender *render,
+  Image *sparse_image,ExceptionInfo *exception)
+{
+  /* ----- MAIN CODE ----- */
+  const Image
+    *const image = render->image;
+
+  const SparseColorMethod
+    sparse_method = render->sparse_method;
+
+  const size_t
+    number_arguments = render->number_arguments;
+
+  const double
+    *const arguments = render->arguments;
+
+  const size_t
+    number_colors = render->number_colors;
+
+  double
+    *const coeff = render->coeff;
+
+  CacheView
+    *sparse_view;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    j;
+
+  status=MagickTrue;
+  progress=0;
+  sparse_view=AcquireAuthenticCacheView(sparse_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,sparse_image,sparse_image->rows,1)
+#endif
+  for (j=0; j < (ssize_t) sparse_image->rows; j++)
+  {
+    PixelInfo
+      pixel;    /* pixel to assign to distorted image */
+
+    Quantum
+      *magick_restrict q;
+
+    SparseColorRowInput
+      row;
+
+    q=GetCacheViewAuthenticPixels(sparse_view,0,j,sparse_image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    GetPixelInfo(sparse_image,&pixel);
+    row.sparse_method=sparse_method;
+    row.image=image;
+    row.sparse_image=sparse_image;
+    row.number_arguments=number_arguments;
+    row.arguments=arguments;
+    row.number_colors=number_colors;
+    row.coeff=coeff;
+    SparseColorRow(&row,j,q,pixel);
+    SyncDistortRow(&status,sparse_view,exception);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetDistortProgress(&status,image,SparseColorTag,progress);
+      }
+  }
+  sparse_view=DestroyCacheView(sparse_view);
+  if (status == MagickFalse)
+    sparse_image=DestroyImage(sparse_image);
+  return(sparse_image);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
 {
-#define SparseColorTag  "Distort/SparseColor"
-
   double
     *coeff;
 
@@ -4872,6 +4892,9 @@ MagickExport Image *SparseColorImage(const Image *image,
 
   SparseColorMethod
     sparse_method;
+
+  SparseColorRender
+    render;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -4921,168 +4944,15 @@ MagickExport Image *SparseColorImage(const Image *image,
    * the image.
    */
 
-  sparse_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (sparse_image == (Image *) NULL)
+  if (CloneSparseColorImage(image,&sparse_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(sparse_image,DirectClass,exception) == MagickFalse)
-    { /* if image is ColorMapped - change it to DirectClass */
-      sparse_image=DestroyImage(sparse_image);
-      return((Image *) NULL);
-    }
-  if (IsGrayColorspace(sparse_image->colorspace) != MagickFalse)
-    (void) SetImageColorspace(sparse_image,sRGBColorspace,exception);
-  { /* ----- MAIN CODE ----- */
-    CacheView
-      *sparse_view;
-
-    MagickBooleanType
-      status;
-
-    MagickOffsetType
-      progress;
-
-    ssize_t
-      j;
-
-    status=MagickTrue;
-    progress=0;
-    sparse_view=AcquireAuthenticCacheView(sparse_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp parallel for schedule(static) shared(progress,status) \
-      magick_number_threads(image,sparse_image,sparse_image->rows,1)
-#endif
-    for (j=0; j < (ssize_t) sparse_image->rows; j++)
-    {
-      PixelInfo
-        pixel;    /* pixel to assign to distorted image */
-
-      Quantum
-        *magick_restrict q;
-
-      ssize_t
-        i;
-
-      q=GetCacheViewAuthenticPixels(sparse_view,0,j,sparse_image->columns,1,
-        exception);
-      if (q == (Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      GetPixelInfo(sparse_image,&pixel);
-      for (i=0; i < (ssize_t) sparse_image->columns; i++)
-      {
-        GetPixelInfoPixel(sparse_image,q,&pixel);
-        switch (sparse_method)
-        {
-          case BarycentricColorInterpolate:
-          {
-            SparseColorPlane
-              plane;
-
-            plane.sparse_image=sparse_image;
-            plane.coeff=coeff;
-            plane.i=i;
-            plane.j=j;
-            pixel=BarycentricSparseColor(&plane,pixel);
-            break;
-          }
-          case BilinearColorInterpolate:
-          {
-            SparseColorPlane
-              plane;
-
-            plane.sparse_image=sparse_image;
-            plane.coeff=coeff;
-            plane.i=i;
-            plane.j=j;
-            pixel=BilinearSparseColor(&plane,image,pixel);
-            break;
-          }
-          case InverseColorInterpolate:
-          case ShepardsColorInterpolate:
-          { /* Inverse (Squared) Distance weights average (IDW) */
-            SparseColorWeights
-              inverse;
-
-            inverse.image=image;
-            inverse.sparse_image=sparse_image;
-            inverse.number_arguments=number_arguments;
-            inverse.arguments=arguments;
-            inverse.number_colors=number_colors;
-            inverse.coeff=coeff;
-            inverse.i=i;
-            inverse.j=j;
-            pixel=InverseSparseColor(&inverse,pixel);
-            break;
-          }
-          case ManhattanColorInterpolate:
-          {
-            SparseColorPoint
-              point;
-
-            point.image=image;
-            point.sparse_image=sparse_image;
-            point.number_arguments=number_arguments;
-            point.arguments=arguments;
-            point.number_colors=number_colors;
-            point.i=i;
-            point.j=j;
-            ManhattanSparseColor(&point,&pixel);
-            break;
-          }
-          case VoronoiColorInterpolate:
-          default:
-          {
-            SparseColorPoint
-              point;
-
-            point.image=image;
-            point.sparse_image=sparse_image;
-            point.number_arguments=number_arguments;
-            point.arguments=arguments;
-            point.number_colors=number_colors;
-            point.i=i;
-            point.j=j;
-            pixel=VoronoiSparseColor(&point,pixel);
-            break;
-          }
-        }
-        /* set the color directly back into the source image */
-        if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-          pixel.red=(MagickRealType) ClampPixel((double) QuantumRange*
-            pixel.red);
-        if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-          pixel.green=(MagickRealType) ClampPixel((double) QuantumRange*
-            pixel.green);
-        if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-          pixel.blue=(MagickRealType) ClampPixel((double) QuantumRange*
-            pixel.blue);
-        if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-            (image->colorspace == CMYKColorspace))
-          pixel.black=(MagickRealType) ClampPixel((double) QuantumRange*
-            pixel.black);
-        if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-            (image->alpha_trait != UndefinedPixelTrait))
-          pixel.alpha=(MagickRealType) ClampPixel((double) QuantumRange*
-            pixel.alpha);
-        SetPixelViaPixelInfo(sparse_image,&pixel,q);
-        q+=(ptrdiff_t) GetPixelChannels(sparse_image);
-      }
-      SyncDistortRow(&status,sparse_view,exception);
-      if (image->progress_monitor != (MagickProgressMonitor) NULL)
-        {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-          #pragma omp atomic
-#endif
-          progress++;
-          SetDistortProgress(&status,image,SparseColorTag,progress);
-        }
-    }
-    sparse_view=DestroyCacheView(sparse_view);
-    if (status == MagickFalse)
-      sparse_image=DestroyImage(sparse_image);
-  }
+  render.image=image;
+  render.sparse_method=sparse_method;
+  render.number_arguments=number_arguments;
+  render.arguments=arguments;
+  render.number_colors=number_colors;
+  render.coeff=coeff;
+  sparse_image=RenderSparseColorImage(&render,sparse_image,exception);
   coeff = (double *) RelinquishMagickMemory(coeff);
   return(sparse_image);
 }
