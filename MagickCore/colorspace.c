@@ -2889,6 +2889,72 @@ static MagickBooleanType GenericTosRGB(Image *image,const IlluminantType illumin
   return(FinishColorspace(&finish,sRGBColorspace,status));
 }
 
+static void InitializeYCCOrIdentityMaps(const Image *image,
+  TransformPacket *x_map,
+  TransformPacket *y_map,TransformPacket *z_map)
+{
+  ssize_t
+    i;
+
+  switch (image->colorspace)
+  {
+    case YCCColorspace:
+    {
+      /*
+        Initialize YCC tables:
+
+          R = Y            +1.340762*C2
+          G = Y-0.317038*C1-0.682243*C2
+          B = Y+1.632639*C1
+
+        YCC is scaled by 1.3584.  C1 zero is 156 and C2 is at 137.
+      */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static)
+#endif
+      for (i=0; i <= (ssize_t) MaxMap; i++)
+      {
+        x_map[i].x=(MagickRealType) (1.3584000*(double) i);
+        y_map[i].x=(MagickRealType) 0.0000000;
+        z_map[i].x=(MagickRealType) (1.8215000*(1.0*(double) i-(double)
+          ScaleQuantumToMap(ScaleCharToQuantum(137))));
+        x_map[i].y=(MagickRealType) (1.3584000*(double) i);
+        y_map[i].y=(MagickRealType) (-0.4302726*(1.0*(double) i-(double)
+          ScaleQuantumToMap(ScaleCharToQuantum(156))));
+        z_map[i].y=(MagickRealType) (-0.9271435*(1.0*(double) i-(double)
+          ScaleQuantumToMap(ScaleCharToQuantum(137))));
+        x_map[i].z=(MagickRealType) (1.3584000*(double) i);
+        y_map[i].z=(MagickRealType) (2.2179000*(1.0*(double) i-(double)
+          ScaleQuantumToMap(ScaleCharToQuantum(156))));
+        z_map[i].z=(MagickRealType) 0.0000000;
+      }
+      break;
+    }
+    default:
+    {
+      /*
+        Linear conversion tables.
+      */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static)
+#endif
+      for (i=0; i <= (ssize_t) MaxMap; i++)
+      {
+        x_map[i].x=(MagickRealType) (1.0*(double) i);
+        y_map[i].x=(MagickRealType) 0.0;
+        z_map[i].x=(MagickRealType) 0.0;
+        x_map[i].y=(MagickRealType) 0.0;
+        y_map[i].y=(MagickRealType) (1.0*(double) i);
+        z_map[i].y=(MagickRealType) 0.0;
+        x_map[i].z=(MagickRealType) 0.0;
+        y_map[i].z=(MagickRealType) 0.0;
+        z_map[i].z=(MagickRealType) (1.0*(double) i);
+      }
+      break;
+    }
+  }
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -3210,58 +3276,9 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       }
       break;
     }
-    case YCCColorspace:
-    {
-      /*
-        Initialize YCC tables:
-
-          R = Y            +1.340762*C2
-          G = Y-0.317038*C1-0.682243*C2
-          B = Y+1.632639*C1
-
-        YCC is scaled by 1.3584.  C1 zero is 156 and C2 is at 137.
-      */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=(MagickRealType) (1.3584000*(double) i);
-        y_map[i].x=(MagickRealType) 0.0000000;
-        z_map[i].x=(MagickRealType) (1.8215000*(1.0*(double) i-(double)
-          ScaleQuantumToMap(ScaleCharToQuantum(137))));
-        x_map[i].y=(MagickRealType) (1.3584000*(double) i);
-        y_map[i].y=(MagickRealType) (-0.4302726*(1.0*(double) i-(double)
-          ScaleQuantumToMap(ScaleCharToQuantum(156))));
-        z_map[i].y=(MagickRealType) (-0.9271435*(1.0*(double) i-(double)
-          ScaleQuantumToMap(ScaleCharToQuantum(137))));
-        x_map[i].z=(MagickRealType) (1.3584000*(double) i);
-        y_map[i].z=(MagickRealType) (2.2179000*(1.0*(double) i-(double)
-          ScaleQuantumToMap(ScaleCharToQuantum(156))));
-        z_map[i].z=(MagickRealType) 0.0000000;
-      }
-      break;
-    }
     default:
     {
-      /*
-        Linear conversion tables.
-      */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=(MagickRealType) (1.0*(double) i);
-        y_map[i].x=(MagickRealType) 0.0;
-        z_map[i].x=(MagickRealType) 0.0;
-        x_map[i].y=(MagickRealType) 0.0;
-        y_map[i].y=(MagickRealType) (1.0*(double) i);
-        z_map[i].y=(MagickRealType) 0.0;
-        x_map[i].z=(MagickRealType) 0.0;
-        y_map[i].z=(MagickRealType) 0.0;
-        z_map[i].z=(MagickRealType) (1.0*(double) i);
-      }
+      InitializeYCCOrIdentityMaps(image,x_map,y_map,z_map);
       break;
     }
   }
