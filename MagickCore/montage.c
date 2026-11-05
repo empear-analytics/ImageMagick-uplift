@@ -1013,6 +1013,16 @@ typedef struct _MontagePageInfo
 
   char
     *title;
+
+  size_t
+    title_offset,
+    border_width;
+
+  TypeMetric
+    metrics;
+
+  size_t
+    number_lines;
 } MontagePageInfo;
 
 static void DecorateMontagePage(const MontagePageInfo *page)
@@ -1078,6 +1088,26 @@ static void InitializeMontageCanvas(const MontageInfo *montage_info,
   montage->columns=(size_t) MagickMax((ssize_t) (*bounds).width,1);
   montage->rows=(size_t) MagickMax((ssize_t) (*bounds).height,1);
   (void) SetImageBackgroundColor(montage,exception);
+}
+
+static void SetMontagePage(const MontagePageInfo *page)
+{
+  ssize_t
+    x_offset,
+    y_offset;
+
+  GetMontageOffsets(page->montage_info,page->number_images,&x_offset,
+    &y_offset);
+  y_offset+=(ssize_t) page->title_offset;
+  (void) FormatLocaleString(page->montage->montage,MagickPathExtent,
+    "%.17gx%.17g%+.20g%+.20g",(double) ((ssize_t) page->extract_info.width+
+    (page->extract_info.x+(ssize_t) page->border_width)*2),(double) ((ssize_t)
+    page->extract_info.height+(page->extract_info.y+(ssize_t)
+    page->border_width)*2+(double) ((page->metrics.ascent-
+    page->metrics.descent+4)*page->number_lines+
+    (page->montage_info->shadow != MagickFalse ? 4 : 0))),(double) x_offset,
+    (double) y_offset);
+  DecorateMontagePage(page);
 }
 
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
@@ -1283,15 +1313,6 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     extent=GetMontageDirectoryExtent(image_list,tiles_per_page,number_images);
     if (AcquireMontageStrings(montage,extent) == MagickFalse)
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
-    y_offset+=(ssize_t) title_offset;
-    (void) FormatLocaleString(montage->montage,MagickPathExtent,
-      "%.17gx%.17g%+.20g%+.20g",(double) ((ssize_t) extract_info.width+
-      (extract_info.x+(ssize_t) border_width)*2),(double) ((ssize_t)
-      extract_info.height+(extract_info.y+(ssize_t) border_width)*2+(double)
-      ((metrics.ascent-metrics.descent+4)*number_lines+
-      (montage_info->shadow != MagickFalse ? 4 : 0))),(double) x_offset,
-      (double) y_offset);
     page_info.montage=montage;
     page_info.tiles_per_page=tiles_per_page;
     page_info.number_images=number_images;
@@ -1304,7 +1325,11 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     page_info.draw_info=draw_info;
     page_info.extract_info=extract_info;
     page_info.title=title;
-    DecorateMontagePage(&page_info);
+    page_info.title_offset=title_offset;
+    page_info.border_width=border_width;
+    page_info.metrics=metrics;
+    page_info.number_lines=number_lines;
+    SetMontagePage(&page_info);
     /*
       Copy tile to the composite.
     */
