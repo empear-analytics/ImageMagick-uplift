@@ -1214,10 +1214,8 @@ static void DumpChannelQualifier (ElementT * pel)
   }
 }
 
-static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
+static void DumpRpnHeader (FxInfo * pfx, FILE * fh)
 {
-  int i;
-
   fprintf (fh, "DumpRPN:");
   fprintf (fh, "  numElements=%i", pfx->numElements);
   fprintf (fh, "  usedElements=%i", pfx->usedElements);
@@ -1229,6 +1227,47 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
   if      (pfx->runType==rtEntireImage) fprintf (stderr, "EntireImage");
   else if (pfx->runType==rtCornerOnly)  fprintf (stderr, "CornerOnly");
   fprintf (fh, "\n");
+}
+
+static void DumpRpnElement (FxInfo * pfx, FILE * fh, ElementT * pel, int i)
+{
+  const char * str = OprStr (pel->operator_index);
+  const char *sRelAbs = "";
+
+  if (IsPixelReferenceElement(pel) != MagickFalse)
+    sRelAbs = pel->is_relative ? "[]" : "{}";
+
+  if (pel->type == etColourConstant)
+    fprintf (fh, "  %i: %s vals=%.*Lg,%.*Lg,%.*Lg '%s%s' nArgs=%i ndx=%i  %s",
+             i, sElementTypes[pel->type],
+             pfx->precision, pel->val, pfx->precision, pel->val1, pfx->precision, pel->val2,
+             str, sRelAbs, pel->number_args, pel->element_index,
+             pel->do_push ? "push" : "NO push");
+  else
+    fprintf (fh, "  %i: %s val=%.*Lg '%s%s' nArgs=%i ndx=%i  %s",
+             i, sElementTypes[pel->type], pfx->precision, pel->val, str, sRelAbs,
+             pel->number_args, pel->element_index,
+             pel->do_push ? "push" : "NO push");
+}
+
+static void DumpRpnUserSymbolLink (FxInfo * pfx, FILE * fh, ElementT * pel)
+{
+  char UserSym[MagickPathExtent];
+
+  if (pel->operator_index == rCopyTo) {
+    fprintf (fh, "  CopyTo ==> %s", NameOfUserSym (pfx, pel->element_index, UserSym));
+  } else if (pel->operator_index == rCopyFrom) {
+    fprintf (fh, "  CopyFrom <== %s", NameOfUserSym (pfx, pel->element_index, UserSym));
+  } else if (OprInPlace (pel->operator_index)) {
+    fprintf (fh, "  <==> %s", NameOfUserSym (pfx, pel->element_index, UserSym));
+  }
+}
+
+static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
+{
+  int i;
+
+  DumpRpnHeader (pfx, fh);
 
 
   for (i=0; i < pfx->usedElements; i++) {
@@ -1239,39 +1278,15 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
     CountJumpDestination (pfx, i);
   }
   for (i=0; i < pfx->usedElements; i++) {
-    char UserSym[MagickPathExtent];
-
     ElementT * pel = &pfx->Elements[i];
-    const char * str = OprStr (pel->operator_index);
-    const char *sRelAbs = "";
-
-    if (IsPixelReferenceElement(pel) != MagickFalse)
-      sRelAbs = pel->is_relative ? "[]" : "{}";
-
-    if (pel->type == etColourConstant)
-      fprintf (fh, "  %i: %s vals=%.*Lg,%.*Lg,%.*Lg '%s%s' nArgs=%i ndx=%i  %s",
-               i, sElementTypes[pel->type],
-               pfx->precision, pel->val, pfx->precision, pel->val1, pfx->precision, pel->val2,
-               str, sRelAbs, pel->number_args, pel->element_index,
-               pel->do_push ? "push" : "NO push");
-    else
-      fprintf (fh, "  %i: %s val=%.*Lg '%s%s' nArgs=%i ndx=%i  %s",
-               i, sElementTypes[pel->type], pfx->precision, pel->val, str, sRelAbs,
-               pel->number_args, pel->element_index,
-               pel->do_push ? "push" : "NO push");
+    DumpRpnElement (pfx, fh, pel, i);
 
     if (pel->img_attr_qual != aNull)
       fprintf (fh, " ia=%s", OprStr((int) pel->img_attr_qual));
 
     DumpChannelQualifier (pel);
 
-    if (pel->operator_index == rCopyTo) {
-      fprintf (fh, "  CopyTo ==> %s", NameOfUserSym (pfx, pel->element_index, UserSym));
-    } else if (pel->operator_index == rCopyFrom) {
-      fprintf (fh, "  CopyFrom <== %s", NameOfUserSym (pfx, pel->element_index, UserSym));
-    } else if (OprInPlace (pel->operator_index)) {
-      fprintf (fh, "  <==> %s", NameOfUserSym (pfx, pel->element_index, UserSym));
-    }
+    DumpRpnUserSymbolLink (pfx, fh, pel);
     if (pel->number_dest > 0)  fprintf (fh, "  <==dest(%i)", pel->number_dest);
     fprintf (fh, "\n");
   }
