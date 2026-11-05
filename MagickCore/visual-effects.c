@@ -3597,6 +3597,13 @@ static void FillSineMap(float *sine_map,const size_t columns,
       ((2.0*MagickPI*i)*(double) MagickSafeReciprocal(wave_length))));
 }
 
+static void SetWaveCanvasAlpha(Image *canvas_image,ExceptionInfo *exception)
+{
+  if ((canvas_image->alpha_trait == UndefinedPixelTrait) &&
+      (canvas_image->background_color.alpha != (double) OpaqueAlpha))
+    (void) SetImageAlpha(canvas_image,OpaqueAlpha,exception);
+}
+
 MagickExport Image *WaveImage(const Image *image,const double amplitude,
   const double wave_length,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -3635,9 +3642,7 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
   canvas_image=CloneImage(image,0,0,MagickTrue,exception);
   if (canvas_image == (Image *) NULL)
     return((Image *) NULL);
-  if ((canvas_image->alpha_trait == UndefinedPixelTrait) &&
-      (canvas_image->background_color.alpha != (double) OpaqueAlpha))
-    (void) SetImageAlpha(canvas_image,OpaqueAlpha,exception);
+  SetWaveCanvasAlpha(canvas_image,exception);
   wave_image=CloneImage(canvas_image,canvas_image->columns,(size_t)
     (canvas_image->rows+2.0*fabs(amplitude)),MagickTrue,exception);
   if (wave_image == (Image *) NULL)
