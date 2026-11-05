@@ -197,11 +197,34 @@ static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
     (*status)=MagickFalse;
 }
 
-static MagickBooleanType ChannelImage(Image *destination_image,
-  const PixelChannel destination_channel,const ChannelFx channel_op,
-  const Image *source_image,const PixelChannel source_channel,
-  const Quantum pixel,ExceptionInfo *exception)
+typedef struct _ChannelPlan
 {
+  PixelChannel
+    destination_channel;
+
+  ChannelFx
+    channel_op;
+
+  const Image
+    *source_image;
+
+  PixelChannel
+    source_channel;
+} ChannelPlan;
+
+static MagickBooleanType ChannelImage(Image *destination_image,
+  const ChannelPlan *plan,const Quantum pixel,ExceptionInfo *exception)
+{
+  const ChannelFx
+    channel_op = plan->channel_op;
+
+  const Image
+    *const source_image = plan->source_image;
+
+  const PixelChannel
+    destination_channel = plan->destination_channel,
+    source_channel = plan->source_channel;
+
   CacheView
     *source_view,
     *destination_view;
@@ -477,6 +500,9 @@ static MagickBooleanType ApplyChannelOperation(const ChannelFxApply *apply,
   ExceptionInfo
     *const exception = apply->exception;
 
+  ChannelPlan
+    plan;
+
   Image
     **const destination_image = targets->destination_image;
 
@@ -486,8 +512,12 @@ static MagickBooleanType ApplyChannelOperation(const ChannelFxApply *apply,
   ssize_t
     *const channels = targets->channels;
 
-  status=ChannelImage((*destination_image),destination_channel,channel_op,
-    source_image,source_channel,ClampToQuantum(pixel),exception);
+  plan.destination_channel=destination_channel;
+  plan.channel_op=channel_op;
+  plan.source_image=source_image;
+  plan.source_channel=source_channel;
+  status=ChannelImage((*destination_image),&plan,ClampToQuantum(pixel),
+    exception);
   if (status == MagickFalse)
     {
       (*destination_image)=DestroyImageList((*destination_image));
@@ -496,8 +526,12 @@ static MagickBooleanType ApplyChannelOperation(const ChannelFxApply *apply,
   (*channels)++;
   if (channel_op == ExchangeChannelOp)
     {
-      status=ChannelImage((*destination_image),source_channel,channel_op,
-        source_image,destination_channel,ClampToQuantum(pixel),exception);
+      plan.destination_channel=source_channel;
+      plan.channel_op=channel_op;
+      plan.source_image=source_image;
+      plan.source_channel=destination_channel;
+      status=ChannelImage((*destination_image),&plan,ClampToQuantum(pixel),
+        exception);
       if (status == MagickFalse)
         {
           (*destination_image)=DestroyImageList((*destination_image));
