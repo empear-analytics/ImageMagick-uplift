@@ -3432,6 +3432,17 @@ static MagickBooleanType PushOperatorUnlessDone (FxInfo * pfx, OperatorE op,
   return(MagickTrue);
 }
 
+static void FindOperatorToken (FxInfo * pfx, OperatorE * op, size_t * len)
+{
+  for (*op = (OperatorE)0; *op != oNull; *op=(OperatorE) (*op+1)) {
+    const char * opStr = Operators[*op].str;
+    *len = strlen(opStr);
+    if (LocaleNCompare (opStr, pfx->pex, *len)==0) {
+      break;
+    }
+  }
+}
+
 static MagickBooleanType GetOperator (
   FxInfo * pfx,
   MagickBooleanType * Assign, MagickBooleanType * Update, MagickBooleanType * IncrDecr)
@@ -3440,13 +3451,7 @@ static MagickBooleanType GetOperator (
   size_t len = 0;
   MagickBooleanType DoneIt = MagickFalse;
   SkipSpaces (pfx);
-  for (op = (OperatorE)0; op != oNull; op=(OperatorE) (op+1)) {
-    const char * opStr = Operators[op].str;
-    len = strlen(opStr);
-    if (LocaleNCompare (opStr, pfx->pex, len)==0) {
-      break;
-    }
-  }
+  FindOperatorToken (pfx, &op, &len);
 
   if (!IsRealOperator (op)) {
     (void) ThrowMagickException (
