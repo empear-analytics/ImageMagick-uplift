@@ -457,12 +457,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
           *canvas;
 
         (void) SetPixelChannelMask(destination_image,channel_mask);
-        if ((channel_op == ExtractChannelOp) && (channels == 1))
-          {
-            (void) SetPixelMetaChannels(destination_image,0,exception);
-            (void) SetImageColorspace(destination_image,GRAYColorspace,
-              exception);
-          }
+        SetGrayChannelImage(destination_image,channel_op,channels,exception);
         canvas=CloneImage(source_image,0,0,MagickTrue,exception);
         if (canvas == (Image *) NULL)
           {
