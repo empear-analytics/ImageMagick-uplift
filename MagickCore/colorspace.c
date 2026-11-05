@@ -1290,6 +1290,26 @@ static MagickBooleanType sRGBTransformByTables(const sRGBTableInput *table,
   return(status);
 }
 
+static MagickBooleanType sRGBTransformLogOrLinear(
+  const sRGBTableInput *table,Image *image,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  const ColorspaceType
+    colorspace = table->colorspace;
+
+  switch (colorspace)
+  {
+    case LogColorspace:
+      return(sRGBToLog(image,colorspace,status,exception));
+    case RGBColorspace:
+    case scRGBColorspace:
+      return(sRGBToLinearRGB(image,colorspace,status,exception));
+    default:
+      break;
+  }
+  return(sRGBTransformByTables(table,image,status,exception));
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1362,17 +1382,12 @@ static MagickBooleanType sRGBTransformImage(Image *image,
       input.illuminant=illuminant;
       return(sRGBToGeneric(&input,image,status,exception));
     }
-    case LogColorspace:
-      return(sRGBToLog(image,colorspace,status,exception));
-    case RGBColorspace:
-    case scRGBColorspace:
-      return(sRGBToLinearRGB(image,colorspace,status,exception));
     default:
       break;
   }
   table.colorspace=colorspace;
   table.progress=progress;
-  return(sRGBTransformByTables(&table,image,status,exception));
+  return(sRGBTransformLogOrLinear(&table,image,status,exception));
 }
 
 /*
