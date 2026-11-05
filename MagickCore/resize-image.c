@@ -713,16 +713,11 @@ static MagickBooleanType VerticalFilter(
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         (*progress)++;
-        proceed=SetImageProgress(image,ResizeImageTag,*progress,span);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetResizeProgress(image,*progress,span,&status);
       }
   }
   return(DestroyFilterResources(image_view,resize_view,contributions,status));
