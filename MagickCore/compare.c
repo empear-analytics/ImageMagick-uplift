@@ -5243,6 +5243,42 @@ static void SelectLowerSimilarity(const SimilarityCandidate *tile,
   }
 }
 
+static void SelectBestSimilarity(const SimilarityCandidate *tile,
+  SimilarityInfo *channel_info)
+{
+  const MetricType
+    metric = tile->metric;
+
+  const double
+    similarity = tile->similarity;
+
+  const ssize_t
+    x = tile->x,
+    y = tile->y;
+
+  switch (metric)
+  {
+    case DotProductCorrelationErrorMetric:
+    case NormalizedCrossCorrelationErrorMetric:
+    case PeakSignalToNoiseRatioErrorMetric:
+    case PhaseCorrelationErrorMetric:
+    case StructuralSimilarityErrorMetric:
+    {
+      if (similarity <= (*channel_info).similarity)
+        break;
+      (*channel_info).similarity=similarity;
+      (*channel_info).x=x;
+      (*channel_info).y=y;
+      break;
+    }
+    default:
+    {
+      SelectLowerSimilarity(tile,channel_info);
+      break;
+    }
+  }
+}
+
 MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
@@ -5403,22 +5439,9 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
       tile.y=y;
       switch (metric)
       {
-        case DotProductCorrelationErrorMetric:
-        case NormalizedCrossCorrelationErrorMetric:
-        case PeakSignalToNoiseRatioErrorMetric:
-        case PhaseCorrelationErrorMetric:
-        case StructuralSimilarityErrorMetric:
-        {
-          if (similarity <= channel_info.similarity)
-            break;
-          channel_info.similarity=similarity;
-          channel_info.x=x;
-          channel_info.y=y;
-          break;
-        }
         default:
         {
-          SelectLowerSimilarity(&tile,&channel_info);
+          SelectBestSimilarity(&tile,&channel_info);
           break;
         }
       }
