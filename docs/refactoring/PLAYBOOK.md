@@ -6228,6 +6228,144 @@ distort.c 3.55 to 4.25. Added by Claude Code (Claude Sonnet 5.5) under the manda
 
 ---
 
+## Recipe BR - Extract Block Leaving Through a Loop Break or a Return
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Complex
+Method* or *Large Method*, and the block that would fix it stands in a loop and leaves
+through both exits a loop body has: `break;` of that loop on some paths and `return(R);`
+of the function on others, falling through on the rest, as `fx.c`'s `TranslateExpression`
+does: `if (IsExpressionEnd(pfx,strLimit) != MagickFalse) { if (IncrDecr) break; ...
+return MagickFalse; }`.
+
+**Not covered by:** Recipe LB, whose block leaves only through `break;` (LB step 1 refuses
+a `return`); Recipes W, V, Y and I, whose block leaves only through `return(R);` or `goto
+L;` and contains no `break` that leaves it; Recipe RV, whose block returns and falls through
+but never breaks; Recipe E step 7, whose `break;` ends a `switch`, not a loop; Recipe EI,
+which moves nothing and needs an `else` block. A helper cannot leave its caller's loop, and
+one result cannot say both "return" and "break", so each of those recipes leaves one of the
+exits in the block.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. The
+   innermost loop or `switch` around it is a loop `Lp`. Every `break;` in the block that
+   leaves it ends `Lp`; every `return` in it is `return(R);` (or `return R;`) with one
+   expression `R` that meets Recipe W step 2; it holds at least one of each, no `goto`,
+   and no `continue` that leaves it. A `break` or `continue` of a loop or `switch` nested
+   inside the block stays as it is.
+2. The block writes variables of the caller as Recipe LB step 2 allows (at most one `v`
+   that the caller reads after it, by pointer; temporaries declared in the new function);
+   writes through pointers it already uses stay as they are.
+3. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller, whose last parameter is `MagickBooleanType *broke` and whose first statement
+   is `(*broke)=MagickFalse;`. Each `return(R);` becomes `return(MagickFalse);` (left as
+   it is when `R` is `MagickFalse`); each `break;` that ended `Lp` becomes
+   `(*broke)=MagickTrue;` followed by `return(MagickTrue);`, in braces when it stood as
+   the body of an `if`; the function ends with `return(MagickTrue);`. Write `*v` for `v`
+   (LB step 3). Nothing else in the text changes.
+4. Pass the variables the block only reads by value, at most four parameters with `v` and
+   `broke` (Recipe LB step 4); or put them in one `const` input struct as LB step 4 does
+   (Recipe Y steps 3 to 5, or the struct filled once before `Lp` in a function with no
+   OpenMP region), a read-only value the struct leaves out by value after it, `broke`
+   last.
+5. The caller declares `MagickBooleanType broke = MagickFalse;` once among the
+   declarations at the top of its body; every helper of this recipe in the function
+   takes the same `&broke`. Where the block stood write
+   `if (Helper(...,&broke) == MagickFalse) return(R);`, the block's own `R` text, then
+   `if (broke != MagickFalse) break;`. Both stand where the block stood, inside the same
+   loops, so that `break;` ends `Lp`. Check every argument and member by reading.
+6. When the block is the statement after an `else` (`else if (C) { ... }`), it is cut
+   the same way and the two statements of step 5 take braces, `else { ... }`; Recipe EI
+   may then chain them, in a commit of its own.
+
+**Before:**
+
+```c
+  while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
+    ...
+    if (IsExpressionEnd(pfx,strLimit) != MagickFalse)
+    {
+      if (IncrDecr) break;
+
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Expected operand after operator", "at '%s'",
+        SetShortExp(pfx));
+      return MagickFalse;
+    }
+    ...
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType ExpectOperandAfterOperator (FxInfo * pfx,
+  const char * strLimit, MagickBooleanType IncrDecr, MagickBooleanType * broke)
+{
+  (*broke)=MagickFalse;
+  if (IsExpressionEnd(pfx,strLimit) != MagickFalse)
+  {
+    if (IncrDecr) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+
+    (void) ThrowMagickException (
+      ...
+    return MagickFalse;
+  }
+  return(MagickTrue);
+}
+...
+    if (ExpectOperandAfterOperator (pfx, strLimit, IncrDecr, &broke) ==
+        MagickFalse)
+      return MagickFalse;
+    if (broke != MagickFalse) break;
+```
+
+**Careful:**
+
+- Why the behaviour is the same, path by path. Every path through the block ends in one
+  of three ways. A `return(R);` path: the helper runs the same statements and returns
+  `MagickFalse`; the caller returns `R` at once (W step 2: the same value), as the block
+  did. A `break;` path: the helper runs the same statements, sets `broke` and returns
+  `MagickTrue`; the caller does not return, reads `broke`, and its `break;` ends `Lp`,
+  running nothing in between, as the block's `break;` did. A fall-through path: `broke`
+  stays `MagickFalse` from the helper's first statement, the helper returns `MagickTrue`,
+  neither test fires, and the caller goes on with the next statement.
+- `broke` is written on every path of the helper before it returns `MagickTrue`, and the
+  caller reads it only then, so the value it held before the call, or one an earlier
+  helper of the function left in it, is never read. That is why the helper clears it
+  first rather than the caller once: two blocks share the one local. The initialiser in
+  the caller only keeps compilers from warning that it may be used uninitialised.
+- The order of effects is the block's: the helper runs the block's statements, and the
+  caller's two tests read only `broke` and the helper's result, which nothing else
+  writes.
+- Step 1 matters: a `break` inside a `switch` inside the loop ends the `switch`, and a
+  `break` of a loop nested inside the block ends that loop; both move with the block
+  unchanged. Read each `break` against its loop.
+- Step 6 is C's own grammar: `else if (C) S` is `else` followed by the statement `if (C)
+  S`, so the block is that statement and nothing else changes; the braces hold the two
+  statements of step 5 where one stood.
+- The `return` and `break` paths are mostly error paths: the oracle checks the paths its
+  cases take; each `break;` and `return(R);` is checked by reading against its rewrite,
+  and `refactor_guard.py --calls` moves only `+2` for each new function.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new function,
+nothing else moved), and steps 1, 2 and 5 checked by reading.
+
+**Provenance:** 2026-11-05, from `fx.c`'s `TranslateExpression` (campaign A, W14): three
+of its eight bumps are blocks that leave the operator loop through `break;` on one path
+and the function through `return MagickFalse;` on another (the ternary colon, the
+missing-operand test, the in-place operator target), the plateau W13 recorded ("a block
+that exits by both `break` and `return`"). A probe of the chain (Recipe CN on the
+final copy test, this recipe on the three blocks, Recipe EI on the last): bumps 8 to 4,
+fx.c 3.52 to 3.59, no finding on any new function. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -6482,3 +6620,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | EI | Chain Exiting Guards into an Else-If: an `else` block that is only a run of `if` statements, each but the last leaving the flow when it fires, becomes an `else if` chain with the conditions and bodies copied unchanged; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `fx.c`'s `GetFunction` (campaign A, W13): the argument loop's `else` block (a throw with `return MagickFalse`, a `break`, a pad test) is a bump that CN does not reach (statements, not one nested `if`) and no extraction recipe takes (a `break` and a `return` in one block). A probe of the whole chain: that bump gone, the loop's switch moved, `GetFunction` leaves Bumpy Road Ahead, fx.c 3.37 to 3.52 | owner |
 | 2026-11-05 | NEW | SW | Split a Returning Selection into Chained Functions: a run of adjacent groups of a `switch` whose every group ends in `return(R);` (followed by a tail ending the function) moves, with the tail, to a new function of the same return type whose `switch` ends `default: break;`; the caller keeps the other groups and `default:` and returns the call | `distort.c`'s `GenerateCoefficients` (campaign A, W13): the dispatch `switch` of seventeen case helpers (cc 126 of the function); SD refuses `return`, SR wants one constant, E step 7 moves the whole `switch` (a Complex Method). A probe of the whole chain: the function leaves Bumpy Road Ahead, Complex Method and Large Method, 3.55 to 4.25 | owner |
 | 2026-11-05 | NEW | CB | Extract Critical Block Body: the body of a `#pragma omp critical` block moves into a `static void` helper that its call replaces, the pragma and braces staying in the caller; written variables by pointer, read ones by value or pointer to `const`, at most four parameters; checked by reading | `compare.c`'s eleven `Get*Similarity` merges (a probe, one helper call per critical body: 2.97 to 3.15) and `feature.c`'s `CannyEdgeImage` | owner |
+| 2026-11-05 | NEW | BR | Extract Block Leaving Through a Loop Break or a Return: a block in a loop that leaves through `break;` of the loop on some paths and `return(R);` (one `R`, Recipe W step 2) on others moves to a `static MagickBooleanType` function taking `MagickBooleanType *broke` last, which it clears first; each `return(R);` becomes `return(MagickFalse);`, each `break;` `(*broke)=MagickTrue; return(MagickTrue);`; the caller writes `if (Helper(...,&broke) == MagickFalse) return(R);` and `if (broke != MagickFalse) break;` | `fx.c`'s `TranslateExpression` (campaign A, W14): the ternary colon, the missing-operand test and the in-place operator target each leave the operator loop through `break;` and the function through `return MagickFalse;`, which LB, W, V, Y, I and RV each refuse (the W13 plateau). A probe of the chain (CN, this recipe on the three blocks, EI): bumps 8 to 4, fx.c 3.52 to 3.59, no finding on any new function | mandate (2026-10-24) |
