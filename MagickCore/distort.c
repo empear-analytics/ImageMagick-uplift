@@ -2006,6 +2006,43 @@ static double *GenerateRadialCoefficients(double *coeff,DistortMethod *method,
   return((double *) NULL);
 }
 
+static double *GenerateMappedCoefficients(double *coeff,DistortMethod *method,
+  const CoefficientContext *context)
+{
+  switch (*method)
+  {
+    case BilinearForwardDistortion:
+    case BilinearReverseDistortion:
+      return(BilinearCoefficients(coeff,method,context));
+#if 0
+    case QuadrilateralDistortion:
+    {
+      /* Map a Quadrilateral to a unit square using BilinearReverse
+         Then map that unit square back to the final Quadrilateral
+         using BilinearForward.
+
+         Input Arguments are sets of control points...
+         For Distort Images    u,v, x,y  ...
+         For Sparse Gradients  x,y, r,g,b  ...
+
+      */
+      /* UNDER CONSTRUCTION */
+      return(coeff);
+    }
+#endif
+
+    case PolynomialDistortion:
+      return(PolynomialCoefficients(coeff,method,context));
+    case ArcDistortion:
+      return(ArcCoefficients(coeff,method,context));
+    case ShepardsDistortion:
+      return(ShepardsCoefficients(coeff,method,context));
+    default:
+      break;
+  }
+  return(GenerateRadialCoefficients(coeff,method,context));
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -2103,36 +2140,10 @@ static double *GenerateCoefficients(const Image *image,
       return(PerspectiveCoefficients(coeff,method,&context));
     case PerspectiveProjectionDistortion:
       return(PerspectiveProjectionCoefficients(coeff,method,&context));
-    case BilinearForwardDistortion:
-    case BilinearReverseDistortion:
-      return(BilinearCoefficients(coeff,method,&context));
-#if 0
-    case QuadrilateralDistortion:
-    {
-      /* Map a Quadrilateral to a unit square using BilinearReverse
-         Then map that unit square back to the final Quadrilateral
-         using BilinearForward.
-
-         Input Arguments are sets of control points...
-         For Distort Images    u,v, x,y  ...
-         For Sparse Gradients  x,y, r,g,b  ...
-
-      */
-      /* UNDER CONSTRUCTION */
-      return(coeff);
-    }
-#endif
-
-    case PolynomialDistortion:
-      return(PolynomialCoefficients(coeff,method,&context));
-    case ArcDistortion:
-      return(ArcCoefficients(coeff,method,&context));
-    case ShepardsDistortion:
-      return(ShepardsCoefficients(coeff,method,&context));
     default:
       break;
   }
-  return(GenerateRadialCoefficients(coeff,method,&context));
+  return(GenerateMappedCoefficients(coeff,method,&context));
 }
 
 /*
