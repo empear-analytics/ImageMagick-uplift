@@ -969,6 +969,110 @@ static void GravitateMontageTile(const MontageGravityInfo *gravity,
   (*y)=geometry.y+(ssize_t) gravity->border_width;
 }
 
+typedef struct _MontageTilePlacement
+{
+  size_t
+    border_width;
+
+  const MontageInfo
+    *montage_info;
+
+  size_t
+    width,
+    height;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    *tile_image;
+
+  ssize_t
+    bevel_width;
+
+  FrameInfo
+    frame_info;
+
+  TypeMetric
+    metrics;
+
+  Image
+    *montage;
+
+  DrawInfo
+    *draw_info;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  size_t
+    max_height;
+
+  MagickBooleanType
+    concatenate;
+
+  RectangleInfo
+    extract_info;
+} MontageTilePlacement;
+
+static Image *PlaceMontageTile(const MontageTilePlacement *placement,
+  Image *image)
+{
+  MagickStatusType
+    flags;
+
+  MontageGravityInfo
+    gravity_info;
+
+  ssize_t
+    x,
+    y;
+
+  if (placement->border_width != 0)
+    image=AddTileBorder(image,placement->montage_info,placement->border_width,
+      placement->width,placement->height,placement->exception);
+  gravity_info.tile_image=placement->tile_image;
+  gravity_info.width=placement->width;
+  gravity_info.height=placement->height;
+  gravity_info.montage_info=placement->montage_info;
+  gravity_info.image=image;
+  gravity_info.border_width=placement->border_width;
+  gravity_info.exception=placement->exception;
+  GravitateMontageTile(&gravity_info,&flags,&x,&y);
+  if ((placement->montage_info->frame != (char *) NULL) &&
+      (placement->bevel_width > 0))
+    {
+      image=AddTileFrame(image,placement->frame_info,placement->width,
+        placement->height,placement->metrics,placement->exception);
+      x=0;
+      y=0;
+    }
+  if (LocaleCompare(image->magick,"NULL") != 0)
+    {
+      MontageTileInfo
+        tile_info;
+
+      tile_info.montage_info=placement->montage_info;
+      tile_info.montage=placement->montage;
+      tile_info.draw_info=placement->draw_info;
+      tile_info.x_offset=placement->x_offset;
+      tile_info.y_offset=placement->y_offset;
+      tile_info.x=x;
+      tile_info.y=y;
+      tile_info.bevel_width=placement->bevel_width;
+      tile_info.width=placement->width;
+      tile_info.height=placement->height;
+      tile_info.border_width=placement->border_width;
+      tile_info.max_height=placement->max_height;
+      tile_info.concatenate=placement->concatenate;
+      tile_info.extract_info=placement->extract_info;
+      tile_info.metrics=placement->metrics;
+      image=CompositeMontageTile(image,&tile_info,placement->exception);
+    }
+  return(image);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1033,9 +1137,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   ssize_t
     bevel_width,
     tile,
-    x,
     x_offset,
-    y,
     y_offset;
 
   TypeMetric
@@ -1219,8 +1321,8 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     status=MagickTrue;
     for (tile=0; tile < MagickMin((ssize_t) tiles_per_page,(ssize_t) number_images); tile++)
     {
-      MontageGravityInfo
-        gravity_info;
+      MontageTilePlacement
+        placement;
 
       /*
         Copy this tile to the composite.
@@ -1234,45 +1336,23 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
       if (image->rows > max_height)
         max_height=image->rows;
       height=concatenate != MagickFalse ? max_height : extract_info.height;
-      if (border_width != 0)
-        image=AddTileBorder(image,montage_info,border_width,width,height,
-          exception);
-      gravity_info.tile_image=tile_image;
-      gravity_info.width=width;
-      gravity_info.height=height;
-      gravity_info.montage_info=montage_info;
-      gravity_info.image=image;
-      gravity_info.border_width=border_width;
-      gravity_info.exception=exception;
-      GravitateMontageTile(&gravity_info,&flags,&x,&y);
-      if ((montage_info->frame != (char *) NULL) && (bevel_width > 0))
-        {
-          image=AddTileFrame(image,frame_info,width,height,metrics,exception);
-          x=0;
-          y=0;
-        }
-      if (LocaleCompare(image->magick,"NULL") != 0)
-        {
-          MontageTileInfo
-            tile_info;
-
-          tile_info.montage_info=montage_info;
-          tile_info.montage=montage;
-          tile_info.draw_info=draw_info;
-          tile_info.x_offset=x_offset;
-          tile_info.y_offset=y_offset;
-          tile_info.x=x;
-          tile_info.y=y;
-          tile_info.bevel_width=bevel_width;
-          tile_info.width=width;
-          tile_info.height=height;
-          tile_info.border_width=border_width;
-          tile_info.max_height=max_height;
-          tile_info.concatenate=concatenate;
-          tile_info.extract_info=extract_info;
-          tile_info.metrics=metrics;
-          image=CompositeMontageTile(image,&tile_info,exception);
-        }
+      placement.border_width=border_width;
+      placement.montage_info=montage_info;
+      placement.width=width;
+      placement.height=height;
+      placement.exception=exception;
+      placement.tile_image=tile_image;
+      placement.bevel_width=bevel_width;
+      placement.frame_info=frame_info;
+      placement.metrics=metrics;
+      placement.montage=montage;
+      placement.draw_info=draw_info;
+      placement.x_offset=x_offset;
+      placement.y_offset=y_offset;
+      placement.max_height=max_height;
+      placement.concatenate=concatenate;
+      placement.extract_info=extract_info;
+      image=PlaceMontageTile(&placement,image);
       x_offset+=(ssize_t) width+2*(extract_info.x+(ssize_t) border_width);
       if (((tile+1) == (ssize_t) tiles_per_page) ||
           (((tile+1) % (ssize_t) tiles_per_row) == 0))
