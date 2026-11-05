@@ -1488,6 +1488,16 @@ static void ParseDitherLevels(const char *p,double *levels)
   }
 }
 
+static void DecrementDitherLevels(double *levels)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < MaxPixelChannels; i++)
+    if (fabs(levels[i]) >= 1)
+      levels[i]-=1.0;
+}
+
 static void GetDitherLevels(const char *threshold_map,double *levels)
 {
   const char
@@ -1501,9 +1511,7 @@ static void GetDitherLevels(const char *threshold_map,double *levels)
   p=strchr((char *) threshold_map,',');
   if ((p != (char *) NULL) && (isdigit((int) ((unsigned char) *(++p))) != 0))
     ParseDitherLevels(p,levels);
-  for (i=0; i < MaxPixelChannels; i++)
-    if (fabs(levels[i]) >= 1)
-      levels[i]-=1.0;
+  DecrementDitherLevels(levels);
 }
 
 typedef struct _OrderedDither
