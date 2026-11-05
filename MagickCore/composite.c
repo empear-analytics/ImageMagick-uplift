@@ -2541,6 +2541,70 @@ static void SetIntensityAlphaRow(const IntensityRowInputs *row,
   }
 }
 
+typedef struct _CompositeSetup
+{
+  ssize_t
+    x_offset,
+    y_offset;
+} CompositeSetup;
+
+static MagickBooleanType CompositeCopyImage(Image *image,Image *source_image,
+  const CompositeSetup *setup,ExceptionInfo *exception)
+{
+  const ssize_t
+    x_offset = setup->x_offset,
+    y_offset = setup->y_offset;
+
+  CacheView
+    *image_view,
+    *source_view;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  source_view=AcquireVirtualCacheView(source_image,exception);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(source_image,image,source_image->rows,4)
+#endif
+  for (y=0; y < (ssize_t) source_image->rows; y++)
+  {
+    const Quantum
+      *p;
+
+    Quantum
+      *q;
+
+    if (status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
+      exception);
+    q=GetCacheViewAuthenticPixels(image_view,x_offset,y+y_offset,
+      source_image->columns,1,exception);
+    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+      {
+        status=MagickFalse;
+        continue;
+      }
+    CopyCompositeRow(source_image,image,p,q);
+    SyncCompositeRow(image_view,exception,&status);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+        SetCompositeProgress(image,CompositeImageTag,(MagickOffsetType) y,
+          &status);
+      }
+  }
+  source_view=DestroyCacheView(source_view);
+  image_view=DestroyCacheView(image_view);
+  source_image=DestroyImage(source_image);
+  return(status);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -2554,6 +2618,9 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 
   ColorspaceType
     colorspace = HCLColorspace;
+
+  CompositeSetup
+    setup;
 
   const char
     *artifact;
@@ -2641,6 +2708,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   percent_chroma=100.0;
   source_dissolve=1.0;
   threshold=0.05f;
+  setup.x_offset=x_offset;
+  setup.y_offset=y_offset;
   switch (compose)
   {
     case CopyCompositeOp:
@@ -2654,44 +2723,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       if ((source_image->alpha_trait == UndefinedPixelTrait) &&
           (image->alpha_trait != UndefinedPixelTrait))
         (void) SetImageAlphaChannel(source_image,OpaqueAlphaChannel,exception);
-      status=MagickTrue;
-      source_view=AcquireVirtualCacheView(source_image,exception);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(source_image,image,source_image->rows,4)
-#endif
-      for (y=0; y < (ssize_t) source_image->rows; y++)
-      {
-        const Quantum
-          *p;
-
-        Quantum
-          *q;
-
-        if (status == MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
-          exception);
-        q=GetCacheViewAuthenticPixels(image_view,x_offset,y+y_offset,
-          source_image->columns,1,exception);
-        if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
-        CopyCompositeRow(source_image,image,p,q);
-        SyncCompositeRow(image_view,exception,&status);
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            SetCompositeProgress(image,CompositeImageTag,(MagickOffsetType) y,
-              &status);
-          }
-      }
-      source_view=DestroyCacheView(source_view);
-      image_view=DestroyCacheView(image_view);
-      source_image=DestroyImage(source_image);
-      return(status);
+      return(CompositeCopyImage(image,source_image,&setup,exception));
     }
     case IntensityCompositeOp:
     {
