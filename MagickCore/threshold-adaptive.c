@@ -361,6 +361,90 @@ static void SetThresholdProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
+typedef struct _AdaptiveThresholdRows
+{
+  CacheView
+    *image_view,
+    *threshold_view;
+
+  const Image
+    *image;
+
+  Image
+    *threshold_image;
+
+  size_t
+    width,
+    height;
+
+  MagickSizeType
+    number_pixels;
+
+  double
+    bias;
+
+  ExceptionInfo
+    *exception;
+} AdaptiveThresholdRows;
+
+static MagickBooleanType ThresholdRows(const AdaptiveThresholdRows *rows,
+  const ssize_t y,MagickBooleanType *status)
+{
+  CacheView
+    *const image_view = rows->image_view,
+    *const threshold_view = rows->threshold_view;
+
+  const Image
+    *const image = rows->image;
+
+  Image
+    *const threshold_image = rows->threshold_image;
+
+  const size_t
+    width = rows->width,
+    height = rows->height;
+
+  const MagickSizeType
+    number_pixels = rows->number_pixels;
+
+  const double
+    bias = rows->bias;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  AdaptiveThresholdInfo
+    info;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,-((ssize_t) width/2L),y-(ssize_t)
+    (height/2L),image->columns+width,height,exception);
+  q=QueueCacheViewAuthenticPixels(threshold_view,0,y,threshold_image->columns,
+    1,exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  info.image=image;
+  info.threshold_image=threshold_image;
+  info.width=width;
+  info.height=height;
+  info.number_pixels=number_pixels;
+  info.bias=bias;
+  AdaptiveThresholdRow(&info,p,q);
+  if (SyncCacheViewAuthenticPixels(threshold_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *AdaptiveThresholdImage(const Image *image,
   const size_t width,const size_t height,const double bias,
   ExceptionInfo *exception)
@@ -416,35 +500,12 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    AdaptiveThresholdInfo
-      info;
+    const AdaptiveThresholdRows
+      rows = { image_view, threshold_view, image, threshold_image, width,
+        height, number_pixels, bias, exception };
 
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    if (ThresholdRows(&rows,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,-((ssize_t) width/2L),y-(ssize_t)
-      (height/2L),image->columns+width,height,exception);
-    q=QueueCacheViewAuthenticPixels(threshold_view,0,y,threshold_image->columns,
-      1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    info.image=image;
-    info.threshold_image=threshold_image;
-    info.width=width;
-    info.height=height;
-    info.number_pixels=number_pixels;
-    info.bias=bias;
-    AdaptiveThresholdRow(&info,p,q);
-    if (SyncCacheViewAuthenticPixels(threshold_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
