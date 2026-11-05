@@ -1967,6 +1967,13 @@ static inline MagickBooleanType IsSpliceRowOutside(const Image *splice_image,
     MagickFalse);
 }
 
+static void SyncTransformView(CacheView *view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -2035,8 +2042,7 @@ MagickExport Image *SpliceImage(const Image *image,
       continue;
     if (SpliceImageRow(&row,y,y,&status) == MagickFalse)
       continue;
-    if (SyncCacheViewAuthenticPixels(splice_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncTransformView(splice_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2063,8 +2069,7 @@ MagickExport Image *SpliceImage(const Image *image,
     if (SpliceImageRow(&row,y-(ssize_t) splice_geometry.height,y,&status) ==
         MagickFalse)
       continue;
-    if (SyncCacheViewAuthenticPixels(splice_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncTransformView(splice_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
