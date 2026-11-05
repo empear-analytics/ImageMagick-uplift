@@ -3773,6 +3773,21 @@ static void SetTintColorspace(const Image *image,const PixelInfo *tint,
     (void) SetImageColorspace(tint_image,sRGBColorspace,exception);
 }
 
+static PixelInfo ScaleTintColorVector(PixelInfo color_vector,
+  const PixelInfo *tint)
+{
+  double
+    intensity;
+
+  intensity=(double) GetPixelInfoIntensity((const Image *) NULL,tint);
+  color_vector.red=(double) (color_vector.red*tint->red/100.0-intensity);
+  color_vector.green=(double) (color_vector.green*tint->green/100.0-intensity);
+  color_vector.blue=(double) (color_vector.blue*tint->blue/100.0-intensity);
+  color_vector.black=(double) (color_vector.black*tint->black/100.0-intensity);
+  color_vector.alpha=(double) (color_vector.alpha*tint->alpha/100.0-intensity);
+  return(color_vector);
+}
+
 MagickExport Image *TintImage(const Image *image,const char *blend,
   const PixelInfo *tint,ExceptionInfo *exception)
 {
@@ -3781,9 +3796,6 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
   CacheView
     *image_view,
     *tint_view;
-
-  double
-    intensity;
 
   Image
     *tint_image;
@@ -3818,12 +3830,7 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
     Determine RGB values of the color.
   */
   color_vector=ParseTintColorVector(image,blend);
-  intensity=(double) GetPixelInfoIntensity((const Image *) NULL,tint);
-  color_vector.red=(double) (color_vector.red*tint->red/100.0-intensity);
-  color_vector.green=(double) (color_vector.green*tint->green/100.0-intensity);
-  color_vector.blue=(double) (color_vector.blue*tint->blue/100.0-intensity);
-  color_vector.black=(double) (color_vector.black*tint->black/100.0-intensity);
-  color_vector.alpha=(double) (color_vector.alpha*tint->alpha/100.0-intensity);
+  color_vector=ScaleTintColorVector(color_vector,tint);
   /*
     Tint image.
   */
