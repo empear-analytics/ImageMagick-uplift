@@ -3135,6 +3135,63 @@ static MagickBooleanType FinishKmeansImage(Image *image,
   return(SyncImage(image,exception));
 }
 
+typedef struct _KmeansPass
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  KmeansInfo
+    **kmeans_pixels;
+
+  ExceptionInfo
+    *exception;
+} KmeansPass;
+
+static MagickBooleanType AssignKmeansPixels(const KmeansPass *kmeans,
+  MagickBooleanType status)
+{
+  Image
+    *const image = kmeans->image;
+
+  CacheView
+    *const image_view = kmeans->image_view;
+
+  KmeansInfo
+    **const kmeans_pixels = kmeans->kmeans_pixels;
+
+  ExceptionInfo
+    *const exception = kmeans->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(dynamic) shared(status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    Quantum
+      *magick_restrict q;
+
+    const QuantizeRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    AssignKmeansRow(image,kmeans_pixels,id,q);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      status=MagickFalse;
+  }
+  return(status);
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -3205,31 +3262,15 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
     double
       distortion;
 
-    ssize_t
-      y;
+    KmeansPass
+      kmeans;
 
     ClearKmeansPixels(image,kmeans_pixels,number_threads);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp parallel for schedule(dynamic) shared(status) \
-      magick_number_threads(image,image,image->rows,1)
-#endif
-    for (y=0; y < (ssize_t) image->rows; y++)
-    {
-      const int
-        id = GetOpenMPThreadId();
-
-      Quantum
-        *magick_restrict q;
-
-      const QuantizeRowInfo
-        row = { image,image_view,exception };
-
-      if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
-        continue;
-      AssignKmeansRow(image,kmeans_pixels,id,q);
-      if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-        status=MagickFalse;
-    }
+    kmeans.image=image;
+    kmeans.image_view=image_view;
+    kmeans.kmeans_pixels=kmeans_pixels;
+    kmeans.exception=exception;
+    status=AssignKmeansPixels(&kmeans,status);
     if (status == MagickFalse)
       break;
     /*
