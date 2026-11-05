@@ -1209,6 +1209,53 @@ static MagickBooleanType sRGBToLinearRGB(Image *image,const ColorspaceType color
   return(FinishColorspace(&finish,colorspace,status));
 }
 
+typedef struct _LogProperties
+{
+  double
+    *density,
+    *gamma,
+    *film_gamma,
+    *reference_black,
+    *reference_white;
+} LogProperties;
+
+static void GetLogProperties(const Image *image,ExceptionInfo *exception,
+  const LogProperties *targets)
+{
+#define DisplayGamma  (1.0/1.7)
+#define FilmGamma  0.6
+#define ReferenceBlack  95.0
+#define ReferenceWhite  685.0
+
+  const char
+    *value;
+
+  double
+    *const density = targets->density,
+    *const gamma = targets->gamma,
+    *const film_gamma = targets->film_gamma,
+    *const reference_black = targets->reference_black,
+    *const reference_white = targets->reference_white;
+
+  (*density)=DisplayGamma;
+  (*gamma)=DisplayGamma;
+  value=GetImageProperty(image,"gamma",exception);
+  if (value != (const char *) NULL)
+    (*gamma)=MagickSafeReciprocal(StringToDouble(value,(char **) NULL));
+  (*film_gamma)=FilmGamma;
+  value=GetImageProperty(image,"film-gamma",exception);
+  if (value != (const char *) NULL)
+    (*film_gamma)=StringToDouble(value,(char **) NULL);
+  (*reference_black)=ReferenceBlack;
+  value=GetImageProperty(image,"reference-black",exception);
+  if (value != (const char *) NULL)
+    (*reference_black)=StringToDouble(value,(char **) NULL);
+  (*reference_white)=ReferenceWhite;
+  value=GetImageProperty(image,"reference-white",exception);
+  if (value != (const char *) NULL)
+    (*reference_white)=StringToDouble(value,(char **) NULL);
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1297,14 +1344,6 @@ static MagickBooleanType sRGBTransformImage(Image *image,
     }
     case LogColorspace:
     {
-#define DisplayGamma  (1.0/1.7)
-#define FilmGamma  0.6
-#define ReferenceBlack  95.0
-#define ReferenceWhite  685.0
-
-      const char
-        *value;
-
       double
         black,
         density,
@@ -1313,29 +1352,17 @@ static MagickBooleanType sRGBTransformImage(Image *image,
         reference_black,
         reference_white;
 
+      const LogProperties
+        targets = { &density,&gamma,&film_gamma,&reference_black,
+          &reference_white };
+
       Quantum
         *logmap;
 
       /*
         Transform RGB to Log colorspace.
       */
-      density=DisplayGamma;
-      gamma=DisplayGamma;
-      value=GetImageProperty(image,"gamma",exception);
-      if (value != (const char *) NULL)
-        gamma=MagickSafeReciprocal(StringToDouble(value,(char **) NULL));
-      film_gamma=FilmGamma;
-      value=GetImageProperty(image,"film-gamma",exception);
-      if (value != (const char *) NULL)
-        film_gamma=StringToDouble(value,(char **) NULL);
-      reference_black=ReferenceBlack;
-      value=GetImageProperty(image,"reference-black",exception);
-      if (value != (const char *) NULL)
-        reference_black=StringToDouble(value,(char **) NULL);
-      reference_white=ReferenceWhite;
-      value=GetImageProperty(image,"reference-white",exception);
-      if (value != (const char *) NULL)
-        reference_white=StringToDouble(value,(char **) NULL);
+      GetLogProperties(image,exception,&targets);
       logmap=(Quantum *) AcquireQuantumMemory((size_t) MaxMap+1UL,
         sizeof(*logmap));
       if (logmap == (Quantum *) NULL)
