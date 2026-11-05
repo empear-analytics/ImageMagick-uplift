@@ -2059,6 +2059,59 @@ static MagickBooleanType IsSpliceRowPending(Image *splice_image,
 
 #define SpliceImageTag  "Splice/Image"
 
+static Image *SpliceImageBelow(const SpliceRow *splice,
+  MagickOffsetType progress,MagickBooleanType status)
+{
+  const Image
+    *const image = splice->image;
+
+  Image
+    *const splice_image = splice->splice_image;
+
+  CacheView
+    *const image_view = splice->image_view,
+    *const splice_view = splice->splice_view;
+
+  const RectangleInfo
+    splice_geometry = splice->splice_geometry;
+
+  ExceptionInfo
+    *const exception = splice->exception;
+
+  const ssize_t
+    columns = splice->columns;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,splice_image,splice_image->rows,2)
+#endif
+  for (y=splice_geometry.y+(ssize_t) splice_geometry.height; y < (ssize_t) splice_image->rows; y++)
+  {
+    const SpliceRow
+      row = { image,splice_image,image_view,splice_view,splice_geometry,
+        exception,columns };
+
+    if (IsSpliceRowPending(splice_image,y,&status) == MagickFalse)
+      continue;
+    if (SpliceImageRow(&row,y-(ssize_t) splice_geometry.height,y,&status) ==
+        MagickFalse)
+      continue;
+    SyncTransformView(splice_view,exception,&status);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetSpliceProgress(&row,SpliceImageTag,progress,&status);
+      }
+  }
+  return(FinishSpliceImage(splice_image,splice_view,image_view,status));
+}
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -2077,6 +2130,9 @@ MagickExport Image *SpliceImage(const Image *image,
 
   RectangleInfo
     splice_geometry;
+
+  SpliceRow
+    splice;
 
   ssize_t
     columns,
@@ -2135,32 +2191,14 @@ MagickExport Image *SpliceImage(const Image *image,
         SetSpliceProgress(&row,SpliceImageTag,progress,&status);
       }
   }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,splice_image,splice_image->rows,2)
-#endif
-  for (y=splice_geometry.y+(ssize_t) splice_geometry.height; y < (ssize_t) splice_image->rows; y++)
-  {
-    const SpliceRow
-      row = { image,splice_image,image_view,splice_view,splice_geometry,
-        exception,columns };
-
-    if (IsSpliceRowPending(splice_image,y,&status) == MagickFalse)
-      continue;
-    if (SpliceImageRow(&row,y-(ssize_t) splice_geometry.height,y,&status) ==
-        MagickFalse)
-      continue;
-    SyncTransformView(splice_view,exception,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetSpliceProgress(&row,SpliceImageTag,progress,&status);
-      }
-  }
-  return(FinishSpliceImage(splice_image,splice_view,image_view,status));
+  splice.image=image;
+  splice.splice_image=splice_image;
+  splice.image_view=image_view;
+  splice.splice_view=splice_view;
+  splice.splice_geometry=splice_geometry;
+  splice.exception=exception;
+  splice.columns=columns;
+  return(SpliceImageBelow(&splice,progress,status));
 }
 
 /*
