@@ -668,6 +668,13 @@ static void RelinquishWaveletBuffers(float *kernel,MemoryInfo *pixels_info)
     pixels_info=RelinquishVirtualMemory(pixels_info);
 }
 
+static inline MagickBooleanType IsWaveletBufferMissing(
+  const MemoryInfo *pixels_info,const float *kernel)
+{
+  return(((pixels_info == (MemoryInfo *) NULL) || (kernel == (float *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport Image *WaveletDenoiseImage(const Image *image,
   const double threshold,const double softness,ExceptionInfo *exception)
 {
@@ -731,7 +738,7 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
     sizeof(*pixels));
   kernel=(float *) AcquireQuantumMemory(MagickMax(image->rows,image->columns)+1,
     GetOpenMPMaximumThreads()*sizeof(*kernel));
-  if ((pixels_info == (MemoryInfo *) NULL) || (kernel == (float *) NULL))
+  if (IsWaveletBufferMissing(pixels_info,kernel) != MagickFalse)
     {
       RelinquishWaveletBuffers(kernel,pixels_info);
       noise_image=DestroyImage(noise_image);
