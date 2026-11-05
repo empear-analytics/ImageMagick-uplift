@@ -769,12 +769,125 @@ static MagickBooleanType ComputeCannyGradients(Image *edge_image,
 
 #define CannyEdgeImageTag  "CannyEdge/Image"
 
+typedef struct _CannyHysteresisInputs
+{
+  const Image
+    *image;
+
+  Image
+    *edge_image;
+
+  MatrixInfo
+    *canny_cache;
+
+  double
+    lower_percent,
+    upper_percent,
+    max,
+    min;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ExceptionInfo
+    *exception;
+} CannyHysteresisInputs;
+
+static Image *TraceCannyHysteresis(
+  const CannyHysteresisInputs *hysteresis_inputs)
+{
+  const Image
+    *const image = hysteresis_inputs->image;
+
+  Image
+    *const edge_image = hysteresis_inputs->edge_image;
+
+  MatrixInfo
+    *canny_cache = hysteresis_inputs->canny_cache;
+
+  const double
+    lower_percent = hysteresis_inputs->lower_percent,
+    upper_percent = hysteresis_inputs->upper_percent,
+    max = hysteresis_inputs->max,
+    min = hysteresis_inputs->min;
+
+  MagickBooleanType
+    status = hysteresis_inputs->status;
+
+  MagickOffsetType
+    progress = hysteresis_inputs->progress;
+
+  ExceptionInfo
+    *const exception = hysteresis_inputs->exception;
+
+  CacheView
+    *edge_view;
+
+  CannyTrace trace;
+
+  double
+    lower_threshold,
+    upper_threshold;
+
+  ssize_t
+    y;
+
+  /*
+    Estimate hysteresis threshold.
+  */
+  lower_threshold=lower_percent*(max-min)+min;
+  upper_threshold=upper_percent*(max-min)+min;
+  /*
+    Hysteresis threshold.
+  */
+  edge_view=AcquireAuthenticCacheView(edge_image,exception);
+  trace.edge_image=edge_image;
+  trace.edge_view=edge_view;
+  trace.canny_cache=canny_cache;
+  trace.lower_threshold=lower_threshold;
+
+  for (y=0; y < (ssize_t) edge_image->rows; y++)
+  {
+    CannyHysteresis
+      hysteresis;
+
+    if (status == MagickFalse)
+      continue;
+    hysteresis.edge_image=edge_image;
+    hysteresis.edge_view=edge_view;
+    hysteresis.canny_cache=canny_cache;
+    hysteresis.upper_threshold=upper_threshold;
+    hysteresis.y=y;
+    status=TraceCannyEdgeRow(&hysteresis,trace,status,exception);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetFeatureProgress(image,CannyEdgeImageTag,progress,&status);
+      }
+  }
+  edge_view=DestroyCacheView(edge_view);
+  /*
+    Free resources.
+  */
+  canny_cache=DestroyMatrixInfo(canny_cache);
+  return(edge_image);
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
 {
   CacheView
     *edge_view;
+
+  CannyHysteresisInputs
+    hysteresis_inputs;
 
   CannyInfo
     element;
@@ -783,10 +896,8 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
     geometry[MagickPathExtent];
 
   double
-    lower_threshold,
     max,
-    min,
-    upper_threshold;
+    min;
 
   Image
     *edge_image;
@@ -805,8 +916,6 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
 
   ssize_t
     y;
-
-  CannyTrace trace;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -879,48 +988,17 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
     SyncFeatureView(edge_view,exception,&status);
   }
   edge_view=DestroyCacheView(edge_view);
-  /*
-    Estimate hysteresis threshold.
-  */
-  lower_threshold=lower_percent*(max-min)+min;
-  upper_threshold=upper_percent*(max-min)+min;
-  /*
-    Hysteresis threshold.
-  */
-  edge_view=AcquireAuthenticCacheView(edge_image,exception);
-  trace.edge_image=edge_image;
-  trace.edge_view=edge_view;
-  trace.canny_cache=canny_cache;
-  trace.lower_threshold=lower_threshold;
-
-  for (y=0; y < (ssize_t) edge_image->rows; y++)
-  {
-    CannyHysteresis
-      hysteresis;
-
-    if (status == MagickFalse)
-      continue;
-    hysteresis.edge_image=edge_image;
-    hysteresis.edge_view=edge_view;
-    hysteresis.canny_cache=canny_cache;
-    hysteresis.upper_threshold=upper_threshold;
-    hysteresis.y=y;
-    status=TraceCannyEdgeRow(&hysteresis,trace,status,exception);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetFeatureProgress(image,CannyEdgeImageTag,progress,&status);
-      }
-  }
-  edge_view=DestroyCacheView(edge_view);
-  /*
-    Free resources.
-  */
-  canny_cache=DestroyMatrixInfo(canny_cache);
-  return(edge_image);
+  hysteresis_inputs.image=image;
+  hysteresis_inputs.edge_image=edge_image;
+  hysteresis_inputs.canny_cache=canny_cache;
+  hysteresis_inputs.lower_percent=lower_percent;
+  hysteresis_inputs.upper_percent=upper_percent;
+  hysteresis_inputs.max=max;
+  hysteresis_inputs.min=min;
+  hysteresis_inputs.status=status;
+  hysteresis_inputs.progress=progress;
+  hysteresis_inputs.exception=exception;
+  return(TraceCannyHysteresis(&hysteresis_inputs));
 }
 
 
