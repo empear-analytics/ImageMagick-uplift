@@ -2224,9 +2224,7 @@ MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
   image_view=DestroyCacheView(image_view);
   (void) NormalizeImage(sepia_image,exception);
   (void) ContrastImage(sepia_image,MagickTrue,exception);
-  if (status == MagickFalse)
-    sepia_image=DestroyImage(sepia_image);
-  return(sepia_image);
+  return(ReleaseFailedImage(sepia_image,status));
 }
 
 /*
