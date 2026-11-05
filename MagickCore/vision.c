@@ -2640,6 +2640,95 @@ static void ApplyShapeThresholds(const CCMetricInputs *inputs,
     }
 }
 
+static void ApplyAxisThresholds(const CCMetricInputs *inputs,
+  const CCMetricTargets *targets)
+{
+  const Image
+    *const image = inputs->image;
+
+  Image
+    *const component_image = inputs->component_image;
+
+  CCObjectInfo
+    *const object = inputs->object;
+
+  ExceptionInfo
+    *const exception = inputs->exception;
+
+  const ssize_t
+    background_id = inputs->background_id;
+
+  double
+    *const min_threshold = targets->min_threshold,
+    *const max_threshold = targets->max_threshold;
+
+  ssize_t
+    *const n = targets->n;
+
+  const char
+    *(*const metrics)[CCMaxMetrics] = targets->metrics;
+
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"connected-components:major-axis-threshold");
+  if (artifact != (const char *) NULL)
+    {
+      CCThresholdRange range;
+
+      /*
+        Merge any object not within the min and max ellipse major threshold.
+      */
+      range=GetThresholdRange(artifact,min_threshold,max_threshold,
+        background_id);
+      (*metrics)[++(*n)]="major-axis";
+      MajorAxisThreshold(component_image,object,(*n),exception);
+      MergeObjectsOutsideRange(object,component_image->colors,(*n),&range);
+    }
+  artifact=GetImageArtifact(image,"connected-components:minor-axis-threshold");
+  if (artifact != (const char *) NULL)
+    {
+      CCThresholdRange range;
+
+      /*
+        Merge any object not within the min and max ellipse minor threshold.
+      */
+      range=GetThresholdRange(artifact,min_threshold,max_threshold,
+        background_id);
+      (*metrics)[++(*n)]="minor-axis";
+      MinorAxisThreshold(component_image,object,(*n),exception);
+      MergeObjectsOutsideRange(object,component_image->colors,(*n),&range);
+    }
+  artifact=GetImageArtifact(image,"connected-components:eccentricity-threshold");
+  if (artifact != (const char *) NULL)
+    {
+      CCThresholdRange range;
+
+      /*
+        Merge any object not within the min and max eccentricity threshold.
+      */
+      range=GetThresholdRange(artifact,min_threshold,max_threshold,
+        background_id);
+      (*metrics)[++(*n)]="eccentricity";
+      EccentricityThreshold(component_image,object,(*n),exception);
+      MergeObjectsOutsideRange(object,component_image->colors,(*n),&range);
+    }
+  artifact=GetImageArtifact(image,"connected-components:angle-threshold");
+  if (artifact != (const char *) NULL)
+    {
+      CCThresholdRange range;
+
+      /*
+        Merge any object not within the min and max ellipse angle threshold.
+      */
+      range=GetThresholdRange(artifact,min_threshold,max_threshold,
+        background_id);
+      (*metrics)[++(*n)]="angle";
+      AngleThreshold(component_image,object,(*n),exception);
+      MergeObjectsOutsideRange(object,component_image->colors,(*n),&range);
+    }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2918,62 +3007,16 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   targets.n=(&n);
   targets.metrics=(&metrics);
   ApplyShapeThresholds(&inputs,&targets);
-  artifact=GetImageArtifact(image,"connected-components:major-axis-threshold");
-  if (artifact != (const char *) NULL)
-    {
-      CCThresholdRange range;
-
-      /*
-        Merge any object not within the min and max ellipse major threshold.
-      */
-      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
-        background_id);
-      metrics[++n]="major-axis";
-      MajorAxisThreshold(component_image,object,n,exception);
-      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
-    }
-  artifact=GetImageArtifact(image,"connected-components:minor-axis-threshold");
-  if (artifact != (const char *) NULL)
-    {
-      CCThresholdRange range;
-
-      /*
-        Merge any object not within the min and max ellipse minor threshold.
-      */
-      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
-        background_id);
-      metrics[++n]="minor-axis";
-      MinorAxisThreshold(component_image,object,n,exception);
-      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
-    }
-  artifact=GetImageArtifact(image,"connected-components:eccentricity-threshold");
-  if (artifact != (const char *) NULL)
-    {
-      CCThresholdRange range;
-
-      /*
-        Merge any object not within the min and max eccentricity threshold.
-      */
-      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
-        background_id);
-      metrics[++n]="eccentricity";
-      EccentricityThreshold(component_image,object,n,exception);
-      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
-    }
-  artifact=GetImageArtifact(image,"connected-components:angle-threshold");
-  if (artifact != (const char *) NULL)
-    {
-      CCThresholdRange range;
-
-      /*
-        Merge any object not within the min and max ellipse angle threshold.
-      */
-      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
-        background_id);
-      metrics[++n]="angle";
-      AngleThreshold(component_image,object,n,exception);
-      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
-    }
+  inputs.image=image;
+  inputs.component_image=component_image;
+  inputs.object=object;
+  inputs.exception=exception;
+  inputs.background_id=background_id;
+  targets.min_threshold=(&min_threshold);
+  targets.max_threshold=(&max_threshold);
+  targets.n=(&n);
+  targets.metrics=(&metrics);
+  ApplyAxisThresholds(&inputs,&targets);
   /*
     Merge any object not within the min and max area threshold.
   */
