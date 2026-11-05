@@ -4335,6 +4335,88 @@ static void CheckRunTimeAddress (FxInfo * pfx, const int i)
   }
 }
 
+typedef struct _PopInputs
+{
+  FxInfo
+    *pfx;
+
+  fxRtT
+    *pfxrt;
+
+  ElementT
+    *pel;
+
+  int
+    i;
+} PopInputs;
+
+typedef struct _PopTargets
+{
+  fxFltType
+    *regA,
+    *regB,
+    *regC,
+    *regD,
+    *regE;
+} PopTargets;
+
+static void PopArguments (const PopInputs * pop, const PopTargets * targets)
+{
+  FxInfo
+    *const pfx = pop->pfx;
+
+  fxRtT
+    *const pfxrt = pop->pfxrt;
+
+  ElementT
+    *const pel = pop->pel;
+
+  const int
+    i = pop->i;
+
+  fxFltType
+    *const regA = targets->regA,
+    *const regB = targets->regB,
+    *const regC = targets->regC,
+    *const regD = targets->regD,
+    *const regE = targets->regE;
+
+  switch (pel->number_args) {
+      case 0:
+        break;
+      case 1:
+        (*regA) = PopVal (pfx, pfxrt, i);
+        break;
+      case 2:
+        (*regB) = PopVal (pfx, pfxrt, i);
+        (*regA) = PopVal (pfx, pfxrt, i);
+        break;
+      case 3:
+        (*regC) = PopVal (pfx, pfxrt, i);
+        (*regB) = PopVal (pfx, pfxrt, i);
+        (*regA) = PopVal (pfx, pfxrt, i);
+        break;
+      case 4:
+        (*regD) = PopVal (pfx, pfxrt, i);
+        (*regC) = PopVal (pfx, pfxrt, i);
+        (*regB) = PopVal (pfx, pfxrt, i);
+        (*regA) = PopVal (pfx, pfxrt, i);
+        break;
+      case 5:
+        (*regE) = PopVal (pfx, pfxrt, i);
+        (*regD) = PopVal (pfx, pfxrt, i);
+        (*regC) = PopVal (pfx, pfxrt, i);
+        (*regB) = PopVal (pfx, pfxrt, i);
+        (*regA) = PopVal (pfx, pfxrt, i);
+        break;
+      default:
+        (void) ThrowMagickException (
+          pfx->exception, GetMagickModule(), OptionError,
+          "Too many args:", "%i", pel->number_args);
+        break;
+    }
+}
+
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -4349,6 +4431,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
   MagickBooleanType NeedRelinq = MagickFalse;
   double hue=0, saturation=0, lightness=0;
   int i;
+  const PopTargets targets = { &regA, &regB, &regC, &regD, &regE };
 
   /* For -fx, this sets p to ImgNum 0.
      for %[fx:...], this sets p to the current image.
@@ -4384,45 +4467,19 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
     ElementT
       *pel;
 
+    PopInputs
+      pop_in;
+
     RpnPixelInputs
       rpn_in;
 
     CheckRunTimeAddress (pfx, i);
     pel=&pfx->Elements[i];
-    switch (pel->number_args) {
-        case 0:
-          break;
-        case 1:
-          regA = PopVal (pfx, pfxrt, i);
-          break;
-        case 2:
-          regB = PopVal (pfx, pfxrt, i);
-          regA = PopVal (pfx, pfxrt, i);
-          break;
-        case 3:
-          regC = PopVal (pfx, pfxrt, i);
-          regB = PopVal (pfx, pfxrt, i);
-          regA = PopVal (pfx, pfxrt, i);
-          break;
-        case 4:
-          regD = PopVal (pfx, pfxrt, i);
-          regC = PopVal (pfx, pfxrt, i);
-          regB = PopVal (pfx, pfxrt, i);
-          regA = PopVal (pfx, pfxrt, i);
-          break;
-        case 5:
-          regE = PopVal (pfx, pfxrt, i);
-          regD = PopVal (pfx, pfxrt, i);
-          regC = PopVal (pfx, pfxrt, i);
-          regB = PopVal (pfx, pfxrt, i);
-          regA = PopVal (pfx, pfxrt, i);
-          break;
-        default:
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "Too many args:", "%i", pel->number_args);
-          break;
-      }
+    pop_in.pfx=pfx;
+    pop_in.pfxrt=pfxrt;
+    pop_in.pel=pel;
+    pop_in.i=i;
+    PopArguments (&pop_in, &targets);
 
       switch (pel->operator_index) {
         case oAddEq:
