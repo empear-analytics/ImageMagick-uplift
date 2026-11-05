@@ -62,8 +62,10 @@ $call Make distort-resize.c
 $call Make distribute-cache.c
 $call Make draw.c
 $call Make effect.c
+$call Make effect-preview.c
 $call Make effect-blur.c
 $call Make enhance.c
+$call Make enhance-clahe.c
 $call Make enhance-tone.c
 $call Make exception.c
 $call Make feature.c

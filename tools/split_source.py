@@ -88,7 +88,8 @@ while i < len(L):
             i = k + 1; continue
     i += 1
 names = {d[0] for d in defs}
-body = {d[0]: "\n".join(L[d[1]:d[2] + 1]) for d in defs}
+# a name that only a comment mentions ("Contrast limited ...") is not a call
+body = {d[0]: re.sub(r"/\*.*?\*/", "", "\n".join(L[d[1]:d[2] + 1]), flags=re.S) for d in defs}
 calls = {n: {x for x in names if x != n and re.search(r"\b%s\b" % re.escape(x), body[n])} for n in names}
 static = {d[0] for d in defs if d[3]}
 reach = set(roots); st = list(roots)
