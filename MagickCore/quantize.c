@@ -4340,6 +4340,13 @@ static MagickBooleanType AcquireGrayscaleColormap(Image *image,
   return(MagickTrue);
 }
 
+static void SyncQuantizeRow(CacheView *image_view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType SetGrayscaleImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -4403,8 +4410,7 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
     if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
       continue;
     RemapGrayscaleRow(image,colormap_index,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncQuantizeRow(image_view,exception,&status);
   }
   image_view=DestroyCacheView(image_view);
   colormap_index=(ssize_t *) RelinquishMagickMemory(colormap_index);
