@@ -1714,6 +1714,80 @@ static void SetBarrelCenter(double *coeff,const Image *image,
   }
 }
 
+static double *BarrelCoefficients(double *coeff,const DistortMethod *method,
+  const CoefficientContext *context)
+{
+  const Image
+    *const image = context->image;
+
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
+  /* Barrel Distortion
+       Rs=(A*Rd^3 + B*Rd^2 + C*Rd + D)*Rd
+     BarrelInv Distortion
+       Rs=Rd/(A*Rd^3 + B*Rd^2 + C*Rd + D)
+
+    Where Rd is the normalized radius from corner to middle of image
+    Input Arguments are one of the following forms (number of arguments)...
+        3:  A,B,C
+        4:  A,B,C,D
+        5:  A,B,C    X,Y
+        6:  A,B,C,D  X,Y
+        8:  Ax,Bx,Cx,Dx  Ay,By,Cy,Dy
+       10:  Ax,Bx,Cx,Dx  Ay,By,Cy,Dy   X,Y
+
+    Returns 10 coefficient values, which are de-normalized (pixel scale)
+      Ax, Bx, Cx, Dx,   Ay, By, Cy, Dy,    Xc, Yc
+  */
+  /* Radius de-normalization scaling factor */
+  double
+    rscale = 2.0/MagickMin((double) image->columns,(double) image->rows);
+
+  /* sanity check  number of args must = 3,4,5,6,8,10 or error */
+  if (IsInvalidBarrelArgumentCount(number_arguments) != MagickFalse)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionError,"InvalidArgument", "%s : number of arguments",
+        CommandOptionToMnemonic(MagickDistortOptions, *method) );
+      return((double *) NULL);
+    }
+  /* A,B,C,D coefficients */
+  coeff[0] = arguments[0];
+  coeff[1] = arguments[1];
+  coeff[2] = arguments[2];
+  if ((number_arguments == 3) || (number_arguments == 5) )
+    coeff[3] = 1.0 - coeff[0] - coeff[1] - coeff[2];
+  else
+    coeff[3] = arguments[3];
+  /* de-normalize the coefficients */
+  coeff[0] *= pow(rscale,3.0);
+  coeff[1] *= rscale*rscale;
+  coeff[2] *= rscale;
+  /* Y coefficients: as given OR same as X coefficients */
+  if ( number_arguments >= 8 ) {
+    coeff[4] = arguments[4] * pow(rscale,3.0);
+    coeff[5] = arguments[5] * rscale*rscale;
+    coeff[6] = arguments[6] * rscale;
+    coeff[7] = arguments[7];
+  }
+  else {
+    coeff[4] = coeff[0];
+    coeff[5] = coeff[1];
+    coeff[6] = coeff[2];
+    coeff[7] = coeff[3];
+  }
+  SetBarrelCenter(coeff,image,arguments,number_arguments);
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1915,65 +1989,7 @@ static double *GenerateCoefficients(const Image *image,
       return(CylinderCoefficients(coeff,method,&context));
     case BarrelDistortion:
     case BarrelInverseDistortion:
-    {
-      /* Barrel Distortion
-           Rs=(A*Rd^3 + B*Rd^2 + C*Rd + D)*Rd
-         BarrelInv Distortion
-           Rs=Rd/(A*Rd^3 + B*Rd^2 + C*Rd + D)
-
-        Where Rd is the normalized radius from corner to middle of image
-        Input Arguments are one of the following forms (number of arguments)...
-            3:  A,B,C
-            4:  A,B,C,D
-            5:  A,B,C    X,Y
-            6:  A,B,C,D  X,Y
-            8:  Ax,Bx,Cx,Dx  Ay,By,Cy,Dy
-           10:  Ax,Bx,Cx,Dx  Ay,By,Cy,Dy   X,Y
-
-        Returns 10 coefficient values, which are de-normalized (pixel scale)
-          Ax, Bx, Cx, Dx,   Ay, By, Cy, Dy,    Xc, Yc
-      */
-      /* Radius de-normalization scaling factor */
-      double
-        rscale = 2.0/MagickMin((double) image->columns,(double) image->rows);
-
-      /* sanity check  number of args must = 3,4,5,6,8,10 or error */
-      if (IsInvalidBarrelArgumentCount(number_arguments) != MagickFalse)
-        {
-          coeff=(double *) RelinquishMagickMemory(coeff);
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            OptionError,"InvalidArgument", "%s : number of arguments",
-            CommandOptionToMnemonic(MagickDistortOptions, *method) );
-          return((double *) NULL);
-        }
-      /* A,B,C,D coefficients */
-      coeff[0] = arguments[0];
-      coeff[1] = arguments[1];
-      coeff[2] = arguments[2];
-      if ((number_arguments == 3) || (number_arguments == 5) )
-        coeff[3] = 1.0 - coeff[0] - coeff[1] - coeff[2];
-      else
-        coeff[3] = arguments[3];
-      /* de-normalize the coefficients */
-      coeff[0] *= pow(rscale,3.0);
-      coeff[1] *= rscale*rscale;
-      coeff[2] *= rscale;
-      /* Y coefficients: as given OR same as X coefficients */
-      if ( number_arguments >= 8 ) {
-        coeff[4] = arguments[4] * pow(rscale,3.0);
-        coeff[5] = arguments[5] * rscale*rscale;
-        coeff[6] = arguments[6] * rscale;
-        coeff[7] = arguments[7];
-      }
-      else {
-        coeff[4] = coeff[0];
-        coeff[5] = coeff[1];
-        coeff[6] = coeff[2];
-        coeff[7] = coeff[3];
-      }
-      SetBarrelCenter(coeff,image,arguments,number_arguments);
-      return(coeff);
-    }
+      return(BarrelCoefficients(coeff,method,&context));
     case ShepardsDistortion:
     {
       /* Shepards Distortion  input arguments are the coefficients!
