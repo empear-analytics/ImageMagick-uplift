@@ -3597,6 +3597,15 @@ static void FillSineMap(float *sine_map,const size_t columns,
       ((2.0*MagickPI*i)*(double) MagickSafeReciprocal(wave_length))));
 }
 
+static void DestroyWaveResources(CacheView *wave_view,
+  CacheView *canvas_image_view,Image *canvas_image,float *sine_map)
+{
+  wave_view=DestroyCacheView(wave_view);
+  canvas_image_view=DestroyCacheView(canvas_image_view);
+  canvas_image=DestroyImage(canvas_image);
+  sine_map=(float *) RelinquishMagickMemory(sine_map);
+}
+
 static void SetWaveCanvasAlpha(Image *canvas_image,ExceptionInfo *exception)
 {
   if ((canvas_image->alpha_trait == UndefinedPixelTrait) &&
@@ -3698,10 +3707,7 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
         SetEffectProgress(canvas_image,WaveImageTag,progress,&status);
       }
   }
-  wave_view=DestroyCacheView(wave_view);
-  canvas_image_view=DestroyCacheView(canvas_image_view);
-  canvas_image=DestroyImage(canvas_image);
-  sine_map=(float *) RelinquishMagickMemory(sine_map);
+  DestroyWaveResources(wave_view,canvas_image_view,canvas_image,sine_map);
   return(ReleaseFailedImage(wave_image,status));
 }
 
