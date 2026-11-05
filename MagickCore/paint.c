@@ -276,6 +276,18 @@ static void SetGradientRadii(GradientInfo *gradient,const Image *image)
   gradient->radius=MagickMax(gradient->radii.x,gradient->radii.y);
 }
 
+static void ParseGradientVector(GradientInfo *gradient,const Image *image)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"gradient:vector");
+  if (artifact != (const char *) NULL)
+    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf%*[ ,]%lf%*[ ,]%lf",
+      &gradient->gradient_vector.x1,&gradient->gradient_vector.y1,
+      &gradient->gradient_vector.x2,&gradient->gradient_vector.y2);
+}
+
 static void SetGradientVector(GradientInfo *gradient,const Image *image,
   const GradientType type)
 {
@@ -290,11 +302,7 @@ static void SetGradientVector(GradientInfo *gradient,const Image *image,
   artifact=GetImageArtifact(image,"gradient:angle");
   if (artifact != (const char *) NULL)
     gradient->angle=StringToDouble(artifact,(char **) NULL);
-  artifact=GetImageArtifact(image,"gradient:vector");
-  if (artifact != (const char *) NULL)
-    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf%*[ ,]%lf%*[ ,]%lf",
-      &gradient->gradient_vector.x1,&gradient->gradient_vector.y1,
-      &gradient->gradient_vector.x2,&gradient->gradient_vector.y2);
+  ParseGradientVector(gradient,image);
   if (IsGradientDefaultDirection(image) != MagickFalse)
     if ((type == LinearGradient) && (gradient->gradient_vector.y2 != 0.0))
       gradient->gradient_vector.x2=0.0;
