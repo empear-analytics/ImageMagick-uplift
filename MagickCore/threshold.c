@@ -1109,6 +1109,19 @@ static XMLTreeInfo *FindThresholdMap(XMLTreeInfo *thresholds,
   return(threshold);
 }
 
+static MagickBooleanType CheckThresholdLevel(const ThresholdMap *map,
+  const ssize_t i,const char *map_id,ExceptionInfo *exception)
+{
+  if ((map->levels[i] < 0) || (map->levels[i] > map->divisor))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlInvalidContent", "<level> %.17g out of range, map \"%s\"",
+        (double) map->levels[i],map_id);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ReadThresholdLevels(ThresholdMap *map,
   XMLTreeInfo *levels,const char *map_id,ExceptionInfo *exception)
 {
@@ -1144,13 +1157,8 @@ static MagickBooleanType ReadThresholdLevels(ThresholdMap *map,
           "XmlInvalidContent", "<level> too few values, map \"%s\"",map_id);
         return(MagickFalse);
       }
-    if ((map->levels[i] < 0) || (map->levels[i] > map->divisor))
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-          "XmlInvalidContent", "<level> %.17g out of range, map \"%s\"",
-          (double) map->levels[i],map_id);
-        return(MagickFalse);
-      }
+    if (CheckThresholdLevel(map,i,map_id,exception) == MagickFalse)
+      return(MagickFalse);
     content=p;
   }
   value=(double) strtol(content,&p,10);
