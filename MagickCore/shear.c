@@ -396,6 +396,13 @@ static void TransferPixelsBackward(Quantum *magick_restrict p,PixelInfo pixel,
   }
 }
 
+static void SyncShearView(CacheView *image_view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType XShearImage(Image *image,const double degrees,
   const ShearRegion *region,ExceptionInfo *exception)
 {
@@ -527,8 +534,7 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
         break;
       }
     }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncShearView(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
