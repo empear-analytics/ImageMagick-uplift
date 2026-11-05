@@ -531,6 +531,87 @@ static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
   return(image);
 }
 
+typedef struct _AdaptiveBlurLine
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image,
+    *edge_image;
+
+  CacheView
+    *image_view,
+    *edge_view,
+    *blur_view;
+
+  double
+    **kernel;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
+} AdaptiveBlurLine;
+
+static MagickBooleanType BlurAdaptiveLine(const AdaptiveBlurLine *line,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const image = line->image;
+
+  Image
+    *const blur_image = line->blur_image,
+    *const edge_image = line->edge_image;
+
+  CacheView
+    *const image_view = line->image_view,
+    *const edge_view = line->edge_view,
+    *const blur_view = line->blur_view;
+
+  double
+    **const kernel = line->kernel;
+
+  const size_t
+    width = line->width;
+
+  ExceptionInfo
+    *const exception = line->exception;
+
+  const Quantum
+    *magick_restrict r;
+
+  Quantum
+    *magick_restrict q;
+
+  AdaptiveBlurRow
+    row;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  r=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
+    exception);
+  if ((r == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  row.image=image;
+  row.blur_image=blur_image;
+  row.edge_image=edge_image;
+  row.image_view=image_view;
+  row.kernel=kernel;
+  row.width=width;
+  row.y=y;
+  row.exception=exception;
+  BlurAdaptiveRow(&row,r,q);
+  if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -623,36 +704,12 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) blur_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict r;
+    const AdaptiveBlurLine
+      line = { image, blur_image, edge_image, image_view, edge_view, blur_view,
+        kernel, width, exception };
 
-    Quantum
-      *magick_restrict q;
-
-    AdaptiveBlurRow
-      row;
-
-    if (status == MagickFalse)
+    if (BlurAdaptiveLine(&line,y,&status) == MagickFalse)
       continue;
-    r=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
-      exception);
-    if ((r == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.blur_image=blur_image;
-    row.edge_image=edge_image;
-    row.image_view=image_view;
-    row.kernel=kernel;
-    row.width=width;
-    row.y=y;
-    row.exception=exception;
-    BlurAdaptiveRow(&row,r,q);
-    if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
