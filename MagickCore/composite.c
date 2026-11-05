@@ -2605,6 +2605,41 @@ static MagickBooleanType CompositeCopyImage(Image *image,Image *source_image,
   return(status);
 }
 
+typedef struct _DisplaceSetup
+{
+  MagickStatusType
+    flags;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *image,
+    *source_image;
+} DisplaceSetup;
+
+static void SetDisplaceScaleArguments(const DisplaceSetup *displace,
+  MagickRealType *horizontal_scale,MagickRealType *vertical_scale)
+{
+  (*horizontal_scale)=displace->geometry_info.rho;
+  (*vertical_scale)=displace->geometry_info.sigma;
+  if ((displace->flags & PercentValue) != 0)
+    {
+      if ((displace->flags & AspectValue) == 0)
+        {
+          (*horizontal_scale)*=(displace->source_image->columns-1)/200.0;
+          (*vertical_scale)*=(displace->source_image->rows-1)/200.0;
+        }
+      else
+        {
+          (*horizontal_scale)*=(displace->image->columns-1)/200.0;
+          (*vertical_scale)*=(displace->image->rows-1)/200.0;
+        }
+    }
+  if ((displace->flags & HeightValue) == 0)
+    (*vertical_scale)=(*horizontal_scale);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -2972,6 +3007,9 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         center,
         offset;
 
+      DisplaceSetup
+        displace;
+
       /*
         Displace/Distort based on overlay gradient map:
           X = red_channel;  Y = green_channel;
@@ -2988,6 +3026,10 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       artifact=GetImageArtifact(image,"compose:args");
       if (artifact != (char *) NULL)
         flags=ParseGeometry(artifact,&geometry_info);
+      displace.flags=flags;
+      displace.geometry_info=geometry_info;
+      displace.image=image;
+      displace.source_image=source_image;
       if ((flags & (WidthValue | HeightValue)) == 0 )
         {
           if ((flags & AspectValue) == 0)
@@ -3002,25 +3044,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
             }
         }
       else
-        {
-          horizontal_scale=geometry_info.rho;
-          vertical_scale=geometry_info.sigma;
-          if ((flags & PercentValue) != 0)
-            {
-              if ((flags & AspectValue) == 0)
-                {
-                  horizontal_scale*=(source_image->columns-1)/200.0;
-                  vertical_scale*=(source_image->rows-1)/200.0;
-                }
-              else
-                {
-                  horizontal_scale*=(image->columns-1)/200.0;
-                  vertical_scale*=(image->rows-1)/200.0;
-                }
-            }
-          if ((flags & HeightValue) == 0)
-            vertical_scale=horizontal_scale;
-        }
+        SetDisplaceScaleArguments(&displace,&horizontal_scale,&vertical_scale);
       /*
         Determine fixed center point for absolute distortion map
          Absolute distort ==
