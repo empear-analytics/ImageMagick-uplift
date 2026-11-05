@@ -2057,11 +2057,11 @@ static MagickBooleanType IsSpliceRowPending(Image *splice_image,
   return(MagickTrue);
 }
 
+#define SpliceImageTag  "Splice/Image"
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
-#define SpliceImageTag  "Splice/Image"
-
   CacheView
     *image_view,
     *splice_view;
