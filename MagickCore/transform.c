@@ -2287,8 +2287,7 @@ MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(transpose_image);
     }
-    if (SyncCacheViewAuthenticPixels(transpose_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncTransformView(transpose_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
