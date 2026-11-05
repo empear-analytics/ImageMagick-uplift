@@ -2320,6 +2320,9 @@ typedef struct _FunctionQualifiers
 
   char
     *expChLimit;
+
+  ImgAttrE
+    *iaQual;
 } FunctionQualifiers;
 
 static MagickBooleanType QualifyCoordFunction (FxInfo * pfx,
@@ -2356,6 +2359,53 @@ static MagickBooleanType QualifyCoordFunction (FxInfo * pfx,
   return MagickTrue;
 }
 
+static MagickBooleanType QualifyFunction (FxInfo * pfx,
+  const FunctionQualifiers *qualifiers)
+{
+  MagickBooleanType
+    *const coordQual = qualifiers->coordQual;
+
+  FunctionE
+    *const fe = qualifiers->fe;
+
+  const char
+    **const funStr = qualifiers->funStr;
+
+  PixelChannel
+    *const chQual = qualifiers->chQual;
+
+  ImgAttrE
+    *const iaQual = qualifiers->iaQual;
+
+  if (IsQualifier (pfx)) {
+
+    QualifierCheck check;
+
+    if (QualifyCoordFunction (pfx, qualifiers) == MagickFalse)
+      return MagickFalse;
+
+    if (IsUnqualifiedPixelFunction(*chQual,*fe) != MagickFalse)
+    {
+      *chQual = GetChannelQualifier (pfx, (int) *fe);
+    }
+
+    if (IsUnqualifiedCoordFunction(*chQual,*fe) != MagickFalse) {
+      /* Note: we don't allow "p.mean" etc. */
+      *iaQual = GetImgAttrQualifier (pfx, (int) *fe);
+    }
+    if (IsAttributeQualified(pfx,*chQual,*iaQual) != MagickFalse) {
+      *chQual = GetChannelQualifier (pfx, (int) *fe);
+    }
+    check.funStr=*funStr;
+    check.coordQual=*coordQual;
+    check.chQual=*chQual;
+    check.iaQual=*iaQual;
+    if (CheckFunctionQualifiers (&check, pfx) == MagickFalse)
+      return MagickFalse;
+  }
+  return MagickTrue;
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2379,7 +2429,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   ImgAttrE iaQual = aNull;
 
   const FunctionQualifiers qualifiers = { &coordQual, &fe, &funStr, &chQual,
-    &expChLimit };
+    &expChLimit, &iaQual };
 
   pfx->pex += pfx->lenToken;
 
@@ -2570,32 +2620,8 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
     return MagickFalse;
   }
 
-  if (IsQualifier (pfx)) {
-
-    QualifierCheck check;
-
-    if (QualifyCoordFunction (pfx, &qualifiers) == MagickFalse)
-      return MagickFalse;
-
-    if (IsUnqualifiedPixelFunction(chQual,fe) != MagickFalse)
-    {
-      chQual = GetChannelQualifier (pfx, (int) fe);
-    }
-
-    if (IsUnqualifiedCoordFunction(chQual,fe) != MagickFalse) {
-      /* Note: we don't allow "p.mean" etc. */
-      iaQual = GetImgAttrQualifier (pfx, (int) fe);
-    }
-    if (IsAttributeQualified(pfx,chQual,iaQual) != MagickFalse) {
-      chQual = GetChannelQualifier (pfx, (int) fe);
-    }
-    check.funStr=funStr;
-    check.coordQual=coordQual;
-    check.chQual=chQual;
-    check.iaQual=iaQual;
-    if (CheckFunctionQualifiers (&check, pfx) == MagickFalse)
-      return MagickFalse;
-  }
+  if (QualifyFunction (pfx, &qualifiers) == MagickFalse)
+    return MagickFalse;
 
   if (iaQual != aNull && chQual != NO_CHAN_QUAL) {
     if (!CheckAttrChannelQualifier (pfx, iaQual, chQual)) return MagickFalse;
