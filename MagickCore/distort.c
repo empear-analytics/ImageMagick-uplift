@@ -3177,6 +3177,57 @@ static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
   return(MagickTrue);
 }
 
+static MagickBooleanType PrintPerspectiveFX(double *coeff,
+  const char *image_gen,const char *lookup,ExceptionInfo *exception)
+{
+  double
+    *inverse;
+
+  ssize_t
+    i;
+
+  inverse=(double *) AcquireQuantumMemory(8,sizeof(*inverse));
+  if (inverse == (double *) NULL)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","%s",
+        "DistortCoefficients");
+      return(MagickFalse);
+    }
+  InvertPerspectiveCoefficients(coeff, inverse);
+  (void) FormatLocaleFile(stderr,"Perspective Projection:\n");
+  (void) FormatLocaleFile(stderr,
+    "  -distort PerspectiveProjection \\\n      '");
+  for (i=0; i < 4; i++)
+    (void) FormatLocaleFile(stderr, "%.*g, ",GetMagickPrecision(),
+      inverse[i]);
+  (void) FormatLocaleFile(stderr, "\n       ");
+  for ( ; i < 7; i++)
+    (void) FormatLocaleFile(stderr, "%.*g, ",GetMagickPrecision(),
+      inverse[i]);
+  (void) FormatLocaleFile(stderr, "%.*g'\n",GetMagickPrecision(),
+    inverse[7]);
+  inverse=(double *) RelinquishMagickMemory(inverse);
+  (void) FormatLocaleFile(stderr,"Perspective Distort, FX Equivalent:\n");
+  (void) FormatLocaleFile(stderr,"%.1024s",image_gen);
+  (void) FormatLocaleFile(stderr,
+    "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
+  (void) FormatLocaleFile(stderr,"       rr=%+.*g*ii %+.*g*jj + 1;\n",
+    GetMagickPrecision(),coeff[6],GetMagickPrecision(),coeff[7]);
+  (void) FormatLocaleFile(stderr,
+    "       xx=(%+.*g*ii %+.*g*jj %+.*g)/rr;\n",
+    GetMagickPrecision(),coeff[0],GetMagickPrecision(),coeff[1],
+    GetMagickPrecision(),coeff[2]);
+  (void) FormatLocaleFile(stderr,
+    "       yy=(%+.*g*ii %+.*g*jj %+.*g)/rr;\n",
+    GetMagickPrecision(),coeff[3],GetMagickPrecision(),coeff[4],
+    GetMagickPrecision(),coeff[5]);
+  (void) FormatLocaleFile(stderr,"       rr%s0 ? %s : blue' \\\n",
+    coeff[8] < 0.0 ? "<" : ">", lookup);
+  return(MagickTrue);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3492,48 +3543,9 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       }
       case PerspectiveDistortion:
       {
-        double
-          *inverse;
-
-        inverse=(double *) AcquireQuantumMemory(8,sizeof(*inverse));
-        if (inverse == (double *) NULL)
-          {
-            coeff=(double *) RelinquishMagickMemory(coeff);
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","%s",
-              "DistortCoefficients");
-            return((Image *) NULL);
-          }
-        InvertPerspectiveCoefficients(coeff, inverse);
-        (void) FormatLocaleFile(stderr,"Perspective Projection:\n");
-        (void) FormatLocaleFile(stderr,
-          "  -distort PerspectiveProjection \\\n      '");
-        for (i=0; i < 4; i++)
-          (void) FormatLocaleFile(stderr, "%.*g, ",GetMagickPrecision(),
-            inverse[i]);
-        (void) FormatLocaleFile(stderr, "\n       ");
-        for ( ; i < 7; i++)
-          (void) FormatLocaleFile(stderr, "%.*g, ",GetMagickPrecision(),
-            inverse[i]);
-        (void) FormatLocaleFile(stderr, "%.*g'\n",GetMagickPrecision(),
-          inverse[7]);
-        inverse=(double *) RelinquishMagickMemory(inverse);
-        (void) FormatLocaleFile(stderr,"Perspective Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%.1024s",image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
-        (void) FormatLocaleFile(stderr,"       rr=%+.*g*ii %+.*g*jj + 1;\n",
-          GetMagickPrecision(),coeff[6],GetMagickPrecision(),coeff[7]);
-        (void) FormatLocaleFile(stderr,
-          "       xx=(%+.*g*ii %+.*g*jj %+.*g)/rr;\n",
-          GetMagickPrecision(),coeff[0],GetMagickPrecision(),coeff[1],
-          GetMagickPrecision(),coeff[2]);
-        (void) FormatLocaleFile(stderr,
-          "       yy=(%+.*g*ii %+.*g*jj %+.*g)/rr;\n",
-          GetMagickPrecision(),coeff[3],GetMagickPrecision(),coeff[4],
-          GetMagickPrecision(),coeff[5]);
-        (void) FormatLocaleFile(stderr,"       rr%s0 ? %s : blue' \\\n",
-          coeff[8] < 0.0 ? "<" : ">", lookup);
+        if (PrintPerspectiveFX(coeff,image_gen,lookup,exception) ==
+            MagickFalse)
+          return((Image *) NULL);
         break;
       }
       case BilinearForwardDistortion:
