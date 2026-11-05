@@ -1763,9 +1763,63 @@ static void EncodeGrayscaleGamma(const Image *image,MagickRealType *red,
     }
 }
 
+typedef struct _GrayscaleSample
+{
+  const Image
+    *image;
+
+  PixelIntensityMethod
+    method;
+
+  MagickRealType
+    blue,
+    green,
+    red;
+} GrayscaleSample;
+
+static void GetGammaLumaIntensity(const GrayscaleSample *sample,
+  MagickRealType *intensity)
+{
+  const Image
+    *const image = sample->image;
+
+  const PixelIntensityMethod
+    method = sample->method;
+
+  MagickRealType
+    blue = sample->blue,
+    green = sample->green,
+    red = sample->red;
+
+  switch (method)
+  {
+    case Rec601LumaPixelIntensityMethod:
+    {
+      EncodeGrayscaleGamma(image,&red,&green,&blue);
+      (*intensity)=0.298839*red+0.586811*green+0.114350*blue;
+      break;
+    }
+    case Rec709LumaPixelIntensityMethod:
+    default:
+    {
+      if (image->colorspace == RGBColorspace)
+        {
+          red=EncodePixelGamma(red);
+          green=EncodePixelGamma(green);
+          blue=EncodePixelGamma(blue);
+        }
+      (*intensity)=0.212656*red+0.715158*green+0.072186*blue;
+      break;
+    }
+  }
+}
+
 static MagickRealType GetGrayscaleIntensity(const Image *image,
   const PixelIntensityMethod method,const Quantum *q)
 {
+  GrayscaleSample
+    sample;
+
   MagickRealType
     blue,
     green,
@@ -1776,6 +1830,11 @@ static MagickRealType GetGrayscaleIntensity(const Image *image,
   green=(MagickRealType) GetPixelGreen(image,q);
   blue=(MagickRealType) GetPixelBlue(image,q);
   intensity=0.0;
+  sample.image=image;
+  sample.method=method;
+  sample.blue=blue;
+  sample.green=green;
+  sample.red=red;
   switch (method)
   {
     case AveragePixelIntensityMethod:
@@ -1800,12 +1859,6 @@ static MagickRealType GetGrayscaleIntensity(const Image *image,
         blue*blue)/3.0);
       break;
     }
-    case Rec601LumaPixelIntensityMethod:
-    {
-      EncodeGrayscaleGamma(image,&red,&green,&blue);
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
     case Rec601LuminancePixelIntensityMethod:
     {
       if (image->colorspace == sRGBColorspace)
@@ -1817,16 +1870,9 @@ static MagickRealType GetGrayscaleIntensity(const Image *image,
       intensity=0.298839*red+0.586811*green+0.114350*blue;
       break;
     }
-    case Rec709LumaPixelIntensityMethod:
     default:
     {
-      if (image->colorspace == RGBColorspace)
-        {
-          red=EncodePixelGamma(red);
-          green=EncodePixelGamma(green);
-          blue=EncodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
+      GetGammaLumaIntensity(&sample,&intensity);
       break;
     }
     case Rec709LuminancePixelIntensityMethod:
