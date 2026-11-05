@@ -298,6 +298,20 @@ static void ApplyFunctionToPixel(const Image *image,
   }
 }
 
+static void ApplyFunctionToRow(const Image *image,
+  const FunctionArguments *arguments,ExceptionInfo *exception,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ApplyFunctionToPixel(image,arguments,exception,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType FunctionImage(Image *image,
   const MagickFunction function,const size_t number_parameters,
   const double *parameters,ExceptionInfo *exception)
@@ -344,9 +358,6 @@ MagickExport MagickBooleanType FunctionImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -355,11 +366,7 @@ MagickExport MagickBooleanType FunctionImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ApplyFunctionToPixel(image,&arguments,exception,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ApplyFunctionToRow(image,&arguments,exception,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
