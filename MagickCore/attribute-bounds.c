@@ -315,6 +315,50 @@ static CensusInfo GetInitialEdgeCensus(const Image *edge_image,
   return(edge);
 }
 
+typedef struct _EdgeTrimScan
+{
+  const Image
+    *edge_image;
+
+  const CacheView
+    *edge_view;
+
+  ExceptionInfo
+    *exception;
+} EdgeTrimScan;
+
+static double GetLeftEdgeCensus(const EdgeTrimScan *scan,
+  const CensusInfo *vertex,const RectangleInfo *bounds)
+{
+  return(GetEdgeBackgroundCensus(scan->edge_image,scan->edge_view,
+    NorthWestGravity,1,bounds->height,(ssize_t) vertex->left,(ssize_t)
+    vertex->top,scan->exception));
+}
+
+static double GetRightEdgeCensus(const EdgeTrimScan *scan,
+  const CensusInfo *vertex,const RectangleInfo *bounds)
+{
+  return(GetEdgeBackgroundCensus(scan->edge_image,scan->edge_view,
+    NorthEastGravity,1,bounds->height,(ssize_t) vertex->right,(ssize_t)
+    vertex->top,scan->exception));
+}
+
+static double GetTopEdgeCensus(const EdgeTrimScan *scan,
+  const CensusInfo *vertex,const RectangleInfo *bounds)
+{
+  return(GetEdgeBackgroundCensus(scan->edge_image,scan->edge_view,
+    NorthWestGravity,bounds->width,1,(ssize_t) vertex->left,(ssize_t)
+    vertex->top,scan->exception));
+}
+
+static double GetBottomEdgeCensus(const EdgeTrimScan *scan,
+  const CensusInfo *vertex,const RectangleInfo *bounds)
+{
+  return(GetEdgeBackgroundCensus(scan->edge_image,scan->edge_view,
+    SouthWestGravity,bounds->width,1,(ssize_t) vertex->left,(ssize_t)
+    vertex->bottom,scan->exception));
+}
+
 static RectangleInfo GetEdgeBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -328,6 +372,9 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
   double
     background_census,
     percent_background;
+
+  EdgeTrimScan
+    scan;
 
   Image
     *edge_image;
@@ -349,6 +396,9 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
   (void) ParseAbsoluteGeometry("0x0+0+0",&edge_image->page);
   (void) memset(&vertex,0,sizeof(vertex));
   edge_view=AcquireVirtualCacheView(edge_image,exception);
+  scan.edge_image=edge_image;
+  scan.edge_view=edge_view;
+  scan.exception=exception;
   edge=GetInitialEdgeCensus(edge_image,edge_view,exception);
   percent_background=GetPercentBackground(edge_image);
   background_census=GetMinEdgeBackgroundCensus(&edge);
@@ -364,15 +414,9 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
         */
         vertex.left++;
         bounds.width--;
-        edge.left=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,1,bounds.height,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
-        edge.top=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
-        edge.bottom=GetEdgeBackgroundCensus(edge_image,edge_view,
-          SouthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.bottom,exception);
+        edge.left=GetLeftEdgeCensus(&scan,&vertex,&bounds);
+        edge.top=GetTopEdgeCensus(&scan,&vertex,&bounds);
+        edge.bottom=GetBottomEdgeCensus(&scan,&vertex,&bounds);
         continue;
       }
     if (fabs(edge.right-background_census) < MagickEpsilon)
@@ -382,15 +426,9 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
         */
         vertex.right++;
         bounds.width--;
-        edge.right=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthEastGravity,1,bounds.height,(ssize_t) vertex.right,(ssize_t)
-          vertex.top,exception);
-        edge.top=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
-        edge.bottom=GetEdgeBackgroundCensus(edge_image,edge_view,
-          SouthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.bottom,exception);
+        edge.right=GetRightEdgeCensus(&scan,&vertex,&bounds);
+        edge.top=GetTopEdgeCensus(&scan,&vertex,&bounds);
+        edge.bottom=GetBottomEdgeCensus(&scan,&vertex,&bounds);
         continue;
       }
     if (fabs(edge.top-background_census) < MagickEpsilon)
@@ -400,15 +438,9 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
         */
         vertex.top++;
         bounds.height--;
-        edge.left=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,1,bounds.height,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
-        edge.right=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthEastGravity,1,bounds.height,(ssize_t) vertex.right,(ssize_t)
-          vertex.top,exception);
-        edge.top=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
+        edge.left=GetLeftEdgeCensus(&scan,&vertex,&bounds);
+        edge.right=GetRightEdgeCensus(&scan,&vertex,&bounds);
+        edge.top=GetTopEdgeCensus(&scan,&vertex,&bounds);
         continue;
       }
     if (fabs(edge.bottom-background_census) < MagickEpsilon)
@@ -418,15 +450,9 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
         */
         vertex.bottom++;
         bounds.height--;
-        edge.left=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,1,bounds.height,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
-        edge.right=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthEastGravity,1,bounds.height,(ssize_t) vertex.right,(ssize_t)
-          vertex.top,exception);
-        edge.bottom=GetEdgeBackgroundCensus(edge_image,edge_view,
-          SouthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.bottom,exception);
+        edge.left=GetLeftEdgeCensus(&scan,&vertex,&bounds);
+        edge.right=GetRightEdgeCensus(&scan,&vertex,&bounds);
+        edge.bottom=GetBottomEdgeCensus(&scan,&vertex,&bounds);
         continue;
       }
   }
