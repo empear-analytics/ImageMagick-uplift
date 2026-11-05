@@ -314,3 +314,10 @@ block, using N step 2's read-then-written clause, while Z step 2 says a written 
 4-7 use the member form in the four `DisplaceSetup` helpers because the const-local form made the x and y halves of
 the Distort centre code a clone pair (N's Careful item sanctions this). Upstream, not changed: `white_luminance` is
 set at its declaration and again before use; the Displace path calls `SetGeometryInfo` twice.
+
+## Lane c, tenth batch: colorspace.c 7.14 -> 7.35, enhance.c 7.49 -> 7.72 (Opus, 7 commits)
+
+Amendment under the mandate, not yet ruled on: **Recipe SW steps 2 and 3** (8393d2d77): a group of the moved run
+may hold whole parallel loops under N step 1's conditions, and when the tail begins with the fill of an N input
+struct, that struct is shared (the fill stays in the caller, the helper takes `const Name *`). The lane declined
+two higher-scoring groupings (7.37, 7.39) as clone-detector dodging. `layer.c` unchanged.
