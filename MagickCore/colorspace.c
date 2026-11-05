@@ -3079,11 +3079,86 @@ static void InitializeTosRGBMaps(const Image *image,
   }
 }
 
-static MagickBooleanType TransformsRGBImage(Image *image,
-  ExceptionInfo *exception)
+static MagickBooleanType TransformsRGBPixels(
+  const TransformsRGBTables *tables,MagickBooleanType status,
+  MagickOffsetType progress)
 {
 #define TransformsRGBImageTag  "Transform/Image"
 
+  ExceptionInfo
+    *const exception = tables->exception;
+
+  Image
+    *const image = tables->image;
+
+  TransformPacket
+    *const x_map = tables->x_map,
+    *const y_map = tables->y_map,
+    *const z_map = tables->z_map;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    PixelInfo
+      pixel;
+
+    ssize_t
+      x;
+
+    Quantum
+      *magick_restrict q;
+
+    const ColorspaceRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      size_t
+        blue,
+        green,
+        red;
+
+      red=ScaleQuantumToMap(GetPixelRed(image,q));
+      green=ScaleQuantumToMap(GetPixelGreen(image,q));
+      blue=ScaleQuantumToMap(GetPixelBlue(image,q));
+      pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x;
+      pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y;
+      pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z;
+      pixel=ScaleTransformedPixel(image,YCCMap,pixel);
+      SetPixelRed(image,ClampToQuantum(pixel.red),q);
+      SetPixelGreen(image,ClampToQuantum(pixel.green),q);
+      SetPixelBlue(image,ClampToQuantum(pixel.blue),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    SyncColorspaceRow(image_view,exception,&status);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetColorspaceProgress(image,TransformsRGBImageTag,progress,&status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+static MagickBooleanType TransformsRGBImage(Image *image,
+  ExceptionInfo *exception)
+{
   CacheView
     *image_view;
 
@@ -3324,57 +3399,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       /*
         Convert DirectClass image.
       */
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        PixelInfo
-          pixel;
-
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          size_t
-            blue,
-            green,
-            red;
-
-          red=ScaleQuantumToMap(GetPixelRed(image,q));
-          green=ScaleQuantumToMap(GetPixelGreen(image,q));
-          blue=ScaleQuantumToMap(GetPixelBlue(image,q));
-          pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x;
-          pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y;
-          pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z;
-          pixel=ScaleTransformedPixel(image,YCCMap,pixel);
-          SetPixelRed(image,ClampToQuantum(pixel.red),q);
-          SetPixelGreen(image,ClampToQuantum(pixel.green),q);
-          SetPixelBlue(image,ClampToQuantum(pixel.blue),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp atomic
-#endif
-            progress++;
-            SetColorspaceProgress(image,TransformsRGBImageTag,progress,&status);
-          }
-      }
-      image_view=DestroyCacheView(image_view);
+      status=TransformsRGBPixels(&tables,status,progress);
       break;
     }
     case PseudoClass:
