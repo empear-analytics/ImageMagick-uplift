@@ -893,10 +893,36 @@ static void LogCannyEdgeEvent(const Image *image)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
 }
 
-MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
-  const double sigma,const double lower_percent,const double upper_percent,
-  ExceptionInfo *exception)
+typedef struct _CannyEdgeInputs
 {
+  const Image
+    *image;
+
+  Image
+    *edge_image;
+
+  MatrixInfo
+    *canny_cache;
+
+  double
+    lower_percent,
+    upper_percent;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+} CannyEdgeInputs;
+
+static Image *ThinCannyEdges(const CannyEdgeInputs *canny_inputs)
+{
+  Image
+    *const edge_image = canny_inputs->edge_image;
+
+  MatrixInfo
+    *const canny_cache = canny_inputs->canny_cache;
+
   CacheView
     *edge_view;
 
@@ -906,12 +932,85 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   CannyInfo
     element;
 
-  char
-    geometry[MagickPathExtent];
-
   double
     max,
     min;
+
+  MagickBooleanType
+    status = canny_inputs->status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    y;
+
+  /*
+    Non-maxima suppression, remove pixels that are not considered to be part
+    of an edge.
+  */
+  progress=0;
+  (void) GetMatrixElement(canny_cache,0,0,&element);
+  max=element.intensity;
+  min=element.intensity;
+  edge_view=AcquireAuthenticCacheView(edge_image,canny_inputs->exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(edge_image,edge_image,edge_image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) edge_image->rows; y++)
+  {
+    const ComputeCannyGradientRowInfo
+      info = { edge_view, edge_image, canny_inputs->exception, canny_cache };
+
+    Quantum
+      *magick_restrict q;
+
+    ssize_t
+      x;
+
+    if (GetCannyRow(&info,y,&q,&status) == MagickFalse)
+      continue;
+    for (x=0; x < (ssize_t) edge_image->columns; x++)
+    {
+      CannyInfo
+        pixel;
+
+      pixel=SuppressCannyNonMaxima(canny_cache,x,y);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp critical (MagickCore_CannyEdgeImage)
+#endif
+      {
+        UpdateCannyRange(pixel.intensity,&min,&max);
+      }
+      *q=(Quantum) 0;
+      q+=(ptrdiff_t) GetPixelChannels(edge_image);
+    }
+    SyncFeatureView(edge_view,canny_inputs->exception,&status);
+  }
+  edge_view=DestroyCacheView(edge_view);
+  hysteresis_inputs.image=canny_inputs->image;
+  hysteresis_inputs.edge_image=edge_image;
+  hysteresis_inputs.canny_cache=canny_cache;
+  hysteresis_inputs.lower_percent=canny_inputs->lower_percent;
+  hysteresis_inputs.upper_percent=canny_inputs->upper_percent;
+  hysteresis_inputs.max=max;
+  hysteresis_inputs.min=min;
+  hysteresis_inputs.status=status;
+  hysteresis_inputs.progress=progress;
+  hysteresis_inputs.exception=canny_inputs->exception;
+  return(TraceCannyHysteresis(&hysteresis_inputs));
+}
+
+MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
+  const double sigma,const double lower_percent,const double upper_percent,
+  ExceptionInfo *exception)
+{
+  CannyEdgeInputs
+    canny_inputs;
+
+  char
+    geometry[MagickPathExtent];
 
   Image
     *edge_image;
@@ -922,14 +1021,8 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   MagickBooleanType
     status;
 
-  MagickOffsetType
-    progress;
-
   MatrixInfo
     *canny_cache;
-
-  ssize_t
-    y;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -957,61 +1050,14 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
       return((Image *) NULL);
     }
   status=ComputeCannyGradients(edge_image,canny_cache,exception);
-  /*
-    Non-maxima suppression, remove pixels that are not considered to be part
-    of an edge.
-  */
-  progress=0;
-  (void) GetMatrixElement(canny_cache,0,0,&element);
-  max=element.intensity;
-  min=element.intensity;
-  edge_view=AcquireAuthenticCacheView(edge_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(edge_image,edge_image,edge_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) edge_image->rows; y++)
-  {
-    const ComputeCannyGradientRowInfo
-      info = { edge_view, edge_image, exception, canny_cache };
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (GetCannyRow(&info,y,&q,&status) == MagickFalse)
-      continue;
-    for (x=0; x < (ssize_t) edge_image->columns; x++)
-    {
-      CannyInfo
-        pixel;
-
-      pixel=SuppressCannyNonMaxima(canny_cache,x,y);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp critical (MagickCore_CannyEdgeImage)
-#endif
-      {
-        UpdateCannyRange(pixel.intensity,&min,&max);
-      }
-      *q=(Quantum) 0;
-      q+=(ptrdiff_t) GetPixelChannels(edge_image);
-    }
-    SyncFeatureView(edge_view,exception,&status);
-  }
-  edge_view=DestroyCacheView(edge_view);
-  hysteresis_inputs.image=image;
-  hysteresis_inputs.edge_image=edge_image;
-  hysteresis_inputs.canny_cache=canny_cache;
-  hysteresis_inputs.lower_percent=lower_percent;
-  hysteresis_inputs.upper_percent=upper_percent;
-  hysteresis_inputs.max=max;
-  hysteresis_inputs.min=min;
-  hysteresis_inputs.status=status;
-  hysteresis_inputs.progress=progress;
-  hysteresis_inputs.exception=exception;
-  return(TraceCannyHysteresis(&hysteresis_inputs));
+  canny_inputs.image=image;
+  canny_inputs.edge_image=edge_image;
+  canny_inputs.canny_cache=canny_cache;
+  canny_inputs.lower_percent=lower_percent;
+  canny_inputs.upper_percent=upper_percent;
+  canny_inputs.status=status;
+  canny_inputs.exception=exception;
+  return(ThinCannyEdges(&canny_inputs));
 }
 
 
