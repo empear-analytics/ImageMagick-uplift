@@ -62,12 +62,18 @@ def macro_block_start(L, c):
     return u if L[u].lstrip().startswith("#define") else None
 
 def typedef_names(L, starts):
-    """The names closing each `typedef struct _X` that begins at one of the lines STARTS."""
+    """The names closing each `typedef struct [_X]` that begins at one of the lines STARTS."""
     names = []
     for n in starts:
         while not re.match(r"^} \w+;$", L[n]): n += 1
         names.append(L[n][2:-1])
     return names
+
+def brace_delta(line):
+    """Opening minus closing braces on LINE, outside string and character literals and comments."""
+    t = re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', "", line)
+    t = re.sub(r"/\*.*?\*/|//.*$", "", t)
+    return t.count("{") - t.count("}")
 
 args = sys.argv[1:]; out = None; copy_macros = []
 while "--copy-macro" in args: k = args.index("--copy-macro"); copy_macros.append(args[k + 1]); del args[k:k + 2]
@@ -81,9 +87,21 @@ while i < len(L):
         j = i
         while j < len(L) and L[j] != "{" and not L[j].rstrip().endswith(";"): j += 1
         if j < len(L) and L[j] == "{":
-            k = j + 1
-            # the closing brace of a function stands alone in column 0; a macro body's own `}` follows a line ending in `\`
-            while k < len(L) and not (L[k] == "}" and not L[k - 1].rstrip().endswith("\\")): k += 1
+            k = j + 1; depth = 1; alt = []
+            # the closing brace of a function stands alone in column 0; a macro body's own `}` follows a line ending in `\`,
+            # and a column-0 block inside the body (`{` ... `}` under an #if) keeps the brace depth above zero; braces
+            # in an #else or #elif branch are not counted (the first branch alone is a whole function)
+            while k < len(L):
+                w = L[k].strip()
+                if re.match(r"#\s*(if|ifdef|ifndef)\b", w): alt.append(False)
+                elif re.match(r"#\s*(else|elif)\b", w):
+                    if alt: alt[-1] = True
+                    else: alt.append(True)
+                elif re.match(r"#\s*endif\b", w):
+                    if alt: alt.pop()
+                elif not any(alt): depth += brace_delta(L[k])
+                if L[k] == "}" and not L[k - 1].rstrip().endswith("\\") and depth == 0: break
+                k += 1
             defs.append((m.group(2), i, k, bool(m.group(1) and m.group(1).startswith("static"))))
             i = k + 1; continue
     i += 1
@@ -147,7 +165,7 @@ for run in runs:
             inproto = not t.endswith(";"); continue
         if intype:
             intype = not re.match(r"^} \w+;$", L[n]); continue
-        if re.match(r"^typedef struct _\w+$", L[n]):
+        if re.match(r"^typedef struct( _\w+)?$", L[n]):
             intype = True; inner.append(n); continue
         if t.startswith("#define") or (n > 0 and L[n - 1].rstrip().endswith("\\")):
             continue
@@ -190,8 +208,8 @@ for mname in defined(region):
 moved_types = []
 for tname in sorted(set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M))):
     if not re.search(r"\b%s\b" % tname, region): continue
-    t0 = next(k for k, l in enumerate(rest_lines) if re.match(r"^typedef struct _%s$" % tname, l))
-    t1 = next(k for k in range(t0, len(rest_lines)) if rest_lines[k] == "} %s;" % tname)
+    t1 = next(k for k, l in enumerate(rest_lines) if l == "} %s;" % tname)
+    t0 = next(k for k in range(t1, -1, -1) if re.match(r"^typedef struct( _\w+)?$", rest_lines[k]))
     others = "\n".join(rest_lines[:t0] + rest_lines[t1 + 1:])
     if re.search(r"\b%s\b" % tname, others): continue
     moved_types.append("\n".join(rest_lines[t0:t1 + 1]))
