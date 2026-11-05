@@ -1006,6 +1006,108 @@ static Image *AppendPreviewTile(Image *images,Image *preview_image,
   return(images);
 }
 
+typedef struct _PreviewTileInput
+{
+  const Image
+    *image;
+
+  Image
+    *thumbnail;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *factor,
+    *label;
+
+  ImageInfo
+    *preview_info;
+
+  PreviewType
+    preview;
+
+  ssize_t
+    i;
+
+  PreviewTargets
+    targets;
+} PreviewTileInput;
+
+typedef struct _PreviewTileTargets
+{
+  Image
+    **preview_image;
+
+  double
+    *threshold,
+    *percentage,
+    *radius,
+    *sigma;
+
+  Image
+    **images;
+} PreviewTileTargets;
+
+static MagickBooleanType RenderPreviewTile(const PreviewTileInput *input,
+  const PreviewTileTargets *tile_targets)
+{
+  Image
+    *thumbnail = input->thumbnail;
+
+  Image
+    **const preview_image = tile_targets->preview_image,
+    **const images = tile_targets->images;
+
+  double
+    *const threshold = tile_targets->threshold,
+    *const percentage = tile_targets->percentage,
+    *const radius = tile_targets->radius,
+    *const sigma = tile_targets->sigma;
+
+  MagickBooleanType
+    proceed;
+
+  PreviewSelection
+    selection;
+
+  PreviewTile
+    tile;
+
+  tile.image=input->image;
+  tile.thumbnail=thumbnail;
+  tile.exception=input->exception;
+  tile.factor=input->factor;
+  tile.label=input->label;
+  tile.preview_info=input->preview_info;
+  tile.preview=input->preview;
+  tile.i=input->i;
+  tile.percentage=(*percentage);
+  tile.radius=(*radius);
+  tile.sigma=(*sigma);
+  selection.preview=input->preview;
+  selection.i=input->i;
+  selection.label=input->label;
+  selection.exception=input->exception;
+  selection.tile=tile;
+  selection.targets=input->targets;
+  ApplyDespeckleSegmentPreview(&selection,&thumbnail,&(*preview_image),
+    &(*threshold));
+  thumbnail=DestroyImage(thumbnail);
+  (*percentage)+=12.5;
+  (*radius)+=0.5;
+  (*sigma)+=0.25;
+  if ((*preview_image) == (Image *) NULL)
+    return(MagickFalse);
+  (*images)=AppendPreviewTile((*images),(*preview_image),input->label,
+    input->exception);
+  proceed=SetImageProgress(input->image,PreviewImageTag,(MagickOffsetType)
+    input->i,NumberTiles);
+  if (proceed == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -1030,9 +1132,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ImageInfo
     *preview_info;
 
-  MagickBooleanType
-    proceed;
-
   QuantizeInfo
     quantize_info;
 
@@ -1047,6 +1146,10 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
 
   const PreviewTargets
     targets = { &preview_image, &degrees, &gamma, &colors, &quantize_info };
+
+  const PreviewTileTargets
+    tile_targets = { &preview_image, &threshold, &percentage, &radius, &sigma,
+      &images };
 
   /*
     Open output image file.
@@ -1070,46 +1173,24 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   threshold=0.0;
   for (i=0; i < NumberTiles; i++)
   {
-    PreviewSelection
-      selection;
-
-    PreviewTile
-      tile;
+    PreviewTileInput
+      input;
 
     if (AcquirePreviewThumbnail(image,geometry,exception,&thumbnail) ==
         MagickFalse)
       break;
     if (AppendMiddlePreviewTile(i,thumbnail,exception,&images) == MagickFalse)
       continue;
-    tile.image=image;
-    tile.thumbnail=thumbnail;
-    tile.exception=exception;
-    tile.factor=factor;
-    tile.label=label;
-    tile.preview_info=preview_info;
-    tile.preview=preview;
-    tile.i=i;
-    tile.percentage=percentage;
-    tile.radius=radius;
-    tile.sigma=sigma;
-    selection.preview=preview;
-    selection.i=i;
-    selection.label=label;
-    selection.exception=exception;
-    selection.tile=tile;
-    selection.targets=targets;
-    ApplyDespeckleSegmentPreview(&selection,&thumbnail,&preview_image,
-      &threshold);
-    thumbnail=DestroyImage(thumbnail);
-    percentage+=12.5;
-    radius+=0.5;
-    sigma+=0.25;
-    if (preview_image == (Image *) NULL)
-      break;
-    images=AppendPreviewTile(images,preview_image,label,exception);
-    proceed=SetImageProgress(image,PreviewImageTag,(MagickOffsetType) i,
-      NumberTiles);
-    if (proceed == MagickFalse)
+    input.image=image;
+    input.thumbnail=thumbnail;
+    input.exception=exception;
+    input.factor=factor;
+    input.label=label;
+    input.preview_info=preview_info;
+    input.preview=preview;
+    input.i=i;
+    input.targets=targets;
+    if (RenderPreviewTile(&input,&tile_targets) == MagickFalse)
       break;
   }
   if (images == (Image *) NULL)
