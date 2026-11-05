@@ -308,6 +308,17 @@ static MagickBooleanType CheckSourceChannel(const Image *source_image,
   return(MagickTrue);
 }
 
+static void ParseTransferOperator(ChannelFx *channel_op,const char **p,
+  char *token)
+{
+  if (*token == '>')
+    {
+      if ((*channel_op) != ExchangeChannelOp)
+        (*channel_op)=TransferChannelOp;
+      (void) GetNextToken((*p),p,MagickPathExtent,token);
+    }
+}
+
 static void ParseChannelOperator(ChannelFx *channel_op,const char **p,
   char *token)
 {
@@ -324,12 +335,7 @@ static void ParseChannelOperator(ChannelFx *channel_op,const char **p,
         (*channel_op)=AssignChannelOp;
       (void) GetNextToken((*p),p,MagickPathExtent,token);
     }
-  if (*token == '>')
-    {
-      if ((*channel_op) != ExchangeChannelOp)
-        (*channel_op)=TransferChannelOp;
-      (void) GetNextToken((*p),p,MagickPathExtent,token);
-    }
+  ParseTransferOperator(channel_op,p,token);
 }
 
 static void AdvanceDestinationChannel(const ChannelFx channel_op,
