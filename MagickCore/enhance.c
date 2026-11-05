@@ -2672,6 +2672,15 @@ static void SumWhiteBalanceChroma(const EnhanceLine *line,
   }
 }
 
+static MagickBooleanType FinishWhiteBalance(Image *image,
+  MagickStatusType status,ExceptionInfo *exception)
+{
+  status=LevelWhiteBalanceVibrance(image,status,exception);
+  status&=(MagickStatusType) TransformImageColorspace(image,sRGBColorspace,
+    exception);
+  return(status != 0 ? MagickTrue : MagickFalse);
+}
+
 typedef struct _WhiteBalanceHead
 {
   const Image
@@ -2797,8 +2806,5 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
       }
   }
   image_view=DestroyCacheView(image_view);
-  status=LevelWhiteBalanceVibrance(image,status,exception);
-  status&=(MagickStatusType) TransformImageColorspace(image,sRGBColorspace,
-    exception);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return(FinishWhiteBalance(image,status,exception));
 }
