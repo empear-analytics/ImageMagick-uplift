@@ -291,6 +291,23 @@ static MagickBooleanType ParseDestinationChannel(Image *destination_image,
   return(MagickTrue);
 }
 
+static MagickBooleanType CheckSourceChannel(const Image *source_image,
+  const PixelChannel source_channel,const char *token,
+  ExceptionInfo *exception)
+{
+  PixelTrait
+    traits;
+
+  traits=GetPixelChannelTraits(source_image,source_channel);
+  if (traits == UndefinedPixelTrait)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        CorruptImageError,"MissingImageChannel","`%s'",token);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -350,9 +367,6 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   (void) GetNextToken(p,&p,MagickPathExtent,token);
   while (*token != '\0')
   {
-    PixelTrait
-      traits;
-
     ssize_t
       i;
 
@@ -410,11 +424,9 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
     }
     i=ParsePixelChannelOption(token);
     source_channel=(PixelChannel) i;
-    traits=GetPixelChannelTraits(source_image,source_channel);
-    if (traits == UndefinedPixelTrait)
+    if (CheckSourceChannel(source_image,source_channel,token,
+          exception) == MagickFalse)
       {
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          CorruptImageError,"MissingImageChannel","`%s'",token);
         destination_image=DestroyImageList(destination_image);
         return(destination_image);
       }
