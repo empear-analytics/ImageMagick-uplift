@@ -4567,6 +4567,102 @@ static PixelInfo ClampSparseColor(const Image *image,
   return(pixel);
 }
 
+typedef struct _SparseColorPixelInput
+{
+  SparseColorMethod
+    sparse_method;
+
+  const Image
+    *image;
+
+  Image
+    *sparse_image;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  size_t
+    number_colors;
+
+  double
+    *coeff;
+
+  ssize_t
+    i,
+    j;
+} SparseColorPixelInput;
+
+static void SparseColorPixel(const SparseColorPixelInput *pixel_input,
+  PixelInfo *pixel)
+{
+  switch (pixel_input->sparse_method)
+  {
+    case BilinearColorInterpolate:
+    {
+      SparseColorPlane
+        plane;
+
+      plane.sparse_image=pixel_input->sparse_image;
+      plane.coeff=pixel_input->coeff;
+      plane.i=pixel_input->i;
+      plane.j=pixel_input->j;
+      (*pixel)=BilinearSparseColor(&plane,pixel_input->image,(*pixel));
+      break;
+    }
+    case InverseColorInterpolate:
+    case ShepardsColorInterpolate:
+    { /* Inverse (Squared) Distance weights average (IDW) */
+      SparseColorWeights
+        inverse;
+
+      inverse.image=pixel_input->image;
+      inverse.sparse_image=pixel_input->sparse_image;
+      inverse.number_arguments=pixel_input->number_arguments;
+      inverse.arguments=pixel_input->arguments;
+      inverse.number_colors=pixel_input->number_colors;
+      inverse.coeff=pixel_input->coeff;
+      inverse.i=pixel_input->i;
+      inverse.j=pixel_input->j;
+      (*pixel)=InverseSparseColor(&inverse,(*pixel));
+      break;
+    }
+    case ManhattanColorInterpolate:
+    {
+      SparseColorPoint
+        point;
+
+      point.image=pixel_input->image;
+      point.sparse_image=pixel_input->sparse_image;
+      point.number_arguments=pixel_input->number_arguments;
+      point.arguments=pixel_input->arguments;
+      point.number_colors=pixel_input->number_colors;
+      point.i=pixel_input->i;
+      point.j=pixel_input->j;
+      ManhattanSparseColor(&point,&(*pixel));
+      break;
+    }
+    case VoronoiColorInterpolate:
+    default:
+    {
+      SparseColorPoint
+        point;
+
+      point.image=pixel_input->image;
+      point.sparse_image=pixel_input->sparse_image;
+      point.number_arguments=pixel_input->number_arguments;
+      point.arguments=pixel_input->arguments;
+      point.number_colors=pixel_input->number_colors;
+      point.i=pixel_input->i;
+      point.j=pixel_input->j;
+      (*pixel)=VoronoiSparseColor(&point,(*pixel));
+      break;
+    }
+  }
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -4697,64 +4793,21 @@ MagickExport Image *SparseColorImage(const Image *image,
             pixel=BarycentricSparseColor(&plane,pixel);
             break;
           }
-          case BilinearColorInterpolate:
-          {
-            SparseColorPlane
-              plane;
-
-            plane.sparse_image=sparse_image;
-            plane.coeff=coeff;
-            plane.i=i;
-            plane.j=j;
-            pixel=BilinearSparseColor(&plane,image,pixel);
-            break;
-          }
-          case InverseColorInterpolate:
-          case ShepardsColorInterpolate:
-          { /* Inverse (Squared) Distance weights average (IDW) */
-            SparseColorWeights
-              inverse;
-
-            inverse.image=image;
-            inverse.sparse_image=sparse_image;
-            inverse.number_arguments=number_arguments;
-            inverse.arguments=arguments;
-            inverse.number_colors=number_colors;
-            inverse.coeff=coeff;
-            inverse.i=i;
-            inverse.j=j;
-            pixel=InverseSparseColor(&inverse,pixel);
-            break;
-          }
-          case ManhattanColorInterpolate:
-          {
-            SparseColorPoint
-              point;
-
-            point.image=image;
-            point.sparse_image=sparse_image;
-            point.number_arguments=number_arguments;
-            point.arguments=arguments;
-            point.number_colors=number_colors;
-            point.i=i;
-            point.j=j;
-            ManhattanSparseColor(&point,&pixel);
-            break;
-          }
-          case VoronoiColorInterpolate:
           default:
           {
-            SparseColorPoint
-              point;
+            SparseColorPixelInput
+              pixel_input;
 
-            point.image=image;
-            point.sparse_image=sparse_image;
-            point.number_arguments=number_arguments;
-            point.arguments=arguments;
-            point.number_colors=number_colors;
-            point.i=i;
-            point.j=j;
-            pixel=VoronoiSparseColor(&point,pixel);
+            pixel_input.sparse_method=sparse_method;
+            pixel_input.image=image;
+            pixel_input.sparse_image=sparse_image;
+            pixel_input.number_arguments=number_arguments;
+            pixel_input.arguments=arguments;
+            pixel_input.number_colors=number_colors;
+            pixel_input.coeff=coeff;
+            pixel_input.i=i;
+            pixel_input.j=j;
+            SparseColorPixel(&pixel_input,&pixel);
             break;
           }
         }
