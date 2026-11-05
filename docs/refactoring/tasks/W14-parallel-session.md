@@ -271,3 +271,10 @@ boundaries found are unchanged except `SimilarityImage`, which the old tool cut 
 inside its HDRI/FFTW `#if`; dry runs the old tool accepted produce byte-identical files. Campaign B should pick
 it up. The agent rejected the one split that would lift `compare.c` to 8.92, because it moves the whole problem
 into a new file that scores 2.97.
+
+## Lane c, eighth batch: visual-effects.c 7.33 -> 8.54, colorspace-convert.c 7.14 -> 9.08 (Opus, 11 commits)
+
+New file `colorspace-generic-rgb.c` (9.68): **add it to the Windows build configuration.** The oracle caught a bug in
+a draft of one SD step (67 cases diverged; `&input` passed where step 8 passes `input`), fixed before the commit.
+Upstream, not changed: `MorphImages` passes an uninitialised `status` to `MorphSingleImage`, which only writes it;
+`MorphSequenceFrames` leaks the morph list when `SetImageStorageClass` fails.
