@@ -2607,6 +2607,9 @@ static MagickBooleanType CompositeCopyImage(Image *image,Image *source_image,
 
 typedef struct _DisplaceSetup
 {
+  CompositeOperator
+    compose;
+
   MagickStatusType
     flags;
 
@@ -2672,6 +2675,24 @@ static void SetDistortCenterX(const DisplaceSetup *displace,PointInfo *center)
       (*center).x=displace->geometry_info.xi;
     else
       (*center).x=(MagickRealType) (displace->x_offset+displace->geometry_info.xi);
+}
+
+static void SetDistortCenter(const DisplaceSetup *displace,PointInfo *center)
+{
+  if (displace->compose == DistortCompositeOp)
+    {
+      SetDistortCenterX(displace,center);
+      if ((displace->flags & YValue) == 0)
+        if ((displace->flags & AspectValue) != 0)
+          (*center).y=(MagickRealType) ((displace->image->rows-1)/2.0);
+        else
+          (*center).y=(MagickRealType) (displace->y_offset+(displace->source_image->rows-1)/2.0);
+      else
+        if ((displace->flags & AspectValue) != 0)
+          (*center).y=displace->geometry_info.psi;
+        else
+          (*center).y=(MagickRealType) (displace->y_offset+displace->geometry_info.psi);
+    }
 }
 
 MagickExport MagickBooleanType CompositeImage(Image *image,
@@ -3060,6 +3081,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       artifact=GetImageArtifact(image,"compose:args");
       if (artifact != (char *) NULL)
         flags=ParseGeometry(artifact,&geometry_info);
+      displace.compose=compose;
       displace.flags=flags;
       displace.geometry_info=geometry_info;
       displace.image=image;
@@ -3080,20 +3102,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       */
       center.x=(MagickRealType) x_offset;
       center.y=(MagickRealType) y_offset;
-      if (compose == DistortCompositeOp)
-        {
-          SetDistortCenterX(&displace,&center);
-          if ((flags & YValue) == 0)
-            if ((flags & AspectValue) != 0)
-              center.y=(MagickRealType) ((image->rows-1)/2.0);
-            else
-              center.y=(MagickRealType) (y_offset+(source_image->rows-1)/2.0);
-          else
-            if ((flags & AspectValue) != 0)
-              center.y=geometry_info.psi;
-            else
-              center.y=(MagickRealType) (y_offset+geometry_info.psi);
-        }
+      SetDistortCenter(&displace,&center);
       /*
         Shift the pixel offset point as defined by the provided,
         displacement/distortion map.  -- Like a lens...
