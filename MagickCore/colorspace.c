@@ -1318,6 +1318,33 @@ static void sRGBTransformColormap(const sRGBTransformTables *tables)
   (void) SyncImage(image,exception);
 }
 
+static void sRGBToLogPixels(Image *image,Quantum *logmap,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=(ssize_t) image->columns; x != 0; x--)
+  {
+    double
+      blue,
+      green,
+      red;
+
+    red=(double) DecodePixelGamma((MagickRealType)
+      GetPixelRed(image,q));
+    green=(double) DecodePixelGamma((MagickRealType)
+      GetPixelGreen(image,q));
+    blue=(double) DecodePixelGamma((MagickRealType)
+      GetPixelBlue(image,q));
+    SetPixelRed(image,logmap[ScaleQuantumToMap(ClampToQuantum(red))],q);
+    SetPixelGreen(image,logmap[ScaleQuantumToMap(ClampToQuantum(green))],
+      q);
+    SetPixelBlue(image,logmap[ScaleQuantumToMap(ClampToQuantum(blue))],q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1449,9 +1476,6 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        ssize_t
-          x;
-
         Quantum
           *magick_restrict q;
 
@@ -1460,25 +1484,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 
         if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        for (x=(ssize_t) image->columns; x != 0; x--)
-        {
-          double
-            blue,
-            green,
-            red;
-
-          red=(double) DecodePixelGamma((MagickRealType)
-            GetPixelRed(image,q));
-          green=(double) DecodePixelGamma((MagickRealType)
-            GetPixelGreen(image,q));
-          blue=(double) DecodePixelGamma((MagickRealType)
-            GetPixelBlue(image,q));
-          SetPixelRed(image,logmap[ScaleQuantumToMap(ClampToQuantum(red))],q);
-          SetPixelGreen(image,logmap[ScaleQuantumToMap(ClampToQuantum(green))],
-            q);
-          SetPixelBlue(image,logmap[ScaleQuantumToMap(ClampToQuantum(blue))],q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        sRGBToLogPixels(image,logmap,q);
         SyncColorspaceRow(image_view,exception,&status);
       }
       image_view=DestroyCacheView(image_view);
