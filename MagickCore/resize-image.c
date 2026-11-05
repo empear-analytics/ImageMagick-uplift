@@ -610,6 +610,13 @@ static void FilterVerticalPixel(const Image *image,
   }
 }
 
+static void SyncResizeView(CacheView *resize_view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType VerticalFilter(
   const ResizeFilter *magick_restrict resize_filter,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
@@ -709,8 +716,7 @@ static MagickBooleanType VerticalFilter(
         x,p,q);
       q+=(ptrdiff_t) GetPixelChannels(resize_image);
     }
-    if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncResizeView(resize_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
