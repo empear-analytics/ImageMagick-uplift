@@ -4326,6 +4326,15 @@ static fxFltType GetInterpolatedValueUP (const RpnInterpInputs * in,
   return(regA);
 }
 
+static void CheckRunTimeAddress (FxInfo * pfx, const int i)
+{
+  if (i < 0) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Bad run-time address", "%i", i);
+  }
+}
+
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -4378,11 +4387,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
     RpnPixelInputs
       rpn_in;
 
-    if (i < 0) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Bad run-time address", "%i", i);
-    }
+    CheckRunTimeAddress (pfx, i);
     pel=&pfx->Elements[i];
     switch (pel->number_args) {
         case 0:
