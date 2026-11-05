@@ -2739,6 +2739,26 @@ static void GetMathematicsArguments(const Image *image,
     }
 }
 
+static void GetModulateArguments(const Image *image,
+  GeometryInfo *geometry_info,MagickRealType *percent_luma,
+  MagickRealType *percent_chroma)
+{
+  const char
+    *artifact;
+
+  MagickStatusType
+    flags;
+
+  artifact=GetImageArtifact(image,"compose:args");
+  if (artifact != (char *) NULL)
+    {
+      flags=ParseGeometry(artifact,geometry_info);
+      (*percent_luma)=(*geometry_info).rho;
+      if ((flags & SigmaValue) != 0)
+        (*percent_chroma)=(*geometry_info).sigma;
+    }
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3295,14 +3315,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       /*
         Determine the luma and chroma scale.
       */
-      artifact=GetImageArtifact(image,"compose:args");
-      if (artifact != (char *) NULL)
-        {
-          flags=ParseGeometry(artifact,&geometry_info);
-          percent_luma=geometry_info.rho;
-          if ((flags & SigmaValue) != 0)
-            percent_chroma=geometry_info.sigma;
-        }
+      GetModulateArguments(image,&geometry_info,&percent_luma,&percent_chroma);
       break;
     }
     case ThresholdCompositeOp:
