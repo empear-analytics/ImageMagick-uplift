@@ -1305,6 +1305,43 @@ MagickExport Image *ColorMatrixImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _WarpInfo
+{
+  const Image
+    *image,
+    *canvas_image,
+    *warp_image;
+
+  CacheView
+    *interpolate_view;
+
+  ExceptionInfo
+    *exception;
+
+  PixelInterpolateMethod
+    method;
+
+  PointInfo
+    center,
+    scale;
+
+  double
+    amount,
+    radius;
+
+  ssize_t
+    y;
+} WarpInfo;
+
+typedef struct _WarpSite
+{
+  PointInfo
+    delta;
+
+  double
+    distance;
+} WarpSite;
+
 static void CopyPixelChannels(const Image *source,
   const Image *destination,const Quantum *magick_restrict p,
   Quantum *magick_restrict q)
@@ -3850,6 +3887,29 @@ MagickExport Image *StereoAnaglyphImage(const Image *left_image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType SwirlPixel(const WarpInfo *warp,
+  const WarpSite *site,Quantum *magick_restrict q,MagickBooleanType *status)
+{
+  double
+    cosine,
+    factor,
+    sine;
+
+  /*
+    Swirl the pixel.
+  */
+  factor=1.0-sqrt((double) site->distance)/warp->radius;
+  sine=sin((double) (warp->amount*factor*factor));
+  cosine=cos((double) (warp->amount*factor*factor));
+  (*status)=InterpolatePixelChannels(warp->canvas_image,warp->interpolate_view,
+    warp->warp_image,warp->method,((cosine*site->delta.x-sine*site->delta.y)/
+    warp->scale.x+warp->center.x),(double) ((sine*site->delta.x+cosine*
+    site->delta.y)/warp->scale.y+warp->center.y),q,warp->exception);
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport Image *SwirlImage(const Image *image,double degrees,
   const PixelInterpolateMethod method,ExceptionInfo *exception)
 {
@@ -3937,11 +3997,9 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
     const EffectRows
       rows = { canvas_image,swirl_image,canvas_view,swirl_view,exception,y };
 
-    double
-      distance;
-
-    PointInfo
-      delta;
+    const WarpInfo
+      warp = { image,canvas_image,swirl_image,interpolate_view,exception,
+        method,center,scale,degrees,radius,y };
 
     const Quantum
       *magick_restrict p;
@@ -3952,38 +4010,24 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
     Quantum
       *magick_restrict q;
 
+    WarpSite
+      site;
+
     if (GetEffectRows(&rows,&p,&q,&status) == MagickFalse)
       continue;
-    delta.y=scale.y*(double) (y-center.y);
+    site.delta.y=scale.y*(double) (y-center.y);
     for (x=0; x < (ssize_t) canvas_image->columns; x++)
     {
       /*
         Determine if the pixel is within an ellipse.
       */
-      delta.x=scale.x*(double) (x-center.x);
-      distance=delta.x*delta.x+delta.y*delta.y;
-      if (distance >= (radius*radius))
+      site.delta.x=scale.x*(double) (x-center.x);
+      site.distance=site.delta.x*site.delta.x+site.delta.y*site.delta.y;
+      if (site.distance >= (radius*radius))
         CopyPixelChannels(canvas_image,swirl_image,p,q);
       else
-        {
-          double
-            cosine,
-            factor,
-            sine;
-
-          /*
-            Swirl the pixel.
-          */
-          factor=1.0-sqrt((double) distance)/radius;
-          sine=sin((double) (degrees*factor*factor));
-          cosine=cos((double) (degrees*factor*factor));
-          status=InterpolatePixelChannels(canvas_image,interpolate_view,
-            swirl_image,method,((cosine*delta.x-sine*delta.y)/scale.x+center.x),
-            (double) ((sine*delta.x+cosine*delta.y)/scale.y+center.y),q,
-            exception);
-          if (status == MagickFalse)
-            break;
-        }
+        if (SwirlPixel(&warp,&site,q,&status) == MagickFalse)
+          break;
       p+=(ptrdiff_t) GetPixelChannels(canvas_image);
       q+=(ptrdiff_t) GetPixelChannels(swirl_image);
     }
