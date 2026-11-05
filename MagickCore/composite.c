@@ -2502,6 +2502,45 @@ static void CopyCompositeRow(const Image *source_image,const Image *image,
   }
 }
 
+typedef struct _IntensityRowInputs
+{
+  Image
+    *image,
+    *source_image;
+
+  MagickBooleanType
+    clamp;
+} IntensityRowInputs;
+
+static void SetIntensityAlphaRow(const IntensityRowInputs *row,
+  const Quantum *p,Quantum *q)
+{
+  Image
+    *const image = row->image,
+    *const source_image = row->source_image;
+
+  const MagickBooleanType
+    clamp = row->clamp;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) source_image->columns; x++)
+  {
+    if (GetPixelReadMask(source_image,p) <= (QuantumRange/2))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(source_image);
+        q+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    SetPixelAlpha(image,clamp != MagickFalse ?
+      ClampPixel(GetPixelIntensity(source_image,p)) :
+      ClampToQuantum(GetPixelIntensity(source_image,p)),q);
+    p+=(ptrdiff_t) GetPixelChannels(source_image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -2677,8 +2716,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         Quantum
           *q;
 
-        ssize_t
-          x;
+        IntensityRowInputs
+          row;
 
         if (status == MagickFalse)
           continue;
@@ -2691,20 +2730,10 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
             status=MagickFalse;
             continue;
           }
-        for (x=0; x < (ssize_t) source_image->columns; x++)
-        {
-          if (GetPixelReadMask(source_image,p) <= (QuantumRange/2))
-            {
-              p+=(ptrdiff_t) GetPixelChannels(source_image);
-              q+=(ptrdiff_t) GetPixelChannels(image);
-              continue;
-            }
-          SetPixelAlpha(image,clamp != MagickFalse ?
-            ClampPixel(GetPixelIntensity(source_image,p)) :
-            ClampToQuantum(GetPixelIntensity(source_image,p)),q);
-          p+=(ptrdiff_t) GetPixelChannels(source_image);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        row.image=image;
+        row.source_image=source_image;
+        row.clamp=clamp;
+        SetIntensityAlphaRow(&row,p,q);
         SyncCompositeRow(image_view,exception,&status);
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
