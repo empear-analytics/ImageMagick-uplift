@@ -3139,6 +3139,12 @@ static void GetSwirlGeometry(const Image *canvas_image,PointInfo *center,
   *scale=GetSwirlScale(canvas_image);
 }
 
+static void SetSwirlImageAlpha(Image *swirl_image,ExceptionInfo *exception)
+{
+  if (swirl_image->background_color.alpha_trait != UndefinedPixelTrait)
+    (void) SetImageAlphaChannel(swirl_image,OnAlphaChannel,exception);
+}
+
 MagickExport Image *SwirlImage(const Image *image,double degrees,
   const PixelInterpolateMethod method,ExceptionInfo *exception)
 {
@@ -3183,8 +3189,7 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
     return((Image *) NULL);
   if (CloneWarpImage(canvas_image,&swirl_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (swirl_image->background_color.alpha_trait != UndefinedPixelTrait)
-    (void) SetImageAlphaChannel(swirl_image,OnAlphaChannel,exception);
+  SetSwirlImageAlpha(swirl_image,exception);
   /*
     Compute scaling factor.
   */
