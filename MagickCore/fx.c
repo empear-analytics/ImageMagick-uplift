@@ -2506,6 +2506,36 @@ static MagickBooleanType OpenFunction (FxInfo * pfx, FunctionE fe,
   return MagickTrue;
 }
 
+static MagickBooleanType TryEpochFunction (FxInfo * pfx, FunctionE fe,
+  OperatorE pushOp, MagickBooleanType * result)
+{
+  if (fe==fEpoch) {
+    fxFltType
+      val,
+      seconds;
+    ssize_t
+      lenOptArt = GetProperty (pfx, &val, &seconds);
+    if (seconds == SECONDS_ERR) {
+      /* Exception may not have been raised. */
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Function 'epoch' expected date property", "at '%s'",
+        SetShortExp(pfx));
+      (*result)=MagickFalse;
+      return MagickTrue;
+    }
+    if (lenOptArt < 0) {
+      (*result)=MagickFalse;
+      return MagickTrue;
+    }
+    if (lenOptArt > 0) {
+      (*result)=(AddEpochSeconds (pfx, seconds, lenOptArt, pushOp));
+      return MagickTrue;
+    }
+  }
+  return MagickFalse;
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2528,6 +2558,8 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   PixelChannel chQual = NO_CHAN_QUAL;
   ImgAttrE iaQual = aNull;
 
+  MagickBooleanType returned = MagickFalse;
+
   const FunctionQualifiers qualifiers = { &coordQual, &fe, &funStr, &chQual,
     &expChLimit, &iaQual };
 
@@ -2545,25 +2577,8 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   if (fe==fDo) {
     (void) AddAddressingElement (pfx, rGoto, NULL_ADDRESS); /* address will be ndx1+1 */
   }
-  if (fe==fEpoch) {
-    fxFltType
-      val,
-      seconds;
-    ssize_t
-      lenOptArt = GetProperty (pfx, &val, &seconds);
-    if (seconds == SECONDS_ERR) {
-      /* Exception may not have been raised. */
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Function 'epoch' expected date property", "at '%s'",
-        SetShortExp(pfx));
-      return MagickFalse;
-    }
-    if (lenOptArt < 0) return MagickFalse;
-    if (lenOptArt > 0) {
-      return (AddEpochSeconds (pfx, seconds, lenOptArt, pushOp));
-    }
-  }
+  if (TryEpochFunction (pfx, fe, pushOp, &returned) != MagickFalse)
+    return returned;
 
   while (nArgs > 0) {
     int FndOne = 0;
