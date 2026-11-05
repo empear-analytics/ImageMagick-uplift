@@ -120,3 +120,12 @@ needed a measured plan of 13 leaf helpers whose first twelve steps are flat (rul
 Upstream, not changed: `OrderedDitherImage` leaks `map` when `SetImageStorageClass` fails; `BlackThresholdImage`
 switches gray images with `SetImageColorspace` where White and Range use `TransformImageColorspace`, and its
 comment says "White threshold image"; `RangeThresholdValue` has a redundant final else-if returning 0 on both arms.
+
+## Lane c, fourth file: distort.c 5.15 -> 5.77 with two splits (Opus, 8 commits)
+
+Two Recipe S splits: `distort-resize.c` (9.92) and `distort-affine.c` (10.0). **The Windows build configuration
+outside the repository must add both files.** `SparseColorImage` left every category except its public
+argument count. **Owner question, measured:** `distort.c` is at 110 functions again. A 111th function raises
+*Number of Functions in a Single Module* once (-0.17; probes at 111, 115 and 120 functions all score 5.60), and
+finishing `DistortImage` is worth about +0.95. May the `DistortImage` chain take the file past 110 functions?
+Upstream, not changed: `SparseColorImage`'s clone and storage-class failure exits return without freeing `coeff`.
