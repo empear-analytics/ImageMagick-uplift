@@ -3622,6 +3622,26 @@ static MagickBooleanType SetInPlaceTarget (FxInfo * pfx, int UserSymNdx0)
   return MagickTrue;
 }
 
+static MagickBooleanType ExpectOperandAfterOperator (FxInfo * pfx,
+  const char * strLimit, MagickBooleanType IncrDecr, MagickBooleanType * broke)
+{
+  (*broke)=MagickFalse;
+  if (IsExpressionEnd(pfx,strLimit) != MagickFalse)
+  {
+    if (IncrDecr) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Expected operand after operator", "at '%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -3636,6 +3656,8 @@ static MagickBooleanType TranslateExpression (
     IncrDecr = MagickFalse;
 
   int StartEleNdx;
+
+  MagickBooleanType broke = MagickFalse;
 
   const OperandSymbols
     operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll },
@@ -3732,16 +3754,10 @@ static MagickBooleanType TranslateExpression (
 
     UserSymbol = NewUserSymbol = MagickFalse;
 
-    if (IsExpressionEnd(pfx,strLimit) != MagickFalse)
-    {
-      if (IncrDecr) break;
-
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Expected operand after operator", "at '%s'",
-        SetShortExp(pfx));
+    if (ExpectOperandAfterOperator (pfx, strLimit, IncrDecr, &broke) ==
+        MagickFalse)
       return MagickFalse;
-    }
+    if (broke != MagickFalse) break;
 
     if (IncrDecr) {
       (void) ThrowMagickException (
