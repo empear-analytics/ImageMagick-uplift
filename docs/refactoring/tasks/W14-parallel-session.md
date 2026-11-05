@@ -129,3 +129,8 @@ argument count. **Owner question, measured:** `distort.c` is at 110 functions ag
 *Number of Functions in a Single Module* once (-0.17; probes at 111, 115 and 120 functions all score 5.60), and
 finishing `DistortImage` is worth about +0.95. May the `DistortImage` chain take the file past 110 functions?
 Upstream, not changed: `SparseColorImage`'s clone and storage-class failure exits return without freeing `coeff`.
+
+## Lane d, fourth batch: paint.c 7.02 -> 7.24 (Sonnet, 4 commits); channel.c unchanged
+
+Upstream, not changed: in a `ChannelFxImage` assign operation `destination_channel` takes `i`, the source
+channel index, because `i` is not reparsed; `FloodfillPaintImage` has an unused `pixel` local.
