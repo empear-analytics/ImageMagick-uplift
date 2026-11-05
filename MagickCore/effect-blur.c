@@ -531,6 +531,16 @@ static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
   return(image);
 }
 
+static void RelinquishAdaptiveKernelSet(double **kernel,const size_t width)
+{
+  ssize_t
+    w;
+
+  for (w=0; w < (ssize_t) width; w+=2)
+    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
+  kernel=(double **) RelinquishAlignedMemory(kernel);
+}
+
 typedef struct _AdaptiveBlurLine
 {
   const Image
@@ -640,7 +650,6 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
     width;
 
   ssize_t
-    w,
     y;
 
   assert(image != (const Image *) NULL);
@@ -724,9 +733,7 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   edge_view=DestroyCacheView(edge_view);
   image_view=DestroyCacheView(image_view);
   edge_image=DestroyImage(edge_image);
-  for (w=0; w < (ssize_t) width; w+=2)
-    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
-  kernel=(double **) RelinquishAlignedMemory(kernel);
+  RelinquishAdaptiveKernelSet(kernel,width);
   return(ReleaseFailedImage(blur_image,status));
 }
 
