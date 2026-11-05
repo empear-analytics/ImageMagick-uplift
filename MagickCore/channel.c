@@ -332,6 +332,23 @@ static void ParseChannelOperator(ChannelFx *channel_op,const char **p,
     }
 }
 
+static void AdvanceDestinationChannel(const ChannelFx channel_op,
+  ChannelType *channel_mask,PixelChannel *destination_channel)
+{
+  switch (channel_op)
+  {
+    case ExtractChannelOp:
+    {
+      (*channel_mask)=(ChannelType) ((*channel_mask) |
+        (MagickLLConstant(1) << (*destination_channel)));
+      (*destination_channel)=(PixelChannel) ((*destination_channel)+1);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -505,18 +522,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
           }
         channels++;
       }
-    switch (channel_op)
-    {
-      case ExtractChannelOp:
-      {
-        channel_mask=(ChannelType) (channel_mask |
-          (MagickLLConstant(1) << destination_channel));
-        destination_channel=(PixelChannel) (destination_channel+1);
-        break;
-      }
-      default:
-        break;
-    }
+    AdvanceDestinationChannel(channel_op,&channel_mask,&destination_channel);
     status=SetImageProgress(source_image,ChannelFxImageTag,p-expression,
       strlen(expression));
     if (status == MagickFalse)
