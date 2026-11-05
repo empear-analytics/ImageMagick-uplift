@@ -1469,6 +1469,74 @@ static void SetArcCoefficients(double *coeff,const Image *image,
   coeff[4] = ((double)image->columns-1.0)/2.0;
 }
 
+static double *ArcCoefficients(double *coeff,const DistortMethod *method,
+  const CoefficientContext *context)
+{
+  const Image
+    *const image = context->image;
+
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
+  /* Arc Distortion
+     Args: arc_width  rotate  top_edge_radius  bottom_edge_radius
+     All but first argument are optional
+        arc_width      The angle over which to arc the image side-to-side
+        rotate         Angle to rotate image from vertical center
+        top_radius     Set top edge of source image at this radius
+        bottom_radius  Set bottom edge to this radius (radial scaling)
+
+     By default, if the radii arguments are nor provided the image radius
+     is calculated so the horizontal center-line is fits the given arc
+     without scaling.
+
+     The output image size is ALWAYS adjusted to contain the whole image,
+     and an offset is given to position image relative to the 0,0 point of
+     the origin, allowing users to use relative positioning onto larger
+     background (via -flatten).
+
+     The arguments are converted to these coefficients
+        c0: angle for center of source image
+        c1: angle scale for mapping to source image
+        c2: radius for top of source image
+        c3: radius scale for mapping source image
+        c4: centerline of arc within source image
+
+     Note the coefficients use a center angle, so asymptotic join is
+     furthest from both sides of the source image. This also means that
+     for arc angles greater than 360 the sides of the image will be
+     trimmed equally.
+
+     Arc Distortion Notes...
+       + Does not use a set of CPs
+       + Will only work with Image Distortion
+       + Can not be used for generating a sparse gradient (interpolation)
+  */
+  if ( number_arguments >= 1 && arguments[0] < MagickEpsilon ) {
+    coeff = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument","%s : 'Arc Angle Too Small'",
+        CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    return((double *) NULL);
+  }
+  if ( number_arguments >= 3 && arguments[2] < MagickEpsilon ) {
+    coeff = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument","%s : 'Outer Radius Too Small'",
+        CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    return((double *) NULL);
+  }
+  SetArcCoefficients(coeff,image,arguments,number_arguments);
+
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1661,59 +1729,7 @@ static double *GenerateCoefficients(const Image *image,
     case PolynomialDistortion:
       return(PolynomialCoefficients(coeff,method,&context));
     case ArcDistortion:
-    {
-      /* Arc Distortion
-         Args: arc_width  rotate  top_edge_radius  bottom_edge_radius
-         All but first argument are optional
-            arc_width      The angle over which to arc the image side-to-side
-            rotate         Angle to rotate image from vertical center
-            top_radius     Set top edge of source image at this radius
-            bottom_radius  Set bottom edge to this radius (radial scaling)
-
-         By default, if the radii arguments are nor provided the image radius
-         is calculated so the horizontal center-line is fits the given arc
-         without scaling.
-
-         The output image size is ALWAYS adjusted to contain the whole image,
-         and an offset is given to position image relative to the 0,0 point of
-         the origin, allowing users to use relative positioning onto larger
-         background (via -flatten).
-
-         The arguments are converted to these coefficients
-            c0: angle for center of source image
-            c1: angle scale for mapping to source image
-            c2: radius for top of source image
-            c3: radius scale for mapping source image
-            c4: centerline of arc within source image
-
-         Note the coefficients use a center angle, so asymptotic join is
-         furthest from both sides of the source image. This also means that
-         for arc angles greater than 360 the sides of the image will be
-         trimmed equally.
-
-         Arc Distortion Notes...
-           + Does not use a set of CPs
-           + Will only work with Image Distortion
-           + Can not be used for generating a sparse gradient (interpolation)
-      */
-      if ( number_arguments >= 1 && arguments[0] < MagickEpsilon ) {
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "InvalidArgument","%s : 'Arc Angle Too Small'",
-            CommandOptionToMnemonic(MagickDistortOptions, *method) );
-        return((double *) NULL);
-      }
-      if ( number_arguments >= 3 && arguments[2] < MagickEpsilon ) {
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "InvalidArgument","%s : 'Outer Radius Too Small'",
-            CommandOptionToMnemonic(MagickDistortOptions, *method) );
-        return((double *) NULL);
-      }
-      SetArcCoefficients(coeff,image,arguments,number_arguments);
-
-      return(coeff);
-    }
+      return(ArcCoefficients(coeff,method,&context));
     case PolarDistortion:
     case DePolarDistortion:
     {
