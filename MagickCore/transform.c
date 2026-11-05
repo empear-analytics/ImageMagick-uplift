@@ -1897,6 +1897,17 @@ static MagickBooleanType SpliceImageRow(const SpliceRow *row,
   return(MagickTrue);
 }
 
+static void SetSpliceProgress(const SpliceRow *row,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(row->image,tag,progress,row->splice_image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void SetSpliceBackground(Image *splice_image,
   ExceptionInfo *exception)
 {
@@ -2003,17 +2014,11 @@ MagickExport Image *SpliceImage(const Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SpliceImageTag,progress,
-          splice_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetSpliceProgress(&row,SpliceImageTag,progress,&status);
       }
   }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2037,17 +2042,11 @@ MagickExport Image *SpliceImage(const Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SpliceImageTag,progress,
-          splice_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetSpliceProgress(&row,SpliceImageTag,progress,&status);
       }
   }
   return(FinishSpliceImage(splice_image,splice_view,image_view,status));
