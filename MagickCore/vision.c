@@ -3658,8 +3658,33 @@ static Image *SelectLabeledComponents(const CCLabeledInputs *labeled)
   return(SelectConnectedComponents(&selection));
 }
 
-MagickExport Image *ConnectedComponentsImage(const Image *image,
-  const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
+typedef struct _CCComponentInputs
+{
+  const Image
+    *image;
+
+  Image
+    *component_image;
+
+  MatrixInfo
+    *equivalences;
+
+  CCObjectInfo
+    *object,
+    **objects;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2];
+
+  ExceptionInfo
+    *exception;
+} CCComponentInputs;
+
+static Image *FindConnectedComponents(const CCComponentInputs *components)
 {
   CacheView
     *image_view;
@@ -3676,17 +3701,71 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   CCLabeledInputs
     labeled;
 
-  CCObjectInfo
-    *object;
-
-  Image
-    *component_image;
-
   MagickBooleanType
     status;
 
   MagickOffsetType
     progress;
+
+  MatrixInfo
+    *equivalences = components->equivalences;
+
+  ssize_t
+    n;
+
+  /*
+    Find connected components.
+  */
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireVirtualCacheView(components->image,components->exception);
+  equivalence_inputs.image=components->image;
+  equivalence_inputs.image_view=image_view;
+  equivalence_inputs.equivalences=equivalences;
+  equivalence_inputs.connectivity=components->connectivity;
+  equivalence_inputs.connect4=components->connect4;
+  equivalence_inputs.connect8=components->connect8;
+  equivalence_inputs.exception=components->exception;
+  status=ResolveEquivalences(&equivalence_inputs,status);
+  /*
+    Label connected components.
+  */
+  label_inputs.image=components->image;
+  label_inputs.image_view=image_view;
+  label_inputs.equivalences=equivalences;
+  label_inputs.object=components->object;
+  label_inputs.component_image=components->component_image;
+  label_inputs.exception=components->exception;
+  label_counts.n=(&n);
+  label_counts.status=(&status);
+  label_counts.progress=(&progress);
+  LabelConnectedComponents(&label_inputs,&label_counts);
+  image_view=DestroyCacheView(image_view);
+  equivalences=DestroyMatrixInfo(equivalences);
+  labeled.image=components->image;
+  labeled.component_image=components->component_image;
+  labeled.object=components->object;
+  labeled.objects=components->objects;
+  labeled.connectivity=components->connectivity;
+  labeled.connect4=components->connect4;
+  labeled.connect8=components->connect8;
+  labeled.n=n;
+  labeled.status=status;
+  labeled.exception=components->exception;
+  return(SelectLabeledComponents(&labeled));
+}
+
+MagickExport Image *ConnectedComponentsImage(const Image *image,
+  const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
+{
+  CCComponentInputs
+    components;
+
+  CCObjectInfo
+    *object;
+
+  Image
+    *component_image;
 
   MatrixInfo
     *equivalences;
@@ -3696,8 +3775,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
 
   ssize_t
     connect4[2][2] = { { -1,  0 }, {  0, -1 } },
-    connect8[4][2] = { { -1, -1 }, { -1,  0 }, { -1,  1 }, {  0, -1 } },
-    n;
+    connect8[4][2] = { { -1, -1 }, { -1,  0 }, { -1,  1 }, {  0, -1 } };
 
   /*
     Initialize connected components image attributes.
@@ -3746,43 +3824,16 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   /*
     Find connected components.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  equivalence_inputs.image=image;
-  equivalence_inputs.image_view=image_view;
-  equivalence_inputs.equivalences=equivalences;
-  equivalence_inputs.connectivity=connectivity;
-  equivalence_inputs.connect4=connect4;
-  equivalence_inputs.connect8=connect8;
-  equivalence_inputs.exception=exception;
-  status=ResolveEquivalences(&equivalence_inputs,status);
-  /*
-    Label connected components.
-  */
-  label_inputs.image=image;
-  label_inputs.image_view=image_view;
-  label_inputs.equivalences=equivalences;
-  label_inputs.object=object;
-  label_inputs.component_image=component_image;
-  label_inputs.exception=exception;
-  label_counts.n=(&n);
-  label_counts.status=(&status);
-  label_counts.progress=(&progress);
-  LabelConnectedComponents(&label_inputs,&label_counts);
-  image_view=DestroyCacheView(image_view);
-  equivalences=DestroyMatrixInfo(equivalences);
-  labeled.image=image;
-  labeled.component_image=component_image;
-  labeled.object=object;
-  labeled.objects=objects;
-  labeled.connectivity=connectivity;
-  labeled.connect4=connect4;
-  labeled.connect8=connect8;
-  labeled.n=n;
-  labeled.status=status;
-  labeled.exception=exception;
-  return(SelectLabeledComponents(&labeled));
+  components.image=image;
+  components.component_image=component_image;
+  components.equivalences=equivalences;
+  components.object=object;
+  components.objects=objects;
+  components.connectivity=connectivity;
+  components.connect4=connect4;
+  components.connect8=connect8;
+  components.exception=exception;
+  return(FindConnectedComponents(&components));
 }
 
 /*
