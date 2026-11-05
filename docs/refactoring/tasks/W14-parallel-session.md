@@ -101,3 +101,14 @@ only the current iteration's own slot of a shared function-local array or struct
 iteration touches, so the access pattern is unchanged. Upstream, not changed: both `EvaluateImages` loops
 `continue` past a failed row without releasing `p`; in `GetImageFeatures` the Q green term divides by
 `density_y[x].direction[i].red`, the co-occurrence failure path leaks, and `p+=...;;` has a doubled semicolon.
+
+## Lane d, third batch: segment.c 6.44 -> 6.46; fourier.c parked
+
+`segment.c`: two commits merged. `fourier.c`: five commits (6.33 -> 6.83) are **not merged**. The first moves
+compiled `#if defined(MAGICKCORE_HAVE_COMPLEX_H)` blocks together with their `#else` branches, unchanged; the
+playbook's *Preprocessor branches* rule allows only never-compiled `#if 0` text to move, because the oracle
+build compiles one branch and cannot check the other. **My lane prompt told the agent these branches could be
+refactored as ordinary code; that was my error.** The commits are on the local branch `w14-fourier-ifdef`.
+**Owner question:** may a function's `#if defined(X)` / `#else` pair move verbatim and unchanged into a helper
+when only one branch is compiled and checked by the oracle (the other compiled only by `pp_identical`-style text
+comparison)? If yes, the branch can be merged as is.
