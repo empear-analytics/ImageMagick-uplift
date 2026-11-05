@@ -3297,6 +3297,72 @@ static void PrintBilinearReverseFX(const double *coeff,const char *image_gen,
   (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
 }
 
+typedef struct _DistortVerboseFX
+{
+  DistortMethod
+    method;
+
+  const Image
+    *image;
+
+  double
+    *coeff;
+
+  char
+    *image_gen;
+
+  const char
+    *lookup;
+} DistortVerboseFX;
+
+static void PrintLensDistortFX(const DistortVerboseFX *fx)
+{
+  const DistortMethod
+    method = fx->method;
+
+  const Image
+    *const image = fx->image;
+
+  double
+    *const coeff = fx->coeff;
+
+  char
+    *const image_gen = fx->image_gen;
+
+  const char
+    *const lookup = fx->lookup;
+
+  switch (method)
+  {
+    case Plane2CylinderDistortion:
+    {
+      (void) FormatLocaleFile(stderr,
+        "Plane to Cylinder Distort, Internal Coefficients\n");
+      (void) FormatLocaleFile(stderr,"  cylinder_radius = %+lf\n",coeff[1]);
+      (void) FormatLocaleFile(stderr,
+        "Plane to Cylinder Distort, FX Equivalent:\n");
+      (void) FormatLocaleFile(stderr,"%s", image_gen);
+      (void) FormatLocaleFile(stderr,
+        "  -fx 'ii=i+page.x%+lf+0.5; jj=j+page.y%+lf+0.5;\n",-coeff[4],
+        -coeff[5]);
+      (void) FormatLocaleFile(stderr,"       ii=ii/%+lf;\n",coeff[1]);
+      (void) FormatLocaleFile(stderr,"       xx=%lf*tan(ii)%+lf;\n",coeff[1],
+        coeff[2] );
+      (void) FormatLocaleFile(stderr,"       yy=jj/cos(ii)%+lf;\n",coeff[3]);
+      (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+      break;
+    }
+    case BarrelDistortion:
+    case BarrelInverseDistortion:
+    {
+      PrintBarrelFX(image,coeff,method,image_gen);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3587,6 +3653,8 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
        i;
     char image_gen[MagickPathExtent];
     const char *lookup;
+    DistortVerboseFX
+      fx;
 
     /* Set destination image size and virtual offset */
     if ( bestfit || viewport_given ) {
@@ -3601,6 +3669,11 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       lookup = "p{xx-page.x-0.5,yy-page.y-0.5}"; /* simplify lookup */
     }
 
+    fx.method=method;
+    fx.image=image;
+    fx.coeff=coeff;
+    fx.image_gen=image_gen;
+    fx.lookup=lookup;
     switch (method)
     {
       case AffineDistortion:
@@ -3667,32 +3740,11 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         PrintCylinder2PlaneFX(coeff,image_gen,lookup);
         break;
       }
-      case Plane2CylinderDistortion:
-      {
-        (void) FormatLocaleFile(stderr,
-          "Plane to Cylinder Distort, Internal Coefficients\n");
-        (void) FormatLocaleFile(stderr,"  cylinder_radius = %+lf\n",coeff[1]);
-        (void) FormatLocaleFile(stderr,
-          "Plane to Cylinder Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x%+lf+0.5; jj=j+page.y%+lf+0.5;\n",-coeff[4],
-          -coeff[5]);
-        (void) FormatLocaleFile(stderr,"       ii=ii/%+lf;\n",coeff[1]);
-        (void) FormatLocaleFile(stderr,"       xx=%lf*tan(ii)%+lf;\n",coeff[1],
-          coeff[2] );
-        (void) FormatLocaleFile(stderr,"       yy=jj/cos(ii)%+lf;\n",coeff[3]);
-        (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
-        break;
-      }
-      case BarrelDistortion:
-      case BarrelInverseDistortion:
-      {
-        PrintBarrelFX(image,coeff,method,image_gen);
-        break;
-      }
       default:
+      {
+        PrintLensDistortFX(&fx);
         break;
+      }
     }
   }
   /*
