@@ -1805,13 +1805,80 @@ static MagickBooleanType MorphFrame(const MorphFrameInfo *frame,
   return(status);
 }
 
-MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
-  ExceptionInfo *exception)
+typedef struct _MorphSequenceTargets
 {
+  Image
+    **morph_images;
+
+  MagickBooleanType
+    *status;
+
+  ssize_t
+    *n;
+} MorphSequenceTargets;
+
+static MagickBooleanType MorphSequenceFrames(const Image *next,
+  const size_t number_frames,ExceptionInfo *exception,
+  const MorphSequenceTargets *targets)
+{
+  Image
+    **const morph_images = targets->morph_images;
+
+  MagickBooleanType
+    *const status = targets->status;
+
+  ssize_t
+    *const n = targets->n;
+
   double
     alpha,
     beta;
 
+  Image
+    *morph_image;
+
+  for ((*n)=0; (*n) < (ssize_t) number_frames; (*n)++)
+  {
+    MorphFrameInfo
+      frame;
+
+    beta=(double) ((*n)+1.0)/(double) (number_frames+1.0);
+    alpha=1.0-beta;
+    morph_image=ResizeImage(next,(size_t) (alpha*next->columns+beta*
+      GetNextImageInList(next)->columns+0.5),(size_t) (alpha*next->rows+beta*
+      GetNextImageInList(next)->rows+0.5),next->filter,exception);
+    if (morph_image == (Image *) NULL)
+      {
+        (*morph_images)=DestroyImageList((*morph_images));
+        return(MagickFalse);
+      }
+    (*status)=SetImageStorageClass(morph_image,DirectClass,exception);
+    if ((*status) == MagickFalse)
+      {
+        morph_image=DestroyImage(morph_image);
+        return(MagickFalse);
+      }
+    AppendImageToList(morph_images,morph_image);
+    (*morph_images)=GetLastImageInList((*morph_images));
+    morph_image=ResizeImage(GetNextImageInList(next),(*morph_images)->columns,
+      (*morph_images)->rows,GetNextImageInList(next)->filter,exception);
+    if (morph_image == (Image *) NULL)
+      {
+        (*morph_images)=DestroyImageList((*morph_images));
+        return(MagickFalse);
+      }
+    frame.morph_images=(*morph_images);
+    frame.alpha=alpha;
+    frame.beta=beta;
+    frame.exception=exception;
+    (*status)=MorphFrame(&frame,morph_image,(*status));
+  }
+  return(MagickTrue);
+}
+
+MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
+  ExceptionInfo *exception)
+{
   Image
     *morph_image,
     *morph_images;
@@ -1855,42 +1922,15 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
   next=image;
   for ( ; GetNextImageInList(next) != (Image *) NULL; next=GetNextImageInList(next))
   {
-    for (n=0; n < (ssize_t) number_frames; n++)
-    {
-      MorphFrameInfo
-        frame;
+    MorphSequenceTargets
+      targets;
 
-      beta=(double) (n+1.0)/(double) (number_frames+1.0);
-      alpha=1.0-beta;
-      morph_image=ResizeImage(next,(size_t) (alpha*next->columns+beta*
-        GetNextImageInList(next)->columns+0.5),(size_t) (alpha*next->rows+beta*
-        GetNextImageInList(next)->rows+0.5),next->filter,exception);
-      if (morph_image == (Image *) NULL)
-        {
-          morph_images=DestroyImageList(morph_images);
-          return((Image *) NULL);
-        }
-      status=SetImageStorageClass(morph_image,DirectClass,exception);
-      if (status == MagickFalse)
-        {
-          morph_image=DestroyImage(morph_image);
-          return((Image *) NULL);
-        }
-      AppendImageToList(&morph_images,morph_image);
-      morph_images=GetLastImageInList(morph_images);
-      morph_image=ResizeImage(GetNextImageInList(next),morph_images->columns,
-        morph_images->rows,GetNextImageInList(next)->filter,exception);
-      if (morph_image == (Image *) NULL)
-        {
-          morph_images=DestroyImageList(morph_images);
-          return((Image *) NULL);
-        }
-      frame.morph_images=morph_images;
-      frame.alpha=alpha;
-      frame.beta=beta;
-      frame.exception=exception;
-      status=MorphFrame(&frame,morph_image,status);
-    }
+    targets.morph_images=(&morph_images);
+    targets.status=(&status);
+    targets.n=(&n);
+    if (MorphSequenceFrames(next,number_frames,exception,&targets) ==
+        MagickFalse)
+      return((Image *) NULL);
     if (n < (ssize_t) number_frames)
       break;
     /*
