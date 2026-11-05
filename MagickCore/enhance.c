@@ -1456,6 +1456,16 @@ static MagickBooleanType EnhanceImageHead(const EnhanceHead *head,
   return(MagickTrue);
 }
 
+static Image *FinishEnhanceImage(CacheView *enhance_view,CacheView *image_view,
+  Image *enhance_image,const MagickBooleanType status)
+{
+  enhance_view=DestroyCacheView(enhance_view);
+  image_view=DestroyCacheView(image_view);
+  if (status == MagickFalse)
+    enhance_image=DestroyImage(enhance_image);
+  return(enhance_image);
+}
+
 MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -1524,11 +1534,7 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
         SetEnhanceProgress(image,EnhanceImageTag,progress,&status);
       }
   }
-  enhance_view=DestroyCacheView(enhance_view);
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    enhance_image=DestroyImage(enhance_image);
-  return(enhance_image);
+  return(FinishEnhanceImage(enhance_view,image_view,enhance_image,status));
 }
 
 
