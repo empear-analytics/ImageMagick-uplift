@@ -3783,11 +3783,11 @@ static MagickBooleanType AcquireSelectiveLuminance(const Image *image,
   return(MagickTrue);
 }
 
+#define SelectiveBlurImageTag  "SelectiveBlur/Image"
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
-#define SelectiveBlurImageTag  "SelectiveBlur/Image"
-
   CacheView
     *blur_view,
     *image_view,
