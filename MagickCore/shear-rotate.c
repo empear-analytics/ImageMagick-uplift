@@ -740,6 +740,36 @@ static void RotateImage180(const RotateInfo *info,MagickBooleanType *status,
   }
 }
 
+static Image *FinishRotateImage(const RotateInfo *info,
+  const MagickBooleanType status,const RectangleInfo page)
+{
+  const Image
+    *image = info->image;
+
+  CacheView
+    *image_view = info->image_view,
+    *rotate_view = info->rotate_view;
+
+  Image
+    *rotate_image = info->rotate_image;
+
+  const size_t
+    rotations = info->rotations;
+
+  ExceptionInfo
+    *exception = info->exception;
+
+  rotate_view=DestroyCacheView(rotate_view);
+  image_view=DestroyCacheView(image_view);
+  rotate_image->type=image->type;
+  rotate_image->page=page;
+  if (status != MagickFalse)
+    AppendRotateTransform(image,rotations,rotate_image,exception);
+  if (status == MagickFalse)
+    rotate_image=DestroyImage(rotate_image);
+  return(rotate_image);
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -827,13 +857,5 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
       break;
     }
   }
-  rotate_view=DestroyCacheView(rotate_view);
-  image_view=DestroyCacheView(image_view);
-  rotate_image->type=image->type;
-  rotate_image->page=page;
-  if (status != MagickFalse)
-    AppendRotateTransform(image,rotations,rotate_image,exception);
-  if (status == MagickFalse)
-    rotate_image=DestroyImage(rotate_image);
-  return(rotate_image);
+  return(FinishRotateImage(&info,status,page));
 }
