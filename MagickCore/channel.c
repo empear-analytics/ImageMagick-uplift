@@ -193,7 +193,7 @@ static MagickBooleanType ChannelImage(Image *destination_image,
   return(status);
 }
 
-static MagickBooleanType RegisterDestinationChannel(
+static MagickBooleanType AddDestinationMaskChannel(
   Image *destination_image,const PixelChannel destination_channel,
   const char *token,ExceptionInfo *exception)
 {
@@ -202,13 +202,6 @@ static MagickBooleanType RegisterDestinationChannel(
 
   switch (destination_channel)
   {
-    case RedPixelChannel:
-    case GreenPixelChannel:
-    case BluePixelChannel:
-    case BlackPixelChannel:
-    case AlphaPixelChannel:
-    case IndexPixelChannel:
-      break;
     case CompositeMaskPixelChannel:
     {
       destination_image->channels=(ChannelType)
@@ -246,6 +239,26 @@ static MagickBooleanType RegisterDestinationChannel(
         }
       break;
     }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType RegisterDestinationChannel(
+  Image *destination_image,const PixelChannel destination_channel,
+  const char *token,ExceptionInfo *exception)
+{
+  switch (destination_channel)
+  {
+    case RedPixelChannel:
+    case GreenPixelChannel:
+    case BluePixelChannel:
+    case BlackPixelChannel:
+    case AlphaPixelChannel:
+    case IndexPixelChannel:
+      break;
+    default:
+      return(AddDestinationMaskChannel(destination_image,destination_channel,
+        token,exception));
   }
   return(MagickTrue);
 }
