@@ -3128,6 +3128,682 @@ static void MapBarrelDistortion(const DistortMapping *mapping,PointInfo *d,
   }
 }
 
+static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
+  const char *lookup,ExceptionInfo *exception)
+{
+  double
+    *inverse;
+
+  ssize_t
+    i;
+
+  inverse=(double *) AcquireQuantumMemory(6,sizeof(*inverse));
+  if (inverse == (double *) NULL)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","%s","DistortImages");
+      return(MagickFalse);
+    }
+  InvertAffineCoefficients(coeff, inverse);
+  CoefficientsToAffineArgs(inverse);
+  (void) FormatLocaleFile(stderr, "Affine projection:\n");
+  (void) FormatLocaleFile(stderr,
+    "  -distort AffineProjection \\\n    '");
+  for (i=0; i < 5; i++)
+    (void) FormatLocaleFile(stderr, "%.*g,",GetMagickPrecision(),
+      inverse[i]);
+  (void) FormatLocaleFile(stderr, "%.*g'\n",GetMagickPrecision(),
+    inverse[5]);
+  (void) FormatLocaleFile(stderr,
+    "Equivalent scale, rotation(deg), translation:\n");
+  (void) FormatLocaleFile(stderr,"  %.*g,%.*g,%.*g,%.*g\n",
+    GetMagickPrecision(),sqrt(inverse[0]*inverse[0]+
+    inverse[1]*inverse[1]),GetMagickPrecision(),
+    RadiansToDegrees(atan2(inverse[1],inverse[0])),
+    GetMagickPrecision(),inverse[4],GetMagickPrecision(),inverse[5]);
+  inverse=(double *) RelinquishMagickMemory(inverse);
+  (void) FormatLocaleFile(stderr,"Affine distort, FX equivalent:\n");
+  (void) FormatLocaleFile(stderr, "%s", image_gen);
+  (void) FormatLocaleFile(stderr,
+    "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
+  (void) FormatLocaleFile(stderr,"       xx=%+.*g*ii %+.*g*jj %+.*g;\n",
+    GetMagickPrecision(),coeff[0],GetMagickPrecision(),coeff[1],
+    GetMagickPrecision(),coeff[2]);
+  (void) FormatLocaleFile(stderr,"       yy=%+.*g*ii %+.*g*jj %+.*g;\n",
+    GetMagickPrecision(),coeff[3],GetMagickPrecision(),coeff[4],
+    GetMagickPrecision(),coeff[5]);
+  (void) FormatLocaleFile(stderr,"       %s' \\\n",lookup);
+  return(MagickTrue);
+}
+
+static MagickBooleanType PrintPerspectiveFX(double *coeff,
+  const char *image_gen,const char *lookup,ExceptionInfo *exception)
+{
+  double
+    *inverse;
+
+  ssize_t
+    i;
+
+  inverse=(double *) AcquireQuantumMemory(8,sizeof(*inverse));
+  if (inverse == (double *) NULL)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","%s",
+        "DistortCoefficients");
+      return(MagickFalse);
+    }
+  InvertPerspectiveCoefficients(coeff, inverse);
+  (void) FormatLocaleFile(stderr,"Perspective Projection:\n");
+  (void) FormatLocaleFile(stderr,
+    "  -distort PerspectiveProjection \\\n      '");
+  for (i=0; i < 4; i++)
+    (void) FormatLocaleFile(stderr, "%.*g, ",GetMagickPrecision(),
+      inverse[i]);
+  (void) FormatLocaleFile(stderr, "\n       ");
+  for ( ; i < 7; i++)
+    (void) FormatLocaleFile(stderr, "%.*g, ",GetMagickPrecision(),
+      inverse[i]);
+  (void) FormatLocaleFile(stderr, "%.*g'\n",GetMagickPrecision(),
+    inverse[7]);
+  inverse=(double *) RelinquishMagickMemory(inverse);
+  (void) FormatLocaleFile(stderr,"Perspective Distort, FX Equivalent:\n");
+  (void) FormatLocaleFile(stderr,"%.1024s",image_gen);
+  (void) FormatLocaleFile(stderr,
+    "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
+  (void) FormatLocaleFile(stderr,"       rr=%+.*g*ii %+.*g*jj + 1;\n",
+    GetMagickPrecision(),coeff[6],GetMagickPrecision(),coeff[7]);
+  (void) FormatLocaleFile(stderr,
+    "       xx=(%+.*g*ii %+.*g*jj %+.*g)/rr;\n",
+    GetMagickPrecision(),coeff[0],GetMagickPrecision(),coeff[1],
+    GetMagickPrecision(),coeff[2]);
+  (void) FormatLocaleFile(stderr,
+    "       yy=(%+.*g*ii %+.*g*jj %+.*g)/rr;\n",
+    GetMagickPrecision(),coeff[3],GetMagickPrecision(),coeff[4],
+    GetMagickPrecision(),coeff[5]);
+  (void) FormatLocaleFile(stderr,"       rr%s0 ? %s : blue' \\\n",
+    coeff[8] < 0.0 ? "<" : ">", lookup);
+  return(MagickTrue);
+}
+
+static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
+  const char *lookup)
+{
+  (void) FormatLocaleFile(stderr,"BilinearForward Mapping Equations:\n");
+  (void) FormatLocaleFile(stderr,"%s", image_gen);
+  (void) FormatLocaleFile(stderr,"    i = %+lf*x %+lf*y %+lf*x*y %+lf;\n",
+    coeff[0],coeff[1],coeff[2],coeff[3]);
+  (void) FormatLocaleFile(stderr,"    j = %+lf*x %+lf*y %+lf*x*y %+lf;\n",
+    coeff[4],coeff[5],coeff[6],coeff[7]);
+#if 0
+        /* for debugging */
+        (void) FormatLocaleFile(stderr, "   c8 = %+lf  c9 = 2*a = %+lf;\n",
+            coeff[8], coeff[9]);
+#endif
+  (void) FormatLocaleFile(stderr,
+    "BilinearForward Distort, FX Equivalent:\n");
+  (void) FormatLocaleFile(stderr,"%s", image_gen);
+  (void) FormatLocaleFile(stderr,
+    "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",0.5-coeff[3],0.5-
+    coeff[7]);
+  (void) FormatLocaleFile(stderr,"       bb=%lf*ii %+lf*jj %+lf;\n",
+    coeff[6], -coeff[2], coeff[8]);
+  /* Handle Special degenerate (non-quadratic) or trapezoidal case */
+  if (coeff[9] != 0)
+    {
+      (void) FormatLocaleFile(stderr,
+        "       rt=bb*bb %+lf*(%lf*ii%+lf*jj);\n",-2*coeff[9],coeff[4],
+        -coeff[0]);
+    (void) FormatLocaleFile(stderr,
+      "       yy=( -bb + sqrt(rt) ) / %lf;\n",coeff[9]);
+    }
+  else
+    (void) FormatLocaleFile(stderr,"       yy=(%lf*ii%+lf*jj)/bb;\n",
+      -coeff[4],coeff[0]);
+  (void) FormatLocaleFile(stderr,
+    "       xx=(ii %+lf*yy)/(%lf %+lf*yy);\n",-coeff[1],coeff[0],
+    coeff[2]);
+  if ( coeff[9] != 0 )
+    (void) FormatLocaleFile(stderr,"       (rt < 0 ) ? red : %s'\n",
+      lookup);
+  else
+    (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+}
+
+static void PrintBilinearReverseFX(const double *coeff,const char *image_gen,
+  const char *lookup)
+{
+#if 0
+        (void) FormatLocaleFile(stderr, "Polynomial Projection Distort:\n");
+        (void) FormatLocaleFile(stderr, "  -distort PolynomialProjection \\\n");
+        (void) FormatLocaleFile(stderr, "      '1.5, %lf, %lf, %lf, %lf,\n",
+            coeff[3], coeff[0], coeff[1], coeff[2]);
+        (void) FormatLocaleFile(stderr, "            %lf, %lf, %lf, %lf'\n",
+            coeff[7], coeff[4], coeff[5], coeff[6]);
+#endif
+  (void) FormatLocaleFile(stderr,
+    "BilinearReverse Distort, FX Equivalent:\n");
+  (void) FormatLocaleFile(stderr,"%s", image_gen);
+  (void) FormatLocaleFile(stderr,
+    "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
+  (void) FormatLocaleFile(stderr,
+    "       xx=%+lf*ii %+lf*jj %+lf*ii*jj %+lf;\n",coeff[0],coeff[1],
+    coeff[2], coeff[3]);
+  (void) FormatLocaleFile(stderr,
+     "       yy=%+lf*ii %+lf*jj %+lf*ii*jj %+lf;\n",coeff[4],coeff[5],
+     coeff[6], coeff[7]);
+  (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+}
+
+typedef struct _DistortVerboseFX
+{
+  DistortMethod
+    method;
+
+  const Image
+    *image;
+
+  double
+    *coeff;
+
+  char
+    *image_gen;
+
+  const char
+    *lookup;
+} DistortVerboseFX;
+
+static void PrintLensDistortFX(const DistortVerboseFX *fx)
+{
+  const DistortMethod
+    method = fx->method;
+
+  const Image
+    *const image = fx->image;
+
+  double
+    *const coeff = fx->coeff;
+
+  char
+    *const image_gen = fx->image_gen;
+
+  const char
+    *const lookup = fx->lookup;
+
+  switch (method)
+  {
+    case Plane2CylinderDistortion:
+    {
+      (void) FormatLocaleFile(stderr,
+        "Plane to Cylinder Distort, Internal Coefficients\n");
+      (void) FormatLocaleFile(stderr,"  cylinder_radius = %+lf\n",coeff[1]);
+      (void) FormatLocaleFile(stderr,
+        "Plane to Cylinder Distort, FX Equivalent:\n");
+      (void) FormatLocaleFile(stderr,"%s", image_gen);
+      (void) FormatLocaleFile(stderr,
+        "  -fx 'ii=i+page.x%+lf+0.5; jj=j+page.y%+lf+0.5;\n",-coeff[4],
+        -coeff[5]);
+      (void) FormatLocaleFile(stderr,"       ii=ii/%+lf;\n",coeff[1]);
+      (void) FormatLocaleFile(stderr,"       xx=%lf*tan(ii)%+lf;\n",coeff[1],
+        coeff[2] );
+      (void) FormatLocaleFile(stderr,"       yy=jj/cos(ii)%+lf;\n",coeff[3]);
+      (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+      break;
+    }
+    case BarrelDistortion:
+    case BarrelInverseDistortion:
+    {
+      PrintBarrelFX(image,coeff,method,image_gen);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void PrintRadialDistortFX(const DistortVerboseFX *fx)
+{
+  const DistortMethod
+    method = fx->method;
+
+  double
+    *const coeff = fx->coeff;
+
+  char
+    *const image_gen = fx->image_gen;
+
+  const char
+    *const lookup = fx->lookup;
+
+  ssize_t
+    i;
+
+  switch (method)
+  {
+    case ArcDistortion:
+    {
+      PrintArcFX(coeff,image_gen);
+      break;
+    }
+    case PolarDistortion:
+    {
+      (void) FormatLocaleFile(stderr,"Polar Distort, Internal Coefficients\n");
+      for (i=0; i < 8; i++)
+        (void) FormatLocaleFile(stderr,"  c%.17g = %+lf\n",(double) i,
+          coeff[i]);
+      (void) FormatLocaleFile(stderr,"Polar Distort, FX Equivalent:\n");
+      (void) FormatLocaleFile(stderr,"%s", image_gen);
+      (void) FormatLocaleFile(stderr,
+        "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",-coeff[2],-coeff[3]);
+      (void) FormatLocaleFile(stderr,"       xx=(atan2(ii,jj)%+lf)/(2*pi);\n",
+        -(coeff[4]+coeff[5])/2 );
+      (void) FormatLocaleFile(stderr,"       xx=xx-round(xx);\n");
+      (void) FormatLocaleFile(stderr,"       xx=xx*2*pi*%lf + v.w/2;\n",
+        coeff[6] );
+      (void) FormatLocaleFile(stderr,"       yy=(hypot(ii,jj)%+lf)*%lf;\n",
+        -coeff[1],coeff[7] );
+      (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
+      break;
+    }
+    case DePolarDistortion:
+    {
+      PrintDePolarFX(coeff,image_gen);
+      break;
+    }
+    case Cylinder2PlaneDistortion:
+    {
+      PrintCylinder2PlaneFX(coeff,image_gen,lookup);
+      break;
+    }
+    default:
+    {
+      PrintLensDistortFX(fx);
+      break;
+    }
+  }
+}
+
+static void PrintDistortFX(const DistortVerboseFX *fx)
+{
+  const DistortMethod
+    method = fx->method;
+
+  double
+    *const coeff = fx->coeff;
+
+  char
+    *const image_gen = fx->image_gen;
+
+  const char
+    *const lookup = fx->lookup;
+
+  switch (method)
+  {
+    case BilinearForwardDistortion:
+    {
+      PrintBilinearForwardFX(coeff,image_gen,lookup);
+      break;
+    }
+    case BilinearReverseDistortion:
+    {
+      PrintBilinearReverseFX(coeff,image_gen,lookup);
+      break;
+    }
+    case PolynomialDistortion:
+    {
+      PrintPolynomialFX(coeff,image_gen,lookup);
+      break;
+    }
+    default:
+    {
+      PrintRadialDistortFX(fx);
+      break;
+    }
+  }
+}
+
+typedef struct _VerboseDestination
+{
+  MagickBooleanType
+    bestfit,
+    viewport_given;
+
+  RectangleInfo
+    geometry;
+} VerboseDestination;
+
+static void SetVerboseDestination(const VerboseDestination *destination,
+  char (*image_gen)[MagickPathExtent],const char **lookup)
+{
+  const MagickBooleanType
+    bestfit = destination->bestfit,
+    viewport_given = destination->viewport_given;
+
+  const RectangleInfo
+    geometry = destination->geometry;
+
+  if ( bestfit || viewport_given ) {
+    (void) FormatLocaleString((*image_gen),MagickPathExtent,
+      "  -size %.17gx%.17g -page %+.20g%+.20g xc: +insert \\\n",
+      (double) geometry.width,(double) geometry.height,(double) geometry.x,
+      (double) geometry.y);
+    (*lookup)="v.p{xx-v.page.x-0.5,yy-v.page.y-0.5}";
+  }
+  else {
+    (*image_gen)[0] = '\0';             /* no destination to generate */
+    (*lookup) = "p{xx-page.x-0.5,yy-page.y-0.5}"; /* simplify lookup */
+  }
+}
+
+typedef struct _DistortVerboseInput
+{
+  const Image
+    *image;
+
+  DistortMethod
+    method;
+
+  double
+    *coeff;
+
+  MagickBooleanType
+    bestfit,
+    viewport_given;
+
+  RectangleInfo
+    geometry;
+} DistortVerboseInput;
+
+static MagickBooleanType PrintDistortVerbose(
+  const DistortVerboseInput *verbose_input,ExceptionInfo *exception)
+{
+  const Image
+    *const image = verbose_input->image;
+
+  const DistortMethod
+    method = verbose_input->method;
+
+  double
+    *const coeff = verbose_input->coeff;
+
+  const MagickBooleanType
+    bestfit = verbose_input->bestfit,
+    viewport_given = verbose_input->viewport_given;
+
+  const RectangleInfo
+    geometry = verbose_input->geometry;
+
+  if (IsStringTrue(GetImageArtifact(image,"verbose")) != MagickFalse) {
+    char image_gen[MagickPathExtent];
+    const char *lookup;
+    DistortVerboseFX
+      fx;
+
+    VerboseDestination
+      destination;
+
+    /* Set destination image size and virtual offset */
+    destination.bestfit=bestfit;
+    destination.viewport_given=viewport_given;
+    destination.geometry=geometry;
+    SetVerboseDestination(&destination,&image_gen,&lookup);
+
+    fx.method=method;
+    fx.image=image;
+    fx.coeff=coeff;
+    fx.image_gen=image_gen;
+    fx.lookup=lookup;
+    switch (method)
+    {
+      case AffineDistortion:
+      case RigidAffineDistortion:
+      {
+        if (PrintAffineFX(coeff,image_gen,lookup,exception) == MagickFalse)
+          return(MagickFalse);
+        break;
+      }
+      case PerspectiveDistortion:
+      {
+        if (PrintPerspectiveFX(coeff,image_gen,lookup,exception) ==
+            MagickFalse)
+          return(MagickFalse);
+        break;
+      }
+      default:
+      {
+        PrintDistortFX(&fx);
+        break;
+      }
+    }
+  }
+  return(MagickTrue);
+}
+
+/* defines to figure out the bounds of the distorted image */
+#define InitalBounds(p) \
+{ \
+  /* printf("%lg,%lg -> %lg,%lg\n", s.x,s.y, d.x,d.y); */ \
+  min.x = max.x = p.x; \
+  min.y = max.y = p.y; \
+}
+#define ExpandBounds(p) \
+{ \
+  /* printf("%lg,%lg -> %lg,%lg\n", s.x,s.y, d.x,d.y); */ \
+  min.x = MagickMin(min.x,p.x); \
+  max.x = MagickMax(max.x,p.x); \
+  min.y = MagickMin(min.y,p.y); \
+  max.y = MagickMax(max.y,p.y); \
+}
+
+static void AffineBestFitBounds(const double *coeff,const Image *image,
+  PointInfo *caller_min,PointInfo *caller_max)
+{
+  double
+    inverse[6];
+
+  PointInfo
+    d,
+    max = (*caller_max),
+    min = (*caller_min),
+    s;
+
+  InvertAffineCoefficients(coeff, inverse);
+  s.x = (double) image->page.x;
+  s.y = (double) image->page.y;
+  d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
+  d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
+  InitalBounds(d);
+  s.x = (double) image->page.x+image->columns;
+  s.y = (double) image->page.y;
+  d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
+  d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
+  ExpandBounds(d);
+  s.x = (double) image->page.x;
+  s.y = (double) image->page.y+image->rows;
+  d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
+  d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
+  ExpandBounds(d);
+  s.x = (double) image->page.x+image->columns;
+  s.y = (double) image->page.y+image->rows;
+  d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
+  d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
+  ExpandBounds(d);
+  (*caller_min)=min;
+  (*caller_max)=max;
+}
+
+static void PerspectiveBestFitBounds(const double *coeff,const Image *image,
+  PointInfo *caller_min,PointInfo *caller_max)
+{
+  double
+    inverse[8],
+    scale;
+
+  PointInfo
+    d,
+    max = (*caller_max),
+    min = (*caller_min),
+    s;
+
+  InvertPerspectiveCoefficients(coeff, inverse);
+  s.x = (double) image->page.x;
+  s.y = (double) image->page.y;
+  scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
+  scale=MagickSafeReciprocal(scale);
+  d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
+  d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
+  InitalBounds(d);
+  s.x = (double) image->page.x+image->columns;
+  s.y = (double) image->page.y;
+  scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
+  scale=MagickSafeReciprocal(scale);
+  d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
+  d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
+  ExpandBounds(d);
+  s.x = (double) image->page.x;
+  s.y = (double) image->page.y+image->rows;
+  scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
+  scale=MagickSafeReciprocal(scale);
+  d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
+  d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
+  ExpandBounds(d);
+  s.x = (double) image->page.x+image->columns;
+  s.y = (double) image->page.y+image->rows;
+  scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
+  scale=MagickSafeReciprocal(scale);
+  d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
+  d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
+  ExpandBounds(d);
+  (*caller_min)=min;
+  (*caller_max)=max;
+}
+
+static void ArcBestFitBounds(double *coeff,const Image *image,
+  PointInfo *caller_min,PointInfo *caller_max)
+{
+  double
+    a,
+    ca,
+    sa;
+
+  PointInfo
+    d,
+    max = (*caller_max),
+    min = (*caller_min);
+
+  /* Forward Map Corners */
+  a = coeff[0]-coeff[1]/2; ca = cos(a); sa = sin(a);
+  d.x = coeff[2]*ca;
+  d.y = coeff[2]*sa;
+  InitalBounds(d);
+  d.x = (coeff[2]-coeff[3])*ca;
+  d.y = (coeff[2]-coeff[3])*sa;
+  ExpandBounds(d);
+  a = coeff[0]+coeff[1]/2; ca = cos(a); sa = sin(a);
+  d.x = coeff[2]*ca;
+  d.y = coeff[2]*sa;
+  ExpandBounds(d);
+  d.x = (coeff[2]-coeff[3])*ca;
+  d.y = (coeff[2]-coeff[3])*sa;
+  ExpandBounds(d);
+  /* Orthogonal points along top of arc */
+  for( a=(double) (ceil((double) ((coeff[0]-coeff[1]/2.0)/MagickPI2))*MagickPI2);
+         a<(coeff[0]+coeff[1]/2.0); a+=MagickPI2 ) {
+    ca = cos(a); sa = sin(a);
+    d.x = coeff[2]*ca;
+    d.y = coeff[2]*sa;
+    ExpandBounds(d);
+  }
+  /*
+    Convert the angle_to_width and radius_to_height
+    to appropriate scaling factors, to allow faster processing
+    in the mapping function.
+  */
+  coeff[1] = (double) (Magick2PI*image->columns/coeff[1]);
+  coeff[3] = (double)image->rows/coeff[3];
+  (*caller_min)=min;
+  (*caller_max)=max;
+}
+
+static Image *DistortResizeFromArguments(const Image *image,
+  const size_t number_arguments,const double *arguments,
+  ExceptionInfo *exception)
+{
+  Image
+    *distort_image;
+
+  if ( number_arguments != 2 )
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+                "InvalidArgument","%s : '%s'","Resize",
+                "Invalid number of args: 2 only");
+      return((Image *) NULL);
+    }
+  distort_image=DistortResizeImage(image,CastDoubleToSizeT(arguments[0]),
+    CastDoubleToSizeT(arguments[1]),exception);
+  return(distort_image);
+}
+
+typedef struct _DistortScaleTargets
+{
+  double
+    *output_scaling;
+
+  RectangleInfo
+    *geometry;
+} DistortScaleTargets;
+
+static MagickBooleanType ScaleDistortGeometry(const Image *image,
+  const DistortScaleTargets *targets)
+{
+  double
+    *const output_scaling = targets->output_scaling;
+
+  RectangleInfo
+    *const geometry = targets->geometry;
+
+  { const char *artifact;
+    artifact=GetImageArtifact(image,"distort:scale");
+    (*output_scaling) = 1.0;
+    if (artifact != (const char *) NULL) {
+      (*output_scaling) = fabs(StringToDouble(artifact,(char **) NULL));
+      (*geometry).width=CastDoubleToSizeT((*output_scaling)*(*geometry).width+0.5);
+      (*geometry).height=CastDoubleToSizeT((*output_scaling)*(*geometry).height+0.5);
+      (*geometry).x=(ssize_t) ((*output_scaling)*(*geometry).x+0.5);
+      (*geometry).y=(ssize_t) ((*output_scaling)*(*geometry).y+0.5);
+      if ( (*output_scaling) < 0.1 ) {
+        return(MagickFalse);
+      }
+      (*output_scaling) = 1/(*output_scaling);
+    }
+  }
+  return(MagickTrue);
+}
+
+static void SetDistortProgress(MagickBooleanType *status,const Image *image,
+  const char *tag,const MagickOffsetType progress)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static void SyncDistortRow(MagickBooleanType *status,CacheView *view,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    sync;
+
+  sync=SyncCacheViewAuthenticPixels(view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3150,6 +3826,12 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   PixelInfo
     invalid;  /* the color to assign when distort result is invalid */
 
+  DistortVerboseInput
+    verbose_input;
+
+  DistortScaleTargets
+    scale_targets;
+
   const CoefficientInput input = { number_arguments, arguments, 0 };
 
   assert(image != (Image *) NULL);
@@ -3162,18 +3844,8 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
     Handle Special Compound Distortions
   */
   if ( method == ResizeDistortion )
-    {
-      if ( number_arguments != 2 )
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-                    "InvalidArgument","%s : '%s'","Resize",
-                    "Invalid number of args: 2 only");
-          return((Image *) NULL);
-        }
-      distort_image=DistortResizeImage(image,CastDoubleToSizeT(arguments[0]),
-        CastDoubleToSizeT(arguments[1]),exception);
-      return(distort_image);
-    }
+    return(DistortResizeFromArguments(image,number_arguments,arguments,
+      exception));
 
   /*
     Convert input arguments (usually as control points for reverse mapping)
@@ -3204,122 +3876,29 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   /* Work out the 'best fit', (required for ArcDistortion) */
   if ( bestfit ) {
     PointInfo
-      s,d,min,max;  /* source, dest coords --mapping--> min, max coords */
+      s,min,max;  /* source, dest coords --mapping--> min, max coords */
 
     MagickBooleanType
       fix_bounds = MagickTrue;   /* enlarge bounds for VP handling */
 
     s.x=s.y=min.x=max.x=min.y=max.y=0.0;   /* keep compiler happy */
 
-/* defines to figure out the bounds of the distorted image */
-#define InitalBounds(p) \
-{ \
-  /* printf("%lg,%lg -> %lg,%lg\n", s.x,s.y, d.x,d.y); */ \
-  min.x = max.x = p.x; \
-  min.y = max.y = p.y; \
-}
-#define ExpandBounds(p) \
-{ \
-  /* printf("%lg,%lg -> %lg,%lg\n", s.x,s.y, d.x,d.y); */ \
-  min.x = MagickMin(min.x,p.x); \
-  max.x = MagickMax(max.x,p.x); \
-  min.y = MagickMin(min.y,p.y); \
-  max.y = MagickMax(max.y,p.y); \
-}
-
     switch (method)
     {
       case AffineDistortion:
       case RigidAffineDistortion:
-      { double inverse[6];
-        InvertAffineCoefficients(coeff, inverse);
-        s.x = (double) image->page.x;
-        s.y = (double) image->page.y;
-        d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
-        d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
-        InitalBounds(d);
-        s.x = (double) image->page.x+image->columns;
-        s.y = (double) image->page.y;
-        d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
-        d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
-        ExpandBounds(d);
-        s.x = (double) image->page.x;
-        s.y = (double) image->page.y+image->rows;
-        d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
-        d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
-        ExpandBounds(d);
-        s.x = (double) image->page.x+image->columns;
-        s.y = (double) image->page.y+image->rows;
-        d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
-        d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
-        ExpandBounds(d);
+      {
+        AffineBestFitBounds(coeff,image,&min,&max);
         break;
       }
       case PerspectiveDistortion:
-      { double inverse[8], scale;
-        InvertPerspectiveCoefficients(coeff, inverse);
-        s.x = (double) image->page.x;
-        s.y = (double) image->page.y;
-        scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
-        scale=MagickSafeReciprocal(scale);
-        d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
-        d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
-        InitalBounds(d);
-        s.x = (double) image->page.x+image->columns;
-        s.y = (double) image->page.y;
-        scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
-        scale=MagickSafeReciprocal(scale);
-        d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
-        d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
-        ExpandBounds(d);
-        s.x = (double) image->page.x;
-        s.y = (double) image->page.y+image->rows;
-        scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
-        scale=MagickSafeReciprocal(scale);
-        d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
-        d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
-        ExpandBounds(d);
-        s.x = (double) image->page.x+image->columns;
-        s.y = (double) image->page.y+image->rows;
-        scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
-        scale=MagickSafeReciprocal(scale);
-        d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
-        d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
-        ExpandBounds(d);
+      {
+        PerspectiveBestFitBounds(coeff,image,&min,&max);
         break;
       }
       case ArcDistortion:
-      { double a, ca, sa;
-        /* Forward Map Corners */
-        a = coeff[0]-coeff[1]/2; ca = cos(a); sa = sin(a);
-        d.x = coeff[2]*ca;
-        d.y = coeff[2]*sa;
-        InitalBounds(d);
-        d.x = (coeff[2]-coeff[3])*ca;
-        d.y = (coeff[2]-coeff[3])*sa;
-        ExpandBounds(d);
-        a = coeff[0]+coeff[1]/2; ca = cos(a); sa = sin(a);
-        d.x = coeff[2]*ca;
-        d.y = coeff[2]*sa;
-        ExpandBounds(d);
-        d.x = (coeff[2]-coeff[3])*ca;
-        d.y = (coeff[2]-coeff[3])*sa;
-        ExpandBounds(d);
-        /* Orthogonal points along top of arc */
-        for( a=(double) (ceil((double) ((coeff[0]-coeff[1]/2.0)/MagickPI2))*MagickPI2);
-               a<(coeff[0]+coeff[1]/2.0); a+=MagickPI2 ) {
-          ca = cos(a); sa = sin(a);
-          d.x = coeff[2]*ca;
-          d.y = coeff[2]*sa;
-          ExpandBounds(d);
-        }
-        /*
-          Convert the angle_to_width and radius_to_height
-          to appropriate scaling factors, to allow faster processing
-          in the mapping function.
-        */
-        coeff[1] = (double) (Magick2PI*image->columns/coeff[1]);
-        coeff[3] = (double)image->rows/coeff[3];
+      {
+        ArcBestFitBounds(coeff,image,&min,&max);
         break;
       }
       case PolarDistortion:
@@ -3413,276 +3992,28 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   GetDistortViewport(image,&geometry,&viewport_given,exception);
 
   /* Verbose output */
-  if (IsStringTrue(GetImageArtifact(image,"verbose")) != MagickFalse) {
-    ssize_t
-       i;
-    char image_gen[MagickPathExtent];
-    const char *lookup;
-
-    /* Set destination image size and virtual offset */
-    if ( bestfit || viewport_given ) {
-      (void) FormatLocaleString(image_gen,MagickPathExtent,
-        "  -size %.17gx%.17g -page %+.20g%+.20g xc: +insert \\\n",
-        (double) geometry.width,(double) geometry.height,(double) geometry.x,
-        (double) geometry.y);
-      lookup="v.p{xx-v.page.x-0.5,yy-v.page.y-0.5}";
-    }
-    else {
-      image_gen[0] = '\0';             /* no destination to generate */
-      lookup = "p{xx-page.x-0.5,yy-page.y-0.5}"; /* simplify lookup */
-    }
-
-    switch (method)
-    {
-      case AffineDistortion:
-      case RigidAffineDistortion:
-      {
-        double
-          *inverse;
-
-        inverse=(double *) AcquireQuantumMemory(6,sizeof(*inverse));
-        if (inverse == (double *) NULL)
-          {
-            coeff=(double *) RelinquishMagickMemory(coeff);
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","%s","DistortImages");
-            return((Image *) NULL);
-          }
-        InvertAffineCoefficients(coeff, inverse);
-        CoefficientsToAffineArgs(inverse);
-        (void) FormatLocaleFile(stderr, "Affine projection:\n");
-        (void) FormatLocaleFile(stderr,
-          "  -distort AffineProjection \\\n    '");
-        for (i=0; i < 5; i++)
-          (void) FormatLocaleFile(stderr, "%.*g,",GetMagickPrecision(),
-            inverse[i]);
-        (void) FormatLocaleFile(stderr, "%.*g'\n",GetMagickPrecision(),
-          inverse[5]);
-        (void) FormatLocaleFile(stderr,
-          "Equivalent scale, rotation(deg), translation:\n");
-        (void) FormatLocaleFile(stderr,"  %.*g,%.*g,%.*g,%.*g\n",
-          GetMagickPrecision(),sqrt(inverse[0]*inverse[0]+
-          inverse[1]*inverse[1]),GetMagickPrecision(),
-          RadiansToDegrees(atan2(inverse[1],inverse[0])),
-          GetMagickPrecision(),inverse[4],GetMagickPrecision(),inverse[5]);
-        inverse=(double *) RelinquishMagickMemory(inverse);
-        (void) FormatLocaleFile(stderr,"Affine distort, FX equivalent:\n");
-        (void) FormatLocaleFile(stderr, "%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
-        (void) FormatLocaleFile(stderr,"       xx=%+.*g*ii %+.*g*jj %+.*g;\n",
-          GetMagickPrecision(),coeff[0],GetMagickPrecision(),coeff[1],
-          GetMagickPrecision(),coeff[2]);
-        (void) FormatLocaleFile(stderr,"       yy=%+.*g*ii %+.*g*jj %+.*g;\n",
-          GetMagickPrecision(),coeff[3],GetMagickPrecision(),coeff[4],
-          GetMagickPrecision(),coeff[5]);
-        (void) FormatLocaleFile(stderr,"       %s' \\\n",lookup);
-        break;
-      }
-      case PerspectiveDistortion:
-      {
-        double
-          *inverse;
-
-        inverse=(double *) AcquireQuantumMemory(8,sizeof(*inverse));
-        if (inverse == (double *) NULL)
-          {
-            coeff=(double *) RelinquishMagickMemory(coeff);
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","%s",
-              "DistortCoefficients");
-            return((Image *) NULL);
-          }
-        InvertPerspectiveCoefficients(coeff, inverse);
-        (void) FormatLocaleFile(stderr,"Perspective Projection:\n");
-        (void) FormatLocaleFile(stderr,
-          "  -distort PerspectiveProjection \\\n      '");
-        for (i=0; i < 4; i++)
-          (void) FormatLocaleFile(stderr, "%.*g, ",GetMagickPrecision(),
-            inverse[i]);
-        (void) FormatLocaleFile(stderr, "\n       ");
-        for ( ; i < 7; i++)
-          (void) FormatLocaleFile(stderr, "%.*g, ",GetMagickPrecision(),
-            inverse[i]);
-        (void) FormatLocaleFile(stderr, "%.*g'\n",GetMagickPrecision(),
-          inverse[7]);
-        inverse=(double *) RelinquishMagickMemory(inverse);
-        (void) FormatLocaleFile(stderr,"Perspective Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%.1024s",image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
-        (void) FormatLocaleFile(stderr,"       rr=%+.*g*ii %+.*g*jj + 1;\n",
-          GetMagickPrecision(),coeff[6],GetMagickPrecision(),coeff[7]);
-        (void) FormatLocaleFile(stderr,
-          "       xx=(%+.*g*ii %+.*g*jj %+.*g)/rr;\n",
-          GetMagickPrecision(),coeff[0],GetMagickPrecision(),coeff[1],
-          GetMagickPrecision(),coeff[2]);
-        (void) FormatLocaleFile(stderr,
-          "       yy=(%+.*g*ii %+.*g*jj %+.*g)/rr;\n",
-          GetMagickPrecision(),coeff[3],GetMagickPrecision(),coeff[4],
-          GetMagickPrecision(),coeff[5]);
-        (void) FormatLocaleFile(stderr,"       rr%s0 ? %s : blue' \\\n",
-          coeff[8] < 0.0 ? "<" : ">", lookup);
-        break;
-      }
-      case BilinearForwardDistortion:
-      {
-        (void) FormatLocaleFile(stderr,"BilinearForward Mapping Equations:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,"    i = %+lf*x %+lf*y %+lf*x*y %+lf;\n",
-          coeff[0],coeff[1],coeff[2],coeff[3]);
-        (void) FormatLocaleFile(stderr,"    j = %+lf*x %+lf*y %+lf*x*y %+lf;\n",
-          coeff[4],coeff[5],coeff[6],coeff[7]);
-#if 0
-        /* for debugging */
-        (void) FormatLocaleFile(stderr, "   c8 = %+lf  c9 = 2*a = %+lf;\n",
-            coeff[8], coeff[9]);
-#endif
-        (void) FormatLocaleFile(stderr,
-          "BilinearForward Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",0.5-coeff[3],0.5-
-          coeff[7]);
-        (void) FormatLocaleFile(stderr,"       bb=%lf*ii %+lf*jj %+lf;\n",
-          coeff[6], -coeff[2], coeff[8]);
-        /* Handle Special degenerate (non-quadratic) or trapezoidal case */
-        if (coeff[9] != 0)
-          {
-            (void) FormatLocaleFile(stderr,
-              "       rt=bb*bb %+lf*(%lf*ii%+lf*jj);\n",-2*coeff[9],coeff[4],
-              -coeff[0]);
-          (void) FormatLocaleFile(stderr,
-            "       yy=( -bb + sqrt(rt) ) / %lf;\n",coeff[9]);
-          }
-        else
-          (void) FormatLocaleFile(stderr,"       yy=(%lf*ii%+lf*jj)/bb;\n",
-            -coeff[4],coeff[0]);
-        (void) FormatLocaleFile(stderr,
-          "       xx=(ii %+lf*yy)/(%lf %+lf*yy);\n",-coeff[1],coeff[0],
-          coeff[2]);
-        if ( coeff[9] != 0 )
-          (void) FormatLocaleFile(stderr,"       (rt < 0 ) ? red : %s'\n",
-            lookup);
-        else
-          (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
-        break;
-      }
-      case BilinearReverseDistortion:
-      {
-#if 0
-        (void) FormatLocaleFile(stderr, "Polynomial Projection Distort:\n");
-        (void) FormatLocaleFile(stderr, "  -distort PolynomialProjection \\\n");
-        (void) FormatLocaleFile(stderr, "      '1.5, %lf, %lf, %lf, %lf,\n",
-            coeff[3], coeff[0], coeff[1], coeff[2]);
-        (void) FormatLocaleFile(stderr, "            %lf, %lf, %lf, %lf'\n",
-            coeff[7], coeff[4], coeff[5], coeff[6]);
-#endif
-        (void) FormatLocaleFile(stderr,
-          "BilinearReverse Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
-        (void) FormatLocaleFile(stderr,
-          "       xx=%+lf*ii %+lf*jj %+lf*ii*jj %+lf;\n",coeff[0],coeff[1],
-          coeff[2], coeff[3]);
-        (void) FormatLocaleFile(stderr,
-           "       yy=%+lf*ii %+lf*jj %+lf*ii*jj %+lf;\n",coeff[4],coeff[5],
-           coeff[6], coeff[7]);
-        (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
-        break;
-      }
-      case PolynomialDistortion:
-      {
-        PrintPolynomialFX(coeff,image_gen,lookup);
-        break;
-      }
-      case ArcDistortion:
-      {
-        PrintArcFX(coeff,image_gen);
-        break;
-      }
-      case PolarDistortion:
-      {
-        (void) FormatLocaleFile(stderr,"Polar Distort, Internal Coefficients\n");
-        for (i=0; i < 8; i++)
-          (void) FormatLocaleFile(stderr,"  c%.17g = %+lf\n",(double) i,
-            coeff[i]);
-        (void) FormatLocaleFile(stderr,"Polar Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",-coeff[2],-coeff[3]);
-        (void) FormatLocaleFile(stderr,"       xx=(atan2(ii,jj)%+lf)/(2*pi);\n",
-          -(coeff[4]+coeff[5])/2 );
-        (void) FormatLocaleFile(stderr,"       xx=xx-round(xx);\n");
-        (void) FormatLocaleFile(stderr,"       xx=xx*2*pi*%lf + v.w/2;\n",
-          coeff[6] );
-        (void) FormatLocaleFile(stderr,"       yy=(hypot(ii,jj)%+lf)*%lf;\n",
-          -coeff[1],coeff[7] );
-        (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
-        break;
-      }
-      case DePolarDistortion:
-      {
-        PrintDePolarFX(coeff,image_gen);
-        break;
-      }
-      case Cylinder2PlaneDistortion:
-      {
-        PrintCylinder2PlaneFX(coeff,image_gen,lookup);
-        break;
-      }
-      case Plane2CylinderDistortion:
-      {
-        (void) FormatLocaleFile(stderr,
-          "Plane to Cylinder Distort, Internal Coefficients\n");
-        (void) FormatLocaleFile(stderr,"  cylinder_radius = %+lf\n",coeff[1]);
-        (void) FormatLocaleFile(stderr,
-          "Plane to Cylinder Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x%+lf+0.5; jj=j+page.y%+lf+0.5;\n",-coeff[4],
-          -coeff[5]);
-        (void) FormatLocaleFile(stderr,"       ii=ii/%+lf;\n",coeff[1]);
-        (void) FormatLocaleFile(stderr,"       xx=%lf*tan(ii)%+lf;\n",coeff[1],
-          coeff[2] );
-        (void) FormatLocaleFile(stderr,"       yy=jj/cos(ii)%+lf;\n",coeff[3]);
-        (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
-        break;
-      }
-      case BarrelDistortion:
-      case BarrelInverseDistortion:
-      {
-        PrintBarrelFX(image,coeff,method,image_gen);
-        break;
-      }
-      default:
-        break;
-    }
-  }
+  verbose_input.image=image;
+  verbose_input.method=method;
+  verbose_input.coeff=coeff;
+  verbose_input.bestfit=bestfit;
+  verbose_input.viewport_given=viewport_given;
+  verbose_input.geometry=geometry;
+  if (PrintDistortVerbose(&verbose_input,exception) == MagickFalse)
+    return((Image *) NULL);
   /*
     The user provided a 'scale' expert option will scale the output image size,
     by the factor given allowing for super-sampling of the distorted image
     space.  Any scaling factors must naturally be halved as a result.
   */
-  { const char *artifact;
-    artifact=GetImageArtifact(image,"distort:scale");
-    output_scaling = 1.0;
-    if (artifact != (const char *) NULL) {
-      output_scaling = fabs(StringToDouble(artifact,(char **) NULL));
-      geometry.width=CastDoubleToSizeT(output_scaling*geometry.width+0.5);
-      geometry.height=CastDoubleToSizeT(output_scaling*geometry.height+0.5);
-      geometry.x=(ssize_t) (output_scaling*geometry.x+0.5);
-      geometry.y=(ssize_t) (output_scaling*geometry.y+0.5);
-      if ( output_scaling < 0.1 ) {
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-                "InvalidArgument","%s", "-set option:distort:scale" );
-        return((Image *) NULL);
-      }
-      output_scaling = 1/output_scaling;
+  scale_targets.output_scaling=(&output_scaling);
+  scale_targets.geometry=(&geometry);
+  if (ScaleDistortGeometry(image,&scale_targets) == MagickFalse)
+    {
+      coeff = (double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+              "InvalidArgument","%s", "-set option:distort:scale" );
+      return((Image *) NULL);
     }
-  }
 
   /*
     Initialize the distort image attributes.
@@ -3749,9 +4080,6 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
 
       double
         validity;  /* how mathematically valid is this the mapping */
-
-      MagickBooleanType
-        sync;
 
       PixelInfo
         pixel;    /* pixel color to assign to distorted image */
@@ -3941,21 +4269,14 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         }
         q+=(ptrdiff_t) GetPixelChannels(distort_image);
       }
-      sync=SyncCacheViewAuthenticPixels(distort_view,exception);
-      if (sync == MagickFalse)
-        status=MagickFalse;
+      SyncDistortRow(&status,distort_view,exception);
       if (image->progress_monitor != (MagickProgressMonitor) NULL)
         {
-          MagickBooleanType
-            proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
           #pragma omp atomic
 #endif
           progress++;
-          proceed=SetImageProgress(image,DistortImageTag,progress,image->rows);
-          if (proceed == MagickFalse)
-            status=MagickFalse;
+          SetDistortProgress(&status,image,DistortImageTag,progress);
         }
     }
     distort_view=DestroyCacheView(distort_view);
@@ -4632,9 +4953,6 @@ MagickExport Image *SparseColorImage(const Image *image,
 #endif
     for (j=0; j < (ssize_t) sparse_image->rows; j++)
     {
-      MagickBooleanType
-        sync;
-
       PixelInfo
         pixel;    /* pixel to assign to distorted image */
 
@@ -4751,21 +5069,14 @@ MagickExport Image *SparseColorImage(const Image *image,
         SetPixelViaPixelInfo(sparse_image,&pixel,q);
         q+=(ptrdiff_t) GetPixelChannels(sparse_image);
       }
-      sync=SyncCacheViewAuthenticPixels(sparse_view,exception);
-      if (sync == MagickFalse)
-        status=MagickFalse;
+      SyncDistortRow(&status,sparse_view,exception);
       if (image->progress_monitor != (MagickProgressMonitor) NULL)
         {
-          MagickBooleanType
-            proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
           #pragma omp atomic
 #endif
           progress++;
-          proceed=SetImageProgress(image,SparseColorTag,progress,image->rows);
-          if (proceed == MagickFalse)
-            status=MagickFalse;
+          SetDistortProgress(&status,image,SparseColorTag,progress);
         }
     }
     sparse_view=DestroyCacheView(sparse_view);

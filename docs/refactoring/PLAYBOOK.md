@@ -6384,6 +6384,149 @@ Bumpy Road Ahead, fx.c 3.59 to 3.62, no finding on any new function.
 
 ---
 
+## Recipe MB - Extract Block Through Copies of Macro-Bound Locals
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead*, and
+the block that would fix it (a group of a `switch`, say) writes struct locals of the
+caller through function-like macros whose bodies name those locals, as `distort.c`'s
+`DistortImage` does in its best-fit cases: `InitalBounds(p)` and `ExpandBounds(p)` assign
+`min.x`, `max.x`, `min.y` and `max.y` of the block's own `PointInfo min,max`. The writes
+sit in the macro text, which every use of the macro shares.
+
+**Not covered by:** Recipes O and Z, which write each written variable `v` as `(*v)` at
+every use: here the uses are in the macro body, and editing it would change every other
+expansion of the macro (and a `.` on a pointer does not compile); Recipe I, which binds the
+same `(*v)` through a targets struct; Recipe E, whose step 4 skips a block that writes two
+of the caller's variables and forbids an out-parameter struct; Recipe H, which moves the
+macros above the function but extracts nothing (this recipe follows it when the macros are
+defined inside the caller).
+
+**How:**
+
+1. The block meets Recipe O steps 1 and 3: it lies outside every OpenMP region with no
+   `#pragma` line, and contains no `return`, `goto`, or `continue` or `break` that leaves
+   it. The macros it uses are defined above the place of the new function, unchanged
+   (when they are defined inside the caller, Recipe H's step 1 hoists them first, in a
+   commit of its own).
+2. List the variables of the caller the block writes. Each one a macro body names, `v`,
+   is a plain local of struct type whose address is not taken elsewhere (Recipe O step
+   2), every member of which is set on every path to the block (Recipe N step 2 (a));
+   the block names it only as `v`, never through a pointer, and passes `&v` nowhere.
+   Every other variable it writes is a temporary of Recipe E step 4 (written before it
+   is read on every path through the block, read by nothing after it), which the new
+   function declares; writes through pointers the block already uses (`coeff[1]=...`)
+   stay as they are.
+3. Cut the block into a new `static void` function directly above the caller (below the
+   macros). Its parameters are the variables the block only reads, by value as in Recipe
+   E, then one pointer `T *caller_v` per `v`, of the variable's exact type, in the order
+   the block first writes them; at most four parameters in all.
+4. At the top of its body declare, with the block's own declarations and the temporaries
+   of step 2, one local per `v` of the variable's exact type and name, initialised from
+   its pointer: `PointInfo min = (*caller_min);` (the copy in). The block's text, the
+   macro uses included, is unchanged.
+5. After the block's last statement assign each local back through its pointer,
+   `(*caller_v)=v;`, in the order of the parameters (the copy out). The function has no
+   other exit (step 1), so the copy out runs on every path.
+6. Call it where the block stood, with the read-only variables and `&v` for each `v`, and
+   check every argument against its parameter by reading. A declaration the caller no
+   longer uses (a temporary the block alone used) leaves it (Recipe E step 4).
+7. Check by script that each macro's `#define` text is byte for byte the same before and
+   after, and that the new function's text is the block's text plus the declarations of
+   step 4 and the assignments of step 5.
+
+**Before:**
+
+```c
+    PointInfo
+      s,d,min,max;  /* source, dest coords --mapping--> min, max coords */
+    ...
+    s.x=s.y=min.x=max.x=min.y=max.y=0.0;   /* keep compiler happy */
+
+    switch (method)
+    {
+      ...
+      case ArcDistortion:
+      { double a, ca, sa;
+        /* Forward Map Corners */
+        a = coeff[0]-coeff[1]/2; ca = cos(a); sa = sin(a);
+        d.x = coeff[2]*ca;
+        d.y = coeff[2]*sa;
+        InitalBounds(d);
+        ...
+        coeff[3] = (double)image->rows/coeff[3];
+        break;
+      }
+```
+
+**After:**
+
+```c
+static void ArcBestFitBounds(double *coeff,const Image *image,
+  PointInfo *caller_min,PointInfo *caller_max)
+{
+  double
+    a,
+    ca,
+    sa;
+
+  PointInfo
+    d,
+    max = (*caller_max),
+    min = (*caller_min);
+
+  /* Forward Map Corners */
+  a = coeff[0]-coeff[1]/2; ca = cos(a); sa = sin(a);
+  d.x = coeff[2]*ca;
+  d.y = coeff[2]*sa;
+  InitalBounds(d);
+  ...
+  coeff[3] = (double)image->rows/coeff[3];
+  (*caller_min)=min;
+  (*caller_max)=max;
+}
+...
+      case ArcDistortion:
+      {
+        ArcBestFitBounds(coeff,image,&min,&max);
+        break;
+      }
+```
+
+**Careful:**
+
+- The copy in and the copy out are pass-by-value-result. It computes what writing the
+  caller's variable in place computes when nothing else reaches that variable while the
+  function runs: the block names it only as `v`, its address goes nowhere else, and the
+  `caller_v` pointers point to distinct variables (step 2). The local starts with the
+  caller's values and only the block writes it, so every read of `v` in the block, the
+  ones in the macro expansions included, gives the value the caller's `v` would have
+  held there; at the exit the caller's variable receives every member's final value, a
+  member the block did not write getting back the value it had.
+- The copy in reads every member of `v`. Step 2 requires each to be set before the block,
+  so no indeterminate value is read (`DistortImage` zeroes `min` and `max` before its
+  `switch`).
+- Copying a struct of `double` members moves values; it computes nothing, so no rounding
+  changes. The macro expansions are the same tokens in the same order, and `min` and
+  `max` in them resolve to locals of the same names and types.
+- A macro used in the new function and in the caller keeps one definition; nothing
+  in it changes (step 7), so its other expansions are untouched.
+- On a path that leaves the block early the copy out would not run: step 1 refuses such
+  a block.
+- A temporary declared in the new function is Recipe E step 4's: the caller's copy was
+  written before it was read and nothing after the block read it.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new function,
+nothing else moved), steps 1, 2 and 6 checked by reading, step 7 by script.
+
+**Provenance:** 2026-11-05, from `distort.c`'s `DistortImage` (campaign A, W14): the
+best-fit `switch`'s Affine/RigidAffine, Perspective and Arc groups write the block's own
+`min` and `max` only through `InitalBounds` and `ExpandBounds`; the W11 to W13 reports
+found no recipe that moves them. A probe of the three steps after the macros' Recipe H
+step: distort.c 4.76 to 4.96, no new finding. Added by Claude Code (Claude Opus 5.5)
+during task W14, under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -6640,3 +6783,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | CB | Extract Critical Block Body: the body of a `#pragma omp critical` block moves into a `static void` helper that its call replaces, the pragma and braces staying in the caller; written variables by pointer, read ones by value or pointer to `const`, at most four parameters; checked by reading | `compare.c`'s eleven `Get*Similarity` merges (a probe, one helper call per critical body: 2.97 to 3.15) and `feature.c`'s `CannyEdgeImage` | owner |
 | 2026-11-05 | NEW | BR | Extract Block Leaving Through a Loop Break or a Return: a block in a loop that leaves through `break;` of the loop on some paths and `return(R);` (one `R`, Recipe W step 2) on others moves to a `static MagickBooleanType` function taking `MagickBooleanType *broke` last, which it clears first; each `return(R);` becomes `return(MagickFalse);`, each `break;` `(*broke)=MagickTrue; return(MagickTrue);`; the caller writes `if (Helper(...,&broke) == MagickFalse) return(R);` and `if (broke != MagickFalse) break;` | `fx.c`'s `TranslateExpression` (campaign A, W14): the ternary colon, the missing-operand test and the in-place operator target each leave the operator loop through `break;` and the function through `return MagickFalse;`, which LB, W, V, Y, I and RV each refuse (the W13 plateau). A probe of the chain (CN, this recipe on the three blocks, EI): bumps 8 to 4, fx.c 3.52 to 3.59, no finding on any new function | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | BR | Step 7: a block holding the call of an earlier helper of this recipe (with `&broke`) and the test of `broke` after it passes the new function's own `broke` on: `&broke` becomes `broke`, other uses `(*broke)` (Recipe O step 5); *Careful* gives the argument | `fx.c`'s `TranslateExpression` (campaign A, W14): the assignment-target chain of the operator-stack loop, after step 6 and Recipe EI, still holds the loop's bump in its first branch, and its `broke` would clash with the helper's parameter. A probe (this step, then Recipe W on the loop): the function leaves Bumpy Road Ahead, fx.c 3.59 to 3.62 | mandate (2026-10-24) |
+| 2026-11-05 | NEW | MB | Extract Block Through Copies of Macro-Bound Locals: a block that writes struct locals of the caller only through function-like macros whose bodies name them (so Recipe O's `(*v)` would edit the macro text) moves to a `static void` function taking a pointer `T *caller_v` per such local, which declares a local of the same name and type initialised `(*caller_v)` (copy in), keeps the block's text and the macro uses unchanged, and ends `(*caller_v)=v;` (copy out); every member set before the block, no exit, no other name or address of `v` in the block, at most four parameters | `distort.c`'s `DistortImage` (campaign A, W14): the best-fit Affine/RigidAffine, Perspective and Arc groups write the block's `min` and `max` only through `InitalBounds` and `ExpandBounds`; O, Z and I would rewrite the macro body, E step 4 skips two outputs; W11 to W13 recorded "no legal home". A probe of the three steps after the macros' Recipe H step: 4.76 to 4.96, no new finding | mandate (2026-10-24) |
