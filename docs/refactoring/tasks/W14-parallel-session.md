@@ -329,3 +329,12 @@ Upstream, possibly a bug, not changed: in `GetImageDynamicThreshold`, `extrema[i
 right size. **Option for the owner:** no oracle case reaches `GetImageDynamicThreshold` (no command-line option
 calls it); a driver case through `imdriver` would let Recipes I, V, W and PC reach the function, which a stub puts
 at about 9.
+
+## Lane a, seventh batch: montage.c 8.56 -> 8.72 with a split (Opus, 4 code commits + 1 tool + 1 playbook)
+
+New file `montage-info.c` (10.0): **add it to the Windows build configuration.** Tool fix in its own commit
+(36da89909, `tools/register_source.py`): it also copied `MagickWand/montage.c`'s `Makefile.in` entries under the new
+name, which broke configure; it now registers MagickCore entries only. Campaign B should pick it up. Amendment under
+the mandate, not yet ruled on: **Recipe I step 2** (551c09acc): a temporary whose declaration in the new function
+would leave a variable written but never read (clang's `-Wunused-but-set-variable`, an error in CI) is a written
+variable of the step instead. `transform.c` unchanged.
