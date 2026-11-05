@@ -410,6 +410,22 @@ static MagickBooleanType AcquireAdaptiveBlurKernels(double **kernel,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireAdaptiveBlurKernelSet(double ***kernel,
+  const size_t width,const double sigma)
+{
+  *kernel=(double **) MagickAssumeAligned(AcquireAlignedMemory((size_t) width,
+    sizeof(**kernel)));
+  if (*kernel == (double **) NULL)
+    return(MagickFalse);
+  (void) memset(*kernel,0,(size_t) width*sizeof(**kernel));
+  if (AcquireAdaptiveBlurKernels(*kernel,width,sigma) == MagickFalse)
+    {
+      *kernel=(double **) RelinquishAlignedMemory(*kernel);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 typedef struct _AdaptiveBlurRow
 {
   const Image
@@ -531,6 +547,16 @@ static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
   return(image);
 }
 
+static void RelinquishAdaptiveKernelSet(double **kernel,const size_t width)
+{
+  ssize_t
+    w;
+
+  for (w=0; w < (ssize_t) width; w+=2)
+    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
+  kernel=(double **) RelinquishAlignedMemory(kernel);
+}
+
 typedef struct _AdaptiveBlurLine
 {
   const Image
@@ -640,7 +666,6 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
     width;
 
   ssize_t
-    w,
     y;
 
   assert(image != (const Image *) NULL);
@@ -674,18 +699,8 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
     Create a set of kernels from maximum (radius,sigma) to minimum.
   */
   width=GetOptimalKernelWidth2D(radius,sigma);
-  kernel=(double **) MagickAssumeAligned(AcquireAlignedMemory((size_t) width,
-    sizeof(*kernel)));
-  if (kernel == (double **) NULL)
+  if (AcquireAdaptiveBlurKernelSet(&kernel,width,sigma) == MagickFalse)
     {
-      edge_image=DestroyImage(edge_image);
-      blur_image=DestroyImage(blur_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  (void) memset(kernel,0,(size_t) width*sizeof(*kernel));
-  if (AcquireAdaptiveBlurKernels(kernel,width,sigma) == MagickFalse)
-    {
-      kernel=(double **) RelinquishAlignedMemory(kernel);
       edge_image=DestroyImage(edge_image);
       blur_image=DestroyImage(blur_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
@@ -724,9 +739,7 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   edge_view=DestroyCacheView(edge_view);
   image_view=DestroyCacheView(image_view);
   edge_image=DestroyImage(edge_image);
-  for (w=0; w < (ssize_t) width; w+=2)
-    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
-  kernel=(double **) RelinquishAlignedMemory(kernel);
+  RelinquishAdaptiveKernelSet(kernel,width);
   return(ReleaseFailedImage(blur_image,status));
 }
 
@@ -977,9 +990,26 @@ static Image *SharpenAdaptiveRows(const AdaptiveSharpen *adaptive)
   return(ReleaseFailedImage(sharp_image,status));
 }
 
+static ssize_t AcquireAdaptiveSharpenKernelRun(double **kernel,
+  const size_t width,const double sigma)
+{
+  ssize_t
+    w;
+
+  for (w=0; w < (ssize_t) width; w+=2)
+  {
+    if (AcquireAdaptiveSharpenKernel(kernel,width,w,sigma) == MagickFalse)
+      break;
+  }
+  return(w);
+}
+
 MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
+  AdaptiveEdge
+    edge;
+
   AdaptiveSharpen
     adaptive;
 
@@ -988,8 +1018,7 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
 
   Image
     *sharp_image,
-    *edge_image,
-    *gaussian_image;
+    *edge_image;
 
   size_t
     width;
@@ -1016,20 +1045,14 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   /*
     Edge detect the image brightness channel, level, sharp, and level again.
   */
-  edge_image=EdgeImage(image,radius,exception);
-  if (edge_image == (Image *) NULL)
+  edge.image=image;
+  edge.radius=radius;
+  edge.sigma=sigma;
+  if (PrepareAdaptiveEdge(&edge,&edge_image,exception) == MagickFalse)
     {
       sharp_image=DestroyImage(sharp_image);
       return((Image *) NULL);
     }
-  (void) AutoLevelImage(edge_image,exception);
-  gaussian_image=BlurImage(edge_image,radius,sigma,exception);
-  if (gaussian_image != (Image *) NULL)
-    {
-      edge_image=DestroyImage(edge_image);
-      edge_image=gaussian_image;
-    }
-  (void) AutoLevelImage(edge_image,exception);
   /*
     Create a set of kernels from maximum (radius,sigma) to minimum.
   */
@@ -1043,11 +1066,7 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
   (void) memset(kernel,0,(size_t) width*sizeof(*kernel));
-  for (w=0; w < (ssize_t) width; w+=2)
-  {
-    if (AcquireAdaptiveSharpenKernel(kernel,width,w,sigma) == MagickFalse)
-      break;
-  }
+  w=AcquireAdaptiveSharpenKernelRun(kernel,width,sigma);
   if (w < (ssize_t) width)
     {
       RelinquishAdaptiveKernels(kernel,w);
