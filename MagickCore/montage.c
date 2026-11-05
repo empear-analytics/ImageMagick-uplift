@@ -1214,6 +1214,19 @@ static void DecorateMontagePage(const MontagePageInfo *page)
     page->montage->client_data);
 }
 
+static size_t GetMontageTitleOffset(const MontageInfo *montage_info,
+  const TypeMetric metrics,const char *title,const RectangleInfo extract_info)
+{
+  size_t
+    title_offset;
+
+  title_offset=0;
+  if (montage_info->title != (char *) NULL)
+    title_offset=(size_t) (2*(metrics.ascent-metrics.descent)*
+      MultilineCensus(title)+2*extract_info.y);
+  return(title_offset);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1372,10 +1385,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   */
   title=InterpretImageProperties(clone_info,image_list[0],montage_info->title,
     exception);
-  title_offset=0;
-  if (montage_info->title != (char *) NULL)
-    title_offset=(size_t) (2*(metrics.ascent-metrics.descent)*
-      MultilineCensus(title)+2*extract_info.y);
+  title_offset=GetMontageTitleOffset(montage_info,metrics,title,extract_info);
   number_lines=GetMaximumLabelLines(image_list,number_images,exception);
   /*
     Allocate next structure.
