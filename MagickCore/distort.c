@@ -1281,6 +1281,73 @@ static void SetBilinearForwardCoefficients(double *coeff,
   }
 }
 
+static double *BilinearCoefficients(double *coeff,const DistortMethod *method,
+  const CoefficientContext *context)
+{
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments,
+    number_values = context->number_values,
+    cp_size = context->cp_size;
+
+  /* Bilinear Distortion (Forward mapping)
+        v = c0*x + c1*y + c2*x*y + c3;
+     for each 'value' given
+
+     This is actually a simple polynomial Distortion!  The difference
+     however is when we need to reverse the above equation to generate a
+     BilinearForwardDistortion (see below).
+
+     Input Arguments are sets of control points...
+     For Distort Images    u,v, x,y  ...
+     For Sparse Gradients  x,y, r,g,b  ...
+
+  */
+  double
+    **matrix,
+    **vectors;
+
+  MagickBooleanType
+    status;
+
+  /* check the number of arguments */
+  if ( number_arguments%cp_size != 0 ||
+       number_arguments < cp_size*4 ) {
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "InvalidArgument", "%s : 'require at least %.17g CPs'",
+          CommandOptionToMnemonic(MagickDistortOptions, *method), 4.0);
+    coeff=(double *) RelinquishMagickMemory(coeff);
+    return((double *) NULL);
+  }
+  /* create matrix, and a fake vectors matrix */
+  matrix=AcquireMagickMatrix(4UL,4UL);
+  vectors=(double **) AcquireQuantumMemory(number_values,sizeof(*vectors));
+  if (matrix == (double **) NULL || vectors == (double **) NULL)
+  {
+    matrix  = RelinquishMagickMatrix(matrix, 4UL);
+    vectors = (double **) RelinquishMagickMemory(vectors);
+    coeff   = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),
+            ResourceLimitError,"MemoryAllocationFailed",
+            "%s", "DistortCoefficients");
+    return((double *) NULL);
+  }
+  status=SolveBilinearCoefficients(coeff,matrix,vectors,context);
+  matrix  = RelinquishMagickMatrix(matrix, 4UL);
+  vectors = (double **) RelinquishMagickMemory(vectors);
+  if ( status == MagickFalse ) {
+    coeff = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument","%s : 'Unsolvable Matrix'",
+        CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    return((double *) NULL);
+  }
+  SetBilinearForwardCoefficients(coeff,method);
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1452,62 +1519,7 @@ static double *GenerateCoefficients(const Image *image,
       return(PerspectiveProjectionCoefficients(coeff,method,&context));
     case BilinearForwardDistortion:
     case BilinearReverseDistortion:
-    {
-      /* Bilinear Distortion (Forward mapping)
-            v = c0*x + c1*y + c2*x*y + c3;
-         for each 'value' given
-
-         This is actually a simple polynomial Distortion!  The difference
-         however is when we need to reverse the above equation to generate a
-         BilinearForwardDistortion (see below).
-
-         Input Arguments are sets of control points...
-         For Distort Images    u,v, x,y  ...
-         For Sparse Gradients  x,y, r,g,b  ...
-
-      */
-      double
-        **matrix,
-        **vectors;
-
-      MagickBooleanType
-        status;
-
-      /* check the number of arguments */
-      if ( number_arguments%cp_size != 0 ||
-           number_arguments < cp_size*4 ) {
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument", "%s : 'require at least %.17g CPs'",
-              CommandOptionToMnemonic(MagickDistortOptions, *method), 4.0);
-        coeff=(double *) RelinquishMagickMemory(coeff);
-        return((double *) NULL);
-      }
-      /* create matrix, and a fake vectors matrix */
-      matrix=AcquireMagickMatrix(4UL,4UL);
-      vectors=(double **) AcquireQuantumMemory(number_values,sizeof(*vectors));
-      if (matrix == (double **) NULL || vectors == (double **) NULL)
-      {
-        matrix  = RelinquishMagickMatrix(matrix, 4UL);
-        vectors = (double **) RelinquishMagickMemory(vectors);
-        coeff   = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),
-                ResourceLimitError,"MemoryAllocationFailed",
-                "%s", "DistortCoefficients");
-        return((double *) NULL);
-      }
-      status=SolveBilinearCoefficients(coeff,matrix,vectors,&context);
-      matrix  = RelinquishMagickMatrix(matrix, 4UL);
-      vectors = (double **) RelinquishMagickMemory(vectors);
-      if ( status == MagickFalse ) {
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "InvalidArgument","%s : 'Unsolvable Matrix'",
-            CommandOptionToMnemonic(MagickDistortOptions, *method) );
-        return((double *) NULL);
-      }
-      SetBilinearForwardCoefficients(coeff,method);
-      return(coeff);
-    }
+      return(BilinearCoefficients(coeff,method,&context));
 #if 0
     case QuadrilateralDistortion:
     {
