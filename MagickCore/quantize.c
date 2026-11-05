@@ -4463,6 +4463,23 @@ static void BuildGrayscaleColormap(Image *image,ssize_t *colormap_index,
   image_view=DestroyCacheView(image_view);
 }
 
+static MagickBooleanType AcquireGrayscaleColormap(Image *image,
+  ssize_t *colormap_index,const size_t extent,ExceptionInfo *exception)
+{
+  if (image->storage_class != PseudoClass)
+    {
+      (void) memset(colormap_index,(-1),extent*sizeof(*colormap_index));
+      if (AcquireImageColormap(image,MaxColormapSize,exception) == MagickFalse)
+        {
+          colormap_index=(ssize_t *) RelinquishMagickMemory(colormap_index);
+          ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+            image->filename);
+        }
+      BuildGrayscaleColormap(image,colormap_index,exception);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType SetGrayscaleImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -4493,17 +4510,9 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
   if (colormap_index == (ssize_t *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
-  if (image->storage_class != PseudoClass)
-    {
-      (void) memset(colormap_index,(-1),extent*sizeof(*colormap_index));
-      if (AcquireImageColormap(image,MaxColormapSize,exception) == MagickFalse)
-        {
-          colormap_index=(ssize_t *) RelinquishMagickMemory(colormap_index);
-          ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-            image->filename);
-        }
-      BuildGrayscaleColormap(image,colormap_index,exception);
-    }
+  if (AcquireGrayscaleColormap(image,colormap_index,extent,exception) ==
+      MagickFalse)
+    return(MagickFalse);
   (void) memset(colormap_index,0,extent*sizeof(*colormap_index));
   SortGrayscaleColormap(image);
   colormap=(PixelInfo *) AcquireQuantumMemory(image->colors,sizeof(*colormap));
