@@ -1621,6 +1621,13 @@ static void AccumulatePolynomialImages(const PolynomialRows *rows,
 
 #define PolynomialImageTag  "Polynomial/Image"
 
+static void SetPolynomialProgress(const Image *images,const Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  if (SetProgress(images,image,PolynomialImageTag,progress) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *PolynomialImage(const Image *images,
   const size_t number_terms,const double *terms,ExceptionInfo *exception)
 {
@@ -1706,9 +1713,7 @@ MagickExport Image *PolynomialImage(const Image *images,
         #pragma omp atomic
 #endif
         progress++;
-        if (SetProgress(images,image,PolynomialImageTag,progress) ==
-            MagickFalse)
-          status=MagickFalse;
+        SetPolynomialProgress(images,image,progress,&status);
       }
   }
   polynomial_view=DestroyCacheView(polynomial_view);
