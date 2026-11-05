@@ -1073,6 +1073,8 @@ static MagickBooleanType AcquireEvaluateCanvas(const Image *images,
   return(MagickTrue);
 }
 
+#define EvaluateImageTag  "Evaluate/Image"
+
 static void SyncEvaluateView(CacheView *evaluate_view,
   ExceptionInfo *exception,MagickBooleanType *status)
 {
@@ -1083,8 +1085,6 @@ static void SyncEvaluateView(CacheView *evaluate_view,
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
-#define EvaluateImageTag  "Evaluate/Image"
-
   CacheView
     *evaluate_view,
     **image_view;
