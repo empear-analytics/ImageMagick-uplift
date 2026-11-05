@@ -3680,6 +3680,53 @@ static void PerspectiveBestFitBounds(const double *coeff,const Image *image,
   (*caller_max)=max;
 }
 
+static void ArcBestFitBounds(double *coeff,const Image *image,
+  PointInfo *caller_min,PointInfo *caller_max)
+{
+  double
+    a,
+    ca,
+    sa;
+
+  PointInfo
+    d,
+    max = (*caller_max),
+    min = (*caller_min);
+
+  /* Forward Map Corners */
+  a = coeff[0]-coeff[1]/2; ca = cos(a); sa = sin(a);
+  d.x = coeff[2]*ca;
+  d.y = coeff[2]*sa;
+  InitalBounds(d);
+  d.x = (coeff[2]-coeff[3])*ca;
+  d.y = (coeff[2]-coeff[3])*sa;
+  ExpandBounds(d);
+  a = coeff[0]+coeff[1]/2; ca = cos(a); sa = sin(a);
+  d.x = coeff[2]*ca;
+  d.y = coeff[2]*sa;
+  ExpandBounds(d);
+  d.x = (coeff[2]-coeff[3])*ca;
+  d.y = (coeff[2]-coeff[3])*sa;
+  ExpandBounds(d);
+  /* Orthogonal points along top of arc */
+  for( a=(double) (ceil((double) ((coeff[0]-coeff[1]/2.0)/MagickPI2))*MagickPI2);
+         a<(coeff[0]+coeff[1]/2.0); a+=MagickPI2 ) {
+    ca = cos(a); sa = sin(a);
+    d.x = coeff[2]*ca;
+    d.y = coeff[2]*sa;
+    ExpandBounds(d);
+  }
+  /*
+    Convert the angle_to_width and radius_to_height
+    to appropriate scaling factors, to allow faster processing
+    in the mapping function.
+  */
+  coeff[1] = (double) (Magick2PI*image->columns/coeff[1]);
+  coeff[3] = (double)image->rows/coeff[3];
+  (*caller_min)=min;
+  (*caller_max)=max;
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3759,7 +3806,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   /* Work out the 'best fit', (required for ArcDistortion) */
   if ( bestfit ) {
     PointInfo
-      s,d,min,max;  /* source, dest coords --mapping--> min, max coords */
+      s,min,max;  /* source, dest coords --mapping--> min, max coords */
 
     MagickBooleanType
       fix_bounds = MagickTrue;   /* enlarge bounds for VP handling */
@@ -3780,37 +3827,8 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         break;
       }
       case ArcDistortion:
-      { double a, ca, sa;
-        /* Forward Map Corners */
-        a = coeff[0]-coeff[1]/2; ca = cos(a); sa = sin(a);
-        d.x = coeff[2]*ca;
-        d.y = coeff[2]*sa;
-        InitalBounds(d);
-        d.x = (coeff[2]-coeff[3])*ca;
-        d.y = (coeff[2]-coeff[3])*sa;
-        ExpandBounds(d);
-        a = coeff[0]+coeff[1]/2; ca = cos(a); sa = sin(a);
-        d.x = coeff[2]*ca;
-        d.y = coeff[2]*sa;
-        ExpandBounds(d);
-        d.x = (coeff[2]-coeff[3])*ca;
-        d.y = (coeff[2]-coeff[3])*sa;
-        ExpandBounds(d);
-        /* Orthogonal points along top of arc */
-        for( a=(double) (ceil((double) ((coeff[0]-coeff[1]/2.0)/MagickPI2))*MagickPI2);
-               a<(coeff[0]+coeff[1]/2.0); a+=MagickPI2 ) {
-          ca = cos(a); sa = sin(a);
-          d.x = coeff[2]*ca;
-          d.y = coeff[2]*sa;
-          ExpandBounds(d);
-        }
-        /*
-          Convert the angle_to_width and radius_to_height
-          to appropriate scaling factors, to allow faster processing
-          in the mapping function.
-        */
-        coeff[1] = (double) (Magick2PI*image->columns/coeff[1]);
-        coeff[3] = (double)image->rows/coeff[3];
+      {
+        ArcBestFitBounds(coeff,image,&min,&max);
         break;
       }
       case PolarDistortion:
