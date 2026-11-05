@@ -1822,6 +1822,16 @@ typedef struct _SpliceRow
   Image
     *splice_image;
 
+  CacheView
+    *image_view,
+    *splice_view;
+
+  RectangleInfo
+    splice_geometry;
+
+  ExceptionInfo
+    *exception;
+
   ssize_t
     columns;
 } SpliceRow;
@@ -1863,6 +1873,28 @@ static void SplicePixelRow(const SpliceRow *row,
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(splice_image);
   }
+}
+
+static MagickBooleanType SpliceImageRow(const SpliceRow *row,
+  const ssize_t source_y,const ssize_t target_y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  p=GetCacheViewVirtualPixels(row->image_view,0,source_y,
+    row->splice_image->columns,1,row->exception);
+  q=QueueCacheViewAuthenticPixels(row->splice_view,0,target_y,
+    row->splice_image->columns,1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  SplicePixelRow(row,row->splice_geometry,p,q);
+  return(MagickTrue);
 }
 
 static void SetSpliceBackground(Image *splice_image,
@@ -1959,30 +1991,14 @@ MagickExport Image *SpliceImage(const Image *image,
 #endif
   for (y=0; y < (ssize_t) splice_geometry.y; y++)
   {
-    SpliceRow
-      row;
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
+    const SpliceRow
+      row = { image,splice_image,image_view,splice_view,splice_geometry,
+        exception,columns };
 
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,splice_image->columns,1,
-      exception);
-    q=QueueCacheViewAuthenticPixels(splice_view,0,y,splice_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.splice_image=splice_image;
-    row.columns=columns;
-    SplicePixelRow(&row,splice_geometry,p,q);
+    if (SpliceImageRow(&row,y,y,&status) == MagickFalse)
+      continue;
     if (SyncCacheViewAuthenticPixels(splice_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -2006,32 +2022,17 @@ MagickExport Image *SpliceImage(const Image *image,
 #endif
   for (y=splice_geometry.y+(ssize_t) splice_geometry.height; y < (ssize_t) splice_image->rows; y++)
   {
-    SpliceRow
-      row;
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
+    const SpliceRow
+      row = { image,splice_image,image_view,splice_view,splice_geometry,
+        exception,columns };
 
     if (status == MagickFalse)
       continue;
     if ((y < 0) || (y >= (ssize_t) splice_image->rows))
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y-(ssize_t) splice_geometry.height,
-      splice_image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(splice_view,0,y,splice_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.splice_image=splice_image;
-    row.columns=columns;
-    SplicePixelRow(&row,splice_geometry,p,q);
+    if (SpliceImageRow(&row,y-(ssize_t) splice_geometry.height,y,&status) ==
+        MagickFalse)
+      continue;
     if (SyncCacheViewAuthenticPixels(splice_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
