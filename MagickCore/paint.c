@@ -655,16 +655,29 @@ static void SetPaintProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
-MagickExport Image *OilPaintImage(const Image *image,const double radius,
-  const double sigma,ExceptionInfo *exception)
+typedef struct _OilPaintRows
+{
+  Image
+    *linear_image,
+    *paint_image;
+
+  size_t
+    **histograms,
+    width;
+
+  ExceptionInfo
+    *exception;
+} OilPaintRows;
+
+static MagickBooleanType OilPaintImageRows(const OilPaintRows *rows)
 {
   CacheView
     *image_view,
     *paint_view;
 
   Image
-    *linear_image,
-    *paint_image;
+    *const linear_image = rows->linear_image,
+    *const paint_image = rows->paint_image;
 
   MagickBooleanType
     status;
@@ -673,36 +686,18 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
     progress;
 
   size_t
-    **histograms,
-    width;
+    **const histograms = rows->histograms;
+
+  const size_t
+    width = rows->width;
+
+  ExceptionInfo
+    *const exception = rows->exception;
 
   ssize_t
     center,
     y;
 
-  /*
-    Initialize painted image attributes.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse) 
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  width=GetOptimalKernelWidth2D(radius,sigma);
-  linear_image=CloneImage(image,0,0,MagickTrue,exception);
-  paint_image=CloneImage(image,0,0,MagickTrue,exception);
-  if ((linear_image == (Image *) NULL) || (paint_image == (Image *) NULL))
-    return(DestroyOilPaintClones(linear_image,paint_image));
-  if (PrepareOilPaintImage(linear_image,paint_image,exception) == MagickFalse)
-    return((Image *) NULL);
-  histograms=AcquireHistogramTLS(NumberPaintBins);
-  if (histograms == (size_t **) NULL)
-    {
-      linear_image=DestroyImage(linear_image);
-      paint_image=DestroyImage(paint_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
   /*
     Oil paint image.
   */
@@ -742,6 +737,58 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
   }
   paint_view=DestroyCacheView(paint_view);
   image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport Image *OilPaintImage(const Image *image,const double radius,
+  const double sigma,ExceptionInfo *exception)
+{
+  Image
+    *linear_image,
+    *paint_image;
+
+  MagickBooleanType
+    status;
+
+  OilPaintRows
+    rows;
+
+  size_t
+    **histograms,
+    width;
+
+  /*
+    Initialize painted image attributes.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse) 
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  width=GetOptimalKernelWidth2D(radius,sigma);
+  linear_image=CloneImage(image,0,0,MagickTrue,exception);
+  paint_image=CloneImage(image,0,0,MagickTrue,exception);
+  if ((linear_image == (Image *) NULL) || (paint_image == (Image *) NULL))
+    return(DestroyOilPaintClones(linear_image,paint_image));
+  if (PrepareOilPaintImage(linear_image,paint_image,exception) == MagickFalse)
+    return((Image *) NULL);
+  histograms=AcquireHistogramTLS(NumberPaintBins);
+  if (histograms == (size_t **) NULL)
+    {
+      linear_image=DestroyImage(linear_image);
+      paint_image=DestroyImage(paint_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  /*
+    Oil paint image.
+  */
+  rows.linear_image=linear_image;
+  rows.paint_image=paint_image;
+  rows.histograms=histograms;
+  rows.width=width;
+  rows.exception=exception;
+  status=OilPaintImageRows(&rows);
   histograms=DestroyHistogramTLS(histograms);
   linear_image=DestroyImage(linear_image);
   if (status == MagickFalse)
