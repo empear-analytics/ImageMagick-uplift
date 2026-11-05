@@ -1537,6 +1537,36 @@ static double *ArcCoefficients(double *coeff,const DistortMethod *method,
   return(coeff);
 }
 
+static void SetPolarCoefficients(double *coeff,const Image *image,
+  const double *arguments,const size_t number_arguments)
+{
+  /* Rmax -  if 0 calculate appropriate value */
+  if ( number_arguments >= 1 )
+    coeff[0] = arguments[0];
+  else
+    coeff[0] = 0.0;
+  /* Rmin  - usually 0 */
+  coeff[1] = number_arguments >= 2 ? arguments[1] : 0.0;
+  /* Center X,Y */
+  if ( number_arguments >= 4 ) {
+    coeff[2] = arguments[2];
+    coeff[3] = arguments[3];
+  }
+  else { /* center of actual image */
+    coeff[2] = (double)(image->columns)/2.0+image->page.x;
+    coeff[3] = (double)(image->rows)/2.0+image->page.y;
+  }
+  /* Angle from,to - about polar center 0 is downward */
+  coeff[4] = -MagickPI;
+  if ( number_arguments >= 5 )
+    coeff[4] = DegreesToRadians(arguments[4]);
+  coeff[5] = coeff[4];
+  if ( number_arguments >= 6 )
+    coeff[5] = DegreesToRadians(arguments[5]);
+  if ( fabs(coeff[4]-coeff[5]) < MagickEpsilon )
+    coeff[5] += Magick2PI; /* same angle is a full circle */
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1750,31 +1780,7 @@ static double *GenerateCoefficients(const Image *image,
         coeff=(double *) RelinquishMagickMemory(coeff);
         return((double *) NULL);
       }
-      /* Rmax -  if 0 calculate appropriate value */
-      if ( number_arguments >= 1 )
-        coeff[0] = arguments[0];
-      else
-        coeff[0] = 0.0;
-      /* Rmin  - usually 0 */
-      coeff[1] = number_arguments >= 2 ? arguments[1] : 0.0;
-      /* Center X,Y */
-      if ( number_arguments >= 4 ) {
-        coeff[2] = arguments[2];
-        coeff[3] = arguments[3];
-      }
-      else { /* center of actual image */
-        coeff[2] = (double)(image->columns)/2.0+image->page.x;
-        coeff[3] = (double)(image->rows)/2.0+image->page.y;
-      }
-      /* Angle from,to - about polar center 0 is downward */
-      coeff[4] = -MagickPI;
-      if ( number_arguments >= 5 )
-        coeff[4] = DegreesToRadians(arguments[4]);
-      coeff[5] = coeff[4];
-      if ( number_arguments >= 6 )
-        coeff[5] = DegreesToRadians(arguments[5]);
-      if ( fabs(coeff[4]-coeff[5]) < MagickEpsilon )
-        coeff[5] += Magick2PI; /* same angle is a full circle */
+      SetPolarCoefficients(coeff,image,arguments,number_arguments);
       /* if radius 0 or negative,  its a special value... */
       if ( coeff[0] < MagickEpsilon )
         SetPolarSpecialRadius(image,coeff);
