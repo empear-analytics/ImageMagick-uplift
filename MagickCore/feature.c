@@ -879,6 +879,12 @@ static Image *TraceCannyHysteresis(
   return(edge_image);
 }
 
+static void LogCannyEdgeEvent(const Image *image)
+{
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -921,8 +927,7 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   assert(image->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
   assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  LogCannyEdgeEvent(image);
   /*
     Filter out noise.
   */
