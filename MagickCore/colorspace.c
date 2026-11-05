@@ -3466,6 +3466,43 @@ static void TransformLinearGrayRowTosRGB(const ColorspaceRowInfo *info,
   SyncColorspaceRow(image_view,exception,status);
 }
 
+static MagickBooleanType LinearGrayTosRGB(Image *image,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  ColorspaceRowInfo
+    finish;
+
+  /*
+    Transform linear GRAY to sRGB colorspace.
+  */
+  if (SyncImageToDirectClass(image,exception) == MagickFalse)
+    return(MagickFalse);
+  if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
+    return(MagickFalse);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const ColorspaceRowInfo
+      info = { image,image_view,exception };
+
+    TransformLinearGrayRowTosRGB(&info,y,&status);
+  }
+  finish.image=image;
+  finish.image_view=image_view;
+  finish.exception=exception;
+  return(FinishColorspace(&finish,sRGBColorspace,status));
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -3499,34 +3536,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
     case CMYKColorspace:
       return(CMYKTosRGB(image,status,exception));
     case LinearGRAYColorspace:
-    {
-      ColorspaceRowInfo
-        finish;
-
-      /*
-        Transform linear GRAY to sRGB colorspace.
-      */
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
-        return(MagickFalse);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const ColorspaceRowInfo
-          info = { image,image_view,exception };
-
-        TransformLinearGrayRowTosRGB(&info,y,&status);
-      }
-      finish.image=image;
-      finish.image_view=image_view;
-      finish.exception=exception;
-      return(FinishColorspace(&finish,sRGBColorspace,status));
-    }
+      return(LinearGrayTosRGB(image,status,exception));
     case GRAYColorspace:
     {
       ColorspaceRowInfo
