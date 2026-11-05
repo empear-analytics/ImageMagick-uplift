@@ -358,6 +358,100 @@ static MagickBooleanType DestroyFilterResources(CacheView *image_view,
   return(status);
 }
 
+typedef struct _HorizontalFilterColumn
+{
+  const HorizontalFilterPass
+    *pass;
+
+  const Image
+    *image;
+
+  Image
+    *resize_image;
+
+  CacheView
+    *image_view,
+    *resize_view;
+
+  ContributionInfo
+    **contributions;
+
+  double
+    scale,
+    support;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    x;
+} HorizontalFilterColumn;
+
+static MagickBooleanType FilterHorizontalColumn(
+  const HorizontalFilterColumn *column,MagickBooleanType *status)
+{
+  const int
+    id = GetOpenMPThreadId();
+
+  const Quantum
+    *magick_restrict p;
+
+  ContributionInfo
+    *magick_restrict contribution;
+
+  double
+    bisect,
+    density;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    n,
+    start,
+    stop,
+    y;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  bisect=(double) (column->x+0.5)/column->pass->x_factor+MagickEpsilon;
+  start=(ssize_t) MagickMax(bisect-column->support+0.5,0.0);
+  stop=(ssize_t) MagickMin(bisect+column->support+0.5,(double)
+    column->image->columns);
+  density=0.0;
+  contribution=column->contributions[id];
+  for (n=0; n < (stop-start); n++)
+  {
+    contribution[n].pixel=start+n;
+    contribution[n].weight=GetResizeFilterWeight(column->pass->resize_filter,
+      column->scale*((double) (start+n)-bisect+0.5));
+    density+=contribution[n].weight;
+  }
+  if (n == 0)
+    return(MagickFalse);
+  NormalizeContributionDensity(contribution,n,density);
+  p=GetCacheViewVirtualPixels(column->image_view,contribution[0].pixel,0,
+    (size_t) (contribution[n-1].pixel-contribution[0].pixel+1),
+    column->image->rows,column->exception);
+  q=QueueCacheViewAuthenticPixels(column->resize_view,column->x,0,1,
+    column->resize_image->rows,column->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (y=0; y < (ssize_t) column->resize_image->rows; y++)
+  {
+    FilterHorizontalPixel(column->image,column->resize_image,contribution,n,
+      start,stop,bisect,y,p,q);
+    q+=(ptrdiff_t) GetPixelChannels(column->resize_image);
+  }
+  if (SyncCacheViewAuthenticPixels(column->resize_view,column->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 static MagickBooleanType HorizontalFilter(const HorizontalFilterPass *pass,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
   ExceptionInfo *exception)
@@ -405,62 +499,21 @@ static MagickBooleanType HorizontalFilter(const HorizontalFilterPass *pass,
 #endif
   for (x=0; x < (ssize_t) resize_image->columns; x++)
   {
-    const int
-      id = GetOpenMPThreadId();
+    HorizontalFilterColumn
+      column;
 
-    const Quantum
-      *magick_restrict p;
-
-    ContributionInfo
-      *magick_restrict contribution;
-
-    double
-      bisect,
-      density;
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      n,
-      start,
-      stop,
-      y;
-
-    if (status == MagickFalse)
+    column.pass=pass;
+    column.image=image;
+    column.resize_image=resize_image;
+    column.image_view=image_view;
+    column.resize_view=resize_view;
+    column.contributions=contributions;
+    column.support=support;
+    column.scale=scale;
+    column.exception=exception;
+    column.x=x;
+    if (FilterHorizontalColumn(&column,&status) == MagickFalse)
       continue;
-    bisect=(double) (x+0.5)/pass->x_factor+MagickEpsilon;
-    start=(ssize_t) MagickMax(bisect-support+0.5,0.0);
-    stop=(ssize_t) MagickMin(bisect+support+0.5,(double) image->columns);
-    density=0.0;
-    contribution=contributions[id];
-    for (n=0; n < (stop-start); n++)
-    {
-      contribution[n].pixel=start+n;
-      contribution[n].weight=GetResizeFilterWeight(pass->resize_filter,scale*
-        ((double) (start+n)-bisect+0.5));
-      density+=contribution[n].weight;
-    }
-    if (n == 0)
-      continue;
-    NormalizeContributionDensity(contribution,n,density);
-    p=GetCacheViewVirtualPixels(image_view,contribution[0].pixel,0,(size_t)
-      (contribution[n-1].pixel-contribution[0].pixel+1),image->rows,exception);
-    q=QueueCacheViewAuthenticPixels(resize_view,x,0,1,resize_image->rows,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (y=0; y < (ssize_t) resize_image->rows; y++)
-    {
-      FilterHorizontalPixel(image,resize_image,contribution,n,start,stop,bisect,
-        y,p,q);
-      q+=(ptrdiff_t) GetPixelChannels(resize_image);
-    }
-    if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType

@@ -572,6 +572,15 @@ static void ReadRadonRow(MagickBooleanType *status,
     }
 }
 
+static void ScanRadonRowReversed(MagickBooleanType *status,
+  const RadonRowSource *source,const unsigned short *bits)
+{
+  if ((*status) == MagickFalse)
+    return;
+  if (ReadRadonRowReversed(source,bits) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType RadonTransform(const Image *image,
   const double threshold,size_t *projection,ExceptionInfo *exception)
 {
@@ -620,19 +629,10 @@ static MagickBooleanType RadonTransform(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    RadonRowSource
-      source;
+    const RadonRowSource
+      source = { image_view,image,threshold,y,exception,source_matrices };
 
-    if (status == MagickFalse)
-      continue;
-    source.image_view=image_view;
-    source.image=image;
-    source.threshold=threshold;
-    source.y=y;
-    source.exception=exception;
-    source.source_matrices=source_matrices;
-    if (ReadRadonRowReversed(&source,bits) == MagickFalse)
-      status=MagickFalse;
+    ScanRadonRowReversed(&status,&source,bits);
   }
   RadonProjection(source_matrices,destination_matrices,-1,projection);
   (void) NullMatrix(source_matrices);
@@ -642,15 +642,9 @@ static MagickBooleanType RadonTransform(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    RadonRowSource
-      source;
+    const RadonRowSource
+      source = { image_view,image,threshold,y,exception,source_matrices };
 
-    source.image_view=image_view;
-    source.image=image;
-    source.threshold=threshold;
-    source.y=y;
-    source.exception=exception;
-    source.source_matrices=source_matrices;
     ReadRadonRow(&status,&source,bits);
   }
   RadonProjection(source_matrices,destination_matrices,1,projection);
@@ -814,6 +808,40 @@ static Image *AutoCropDeskewImage(const Image *image,Image *clone_image,
   return(crop_image);
 }
 
+static void SetDeskewAngleArtifact(Image *clone_image,const double degrees)
+{
+  char
+    angle[MagickPathExtent];
+
+  (void) FormatLocaleString(angle,MagickPathExtent,"%.17g",degrees);
+  (void) SetImageArtifact(clone_image,"deskew:angle",angle);
+}
+
+static AffineMatrix GetDeskewAffineMatrix(const double degrees)
+{
+  AffineMatrix
+    affine_matrix;
+
+  affine_matrix.sx=cos(DegreesToRadians(fmod((double) degrees,360.0)));
+  affine_matrix.rx=sin(DegreesToRadians(fmod((double) degrees,360.0)));
+  affine_matrix.ry=(-sin(DegreesToRadians(fmod((double) degrees,360.0))));
+  affine_matrix.sy=cos(DegreesToRadians(fmod((double) degrees,360.0)));
+  affine_matrix.tx=0.0;
+  affine_matrix.ty=0.0;
+  return(affine_matrix);
+}
+
+static Image *DeskewWithoutCrop(Image *clone_image,
+  const AffineMatrix *affine_matrix,ExceptionInfo *exception)
+{
+  Image
+    *deskew_image;
+
+  deskew_image=AffineTransformImage(clone_image,affine_matrix,exception);
+  clone_image=DestroyImage(clone_image);
+  return(deskew_image);
+}
+
 MagickExport Image *DeskewImage(const Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -827,8 +855,7 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
     degrees;
 
   Image
-    *clone_image,
-    *deskew_image;
+    *clone_image;
 
   MagickBooleanType
     status;
@@ -866,28 +893,13 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
   clone_image=CloneImage(image,0,0,MagickTrue,exception);
   if (clone_image == (Image *) NULL)
     return((Image *) NULL);
-  {
-    char
-      angle[MagickPathExtent];
-
-    (void) FormatLocaleString(angle,MagickPathExtent,"%.17g",degrees);
-    (void) SetImageArtifact(clone_image,"deskew:angle",angle);
-  }
+  SetDeskewAngleArtifact(clone_image,degrees);
   (void) SetImageVirtualPixelMethod(clone_image,BackgroundVirtualPixelMethod,
     exception);
-  affine_matrix.sx=cos(DegreesToRadians(fmod((double) degrees,360.0)));
-  affine_matrix.rx=sin(DegreesToRadians(fmod((double) degrees,360.0)));
-  affine_matrix.ry=(-sin(DegreesToRadians(fmod((double) degrees,360.0))));
-  affine_matrix.sy=cos(DegreesToRadians(fmod((double) degrees,360.0)));
-  affine_matrix.tx=0.0;
-  affine_matrix.ty=0.0;
+  affine_matrix=GetDeskewAffineMatrix(degrees);
   artifact=GetImageArtifact(image,"deskew:auto-crop");
   if (IsStringTrue(artifact) == MagickFalse)
-    {
-      deskew_image=AffineTransformImage(clone_image,&affine_matrix,exception);
-      clone_image=DestroyImage(clone_image);
-      return(deskew_image);
-    }
+    return(DeskewWithoutCrop(clone_image,&affine_matrix,exception));
   /*
     Auto-crop image.
   */

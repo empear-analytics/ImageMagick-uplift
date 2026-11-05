@@ -616,9 +616,26 @@ static void AccumulateScaleScanline(const Image *image,const PointInfo scale,
         x_vector[x*(ssize_t) GetPixelChannels(image)+i];
 }
 
-static void BlendScaleScanline(const Image *image,const PointInfo span,
-  const double *x_vector,double *y_vector,double *scanline)
+typedef struct _ScaleBlend
 {
+  const double
+    *x_vector;
+
+  double
+    *y_vector,
+    *scanline;
+} ScaleBlend;
+
+static void BlendScaleScanline(const Image *image,const PointInfo span,
+  const ScaleBlend *blend)
+{
+  const double
+    *const x_vector = blend->x_vector;
+
+  double
+    *const y_vector = blend->y_vector,
+    *const scanline = blend->scanline;
+
   double
     pixel[CompositePixelChannel];
 
@@ -903,17 +920,326 @@ static void TransferScaleScanline(const ScaleTransfer *transfer,
   }
 }
 
-MagickExport Image *ScaleImage(const Image *image,const size_t columns,
-  const size_t rows,ExceptionInfo *exception)
+typedef struct _ScaleLoop
 {
-#define ScaleImageTag  "Scale/Image"
+  const Image
+    *image;
+
+  Image
+    *scale_image;
 
   CacheView
     *image_view,
     *scale_view;
 
   double
-    alpha,
+    *scale_scanline,
+    *scanline,
+    *x_vector,
+    *y_vector;
+
+  ExceptionInfo
+    *exception;
+} ScaleLoop;
+
+static MagickBooleanType ScaleYRows(const ScaleLoop *loop,const double alpha,
+  const ScaleRowTargets *targets)
+{
+  const ScaleBlend
+    blend = { loop->x_vector, loop->y_vector, loop->scanline };
+
+  const ScaleReadTargets
+    pending_targets = { targets->n, targets->status, targets->number_rows,
+      targets->next_row };
+
+  ScaleRead
+    pending;
+
+  ScaleRows
+    scale_rows;
+
+  /*
+    Scale Y direction.
+  */
+  scale_rows.image=loop->image;
+  scale_rows.scale_image=loop->scale_image;
+  scale_rows.image_view=loop->image_view;
+  scale_rows.alpha=alpha;
+  scale_rows.x_vector=loop->x_vector;
+  scale_rows.y_vector=loop->y_vector;
+  scale_rows.exception=loop->exception;
+  AccumulateScaleRows(&scale_rows,targets);
+  pending.image=loop->image;
+  pending.image_view=loop->image_view;
+  pending.alpha=alpha;
+  pending.x_vector=loop->x_vector;
+  pending.exception=loop->exception;
+  if (ReadPendingScaleRow(&pending,&pending_targets) == MagickFalse)
+    return(MagickFalse);
+  BlendScaleScanline(loop->image,*targets->span,&blend);
+  (*targets->scale).y-=(*targets->span).y;
+  RestartScaleRow(loop->image,loop->scale_image,targets->scale,
+    targets->next_row);
+  (*targets->span).y=1.0;
+  return(MagickTrue);
+}
+
+static MagickBooleanType FetchScaleRow(const ScaleLoop *loop,
+  const double alpha,const ScaleRowTargets *targets)
+{
+  const Quantum
+    *magick_restrict p;
+
+  /*
+    Read a new scanline.
+  */
+  p=GetCacheViewVirtualPixels(loop->image_view,0,(*targets->n)++,
+    loop->image->columns,1,loop->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      *targets->status=MagickFalse;
+      return(MagickFalse);
+    }
+  ImportScaleScanline(loop->image,p,alpha,loop->x_vector);
+  return(MagickTrue);
+}
+
+static MagickBooleanType SyncScaleRow(const ScaleLoop *loop,
+  const ScaleRowTargets *targets)
+{
+  if (SyncCacheViewAuthenticPixels(loop->scale_view,loop->exception) ==
+      MagickFalse)
+    {
+      *targets->status=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+#define ScaleImageTag  "Scale/Image"
+
+static MagickBooleanType UpdateScaleProgress(const ScaleLoop *loop,
+  const ssize_t y,const ScaleRowTargets *targets)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(loop->image,ScaleImageTag,(MagickOffsetType) y,
+    loop->image->rows);
+  if (proceed == MagickFalse)
+    {
+      *targets->status=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ScaleNextRow(const ScaleLoop *loop,
+  const ScaleRowTargets *targets,const ssize_t y)
+{
+  double
+    alpha;
+
+  Quantum
+    *magick_restrict q;
+
+  ScaleTransfer
+    transfer;
+
+  if (*targets->status == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(loop->scale_view,0,y,
+    loop->scale_image->columns,1,loop->exception);
+  if (q == (Quantum *) NULL)
+    {
+      *targets->status=MagickFalse;
+      return(MagickFalse);
+    }
+  alpha=1.0;
+  if (loop->scale_image->rows == loop->image->rows)
+    {
+      if (FetchScaleRow(loop,alpha,targets) == MagickFalse)
+        return(MagickFalse);
+    }
+  else
+    if (ScaleYRows(loop,alpha,targets) == MagickFalse)
+      return(MagickFalse);
+  transfer.image=loop->image;
+  transfer.scale_image=loop->scale_image;
+  transfer.alpha=alpha;
+  transfer.scale_scanline=loop->scale_scanline;
+  transfer.scanline=loop->scanline;
+  TransferScaleScanline(&transfer,q);
+  if (SyncScaleRow(loop,targets) == MagickFalse)
+    return(MagickFalse);
+  if (UpdateScaleProgress(loop,y,targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+typedef struct _ScaleBuffers
+{
+  const Image
+    *image;
+
+  Image
+    *scale_image;
+
+  double
+    *scale_scanline,
+    *scanline,
+    *x_vector,
+    *y_vector;
+} ScaleBuffers;
+
+static void ReleaseScaleBuffers(const ScaleBuffers *buffers)
+{
+  const Image
+    *const image = buffers->image;
+
+  Image
+    *scale_image = buffers->scale_image;
+
+  double
+    *scale_scanline = buffers->scale_scanline,
+    *scanline = buffers->scanline,
+    *x_vector = buffers->x_vector,
+    *y_vector = buffers->y_vector;
+
+  if ((image->rows != scale_image->rows) && (scanline != (double *) NULL))
+    scanline=(double *) RelinquishMagickMemory(scanline);
+  if (scale_scanline != (double *) NULL)
+    scale_scanline=(double *) RelinquishMagickMemory(scale_scanline);
+  if (x_vector != (double *) NULL)
+    x_vector=(double *) RelinquishMagickMemory(x_vector);
+  if (y_vector != (double *) NULL)
+    y_vector=(double *) RelinquishMagickMemory(y_vector);
+  scale_image=DestroyImage(scale_image);
+}
+
+static Image *FinishScaleImage(const ScaleBuffers *buffers,
+  const MagickBooleanType status)
+{
+  const Image
+    *const image = buffers->image;
+
+  Image
+    *scale_image = buffers->scale_image;
+
+  double
+    *scale_scanline = buffers->scale_scanline,
+    *scanline = buffers->scanline,
+    *x_vector = buffers->x_vector,
+    *y_vector = buffers->y_vector;
+
+  y_vector=(double *) RelinquishMagickMemory(y_vector);
+  scale_scanline=(double *) RelinquishMagickMemory(scale_scanline);
+  if (scale_image->rows != image->rows)
+    scanline=(double *) RelinquishMagickMemory(scanline);
+  x_vector=(double *) RelinquishMagickMemory(x_vector);
+  scale_image->type=image->type;
+  if (status == MagickFalse)
+    scale_image=DestroyImage(scale_image);
+  return(scale_image);
+}
+
+static inline MagickBooleanType IsScaleSizeEmpty(const size_t columns,
+  const size_t rows)
+{
+  return(((columns == 0) || (rows == 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsScaleSizeUnchanged(const Image *image,
+  const size_t columns,const size_t rows)
+{
+  return(((columns == image->columns) && (rows == image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
+static Image *ScaleAndFinishImage(const ScaleBuffers *inputs,
+  ExceptionInfo *exception)
+{
+  const Image
+    *const image = inputs->image;
+
+  double
+    *const scale_scanline = inputs->scale_scanline,
+    *const scanline = inputs->scanline,
+    *const x_vector = inputs->x_vector,
+    *const y_vector = inputs->y_vector;
+
+  Image
+    *const scale_image = inputs->scale_image;
+
+  CacheView
+    *image_view,
+    *scale_view;
+
+  MagickBooleanType
+    next_row,
+    status;
+
+  PointInfo
+    scale,
+    span;
+
+  ScaleBuffers
+    buffers;
+
+  ScaleLoop
+    loop;
+
+  ssize_t
+    n,
+    number_rows,
+    y;
+
+  const ScaleRowTargets
+    targets = { &n, &status, &number_rows, &span, &scale, &next_row };
+
+  /*
+    Scale image.
+  */
+  number_rows=0;
+  next_row=MagickTrue;
+  span.y=1.0;
+  scale.y=(double) scale_image->rows/(double) image->rows;
+  (void) memset(y_vector,0,(size_t) MaxPixelChannels*image->columns*
+    sizeof(*y_vector));
+  n=0;
+  status=MagickTrue;
+  image_view=AcquireVirtualCacheView(image,exception);
+  scale_view=AcquireAuthenticCacheView(scale_image,exception);
+  loop.image=image;
+  loop.scale_image=scale_image;
+  loop.image_view=image_view;
+  loop.scale_view=scale_view;
+  loop.scale_scanline=scale_scanline;
+  loop.scanline=scanline;
+  loop.x_vector=x_vector;
+  loop.y_vector=y_vector;
+  loop.exception=exception;
+  for (y=0; y < (ssize_t) scale_image->rows; y++)
+    if (ScaleNextRow(&loop,&targets,y) == MagickFalse)
+      break;
+  scale_view=DestroyCacheView(scale_view);
+  image_view=DestroyCacheView(image_view);
+  /*
+    Free allocated memory.
+  */
+  buffers.image=image;
+  buffers.scale_image=scale_image;
+  buffers.scale_scanline=scale_scanline;
+  buffers.scanline=scanline;
+  buffers.x_vector=x_vector;
+  buffers.y_vector=y_vector;
+  return(FinishScaleImage(&buffers,status));
+}
+
+MagickExport Image *ScaleImage(const Image *image,const size_t columns,
+  const size_t rows,ExceptionInfo *exception)
+{
+  double
     *scale_scanline,
     *scanline,
     *x_vector,
@@ -922,19 +1248,8 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   Image
     *scale_image;
 
-  MagickBooleanType
-    next_row,
-    proceed,
-    status;
-
-  PointInfo
-    scale,
-    span;
-
-  ssize_t
-    n,
-    number_rows,
-    y;
+  ScaleBuffers
+    inputs;
 
   /*
     Initialize scaled image attributes.
@@ -945,9 +1260,9 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((columns == 0) || (rows == 0))
+  if (IsScaleSizeEmpty(columns,rows) != MagickFalse)
     ThrowImageException(ImageError,"NegativeOrZeroImageSize");
-  if ((columns == image->columns) && (rows == image->rows))
+  if (IsScaleSizeUnchanged(image,columns,rows) != MagickFalse)
     return(CloneImage(image,0,0,MagickTrue,exception));
   scale_image=CloneImage(image,columns,rows,MagickTrue,exception);
   if (scale_image == (Image *) NULL)
@@ -973,133 +1288,23 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   if (IsScaleBufferMissing(scanline,scale_scanline,x_vector,y_vector) !=
       MagickFalse)
     {
-      if ((image->rows != scale_image->rows) && (scanline != (double *) NULL))
-        scanline=(double *) RelinquishMagickMemory(scanline);
-      if (scale_scanline != (double *) NULL)
-        scale_scanline=(double *) RelinquishMagickMemory(scale_scanline);
-      if (x_vector != (double *) NULL)
-        x_vector=(double *) RelinquishMagickMemory(x_vector);
-      if (y_vector != (double *) NULL)
-        y_vector=(double *) RelinquishMagickMemory(y_vector);
-      scale_image=DestroyImage(scale_image);
+      ScaleBuffers
+        failure;
+
+      failure.image=image;
+      failure.scale_image=scale_image;
+      failure.scale_scanline=scale_scanline;
+      failure.scanline=scanline;
+      failure.x_vector=x_vector;
+      failure.y_vector=y_vector;
+      ReleaseScaleBuffers(&failure);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  /*
-    Scale image.
-  */
-  number_rows=0;
-  next_row=MagickTrue;
-  span.y=1.0;
-  scale.y=(double) scale_image->rows/(double) image->rows;
-  (void) memset(y_vector,0,(size_t) MaxPixelChannels*image->columns*
-    sizeof(*y_vector));
-  n=0;
-  status=MagickTrue;
-  image_view=AcquireVirtualCacheView(image,exception);
-  scale_view=AcquireAuthenticCacheView(scale_image,exception);
-  for (y=0; y < (ssize_t) scale_image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    ScaleTransfer
-      transfer;
-
-    if (status == MagickFalse)
-      break;
-    q=QueueCacheViewAuthenticPixels(scale_view,0,y,scale_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        break;
-      }
-    alpha=1.0;
-    if (scale_image->rows == image->rows)
-      {
-        /*
-          Read a new scanline.
-        */
-        p=GetCacheViewVirtualPixels(image_view,0,n++,image->columns,1,
-          exception);
-        if (p == (const Quantum *) NULL)
-          {
-            status=MagickFalse;
-            break;
-          }
-        ImportScaleScanline(image,p,alpha,x_vector);
-      }
-    else
-      {
-        const ScaleRowTargets
-          targets = { &n, &status, &number_rows, &span, &scale, &next_row };
-
-        const ScaleReadTargets
-          pending_targets = { &n, &status, &number_rows, &next_row };
-
-        ScaleRead
-          pending;
-
-        ScaleRows
-          scale_rows;
-
-        /*
-          Scale Y direction.
-        */
-        scale_rows.image=image;
-        scale_rows.scale_image=scale_image;
-        scale_rows.image_view=image_view;
-        scale_rows.alpha=alpha;
-        scale_rows.x_vector=x_vector;
-        scale_rows.y_vector=y_vector;
-        scale_rows.exception=exception;
-        AccumulateScaleRows(&scale_rows,&targets);
-        pending.image=image;
-        pending.image_view=image_view;
-        pending.alpha=alpha;
-        pending.x_vector=x_vector;
-        pending.exception=exception;
-        if (ReadPendingScaleRow(&pending,&pending_targets) == MagickFalse)
-          break;
-        BlendScaleScanline(image,span,x_vector,y_vector,scanline);
-        scale.y-=span.y;
-        RestartScaleRow(image,scale_image,&scale,&next_row);
-        span.y=1.0;
-      }
-    transfer.image=image;
-    transfer.scale_image=scale_image;
-    transfer.alpha=alpha;
-    transfer.scale_scanline=scale_scanline;
-    transfer.scanline=scanline;
-    TransferScaleScanline(&transfer,q);
-    if (SyncCacheViewAuthenticPixels(scale_view,exception) == MagickFalse)
-      {
-        status=MagickFalse;
-        break;
-      }
-    proceed=SetImageProgress(image,ScaleImageTag,(MagickOffsetType) y,
-      image->rows);
-    if (proceed == MagickFalse)
-      {
-        status=MagickFalse;
-        break;
-      }
-  }
-  scale_view=DestroyCacheView(scale_view);
-  image_view=DestroyCacheView(image_view);
-  /*
-    Free allocated memory.
-  */
-  y_vector=(double *) RelinquishMagickMemory(y_vector);
-  scale_scanline=(double *) RelinquishMagickMemory(scale_scanline);
-  if (scale_image->rows != image->rows)
-    scanline=(double *) RelinquishMagickMemory(scanline);
-  x_vector=(double *) RelinquishMagickMemory(x_vector);
-  scale_image->type=image->type;
-  if (status == MagickFalse)
-    scale_image=DestroyImage(scale_image);
-  return(scale_image);
+  inputs.image=image;
+  inputs.scale_image=scale_image;
+  inputs.scale_scanline=scale_scanline;
+  inputs.scanline=scanline;
+  inputs.x_vector=x_vector;
+  inputs.y_vector=y_vector;
+  return(ScaleAndFinishImage(&inputs,exception));
 }

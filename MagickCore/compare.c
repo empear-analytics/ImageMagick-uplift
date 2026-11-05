@@ -3516,6 +3516,29 @@ static Image *SIMDivideByMagnitude(Image *image,Image *magnitude_image,
   return(result_image);
 }
 
+static void ClearRowNaNs(const Image *image,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      if (IsNaN((double) q[i]) != 0)
+        q[i]=(Quantum) 0;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType SIMFilterImageNaNs(Image *image,
   ExceptionInfo *exception)
 {
@@ -3541,9 +3564,6 @@ static MagickBooleanType SIMFilterImageNaNs(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -3552,22 +3572,7 @@ static MagickBooleanType SIMFilterImageNaNs(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if (IsNaN((double) q[i]) != 0)
-          q[i]=(Quantum) 0;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ClearRowNaNs(image,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
@@ -5188,21 +5193,297 @@ static double GetSimilarityMetric(const Image *image,
   return(similarity);
 }
 
+typedef struct
+{
+  double
+    similarity;
+
+  ssize_t
+    x,
+    y;
+} SimilarityInfo;
+
+typedef struct _SimilarityCandidate
+{
+  MetricType
+    metric;
+
+  double
+    similarity;
+
+  ssize_t
+    x,
+    y;
+} SimilarityCandidate;
+
+static void SelectLowerSimilarity(const SimilarityCandidate *tile,
+  SimilarityInfo *channel_info)
+{
+  const MetricType
+    metric = tile->metric;
+
+  const double
+    similarity = tile->similarity;
+
+  const ssize_t
+    x = tile->x,
+    y = tile->y;
+
+  switch (metric)
+  {
+    default:
+    {
+      if (similarity >= (*channel_info).similarity)
+        break;
+      (*channel_info).similarity=similarity;
+      (*channel_info).x=x;
+      (*channel_info).y=y;
+      break;
+    }
+  }
+}
+
+static void SelectBestSimilarity(const SimilarityCandidate *tile,
+  SimilarityInfo *channel_info)
+{
+  const MetricType
+    metric = tile->metric;
+
+  const double
+    similarity = tile->similarity;
+
+  const ssize_t
+    x = tile->x,
+    y = tile->y;
+
+  switch (metric)
+  {
+    case DotProductCorrelationErrorMetric:
+    case NormalizedCrossCorrelationErrorMetric:
+    case PeakSignalToNoiseRatioErrorMetric:
+    case PhaseCorrelationErrorMetric:
+    case StructuralSimilarityErrorMetric:
+    {
+      if (similarity <= (*channel_info).similarity)
+        break;
+      (*channel_info).similarity=similarity;
+      (*channel_info).x=x;
+      (*channel_info).y=y;
+      break;
+    }
+    default:
+    {
+      SelectLowerSimilarity(tile,channel_info);
+      break;
+    }
+  }
+}
+
+typedef struct _SimilarityPixel
+{
+  Image
+    *similarity_image;
+
+  PixelChannel
+    channel;
+
+  MetricType
+    metric;
+
+  double
+    similarity;
+} SimilarityPixel;
+
+static void SetSimilarityChannel(const SimilarityPixel *pixel,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const similarity_image = pixel->similarity_image;
+
+  const PixelChannel
+    channel = pixel->channel;
+
+  const MetricType
+    metric = pixel->metric;
+
+  const double
+    similarity = pixel->similarity;
+
+  switch (metric)
+  {
+    case DotProductCorrelationErrorMetric:
+    case NormalizedCrossCorrelationErrorMetric:
+    case PeakSignalToNoiseRatioErrorMetric:
+    case PhaseCorrelationErrorMetric:
+    case StructuralSimilarityErrorMetric:
+    {
+      SetPixelChannel(similarity_image,channel,ClampToQuantum((double)
+        QuantumRange*similarity),q);
+      break;
+    }
+    default:
+    {
+      SetPixelChannel(similarity_image,channel,ClampToQuantum((double)
+        QuantumRange*(1.0-similarity)),q);
+      break;
+    }
+  }
+}
+
+typedef struct _SimilarityChannels
+{
+  const Image
+    *image;
+
+  Image
+    *similarity_image;
+
+  MetricType
+    metric;
+
+  double
+    similarity;
+} SimilarityChannels;
+
+static void SetSimilarityChannels(const SimilarityChannels *channels,
+  Quantum *magick_restrict q)
+{
+  const Image
+    *const image = channels->image;
+
+  Image
+    *const similarity_image = channels->similarity_image;
+
+  const MetricType
+    metric = channels->metric;
+
+  const double
+    similarity = channels->similarity;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait similarity_traits = GetPixelChannelTraits(similarity_image,
+      channel);
+    SimilarityPixel
+      pixel;
+
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((similarity_traits & UpdatePixelTrait) == 0))
+      continue;
+    pixel.similarity_image=similarity_image;
+    pixel.channel=channel;
+    pixel.metric=metric;
+    pixel.similarity=similarity;
+    SetSimilarityChannel(&pixel,q);
+  }
+}
+
+typedef struct _SimilarityRow
+{
+  const Image
+    *image,
+    *reconstruct;
+
+  Image
+    *similarity_image;
+
+  CacheView
+    *similarity_view;
+
+  MetricType
+    metric;
+
+  MagickBooleanType
+    threshold_trigger;
+
+  ExceptionInfo
+    *exception;
+} SimilarityRow;
+
+static MagickBooleanType ScanSimilarityRow(const SimilarityRow *row,
+  const ssize_t y,SimilarityInfo *channel_info,MagickBooleanType *status)
+{
+  const Image
+    *const image = row->image,
+    *const reconstruct = row->reconstruct;
+
+  Image
+    *const similarity_image = row->similarity_image;
+
+  CacheView
+    *const similarity_view = row->similarity_view;
+
+  const MetricType
+    metric = row->metric;
+
+  const MagickBooleanType
+    threshold_trigger = row->threshold_trigger;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  double
+    similarity;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  if (threshold_trigger != MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(similarity_view,0,y,
+    similarity_image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) similarity_image->columns; x++)
+  {
+    SimilarityCandidate
+      tile;
+
+    SimilarityChannels
+      channels;
+
+    similarity=GetSimilarityMetric((Image *) image,reconstruct,metric,x,y,
+      exception);
+    tile.metric=metric;
+    tile.similarity=similarity;
+    tile.x=x;
+    tile.y=y;
+    switch (metric)
+    {
+      default:
+      {
+        SelectBestSimilarity(&tile,channel_info);
+        break;
+      }
+    }
+    channels.image=image;
+    channels.similarity_image=similarity_image;
+    channels.metric=metric;
+    channels.similarity=similarity;
+    SetSimilarityChannels(&channels,q);
+    q+=(ptrdiff_t) GetPixelChannels(similarity_image);
+  }
+  return(MagickTrue);
+}
+
 MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
 #define SimilarityImageTag  "Similarity/Image"
-
-  typedef struct
-  {
-    double
-      similarity;
-
-    ssize_t
-      x,
-      y;
-  } SimilarityInfo;
 
   CacheView
     *similarity_view;
@@ -5316,95 +5597,17 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
 #endif
   for (y=0; y < (ssize_t) similarity_image->rows; y++)
   {
-    double
-      similarity;
-
     MagickBooleanType
       threshold_trigger = MagickFalse;
-
-    Quantum
-      *magick_restrict q;
 
     SimilarityInfo
       channel_info = similarity_info;
 
-    ssize_t
-      x;
+    const SimilarityRow row = { image, reconstruct, similarity_image,
+      similarity_view, metric, threshold_trigger, exception };
 
-    if (status == MagickFalse)
+    if (ScanSimilarityRow(&row,y,&channel_info,&status) == MagickFalse)
       continue;
-    if (threshold_trigger != MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(similarity_view,0,y,
-      similarity_image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) similarity_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      similarity=GetSimilarityMetric((Image *) image,reconstruct,metric,x,y,
-        exception);
-      switch (metric)
-      {
-        case DotProductCorrelationErrorMetric:
-        case NormalizedCrossCorrelationErrorMetric:
-        case PeakSignalToNoiseRatioErrorMetric:
-        case PhaseCorrelationErrorMetric:
-        case StructuralSimilarityErrorMetric:
-        {
-          if (similarity <= channel_info.similarity)
-            break;
-          channel_info.similarity=similarity;
-          channel_info.x=x;
-          channel_info.y=y;
-          break;
-        }
-        default:
-        {
-          if (similarity >= channel_info.similarity)
-            break;
-          channel_info.similarity=similarity;
-          channel_info.x=x;
-          channel_info.y=y;
-          break;
-        }
-      }
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait similarity_traits = GetPixelChannelTraits(similarity_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((similarity_traits & UpdatePixelTrait) == 0))
-          continue;
-        switch (metric)
-        {
-          case DotProductCorrelationErrorMetric:
-          case NormalizedCrossCorrelationErrorMetric:
-          case PeakSignalToNoiseRatioErrorMetric:
-          case PhaseCorrelationErrorMetric:
-          case StructuralSimilarityErrorMetric:
-          {
-            SetPixelChannel(similarity_image,channel,ClampToQuantum((double)
-              QuantumRange*similarity),q);
-            break;
-          }
-          default:
-          {
-            SetPixelChannel(similarity_image,channel,ClampToQuantum((double)
-              QuantumRange*(1.0-similarity)),q);
-            break;
-          }
-        }
-      }
-      q+=(ptrdiff_t) GetPixelChannels(similarity_image);
-    }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_GetSimilarityMetric)
 #endif
@@ -5416,18 +5619,18 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
       case PhaseCorrelationErrorMetric:
       case StructuralSimilarityErrorMetric:
       {
-        if (similarity_threshold != DefaultSimilarityThreshold)
-          if (channel_info.similarity >= similarity_threshold)
-            threshold_trigger=MagickTrue;
+        if ((similarity_threshold != DefaultSimilarityThreshold) &&
+            (channel_info.similarity >= similarity_threshold))
+          threshold_trigger=MagickTrue;
         if (channel_info.similarity >= similarity_info.similarity)
           similarity_info=channel_info;
         break;
       }
       default:
       {
-        if (similarity_threshold != DefaultSimilarityThreshold)
-          if (channel_info.similarity < similarity_threshold)
-            threshold_trigger=MagickTrue;
+        if ((similarity_threshold != DefaultSimilarityThreshold) &&
+            (channel_info.similarity < similarity_threshold))
+          threshold_trigger=MagickTrue;
         if (channel_info.similarity < similarity_info.similarity)
           similarity_info=channel_info;
         break;

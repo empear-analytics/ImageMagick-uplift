@@ -188,6 +188,17 @@ static ThresholdMap
 %  with the 'threshold' value for both the black_point and the white_point.
 %
 */
+static void SetThresholdProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void BilevelPixel(const Image *image,const double threshold,
   double pixel,Quantum *magick_restrict q)
 {
@@ -217,6 +228,29 @@ typedef struct _ThresholdLine
   ExceptionInfo
     *exception;
 } ThresholdLine;
+
+static MagickBooleanType GetThresholdRow(const ThresholdLine *line,
+  const ssize_t y,Quantum *magick_restrict *q,MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*q)=GetCacheViewAuthenticPixels(line->image_view,0,y,
+    line->image->columns,1,line->exception);
+  if ((*q) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void SyncThresholdRow(const ThresholdLine *line,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(line->image_view,line->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+}
 
 static MagickBooleanType SetDirectNonGrayImage(Image *image,
   ExceptionInfo *exception)
@@ -269,14 +303,11 @@ MagickExport MagickBooleanType BilevelImage(Image *image,const double threshold,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       double
@@ -286,21 +317,14 @@ MagickExport MagickBooleanType BilevelImage(Image *image,const double threshold,
       BilevelPixel(image,threshold,pixel,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ThresholdImageTag,progress++,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetThresholdProgress(image,ThresholdImageTag,progress++,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -469,30 +493,20 @@ MagickExport MagickBooleanType BlackThresholdImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     BlackThresholdRow(image,&threshold,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ThresholdImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetThresholdProgress(image,ThresholdImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -640,16 +654,11 @@ MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ClampImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetThresholdProgress(image,ClampImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -898,30 +907,21 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     ColorThresholdRow(image,&start,&stop,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ThresholdImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetThresholdProgress(image,ThresholdImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -1683,31 +1683,22 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.map=map;
     row.y=y;
     OrderedDitherPixels(image,levels,&row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,DitherImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetThresholdProgress(image,DitherImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -1842,34 +1833,24 @@ MagickExport MagickBooleanType PerceptibleImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       PerceptiblePixel(image,epsilon,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,PerceptibleImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetThresholdProgress(image,PerceptibleImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -2045,34 +2026,24 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
     RandomThresholdRow
       row;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.min_threshold=min_threshold;
     row.max_threshold=max_threshold;
     row.random_info=random_info;
     row.id=id;
     RandomThresholdPixels(image,&row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ThresholdImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetThresholdProgress(image,ThresholdImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -2251,34 +2222,24 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
     RangeThresholdRow
       row;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.low_black=low_black;
     row.low_white=low_white;
     row.high_white=high_white;
     row.high_black=high_black;
     RangeThresholdPixels(image,&row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ThresholdImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetThresholdProgress(image,ThresholdImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -2390,33 +2351,24 @@ MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       WhiteThresholdIntensity(image,&threshold,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ThresholdImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetThresholdProgress(image,ThresholdImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);

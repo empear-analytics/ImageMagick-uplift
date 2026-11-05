@@ -213,9 +213,34 @@ static MagickBooleanType SeedCannyTrace(const CannyTrace *trace,
   return(MagickTrue);
 }
 
-static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
-  const ssize_t y,ExceptionInfo *exception)
+typedef struct _CannyNeighbor
 {
+  const CannyTrace
+    *trace;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    u,
+    v;
+} CannyNeighbor;
+
+typedef struct _CannyTraceTargets
+{
+  CannyInfo
+    *edge;
+
+  ssize_t
+    *i;
+} CannyTraceTargets;
+
+static MagickBooleanType TraceCannyNeighbor(const CannyNeighbor *neighbor,
+  const CannyTraceTargets *targets)
+{
+  const CannyTrace
+    *const trace = neighbor->trace;
+
   Image
     *edge_image = trace->edge_image;
 
@@ -228,8 +253,20 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
   const double
     lower_threshold = trace->lower_threshold;
 
+  ExceptionInfo
+    *const exception = neighbor->exception;
+
+  const ssize_t
+    u = neighbor->u,
+    v = neighbor->v;
+
   CannyInfo
-    edge,
+    *const edge = targets->edge;
+
+  ssize_t
+    *const i = targets->i;
+
+  CannyInfo
     pixel;
 
   MagickBooleanType
@@ -238,8 +275,81 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
   Quantum
     *q;
 
+  q=GetCacheViewAuthenticPixels(edge_view,(*edge).x+u,(*edge).y+v,1,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    return(MagickFalse);
+  status=GetMatrixElement(canny_cache,(*edge).x+u,(*edge).y+v,&pixel);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  if (IsUntracedEdgePixel(edge_image,q,pixel,lower_threshold) !=
+      MagickFalse)
+    {
+      *q=QuantumRange;
+      status=SyncCacheViewAuthenticPixels(edge_view,exception);
+      if (status == MagickFalse)
+        return(MagickFalse);
+      (*edge).x+=u;
+      (*edge).y+=v;
+      status=SetMatrixElement(canny_cache,(*i),0,edge);
+      if (status == MagickFalse)
+        return(MagickFalse);
+      (*i)++;
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType TraceCannyRow(const CannyTrace *trace,
+  ExceptionInfo *exception,const ssize_t v,const CannyTraceTargets *targets)
+{
+  Image
+    *edge_image = trace->edge_image;
+
+  const CannyInfo
+    *const edge = targets->edge;
+
+  ssize_t
+    u;
+
+  for (u=(-1); u <= 1; u++)
+  {
+    CannyNeighbor
+      neighbor;
+
+    if ((u == 0) && (v == 0))
+      continue;
+    if (IsAuthenticPixel(edge_image,(*edge).x+u,(*edge).y+v) == MagickFalse)
+      continue;
+    /*
+      Not an edge if gradient value is below the lower threshold.
+    */
+    neighbor.trace=trace;
+    neighbor.exception=exception;
+    neighbor.u=u;
+    neighbor.v=v;
+    if (TraceCannyNeighbor(&neighbor,targets) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
+  const ssize_t y,ExceptionInfo *exception)
+{
+  MatrixInfo
+    *canny_cache = trace->canny_cache;
+
+  CannyInfo
+    edge;
+
+  MagickBooleanType
+    status;
+
   ssize_t
     i;
+
+  const CannyTraceTargets
+    targets = { &edge, &i };
 
   if (SeedCannyTrace(trace,x,y,exception) == MagickFalse)
     return(MagickFalse);
@@ -254,40 +364,8 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
       return(MagickFalse);
     for (v=(-1); v <= 1; v++)
     {
-      ssize_t
-        u;
-
-      for (u=(-1); u <= 1; u++)
-      {
-        if ((u == 0) && (v == 0))
-          continue;
-        if (IsAuthenticPixel(edge_image,edge.x+u,edge.y+v) == MagickFalse)
-          continue;
-        /*
-          Not an edge if gradient value is below the lower threshold.
-        */
-        q=GetCacheViewAuthenticPixels(edge_view,edge.x+u,edge.y+v,1,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          return(MagickFalse);
-        status=GetMatrixElement(canny_cache,edge.x+u,edge.y+v,&pixel);
-        if (status == MagickFalse)
-          return(MagickFalse);
-        if (IsUntracedEdgePixel(edge_image,q,pixel,lower_threshold) !=
-            MagickFalse)
-          {
-            *q=QuantumRange;
-            status=SyncCacheViewAuthenticPixels(edge_view,exception);
-            if (status == MagickFalse)
-              return(MagickFalse);
-            edge.x+=u;
-            edge.y+=v;
-            status=SetMatrixElement(canny_cache,i,0,&edge);
-            if (status == MagickFalse)
-              return(MagickFalse);
-            i++;
-          }
-      }
+      if (TraceCannyRow(trace,exception,v,&targets) == MagickFalse)
+        return(MagickFalse);
     }
   }
   return(MagickTrue);
@@ -592,6 +670,49 @@ static void ComputeCannyGradientRow(MagickBooleanType *status,
   SetCannyGradientRow(edge_image,canny_cache,p,y);
 }
 
+static void SyncFeatureView(CacheView *view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static void SetFeatureProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static MagickBooleanType GetCannyRow(
+  const ComputeCannyGradientRowInfo *info,const ssize_t y,
+  Quantum *magick_restrict *q,MagickBooleanType *status)
+{
+  CacheView
+    *const edge_view = info->edge_view;
+
+  Image
+    *const edge_image = info->edge_image;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*q)=GetCacheViewAuthenticPixels(edge_view,0,y,edge_image->columns,1,
+    exception);
+  if ((*q) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType BlurCannyImage(const Image *image,
   KernelInfo *kernel_info,Image **edge_image,ExceptionInfo *exception)
 {
@@ -603,6 +724,14 @@ static MagickBooleanType BlurCannyImage(const Image *image,
   if (SetCannyEdgeGray((*edge_image),exception) == MagickFalse)
     return(MagickFalse);
   return(MagickTrue);
+}
+
+static void UpdateCannyRange(const double intensity,double *min,double *max)
+{
+  if (intensity < (*min))
+    (*min)=intensity;
+  if (intensity > (*max))
+    (*max)=intensity;
 }
 
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
@@ -705,21 +834,17 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) edge_image->rows; y++)
   {
+    const ComputeCannyGradientRowInfo
+      info = { edge_view, edge_image, exception, canny_cache };
+
     Quantum
       *magick_restrict q;
 
     ssize_t
       x;
 
-    if (status == MagickFalse)
+    if (GetCannyRow(&info,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(edge_view,0,y,edge_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     for (x=0; x < (ssize_t) edge_image->columns; x++)
     {
       CannyInfo
@@ -730,16 +855,12 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
       #pragma omp critical (MagickCore_CannyEdgeImage)
 #endif
       {
-        if (pixel.intensity < min)
-          min=pixel.intensity;
-        if (pixel.intensity > max)
-          max=pixel.intensity;
+        UpdateCannyRange(pixel.intensity,&min,&max);
       }
       *q=(Quantum) 0;
       q+=(ptrdiff_t) GetPixelChannels(edge_image);
     }
-    if (SyncCacheViewAuthenticPixels(edge_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncFeatureView(edge_view,exception,&status);
   }
   edge_view=DestroyCacheView(edge_view);
   /*
@@ -771,16 +892,11 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
     status=TraceCannyEdgeRow(&hysteresis,trace,status,exception);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,CannyEdgeImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetFeatureProgress(image,CannyEdgeImageTag,progress,&status);
       }
   }
   edge_view=DestroyCacheView(edge_view);
@@ -1371,16 +1487,11 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
     VoteHoughRow(&votes,p,center);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,CannyEdgeImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetFeatureProgress(image,CannyEdgeImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -1825,16 +1936,11 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,MeanShiftImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetFeatureProgress(image,MeanShiftImageTag,progress,&status);
       }
   }
   mean_view=DestroyCacheView(mean_view);

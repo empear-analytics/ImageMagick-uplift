@@ -109,6 +109,27 @@ typedef struct _Hq2XNeighbours
     h;
 } Hq2XNeighbours;
 
+typedef struct _MagnifyLoop
+{
+  const Image
+    *source_image,
+    *magnify_image;
+
+  CacheView
+    *image_view,
+    *magnify_view;
+
+  size_t
+    width,
+    magnification;
+
+  void
+    (*scaling_method)(const Image *,const Quantum *,Quantum *,size_t);
+
+  ExceptionInfo
+    *exception;
+} MagnifyLoop;
+
 typedef struct _MagnifyRow
 {
   const Image
@@ -1353,6 +1374,34 @@ static MagickBooleanType MagnifyImageRow(const Image *source_image,
   return(status);
 }
 
+static MagickBooleanType MagnifyImageLine(const MagnifyLoop *loop,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(loop->magnify_view,0,loop->magnification*y,
+    loop->magnify_image->columns,loop->magnification,loop->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  /*
+    Magnify this row of pixels.
+  */
+  if (MagnifyImageRow(loop->source_image,loop->image_view,loop->magnify_image,
+        y,loop->width,loop->magnification,loop->scaling_method,q,
+        loop->exception) == MagickFalse)
+    (*status)=MagickFalse;
+  if (SyncCacheViewAuthenticPixels(loop->magnify_view,
+        loop->exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
 {
 #define MagnifyImageTag  "Magnify/Image"
@@ -1422,26 +1471,11 @@ MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) source_image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const MagnifyLoop loop = { source_image, magnify_image,
+      image_view, magnify_view, width, magnification, scaling_method, exception };
 
-    if (status == MagickFalse)
+    if (MagnifyImageLine(&loop,y,&status) == MagickFalse)
       continue;
-    q=QueueCacheViewAuthenticPixels(magnify_view,0,magnification*y,
-      magnify_image->columns,magnification,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    /*
-      Magnify this row of pixels.
-    */
-    if (MagnifyImageRow(source_image,image_view,magnify_image,y,width,
-          magnification,scaling_method,q,exception) == MagickFalse)
-      status=MagickFalse;
-    if (SyncCacheViewAuthenticPixels(magnify_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType

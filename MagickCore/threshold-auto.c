@@ -159,13 +159,136 @@ static size_t FindKapurThreshold(const double *black_entropy,
   return(threshold);
 }
 
+typedef struct _KapurBuffers
+{
+  const Image
+    *image;
+
+  double
+    *black_entropy,
+    *cumulative_histogram,
+    *white_entropy;
+
+  ExceptionInfo
+    *exception;
+} KapurBuffers;
+
+static double ThrowKapurFailure(const KapurBuffers *buffers)
+{
+  const Image
+    *const image = buffers->image;
+
+  double
+    *black_entropy = buffers->black_entropy,
+    *cumulative_histogram = buffers->cumulative_histogram,
+    *white_entropy = buffers->white_entropy;
+
+  ExceptionInfo
+    *const exception = buffers->exception;
+
+  if (white_entropy != (double *) NULL)
+    white_entropy=(double *) RelinquishMagickMemory(white_entropy);
+  if (black_entropy != (double *) NULL)
+    black_entropy=(double *) RelinquishMagickMemory(black_entropy);
+  if (cumulative_histogram != (double *) NULL)
+    cumulative_histogram=(double *)
+      RelinquishMagickMemory(cumulative_histogram);
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+  return(-1.0);
+}
+
+typedef struct _KapurSums
+{
+  const double
+    *histogram;
+
+  double
+    *black_entropy,
+    *cumulative_histogram,
+    epsilon;
+} KapurSums;
+
+static void ComputeKapurBlackEntropy(const KapurSums *kapur,const ssize_t j)
+{
+  const double
+    *const histogram = kapur->histogram;
+
+  double
+    *const black_entropy = kapur->black_entropy,
+    *const cumulative_histogram = kapur->cumulative_histogram,
+    epsilon = kapur->epsilon;
+
+  double
+    entropy;
+
+  ssize_t
+    i;
+
+  /*
+    Black entropy.
+  */
+  black_entropy[j]=0.0;
+  if (cumulative_histogram[j] > epsilon)
+    {
+      entropy=0.0;
+      for (i=0; i <= j; i++)
+        if (histogram[i] > epsilon)
+          entropy-=histogram[i]/cumulative_histogram[j]*
+            log(histogram[i]/cumulative_histogram[j]);
+      black_entropy[j]=entropy;
+    }
+}
+
+static void ComputeKapurEntropy(const KapurSums *sums,
+  double *white_entropy,const ssize_t j)
+{
+  const double
+    *const histogram = sums->histogram;
+
+  double
+    *const black_entropy = sums->black_entropy,
+    *const cumulative_histogram = sums->cumulative_histogram,
+    epsilon = sums->epsilon;
+
+  double
+    entropy;
+
+  ssize_t
+    i;
+
+  KapurSums
+    kapur;
+
+  /*
+    Black entropy.
+  */
+  kapur.histogram=histogram;
+  kapur.black_entropy=black_entropy;
+  kapur.cumulative_histogram=cumulative_histogram;
+  kapur.epsilon=epsilon;
+  ComputeKapurBlackEntropy(&kapur,j);
+  /*
+    White entropy.
+  */
+  white_entropy[j]=0.0;
+  if ((1.0-cumulative_histogram[j]) > epsilon)
+    {
+      entropy=0.0;
+      for (i=j+1; i <= MaxIntensity; i++)
+        if (histogram[i] > epsilon)
+          entropy-=histogram[i]/(1.0-cumulative_histogram[j])*
+            log(histogram[i]/(1.0-cumulative_histogram[j]));
+      white_entropy[j]=entropy;
+    }
+}
+
 static double KapurThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
   double
     *black_entropy,
     *cumulative_histogram,
-    entropy,
     epsilon,
     *white_entropy;
 
@@ -188,16 +311,15 @@ static double KapurThreshold(const Image *image,const double *histogram,
   if (IsKapurBufferMissing(cumulative_histogram,black_entropy,white_entropy) !=
       MagickFalse)
     {
-      if (white_entropy != (double *) NULL)
-        white_entropy=(double *) RelinquishMagickMemory(white_entropy);
-      if (black_entropy != (double *) NULL)
-        black_entropy=(double *) RelinquishMagickMemory(black_entropy);
-      if (cumulative_histogram != (double *) NULL)
-        cumulative_histogram=(double *)
-          RelinquishMagickMemory(cumulative_histogram);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(-1.0);
+      KapurBuffers
+        failure;
+
+      failure.image=image;
+      failure.cumulative_histogram=cumulative_histogram;
+      failure.black_entropy=black_entropy;
+      failure.white_entropy=white_entropy;
+      failure.exception=exception;
+      return(ThrowKapurFailure(&failure));
     }
    /*
      Entropy for black and white parts of the histogram.
@@ -208,32 +330,14 @@ static double KapurThreshold(const Image *image,const double *histogram,
    epsilon=MagickMinimumValue;
    for (j=0; j <= MaxIntensity; j++)
    {
-     /*
-       Black entropy.
-     */
-     black_entropy[j]=0.0;
-     if (cumulative_histogram[j] > epsilon)
-       {
-         entropy=0.0;
-         for (i=0; i <= j; i++)
-           if (histogram[i] > epsilon)
-             entropy-=histogram[i]/cumulative_histogram[j]*
-               log(histogram[i]/cumulative_histogram[j]);
-         black_entropy[j]=entropy;
-       }
-     /*
-       White entropy.
-     */
-     white_entropy[j]=0.0;
-     if ((1.0-cumulative_histogram[j]) > epsilon)
-       {
-         entropy=0.0;
-         for (i=j+1; i <= MaxIntensity; i++)
-           if (histogram[i] > epsilon)
-             entropy-=histogram[i]/(1.0-cumulative_histogram[j])*
-               log(histogram[i]/(1.0-cumulative_histogram[j]));
-         white_entropy[j]=entropy;
-       }
+     KapurSums
+       sums;
+
+     sums.histogram=histogram;
+     sums.black_entropy=black_entropy;
+     sums.cumulative_histogram=cumulative_histogram;
+     sums.epsilon=epsilon;
+     ComputeKapurEntropy(&sums,white_entropy,j);
    }
   /*
     Find histogram bin with maximum entropy.
@@ -283,6 +387,48 @@ static double FindOTSUThreshold(const double *myu,const double *omega,
   return(threshold);
 }
 
+typedef struct _OTSUBuffers
+{
+  const Image
+    *image;
+
+  double
+    *myu,
+    *omega,
+    *probability,
+    *sigma;
+
+  ExceptionInfo
+    *exception;
+} OTSUBuffers;
+
+static double ThrowOTSUFailure(const OTSUBuffers *buffers)
+{
+  const Image
+    *const image = buffers->image;
+
+  double
+    *myu = buffers->myu,
+    *omega = buffers->omega,
+    *probability = buffers->probability,
+    *sigma = buffers->sigma;
+
+  ExceptionInfo
+    *const exception = buffers->exception;
+
+  if (sigma != (double *) NULL)
+    sigma=(double *) RelinquishMagickMemory(sigma);
+  if (probability != (double *) NULL)
+    probability=(double *) RelinquishMagickMemory(probability);
+  if (omega != (double *) NULL)
+    omega=(double *) RelinquishMagickMemory(omega);
+  if (myu != (double *) NULL)
+    myu=(double *) RelinquishMagickMemory(myu);
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+  return(-1.0);
+}
+
 static double OTSUThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
@@ -306,17 +452,16 @@ static double OTSUThreshold(const Image *image,const double *histogram,
   sigma=(double *) AcquireQuantumMemory(MaxIntensity+1UL,sizeof(*sigma));
   if (IsOTSUBufferMissing(myu,omega,probability,sigma) != MagickFalse)
     {
-      if (sigma != (double *) NULL)
-        sigma=(double *) RelinquishMagickMemory(sigma);
-      if (probability != (double *) NULL)
-        probability=(double *) RelinquishMagickMemory(probability);
-      if (omega != (double *) NULL)
-        omega=(double *) RelinquishMagickMemory(omega);
-      if (myu != (double *) NULL)
-        myu=(double *) RelinquishMagickMemory(myu);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(-1.0);
+      OTSUBuffers
+        failure;
+
+      failure.image=image;
+      failure.myu=myu;
+      failure.omega=omega;
+      failure.probability=probability;
+      failure.sigma=sigma;
+      failure.exception=exception;
+      return(ThrowOTSUFailure(&failure));
     }
   /*
     Calculate probability density.
@@ -434,16 +579,87 @@ static void ScanTriangleBelowPeak(const TriangleLine *line,ssize_t *threshold,
   }
 }
 
+typedef struct _TriangleSplit
+{
+  double
+    a,
+    b,
+    c,
+    inverse_ratio,
+    x2;
+
+  const double
+    *histogram;
+
+  ssize_t
+    end,
+    max,
+    start;
+} TriangleSplit;
+
+static ssize_t FindTriangleSplit(const TriangleSplit *split)
+{
+  const double
+    a = split->a,
+    b = split->b,
+    c = split->c,
+    inverse_ratio = split->inverse_ratio,
+    x2 = split->x2;
+
+  const double
+    *histogram = split->histogram;
+
+  const ssize_t
+    end = split->end,
+    max = split->max,
+    start = split->start;
+
+  double
+    distance,
+    max_distance,
+    segment;
+
+  ssize_t
+    i,
+    threshold;
+
+  TriangleLine
+    line;
+
+  threshold=0;
+  max_distance=0.0;
+  if (x2 == (double) start)
+    {
+      line.a=a;
+      line.b=b;
+      line.c=c;
+      line.inverse_ratio=inverse_ratio;
+      line.histogram=histogram;
+      line.max=max;
+      line.start=start;
+      ScanTriangleBelowPeak(&line,&threshold,&max_distance);
+    }
+  else
+    for (i=end; i > max; i--)
+    {
+      segment=inverse_ratio*(a*i+b*histogram[i]+c);
+      distance=sqrt(segment*segment);
+      if ((distance > max_distance) && (segment < 0.0))
+        {
+          threshold=i;
+          max_distance=distance;
+        }
+    }
+  return(threshold);
+}
+
 static double TriangleThreshold(const double *histogram)
 {
   double
     a,
     b,
     c,
-    distance,
     inverse_ratio,
-    max_distance,
-    segment,
     x1,
     x2,
     y1,
@@ -458,8 +674,8 @@ static double TriangleThreshold(const double *histogram)
     start,
     threshold;
 
-  TriangleLine
-    line;
+  TriangleSplit
+    split;
 
   /*
     Compute optimal threshold with triangle algorithm.
@@ -486,30 +702,16 @@ static double TriangleThreshold(const double *histogram)
   b=x2-x1;
   c=(-1.0)*(a*x1+b*y1);
   inverse_ratio=1.0/sqrt(a*a+b*b+c*c);
-  threshold=0;
-  max_distance=0.0;
-  if (x2 == (double) start)
-    {
-      line.a=a;
-      line.b=b;
-      line.c=c;
-      line.inverse_ratio=inverse_ratio;
-      line.histogram=histogram;
-      line.max=max;
-      line.start=start;
-      ScanTriangleBelowPeak(&line,&threshold,&max_distance);
-    }
-  else
-    for (i=end; i > max; i--)
-    {
-      segment=inverse_ratio*(a*i+b*histogram[i]+c);
-      distance=sqrt(segment*segment);
-      if ((distance > max_distance) && (segment < 0.0))
-        {
-          threshold=i;
-          max_distance=distance;
-        }
-    }
+  split.a=a;
+  split.b=b;
+  split.c=c;
+  split.inverse_ratio=inverse_ratio;
+  split.x2=x2;
+  split.histogram=histogram;
+  split.end=end;
+  split.max=max;
+  split.start=start;
+  threshold=FindTriangleSplit(&split);
   return(100.0*threshold/MaxIntensity);
 }
 
@@ -590,12 +792,25 @@ static double DiscoverHistogramThreshold(const Image *image,
   return(threshold);
 }
 
-MagickExport MagickBooleanType AutoThresholdImage(Image *image,
-  const AutoThresholdMethod method,ExceptionInfo *exception)
+static MagickBooleanType ApplyAutoThreshold(Image *image,const double threshold,
+  ExceptionInfo *exception)
 {
   char
     property[MagickPathExtent];
 
+  /*
+    Threshold image.
+  */
+  (void) FormatLocaleString(property,MagickPathExtent,"%g%%",threshold);
+  (void) SetImageProperty(image,"auto-threshold:threshold",property,exception);
+  if (IsStringTrue(GetImageArtifact(image,"auto-threshold:verbose")) != MagickFalse)
+    (void) FormatLocaleFile(stdout,"%.*g%%\n",GetMagickPrecision(),threshold);
+  return(BilevelImage(image,(double) QuantumRange*threshold/100.0,exception));
+}
+
+MagickExport MagickBooleanType AutoThresholdImage(Image *image,
+  const AutoThresholdMethod method,ExceptionInfo *exception)
+{
   double
     *histogram,
     threshold;
@@ -631,12 +846,5 @@ MagickExport MagickBooleanType AutoThresholdImage(Image *image,
     status=MagickFalse;
   if (status == MagickFalse)
     return(MagickFalse);
-  /*
-    Threshold image.
-  */
-  (void) FormatLocaleString(property,MagickPathExtent,"%g%%",threshold);
-  (void) SetImageProperty(image,"auto-threshold:threshold",property,exception);
-  if (IsStringTrue(GetImageArtifact(image,"auto-threshold:verbose")) != MagickFalse)
-    (void) FormatLocaleFile(stdout,"%.*g%%\n",GetMagickPrecision(),threshold);
-  return(BilevelImage(image,(double) QuantumRange*threshold/100.0,exception));
+  return(ApplyAutoThreshold(image,threshold,exception));
 }

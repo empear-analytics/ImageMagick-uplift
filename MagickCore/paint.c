@@ -1132,6 +1132,54 @@ static MagickBooleanType OilPaintLine(const OilPaintRowInfo *row,
   return(MagickTrue);
 }
 
+typedef struct _PaintRows
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    y;
+} PaintRows;
+
+static MagickBooleanType GetPaintRow(const PaintRows *rows,
+  Quantum *magick_restrict *q,MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*q)=GetCacheViewAuthenticPixels(rows->image_view,0,rows->y,
+    rows->image->columns,1,rows->exception);
+  if ((*q) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void SyncPaintRow(CacheView *view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static void SetPaintProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *OilPaintImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1210,17 +1258,11 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
       continue;
     if (linear_image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(linear_image,OilPaintImageTag,progress,
-          linear_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetPaintProgress(linear_image,OilPaintImageTag,progress,&status);
       }
   }
   paint_view=DestroyCacheView(paint_view);
@@ -1426,17 +1468,11 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,OpaquePaintImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetPaintProgress(image,OpaquePaintImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -1585,41 +1621,31 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    const PaintRows
+      rows = { image,image_view,exception,y };
+
     Quantum
       *magick_restrict q;
 
     TransparentPaintRow
       row;
 
-    if (status == MagickFalse)
+    if (GetPaintRow(&rows,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
     row.target=target;
     row.opacity=opacity;
     row.invert=invert;
     row.zero=zero;
     TransparentPaintRowPixels(&row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncPaintRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,TransparentPaintImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetPaintProgress(image,TransparentPaintImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -1717,6 +1743,9 @@ MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    const PaintRows
+      rows = { image,image_view,exception,y };
+
     MagickBooleanType
       match;
 
@@ -1729,14 +1758,8 @@ MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
     ssize_t
       x;
 
-    if (status == MagickFalse)
+    if (GetPaintRow(&rows,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     GetPixelInfo(image,&pixel);
     for (x=0; x < (ssize_t) image->columns; x++)
     {
@@ -1746,21 +1769,14 @@ MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
         SetPixelAlpha(image,opacity,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncPaintRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,TransparentPaintImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetPaintProgress(image,TransparentPaintImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);

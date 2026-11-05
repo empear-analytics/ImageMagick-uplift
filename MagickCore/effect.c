@@ -621,11 +621,120 @@ static void HullAllPolarities(const DespeckleHull *despeckle_hull,
   Hull(&hull,x,y,-1);
 }
 
+typedef struct _DespeckleChannelPass
+{
+  const Image
+    *image;
+
+  Image
+    *despeckle_image;
+
+  CacheView
+    *image_view,
+    *despeckle_view;
+
+  ExceptionInfo
+    *exception;
+
+  Quantum
+    *buffer,
+    *pixels;
+
+  size_t
+    length;
+
+  const ssize_t
+    *X,
+    *Y;
+} DespeckleChannelPass;
+
+static void DespeckleChannel(const DespeckleChannelPass *despeckle,
+  const ssize_t i,MagickBooleanType *status)
+{
+  const Image
+    *const image = despeckle->image;
+
+  Image
+    *const despeckle_image = despeckle->despeckle_image;
+
+  CacheView
+    *const image_view = despeckle->image_view,
+    *const despeckle_view = despeckle->despeckle_view;
+
+  ExceptionInfo
+    *const exception = despeckle->exception;
+
+  Quantum
+    *magick_restrict const buffer = despeckle->buffer,
+    *magick_restrict const pixels = despeckle->pixels;
+
+  const size_t
+    length = despeckle->length;
+
+  const ssize_t
+    *const X = despeckle->X,
+    *const Y = despeckle->Y;
+
+  DespeckleLoad
+    load;
+
+  DespeckleStore
+    store;
+
+  DespeckleHull
+    despeckle_hull;
+
+  PixelChannel
+     channel;
+
+  PixelTrait
+    despeckle_traits,
+    traits;
+
+  ssize_t
+    k;
+
+  if ((*status) == MagickFalse)
+    return;
+  channel=GetPixelChannelChannel(image,i);
+  traits=GetPixelChannelTraits(image,channel);
+  despeckle_traits=GetPixelChannelTraits(despeckle_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (despeckle_traits == UndefinedPixelTrait))
+    return;
+  if ((despeckle_traits & CopyPixelTrait) != 0)
+    return;
+  (void) memset(pixels,0,length*sizeof(*pixels));
+  load.image=image;
+  load.image_view=image_view;
+  load.pixels=pixels;
+  load.i=i;
+  (*status)=LoadDespeckleChannel(&load,(*status),exception);
+  (void) memset(buffer,0,length*sizeof(*buffer));
+  for (k=0; k < 4; k++)
+  {
+    despeckle_hull.image=image;
+    despeckle_hull.pixels=pixels;
+    despeckle_hull.buffer=buffer;
+    HullAllPolarities(&despeckle_hull,X[k],Y[k]);
+  }
+  store.image=image;
+  store.despeckle_image=despeckle_image;
+  store.despeckle_view=despeckle_view;
+  store.channel=channel;
+  store.pixels=pixels;
+  (*status)=StoreDespeckleChannel(&store,(*status),exception);
+  (*status)=ReportDespeckleProgress(image,i,(*status));
+}
+
 MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
     *despeckle_view,
     *image_view;
+
+  DespeckleChannelPass
+    despeckle;
 
   Image
     *despeckle_image;
@@ -701,58 +810,19 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
   status=MagickTrue;
   image_view=AcquireVirtualCacheView(image,exception);
   despeckle_view=AcquireAuthenticCacheView(despeckle_image,exception);
+  despeckle.image=image;
+  despeckle.despeckle_image=despeckle_image;
+  despeckle.image_view=image_view;
+  despeckle.despeckle_view=despeckle_view;
+  despeckle.exception=exception;
+  despeckle.buffer=buffer;
+  despeckle.pixels=pixels;
+  despeckle.length=length;
+  despeckle.X=X;
+  despeckle.Y=Y;
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    DespeckleLoad
-      load;
-
-    DespeckleStore
-      store;
-
-    DespeckleHull
-      despeckle_hull;
-
-    PixelChannel
-       channel;
-
-    PixelTrait
-      despeckle_traits,
-      traits;
-
-    ssize_t
-      k;
-
-    if (status == MagickFalse)
-      continue;
-    channel=GetPixelChannelChannel(image,i);
-    traits=GetPixelChannelTraits(image,channel);
-    despeckle_traits=GetPixelChannelTraits(despeckle_image,channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (despeckle_traits == UndefinedPixelTrait))
-      continue;
-    if ((despeckle_traits & CopyPixelTrait) != 0)
-      continue;
-    (void) memset(pixels,0,length*sizeof(*pixels));
-    load.image=image;
-    load.image_view=image_view;
-    load.pixels=pixels;
-    load.i=i;
-    status=LoadDespeckleChannel(&load,status,exception);
-    (void) memset(buffer,0,length*sizeof(*buffer));
-    for (k=0; k < 4; k++)
-    {
-      despeckle_hull.image=image;
-      despeckle_hull.pixels=pixels;
-      despeckle_hull.buffer=buffer;
-      HullAllPolarities(&despeckle_hull,X[k],Y[k]);
-    }
-    store.image=image;
-    store.despeckle_image=despeckle_image;
-    store.despeckle_view=despeckle_view;
-    store.channel=channel;
-    store.pixels=pixels;
-    status=StoreDespeckleChannel(&store,status,exception);
-    status=ReportDespeckleProgress(image,i,status);
+    DespeckleChannel(&despeckle,i,&status);
   }
   despeckle_view=DestroyCacheView(despeckle_view);
   image_view=DestroyCacheView(image_view);
@@ -2933,6 +3003,16 @@ typedef struct _ShadeRow
 
   ShadeImages
     shading;
+
+  CacheView
+    *image_view,
+    *shade_view;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    y;
 } ShadeRow;
 
 static void ShadeRowPixels(const ShadeRow *row,const Quantum *magick_restrict p,
@@ -3025,6 +3105,34 @@ static MagickBooleanType AcquireShadeImages(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType ShadeHeadRow(MagickBooleanType *status,
+  const ShadeRow *row)
+{
+  const Image
+    *const linear_image = row->linear_image,
+    *const shade_image = row->shade_image;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(row->image_view,-1,row->y-1,
+    linear_image->columns+2,3,row->exception);
+  q=QueueCacheViewAuthenticPixels(row->shade_view,0,row->y,shade_image->columns,
+    1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ShadeRowPixels(row,p,q);
+  return(MagickTrue);
+}
+
 MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   const double azimuth,const double elevation,ExceptionInfo *exception)
 {
@@ -3088,34 +3196,12 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
     const ShadeImages
       shading = { linear_image, shade_image, gray };
 
-    const Quantum
-      *magick_restrict p;
+    const ShadeRow
+      row = { linear_image,shade_image,light,shading,image_view,shade_view,
+        exception,y };
 
-    Quantum
-      *magick_restrict q;
-
-    ShadeRow
-      row;
-
-    if (status == MagickFalse)
+    if (ShadeHeadRow(&status,&row) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,-1,y-1,linear_image->columns+2,3,
-      exception);
-    q=QueueCacheViewAuthenticPixels(shade_view,0,y,shade_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    /*
-      Shade this row of pixels.
-    */
-    row.linear_image=linear_image;
-    row.shade_image=shade_image;
-    row.light=light;
-    row.shading=shading;
-    ShadeRowPixels(&row,p,q);
     if (SyncCacheViewAuthenticPixels(shade_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)

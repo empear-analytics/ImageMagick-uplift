@@ -139,16 +139,130 @@ typedef struct _CensusInfo
     bottom;
 } CensusInfo;
 
-static double GetEdgeBackgroundCensus(const Image *image,
-  const CacheView *image_view,const GravityType gravity,const size_t width,
-  const size_t height,const ssize_t x_offset,const ssize_t y_offset,
+static double CountRowForeground(const Image *edge_image,const Quantum *p,
+  const PixelInfo background,double census)
+{
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) edge_image->columns; x++)
+  {
+    GetPixelInfoPixel(edge_image,p,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,&background) == MagickFalse)
+      census++;
+    p+=(ptrdiff_t) GetPixelChannels(edge_image);
+  }
+  return(census);
+}
+
+static double CountEdgeForeground(const Image *edge_image,
+  const CacheView *edge_view,const PixelInfo background,
   ExceptionInfo *exception)
+{
+  const Quantum
+    *p;
+
+  double
+    census;
+
+  ssize_t
+    y;
+
+  census=0.0;
+  for (y=0; y < (ssize_t) edge_image->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    census=CountRowForeground(edge_image,p,background,census);
+  }
+  return(census);
+}
+
+static void QueryArtifactColor(const Image *image,const char *key,
+  PixelInfo *color,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,key);
+  if (artifact != (const char *) NULL)
+    (void) QueryColorCompliance(artifact,AllCompliance,color,exception);
+}
+
+typedef struct _EdgeTrimScan
+{
+  const Image
+    *edge_image;
+
+  const CacheView
+    *edge_view;
+
+  ExceptionInfo
+    *exception;
+
+  double
+    background_census;
+} EdgeTrimScan;
+
+static inline RectangleInfo GetEdgeGeometry(const size_t width,
+  const size_t height,const ssize_t x_offset,const ssize_t y_offset)
+{
+  RectangleInfo
+    geometry;
+
+  geometry.width=width;
+  geometry.height=height;
+  geometry.x=x_offset;
+  geometry.y=y_offset;
+  return(geometry);
+}
+
+static void GetNorthernEdgePixel(const EdgeTrimScan *scan,
+  const GravityType gravity,const Quantum **p)
+{
+  const CacheView
+    *image_view = scan->edge_view;
+
+  const Image
+    *image = scan->edge_image;
+
+  ExceptionInfo
+    *exception = scan->exception;
+
+  switch (gravity)
+  {
+    case NorthWestGravity:
+    case NorthGravity:
+    default:
+    {
+      (*p)=GetCacheViewVirtualPixels(image_view,0,0,1,1,exception);
+      break;
+    }
+    case NorthEastGravity:
+    case EastGravity:
+    {
+      (*p)=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,0,1,
+        1,exception);
+      break;
+    }
+  }
+}
+
+static double GetEdgeBackgroundCensus(const EdgeTrimScan *scan,
+  const GravityType gravity,const RectangleInfo geometry)
 {
   CacheView
     *edge_view;
 
-  const char
-    *artifact;
+  const CacheView
+    *image_view = scan->edge_view;
+
+  const Image
+    *image = scan->edge_image;
 
   const Quantum
     *p;
@@ -156,36 +270,26 @@ static double GetEdgeBackgroundCensus(const Image *image,
   double
     census;
 
+  ExceptionInfo
+    *exception = scan->exception;
+
   Image
     *edge_image;
 
   PixelInfo
-    background,
-    pixel;
+    background;
 
   RectangleInfo
     edge_geometry;
-
-  ssize_t
-    y;
 
   /*
     Determine the percent of image background for this edge.
   */
   switch (gravity)
   {
-    case NorthWestGravity:
-    case NorthGravity:
     default:
     {
-      p=GetCacheViewVirtualPixels(image_view,0,0,1,1,exception);
-      break;
-    }
-    case NorthEastGravity:
-    case EastGravity:
-    {
-      p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,0,1,1,
-        exception);
+      GetNorthernEdgePixel(scan,gravity,&p);
       break;
     }
     case SouthEastGravity:
@@ -206,38 +310,15 @@ static double GetEdgeBackgroundCensus(const Image *image,
   if (p == (const Quantum *) NULL)
     return(0.0);
   GetPixelInfoPixel(image,p,&background);
-  artifact=GetImageArtifact(image,"background");
-  if (artifact != (const char *) NULL)
-    (void) QueryColorCompliance(artifact,AllCompliance,&background,exception);
-  artifact=GetImageArtifact(image,"trim:background-color");
-  if (artifact != (const char *) NULL)
-    (void) QueryColorCompliance(artifact,AllCompliance,&background,exception);
-  edge_geometry.width=width;
-  edge_geometry.height=height;
-  edge_geometry.x=x_offset;
-  edge_geometry.y=y_offset;
+  QueryArtifactColor(image,"background",&background,exception);
+  QueryArtifactColor(image,"trim:background-color",&background,exception);
+  edge_geometry=geometry;
   GravityAdjustGeometry(image->columns,image->rows,gravity,&edge_geometry);
   edge_image=CropImage(image,&edge_geometry,exception);
   if (edge_image == (Image *) NULL)
     return(0.0);
-  census=0.0;
   edge_view=AcquireVirtualCacheView(edge_image,exception);
-  for (y=0; y < (ssize_t) edge_image->rows; y++)
-  {
-    ssize_t
-      x;
-
-    p=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) edge_image->columns; x++)
-    {
-      GetPixelInfoPixel(edge_image,p,&pixel);
-      if (IsFuzzyEquivalencePixelInfo(&pixel,&background) == MagickFalse)
-        census++;
-      p+=(ptrdiff_t) GetPixelChannels(edge_image);
-    }
-  }
+  census=CountEdgeForeground(edge_image,edge_view,background,exception);
   census/=((double) edge_image->columns*edge_image->rows);
   edge_view=DestroyCacheView(edge_view);
   edge_image=DestroyImage(edge_image);
@@ -254,6 +335,155 @@ static inline double GetMinEdgeBackgroundCensus(const CensusInfo *edge)
   return(census);
 }
 
+static double GetPercentBackground(const Image *edge_image)
+{
+  const char
+    *artifact;
+
+  double
+    percent_background;
+
+  percent_background=1.0;
+  artifact=GetImageArtifact(edge_image,"trim:percent-background");
+  if (artifact != (const char *) NULL)
+    percent_background=StringToDouble(artifact,(char **) NULL)/100.0;
+  percent_background=MagickMin(MagickMax(1.0-percent_background,MagickEpsilon),
+    1.0);
+  return(percent_background);
+}
+
+static CensusInfo GetInitialEdgeCensus(const Image *edge_image,
+  const CacheView *edge_view,ExceptionInfo *exception)
+{
+  CensusInfo
+    edge;
+
+  EdgeTrimScan
+    scan;
+
+  scan.edge_image=edge_image;
+  scan.edge_view=edge_view;
+  scan.exception=exception;
+  edge.left=GetEdgeBackgroundCensus(&scan,WestGravity,
+    GetEdgeGeometry(1,0,0,0));
+  edge.right=GetEdgeBackgroundCensus(&scan,EastGravity,
+    GetEdgeGeometry(1,0,0,0));
+  edge.top=GetEdgeBackgroundCensus(&scan,NorthGravity,
+    GetEdgeGeometry(0,1,0,0));
+  edge.bottom=GetEdgeBackgroundCensus(&scan,SouthGravity,
+    GetEdgeGeometry(0,1,0,0));
+  return(edge);
+}
+
+static double GetLeftEdgeCensus(const EdgeTrimScan *scan,
+  const CensusInfo *vertex,const RectangleInfo *bounds)
+{
+  return(GetEdgeBackgroundCensus(scan,NorthWestGravity,
+    GetEdgeGeometry(1,bounds->height,(ssize_t) vertex->left,(ssize_t)
+    vertex->top)));
+}
+
+static double GetRightEdgeCensus(const EdgeTrimScan *scan,
+  const CensusInfo *vertex,const RectangleInfo *bounds)
+{
+  return(GetEdgeBackgroundCensus(scan,NorthEastGravity,
+    GetEdgeGeometry(1,bounds->height,(ssize_t) vertex->right,(ssize_t)
+    vertex->top)));
+}
+
+static double GetTopEdgeCensus(const EdgeTrimScan *scan,
+  const CensusInfo *vertex,const RectangleInfo *bounds)
+{
+  return(GetEdgeBackgroundCensus(scan,NorthWestGravity,
+    GetEdgeGeometry(bounds->width,1,(ssize_t) vertex->left,(ssize_t)
+    vertex->top)));
+}
+
+static double GetBottomEdgeCensus(const EdgeTrimScan *scan,
+  const CensusInfo *vertex,const RectangleInfo *bounds)
+{
+  return(GetEdgeBackgroundCensus(scan,SouthWestGravity,
+    GetEdgeGeometry(bounds->width,1,(ssize_t) vertex->left,(ssize_t)
+    vertex->bottom)));
+}
+
+static void TrimLeftEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
+  RectangleInfo *bounds,CensusInfo *edge)
+{
+  /*
+    Trim left edge.
+  */
+  (*vertex).left++;
+  (*bounds).width--;
+  (*edge).left=GetLeftEdgeCensus(scan,vertex,bounds);
+  (*edge).top=GetTopEdgeCensus(scan,vertex,bounds);
+  (*edge).bottom=GetBottomEdgeCensus(scan,vertex,bounds);
+}
+
+static void TrimRightEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
+  RectangleInfo *bounds,CensusInfo *edge)
+{
+  /*
+    Trim right edge.
+  */
+  (*vertex).right++;
+  (*bounds).width--;
+  (*edge).right=GetRightEdgeCensus(scan,vertex,bounds);
+  (*edge).top=GetTopEdgeCensus(scan,vertex,bounds);
+  (*edge).bottom=GetBottomEdgeCensus(scan,vertex,bounds);
+}
+
+static void TrimTopEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
+  RectangleInfo *bounds,CensusInfo *edge)
+{
+  /*
+    Trim top edge.
+  */
+  (*vertex).top++;
+  (*bounds).height--;
+  (*edge).left=GetLeftEdgeCensus(scan,vertex,bounds);
+  (*edge).right=GetRightEdgeCensus(scan,vertex,bounds);
+  (*edge).top=GetTopEdgeCensus(scan,vertex,bounds);
+}
+
+static void TrimBottomEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
+  RectangleInfo *bounds,CensusInfo *edge)
+{
+  /*
+    Trim bottom edge.
+  */
+  (*vertex).bottom++;
+  (*bounds).height--;
+  (*edge).left=GetLeftEdgeCensus(scan,vertex,bounds);
+  (*edge).right=GetRightEdgeCensus(scan,vertex,bounds);
+  (*edge).bottom=GetBottomEdgeCensus(scan,vertex,bounds);
+}
+
+static void TrimLowestEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
+  RectangleInfo *bounds,CensusInfo *edge)
+{
+  if (fabs((*edge).left-scan->background_census) < MagickEpsilon)
+    {
+      TrimLeftEdge(scan,vertex,bounds,edge);
+      return;
+    }
+  if (fabs((*edge).right-scan->background_census) < MagickEpsilon)
+    {
+      TrimRightEdge(scan,vertex,bounds,edge);
+      return;
+    }
+  if (fabs((*edge).top-scan->background_census) < MagickEpsilon)
+    {
+      TrimTopEdge(scan,vertex,bounds,edge);
+      return;
+    }
+  if (fabs((*edge).bottom-scan->background_census) < MagickEpsilon)
+    {
+      TrimBottomEdge(scan,vertex,bounds,edge);
+      return;
+    }
+}
+
 static RectangleInfo GetEdgeBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -264,12 +494,12 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
     edge,
     vertex;
 
-  const char
-    *artifact;
-
   double
     background_census,
     percent_background;
+
+  EdgeTrimScan
+    scan;
 
   Image
     *edge_image;
@@ -291,98 +521,19 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
   (void) ParseAbsoluteGeometry("0x0+0+0",&edge_image->page);
   (void) memset(&vertex,0,sizeof(vertex));
   edge_view=AcquireVirtualCacheView(edge_image,exception);
-  edge.left=GetEdgeBackgroundCensus(edge_image,edge_view,WestGravity,
-    1,0,0,0,exception);
-  edge.right=GetEdgeBackgroundCensus(edge_image,edge_view,EastGravity,
-    1,0,0,0,exception);
-  edge.top=GetEdgeBackgroundCensus(edge_image,edge_view,NorthGravity,
-    0,1,0,0,exception);
-  edge.bottom=GetEdgeBackgroundCensus(edge_image,edge_view,SouthGravity,
-    0,1,0,0,exception);
-  percent_background=1.0;
-  artifact=GetImageArtifact(edge_image,"trim:percent-background");
-  if (artifact != (const char *) NULL)
-    percent_background=StringToDouble(artifact,(char **) NULL)/100.0;
-  percent_background=MagickMin(MagickMax(1.0-percent_background,MagickEpsilon),
-    1.0);
+  scan.edge_image=edge_image;
+  scan.edge_view=edge_view;
+  scan.exception=exception;
+  edge=GetInitialEdgeCensus(edge_image,edge_view,exception);
+  percent_background=GetPercentBackground(edge_image);
   background_census=GetMinEdgeBackgroundCensus(&edge);
   for ( ; background_census < percent_background;
           background_census=GetMinEdgeBackgroundCensus(&edge))
   {
     if ((bounds.width == 0) || (bounds.height == 0))
       break;
-    if (fabs(edge.left-background_census) < MagickEpsilon)
-      {
-        /*
-          Trim left edge.
-        */
-        vertex.left++;
-        bounds.width--;
-        edge.left=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,1,bounds.height,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
-        edge.top=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
-        edge.bottom=GetEdgeBackgroundCensus(edge_image,edge_view,
-          SouthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.bottom,exception);
-        continue;
-      }
-    if (fabs(edge.right-background_census) < MagickEpsilon)
-      {
-        /*
-          Trim right edge.
-        */
-        vertex.right++;
-        bounds.width--;
-        edge.right=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthEastGravity,1,bounds.height,(ssize_t) vertex.right,(ssize_t)
-          vertex.top,exception);
-        edge.top=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
-        edge.bottom=GetEdgeBackgroundCensus(edge_image,edge_view,
-          SouthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.bottom,exception);
-        continue;
-      }
-    if (fabs(edge.top-background_census) < MagickEpsilon)
-      {
-        /*
-          Trim top edge.
-        */
-        vertex.top++;
-        bounds.height--;
-        edge.left=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,1,bounds.height,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
-        edge.right=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthEastGravity,1,bounds.height,(ssize_t) vertex.right,(ssize_t)
-          vertex.top,exception);
-        edge.top=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
-        continue;
-      }
-    if (fabs(edge.bottom-background_census) < MagickEpsilon)
-      {
-        /*
-          Trim bottom edge.
-        */
-        vertex.bottom++;
-        bounds.height--;
-        edge.left=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthWestGravity,1,bounds.height,(ssize_t) vertex.left,(ssize_t)
-          vertex.top,exception);
-        edge.right=GetEdgeBackgroundCensus(edge_image,edge_view,
-          NorthEastGravity,1,bounds.height,(ssize_t) vertex.right,(ssize_t)
-          vertex.top,exception);
-        edge.bottom=GetEdgeBackgroundCensus(edge_image,edge_view,
-          SouthWestGravity,bounds.width,1,(ssize_t) vertex.left,(ssize_t)
-          vertex.bottom,exception);
-        continue;
-      }
+    scan.background_census=background_census;
+    TrimLowestEdge(&scan,&vertex,&bounds,&edge);
   }
   edge_view=DestroyCacheView(edge_view);
   edge_image=DestroyImage(edge_image);
@@ -406,6 +557,179 @@ static inline MagickBooleanType IsBelowLeftOfBounds(const ssize_t x,
 {
   return(((x < (ssize_t) bounding_box.width) &&
     (y > (ssize_t) bounding_box.height)) ? MagickTrue : MagickFalse);
+}
+
+static RectangleInfo GetTrimEdgesBounds(const Image *image,
+  const char *artifact)
+{
+  char
+    *edges,
+    *q,
+    *r;
+
+  RectangleInfo
+    bounds;
+
+  bounds.width=(size_t) image->columns;
+  bounds.height=(size_t) image->rows;
+  bounds.x=0;
+  bounds.y=0;
+  edges=AcquireString(artifact);
+  r=edges;
+  while ((q=StringToken(",",&r)) != (char *) NULL)
+  {
+    if (LocaleCompare(q,"north") == 0)
+      bounds.y=(ssize_t) image->rows;
+    if (LocaleCompare(q,"east") == 0)
+      bounds.width=0;
+    if (LocaleCompare(q,"south") == 0)
+      bounds.height=0;
+    if (LocaleCompare(q,"west") == 0)
+      bounds.x=(ssize_t) image->columns;
+  }
+  edges=DestroyString(edges);
+  return(bounds);
+}
+
+static void GetCornerTargets(const Image *image,const CacheView *image_view,
+  PixelInfo *target,ExceptionInfo *exception)
+{
+  const Quantum
+    *p;
+
+  GetPixelInfo(image,&target[1]);
+  p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,0,1,1,
+    exception);
+  if (p != (const Quantum *) NULL)
+    GetPixelInfoPixel(image,p,&target[1]);
+  GetPixelInfo(image,&target[2]);
+  p=GetCacheViewVirtualPixels(image_view,0,(ssize_t) image->rows-1,1,1,
+    exception);
+  if (p != (const Quantum *) NULL)
+    GetPixelInfoPixel(image,p,&target[2]);
+  GetPixelInfo(image,&target[3]);
+  p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,(ssize_t)
+    image->rows-1,1,1,exception);
+  if (p != (const Quantum *) NULL)
+    GetPixelInfoPixel(image,p,&target[3]);
+}
+
+static inline MagickBooleanType IsBeforeBoundDifferent(const ssize_t position,
+  const ssize_t bound,const PixelInfo *pixel,const PixelInfo *target)
+{
+  return(((position < bound) &&
+    (IsFuzzyEquivalencePixelInfo(pixel,target) == MagickFalse)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsBeyondBoundDifferent(const ssize_t position,
+  const size_t bound,const PixelInfo *pixel,const PixelInfo *target)
+{
+  return(((position > (ssize_t) bound) &&
+    (IsFuzzyEquivalencePixelInfo(pixel,target) == MagickFalse)) ? MagickTrue :
+    MagickFalse);
+}
+
+typedef struct _BoundingBoxRowScan
+{
+  const Image
+    *image;
+
+  PixelInfo
+    zero;
+
+  ssize_t
+    y;
+} BoundingBoxRowScan;
+
+static RectangleInfo ScanBoundingBoxRow(const BoundingBoxRowScan *row_scan,
+  const Quantum *magick_restrict q,const PixelInfo *target,
+  RectangleInfo bounding_box)
+{
+  const Image
+    *image = row_scan->image;
+
+  const PixelInfo
+    zero = row_scan->zero;
+
+  const ssize_t
+    y = row_scan->y;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+    pixel=zero;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      GetPixelInfoPixel(image,q,&pixel);
+      if (IsBeforeBoundDifferent(x,bounding_box.x,&pixel,&target[0]) !=
+          MagickFalse)
+        bounding_box.x=x;
+      if (IsBeyondBoundDifferent(x,bounding_box.width,&pixel,&target[1]) !=
+          MagickFalse)
+        bounding_box.width=(size_t) x;
+      if (IsBeforeBoundDifferent(y,bounding_box.y,&pixel,&target[0]) !=
+          MagickFalse)
+        bounding_box.y=y;
+      if (IsBeyondBoundDifferent(y,bounding_box.height,&pixel,&target[2]) !=
+          MagickFalse)
+        bounding_box.height=(size_t) y;
+      if ((IsBelowLeftOfBounds(x,y,bounding_box) != MagickFalse) &&
+          (IsFuzzyEquivalencePixelInfo(&pixel,&target[3]) == MagickFalse))
+        {
+          bounding_box.width=(size_t) x;
+          bounding_box.height=(size_t) y;
+        }
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  return(bounding_box);
+}
+
+static RectangleInfo GetTrimBounds(const Image *image,const char *artifact)
+{
+  RectangleInfo
+    bounds;
+
+  if (artifact == (const char *) NULL)
+    {
+      bounds.width=(size_t) (image->columns == 1 ? 1 : 0);
+      bounds.height=(size_t) (image->rows == 1 ? 1 : 0);
+      bounds.x=(ssize_t) image->columns;
+      bounds.y=(ssize_t) image->rows;
+    }
+  else
+    bounds=GetTrimEdgesBounds(image,artifact);
+  return(bounds);
+}
+
+static RectangleInfo FinishBoundingBox(const Image *image,
+  RectangleInfo bounds,ExceptionInfo *exception)
+{
+  if (IsEmptyBoundingBox(bounds) != MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+      "GeometryDoesNotContainImage","`%s'",image->filename);
+  else
+    {
+      bounds.width-=(size_t) (bounds.x-1);
+      bounds.height-=(size_t) (bounds.y-1);
+    }
+  return(bounds);
+}
+
+static void MergeBoundingBox(const RectangleInfo bounding_box,
+  RectangleInfo *bounds)
+{
+  if (bounding_box.x < (*bounds).x)
+    (*bounds).x=bounding_box.x;
+  if (bounding_box.y < (*bounds).y)
+    (*bounds).y=bounding_box.y;
+  if (bounding_box.width > (*bounds).width)
+    (*bounds).width=bounding_box.width;
+  if (bounding_box.height > (*bounds).height)
+    (*bounds).height=bounding_box.height;
 }
 
 MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
@@ -441,39 +765,7 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
   if (artifact != (const char *) NULL)
     return(GetEdgeBoundingBox(image,exception));
   artifact=GetImageArtifact(image,"trim:edges");
-  if (artifact == (const char *) NULL)
-    {
-      bounds.width=(size_t) (image->columns == 1 ? 1 : 0);
-      bounds.height=(size_t) (image->rows == 1 ? 1 : 0);
-      bounds.x=(ssize_t) image->columns;
-      bounds.y=(ssize_t) image->rows;
-    }
-  else
-    {
-      char
-        *edges,
-        *q,
-        *r;
-
-      bounds.width=(size_t) image->columns;
-      bounds.height=(size_t) image->rows;
-      bounds.x=0;
-      bounds.y=0;
-      edges=AcquireString(artifact);
-      r=edges;
-      while ((q=StringToken(",",&r)) != (char *) NULL)
-      {
-        if (LocaleCompare(q,"north") == 0)
-          bounds.y=(ssize_t) image->rows;
-        if (LocaleCompare(q,"east") == 0)
-          bounds.width=0;
-        if (LocaleCompare(q,"south") == 0)
-          bounds.height=0;
-        if (LocaleCompare(q,"west") == 0)
-          bounds.x=(ssize_t) image->columns;
-      }
-      edges=DestroyString(edges);
-    }
+  bounds=GetTrimBounds(image,artifact);
   GetPixelInfo(image,&target[0]);
   image_view=AcquireVirtualCacheView(image,exception);
   p=GetCacheViewVirtualPixels(image_view,0,0,1,1,exception);
@@ -483,21 +775,7 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
       return(bounds);
     }
   GetPixelInfoPixel(image,p,&target[0]);
-  GetPixelInfo(image,&target[1]);
-  p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,0,1,1,
-    exception);
-  if (p != (const Quantum *) NULL)
-    GetPixelInfoPixel(image,p,&target[1]);
-  GetPixelInfo(image,&target[2]);
-  p=GetCacheViewVirtualPixels(image_view,0,(ssize_t) image->rows-1,1,1,
-    exception);
-  if (p != (const Quantum *) NULL)
-    GetPixelInfoPixel(image,p,&target[2]);
-  GetPixelInfo(image,&target[3]);
-  p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,(ssize_t)
-    image->rows-1,1,1,exception);
-  if (p != (const Quantum *) NULL)
-    GetPixelInfoPixel(image,p,&target[3]);
+  GetCornerTargets(image,image_view,target,exception);
   status=MagickTrue;
   GetPixelInfo(image,&zero);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -509,14 +787,11 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
     const Quantum
       *magick_restrict q;
 
-    PixelInfo
-      pixel;
+    BoundingBoxRowScan
+      row_scan;
 
     RectangleInfo
       bounding_box;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -530,52 +805,17 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
         status=MagickFalse;
         continue;
       }
-    pixel=zero;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      GetPixelInfoPixel(image,q,&pixel);
-      if ((x < bounding_box.x) &&
-          (IsFuzzyEquivalencePixelInfo(&pixel,&target[0]) == MagickFalse))
-        bounding_box.x=x;
-      if ((x > (ssize_t) bounding_box.width) &&
-          (IsFuzzyEquivalencePixelInfo(&pixel,&target[1]) == MagickFalse))
-        bounding_box.width=(size_t) x;
-      if ((y < bounding_box.y) &&
-          (IsFuzzyEquivalencePixelInfo(&pixel,&target[0]) == MagickFalse))
-        bounding_box.y=y;
-      if ((y > (ssize_t) bounding_box.height) &&
-          (IsFuzzyEquivalencePixelInfo(&pixel,&target[2]) == MagickFalse))
-        bounding_box.height=(size_t) y;
-      if ((IsBelowLeftOfBounds(x,y,bounding_box) != MagickFalse) &&
-          (IsFuzzyEquivalencePixelInfo(&pixel,&target[3]) == MagickFalse))
-        {
-          bounding_box.width=(size_t) x;
-          bounding_box.height=(size_t) y;
-        }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row_scan.image=image;
+    row_scan.zero=zero;
+    row_scan.y=y;
+    bounding_box=ScanBoundingBoxRow(&row_scan,q,target,bounding_box);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
 #  pragma omp critical (MagickCore_GetImageBoundingBox)
 #endif
     {
-      if (bounding_box.x < bounds.x)
-        bounds.x=bounding_box.x;
-      if (bounding_box.y < bounds.y)
-        bounds.y=bounding_box.y;
-      if (bounding_box.width > bounds.width)
-        bounds.width=bounding_box.width;
-      if (bounding_box.height > bounds.height)
-        bounds.height=bounding_box.height;
+      MergeBoundingBox(bounding_box,&bounds);
     }
   }
   image_view=DestroyCacheView(image_view);
-  if (IsEmptyBoundingBox(bounds) != MagickFalse)
-    (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-      "GeometryDoesNotContainImage","`%s'",image->filename);
-  else
-    {
-      bounds.width-=(size_t) (bounds.x-1);
-      bounds.height-=(size_t) (bounds.y-1);
-    }
-  return(bounds);
+  return(FinishBoundingBox(image,bounds,exception));
 }

@@ -806,26 +806,177 @@ static Image *CompositeFrameImage(const FrameComposite *frame_composite,
   return(frame_image);
 }
 
-MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
-  const CompositeOperator compose,ExceptionInfo *exception)
-{
 #define FrameImageTag  "Frame/Image"
 
+typedef struct _FrameSideLine
+{
   CacheView
-    *image_view,
     *frame_view;
 
   Image
     *frame_image;
 
-  FrameComposite
-    frame_composite;
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    highlight,
+    matte,
+    shadow;
+
+  size_t
+    bevel_width;
+
+  ExceptionInfo
+    *exception;
+} FrameSideLine;
+
+static MagickBooleanType DrawFrameSideLine(const FrameSideLine *line,
+  const ssize_t y,MagickBooleanType *status)
+{
+  CacheView
+    *const frame_view = line->frame_view;
+
+  Image
+    *const frame_image = line->frame_image;
+
+  const Image
+    *const image = line->image;
+
+  const FrameInfo
+    *const frame_info = line->frame_info;
+
+  const PixelInfo
+    highlight = line->highlight,
+    matte = line->matte,
+    shadow = line->shadow;
+
+  const size_t
+    bevel_width = line->bevel_width;
+
+  ExceptionInfo
+    *const exception = line->exception;
+
+  FrameSide
+    frame_side;
+
+  Quantum
+    *magick_restrict q;
+
+  /*
+    Initialize scanline with matte color.
+  */
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(frame_view,0,frame_info->y+y,
+    frame_image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  frame_side.frame_image=frame_image;
+  frame_side.image=image;
+  frame_side.frame_info=frame_info;
+  frame_side.highlight=highlight;
+  frame_side.matte=matte;
+  frame_side.shadow=shadow;
+  frame_side.bevel_width=bevel_width;
+  q=DrawFrameSideRow(&frame_side,q);
+  if (SyncCacheViewAuthenticPixels(frame_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static void FrameImageProgress(const Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,FrameImageTag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static MagickBooleanType AcquireFrameImage(const Image *image,
+  const FrameInfo *frame_info,Image **frame_image,ExceptionInfo *exception)
+{
+  *frame_image=CloneImage(image,frame_info->width,frame_info->height,MagickTrue,
+    exception);
+  if (*frame_image == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass(*frame_image,DirectClass,exception) == MagickFalse)
+    {
+      *frame_image=DestroyImage(*frame_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType DrawFrameSides(const FrameSideLine *sides)
+{
+  const Image
+    *const image = sides->image;
 
   MagickBooleanType
     status;
 
   MagickOffsetType
     progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,sides->frame_image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    if (DrawFrameSideLine(sides,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        FrameImageProgress(image,progress,&status);
+      }
+  }
+  return(status);
+}
+
+static Image *DrawFrameBorders(const FrameComposite *frame_composite,
+  Image *frame_image)
+{
+  CacheView
+    *image_view,
+    *frame_view;
+
+  const Image
+    *const image = frame_composite->image;
+
+  const FrameInfo
+    *const frame_info = frame_composite->frame_info;
+
+  const size_t
+    bevel_width = frame_composite->bevel_width;
+
+  ExceptionInfo
+    *const exception = frame_composite->exception;
+
+  FrameSideLine
+    sides;
+
+  MagickBooleanType
+    status;
 
   PixelInfo
     accentuate,
@@ -835,12 +986,72 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     trough;
 
   size_t
-    bevel_width,
     height;
+
+  /*
+    Initialize 3D effects color.
+  */
+  matte=image->matte_color;
+  accentuate=LightenFrameColor(matte,AccentuateModulate);
+  highlight=LightenFrameColor(matte,HighlightModulate);
+  shadow=DarkenFrameColor(matte,ShadowModulate);
+  trough=DarkenFrameColor(matte,TroughModulate);
+  image_view=AcquireVirtualCacheView(image,exception);
+  frame_view=AcquireAuthenticCacheView(frame_image,exception);
+  height=(size_t) (frame_info->outer_bevel+(frame_info->y-(ssize_t)
+    bevel_width)+frame_info->inner_bevel);
+  if (height != 0)
+    {
+      const FrameTopBorder
+        top_border = { frame_view, frame_image, image, frame_info, accentuate,
+          highlight, matte, shadow, trough, bevel_width, height, exception };
+
+      DrawFrameTopBorder(&top_border);
+    }
+  /*
+    Draw sides of ornamental border.
+  */
+  sides.frame_view=frame_view;
+  sides.frame_image=frame_image;
+  sides.image=image;
+  sides.frame_info=frame_info;
+  sides.highlight=highlight;
+  sides.matte=matte;
+  sides.shadow=shadow;
+  sides.bevel_width=bevel_width;
+  sides.exception=exception;
+  status=DrawFrameSides(&sides);
+  height=(size_t) (frame_info->inner_bevel+(ssize_t) frame_info->height-
+    frame_info->y-(ssize_t) image->rows-(ssize_t) bevel_width+
+    frame_info->outer_bevel);
+  if (height != 0)
+    {
+      const FrameBottomBorder
+        bottom_border = { frame_view, frame_image, image, frame_info,
+          accentuate, highlight, matte, shadow, trough, bevel_width,
+          exception };
+
+      DrawFrameBottomBorder(&bottom_border,height);
+    }
+  frame_view=DestroyCacheView(frame_view);
+  image_view=DestroyCacheView(image_view);
+  return(CompositeFrameImage(frame_composite,status,frame_image));
+}
+
+MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
+  const CompositeOperator compose,ExceptionInfo *exception)
+{
+  FrameComposite
+    frame_composite;
+
+  Image
+    *frame_image;
+
+  size_t
+    bevel_width;
 
   ssize_t
     x_offset,
-    y,
     y_offset;
 
   /*
@@ -862,128 +1073,15 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   /*
     Initialize framed image attributes.
   */
-  frame_image=CloneImage(image,frame_info->width,frame_info->height,MagickTrue,
-    exception);
-  if (frame_image == (Image *) NULL)
+  if (AcquireFrameImage(image,frame_info,&frame_image,exception) ==
+      MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(frame_image,DirectClass,exception) == MagickFalse)
-    {
-      frame_image=DestroyImage(frame_image);
-      return((Image *) NULL);
-    }
   SetFrameImageAttributes(frame_image,image,exception);
-  /*
-    Initialize 3D effects color.
-  */
-  matte=image->matte_color;
-  accentuate=LightenFrameColor(matte,AccentuateModulate);
-  highlight=LightenFrameColor(matte,HighlightModulate);
-  shadow=DarkenFrameColor(matte,ShadowModulate);
-  trough=DarkenFrameColor(matte,TroughModulate);
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  frame_view=AcquireAuthenticCacheView(frame_image,exception);
-  height=(size_t) (frame_info->outer_bevel+(frame_info->y-(ssize_t)
-    bevel_width)+frame_info->inner_bevel);
-  if (height != 0)
-    {
-      FrameTopBorder
-        top_border;
-
-      top_border.frame_view=frame_view;
-      top_border.frame_image=frame_image;
-      top_border.image=image;
-      top_border.frame_info=frame_info;
-      top_border.accentuate=accentuate;
-      top_border.highlight=highlight;
-      top_border.matte=matte;
-      top_border.shadow=shadow;
-      top_border.trough=trough;
-      top_border.bevel_width=bevel_width;
-      top_border.height=height;
-      top_border.exception=exception;
-      DrawFrameTopBorder(&top_border);
-    }
-  /*
-    Draw sides of ornamental border.
-  */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,frame_image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    FrameSide
-      frame_side;
-
-    Quantum
-      *magick_restrict q;
-
-    /*
-      Initialize scanline with matte color.
-    */
-    if (status == MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(frame_view,0,frame_info->y+y,
-      frame_image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    frame_side.frame_image=frame_image;
-    frame_side.image=image;
-    frame_side.frame_info=frame_info;
-    frame_side.highlight=highlight;
-    frame_side.matte=matte;
-    frame_side.shadow=shadow;
-    frame_side.bevel_width=bevel_width;
-    q=DrawFrameSideRow(&frame_side,q);
-    if (SyncCacheViewAuthenticPixels(frame_view,exception) == MagickFalse)
-      status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        proceed=SetImageProgress(image,FrameImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
-  }
-  height=(size_t) (frame_info->inner_bevel+(ssize_t) frame_info->height-
-    frame_info->y-(ssize_t) image->rows-(ssize_t) bevel_width+
-    frame_info->outer_bevel);
-  if (height != 0)
-    {
-      FrameBottomBorder
-        bottom_border;
-
-      bottom_border.frame_view=frame_view;
-      bottom_border.frame_image=frame_image;
-      bottom_border.image=image;
-      bottom_border.frame_info=frame_info;
-      bottom_border.accentuate=accentuate;
-      bottom_border.highlight=highlight;
-      bottom_border.matte=matte;
-      bottom_border.shadow=shadow;
-      bottom_border.trough=trough;
-      bottom_border.bevel_width=bevel_width;
-      bottom_border.exception=exception;
-      DrawFrameBottomBorder(&bottom_border,height);
-    }
-  frame_view=DestroyCacheView(frame_view);
-  image_view=DestroyCacheView(image_view);
   frame_composite.image=image;
   frame_composite.frame_info=frame_info;
   frame_composite.compose=compose;
   frame_composite.bevel_width=bevel_width;
   frame_composite.exception=exception;
-  return(CompositeFrameImage(&frame_composite,status,frame_image));
+  return(DrawFrameBorders(&frame_composite,frame_image));
 }
 

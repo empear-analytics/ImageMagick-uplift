@@ -726,11 +726,106 @@ static MagickBooleanType AcquireStatisticImage(const Image *image,
   return(MagickTrue);
 }
 
+#define StatisticImageTag  "Statistic/Image"
+
+typedef struct _StatisticRow
+{
+  const Image
+    *image;
+
+  const Image
+    *statistic_image;
+
+  CacheView
+    *image_view,
+    *statistic_view;
+
+  ExceptionInfo
+    *exception;
+
+  StatisticType
+    type;
+
+  size_t
+    width,
+    height;
+
+  ssize_t
+    center;
+
+  PixelList
+    **magick_restrict pixel_list;
+
+  int
+    id;
+} StatisticRow;
+
+static MagickBooleanType StatisticImageLine(const StatisticRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const image = row->image;
+
+  const Image
+    *const statistic_image = row->statistic_image;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(row->image_view,-((ssize_t)
+    MagickMax(row->width,1)/2L),y-(ssize_t) (MagickMax(row->height,1)/2L),
+    image->columns+MagickMax(row->width,1),MagickMax(row->height,1),
+    row->exception);
+  q=QueueCacheViewAuthenticPixels(row->statistic_view,0,y,
+    statistic_image->columns,1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) statistic_image->columns; x++)
+  {
+    StatisticImagePixel(image,statistic_image,row->type,row->width,row->height,
+      row->center,p,q,row->pixel_list,row->id);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(statistic_image);
+  }
+  if (SyncCacheViewAuthenticPixels(row->statistic_view,row->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static void StatisticImageProgress(const Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,StatisticImageTag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static Image *FinishStatisticImage(Image *statistic_image,
+  const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    statistic_image=DestroyImage(statistic_image);
+  return(statistic_image);
+}
+
 MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   const size_t width,const size_t height,ExceptionInfo *exception)
 {
-#define StatisticImageTag  "Statistic/Image"
-
   CacheView
     *image_view,
     *statistic_view;
@@ -787,53 +882,24 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
     const int
       id = GetOpenMPThreadId();
 
-    const Quantum
-      *magick_restrict p;
+    const StatisticRow
+      row = { image, statistic_image, image_view, statistic_view, exception,
+        type, width, height, center, pixel_list, id };
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    if (StatisticImageLine(&row,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,-((ssize_t) MagickMax(width,1)/2L),y-
-      (ssize_t) (MagickMax(height,1)/2L),image->columns+MagickMax(width,1),
-      MagickMax(height,1),exception);
-    q=QueueCacheViewAuthenticPixels(statistic_view,0,y,statistic_image->columns,      1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) statistic_image->columns; x++)
-    {
-      StatisticImagePixel(image,statistic_image,type,width,height,center,p,q,
-        pixel_list,id);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(statistic_image);
-    }
-    if (SyncCacheViewAuthenticPixels(statistic_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,StatisticImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        StatisticImageProgress(image,progress,&status);
       }
   }
   statistic_view=DestroyCacheView(statistic_view);
   image_view=DestroyCacheView(image_view);
   pixel_list=DestroyPixelListTLS(pixel_list);
-  if (status == MagickFalse)
-    statistic_image=DestroyImage(statistic_image);
+  statistic_image=FinishStatisticImage(statistic_image,status);
   return(statistic_image);
 }

@@ -219,6 +219,17 @@ MagickExport Image *AutoOrientImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetTransformProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void CopyPixelChannelsTo(const Image *image,const Image *destination,
   const Quantum *p,Quantum *q)
 {
@@ -262,6 +273,16 @@ typedef struct _ChopRowImages
 
   Image
     *chop_image;
+
+  CacheView
+    *image_view,
+    *chop_view;
+
+  RectangleInfo
+    extent;
+
+  ExceptionInfo
+    *exception;
 } ChopRowImages;
 
 static void ChopPixelRow(const ChopRowImages *images,
@@ -285,6 +306,31 @@ static void ChopPixelRow(const ChopRowImages *images,
       }
     p+=(ptrdiff_t) GetPixelChannels(image);
   }
+}
+
+static MagickBooleanType ChopImageRow(const ChopRowImages *images,
+  const ssize_t source_y,const ssize_t target_y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  p=GetCacheViewVirtualPixels(images->image_view,0,source_y,
+    images->image->columns,1,images->exception);
+  q=QueueCacheViewAuthenticPixels(images->chop_view,0,target_y,
+    images->chop_image->columns,1,images->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ChopPixelRow(images,images->extent,p,q);
+  if (SyncCacheViewAuthenticPixels(images->chop_view,images->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
 }
 
 static RectangleInfo ClampChopExtent(const Image *image,
@@ -366,42 +412,20 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
 #endif
   for (y=0; y < (ssize_t) extent.y; y++)
   {
-    ChopRowImages
-      images;
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
+    const ChopRowImages
+      images = { image,chop_image,image_view,chop_view,extent,exception };
 
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(chop_view,0,y,chop_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    images.image=image;
-    images.chop_image=chop_image;
-    ChopPixelRow(&images,extent,p,q);
-    if (SyncCacheViewAuthenticPixels(chop_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (ChopImageRow(&images,y,y,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ChopImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,ChopImageTag,progress,&status);
       }
   }
   /*
@@ -413,43 +437,21 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
 #endif
   for (y=0; y < (ssize_t) (image->rows-((size_t) extent.y+extent.height)); y++)
   {
-    ChopRowImages
-      images;
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
+    const ChopRowImages
+      images = { image,chop_image,image_view,chop_view,extent,exception };
 
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,extent.y+(ssize_t) extent.height+y,
-      image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(chop_view,0,extent.y+y,chop_image->columns,
-      1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    images.image=image;
-    images.chop_image=chop_image;
-    ChopPixelRow(&images,extent,p,q);
-    if (SyncCacheViewAuthenticPixels(chop_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (ChopImageRow(&images,extent.y+(ssize_t) extent.height+y,extent.y+y,
+          &status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ChopImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,ChopImageTag,progress,&status);
       }
   }
   chop_view=DestroyCacheView(chop_view);
@@ -906,16 +908,11 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,CropImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,CropImageTag,progress,&status);
       }
   }
   crop_view=DestroyCacheView(crop_view);
@@ -1255,16 +1252,11 @@ MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,FlipImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,FlipImageTag,progress,&status);
       }
   }
   flip_view=DestroyCacheView(flip_view);
@@ -1394,16 +1386,11 @@ MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,FlopImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,FlopImageTag,progress,&status);
       }
   }
   flop_view=DestroyCacheView(flop_view);
@@ -1835,6 +1822,16 @@ typedef struct _SpliceRow
   Image
     *splice_image;
 
+  CacheView
+    *image_view,
+    *splice_view;
+
+  RectangleInfo
+    splice_geometry;
+
+  ExceptionInfo
+    *exception;
+
   ssize_t
     columns;
 } SpliceRow;
@@ -1876,6 +1873,39 @@ static void SplicePixelRow(const SpliceRow *row,
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(splice_image);
   }
+}
+
+static MagickBooleanType SpliceImageRow(const SpliceRow *row,
+  const ssize_t source_y,const ssize_t target_y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  p=GetCacheViewVirtualPixels(row->image_view,0,source_y,
+    row->splice_image->columns,1,row->exception);
+  q=QueueCacheViewAuthenticPixels(row->splice_view,0,target_y,
+    row->splice_image->columns,1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  SplicePixelRow(row,row->splice_geometry,p,q);
+  return(MagickTrue);
+}
+
+static void SetSpliceProgress(const SpliceRow *row,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(row->image,tag,progress,row->splice_image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
 }
 
 static void SetSpliceBackground(Image *splice_image,
@@ -1972,45 +2002,23 @@ MagickExport Image *SpliceImage(const Image *image,
 #endif
   for (y=0; y < (ssize_t) splice_geometry.y; y++)
   {
-    SpliceRow
-      row;
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
+    const SpliceRow
+      row = { image,splice_image,image_view,splice_view,splice_geometry,
+        exception,columns };
 
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,splice_image->columns,1,
-      exception);
-    q=QueueCacheViewAuthenticPixels(splice_view,0,y,splice_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.splice_image=splice_image;
-    row.columns=columns;
-    SplicePixelRow(&row,splice_geometry,p,q);
+    if (SpliceImageRow(&row,y,y,&status) == MagickFalse)
+      continue;
     if (SyncCacheViewAuthenticPixels(splice_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SpliceImageTag,progress,
-          splice_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetSpliceProgress(&row,SpliceImageTag,progress,&status);
       }
   }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2019,47 +2027,26 @@ MagickExport Image *SpliceImage(const Image *image,
 #endif
   for (y=splice_geometry.y+(ssize_t) splice_geometry.height; y < (ssize_t) splice_image->rows; y++)
   {
-    SpliceRow
-      row;
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
+    const SpliceRow
+      row = { image,splice_image,image_view,splice_view,splice_geometry,
+        exception,columns };
 
     if (status == MagickFalse)
       continue;
     if ((y < 0) || (y >= (ssize_t) splice_image->rows))
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y-(ssize_t) splice_geometry.height,
-      splice_image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(splice_view,0,y,splice_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.splice_image=splice_image;
-    row.columns=columns;
-    SplicePixelRow(&row,splice_geometry,p,q);
+    if (SpliceImageRow(&row,y-(ssize_t) splice_geometry.height,y,&status) ==
+        MagickFalse)
+      continue;
     if (SyncCacheViewAuthenticPixels(splice_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SpliceImageTag,progress,
-          splice_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetSpliceProgress(&row,SpliceImageTag,progress,&status);
       }
   }
   return(FinishSpliceImage(splice_image,splice_view,image_view,status));
@@ -2274,16 +2261,11 @@ MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,TransposeImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,TransposeImageTag,progress,&status);
       }
   }
   transpose_view=DestroyCacheView(transpose_view);
@@ -2448,16 +2430,11 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,TransverseImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,TransverseImageTag,progress,&status);
       }
   }
   transverse_view=DestroyCacheView(transverse_view);

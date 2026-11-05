@@ -533,6 +533,17 @@ static MagickBooleanType ComplexImageRow(const ComplexRowInputs *rows,
   return(MagickTrue);
 }
 
+static void ReportComplexProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -660,16 +671,11 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
       continue;
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(images,ComplexImageTag,progress,images->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportComplexProgress(images,ComplexImageTag,progress,&status);
       }
   }
   Cr_view=DestroyCacheView(Cr_view);

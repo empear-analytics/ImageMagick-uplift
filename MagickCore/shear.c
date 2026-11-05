@@ -877,6 +877,19 @@ static MagickBooleanType IsZeroShear(const PointInfo shear)
   return(((shear.x == 0.0) && (shear.y == 0.0)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType PrepareIntegralImage(Image **integral_image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(*integral_image,DirectClass,exception) == MagickFalse)
+    {
+      *integral_image=DestroyImage(*integral_image);
+      return(MagickFalse);
+    }
+  if ((*integral_image)->alpha_trait == UndefinedPixelTrait)
+    (void) SetImageAlphaChannel(*integral_image,OpaqueAlphaChannel,exception);
+  return(MagickTrue);
+}
+
 MagickExport Image *ShearImage(const Image *image,const double x_shear,
   const double y_shear,ExceptionInfo *exception)
 {
@@ -910,13 +923,8 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
   shear.y=tan(DegreesToRadians(fmod(y_shear,360.0)));
   if (IsZeroShear(shear) != MagickFalse)
     return(integral_image);
-  if (SetImageStorageClass(integral_image,DirectClass,exception) == MagickFalse)
-    {
-      integral_image=DestroyImage(integral_image);
-      return(integral_image);
-    }
-  if (integral_image->alpha_trait == UndefinedPixelTrait)
-    (void) SetImageAlphaChannel(integral_image,OpaqueAlphaChannel,exception);
+  if (PrepareIntegralImage(&integral_image,exception) == MagickFalse)
+    return(integral_image);
   shear_image=ShearIntegralImage(image,integral_image,shear,exception);
   if (shear_image == (Image *) NULL)
     return((Image *) NULL);
@@ -1059,6 +1067,17 @@ static MagickBooleanType ApplyRotationShears(const ShearRotation *rotation,
   return(MagickTrue);
 }
 
+static void GetRotationAngle(const double degrees,MagickRealType *angle,
+  size_t *rotations)
+{
+  (*angle)=fmod(degrees,360.0);
+  if ((*angle) < -45.0)
+    (*angle)+=360.0;
+  for ((*rotations)=0; (*angle) > 45.0; (*rotations)++)
+    (*angle)-=90.0;
+  (*rotations)%=4;
+}
+
 MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   ExceptionInfo *exception)
 {
@@ -1095,12 +1114,7 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  angle=fmod(degrees,360.0);
-  if (angle < -45.0)
-    angle+=360.0;
-  for (rotations=0; angle > 45.0; rotations++)
-    angle-=90.0;
-  rotations%=4;
+  GetRotationAngle(degrees,&angle,&rotations);
   /*
     Calculate shear equations.
   */
@@ -1111,13 +1125,8 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   shear.y=sin((double) DegreesToRadians(angle));
   if (IsZeroShear(shear) != MagickFalse)
     return(integral_image);
-  if (SetImageStorageClass(integral_image,DirectClass,exception) == MagickFalse)
-    {
-      integral_image=DestroyImage(integral_image);
-      return(integral_image);
-    }
-  if (integral_image->alpha_trait == UndefinedPixelTrait)
-    (void) SetImageAlphaChannel(integral_image,OpaqueAlphaChannel,exception);
+  if (PrepareIntegralImage(&integral_image,exception) == MagickFalse)
+    return(integral_image);
   /*
     Compute maximum bounds for 3 shear operations.
   */

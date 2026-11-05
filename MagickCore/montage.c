@@ -799,6 +799,88 @@ static MagickBooleanType SetMontageTileProgress(Image *image,
   return(status);
 }
 
+static void DestroyTileImages(Image **image_list,const ssize_t last)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= last; i++)
+    if (image_list[i] != (Image *) NULL)
+      image_list[i]=DestroyImage(image_list[i]);
+}
+
+static void DestroyTileResources(Image *image,const Image *thumbnail,
+  Image **image_list,ssize_t i)
+{
+  if (image != (Image *) NULL)
+    image=DestroyImage(image);
+  if (thumbnail == (Image *) NULL)
+    i--;
+  DestroyTileImages(image_list,i);
+}
+
+static MagickBooleanType AcquireNextMontage(const ImageInfo *clone_info,
+  Image *montage,ExceptionInfo *exception)
+{
+  AcquireNextImage(clone_info,montage,exception);
+  if (GetNextImageInList(montage) == (Image *) NULL)
+    {
+      montage=DestroyImageList(montage);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void AppendMontageDirectoryEntry(Image *montage,const char *filename,
+  const size_t extent,ExceptionInfo *exception)
+{
+  if (strchr(filename,(int) '\xff') == (char *) NULL)
+    (void) ConcatenateMagickString(montage->directory,filename,extent);
+  else
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+      "InvalidArgument","'%s'",filename);
+  (void) ConcatenateMagickString(montage->directory,"\xff",extent);
+}
+
+static void RelinquishMontageStrings(Image *montage)
+{
+  if (montage->montage != (char *) NULL)
+    montage->montage=(char *) RelinquishMagickMemory(montage->montage);
+  if (montage->directory != (char *) NULL)
+    montage->directory=(char *) RelinquishMagickMemory(montage->directory);
+}
+
+static MagickBooleanType AcquireMontageStrings(Image *montage,
+  const size_t extent)
+{
+  montage->montage=AcquireString((char *) NULL);
+  montage->directory=(char *) AcquireQuantumMemory(extent,
+    sizeof(*montage->directory));
+  if ((montage->montage == (char *) NULL) ||
+      (montage->directory == (char *) NULL))
+    {
+      RelinquishMontageStrings(montage);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void GetMontageTileGeometry(const char *geometry,
+  RectangleInfo *extract_info,MagickStatusType *flags,
+  MagickBooleanType *concatenate)
+{
+  if (geometry != (char *) NULL)
+    {
+      /*
+        Initialize tile geometry.
+      */
+      *flags=GetGeometry(geometry,&(*extract_info).x,&(*extract_info).y,
+        &(*extract_info).width,&(*extract_info).height);
+      *concatenate=((*flags & RhoValue) == 0) && ((*flags & SigmaValue) == 0) ?
+        MagickTrue : MagickFalse;
+    }
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -912,13 +994,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   }
   if (i < (ssize_t) number_images)
     {
-      if (image != (Image *) NULL)
-        image=DestroyImage(image);
-      if (thumbnail == (Image *) NULL)
-        i--;
-      for (tile=0; (ssize_t) tile <= i; tile++)
-        if (image_list[tile] != (Image *) NULL)
-          image_list[tile]=DestroyImage(image_list[tile]);
+      DestroyTileResources(image,thumbnail,image_list,i);
       primary_list=(Image **) RelinquishMagickMemory(primary_list);
       return((Image *) NULL);
     }
@@ -943,16 +1019,8 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   SetGeometry(image_list[0],&extract_info);
   extract_info.x=(ssize_t) montage_info->border_width;
   extract_info.y=(ssize_t) montage_info->border_width;
-  if (montage_info->geometry != (char *) NULL)
-    {
-      /*
-        Initialize tile geometry.
-      */
-      flags=GetGeometry(montage_info->geometry,&extract_info.x,&extract_info.y,
-        &extract_info.width,&extract_info.height);
-      concatenate=((flags & RhoValue) == 0) && ((flags & SigmaValue) == 0) ?
-        MagickTrue : MagickFalse;
-    }
+  GetMontageTileGeometry(montage_info->geometry,&extract_info,&flags,
+    &concatenate);
   border_width=montage_info->border_width;
   bevel_width=0;
   (void) memset(&frame_info,0,sizeof(frame_info));
@@ -1030,20 +1098,9 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     /*
       Set montage geometry.
     */
-    montage->montage=AcquireString((char *) NULL);
     extent=GetMontageDirectoryExtent(image_list,tiles_per_page,number_images);
-    montage->directory=(char *) AcquireQuantumMemory(extent,
-      sizeof(*montage->directory));
-    if ((montage->montage == (char *) NULL) ||
-        (montage->directory == (char *) NULL))
-      {
-        if (montage->montage != (char *) NULL)
-          montage->montage=(char *) RelinquishMagickMemory(montage->montage);
-        if (montage->directory != (char *) NULL)
-          montage->directory=(char *) RelinquishMagickMemory(
-            montage->directory);
-        ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-      }
+    if (AcquireMontageStrings(montage,extent) == MagickFalse)
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
     y_offset+=(ssize_t) title_offset;
     (void) FormatLocaleString(montage->montage,MagickPathExtent,
@@ -1057,13 +1114,8 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     tile=0;
     while (tile < MagickMin((ssize_t) tiles_per_page,(ssize_t) number_images))
     {
-      if (strchr(image_list[tile]->filename,(int) '\xff') == (char *) NULL)
-        (void) ConcatenateMagickString(montage->directory,
-          image_list[tile]->filename,extent);
-      else
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-          "InvalidArgument","'%s'",image_list[tile]->filename);
-      (void) ConcatenateMagickString(montage->directory,"\xff",extent);
+      AppendMontageDirectoryEntry(montage,image_list[tile]->filename,extent,
+        exception);
       tile++;
     }
     progress_monitor=SetImageProgressMonitor(montage,(MagickProgressMonitor)
@@ -1163,12 +1215,8 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
         /*
           Allocate next image structure.
         */
-        AcquireNextImage(clone_info,montage,exception);
-        if (GetNextImageInList(montage) == (Image *) NULL)
-          {
-            montage=DestroyImageList(montage);
-            return((Image *) NULL);
-          }
+        if (AcquireNextMontage(clone_info,montage,exception) == MagickFalse)
+          return((Image *) NULL);
         montage=GetNextImageInList(montage);
         montage->background_color=montage_info->background_color;
         image_list+=tiles_per_page;

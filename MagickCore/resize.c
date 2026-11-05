@@ -2082,6 +2082,39 @@ static void InterpolateResizeLine(MagickBooleanType *status,
     (*status)=MagickFalse;
 }
 
+static MagickBooleanType InterpolateResizeHead(
+  const InterpolativeResizeInfo *resize,const ssize_t y,
+  MagickBooleanType *status)
+{
+  CacheView
+    *const resize_view = resize->resize_view;
+
+  Image
+    *const resize_image = resize->resize_image;
+
+  ExceptionInfo
+    *const exception = resize->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(resize_view,0,y,resize_image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    return(MagickFalse);
+  InterpolateResizeLine(status,resize,y,q);
+  return(MagickTrue);
+}
+
+static void ReportInterpolativeProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  if (SetResizeProgress(image,tag,progress) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *InterpolativeResizeImage(const Image *image,
   const size_t columns,const size_t rows,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -2136,35 +2169,20 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
 #endif
   for (y=0; y < (ssize_t) resize_image->rows; y++)
   {
-    InterpolativeResizeInfo
-      resize;
+    const InterpolativeResizeInfo
+      resize = { image,image_view,resize_view,resize_image,method,scale,
+        exception };
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    if (InterpolateResizeHead(&resize,y,&status) == MagickFalse)
       continue;
-    q=QueueCacheViewAuthenticPixels(resize_view,0,y,resize_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      continue;
-    resize.image=image;
-    resize.image_view=image_view;
-    resize.resize_view=resize_view;
-    resize.resize_image=resize_image;
-    resize.method=method;
-    resize.scale=scale;
-    resize.exception=exception;
-    InterpolateResizeLine(&status,&resize,y,q);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        if (SetResizeProgress(image,InterpolativeResizeImageTag,progress) ==
-            MagickFalse)
-          status=MagickFalse;
+        ReportInterpolativeProgress(image,InterpolativeResizeImageTag,progress,
+          &status);
       }
   }
   return(FinishInterpolativeResize(image_view,resize_view,resize_image,status));
