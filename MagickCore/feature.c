@@ -860,16 +860,11 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
     status=TraceCannyEdgeRow(&hysteresis,trace,status,exception);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,CannyEdgeImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetFeatureProgress(image,CannyEdgeImageTag,progress,&status);
       }
   }
   edge_view=DestroyCacheView(edge_view);
