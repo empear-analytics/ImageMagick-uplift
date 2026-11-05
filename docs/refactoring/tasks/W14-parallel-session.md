@@ -215,3 +215,13 @@ for arrangements that CodeScene does not flag as clones (unrelated operators per
 runs), and each operator dispatch now walks a chain of up to 32 nested calls in the `-fx` per-pixel interpreter.
 Parked on the local branch `w14-fx-annealed`, with a Recipe P amendment and later small steps built on it. **Owner
 decision:** rework along the code's own structure, or accept.
+
+## Lane d, seventh batch: distort-resize.c and visual-effects-wavelet.c to 10.0 (Sonnet, 8 commits)
+
+`statistic.c` 8.81 -> 9.38, `visual-effects-stegano.c` 9.09 -> 9.68 (public signature left). **Review:**
+e27e601a5 (`distort-resize.c`, Recipe E) also merges the alpha branch's own `if (resize_image == NULL)
+return(NULL);` into one check after the if/else and drops that branch's one-line comment; behaviour is the same
+(both branches assign `resize_image`, the single check tests it on the same paths), but the merge of two identical
+checks is not a listed recipe step. One commit to revert if unwanted. Upstream, not changed: `PlasmaImageProxy`'s
+Right block returns MagickFalse on a missing pixel where Left, Bottom and Top return MagickTrue; `*status=Sync...`
+overwrites an earlier failure there and in `SetPlasmaMiddlePixel`.
