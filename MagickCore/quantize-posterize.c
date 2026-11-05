@@ -534,6 +534,54 @@ static void SetPosterizeProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
+typedef struct _PosterizeRows
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  size_t
+    levels;
+
+  ExceptionInfo
+    *exception;
+} PosterizeRows;
+
+static MagickBooleanType PosterizeImageRow(const PosterizeRows *rows,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = rows->image;
+
+  CacheView
+    *const image_view = rows->image_view;
+
+  const size_t
+    levels = rows->levels;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  PosterizeRowPixels(image,levels,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   const DitherMethod dither_method,ExceptionInfo *exception)
 {
@@ -596,21 +644,11 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
-  
-    if (status == MagickFalse)
+    const PosterizeRows
+      rows = { image, image_view, levels, exception };
+
+    if (PosterizeImageRow(&rows,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    PosterizeRowPixels(image,levels,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
