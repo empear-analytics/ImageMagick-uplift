@@ -2304,6 +2304,58 @@ static MagickBooleanType CheckFunctionQualifiers (const QualifierCheck *check,
   return MagickTrue;
 }
 
+typedef struct _FunctionQualifiers
+{
+  MagickBooleanType
+    *coordQual;
+
+  FunctionE
+    *fe;
+
+  const char
+    **funStr;
+
+  PixelChannel
+    *chQual;
+
+  char
+    *expChLimit;
+} FunctionQualifiers;
+
+static MagickBooleanType QualifyCoordFunction (FxInfo * pfx,
+  const FunctionQualifiers *qualifiers)
+{
+  MagickBooleanType
+    *const coordQual = qualifiers->coordQual;
+
+  FunctionE
+    *const fe = qualifiers->fe;
+
+  const char
+    **const funStr = qualifiers->funStr;
+
+  PixelChannel
+    *const chQual = qualifiers->chQual;
+
+  char
+    *const expChLimit = qualifiers->expChLimit;
+
+    if (IsCoordFunction(*fe) != MagickFalse) {
+
+      CoordQualifierTargets targets;
+
+      *coordQual = (GetCoordQualifier (pfx, (int) *fe) == 1) ? MagickTrue : MagickFalse;
+
+      targets.fe=fe;
+      targets.funStr=funStr;
+      targets.chQual=chQual;
+      targets.expChLimit=expChLimit;
+      if (ApplyCoordQualifier (pfx, *coordQual, &targets) == MagickFalse)
+        return MagickFalse;
+    }
+  return MagickTrue;
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2325,6 +2377,9 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   MagickBooleanType coordQual = MagickFalse;
   PixelChannel chQual = NO_CHAN_QUAL;
   ImgAttrE iaQual = aNull;
+
+  const FunctionQualifiers qualifiers = { &coordQual, &fe, &funStr, &chQual,
+    &expChLimit };
 
   pfx->pex += pfx->lenToken;
 
@@ -2519,19 +2574,8 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
     QualifierCheck check;
 
-    if (IsCoordFunction(fe) != MagickFalse) {
-
-      CoordQualifierTargets targets;
-
-      coordQual = (GetCoordQualifier (pfx, (int) fe) == 1) ? MagickTrue : MagickFalse;
-
-      targets.fe=(&fe);
-      targets.funStr=(&funStr);
-      targets.chQual=(&chQual);
-      targets.expChLimit=(&expChLimit);
-      if (ApplyCoordQualifier (pfx, coordQual, &targets) == MagickFalse)
-        return MagickFalse;
-    }
+    if (QualifyCoordFunction (pfx, &qualifiers) == MagickFalse)
+      return MagickFalse;
 
     if (IsUnqualifiedPixelFunction(chQual,fe) != MagickFalse)
     {
