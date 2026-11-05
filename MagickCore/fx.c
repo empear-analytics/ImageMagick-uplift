@@ -3773,10 +3773,9 @@ static MagickBooleanType TranslateExpression (
     UserSymNdx0 = UserSymNdx1;
   }
 
-  if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
-      MagickFalse) {
-    if (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)) return MagickFalse;
-  }
+  if ((IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
+      MagickFalse) && (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)))
+    return MagickFalse;
 
   if (IsPendingLimitChar(pfx,chLimit,strLimit) != MagickFalse) {
     *chLimit = *pfx->pex;
