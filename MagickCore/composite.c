@@ -2780,6 +2780,44 @@ static void GetThresholdArguments(const Image *image,
   (*threshold)*=(double) QuantumRange;
 }
 
+typedef struct _BlurComposite
+{
+  double
+    angle_range,
+    angle_start,
+    height,
+    width;
+
+  Image
+    *source_image;
+} BlurComposite;
+
+static void RotateBlurEllipse(const BlurComposite *blur_composite,
+  const Quantum *p,SegmentInfo *blur)
+{
+  const double
+    angle_range = blur_composite->angle_range,
+    angle_start = blur_composite->angle_start,
+    height = blur_composite->height,
+    width = blur_composite->width;
+
+  Image
+    *const source_image = blur_composite->source_image;
+
+  if (fabs(angle_range) > MagickEpsilon)
+    {
+      MagickRealType
+        angle;
+
+      angle=angle_start+angle_range*QuantumScale*(double) 
+        GetPixelBlue(source_image,p);
+      (*blur).x1=width*cos(angle);
+      (*blur).x2=width*sin(angle);
+      (*blur).y1=(-height*sin(angle));
+      (*blur).y2=height*cos(angle);
+    }
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -2984,6 +3022,9 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       SegmentInfo
         blur;
 
+      BlurComposite
+        blur_composite;
+
       /*
         Blur Image by resampling dictated by an overlay gradient map:
           X = red_channel; Y = green_channel; compose:args =
@@ -3067,6 +3108,11 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       GetPixelInfo(image,&pixel);
       source_view=AcquireVirtualCacheView(source_image,exception);
       canvas_view=AcquireAuthenticCacheView(canvas_image,exception);
+      blur_composite.angle_range=angle_range;
+      blur_composite.angle_start=angle_start;
+      blur_composite.height=height;
+      blur_composite.width=width;
+      blur_composite.source_image=source_image;
       for (y=0; y < (ssize_t) source_image->rows; y++)
       {
         MagickBooleanType
@@ -3096,18 +3142,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               p+=(ptrdiff_t) GetPixelChannels(source_image);
               continue;
             }
-          if (fabs(angle_range) > MagickEpsilon)
-            {
-              MagickRealType
-                angle;
-
-              angle=angle_start+angle_range*QuantumScale*(double) 
-                GetPixelBlue(source_image,p);
-              blur.x1=width*cos(angle);
-              blur.x2=width*sin(angle);
-              blur.y1=(-height*sin(angle));
-              blur.y2=height*cos(angle);
-            }
+          RotateBlurEllipse(&blur_composite,p,&blur);
           ScaleResampleFilter(resample_filter,
             blur.x1*QuantumScale*(double) GetPixelRed(source_image,p),
             blur.y1*QuantumScale*(double) GetPixelGreen(source_image,p),
