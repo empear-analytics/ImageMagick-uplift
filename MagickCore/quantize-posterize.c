@@ -582,6 +582,33 @@ static MagickBooleanType PosterizeImageRow(const PosterizeRows *rows,
   return(MagickTrue);
 }
 
+static MagickOffsetType PosterizeColormap(Image *image,const size_t levels,
+  const MagickBooleanType status)
+{
+  MagickOffsetType
+    progress;
+
+  if (image->storage_class == PseudoClass)
+    {
+      ssize_t
+        i;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+          #pragma omp parallel for schedule(static) shared(progress,status) \
+            magick_number_threads(image,image,image->colors,1)
+#endif
+      for (i=0; i < (ssize_t) image->colors; i++)
+      {
+        PosterizeColormapEntry(image,i,levels);
+      }
+    }
+  /*
+    Posterize image.
+  */
+  progress=0;
+  return(progress);
+}
+
 MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   const DitherMethod dither_method,ExceptionInfo *exception)
 {
@@ -619,24 +646,7 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   /*
     No dither or too many levels.
   */
-  if (image->storage_class == PseudoClass)
-    {
-      ssize_t
-        i;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-          #pragma omp parallel for schedule(static) shared(progress,status) \
-            magick_number_threads(image,image,image->colors,1)
-#endif
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        PosterizeColormapEntry(image,i,levels);
-      }
-    }
-  /*
-    Posterize image.
-  */
-  progress=0;
+  progress=PosterizeColormap(image,levels,status);
   image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp parallel for schedule(static) shared(progress,status) \
