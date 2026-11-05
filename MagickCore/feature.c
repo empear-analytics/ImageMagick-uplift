@@ -1460,16 +1460,11 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
     VoteHoughRow(&votes,p,center);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,CannyEdgeImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetFeatureProgress(image,CannyEdgeImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
