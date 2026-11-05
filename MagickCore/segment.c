@@ -1580,6 +1580,16 @@ static void FindDynamicExtrema(ssize_t **histogram,
   (void) OptimalTau(histogram[Blue],&tau_inputs,extrema[Blue]);
 }
 
+static void RelinquishHistogramsBelow(ssize_t i,ssize_t **histogram,
+  short **extrema)
+{
+  for (i-- ; i >= 0; i--)
+  {
+    extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
+    histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
+  }
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1621,11 +1631,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     extrema[i]=(short *) AcquireQuantumMemory(256UL,sizeof(**histogram));
     if ((histogram[i] == (ssize_t *) NULL) || (extrema[i] == (short *) NULL))
       {
-        for (i-- ; i >= 0; i--)
-        {
-          extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
-          histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
-        }
+        RelinquishHistogramsBelow(i,histogram,extrema);
         (void) ThrowMagickException(exception,GetMagickModule(),
           ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
         return(MagickFalse);
