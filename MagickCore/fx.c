@@ -3642,6 +3642,40 @@ static MagickBooleanType ExpectOperandAfterOperator (FxInfo * pfx,
   return(MagickTrue);
 }
 
+typedef struct _ExpressionContext
+{
+  FxInfo
+    *pfx;
+
+  char
+    *chLimit;
+
+  MagickBooleanType
+    *needPopAll;
+} ExpressionContext;
+
+static MagickBooleanType TranslateTernaryElse (
+  const ExpressionContext * context, TernaryT ternary,
+  MagickBooleanType * broke)
+{
+  FxInfo
+    *const pfx = context->pfx;
+
+  char
+    *const chLimit = context->chLimit;
+
+  MagickBooleanType
+    *const needPopAll = context->needPopAll;
+
+  (*broke)=MagickFalse;
+  if (ternary.addr_colon != NULL_ADDRESS) {
+    if (!TranslateExpression (pfx, ",);", chLimit, needPopAll)) return MagickFalse;
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -3662,6 +3696,8 @@ static MagickBooleanType TranslateExpression (
   const OperandSymbols
     operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll },
     operand1 = { &UserSymbol, &NewUserSymbol, &UserSymNdx1, needPopAll };
+
+  ExpressionContext context;
 
   TernaryT ternary;
   ternary.addr_query = NULL_ADDRESS;
@@ -3701,6 +3737,9 @@ static MagickBooleanType TranslateExpression (
 
   /* Loop through Operator, Operand, Operator, Operand, ...
   */
+  context.pfx=pfx;
+  context.chLimit=chLimit;
+  context.needPopAll=needPopAll;
   while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
     if (!GetOperator (pfx, &Assign, &Update, &IncrDecr)) return MagickFalse;
     SkipSpaces (pfx);
@@ -3747,10 +3786,9 @@ static MagickBooleanType TranslateExpression (
 
     if (!ProcessTernaryOpr (pfx, &ternary)) return MagickFalse;
 
-    if (ternary.addr_colon != NULL_ADDRESS) {
-      if (!TranslateExpression (pfx, ",);", chLimit, needPopAll)) return MagickFalse;
-      break;
-    }
+    if (TranslateTernaryElse (&context, ternary, &broke) == MagickFalse)
+      return MagickFalse;
+    if (broke != MagickFalse) break;
 
     UserSymbol = NewUserSymbol = MagickFalse;
 
