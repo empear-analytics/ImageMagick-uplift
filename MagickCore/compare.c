@@ -5416,18 +5416,18 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
       case PhaseCorrelationErrorMetric:
       case StructuralSimilarityErrorMetric:
       {
-        if (similarity_threshold != DefaultSimilarityThreshold)
-          if (channel_info.similarity >= similarity_threshold)
-            threshold_trigger=MagickTrue;
+        if ((similarity_threshold != DefaultSimilarityThreshold) &&
+            (channel_info.similarity >= similarity_threshold))
+          threshold_trigger=MagickTrue;
         if (channel_info.similarity >= similarity_info.similarity)
           similarity_info=channel_info;
         break;
       }
       default:
       {
-        if (similarity_threshold != DefaultSimilarityThreshold)
-          if (channel_info.similarity < similarity_threshold)
-            threshold_trigger=MagickTrue;
+        if ((similarity_threshold != DefaultSimilarityThreshold) &&
+            (channel_info.similarity < similarity_threshold))
+          threshold_trigger=MagickTrue;
         if (channel_info.similarity < similarity_info.similarity)
           similarity_info=channel_info;
         break;
