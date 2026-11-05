@@ -2536,6 +2536,14 @@ static MagickBooleanType TryEpochFunction (FxInfo * pfx, FunctionE fe,
   return MagickFalse;
 }
 
+static MagickBooleanType ExpectNoArgsClose (FxInfo * pfx,
+  const char expChLimit, char * chLimit)
+{
+    *chLimit = expChLimit;
+    if (!ExpectChar (pfx, ')')) return MagickFalse;
+  return MagickTrue;
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2681,8 +2689,8 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   }
   if (IsNoArgsFunction(fe,FndArgs) != MagickFalse) {
     /* This is for "rand()" and similar. */
-    chLimit = expChLimit;
-    if (!ExpectChar (pfx, ')')) return MagickFalse;
+    if (ExpectNoArgsClose (pfx, expChLimit, &chLimit) == MagickFalse)
+      return MagickFalse;
   }
 
   if (chLimit != expChLimit) {
