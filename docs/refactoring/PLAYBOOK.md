@@ -1479,6 +1479,15 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    from the fill to a call writes a member's variable (Recipe B step 5's condition):
    checked by reading every path, the paths through blocks that stay in the caller
    included.
+   The statements of one loop body are siblings in the same sense (a report before a
+   nested loop, the nested loop, a report after it, each moved under this recipe or
+   Recipe I or Y in its own commit), and the struct may be filled before the loop when
+   nothing in it writes a member's variable. A later block that holds the calls of
+   earlier siblings (the loop around them, moved by this recipe or Recipe I or Y) takes
+   the same `const Name *name` in place of a struct of its own: the typedef gains the
+   members its own text reads (each filled with the others, from the variable of its
+   name), the block reads them as `name->member`, and each inner call passes `name`
+   where it passed `&name`.
 
 **Before:**
 
@@ -1622,6 +1631,12 @@ static void ThresholdWaveletLevel(float *pixels,
   member's variable itself (a coordinate it computes before reading it) declares its own
   variable (Recipe E step 4) and does not read that member, and once moved it no longer
   writes the caller's variable.
+- A block that holds the siblings' calls and takes the same `name` reads, at its own
+  uses, the members filled from the variables it read, and nothing between the fill and
+  those uses writes them (step 8's condition, now for the block as well), so each
+  `name->member` gives the value the block's own read gave. The inner calls receive the
+  very struct they received before, through the same pointer value, so they read what
+  they read.
 - Two helpers that unpack the same members into `const` locals (the Manhattan and
   Voronoi nearest-point searches of `SparseColorImage`), or that test the same five
   channel traits, are reported as *Code Duplication*; the member form removes the
@@ -6656,3 +6671,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | MB | Extract Block Through Copies of Macro-Bound Locals: a block that writes struct locals of the caller only through function-like macros whose bodies name them (so Recipe O's `(*v)` would edit the macro text) moves to a `static void` function taking a pointer `T *caller_v` per such local, which declares a local of the same name and type initialised `(*caller_v)` (copy in), keeps the block's text and the macro uses unchanged, and ends `(*caller_v)=v;` (copy out); every member set before the block, no exit, no other name or address of `v` in the block, at most four parameters | `distort.c`'s `DistortImage` (campaign A, W14): the best-fit Affine/RigidAffine, Perspective and Arc groups write the block's `min` and `max` only through `InitalBounds` and `ExpandBounds`; O, Z and I would rewrite the macro body, E step 4 skips two outputs; W11 to W13 recorded "no legal home". A probe of the three steps after the macros' Recipe H step: 4.76 to 4.96, no new finding | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | N | Step 1: a block that lies outside every OpenMP region may hold whole parallel loops (the `#if`, the pragma with its clauses, the `#endif` and the loop, all inside the block and unchanged), as Recipe O step 1 already admits for its blocks; every variable the region writes or a clause names is a parameter or local of the new function, never a member. *Careful* gives the data-sharing argument. Still eight steps | `colorspace.c`'s `TransformsRGBImage` (campaign A, W14): the DirectClass row loop of the table conversion (`shared(status)`, an `omp atomic` progress tail) reads the image, three maps and the exception, already in the `TransformsRGBTables` local its PseudoClass sibling takes (Recipe N step 8); with the parameters Recipe E would give it takes eight. A probe of the chain (the table set-up split by SD and E, this loop, the tail by E step 7): 5.33 to 5.75, no new finding. The same form was already used, without the text admitting it, by `sRGBToGeneric` (9845ba7e4) | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | Z | Step 1: a block outside every OpenMP region may hold whole parallel loops under Recipe N step 1's conditions (amended the same day): each loop moved whole and unchanged, what the region writes or a clause names a parameter or local of the new function, never a member. *Careful* refers to N's argument. Still seven steps | `colorspace.c`'s `sRGBTransformImage` (campaign A, W14): Recipe SD on its table set-up `switch (colorspace)` (the Rec709YCbCr, YCC and identity groups, two of them whole parallel loops) writes `primary_info` and reads four inputs, so SD step 3 takes Z's form, whose step 1 refused the loops. A probe of the step and the E step that follows it: 5.87 to 5.93 to 6.01, no new finding | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | N | Step 8: the statements of one loop body are sibling blocks too (each moved under N, I or Y), the struct may be filled before the loop when nothing in it writes a member's variable, and a later block that holds the siblings' calls (the loop around them) takes the same `const Name *name`, the typedef gaining the members it reads, read as `name->member`, its inner calls passing `name` for `&name`; *Careful* gives the argument | `morphology.c`'s `MorphologyApply` (campaign A, W14): its kernel-iteration loop (Recipe I), the two verbose reports around it (N) and the stage loop that holds them (I) read the same nine to twelve inputs; one struct per helper would take the stage-loop helper past *Large Method* (77 lines in a probe). A probe of the chain with one shared `MorphologyStages`: MorphologyApply leaves Brain Method and Deep, Nested Complexity, 2.71 to 3.04, no finding on a helper | mandate (2026-10-24) |
