@@ -2807,6 +2807,65 @@ static MagickBooleanType NotAConstantOperand (FxInfo * pfx)
   return MagickTrue;
 }
 
+static MagickBooleanType TryPrefixOperand (FxInfo * pfx,
+  const OperandSymbols * operand, MagickBooleanType * result)
+{
+  /* Try '(' or unary prefix
+  */
+  OperatorE op = GetLeadingOp (pfx);
+  if (op==oOpenParen) {
+    (*result)=GetParenthesisedOperand (pfx, op, operand->needPopAll);
+    return MagickTrue;
+  } else if (OprIsUnaryPrefix (op)) {
+    OperandSymbols
+      symbols;
+
+    symbols.UserSymbol=operand->UserSymbol;
+    symbols.NewUserSymbol=operand->NewUserSymbol;
+    symbols.UserSymNdx=operand->UserSymNdx;
+    symbols.needPopAll=operand->needPopAll;
+    (*result)=GetUnaryPrefixOperand (pfx, op, &symbols);
+    return MagickTrue;
+  } else if (*pfx->pex == '#') {
+    (*result)=GetHexColourOperand (pfx);
+    return MagickTrue;
+  }
+  return MagickFalse;
+}
+
+static MagickBooleanType TryNumberOperand (FxInfo * pfx,
+  MagickBooleanType * result)
+{
+  /* Try a constant number.
+  */
+  char * tailptr;
+  ssize_t lenOptArt;
+  fxFltType val = strtold (pfx->pex, &tailptr);
+  if (pfx->pex != tailptr) {
+    pfx->pex = tailptr;
+    if (*tailptr) {
+      val = ApplyNumberPrefix (pfx, tailptr, val);
+    }
+    (void) AddElement (pfx, val, oNull);
+    (*result)=MagickTrue;
+    return MagickTrue;
+  }
+
+  val = (fxFltType) 0;
+  lenOptArt = GetProperty (pfx, &val, NULL);
+  if (lenOptArt < 0) {
+    (*result)=MagickFalse;
+    return MagickTrue;
+  }
+  if (lenOptArt > 0) {
+    (void) AddElement (pfx, val, oNull);
+    pfx->pex += lenOptArt;
+    (*result)=MagickTrue;
+    return MagickTrue;
+  }
+  return MagickFalse;
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, const OperandSymbols * operand)
 {
@@ -2820,6 +2879,9 @@ static MagickBooleanType GetOperand (
   MagickBooleanType
     *const needPopAll = operand->needPopAll;
 
+  MagickBooleanType
+    returned;
+
   *NewUserSymbol = *UserSymbol = MagickFalse;
   *UserSymNdx = NULL_ADDRESS;
 
@@ -2829,48 +2891,11 @@ static MagickBooleanType GetOperand (
 
   if (pfx->lenToken==0) {
 
-    /* Try '(' or unary prefix
-    */
-    OperatorE op = GetLeadingOp (pfx);
-    if (op==oOpenParen) {
-      return (GetParenthesisedOperand (pfx, op, needPopAll));
-    } else if (OprIsUnaryPrefix (op)) {
-      OperandSymbols
-        symbols;
+    if (TryPrefixOperand (pfx, operand, &returned) != MagickFalse)
+      return returned;
 
-      symbols.UserSymbol=UserSymbol;
-      symbols.NewUserSymbol=NewUserSymbol;
-      symbols.UserSymNdx=UserSymNdx;
-      symbols.needPopAll=needPopAll;
-      return (GetUnaryPrefixOperand (pfx, op, &symbols));
-    } else if (*pfx->pex == '#') {
-      return (GetHexColourOperand (pfx));
-    }
-
-    /* Try a constant number.
-    */
-    {
-      char * tailptr;
-      ssize_t lenOptArt;
-      fxFltType val = strtold (pfx->pex, &tailptr);
-      if (pfx->pex != tailptr) {
-        pfx->pex = tailptr;
-        if (*tailptr) {
-          val = ApplyNumberPrefix (pfx, tailptr, val);
-        }
-        (void) AddElement (pfx, val, oNull);
-        return MagickTrue;
-      }
-
-      val = (fxFltType) 0;
-      lenOptArt = GetProperty (pfx, &val, NULL);
-      if (lenOptArt < 0) return MagickFalse;
-      if (lenOptArt > 0) {
-        (void) AddElement (pfx, val, oNull);
-        pfx->pex += lenOptArt;
-        return MagickTrue;
-      }
-    }
+    if (TryNumberOperand (pfx, &returned) != MagickFalse)
+      return returned;
 
   } /* end of lenToken==0 */
 
