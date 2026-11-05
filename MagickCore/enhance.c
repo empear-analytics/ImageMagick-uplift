@@ -2135,6 +2135,28 @@ static void ModulateImageColormap(const ModulateRow *modulate_row)
   }
 }
 
+typedef struct _ModulateHead
+{
+  ModulateRow
+    modulate_row;
+
+  EnhanceLine
+    line;
+} ModulateHead;
+
+static MagickBooleanType ModulateImageHead(const ModulateHead *head,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if (GetEnhanceRow(&head->line,y,&q,status) == MagickFalse)
+    return(MagickFalse);
+  ModulateImageRow(&head->modulate_row,q);
+  SyncEnhanceRow(&head->line,status);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   ExceptionInfo *exception)
 {
@@ -2202,25 +2224,12 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ModulateRow
-      modulate_row;
+    const ModulateHead
+      head = { { image, colorspace, percent_hue, percent_saturation,
+        percent_brightness, illuminant }, { image,image_view,exception } };
 
-    Quantum
-      *magick_restrict q;
-
-    const EnhanceLine
-      line = { image,image_view,exception };
-
-    if (GetEnhanceRow(&line,y,&q,&status) == MagickFalse)
+    if (ModulateImageHead(&head,y,&status) == MagickFalse)
       continue;
-    modulate_row.image=image;
-    modulate_row.colorspace=colorspace;
-    modulate_row.percent_hue=percent_hue;
-    modulate_row.percent_saturation=percent_saturation;
-    modulate_row.percent_brightness=percent_brightness;
-    modulate_row.illuminant=illuminant;
-    ModulateImageRow(&modulate_row,q);
-    SyncEnhanceRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
