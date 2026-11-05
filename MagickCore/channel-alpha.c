@@ -762,6 +762,46 @@ static MagickBooleanType SetTransparentRowsToBackground(Image *image,
   return(status);
 }
 
+static void SetShapeRemoveAlpha(Image *image,const AlphaChannelOption alpha_type,
+  MagickBooleanType *status,ExceptionInfo *exception)
+{
+  switch (alpha_type)
+  {
+    case RemoveAlphaChannel:
+    {
+      /*
+        Remove transparency.
+      */
+      if ((image->alpha_trait & BlendPixelTrait) == 0)
+        break;
+      (*status)=SetImageStorageClass(image,DirectClass,exception);
+      if ((*status) == MagickFalse)
+        break;
+      (*status)=RemoveAlphaRows(image,(*status),exception);
+      break;
+    }
+    case ShapeAlphaChannel:
+    {
+      PixelInfo
+        background;
+
+      /*
+        Remove transparency.
+      */
+      ConformPixelInfo(image,&image->background_color,&background,exception);
+      background.alpha_trait=BlendPixelTrait;
+      image->alpha_trait=BlendPixelTrait;
+      (*status)=SetImageStorageClass(image,DirectClass,exception);
+      if ((*status) == MagickFalse)
+        break;
+      (*status)=ShapeAlphaRows(image,(*status),background,exception);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -889,39 +929,14 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
       status=SetImageAlpha(image,OpaqueAlpha,exception);
       break;
     }
-    case RemoveAlphaChannel:
+    default:
     {
-      /*
-        Remove transparency.
-      */
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        break;
-      status=SetImageStorageClass(image,DirectClass,exception);
-      if (status == MagickFalse)
-        break;
-      status=RemoveAlphaRows(image,status,exception);
+      SetShapeRemoveAlpha(image,alpha_type,&status,exception);
       break;
     }
     case SetAlphaChannel:
     {
       status=SetMissingAlphaOpaque(image,status,exception);
-      break;
-    }
-    case ShapeAlphaChannel:
-    {
-      PixelInfo
-        background;
-
-      /*
-        Remove transparency.
-      */
-      ConformPixelInfo(image,&image->background_color,&background,exception);
-      background.alpha_trait=BlendPixelTrait;
-      image->alpha_trait=BlendPixelTrait;
-      status=SetImageStorageClass(image,DirectClass,exception);
-      if (status == MagickFalse)
-        break;
-      status=ShapeAlphaRows(image,status,background,exception);
       break;
     }
     case TransparentAlphaChannel:
