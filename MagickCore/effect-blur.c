@@ -3785,17 +3785,55 @@ static MagickBooleanType AcquireSelectiveLuminance(const Image *image,
 
 #define SelectiveBlurImageTag  "SelectiveBlur/Image"
 
-MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
-  const double sigma,const double threshold,ExceptionInfo *exception)
+typedef struct _SelectiveBlur
 {
-  CacheView
-    *blur_view,
-    *image_view,
-    *luminance_view;
+  const Image
+    *image;
 
   Image
     *blur_image,
     *luminance_image;
+
+  MagickRealType
+    *kernel;
+
+  double
+    threshold;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
+} SelectiveBlur;
+
+static Image *BlurSelectiveRows(const SelectiveBlur *selective)
+{
+  const Image
+    *const image = selective->image;
+
+  Image
+    *const blur_image = selective->blur_image;
+
+  Image
+    *luminance_image = selective->luminance_image;
+
+  MagickRealType
+    *kernel = selective->kernel;
+
+  const double
+    threshold = selective->threshold;
+
+  const size_t
+    width = selective->width;
+
+  ExceptionInfo
+    *const exception = selective->exception;
+
+  CacheView
+    *blur_view,
+    *image_view,
+    *luminance_view;
 
   MagickBooleanType
     status;
@@ -3803,15 +3841,62 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   MagickOffsetType
     progress;
 
-  MagickRealType
-    *kernel;
-
-  size_t
-    width;
-
   ssize_t
     center,
     y;
+
+  status=MagickTrue;
+  progress=0;
+  center=(ssize_t) (GetPixelChannels(image)*(image->columns+width)*
+    ((width-1)/2L)+GetPixelChannels(image)*((width-1)/2L));
+  image_view=AcquireVirtualCacheView(image,exception);
+  luminance_view=AcquireVirtualCacheView(luminance_image,exception);
+  blur_view=AcquireAuthenticCacheView(blur_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,blur_image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const SelectiveRow
+      row = { image, blur_image, luminance_image, blur_view, image_view,
+        luminance_view, kernel, center, y, threshold, width, exception };
+
+    if (BlurSelectiveLine(&row,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetBlurProgress(image,SelectiveBlurImageTag,progress,&status);
+      }
+  }
+  blur_image->type=image->type;
+  blur_view=DestroyCacheView(blur_view);
+  luminance_view=DestroyCacheView(luminance_view);
+  image_view=DestroyCacheView(image_view);
+  luminance_image=DestroyImage(luminance_image);
+  kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
+  return(ReleaseFailedImage(blur_image,status));
+}
+
+MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
+  const double sigma,const double threshold,ExceptionInfo *exception)
+{
+  Image
+    *blur_image,
+    *luminance_image;
+
+  MagickRealType
+    *kernel;
+
+  SelectiveBlur
+    selective;
+
+  size_t
+    width;
 
   /*
     Initialize blur image attributes.
@@ -3849,41 +3934,14 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   /*
     Threshold blur image.
   */
-  status=MagickTrue;
-  progress=0;
-  center=(ssize_t) (GetPixelChannels(image)*(image->columns+width)*
-    ((width-1)/2L)+GetPixelChannels(image)*((width-1)/2L));
-  image_view=AcquireVirtualCacheView(image,exception);
-  luminance_view=AcquireVirtualCacheView(luminance_image,exception);
-  blur_view=AcquireAuthenticCacheView(blur_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,blur_image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const SelectiveRow
-      row = { image, blur_image, luminance_image, blur_view, image_view,
-        luminance_view, kernel, center, y, threshold, width, exception };
-
-    if (BlurSelectiveLine(&row,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetBlurProgress(image,SelectiveBlurImageTag,progress,&status);
-      }
-  }
-  blur_image->type=image->type;
-  blur_view=DestroyCacheView(blur_view);
-  luminance_view=DestroyCacheView(luminance_view);
-  image_view=DestroyCacheView(image_view);
-  luminance_image=DestroyImage(luminance_image);
-  kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
-  return(ReleaseFailedImage(blur_image,status));
+  selective.image=image;
+  selective.blur_image=blur_image;
+  selective.luminance_image=luminance_image;
+  selective.kernel=kernel;
+  selective.threshold=threshold;
+  selective.width=width;
+  selective.exception=exception;
+  return(BlurSelectiveRows(&selective));
 }
 
 /*
