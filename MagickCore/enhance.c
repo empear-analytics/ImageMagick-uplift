@@ -1220,6 +1220,11 @@ static MagickBooleanType ContrastImageHead(const ContrastHead *head,
   return(MagickTrue);
 }
 
+static inline int ContrastSign(const MagickBooleanType sharpen)
+{
+  return(sharpen != MagickFalse ? 1 : -1);
+}
+
 MagickExport MagickBooleanType ContrastImage(Image *image,
   const MagickBooleanType sharpen,ExceptionInfo *exception)
 {
@@ -1248,7 +1253,7 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
 #endif
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  sign=sharpen != MagickFalse ? 1 : -1;
+  sign=ContrastSign(sharpen);
   /*
     Contrast enhance colormap.
   */
