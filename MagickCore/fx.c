@@ -5411,6 +5411,17 @@ static void DumpUserSymbolValues (FxInfo * pfx)
   }
 }
 
+static void SetFxProgress (const Image *image, const char *tag,
+  const MagickOffsetType progress, MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed = SetImageProgress (image, tag, progress, image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 /* Following is substitute for FxImage().
 */
 MagickExport Image *FxImage(const Image *image,const char *expression,
@@ -5483,16 +5494,11 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed = SetImageProgress (image, FxImageTag, progress, image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetFxProgress (image, FxImageTag, progress, &status);
       }
   }
 
