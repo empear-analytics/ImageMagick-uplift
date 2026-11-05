@@ -1089,6 +1089,82 @@ static void SyncEvaluateView(CacheView *evaluate_view,
     (*status)=MagickFalse;
 }
 
+typedef struct _EvaluateRowHead
+{
+  const Image
+    *images;
+
+  Image
+    *image;
+
+  CacheView
+    **image_view,
+    *evaluate_view;
+
+  size_t
+    number_images;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} EvaluateRowHead;
+
+static MagickBooleanType FetchEvaluateRows(const EvaluateRowHead *head,
+  const Quantum ***p,Quantum *magick_restrict *q,MagickBooleanType *status)
+{
+  const Image
+    *const images = head->images;
+
+  Image
+    *const image = head->image;
+
+  CacheView
+    **const image_view = head->image_view,
+    *const evaluate_view = head->evaluate_view;
+
+  const size_t
+    number_images = head->number_images;
+
+  const ssize_t
+    y = head->y;
+
+  ExceptionInfo
+    *const exception = head->exception;
+
+  EvaluateFetch
+    fetch;
+
+  ssize_t
+    j;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*p)=(const Quantum **) AcquireQuantumMemory(number_images,sizeof(*(*p)));
+  if ((*p) == (const Quantum **) NULL)
+    {
+      (*status)=MagickFalse;
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",
+        images->filename);
+      return(MagickFalse);
+    }
+  fetch.image_view=image_view;
+  fetch.image=image;
+  fetch.y=y;
+  fetch.number_images=number_images;
+  j=GetEvaluateRows(&fetch,(*p),exception);
+  (*q)=QueueCacheViewAuthenticPixels(evaluate_view,0,y,image->columns,1,
+    exception);
+  if ((j < (ssize_t) number_images) || ((*q) == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -1166,9 +1242,6 @@ MagickExport Image *EvaluateImages(const Image *images,
         const Quantum
           **p;
 
-        EvaluateFetch
-          fetch;
-
         EvaluateMedian
           median;
 
@@ -1178,32 +1251,12 @@ MagickExport Image *EvaluateImages(const Image *images,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          j;
+        const EvaluateRowHead
+          head = { images, image, image_view, evaluate_view, number_images, y,
+            exception };
 
-        if (status == MagickFalse)
+        if (FetchEvaluateRows(&head,&p,&q,&status) == MagickFalse)
           continue;
-        p=(const Quantum **) AcquireQuantumMemory(number_images,sizeof(*p));
-        if (p == (const Quantum **) NULL)
-          {
-            status=MagickFalse;
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'",
-              images->filename);
-            continue;
-          }
-        fetch.image_view=image_view;
-        fetch.image=image;
-        fetch.y=y;
-        fetch.number_images=number_images;
-        j=GetEvaluateRows(&fetch,p,exception);
-        q=QueueCacheViewAuthenticPixels(evaluate_view,0,y,image->columns,1,
-          exception);
-        if ((j < (ssize_t) number_images) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
         evaluate_pixel=evaluate_pixels[id];
         median.image=image;
         median.images=images;
@@ -1239,9 +1292,6 @@ MagickExport Image *EvaluateImages(const Image *images,
         const Quantum
           **p;
 
-        EvaluateFetch
-          fetch;
-
         EvaluateImagesRows
           rows;
 
@@ -1251,32 +1301,12 @@ MagickExport Image *EvaluateImages(const Image *images,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          j;
+        const EvaluateRowHead
+          head = { images, image, image_view, evaluate_view, number_images, y,
+            exception };
 
-        if (status == MagickFalse)
+        if (FetchEvaluateRows(&head,&p,&q,&status) == MagickFalse)
           continue;
-        p=(const Quantum **) AcquireQuantumMemory(number_images,sizeof(*p));
-        if (p == (const Quantum **) NULL)
-          {
-            status=MagickFalse;
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'",
-              images->filename);
-            continue;
-          }
-        fetch.image_view=image_view;
-        fetch.image=image;
-        fetch.y=y;
-        fetch.number_images=number_images;
-        j=GetEvaluateRows(&fetch,p,exception);
-        q=QueueCacheViewAuthenticPixels(evaluate_view,0,y,image->columns,1,
-          exception);
-        if ((j < (ssize_t) number_images) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
         evaluate_pixel=evaluate_pixels[id];
         ClearPolynomialPixels(image,evaluate_pixel);
         rows.image=image;
