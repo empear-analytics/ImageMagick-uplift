@@ -1784,6 +1784,97 @@ static void InitializesRGBRec709ThroughIdentityMaps(const sRGBMapsInput *maps,
   }
 }
 
+static PrimaryInfo InitializesRGBTransformMaps(
+  const ColorspaceType colorspace,TransformPacket *x_map,
+  TransformPacket *y_map,TransformPacket *z_map)
+{
+  PrimaryInfo
+    primary_info;
+
+  ssize_t
+    i;
+
+  (void) memset(&primary_info,0,sizeof(primary_info));
+  switch (colorspace)
+  {
+    case OHTAColorspace:
+    {
+      /*
+        Initialize OHTA tables:
+
+          I1 = 0.33333*R+0.33334*G+0.33333*B
+          I2 = 0.50000*R+0.00000*G-0.50000*B
+          I3 =-0.25000*R+0.50000*G-0.25000*B
+
+        I and Q, normally -0.5 through 0.5, are normalized to the range 0
+        through QuantumRange.
+      */
+      primary_info.y=(MagickRealType) ((MaxMap+1)/2);
+      primary_info.z=(MagickRealType) ((MaxMap+1)/2);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static)
+#endif
+      for (i=0; i <= (ssize_t) MaxMap; i++)
+      {
+        x_map[i].x=(MagickRealType) (0.33333*(double) i);
+        x_map[i].y=(MagickRealType) (0.50000*(double) i);
+        x_map[i].z=(MagickRealType) (-0.25000*(double) i);
+        y_map[i].x=(MagickRealType) (0.33334*(double) i);
+        y_map[i].y=(MagickRealType) (0.00000*(double) i);
+        y_map[i].z=(MagickRealType) (0.50000*(double) i);
+        z_map[i].x=(MagickRealType) (0.33333*(double) i);
+        z_map[i].y=(MagickRealType) (-0.50000*(double) i);
+        z_map[i].z=(MagickRealType) (-0.25000*(double) i);
+      }
+      break;
+    }
+    case Rec601YCbCrColorspace:
+    {
+      /*
+        Initialize YCbCr tables (ITU-R BT.601):
+
+          Y =  0.2988390*R+0.5868110*G+0.1143500*B
+          Cb= -0.1687367*R-0.3312640*G+0.5000000*B
+          Cr=  0.5000000*R-0.4186880*G-0.0813120*B
+
+        Cb and Cr, normally -0.5 through 0.5, are normalized to the range 0
+        through QuantumRange.
+      */
+      primary_info.y=(MagickRealType) ((MaxMap+1)/2);
+      primary_info.z=(MagickRealType) ((MaxMap+1)/2);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static)
+#endif
+      for (i=0; i <= (ssize_t) MaxMap; i++)
+      {
+        x_map[i].x=(MagickRealType) (0.298839*(double) i);
+        x_map[i].y=(MagickRealType) (-0.1687367*(double) i);
+        x_map[i].z=(MagickRealType) (0.500000*(double) i);
+        y_map[i].x=(MagickRealType) (0.586811*(double) i);
+        y_map[i].y=(MagickRealType) (-0.331264*(double) i);
+        y_map[i].z=(MagickRealType) (-0.418688*(double) i);
+        z_map[i].x=(MagickRealType) (0.114350*(double) i);
+        z_map[i].y=(MagickRealType) (0.500000*(double) i);
+        z_map[i].z=(MagickRealType) (-0.081312*(double) i);
+      }
+      break;
+    }
+    default:
+    {
+      sRGBMapsInput
+        maps;
+
+      maps.colorspace=colorspace;
+      maps.x_map=x_map;
+      maps.y_map=y_map;
+      maps.z_map=z_map;
+      InitializesRGBRec709ThroughIdentityMaps(&maps,&primary_info);
+      break;
+    }
+  }
+  return(primary_info);
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1801,9 +1892,6 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 
   PrimaryInfo
     primary_info;
-
-  ssize_t
-    i;
 
   TransformPacket
     *x_map,
@@ -1892,84 +1980,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
-  (void) memset(&primary_info,0,sizeof(primary_info));
-  switch (colorspace)
-  {
-    case OHTAColorspace:
-    {
-      /*
-        Initialize OHTA tables:
-
-          I1 = 0.33333*R+0.33334*G+0.33333*B
-          I2 = 0.50000*R+0.00000*G-0.50000*B
-          I3 =-0.25000*R+0.50000*G-0.25000*B
-
-        I and Q, normally -0.5 through 0.5, are normalized to the range 0
-        through QuantumRange.
-      */
-      primary_info.y=(MagickRealType) ((MaxMap+1)/2);
-      primary_info.z=(MagickRealType) ((MaxMap+1)/2);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=(MagickRealType) (0.33333*(double) i);
-        x_map[i].y=(MagickRealType) (0.50000*(double) i);
-        x_map[i].z=(MagickRealType) (-0.25000*(double) i);
-        y_map[i].x=(MagickRealType) (0.33334*(double) i);
-        y_map[i].y=(MagickRealType) (0.00000*(double) i);
-        y_map[i].z=(MagickRealType) (0.50000*(double) i);
-        z_map[i].x=(MagickRealType) (0.33333*(double) i);
-        z_map[i].y=(MagickRealType) (-0.50000*(double) i);
-        z_map[i].z=(MagickRealType) (-0.25000*(double) i);
-      }
-      break;
-    }
-    case Rec601YCbCrColorspace:
-    {
-      /*
-        Initialize YCbCr tables (ITU-R BT.601):
-
-          Y =  0.2988390*R+0.5868110*G+0.1143500*B
-          Cb= -0.1687367*R-0.3312640*G+0.5000000*B
-          Cr=  0.5000000*R-0.4186880*G-0.0813120*B
-
-        Cb and Cr, normally -0.5 through 0.5, are normalized to the range 0
-        through QuantumRange.
-      */
-      primary_info.y=(MagickRealType) ((MaxMap+1)/2);
-      primary_info.z=(MagickRealType) ((MaxMap+1)/2);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=(MagickRealType) (0.298839*(double) i);
-        x_map[i].y=(MagickRealType) (-0.1687367*(double) i);
-        x_map[i].z=(MagickRealType) (0.500000*(double) i);
-        y_map[i].x=(MagickRealType) (0.586811*(double) i);
-        y_map[i].y=(MagickRealType) (-0.331264*(double) i);
-        y_map[i].z=(MagickRealType) (-0.418688*(double) i);
-        z_map[i].x=(MagickRealType) (0.114350*(double) i);
-        z_map[i].y=(MagickRealType) (0.500000*(double) i);
-        z_map[i].z=(MagickRealType) (-0.081312*(double) i);
-      }
-      break;
-    }
-    default:
-    {
-      sRGBMapsInput
-        maps;
-
-      maps.colorspace=colorspace;
-      maps.x_map=x_map;
-      maps.y_map=y_map;
-      maps.z_map=z_map;
-      InitializesRGBRec709ThroughIdentityMaps(&maps,&primary_info);
-      break;
-    }
-  }
+  primary_info=InitializesRGBTransformMaps(colorspace,x_map,y_map,z_map);
   /*
     Convert from sRGB.
   */
