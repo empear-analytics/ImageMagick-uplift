@@ -2238,6 +2238,72 @@ static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
   return(MagickTrue);
 }
 
+typedef struct _QualifierCheck
+{
+  const char
+    *funStr;
+
+  MagickBooleanType
+    coordQual;
+
+  PixelChannel
+    chQual;
+
+  ImgAttrE
+    iaQual;
+} QualifierCheck;
+
+static MagickBooleanType CheckFunctionQualifiers (const QualifierCheck *check,
+  FxInfo * pfx)
+{
+  const char
+    *const funStr = check->funStr;
+
+  const MagickBooleanType
+    coordQual = check->coordQual;
+
+  const PixelChannel
+    chQual = check->chQual;
+
+  const ImgAttrE
+    iaQual = check->iaQual;
+
+    if (coordQual && iaQual != aNull) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "For function", "'%s', can't have qualifiers 'p' and image attribute '%s' at '%s'",
+        funStr, pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+    if (IsUnqualifiedAccess(coordQual,chQual,iaQual) != MagickFalse) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "For function", "'%s', bad qualifier '%s' at '%s'",
+        funStr, pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+    if (IsCompositeOnlyAccess(coordQual,chQual,iaQual) != MagickFalse) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "For function", "'%s', bad composite qualifier '%s' at '%s'",
+        funStr, pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+
+    if (IsHslChannelQualifier(chQual) != MagickFalse) {
+      pfx->NeedHsl = MagickTrue;
+
+      if (iaQual >= FirstImgAttr && iaQual < aNull) {
+        (void) ThrowMagickException (
+          pfx->exception, GetMagickModule(), OptionError,
+          "Can't have image attribute with HLS qualifier at", "'%s'",
+          SetShortExp(pfx));
+        return MagickFalse;
+      }
+    }
+  return MagickTrue;
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2451,6 +2517,8 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
   if (IsQualifier (pfx)) {
 
+    QualifierCheck check;
+
     if (IsCoordFunction(fe) != MagickFalse) {
 
       CoordQualifierTargets targets;
@@ -2477,39 +2545,12 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
     if (IsAttributeQualified(pfx,chQual,iaQual) != MagickFalse) {
       chQual = GetChannelQualifier (pfx, (int) fe);
     }
-    if (coordQual && iaQual != aNull) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "For function", "'%s', can't have qualifiers 'p' and image attribute '%s' at '%s'",
-        funStr, pfx->token, SetShortExp(pfx));
+    check.funStr=funStr;
+    check.coordQual=coordQual;
+    check.chQual=chQual;
+    check.iaQual=iaQual;
+    if (CheckFunctionQualifiers (&check, pfx) == MagickFalse)
       return MagickFalse;
-    }
-    if (IsUnqualifiedAccess(coordQual,chQual,iaQual) != MagickFalse) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "For function", "'%s', bad qualifier '%s' at '%s'",
-        funStr, pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
-    if (IsCompositeOnlyAccess(coordQual,chQual,iaQual) != MagickFalse) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "For function", "'%s', bad composite qualifier '%s' at '%s'",
-        funStr, pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
-
-    if (IsHslChannelQualifier(chQual) != MagickFalse) {
-      pfx->NeedHsl = MagickTrue;
-
-      if (iaQual >= FirstImgAttr && iaQual < aNull) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Can't have image attribute with HLS qualifier at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-    }
   }
 
   if (iaQual != aNull && chQual != NO_CHAN_QUAL) {
