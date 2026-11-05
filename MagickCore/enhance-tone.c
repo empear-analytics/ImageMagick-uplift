@@ -2861,6 +2861,24 @@ static void NegateGrayscaleRow(const NegateInfo *negate,const ssize_t y,
     (*status)=MagickFalse;
 }
 
+static MagickBooleanType NegateGrayscaleImage(const NegateInfo *negate,
+  MagickBooleanType status,MagickOffsetType progress)
+{
+  CacheView
+    *image_view = negate->image_view;
+
+  Image
+    *const image = negate->image;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) image->rows; y++)
+    NegateGrayscaleRow(negate,y,&status,&progress);
+  image_view=DestroyCacheView(image_view);
+  return(MagickTrue);
+}
+
 static MagickBooleanType NegateImageLine(const NegateInfo *negate,
   const ssize_t y,MagickBooleanType *status)
 {
@@ -2920,12 +2938,7 @@ MagickExport MagickBooleanType NegateImage(Image *image,
   negate.image_view=image_view;
   negate.exception=exception;
   if( grayscale != MagickFalse )
-    {
-      for (y=0; y < (ssize_t) image->rows; y++)
-        NegateGrayscaleRow(&negate,y,&status,&progress);
-      image_view=DestroyCacheView(image_view);
-      return(MagickTrue);
-    }
+    return(NegateGrayscaleImage(&negate,status,progress));
   /*
     Negate image.
   */
