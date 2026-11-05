@@ -3788,6 +3788,41 @@ static PixelInfo ScaleTintColorVector(PixelInfo color_vector,
   return(color_vector);
 }
 
+typedef struct _TintRow
+{
+  const Image
+    *image;
+
+  Image
+    *tint_image;
+
+  PixelInfo
+    color_vector;
+} TintRow;
+
+static void TintImageRow(const TintRow *tint_row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = tint_row->image;
+
+  Image
+    *const tint_image = tint_row->tint_image;
+
+  const PixelInfo
+    color_vector = tint_row->color_vector;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    TintPixel(image,tint_image,&color_vector,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(tint_image);
+  }
+}
+
 MagickExport Image *TintImage(const Image *image,const char *blend,
   const PixelInfo *tint,ExceptionInfo *exception)
 {
@@ -3853,17 +3888,15 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    TintRow
+      tint_row;
 
     if (GetEffectRows(&rows,&p,&q,&status) == MagickFalse)
       continue;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      TintPixel(image,tint_image,&color_vector,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(tint_image);
-    }
+    tint_row.image=image;
+    tint_row.tint_image=tint_image;
+    tint_row.color_vector=color_vector;
+    TintImageRow(&tint_row,p,q);
     SyncEffectRow(tint_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
