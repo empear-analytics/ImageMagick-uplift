@@ -132,7 +132,8 @@ typedef struct _GenericToRGBInput
   double
     X,
     Y,
-    Z;
+    Z,
+    white_luminance;
 
   IlluminantType
     illuminant;
@@ -299,6 +300,62 @@ static void ConvertLabThroughLuvToRGB(const GenericToRGBInput *input)
   }
 }
 
+static void ConvertHSBThroughJzazbzToRGB(const GenericToRGBInput *input)
+{
+  const ColorspaceType
+    colorspace = input->colorspace;
+
+  const double
+    X = input->X,
+    Y = input->Y,
+    Z = input->Z,
+    white_luminance = input->white_luminance;
+
+  double
+    *const R = input->R,
+    *const G = input->G,
+    *const B = input->B;
+
+  switch (colorspace)
+  {
+    case HSBColorspace:
+    {
+      ConvertHSBToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case HSIColorspace:
+    {
+      ConvertHSIToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case HSLColorspace:
+    {
+      ConvertHSLToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case HSVColorspace:
+    {
+      ConvertHSVToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case HWBColorspace:
+    {
+      ConvertHWBToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case JzazbzColorspace:
+    {
+      ConvertJzazbzToRGB(X,Y,Z,white_luminance,R,G,B);
+      break;
+    }
+    default:
+    {
+      ConvertLabThroughLuvToRGB(input);
+      break;
+    }
+  }
+}
+
 MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
   const double X,const double Y,const double Z,const double white_luminance,
   const IlluminantType illuminant,double *R,double *G,double *B)
@@ -310,6 +367,7 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
   input.X=X;
   input.Y=Y;
   input.Z=Z;
+  input.white_luminance=white_luminance;
   input.illuminant=illuminant;
   input.R=R;
   input.G=G;
@@ -352,39 +410,9 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
       ConvertHCLpToRGB(X,Y,Z,R,G,B);
       break;
     }
-    case HSBColorspace:
-    {
-      ConvertHSBToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case HSIColorspace:
-    {
-      ConvertHSIToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case HSLColorspace:
-    {
-      ConvertHSLToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case HSVColorspace:
-    {
-      ConvertHSVToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case HWBColorspace:
-    {
-      ConvertHWBToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case JzazbzColorspace:
-    {
-      ConvertJzazbzToRGB(X,Y,Z,white_luminance,R,G,B);
-      break;
-    }
     default:
     {
-      ConvertLabThroughLuvToRGB(&input);
+      ConvertHSBThroughJzazbzToRGB(&input);
       break;
     }
   }
