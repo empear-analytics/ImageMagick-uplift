@@ -4449,6 +4449,7 @@ typedef struct _MorphologyStages
     method;
 
   KernelInfo
+    *norm_kernel,
     *rflt_kernel;
 
   double
@@ -4584,6 +4585,100 @@ static void ReportMorphologyStage(const MorphologyStages *stages,
   }
 }
 
+typedef struct _MorphologyStageTargets
+{
+  KernelInfo
+    **this_kernel;
+
+  Image
+    **save_image,
+    **curr_image,
+    **work_image;
+
+  size_t
+    *count,
+    *method_changed;
+} MorphologyStageTargets;
+
+static MagickBooleanType ApplyMorphologyStages(
+  const MorphologyStages *stages,const MorphologyStageTargets *targets)
+{
+  KernelInfo
+    **const this_kernel = targets->this_kernel;
+
+  Image
+    **const save_image = targets->save_image,
+    **const curr_image = targets->curr_image,
+    **const work_image = targets->work_image;
+
+  size_t
+    *const count = targets->count,
+    *const method_changed = targets->method_changed;
+
+  MorphologyMethod
+    primitive;
+
+  size_t
+    stage_loop,
+    kernel_changed;
+
+  ssize_t
+    changed;
+
+  const MorphologyIterationTargets
+    iteration_targets = { &kernel_changed, &changed, work_image, count,
+      method_changed, curr_image };
+
+  stage_loop = 0;          /* the compound morphology stage number */
+  while ( stage_loop < stages->stage_limit ) {
+    MorphologyStageSelection
+      selection;
+
+    stage_loop++;   /* The stage of the compound morphology */
+
+    /* Select primitive morphology for this stage of compound method */
+    (*this_kernel) = stages->norm_kernel; /* default use unreflected kernel */
+    primitive = stages->method;        /* Assume method is a primitive */
+    selection.method=stages->method;
+    selection.rflt_kernel=stages->rflt_kernel;
+    selection.stage_loop=stage_loop;
+    switch( stages->method ) {
+      case EdgeMorphology:        /* dilate and erode difference */
+        primitive = DilateMorphology;
+        if ( stage_loop == 2 ) {
+          (*save_image) = (*curr_image);      /* save the image difference */
+          (*curr_image) = (Image *) stages->image;
+          primitive = ErodeMorphology;
+        }
+        break;
+      default:
+        SelectCloseIntensityPrimitive(&selection,this_kernel,&primitive);
+        break;
+    }
+    assert( (*this_kernel) != (KernelInfo *) NULL );
+
+    /* Extra information for debugging compound operations */
+    ReportMorphologyStage(stages,primitive,stage_loop);
+
+    /* Loop 4: Iterate the kernel with primitive */
+    if (IterateMorphologyKernel(stages,primitive,(*this_kernel),
+        &iteration_targets) == MagickFalse)
+      return(MagickFalse);
+
+    ReportStageChanges(stages,kernel_changed,changed,stage_loop);
+
+#if 0
+    (void) FormatLocaleFile(stderr, "--E-- image=0x%lx\n", (unsigned long)image);
+    (void) FormatLocaleFile(stderr, "      curr =0x%lx\n", (unsigned long)curr_image);
+    (void) FormatLocaleFile(stderr, "      work =0x%lx\n", (unsigned long)work_image);
+    (void) FormatLocaleFile(stderr, "      save =0x%lx\n", (unsigned long)save_image);
+    (void) FormatLocaleFile(stderr, "      union=0x%lx\n", (unsigned long)rslt_image);
+#endif
+
+  } /* End Loop 3: Primitive (staging) Loop for Compound Methods */
+  return(MagickTrue);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4604,9 +4699,6 @@ MagickPrivate Image *MorphologyApply(const Image *image,
     *rflt_kernel,      /* the current reflected kernel (if needed) */
     *this_kernel;      /* the kernel being applied */
 
-  MorphologyMethod
-    primitive;      /* the current morphology primitive being applied */
-
   CompositeOperator
     rslt_compose;   /* multi-kernel compose method for results to use */
 
@@ -4618,11 +4710,9 @@ MagickPrivate Image *MorphologyApply(const Image *image,
     method_loop,    /* Loop 1: number of compound method iterations (norm 1) */
     method_limit,   /*         maximum number of compound method iterations */
     kernel_number,  /* Loop 2: the kernel number being applied */
-    stage_loop,     /* Loop 3: primitive loop for compound morphology */
     stage_limit,    /*         how many primitives are in this compound */
     kernel_limit,   /*         number of times to iterate kernel */
     count,          /* total count of primitive steps applied */
-    kernel_changed, /* total count of changed using iterated kernel */
     method_changed; /* total count of changed over method iteration */
 
   ssize_t
@@ -4631,9 +4721,9 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   char
     v_info[MagickPathExtent];
 
-  const MorphologyIterationTargets
-    iteration_targets = { &kernel_changed, &changed, &work_image, &count,
-      &method_changed, &curr_image };
+  const MorphologyStageTargets
+    stage_targets = { &this_kernel, &save_image, &curr_image, &work_image,
+      &count, &method_changed };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -4767,6 +4857,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
       stages.image=image;
       stages.method=method;
+      stages.norm_kernel=norm_kernel;
       stages.rflt_kernel=rflt_kernel;
       stages.bias=bias;
       stages.verbose=verbose;
@@ -4778,53 +4869,8 @@ MagickPrivate Image *MorphologyApply(const Image *image,
       stages.exception=exception;
 
       /* Loop 3: Compound Morphology Staging - Select Primitive to apply */
-      stage_loop = 0;          /* the compound morphology stage number */
-      while ( stage_loop < stage_limit ) {
-        MorphologyStageSelection
-          selection;
-
-        stage_loop++;   /* The stage of the compound morphology */
-
-        /* Select primitive morphology for this stage of compound method */
-        this_kernel = norm_kernel; /* default use unreflected kernel */
-        primitive = method;        /* Assume method is a primitive */
-        selection.method=method;
-        selection.rflt_kernel=rflt_kernel;
-        selection.stage_loop=stage_loop;
-        switch( method ) {
-          case EdgeMorphology:        /* dilate and erode difference */
-            primitive = DilateMorphology;
-            if ( stage_loop == 2 ) {
-              save_image = curr_image;      /* save the image difference */
-              curr_image = (Image *) image;
-              primitive = ErodeMorphology;
-            }
-            break;
-          default:
-            SelectCloseIntensityPrimitive(&selection,&this_kernel,&primitive);
-            break;
-        }
-        assert( this_kernel != (KernelInfo *) NULL );
-
-        /* Extra information for debugging compound operations */
-        ReportMorphologyStage(&stages,primitive,stage_loop);
-
-        /* Loop 4: Iterate the kernel with primitive */
-        if (IterateMorphologyKernel(&stages,primitive,this_kernel,
-            &iteration_targets) == MagickFalse)
-          goto error_cleanup;
-
-        ReportStageChanges(&stages,kernel_changed,changed,stage_loop);
-
-#if 0
-    (void) FormatLocaleFile(stderr, "--E-- image=0x%lx\n", (unsigned long)image);
-    (void) FormatLocaleFile(stderr, "      curr =0x%lx\n", (unsigned long)curr_image);
-    (void) FormatLocaleFile(stderr, "      work =0x%lx\n", (unsigned long)work_image);
-    (void) FormatLocaleFile(stderr, "      save =0x%lx\n", (unsigned long)save_image);
-    (void) FormatLocaleFile(stderr, "      union=0x%lx\n", (unsigned long)rslt_image);
-#endif
-
-      } /* End Loop 3: Primitive (staging) Loop for Compound Methods */
+      if (ApplyMorphologyStages(&stages,&stage_targets) == MagickFalse)
+        goto error_cleanup;
 
       /*  Final Post-processing for some Compound Methods
       **
