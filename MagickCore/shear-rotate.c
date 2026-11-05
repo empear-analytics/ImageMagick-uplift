@@ -770,6 +770,16 @@ static Image *FinishRotateImage(const RotateInfo *info,
   return(rotate_image);
 }
 
+static RectangleInfo RotatePage90(const Image *rotate_image,
+  RectangleInfo page)
+{
+  Swap(page.width,page.height);
+  Swap(page.x,page.y);
+  if (page.width != 0)
+    page.x=(ssize_t) page.width-(ssize_t) rotate_image->columns-page.x;
+  return(page);
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -845,10 +855,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
       }
       (void) SetImageProgress(image,RotateImageTag,(MagickOffsetType)
         image->rows-1,image->rows);
-      Swap(page.width,page.height);
-      Swap(page.x,page.y);
-      if (page.width != 0)
-        page.x=(ssize_t) page.width-(ssize_t) rotate_image->columns-page.x;
+      page=RotatePage90(rotate_image,page);
       break;
     }
     default:
