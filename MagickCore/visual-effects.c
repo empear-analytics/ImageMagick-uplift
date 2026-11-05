@@ -1415,6 +1415,16 @@ static void SetImplodeCanvasAlpha(Image *canvas_image,
     (void) SetImageAlphaChannel(canvas_image,OpaqueAlphaChannel,exception);
 }
 
+static MagickBooleanType CloneImplodeCanvas(const Image *image,
+  Image **canvas_image,ExceptionInfo *exception)
+{
+  *canvas_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (*canvas_image == (Image *) NULL)
+    return(MagickFalse);
+  SetImplodeCanvasAlpha(*canvas_image,exception);
+  return(MagickTrue);
+}
+
 static void GetImplodeGeometry(const Image *canvas_image,PointInfo *scale,
   PointInfo *center,double *radius)
 {
@@ -1474,10 +1484,8 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  canvas_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (canvas_image == (Image *) NULL)
+  if (CloneImplodeCanvas(image,&canvas_image,exception) == MagickFalse)
     return((Image *) NULL);
-  SetImplodeCanvasAlpha(canvas_image,exception);
   if (CloneWarpImage(canvas_image,&implode_image,exception) == MagickFalse)
     return((Image *) NULL);
   /*
