@@ -844,6 +844,13 @@ static IlluminantType GetImageThresholdIlluminant(const Image *image,
   return(illuminant);
 }
 
+static void ScaleColorThresholdLimit(PixelInfo *limit)
+{
+  (*limit).red*=(double) QuantumRange;
+  (*limit).green*=(double) QuantumRange;
+  (*limit).blue*=(double) QuantumRange;
+}
+
 MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   const PixelInfo *start_color,const PixelInfo *stop_color,
   ExceptionInfo *exception)
@@ -890,12 +897,8 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   range.stop_color=stop_color;
   range.illuminant=illuminant;
   ConvertColorThresholdRange(&range,&start,&stop);
-  start.red*=(double) QuantumRange;
-  start.green*=(double) QuantumRange;
-  start.blue*=(double) QuantumRange;
-  stop.red*=(double) QuantumRange;
-  stop.green*=(double) QuantumRange;
-  stop.blue*=(double) QuantumRange;
+  ScaleColorThresholdLimit(&start);
+  ScaleColorThresholdLimit(&stop);
   progress=0;
   image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
