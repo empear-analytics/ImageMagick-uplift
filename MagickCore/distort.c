@@ -1011,6 +1011,54 @@ static double *ScaleRotateTranslateCoefficients(double *coeff,
   return(coeff);
 }
 
+static void AddPerspectiveTerms(double **matrix,double *vectors[1],
+  const CoefficientContext *context)
+{
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    number_arguments = context->number_arguments,
+    cp_x = context->cp_x,
+    cp_y = context->cp_y,
+    cp_values = context->cp_values;
+
+  double
+    terms[8];
+
+  size_t
+    cp_u = cp_values,
+    cp_v = cp_values+1;
+
+  size_t
+    i;
+
+  /* Add control points for least squares solving */
+  for (i=0; i < number_arguments; i+=4) {
+    terms[0]=arguments[i+cp_x];            /*   c0*x   */
+    terms[1]=arguments[i+cp_y];            /*   c1*y   */
+    terms[2]=1.0;                          /*   c2*1   */
+    terms[3]=0.0;
+    terms[4]=0.0;
+    terms[5]=0.0;
+    terms[6]=-terms[0]*arguments[i+cp_u];  /* 1/(c6*x) */
+    terms[7]=-terms[1]*arguments[i+cp_u];  /* 1/(c7*y) */
+    LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+cp_u]),
+        8UL,1UL);
+
+    terms[0]=0.0;
+    terms[1]=0.0;
+    terms[2]=0.0;
+    terms[3]=arguments[i+cp_x];           /*   c3*x   */
+    terms[4]=arguments[i+cp_y];           /*   c4*y   */
+    terms[5]=1.0;                         /*   c5*1   */
+    terms[6]=-terms[3]*arguments[i+cp_v]; /* 1/(c6*x) */
+    terms[7]=-terms[4]*arguments[i+cp_v]; /* 1/(c7*y) */
+    LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+cp_v]),
+        8UL,1UL);
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1209,12 +1257,7 @@ static double *GenerateCoefficients(const Image *image,
       */
       double
         **matrix,
-        *vectors[1],
-        terms[8];
-
-      size_t
-        cp_u = cp_values,
-        cp_v = cp_values+1;
+        *vectors[1];
 
       MagickBooleanType
         status;
@@ -1238,30 +1281,7 @@ static double *GenerateCoefficients(const Image *image,
                   "%s", "DistortCoefficients");
         return((double *) NULL);
       }
-      /* Add control points for least squares solving */
-      for (i=0; i < number_arguments; i+=4) {
-        terms[0]=arguments[i+cp_x];            /*   c0*x   */
-        terms[1]=arguments[i+cp_y];            /*   c1*y   */
-        terms[2]=1.0;                          /*   c2*1   */
-        terms[3]=0.0;
-        terms[4]=0.0;
-        terms[5]=0.0;
-        terms[6]=-terms[0]*arguments[i+cp_u];  /* 1/(c6*x) */
-        terms[7]=-terms[1]*arguments[i+cp_u];  /* 1/(c7*y) */
-        LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+cp_u]),
-            8UL,1UL);
-
-        terms[0]=0.0;
-        terms[1]=0.0;
-        terms[2]=0.0;
-        terms[3]=arguments[i+cp_x];           /*   c3*x   */
-        terms[4]=arguments[i+cp_y];           /*   c4*y   */
-        terms[5]=1.0;                         /*   c5*1   */
-        terms[6]=-terms[3]*arguments[i+cp_v]; /* 1/(c6*x) */
-        terms[7]=-terms[4]*arguments[i+cp_v]; /* 1/(c7*y) */
-        LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+cp_v]),
-            8UL,1UL);
-      }
+      AddPerspectiveTerms(matrix,vectors,&context);
       /* Solve for LeastSquares Coefficients */
       status=GaussJordanElimination(matrix,vectors,8UL,1UL);
       matrix = RelinquishMagickMatrix(matrix, 8UL);
