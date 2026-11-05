@@ -310,6 +310,20 @@ static void SetEffectProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
+static MagickBooleanType CloneEffectImage(const Image *image,
+  Image **effect_image,ExceptionInfo *exception)
+{
+  *effect_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (*effect_image == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass(*effect_image,DirectClass,exception) == MagickFalse)
+    {
+      *effect_image=DestroyImage(*effect_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
   const double attenuate,ExceptionInfo *exception)
 {
@@ -348,14 +362,8 @@ MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  noise_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (noise_image == (Image *) NULL)
+  if (CloneEffectImage(image,&noise_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(noise_image,DirectClass,exception) == MagickFalse)
-    {
-      noise_image=DestroyImage(noise_image);
-      return((Image *) NULL);
-    }
   /*
     Add noise in each row.
   */
