@@ -3581,6 +3581,22 @@ static MagickBooleanType PrintDistortVerbose(
   return(MagickTrue);
 }
 
+/* defines to figure out the bounds of the distorted image */
+#define InitalBounds(p) \
+{ \
+  /* printf("%lg,%lg -> %lg,%lg\n", s.x,s.y, d.x,d.y); */ \
+  min.x = max.x = p.x; \
+  min.y = max.y = p.y; \
+}
+#define ExpandBounds(p) \
+{ \
+  /* printf("%lg,%lg -> %lg,%lg\n", s.x,s.y, d.x,d.y); */ \
+  min.x = MagickMin(min.x,p.x); \
+  max.x = MagickMax(max.x,p.x); \
+  min.y = MagickMin(min.y,p.y); \
+  max.y = MagickMax(max.y,p.y); \
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3666,22 +3682,6 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       fix_bounds = MagickTrue;   /* enlarge bounds for VP handling */
 
     s.x=s.y=min.x=max.x=min.y=max.y=0.0;   /* keep compiler happy */
-
-/* defines to figure out the bounds of the distorted image */
-#define InitalBounds(p) \
-{ \
-  /* printf("%lg,%lg -> %lg,%lg\n", s.x,s.y, d.x,d.y); */ \
-  min.x = max.x = p.x; \
-  min.y = max.y = p.y; \
-}
-#define ExpandBounds(p) \
-{ \
-  /* printf("%lg,%lg -> %lg,%lg\n", s.x,s.y, d.x,d.y); */ \
-  min.x = MagickMin(min.x,p.x); \
-  max.x = MagickMax(max.x,p.x); \
-  min.y = MagickMin(min.y,p.y); \
-  max.y = MagickMax(max.y,p.y); \
-}
 
     switch (method)
     {
