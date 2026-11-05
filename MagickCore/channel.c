@@ -193,13 +193,42 @@ static MagickBooleanType ChannelImage(Image *destination_image,
   return(status);
 }
 
-static MagickBooleanType AddDestinationMaskChannel(
+static MagickBooleanType AddDestinationMetaChannel(
   Image *destination_image,const PixelChannel destination_channel,
   const char *token,ExceptionInfo *exception)
 {
   PixelTrait
     traits;
 
+  switch (destination_channel)
+  {
+    case MetaPixelChannels:
+    default:
+    {
+      traits=GetPixelChannelTraits(destination_image,
+        destination_channel);
+      if (traits != UndefinedPixelTrait)
+        break;
+      (void) SetPixelMetaChannels(destination_image,
+        GetPixelMetaChannels(destination_image)+1,exception);
+      traits=GetPixelChannelTraits(destination_image,
+       destination_channel);
+      if (traits == UndefinedPixelTrait)
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            CorruptImageError,"MissingImageChannel","`%s'",token);
+          return(MagickFalse);
+        }
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AddDestinationMaskChannel(
+  Image *destination_image,const PixelChannel destination_channel,
+  const char *token,ExceptionInfo *exception)
+{
   switch (destination_channel)
   {
     case CompositeMaskPixelChannel:
@@ -220,25 +249,9 @@ static MagickBooleanType AddDestinationMaskChannel(
         (destination_image->channels | WriteMaskChannel);
       break;
     }
-    case MetaPixelChannels:
     default:
-    {
-      traits=GetPixelChannelTraits(destination_image,
-        destination_channel);
-      if (traits != UndefinedPixelTrait)
-        break;
-      (void) SetPixelMetaChannels(destination_image,
-        GetPixelMetaChannels(destination_image)+1,exception);
-      traits=GetPixelChannelTraits(destination_image,
-       destination_channel);
-      if (traits == UndefinedPixelTrait)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            CorruptImageError,"MissingImageChannel","`%s'",token);
-          return(MagickFalse);
-        }
-      break;
-    }
+      return(AddDestinationMetaChannel(destination_image,destination_channel,
+        token,exception));
   }
   return(MagickTrue);
 }
