@@ -364,50 +364,6 @@ static void
   PruneToCubeDepth(QCubeInfo *,const QNodeInfo *),
   ReduceImageColors(const Image *,QCubeInfo *);
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   A c q u i r e Q u a n t i z e I n f o                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  AcquireQuantizeInfo() allocates the QuantizeInfo structure.
-%
-%  The format of the AcquireQuantizeInfo method is:
-%
-%      QuantizeInfo *AcquireQuantizeInfo(const ImageInfo *image_info)
-%
-%  A description of each parameter follows:
-%
-%    o image_info: the image info.
-%
-*/
-MagickExport QuantizeInfo *AcquireQuantizeInfo(const ImageInfo *image_info)
-{
-  QuantizeInfo
-    *quantize_info;
-
-  quantize_info=(QuantizeInfo *) AcquireCriticalMemory(sizeof(*quantize_info));
-  GetQuantizeInfo(quantize_info);
-  if (image_info != (ImageInfo *) NULL)
-    {
-      const char
-        *option;
-
-      quantize_info->dither_method=image_info->dither == MagickFalse ?
-        NoDitherMethod : RiemersmaDitherMethod;
-      option=GetImageOption(image_info,"dither");
-      if (option != (const char *) NULL)
-        quantize_info->dither_method=(DitherMethod) ParseCommandOption(
-          MagickDitherOptions,MagickFalse,option);
-      quantize_info->measure_error=image_info->verbose;
-    }
-  return(quantize_info);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1372,48 +1328,6 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   return(y < (ssize_t) image->rows ? MagickFalse : MagickTrue);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   C l o n e Q u a n t i z e I n f o                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  CloneQuantizeInfo() makes a duplicate of the given quantize info structure,
-%  or if quantize info is NULL, a new one.
-%
-%  The format of the CloneQuantizeInfo method is:
-%
-%      QuantizeInfo *CloneQuantizeInfo(const QuantizeInfo *quantize_info)
-%
-%  A description of each parameter follows:
-%
-%    o clone_info: Method CloneQuantizeInfo returns a duplicate of the given
-%      quantize info, or if image info is NULL a new one.
-%
-%    o quantize_info: a structure of type info.
-%
-*/
-MagickExport QuantizeInfo *CloneQuantizeInfo(const QuantizeInfo *quantize_info)
-{
-  QuantizeInfo
-    *clone_info;
-
-  clone_info=(QuantizeInfo *) AcquireCriticalMemory(sizeof(*clone_info));
-  GetQuantizeInfo(clone_info);
-  if (quantize_info == (QuantizeInfo *) NULL)
-    return(clone_info);
-  clone_info->number_colors=quantize_info->number_colors;
-  clone_info->tree_depth=quantize_info->tree_depth;
-  clone_info->dither_method=quantize_info->dither_method;
-  clone_info->colorspace=quantize_info->colorspace;
-  clone_info->measure_error=quantize_info->measure_error;
-  return(clone_info);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1764,39 +1678,6 @@ static void DestroyQCubeInfo(QCubeInfo *cube_info)
   cube_info=(QCubeInfo *) RelinquishMagickMemory(cube_info);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   D e s t r o y Q u a n t i z e I n f o                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  DestroyQuantizeInfo() deallocates memory associated with an QuantizeInfo
-%  structure.
-%
-%  The format of the DestroyQuantizeInfo method is:
-%
-%      QuantizeInfo *DestroyQuantizeInfo(QuantizeInfo *quantize_info)
-%
-%  A description of each parameter follows:
-%
-%    o quantize_info: Specifies a pointer to an QuantizeInfo structure.
-%
-*/
-MagickExport QuantizeInfo *DestroyQuantizeInfo(QuantizeInfo *quantize_info)
-{
-  assert(quantize_info != (QuantizeInfo *) NULL);
-  assert(quantize_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  quantize_info->signature=(~MagickCoreSignature);
-  quantize_info=(QuantizeInfo *) RelinquishMagickMemory(quantize_info);
-  return(quantize_info);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2927,40 +2808,6 @@ MagickExport MagickBooleanType GetImageQuantizeError(Image *image,
   return(MagickTrue);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t Q u a n t i z e I n f o                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetQuantizeInfo() initializes the QuantizeInfo structure.
-%
-%  The format of the GetQuantizeInfo method is:
-%
-%      void GetQuantizeInfo(QuantizeInfo *quantize_info)
-%
-%  A description of each parameter follows:
-%
-%    o quantize_info: Specifies a pointer to a QuantizeInfo structure.
-%
-*/
-MagickExport void GetQuantizeInfo(QuantizeInfo *quantize_info)
-{
-  assert(quantize_info != (QuantizeInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  (void) memset(quantize_info,0,sizeof(*quantize_info));
-  quantize_info->number_colors=256;
-  quantize_info->dither_method=RiemersmaDitherMethod;
-  quantize_info->colorspace=UndefinedColorspace;
-  quantize_info->measure_error=MagickFalse;
-  quantize_info->signature=MagickCoreSignature;
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
