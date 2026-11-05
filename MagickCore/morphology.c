@@ -4679,6 +4679,15 @@ static MagickBooleanType ApplyMorphologyStages(
   return(MagickTrue);
 }
 
+static void ReportCompoundDifference(const MagickBooleanType verbose,
+  const MorphologyMethod method,const char *const format)
+{
+  if (verbose != MagickFalse)
+    (void) FormatLocaleFile(stderr,
+      format,CommandOptionToMnemonic(
+      MagickMorphologyOptions, method) );
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4884,18 +4893,14 @@ MagickPrivate Image *MorphologyApply(const Image *image,
         case EdgeInMorphology:
         case TopHatMorphology:
         case BottomHatMorphology:
-          if (verbose != MagickFalse)
-            (void) FormatLocaleFile(stderr,
-              "\n%s: Difference with original image",CommandOptionToMnemonic(
-              MagickMorphologyOptions, method) );
+          ReportCompoundDifference(verbose,method,
+            "\n%s: Difference with original image");
           (void) CompositeImage(curr_image,image,DifferenceCompositeOp,
             MagickTrue,0,0,exception);
           break;
         case EdgeMorphology:
-          if (verbose != MagickFalse)
-            (void) FormatLocaleFile(stderr,
-              "\n%s: Difference of Dilate and Erode",CommandOptionToMnemonic(
-              MagickMorphologyOptions, method) );
+          ReportCompoundDifference(verbose,method,
+            "\n%s: Difference of Dilate and Erode");
           (void) CompositeImage(curr_image,save_image,DifferenceCompositeOp,
             MagickTrue,0,0,exception);
           save_image = DestroyImage(save_image); /* finished with save image */
