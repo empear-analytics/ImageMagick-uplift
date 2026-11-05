@@ -281,6 +281,61 @@ static void ConvertRGBToYDbDrThroughYUV(const RGBToGenericInput *input)
   }
 }
 
+static void ConvertRGBToOklabThroughYCbCr(const RGBToGenericInput *input)
+{
+  const ColorspaceType
+    colorspace = input->colorspace;
+
+  const double
+    R = input->R,
+    G = input->G,
+    B = input->B;
+
+  double
+    *const X = input->X,
+    *const Y = input->Y,
+    *const Z = input->Z;
+
+  switch (colorspace)
+  {
+    case OklabColorspace:
+    {
+      ConvertRGBToOklab(R,G,B,X,Y,Z);
+      break;
+    }
+    case OklchColorspace:
+    {
+      ConvertRGBToOklch(R,G,B,X,Y,Z);
+      break;
+    }
+    case ProPhotoColorspace:
+    {
+      ConvertRGBToProPhoto(R,G,B,X,Y,Z);
+      break;
+    }
+    case xyYColorspace:
+    {
+      ConvertRGBToxyY(R,G,B,X,Y,Z);
+      break;
+    }
+    case XYZColorspace:
+    {
+      ConvertRGBToXYZ(R,G,B,X,Y,Z);
+      break;
+    }
+    case YCbCrColorspace:
+    {
+      ConvertRGBToYCbCr(R,G,B,X,Y,Z);
+      break;
+    }
+    default:
+    {
+      ConvertRGBToYDbDrThroughYUV(input);
+      break;
+    }
+  }
+}
+
 MagickPrivate void ConvertRGBToGeneric(const ColorspaceType colorspace,
   const double R,const double G,const double B,const double white_luminance,
   const IlluminantType illuminant,double *X,double *Y,double *Z)
@@ -389,39 +444,9 @@ MagickPrivate void ConvertRGBToGeneric(const ColorspaceType colorspace,
       ConvertRGBToLuv(R,G,B,illuminant,X,Y,Z);
       break;
     }
-    case OklabColorspace:
-    {
-      ConvertRGBToOklab(R,G,B,X,Y,Z);
-      break;
-    }
-    case OklchColorspace:
-    {
-      ConvertRGBToOklch(R,G,B,X,Y,Z);
-      break;
-    }
-    case ProPhotoColorspace:
-    {
-      ConvertRGBToProPhoto(R,G,B,X,Y,Z);
-      break;
-    }
-    case xyYColorspace:
-    {
-      ConvertRGBToxyY(R,G,B,X,Y,Z);
-      break;
-    }
-    case XYZColorspace:
-    {
-      ConvertRGBToXYZ(R,G,B,X,Y,Z);
-      break;
-    }
-    case YCbCrColorspace:
-    {
-      ConvertRGBToYCbCr(R,G,B,X,Y,Z);
-      break;
-    }
     default:
     {
-      ConvertRGBToYDbDrThroughYUV(&input);
+      ConvertRGBToOklabThroughYCbCr(&input);
       break;
     }
   }
