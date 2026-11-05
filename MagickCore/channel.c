@@ -364,6 +364,16 @@ static MagickBooleanType SetChannelFxProgress(const Image *source_image,
   return(MagickTrue);
 }
 
+static void SetGrayChannelImage(Image *destination_image,
+  const ChannelFx channel_op,const ssize_t channels,ExceptionInfo *exception)
+{
+  if ((channel_op == ExtractChannelOp) && (channels == 1))
+    {
+      (void) SetPixelMetaChannels(destination_image,0,exception);
+      (void) SetImageColorspace(destination_image,GRAYColorspace,exception);
+    }
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -542,11 +552,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   if (destination_image == (Image *) NULL)
     return(destination_image);
   (void) SetPixelChannelMask(destination_image,channel_mask);
-  if ((channel_op == ExtractChannelOp) && (channels == 1))
-    {
-      (void) SetPixelMetaChannels(destination_image,0,exception);
-      (void) SetImageColorspace(destination_image,GRAYColorspace,exception);
-    }
+  SetGrayChannelImage(destination_image,channel_op,channels,exception);
   return(GetFirstImageInList(destination_image));
 }
 
