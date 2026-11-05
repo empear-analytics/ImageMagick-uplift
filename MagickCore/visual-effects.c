@@ -1752,6 +1752,59 @@ static Image *MorphSingleImage(const MorphSingleInfo *single,
   return(GetFirstImageInList(morph_images));
 }
 
+typedef struct _MorphFrameInfo
+{
+  Image
+    *morph_images;
+
+  double
+    alpha,
+    beta;
+
+  ExceptionInfo
+    *exception;
+} MorphFrameInfo;
+
+static MagickBooleanType MorphFrame(const MorphFrameInfo *frame,
+  Image *morph_image,MagickBooleanType status)
+{
+  Image
+    *const morph_images = frame->morph_images;
+
+  const double
+    alpha = frame->alpha,
+    beta = frame->beta;
+
+  ExceptionInfo
+    *const exception = frame->exception;
+
+  CacheView
+    *image_view,
+    *morph_view;
+
+  ssize_t
+    y;
+
+  image_view=AcquireVirtualCacheView(morph_image,exception);
+  morph_view=AcquireAuthenticCacheView(morph_images,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(morph_image,morph_image,morph_image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) morph_images->rows; y++)
+  {
+    const MorphFrameRowInfo
+      info = { image_view, morph_image, exception, morph_view,
+        morph_images, alpha, beta };
+
+    MorphFrameRow(&status,&info,y);
+  }
+  morph_view=DestroyCacheView(morph_view);
+  image_view=DestroyCacheView(image_view);
+  morph_image=DestroyImage(morph_image);
+  return(status);
+}
+
 MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
   ExceptionInfo *exception)
 {
@@ -1774,9 +1827,6 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
 
   ssize_t
     n;
-
-  ssize_t
-    y;
 
   /*
     Clone first frame in sequence.
@@ -1807,9 +1857,8 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
   {
     for (n=0; n < (ssize_t) number_frames; n++)
     {
-      CacheView
-        *image_view,
-        *morph_view;
+      MorphFrameInfo
+        frame;
 
       beta=(double) (n+1.0)/(double) (number_frames+1.0);
       alpha=1.0-beta;
@@ -1836,23 +1885,11 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
           morph_images=DestroyImageList(morph_images);
           return((Image *) NULL);
         }
-      image_view=AcquireVirtualCacheView(morph_image,exception);
-      morph_view=AcquireAuthenticCacheView(morph_images,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(morph_image,morph_image,morph_image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) morph_images->rows; y++)
-      {
-        const MorphFrameRowInfo
-          info = { image_view, morph_image, exception, morph_view,
-            morph_images, alpha, beta };
-
-        MorphFrameRow(&status,&info,y);
-      }
-      morph_view=DestroyCacheView(morph_view);
-      image_view=DestroyCacheView(image_view);
-      morph_image=DestroyImage(morph_image);
+      frame.morph_images=morph_images;
+      frame.alpha=alpha;
+      frame.beta=beta;
+      frame.exception=exception;
+      status=MorphFrame(&frame,morph_image,status);
     }
     if (n < (ssize_t) number_frames)
       break;
