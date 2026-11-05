@@ -2482,6 +2482,26 @@ static double GetHardMixVivid(const MagickRealType S,
   return(vivid);
 }
 
+static void CopyCompositeRow(const Image *source_image,const Image *image,
+  const Quantum *p,Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) source_image->columns; x++)
+  {
+    if (GetPixelReadMask(source_image,p) <= (QuantumRange/2))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(source_image);
+        q+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    CopySourceChannels(source_image,image,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(source_image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -2610,9 +2630,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         Quantum
           *q;
 
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
         p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
@@ -2624,18 +2641,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
             status=MagickFalse;
             continue;
           }
-        for (x=0; x < (ssize_t) source_image->columns; x++)
-        {
-          if (GetPixelReadMask(source_image,p) <= (QuantumRange/2))
-            {
-              p+=(ptrdiff_t) GetPixelChannels(source_image);
-              q+=(ptrdiff_t) GetPixelChannels(image);
-              continue;
-            }
-          CopySourceChannels(source_image,image,p,q);
-          p+=(ptrdiff_t) GetPixelChannels(source_image);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        CopyCompositeRow(source_image,image,p,q);
         SyncCompositeRow(image_view,exception,&status);
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
