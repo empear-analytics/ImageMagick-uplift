@@ -371,12 +371,64 @@ static Image *FinishChopImage(const Image *image,Image *chop_image,
 
 #define ChopImageTag  "Chop/Image"
 
+static Image *ExtractChopImageBelow(const ChopRowImages *chop,
+  MagickOffsetType progress,MagickBooleanType status)
+{
+  const Image
+    *const image = chop->image;
+
+  Image
+    *const chop_image = chop->chop_image;
+
+  CacheView
+    *const image_view = chop->image_view,
+    *chop_view = chop->chop_view;
+
+  const RectangleInfo
+    extent = chop->extent;
+
+  ExceptionInfo
+    *const exception = chop->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,chop_image,image->rows-((size_t) extent.y+extent.height),2)
+#endif
+  for (y=0; y < (ssize_t) (image->rows-((size_t) extent.y+extent.height)); y++)
+  {
+    const ChopRowImages
+      images = { image,chop_image,image_view,chop_view,extent,exception };
+
+    if (status == MagickFalse)
+      continue;
+    if (ChopImageRow(&images,extent.y+(ssize_t) extent.height+y,extent.y+y,
+          &status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetTransformProgress(image,ChopImageTag,progress,&status);
+      }
+  }
+  chop_view=DestroyCacheView(chop_view);
+  return(FinishChopImage(image,chop_image,image_view,status));
+}
+
 MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ExceptionInfo *exception)
 {
   CacheView
     *chop_view,
     *image_view;
+
+  ChopRowImages
+    chop;
 
   Image
     *chop_image;
@@ -445,31 +497,13 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   /*
     Extract chop image.
   */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,chop_image,image->rows-((size_t) extent.y+extent.height),2)
-#endif
-  for (y=0; y < (ssize_t) (image->rows-((size_t) extent.y+extent.height)); y++)
-  {
-    const ChopRowImages
-      images = { image,chop_image,image_view,chop_view,extent,exception };
-
-    if (status == MagickFalse)
-      continue;
-    if (ChopImageRow(&images,extent.y+(ssize_t) extent.height+y,extent.y+y,
-          &status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetTransformProgress(image,ChopImageTag,progress,&status);
-      }
-  }
-  chop_view=DestroyCacheView(chop_view);
-  return(FinishChopImage(image,chop_image,image_view,status));
+  chop.image=image;
+  chop.chop_image=chop_image;
+  chop.image_view=image_view;
+  chop.chop_view=chop_view;
+  chop.extent=extent;
+  chop.exception=exception;
+  return(ExtractChopImageBelow(&chop,progress,status));
 }
 
 /*
