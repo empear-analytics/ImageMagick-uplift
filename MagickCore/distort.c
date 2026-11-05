@@ -3497,6 +3497,90 @@ static void SetVerboseDestination(const VerboseDestination *destination,
   }
 }
 
+typedef struct _DistortVerboseInput
+{
+  const Image
+    *image;
+
+  DistortMethod
+    method;
+
+  double
+    *coeff;
+
+  MagickBooleanType
+    bestfit,
+    viewport_given;
+
+  RectangleInfo
+    geometry;
+} DistortVerboseInput;
+
+static MagickBooleanType PrintDistortVerbose(
+  const DistortVerboseInput *verbose_input,ExceptionInfo *exception)
+{
+  const Image
+    *const image = verbose_input->image;
+
+  const DistortMethod
+    method = verbose_input->method;
+
+  double
+    *const coeff = verbose_input->coeff;
+
+  const MagickBooleanType
+    bestfit = verbose_input->bestfit,
+    viewport_given = verbose_input->viewport_given;
+
+  const RectangleInfo
+    geometry = verbose_input->geometry;
+
+  if (IsStringTrue(GetImageArtifact(image,"verbose")) != MagickFalse) {
+    char image_gen[MagickPathExtent];
+    const char *lookup;
+    DistortVerboseFX
+      fx;
+
+    VerboseDestination
+      destination;
+
+    /* Set destination image size and virtual offset */
+    destination.bestfit=bestfit;
+    destination.viewport_given=viewport_given;
+    destination.geometry=geometry;
+    SetVerboseDestination(&destination,&image_gen,&lookup);
+
+    fx.method=method;
+    fx.image=image;
+    fx.coeff=coeff;
+    fx.image_gen=image_gen;
+    fx.lookup=lookup;
+    switch (method)
+    {
+      case AffineDistortion:
+      case RigidAffineDistortion:
+      {
+        if (PrintAffineFX(coeff,image_gen,lookup,exception) == MagickFalse)
+          return(MagickFalse);
+        break;
+      }
+      case PerspectiveDistortion:
+      {
+        if (PrintPerspectiveFX(coeff,image_gen,lookup,exception) ==
+            MagickFalse)
+          return(MagickFalse);
+        break;
+      }
+      default:
+      {
+        PrintDistortFX(&fx);
+        break;
+      }
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3518,6 +3602,9 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
 
   PixelInfo
     invalid;  /* the color to assign when distort result is invalid */
+
+  DistortVerboseInput
+    verbose_input;
 
   const CoefficientInput input = { number_arguments, arguments, 0 };
 
@@ -3782,49 +3869,14 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   GetDistortViewport(image,&geometry,&viewport_given,exception);
 
   /* Verbose output */
-  if (IsStringTrue(GetImageArtifact(image,"verbose")) != MagickFalse) {
-    char image_gen[MagickPathExtent];
-    const char *lookup;
-    DistortVerboseFX
-      fx;
-
-    VerboseDestination
-      destination;
-
-    /* Set destination image size and virtual offset */
-    destination.bestfit=bestfit;
-    destination.viewport_given=viewport_given;
-    destination.geometry=geometry;
-    SetVerboseDestination(&destination,&image_gen,&lookup);
-
-    fx.method=method;
-    fx.image=image;
-    fx.coeff=coeff;
-    fx.image_gen=image_gen;
-    fx.lookup=lookup;
-    switch (method)
-    {
-      case AffineDistortion:
-      case RigidAffineDistortion:
-      {
-        if (PrintAffineFX(coeff,image_gen,lookup,exception) == MagickFalse)
-          return((Image *) NULL);
-        break;
-      }
-      case PerspectiveDistortion:
-      {
-        if (PrintPerspectiveFX(coeff,image_gen,lookup,exception) ==
-            MagickFalse)
-          return((Image *) NULL);
-        break;
-      }
-      default:
-      {
-        PrintDistortFX(&fx);
-        break;
-      }
-    }
-  }
+  verbose_input.image=image;
+  verbose_input.method=method;
+  verbose_input.coeff=coeff;
+  verbose_input.bestfit=bestfit;
+  verbose_input.viewport_given=viewport_given;
+  verbose_input.geometry=geometry;
+  if (PrintDistortVerbose(&verbose_input,exception) == MagickFalse)
+    return((Image *) NULL);
   /*
     The user provided a 'scale' expert option will scale the output image size,
     by the factor given allowing for super-sampling of the distorted image
