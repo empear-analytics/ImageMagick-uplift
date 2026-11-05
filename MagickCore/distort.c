@@ -3634,6 +3634,52 @@ static void AffineBestFitBounds(const double *coeff,const Image *image,
   (*caller_max)=max;
 }
 
+static void PerspectiveBestFitBounds(const double *coeff,const Image *image,
+  PointInfo *caller_min,PointInfo *caller_max)
+{
+  double
+    inverse[8],
+    scale;
+
+  PointInfo
+    d,
+    max = (*caller_max),
+    min = (*caller_min),
+    s;
+
+  InvertPerspectiveCoefficients(coeff, inverse);
+  s.x = (double) image->page.x;
+  s.y = (double) image->page.y;
+  scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
+  scale=MagickSafeReciprocal(scale);
+  d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
+  d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
+  InitalBounds(d);
+  s.x = (double) image->page.x+image->columns;
+  s.y = (double) image->page.y;
+  scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
+  scale=MagickSafeReciprocal(scale);
+  d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
+  d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
+  ExpandBounds(d);
+  s.x = (double) image->page.x;
+  s.y = (double) image->page.y+image->rows;
+  scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
+  scale=MagickSafeReciprocal(scale);
+  d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
+  d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
+  ExpandBounds(d);
+  s.x = (double) image->page.x+image->columns;
+  s.y = (double) image->page.y+image->rows;
+  scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
+  scale=MagickSafeReciprocal(scale);
+  d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
+  d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
+  ExpandBounds(d);
+  (*caller_min)=min;
+  (*caller_max)=max;
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3729,36 +3775,8 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         break;
       }
       case PerspectiveDistortion:
-      { double inverse[8], scale;
-        InvertPerspectiveCoefficients(coeff, inverse);
-        s.x = (double) image->page.x;
-        s.y = (double) image->page.y;
-        scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
-        scale=MagickSafeReciprocal(scale);
-        d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
-        d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
-        InitalBounds(d);
-        s.x = (double) image->page.x+image->columns;
-        s.y = (double) image->page.y;
-        scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
-        scale=MagickSafeReciprocal(scale);
-        d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
-        d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
-        ExpandBounds(d);
-        s.x = (double) image->page.x;
-        s.y = (double) image->page.y+image->rows;
-        scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
-        scale=MagickSafeReciprocal(scale);
-        d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
-        d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
-        ExpandBounds(d);
-        s.x = (double) image->page.x+image->columns;
-        s.y = (double) image->page.y+image->rows;
-        scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
-        scale=MagickSafeReciprocal(scale);
-        d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
-        d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
-        ExpandBounds(d);
+      {
+        PerspectiveBestFitBounds(coeff,image,&min,&max);
         break;
       }
       case ArcDistortion:
