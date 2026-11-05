@@ -3860,11 +3860,11 @@ static MagickBooleanType TranslateExpression (
     if (op == oAssign) {
       if (!AddAssignmentCopyTo (pfx, UserSymNdx0)) return MagickFalse;
       break;
-    } else {
-      if (SetInPlaceOperatorTarget (pfx, op, UserSymNdx0, &broke) ==
-          MagickFalse)
-        return MagickFalse;
-      if (broke != MagickFalse) break;
+    } else if (SetInPlaceOperatorTarget (pfx, op, UserSymNdx0, &broke) ==
+        MagickFalse) {
+      return MagickFalse;
+    } else if (broke != MagickFalse) {
+      break;
     }
   }
 
