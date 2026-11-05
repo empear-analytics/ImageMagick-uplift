@@ -2171,14 +2171,8 @@ MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  sepia_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (sepia_image == (Image *) NULL)
+  if (CloneEffectImage(image,&sepia_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(sepia_image,DirectClass,exception) == MagickFalse)
-    {
-      sepia_image=DestroyImage(sepia_image);
-      return((Image *) NULL);
-    }
   /*
     Tone each row of the image.
   */
