@@ -4756,6 +4756,22 @@ static void SparseColorRow(const SparseColorRowInput *row,const ssize_t j,
   }
 }
 
+static MagickBooleanType CloneSparseColorImage(const Image *image,
+  Image **sparse_image,ExceptionInfo *exception)
+{
+  (*sparse_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*sparse_image) == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass((*sparse_image),DirectClass,exception) == MagickFalse)
+    { /* if image is ColorMapped - change it to DirectClass */
+      (*sparse_image)=DestroyImage((*sparse_image));
+      return(MagickFalse);
+    }
+  if (IsGrayColorspace((*sparse_image)->colorspace) != MagickFalse)
+    (void) SetImageColorspace((*sparse_image),sRGBColorspace,exception);
+  return(MagickTrue);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -4820,16 +4836,8 @@ MagickExport Image *SparseColorImage(const Image *image,
    * the image.
    */
 
-  sparse_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (sparse_image == (Image *) NULL)
+  if (CloneSparseColorImage(image,&sparse_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(sparse_image,DirectClass,exception) == MagickFalse)
-    { /* if image is ColorMapped - change it to DirectClass */
-      sparse_image=DestroyImage(sparse_image);
-      return((Image *) NULL);
-    }
-  if (IsGrayColorspace(sparse_image->colorspace) != MagickFalse)
-    (void) SetImageColorspace(sparse_image,sRGBColorspace,exception);
   { /* ----- MAIN CODE ----- */
     CacheView
       *sparse_view;
