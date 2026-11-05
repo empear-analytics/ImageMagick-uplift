@@ -2842,6 +2842,18 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    `v`. Writes through pointers the block already uses stay as they are; variables
    the block declares move with it; a temporary it writes before reading, and the caller
    does not read after it, is declared in the new function (Recipe Y step 2).
+   Such a temporary is a written variable of this step instead (a member, `*v` in the
+   block) when declaring it in the new function would leave a variable written but never
+   read, in the new function or in the caller: clang's `-Wunused-but-set-variable`,
+   part of `-Wall` in the CI jobs (`tools/ci_warnings.sh`), which turn it into an
+   error. That is the case when the block's own read of it is the caller's only read
+   (a later store of the caller is then never read), or when the block never reads it
+   and the caller only passes its address afterwards to a callee that writes it
+   (`MontageImageList`'s thumbnail loop: `progress_monitor`, saved and restored in the
+   loop and stored again, unread, in the tile loop; `flags`, set by
+   `ParseRegionGeometry` and read nowhere, whose address goes to
+   `GetMontageTileGeometry`). It still meets the rest of this step and counts towards
+   the written variables.
 3. Directly above the new function declare a `typedef struct` with one member per
    written variable: a pointer to the variable's exact type, with the variable's name
    (`const char *funStr` gives `const char **funStr`). It holds addresses only: no value,
@@ -3056,6 +3068,15 @@ static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
   copy the file then does not carry; the second caller fills its own targets struct
   with the addresses of its own locals, which step 2 checks for that caller.
 - Under step 2's `const` form the argument is Recipe LB step 8's: the caller's variables stay its own locals; each struct holds their addresses only, fixed at its declaration and read by nothing but the calls that take it, and a helper binds each member once to a `*const` local, so each `*v` is the object `v` named. A variable whose address fills members of two such structs (`expChLimit` in `fx.c`'s opening and qualifier structs) has two pointers to it, of which only the called helper's is in use while it runs, and no helper holds two members naming one object.
+- A temporary taken as a written variable (step 2's last paragraph): the block writes it
+  before it reads it on every path, so the value it carries in is never read, in either
+  version; inside the helper each read sees what the block last wrote through the same
+  pointer, as a local would. The caller reads nothing the block leaves in it (that is
+  what made it a temporary), so the writes that now land in the caller's variable are
+  dead there, and a callee that later writes it through its address writes the same
+  object as before. Nothing but where the dead value is stored changes; the form exists
+  because a local copy would be a variable written and never read, which the CI jobs
+  reject.
 - More than four written variables (six under the `const` form), two labels, two different
   constants, or a written variable whose address the caller takes elsewhere: skip the block.
 
@@ -7615,3 +7636,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | B | Step 5: calls in a loop of a function with no OpenMP region of its own may take a struct filled once directly before the loop, when nothing from the fill to the loop's end writes what an initialiser reads (the form Recipe OC step 6 and Recipe LB step 4 already use for their structs). *Careful* gives the argument. Still eight steps | `channel.c`'s `SeparatePixelChannel` (5 arguments, called once per pixel by `SeparateImageRow`): B refuses the per-call fill of member accesses in a hot loop; with `ChannelImage` the last two *Excess Number of Function Arguments* of the file, a probe 7.81 to 8.06 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | SD | Step 8: when the groups one step moves write five or six variables of the caller (those the `default` group's call writes through included), the helper takes Recipe Z step 7's `const Targets *targets` after `tile`; the caller declares it `const` once with the addresses as its initialiser and calls `Helper(&tile,&targets);`, the helper binds each member once and passes `&(*v)` on. *Careful* gives the argument. Still eight steps | `effect-preview.c`'s `PreviewImage` (campaign A, W14 lane b): the Roll, Grayscale and Quantize groups with `default` write five variables; a probe 8.42 to 8.58, no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | SW | Step 2: a group of the run may hold whole parallel loops under Recipe N step 1's conditions (each loop moved whole and unchanged with its `#if`, pragma and `#endif`; what the region writes or a clause names is a parameter or local of the new function by the same name, never a member); step 1 admits them. Step 3: a `T` that begins with the fill of a Recipe N input struct whose call ends `T` shares that struct: the fill stays in the caller before the new call (step 4), the new function binds the members the run reads as `const` locals, so the run's text is unchanged, and its `T` is the last call alone, passing `name`. *Careful* gives both arguments. Still six steps | `colorspace.c`'s `TransformsRGBImage` (campaign A, W14 lane c): its linear RGB group holds the row loop's `#pragma omp parallel for`, as a helper of its own it clones `LinearGrayTosRGB` (6.56 in a probe); `sRGBTransformImage`'s tail fills `sRGBTableInput` from `colorspace` and `progress` before `sRGBTransformByTables`, so a helper with `T` would take five parameters. A probe of the chain (this recipe on the Log and linear RGB groups of `TransformsRGBImage`, then on the Log/linear RGB and CMYK/gray runs of `sRGBTransformImage`): 7.14 to 7.23, 7.29 and 7.35, both functions leaving *Large Method*, no finding on a new function | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | I | Step 2: a temporary of the block (written before it is read, not read by the caller after the block) goes as a written variable, a member of the targets struct, instead of a local of the new function, when the local would leave a variable written but never read in the new function or in the caller (`-Wunused-but-set-variable`, an error in the CI jobs): the block's read was the caller's only one, or the caller only passes the variable's address on to a callee that writes it. *Careful* gives the argument (the value carried in is never read, the values left behind are dead in the caller). Still eight steps | `montage.c`'s `MontageImageList` (campaign A, W14 lane a): its thumbnail loop writes `image` (read later by the page loop's `ThrowImageException`) and the temporaries `progress_monitor` (whose tile-loop store nobody reads once the loop's restore leaves) and `flags` (read nowhere; its address goes to `GetMontageTileGeometry`); as locals of the helper both draw the warning, in the caller and in the helper. A probe of the loop and its failure test as Recipe I with the three as targets: 8.62 to 8.72, MontageImageList cc 23 to 19, 248 to 227 lines, no finding on the helper | mandate (2026-10-24) |

@@ -224,6 +224,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/monitor.h \
   MagickCore/monitor-private.h \
   MagickCore/montage.c \
+  MagickCore/montage-info.c \
   MagickCore/montage.h \
   MagickCore/morphology.c \
   MagickCore/morphology.h \

@@ -74,168 +74,6 @@
 #include "MagickCore/version.h"
 #include "MagickCore/visual-effects.h"
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   C l o n e M o n t a g e I n f o                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  CloneMontageInfo() makes a copy of the given montage info structure.  If
-%  NULL is specified, a new image info structure is created initialized to
-%  default values.
-%
-%  The format of the CloneMontageInfo method is:
-%
-%      MontageInfo *CloneMontageInfo(const ImageInfo *image_info,
-%        const MontageInfo *montage_info)
-%
-%  A description of each parameter follows:
-%
-%    o image_info: the image info.
-%
-%    o montage_info: the montage info.
-%
-*/
-MagickExport MontageInfo *CloneMontageInfo(const ImageInfo *image_info,
-  const MontageInfo *montage_info)
-{
-  MontageInfo
-    *clone_info;
-
-  clone_info=(MontageInfo *) AcquireCriticalMemory(sizeof(*clone_info));
-  GetMontageInfo(image_info,clone_info);
-  if (montage_info == (MontageInfo *) NULL)
-    return(clone_info);
-  if (montage_info->geometry != (char *) NULL)
-    clone_info->geometry=AcquireString(montage_info->geometry);
-  if (montage_info->tile != (char *) NULL)
-    clone_info->tile=AcquireString(montage_info->tile);
-  if (montage_info->title != (char *) NULL)
-    clone_info->title=AcquireString(montage_info->title);
-  if (montage_info->frame != (char *) NULL)
-    clone_info->frame=AcquireString(montage_info->frame);
-  if (montage_info->texture != (char *) NULL)
-    clone_info->texture=AcquireString(montage_info->texture);
-  if (montage_info->font != (char *) NULL)
-    clone_info->font=AcquireString(montage_info->font);
-  clone_info->pointsize=montage_info->pointsize;
-  clone_info->border_width=montage_info->border_width;
-  clone_info->shadow=montage_info->shadow;
-  clone_info->fill=montage_info->fill;
-  clone_info->stroke=montage_info->stroke;
-  clone_info->matte_color=montage_info->matte_color;
-  clone_info->background_color=montage_info->background_color;
-  clone_info->border_color=montage_info->border_color;
-  clone_info->gravity=montage_info->gravity;
-  (void) CopyMagickString(clone_info->filename,montage_info->filename,
-    MagickPathExtent);
-  clone_info->debug=IsEventLogging();
-  return(clone_info);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   D e s t r o y M o n t a g e I n f o                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  DestroyMontageInfo() deallocates memory associated with montage_info.
-%
-%  The format of the DestroyMontageInfo method is:
-%
-%      MontageInfo *DestroyMontageInfo(MontageInfo *montage_info)
-%
-%  A description of each parameter follows:
-%
-%    o montage_info: Specifies a pointer to an MontageInfo structure.
-%
-%
-*/
-MagickExport MontageInfo *DestroyMontageInfo(MontageInfo *montage_info)
-{
-  assert(montage_info != (MontageInfo *) NULL);
-  assert(montage_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  if (montage_info->geometry != (char *) NULL)
-    montage_info->geometry=(char *)
-      RelinquishMagickMemory(montage_info->geometry);
-  if (montage_info->tile != (char *) NULL)
-    montage_info->tile=DestroyString(montage_info->tile);
-  if (montage_info->title != (char *) NULL)
-    montage_info->title=DestroyString(montage_info->title);
-  if (montage_info->frame != (char *) NULL)
-    montage_info->frame=DestroyString(montage_info->frame);
-  if (montage_info->texture != (char *) NULL)
-    montage_info->texture=(char *) RelinquishMagickMemory(
-      montage_info->texture);
-  if (montage_info->font != (char *) NULL)
-    montage_info->font=DestroyString(montage_info->font);
-  montage_info->signature=(~MagickCoreSignature);
-  montage_info=(MontageInfo *) RelinquishMagickMemory(montage_info);
-  return(montage_info);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t M o n t a g e I n f o                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetMontageInfo() initializes montage_info to default values.
-%
-%  The format of the GetMontageInfo method is:
-%
-%      void GetMontageInfo(const ImageInfo *image_info,
-%        MontageInfo *montage_info)
-%
-%  A description of each parameter follows:
-%
-%    o image_info: a structure of type ImageInfo.
-%
-%    o montage_info: Specifies a pointer to a MontageInfo structure.
-%
-*/
-MagickExport void GetMontageInfo(const ImageInfo *image_info,
-  MontageInfo *montage_info)
-{
-  assert(image_info != (const ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  assert(montage_info != (MontageInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
-  (void) memset(montage_info,0,sizeof(*montage_info));
-  (void) CopyMagickString(montage_info->filename,image_info->filename,
-    MagickPathExtent);
-  montage_info->geometry=AcquireString(DefaultTileGeometry);
-  if (image_info->font != (char *) NULL)
-    montage_info->font=AcquireString(image_info->font);
-  montage_info->gravity=CenterGravity;
-  montage_info->pointsize=image_info->pointsize;
-  montage_info->fill.alpha=(MagickRealType) OpaqueAlpha;
-  montage_info->stroke.alpha=(MagickRealType) TransparentAlpha;
-  montage_info->matte_color=image_info->matte_color;
-  montage_info->background_color=image_info->background_color;
-  montage_info->border_color=image_info->border_color;
-  montage_info->debug=IsEventLogging();
-  montage_info->signature=MagickCoreSignature;
-}
 
 static Image *AddTileShadow(Image *image,ExceptionInfo *exception)
 {
@@ -1175,6 +1013,16 @@ typedef struct _MontagePageInfo
 
   char
     *title;
+
+  size_t
+    title_offset,
+    border_width;
+
+  TypeMetric
+    metrics;
+
+  size_t
+    number_lines;
 } MontagePageInfo;
 
 static void DecorateMontagePage(const MontagePageInfo *page)
@@ -1227,6 +1075,132 @@ static size_t GetMontageTitleOffset(const MontageInfo *montage_info,
   return(title_offset);
 }
 
+static void InitializeMontageCanvas(const MontageInfo *montage_info,
+  RectangleInfo *bounds,Image *montage,ExceptionInfo *exception)
+{
+  if (montage_info->shadow != MagickFalse)
+    (*bounds).width+=4;
+  /*
+    Initialize montage image.
+  */
+  (void) CopyMagickString(montage->filename,montage_info->filename,
+    MagickPathExtent);
+  montage->columns=(size_t) MagickMax((ssize_t) (*bounds).width,1);
+  montage->rows=(size_t) MagickMax((ssize_t) (*bounds).height,1);
+  (void) SetImageBackgroundColor(montage,exception);
+}
+
+static void SetMontagePage(const MontagePageInfo *page)
+{
+  ssize_t
+    x_offset,
+    y_offset;
+
+  GetMontageOffsets(page->montage_info,page->number_images,&x_offset,
+    &y_offset);
+  y_offset+=(ssize_t) page->title_offset;
+  (void) FormatLocaleString(page->montage->montage,MagickPathExtent,
+    "%.17gx%.17g%+.20g%+.20g",(double) ((ssize_t) page->extract_info.width+
+    (page->extract_info.x+(ssize_t) page->border_width)*2),(double) ((ssize_t)
+    page->extract_info.height+(page->extract_info.y+(ssize_t)
+    page->border_width)*2+(double) ((page->metrics.ascent-
+    page->metrics.descent+4)*page->number_lines+
+    (page->montage_info->shadow != MagickFalse ? 4 : 0))),(double) x_offset,
+    (double) y_offset);
+  DecorateMontagePage(page);
+}
+
+typedef struct _MontageThumbnailInfo
+{
+  Image
+    **image_list;
+
+  size_t
+    number_images;
+
+  const MontageInfo
+    *montage_info;
+} MontageThumbnailInfo;
+
+typedef struct _MontageThumbnailTargets
+{
+  Image
+    **image;
+
+  MagickProgressMonitor
+    *progress_monitor;
+
+  MagickStatusType
+    *flags;
+} MontageThumbnailTargets;
+
+static MagickBooleanType CreateMontageThumbnails(
+  const MontageThumbnailInfo *thumbnail_info,Image **primary_list,
+  ExceptionInfo *exception,const MontageThumbnailTargets *targets)
+{
+  Image
+    **const image = targets->image;
+
+  MagickProgressMonitor
+    *const progress_monitor = targets->progress_monitor;
+
+  MagickStatusType
+    *const flags = targets->flags;
+
+  Image
+    **const image_list = thumbnail_info->image_list;
+
+  const size_t
+    number_images = thumbnail_info->number_images;
+
+  const MontageInfo
+    *const montage_info = thumbnail_info->montage_info;
+
+  Image
+    *thumbnail;
+
+  MagickBooleanType
+    proceed;
+
+  RectangleInfo
+    geometry;
+
+  ssize_t
+    i;
+
+  *image=image_list[0];
+  thumbnail=NewImageList();
+  for (i=0; i < (ssize_t) number_images; i++)
+  {
+    *image=CloneImage(image_list[i],0,0,MagickTrue,exception);
+    if (*image == (Image *) NULL)
+      break;
+    (void) ParseAbsoluteGeometry("0x0+0+0",&(*image)->page);
+    *progress_monitor=SetImageProgressMonitor(*image,(MagickProgressMonitor)
+      NULL,(*image)->client_data);
+    *flags=ParseRegionGeometry(*image,montage_info->geometry,&geometry,
+      exception);
+    thumbnail=ThumbnailImage(*image,geometry.width,geometry.height,exception);
+    if (thumbnail == (Image *) NULL)
+      break;
+    image_list[i]=thumbnail;
+    (void) SetImageProgressMonitor(*image,*progress_monitor,
+      (*image)->client_data);
+    proceed=SetImageProgress(*image,TileImageTag,(MagickOffsetType) i,
+      number_images);
+    if (proceed == MagickFalse)
+      break;
+    *image=DestroyImage(*image);
+  }
+  if (i < (ssize_t) number_images)
+    {
+      DestroyTileResources(*image,thumbnail,image_list,i);
+      primary_list=(Image **) RelinquishMagickMemory(primary_list);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1245,15 +1219,13 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     **primary_list,
     *montage,
     *texture,
-    *tile_image,
-    *thumbnail;
+    *tile_image;
 
   ImageInfo
     *clone_info;
 
   MagickBooleanType
     concatenate,
-    proceed,
     status;
 
   MagickOffsetType
@@ -1265,12 +1237,17 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   MagickStatusType
     flags;
 
+  MontageThumbnailInfo
+    thumbnail_info;
+
+  const MontageThumbnailTargets
+    thumbnail_targets = { (&image), (&progress_monitor), (&flags) };
+
   ssize_t
     i;
 
   RectangleInfo
     bounds,
-    geometry,
     extract_info;
 
   size_t
@@ -1313,34 +1290,12 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   if (primary_list == (Image **) NULL)
     return((Image *) NULL);
   image_list=primary_list;
-  image=image_list[0];
-  thumbnail=NewImageList();
-  for (i=0; i < (ssize_t) number_images; i++)
-  {
-    image=CloneImage(image_list[i],0,0,MagickTrue,exception);
-    if (image == (Image *) NULL)
-      break;
-    (void) ParseAbsoluteGeometry("0x0+0+0",&image->page);
-    progress_monitor=SetImageProgressMonitor(image,(MagickProgressMonitor) NULL,
-      image->client_data);
-    flags=ParseRegionGeometry(image,montage_info->geometry,&geometry,exception);
-    thumbnail=ThumbnailImage(image,geometry.width,geometry.height,exception);
-    if (thumbnail == (Image *) NULL)
-      break;
-    image_list[i]=thumbnail;
-    (void) SetImageProgressMonitor(image,progress_monitor,image->client_data);
-    proceed=SetImageProgress(image,TileImageTag,(MagickOffsetType) i,
-      number_images);
-    if (proceed == MagickFalse)
-      break;
-    image=DestroyImage(image);
-  }
-  if (i < (ssize_t) number_images)
-    {
-      DestroyTileResources(image,thumbnail,image_list,i);
-      primary_list=(Image **) RelinquishMagickMemory(primary_list);
-      return((Image *) NULL);
-    }
+  thumbnail_info.image_list=image_list;
+  thumbnail_info.number_images=number_images;
+  thumbnail_info.montage_info=montage_info;
+  if (CreateMontageThumbnails(&thumbnail_info,primary_list,exception,
+      &thumbnail_targets) == MagickFalse)
+    return((Image *) NULL);
   /*
     Sort image list by increasing tile number.
   */
@@ -1423,31 +1378,13 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     bounds_info.extract_info=extract_info;
     bounds_info.metrics=metrics;
     GetMontageBounds(x_offset,y_offset,&bounds_info,&bounds);
-    if (montage_info->shadow != MagickFalse)
-      bounds.width+=4;
-    /*
-      Initialize montage image.
-    */
-    (void) CopyMagickString(montage->filename,montage_info->filename,
-      MagickPathExtent);
-    montage->columns=(size_t) MagickMax((ssize_t) bounds.width,1);
-    montage->rows=(size_t) MagickMax((ssize_t) bounds.height,1);
-    (void) SetImageBackgroundColor(montage,exception);
+    InitializeMontageCanvas(montage_info,&bounds,montage,exception);
     /*
       Set montage geometry.
     */
     extent=GetMontageDirectoryExtent(image_list,tiles_per_page,number_images);
     if (AcquireMontageStrings(montage,extent) == MagickFalse)
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
-    y_offset+=(ssize_t) title_offset;
-    (void) FormatLocaleString(montage->montage,MagickPathExtent,
-      "%.17gx%.17g%+.20g%+.20g",(double) ((ssize_t) extract_info.width+
-      (extract_info.x+(ssize_t) border_width)*2),(double) ((ssize_t)
-      extract_info.height+(extract_info.y+(ssize_t) border_width)*2+(double)
-      ((metrics.ascent-metrics.descent+4)*number_lines+
-      (montage_info->shadow != MagickFalse ? 4 : 0))),(double) x_offset,
-      (double) y_offset);
     page_info.montage=montage;
     page_info.tiles_per_page=tiles_per_page;
     page_info.number_images=number_images;
@@ -1460,7 +1397,11 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     page_info.draw_info=draw_info;
     page_info.extract_info=extract_info;
     page_info.title=title;
-    DecorateMontagePage(&page_info);
+    page_info.title_offset=title_offset;
+    page_info.border_width=border_width;
+    page_info.metrics=metrics;
+    page_info.number_lines=number_lines;
+    SetMontagePage(&page_info);
     /*
       Copy tile to the composite.
     */

@@ -59,7 +59,9 @@ def makefile_in(s):
                                     "MagickCore/%s.c MagickCore/%s.c" % (orig, new)))
             i += 1
             continue
-        if ("_la-%s." % orig) in line or line == "  MagickCore/%s.c \\" % orig:
+        # MagickCore entries only: MagickWand has sources of the same name (montage.c)
+        if (("_la-%s." % orig) in line and "libMagickCore_" in line) or \
+                line == "  MagickCore/%s.c \\" % orig:
             out += [line, sub(line)]
             n += 1
             i += 1
