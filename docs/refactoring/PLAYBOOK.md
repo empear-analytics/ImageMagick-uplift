@@ -5502,6 +5502,13 @@ outside every region, not a block inside one).
    writes through the same pointer. Inside the critical constructs the block may write
    shared memory through such pointers and members (`table[i]=...`, `image->colors++`),
    as before; it assigns no variable of the caller.
+   The block may also read, test and assign the shared `status` outside the critical
+   constructs, directly or by passing `&status` to a callee, as Recipe PS step 2 allows
+   (named in `shared(...)` or in no data-sharing clause, never in `private`,
+   `firstprivate`, `lastprivate` or `reduction`); inside them it does not touch it.
+   `status` then goes by pointer, `MagickBooleanType *status`, last, every use written
+   `(*status)` and `&status` passed on written `status` (PS step 4), one of step 5's four
+   parameters; that is the only change step 5 makes to the text.
 3. Inside the critical constructs nothing takes a lock or calls a function that could (no
    `omp_set_lock`, no `LockSemaphoreInfo`, no function that enters a critical of the same
    name), as Recipe CB step 1 says. Check each callee by reading.
@@ -5588,6 +5595,10 @@ static void IndexGrayscaleRow(Image *image,ssize_t *colormap_index,
   lock and written back after it.
 - With OpenMP off the pragma is not compiled, and the helper is a plain function holding
   the same statements.
+- A `status` by pointer (step 2) is the shared flag itself, read and written at the same
+  program points, in the same order, outside the lock as before (Recipe PS's argument);
+  nothing is copied before a critical construct or written back after it, and no
+  construct's statement reads or writes it.
 - The oracle builds without OpenMP and cannot see a race or a lock: steps 1 to 3 are
   checked by reading.
 
@@ -5601,7 +5612,12 @@ an unbraced `if`, the function's Deep, Nested Complexity (5) and one of its four
 plateau rows of W11 to W13 recorded that no recipe moves it (CB step 1 refuses the unbraced
 `if`). A probe of the column loop as a helper, after the split that freed the function
 budget: 6.11 to 6.57, the function leaving Deep, Nested Complexity, no finding on the
-helper.
+helper. Step 2's `status` (2026-11-05, W14 lane c): `shear-rotate.c`'s
+`IntegralRotateImage`, whose 270-degree tile row loop holds the sync under
+`critical (MagickCore_IntegralRotateImage)` and sets `status` through its head and its
+sync test outside it; the plateau has recorded since W10 that the critical pinned the
+function. A probe of the whole chain: 7.63 to 10.00. Added by Claude Code (Claude Opus
+5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -7045,3 +7061,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | HC | Extract Block Holding a Named Critical Region: a statement of a parallel loop body (a column loop) that holds whole named `#pragma omp critical (name)` constructs moves, constructs included and unchanged, into a `static void` helper called from that body alone; outside the constructs the block writes only body variables (Recipe O step 1's rule), inside them shared memory through the same pointers; no lock taken; checked by reading | `quantize.c`'s `SetGrayscaleImage` (campaign A, W14): the column loop of its colormap-building parallel loop holds a double-checked insert whose critical governs an unbraced `if` (outside CB step 1), the function's Deep, Nested Complexity (5); a probe 6.11 to 6.57 with no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | PS | Step 7: the loop whose whole body moves may also be a sequential loop nested in the parallel loop's iteration (a tile's row loop inside the tile loop); its `continue;` statements become `return;`, its counter goes by value, and the struct of step 6 is declared in the parallel body and may be filled before that loop (Recipe N steps 7 and 8). *Careful* gives the argument. Still eight steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 90-degree tile row loop's body tests `status`, continues after a failed queue and syncs, at depth 5 of the function; step 7 as written took only the parallel loop's own body. A probe of the whole chain: 7.63 to 10.00, no finding left | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | PC | Step 1: the loop may also be a sequential loop nested in the parallel loop's iteration (a tile's row loop), the head the start of that loop's body and the tail the rest of it, kept because it holds a `#pragma omp critical` construct; the head's and the caller's `continue;` are that loop's own; the struct is declared in the parallel body and may be filled before the loop (Recipe N steps 7 and 8). Still five steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree tile row loop's body tests `status`, queues a row, copies it and syncs under a named critical; PS refuses the pragma and PC step 1 took only the parallel loop's own body. A probe of the whole chain: 7.63 to 10.00 | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | HC | Step 2: outside the critical constructs the block may also read, test and assign the shared `status` (Recipe PS step 2's conditions), directly or through `&status` passed to a callee; it goes by pointer, last, `(*status)` at every use and `status` for `&status` (PS step 4), the only text change step 5 makes; inside the constructs `status` is not touched. *Careful* gives the argument. Still six steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree tile row loop holds the named critical sync and sets `status` through its head and sync test, which step 2 refused; a probe of the whole chain: 7.63 to 10.00 | mandate (2026-10-24) |
