@@ -370,11 +370,55 @@ static MagickBooleanType CombineImageRows(const CombineRows *rows,
   return(MagickTrue);
 }
 
+static MagickBooleanType CombineRowsLoop(const CombineRows *combine_rows,
+  MagickOffsetType progress,MagickBooleanType status)
+{
+  const Image
+    *const image = combine_rows->image;
+
+  Image
+    *const combine_image = combine_rows->combine_image;
+
+  CacheView
+    *const combine_view = combine_rows->combine_view;
+
+  ExceptionInfo
+    *const exception = combine_rows->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(combine_image,combine_image,combine_image->rows,4)
+#endif
+  for (y=0; y < (ssize_t) combine_image->rows; y++)
+  {
+    const CombineRows
+      rows = { image, combine_image, combine_view, exception };
+
+    if (CombineImageRows(&rows,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetCombineProgress(image,combine_image,progress,&status);
+      }
+  }
+  return(status);
+}
+
 MagickExport Image *CombineImages(const Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
   CacheView
     *combine_view;
+
+  CombineRows
+    rows;
 
   Image
     *combine_image;
@@ -387,9 +431,6 @@ MagickExport Image *CombineImages(const Image *image,
 
   size_t
     number_channels;
-
-  ssize_t
-    y;
 
   /*
     Ensure the image are the same size.
@@ -417,26 +458,11 @@ MagickExport Image *CombineImages(const Image *image,
   status=MagickTrue;
   progress=0;
   combine_view=AcquireAuthenticCacheView(combine_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(combine_image,combine_image,combine_image->rows,4)
-#endif
-  for (y=0; y < (ssize_t) combine_image->rows; y++)
-  {
-    const CombineRows
-      rows = { image, combine_image, combine_view, exception };
-
-    if (CombineImageRows(&rows,y,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetCombineProgress(image,combine_image,progress,&status);
-      }
-  }
+  rows.image=image;
+  rows.combine_image=combine_image;
+  rows.combine_view=combine_view;
+  rows.exception=exception;
+  status=CombineRowsLoop(&rows,progress,status);
   combine_view=DestroyCacheView(combine_view);
   combine_image=FinishCombineImage(combine_image,status);
   return(combine_image);
