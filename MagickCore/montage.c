@@ -415,10 +415,28 @@ static FrameInfo ParseMontageFrame(const MontageInfo *montage_info,
 %
 */
 
-static void GetMontageGeometry(char *geometry,const size_t number_images,
-  ssize_t *x_offset,ssize_t *y_offset,size_t *tiles_per_column,
-  size_t *tiles_per_row)
+typedef struct _MontageGeometryTargets
 {
+  ssize_t
+    *x_offset,
+    *y_offset;
+
+  size_t
+    *tiles_per_column,
+    *tiles_per_row;
+} MontageGeometryTargets;
+
+static void GetMontageGeometry(char *geometry,const size_t number_images,
+  const MontageGeometryTargets *targets)
+{
+  ssize_t
+    *const x_offset = targets->x_offset,
+    *const y_offset = targets->y_offset;
+
+  size_t
+    *const tiles_per_column = targets->tiles_per_column,
+    *const tiles_per_row = targets->tiles_per_row;
+
   *tiles_per_column=0;
   *tiles_per_row=0;
   (void) GetGeometry(geometry,x_offset,y_offset,tiles_per_row,tiles_per_column);
@@ -653,11 +671,13 @@ static void GetMontageOffsets(const MontageInfo *montage_info,
   size_t
     sans;
 
+  const MontageGeometryTargets
+    targets = { x_offset, y_offset, (&sans), (&sans) };
+
   *x_offset=0;
   *y_offset=0;
   if (montage_info->tile != (char *) NULL)
-    GetMontageGeometry(montage_info->tile,number_images,x_offset,y_offset,
-      &sans,&sans);
+    GetMontageGeometry(montage_info->tile,number_images,&targets);
 }
 
 static ssize_t GetMontageRowOffset(const MontageInfo *montage_info,
@@ -670,10 +690,12 @@ static ssize_t GetMontageRowOffset(const MontageInfo *montage_info,
     x_offset,
     y;
 
+  const MontageGeometryTargets
+    targets = { (&x_offset), (&y), (&sans), (&sans) };
+
   x_offset=0;
   if (montage_info->tile != (char *) NULL)
-    GetMontageGeometry(montage_info->tile,number_images,&x_offset,&y,
-      &sans,&sans);
+    GetMontageGeometry(montage_info->tile,number_images,&targets);
   return(x_offset);
 }
 
@@ -888,13 +910,15 @@ static void GetMontageTileCounts(const MontageInfo *montage_info,
     x_offset,
     y_offset;
 
+  const MontageGeometryTargets
+    targets = { (&x_offset), (&y_offset), tiles_per_column, tiles_per_row };
+
   *tiles_per_column=(size_t) sqrt((double) number_images);
   *tiles_per_row=(size_t) ceil((double) number_images/(*tiles_per_column));
   x_offset=0;
   y_offset=0;
   if (montage_info->tile != (char *) NULL)
-    GetMontageGeometry(montage_info->tile,number_images,&x_offset,&y_offset,
-      tiles_per_column,tiles_per_row);
+    GetMontageGeometry(montage_info->tile,number_images,&targets);
 }
 
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
