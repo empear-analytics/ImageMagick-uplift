@@ -82,7 +82,8 @@ while i < len(L):
         while j < len(L) and L[j] != "{" and not L[j].rstrip().endswith(";"): j += 1
         if j < len(L) and L[j] == "{":
             k = j + 1
-            while k < len(L) and L[k] != "}": k += 1
+            # the closing brace of a function stands alone in column 0; a macro body's own `}` follows a line ending in `\`
+            while k < len(L) and not (L[k] == "}" and not L[k - 1].rstrip().endswith("\\")): k += 1
             defs.append((m.group(2), i, k, bool(m.group(1) and m.group(1).startswith("static"))))
             i = k + 1; continue
     i += 1
@@ -239,7 +240,7 @@ art_lines = blocks[0]
 for blk in blocks[1:]: art_lines = art_lines + [blank] + blk
 hdr = L[:art_rows[0]] + art_lines + L[art_rows[-1] + 1:tk] + [row(title, len(title))] + L[tk + 1:hend + 1]
 assert all(len(x) == 79 for x in art_lines), "header width"
-inc_a = L.index("  Include declarations.") - 1
+inc_a = next(k for k, l in enumerate(L) if l.strip() == "Include declarations.") - 1
 inc_b = max(k for k in range(len(L)) if L[k].startswith("#include") and k < first[1])
 # carry a trailing #endif etc. that closes a conditional include
 while L[inc_b + 1].startswith("#"): inc_b += 1
