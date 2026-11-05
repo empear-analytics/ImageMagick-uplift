@@ -2174,15 +2174,10 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   GetModulateColorspace(image,&colorspace,&illuminant);
   if (image->storage_class == PseudoClass)
     {
-      ModulateRow
-        modulate_row;
+      const ModulateRow
+        modulate_row = { image, colorspace, percent_hue, percent_saturation,
+          percent_brightness, illuminant };
 
-      modulate_row.image=image;
-      modulate_row.colorspace=colorspace;
-      modulate_row.percent_hue=percent_hue;
-      modulate_row.percent_saturation=percent_saturation;
-      modulate_row.percent_brightness=percent_brightness;
-      modulate_row.illuminant=illuminant;
       ModulateImageColormap(&modulate_row);
     }
   /*
