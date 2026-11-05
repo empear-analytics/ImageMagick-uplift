@@ -823,6 +823,18 @@ static Image *FinishStatisticImage(Image *statistic_image,
   return(statistic_image);
 }
 
+static ssize_t GetStatisticCenter(const Image *image,const size_t width,
+  const size_t height)
+{
+  ssize_t
+    center;
+
+  center=(ssize_t) GetPixelChannels(image)*((ssize_t) image->columns+
+    MagickMax((ssize_t) width,1L))*(MagickMax((ssize_t) height,1)/2L)+(ssize_t)
+    GetPixelChannels(image)*(MagickMax((ssize_t) width,1L)/2L);
+  return(center);
+}
+
 MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   const size_t width,const size_t height,ExceptionInfo *exception)
 {
@@ -866,9 +878,7 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   /*
     Make each pixel the min / max / median / mode / etc. of the neighborhood.
   */
-  center=(ssize_t) GetPixelChannels(image)*((ssize_t) image->columns+
-    MagickMax((ssize_t) width,1L))*(MagickMax((ssize_t) height,1)/2L)+(ssize_t)
-    GetPixelChannels(image)*(MagickMax((ssize_t) width,1L)/2L);
+  center=GetStatisticCenter(image,width,height);
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
