@@ -4322,6 +4322,59 @@ static Image *ComposeKernelResult(const MorphologyKernelCompose *kernel_compose,
   return(curr_image);
 }
 
+typedef struct _MorphologyStageSelection
+{
+  MorphologyMethod
+    method;
+
+  KernelInfo
+    *rflt_kernel;
+
+  size_t
+    stage_loop;
+} MorphologyStageSelection;
+
+static void SelectSmoothOrCorrelatePrimitive(
+  const MorphologyStageSelection *selection,KernelInfo **this_kernel,
+  MorphologyMethod *primitive)
+{
+  switch( selection->method ) {
+    case SmoothMorphology:         /* open, close */
+      switch ( selection->stage_loop ) {
+        case 1: /* start an open method, which starts with Erode */
+          (*primitive) = ErodeMorphology;
+          break;
+        case 2:  /* now Dilate the Erode */
+          (*primitive) = DilateMorphology;
+          break;
+        case 3:  /* Reflect kernel a close */
+          (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
+          (*primitive) = DilateMorphology;
+          break;
+        case 4:  /* Finish the Close */
+          (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
+          (*primitive) = ErodeMorphology;
+          break;
+      }
+      break;
+    case CorrelateMorphology:
+      /* A Correlation is a Convolution with a reflected kernel.
+      ** However a Convolution is a weighted sum using a reflected
+      ** kernel.  It may seem strange to convert a Correlation into a
+      ** Convolution as the Correlation is the simpler method, but
+      ** Convolution is much more commonly used, and it makes sense to
+      ** implement it directly so as to avoid the need to duplicate the
+      ** kernel when it is not required (which is typically the
+      ** default).
+      */
+      (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
+      (*primitive) = ConvolveMorphology;
+      break;
+    default:
+      break;
+  }
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4501,11 +4554,17 @@ MagickPrivate Image *MorphologyApply(const Image *image,
       /* Loop 3: Compound Morphology Staging - Select Primitive to apply */
       stage_loop = 0;          /* the compound morphology stage number */
       while ( stage_loop < stage_limit ) {
+        MorphologyStageSelection
+          selection;
+
         stage_loop++;   /* The stage of the compound morphology */
 
         /* Select primitive morphology for this stage of compound method */
         this_kernel = norm_kernel; /* default use unreflected kernel */
         primitive = method;        /* Assume method is a primitive */
+        selection.method=method;
+        selection.rflt_kernel=rflt_kernel;
+        selection.stage_loop=stage_loop;
         switch( method ) {
           case ErodeMorphology:      /* just erode */
           case EdgeInMorphology:     /* erode and image difference */
@@ -4539,24 +4598,6 @@ MagickPrivate Image *MorphologyApply(const Image *image,
             if ( stage_loop == 2 )
               primitive = ErodeIntensityMorphology;
             break;
-          case SmoothMorphology:         /* open, close */
-            switch ( stage_loop ) {
-              case 1: /* start an open method, which starts with Erode */
-                primitive = ErodeMorphology;
-                break;
-              case 2:  /* now Dilate the Erode */
-                primitive = DilateMorphology;
-                break;
-              case 3:  /* Reflect kernel a close */
-                this_kernel = rflt_kernel; /* use the reflected kernel */
-                primitive = DilateMorphology;
-                break;
-              case 4:  /* Finish the Close */
-                this_kernel = rflt_kernel; /* use the reflected kernel */
-                primitive = ErodeMorphology;
-                break;
-            }
-            break;
           case EdgeMorphology:        /* dilate and erode difference */
             primitive = DilateMorphology;
             if ( stage_loop == 2 ) {
@@ -4565,20 +4606,8 @@ MagickPrivate Image *MorphologyApply(const Image *image,
               primitive = ErodeMorphology;
             }
             break;
-          case CorrelateMorphology:
-            /* A Correlation is a Convolution with a reflected kernel.
-            ** However a Convolution is a weighted sum using a reflected
-            ** kernel.  It may seem strange to convert a Correlation into a
-            ** Convolution as the Correlation is the simpler method, but
-            ** Convolution is much more commonly used, and it makes sense to
-            ** implement it directly so as to avoid the need to duplicate the
-            ** kernel when it is not required (which is typically the
-            ** default).
-            */
-            this_kernel = rflt_kernel; /* use the reflected kernel */
-            primitive = ConvolveMorphology;
-            break;
           default:
+            SelectSmoothOrCorrelatePrimitive(&selection,&this_kernel,&primitive);
             break;
         }
         assert( this_kernel != (KernelInfo *) NULL );
