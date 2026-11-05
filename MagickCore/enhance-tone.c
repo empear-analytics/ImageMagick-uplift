@@ -1046,6 +1046,47 @@ static void FormStretchHistogram(Image *image,double *histogram,
   image_view=DestroyCacheView(image_view);
 }
 
+typedef struct _StretchLevels
+{
+  Image
+    *image;
+
+  double
+    *histogram,
+    black_point,
+    white_point;
+} StretchLevels;
+
+static void FindStretchLevels(const StretchLevels *levels,Quantum *black,
+  Quantum *white)
+{
+  Image
+    *const image = levels->image;
+
+  double
+    *const histogram = levels->histogram;
+
+  const double
+    black_point = levels->black_point,
+    white_point = levels->white_point;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    ssize_t
+      j;
+
+    black[i]=(Quantum) 0;
+    white[i]=(Quantum) ScaleQuantumToMap(QuantumRange);
+    j=FindStretchBlackLevel(image,histogram,i,black_point);
+    black[i]=(Quantum) j;
+    j=FindStretchWhiteLevel(image,histogram,i,white_point);
+    white[i]=(Quantum) j;
+  }
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -1068,8 +1109,8 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     *stretch_map,
     *white;
 
-  ssize_t
-    i;
+  StretchLevels
+    levels;
 
   ssize_t
     y;
@@ -1101,18 +1142,11 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   /*
     Find the histogram boundaries by locating the black/white levels.
   */
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    ssize_t
-      j;
-
-    black[i]=(Quantum) 0;
-    white[i]=(Quantum) ScaleQuantumToMap(QuantumRange);
-    j=FindStretchBlackLevel(image,histogram,i,black_point);
-    black[i]=(Quantum) j;
-    j=FindStretchWhiteLevel(image,histogram,i,white_point);
-    white[i]=(Quantum) j;
-  }
+  levels.image=image;
+  levels.histogram=histogram;
+  levels.black_point=black_point;
+  levels.white_point=white_point;
+  FindStretchLevels(&levels,black,white);
   histogram=(double *) RelinquishMagickMemory(histogram);
   /*
     Stretch the histogram to create the stretched image mapping.
@@ -1222,6 +1256,38 @@ static void AccumulateEqualizeHistogram(const Image *image,
   }
 }
 
+typedef struct _EqualizeColors
+{
+  Image
+    *image;
+
+  const double
+    *black,
+    *white,
+    *equalize_map;
+} EqualizeColors;
+
+static void EqualizeColormapRed(const EqualizeColors *colors,const ssize_t j)
+{
+  Image
+    *const image = colors->image;
+
+  const double
+    *const black = colors->black,
+    *const white = colors->white,
+    *const equalize_map = colors->equalize_map;
+
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,
+        RedPixelChannel);
+      if (black[channel] != white[channel])
+        image->colormap[j].red=equalize_map[(ssize_t)
+          GetPixelChannels(image)*ScaleQuantumToMap(
+          ClampToQuantum(image->colormap[j].red))+channel];
+    }
+}
+
 static void EqualizeColormap(Image *image,const double *black,
   const double *white,const double *equalize_map)
 {
@@ -1230,15 +1296,14 @@ static void EqualizeColormap(Image *image,const double *black,
 
   for (j=0; j < (ssize_t) image->colors; j++)
   {
-    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,
-          RedPixelChannel);
-        if (black[channel] != white[channel])
-          image->colormap[j].red=equalize_map[(ssize_t)
-            GetPixelChannels(image)*ScaleQuantumToMap(
-            ClampToQuantum(image->colormap[j].red))+channel];
-      }
+    EqualizeColors
+      colors;
+
+    colors.image=image;
+    colors.black=black;
+    colors.white=white;
+    colors.equalize_map=equalize_map;
+    EqualizeColormapRed(&colors,j);
     if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
       {
         PixelChannel channel = GetPixelChannelChannel(image,
@@ -1385,6 +1450,41 @@ static void BuildEqualizeChannelMap(const EqualizeChannel *equalize,
         (size_t) j+(size_t) i]-black[i]))/(white[i]-black[i])));
 }
 
+typedef struct _EqualizeLevels
+{
+  Image
+    *image;
+
+  double
+    *map;
+} EqualizeLevels;
+
+static void BuildEqualizeMaps(const EqualizeLevels *levels,double *black,
+  double *white,double *equalize_map)
+{
+  Image
+    *const image = levels->image;
+
+  double
+    *const map = levels->map;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    EqualizeChannel
+      equalize;
+
+    black[i]=map[i];
+    white[i]=map[GetPixelChannels(image)*MaxMap+(size_t) i];
+    equalize.image=image;
+    equalize.map=map;
+    equalize.i=i;
+    BuildEqualizeChannelMap(&equalize,black,white,equalize_map);
+  }
+}
+
 static void RelinquishEqualizeMemory(double *map,double *histogram,
   double *equalize_map)
 {
@@ -1411,14 +1511,14 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
     *map,
     white[2*CompositePixelChannel+1];
 
+  EqualizeLevels
+    levels;
+
   MagickBooleanType
     status;
 
   MagickOffsetType
     progress;
-
-  ssize_t
-    i;
 
   ssize_t
     y;
@@ -1457,18 +1557,9 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
     sizeof(*equalize_map));
   (void) memset(black,0,sizeof(*black));
   (void) memset(white,0,sizeof(*white));
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    EqualizeChannel
-      equalize;
-
-    black[i]=map[i];
-    white[i]=map[GetPixelChannels(image)*MaxMap+(size_t) i];
-    equalize.image=image;
-    equalize.map=map;
-    equalize.i=i;
-    BuildEqualizeChannelMap(&equalize,black,white,equalize_map);
-  }
+  levels.image=image;
+  levels.map=map;
+  BuildEqualizeMaps(&levels,black,white,equalize_map);
   histogram=(double *) RelinquishMagickMemory(histogram);
   map=(double *) RelinquishMagickMemory(map);
   /*
@@ -1729,9 +1820,109 @@ static void EncodeGrayscaleGamma(const Image *image,MagickRealType *red,
     }
 }
 
+typedef struct _GrayscaleSample
+{
+  const Image
+    *image;
+
+  PixelIntensityMethod
+    method;
+
+  MagickRealType
+    blue,
+    green,
+    red;
+} GrayscaleSample;
+
+static void GetGammaLumaIntensity(const GrayscaleSample *sample,
+  MagickRealType *intensity)
+{
+  const Image
+    *const image = sample->image;
+
+  const PixelIntensityMethod
+    method = sample->method;
+
+  MagickRealType
+    blue = sample->blue,
+    green = sample->green,
+    red = sample->red;
+
+  switch (method)
+  {
+    case Rec601LumaPixelIntensityMethod:
+    {
+      EncodeGrayscaleGamma(image,&red,&green,&blue);
+      (*intensity)=0.298839*red+0.586811*green+0.114350*blue;
+      break;
+    }
+    case Rec709LumaPixelIntensityMethod:
+    default:
+    {
+      if (image->colorspace == RGBColorspace)
+        {
+          red=EncodePixelGamma(red);
+          green=EncodePixelGamma(green);
+          blue=EncodePixelGamma(blue);
+        }
+      (*intensity)=0.212656*red+0.715158*green+0.072186*blue;
+      break;
+    }
+  }
+}
+
+static void GetLuminanceIntensity(const GrayscaleSample *sample,
+  MagickRealType *intensity)
+{
+  const Image
+    *const image = sample->image;
+
+  const PixelIntensityMethod
+    method = sample->method;
+
+  MagickRealType
+    blue = sample->blue,
+    green = sample->green,
+    red = sample->red;
+
+  switch (method)
+  {
+    case Rec601LuminancePixelIntensityMethod:
+    {
+      if (image->colorspace == sRGBColorspace)
+        {
+          red=DecodePixelGamma(red);
+          green=DecodePixelGamma(green);
+          blue=DecodePixelGamma(blue);
+        }
+      (*intensity)=0.298839*red+0.586811*green+0.114350*blue;
+      break;
+    }
+    default:
+    {
+      GetGammaLumaIntensity(sample,intensity);
+      break;
+    }
+    case Rec709LuminancePixelIntensityMethod:
+    {
+      if (image->colorspace == sRGBColorspace)
+        {
+          red=DecodePixelGamma(red);
+          green=DecodePixelGamma(green);
+          blue=DecodePixelGamma(blue);
+        }
+      (*intensity)=0.212656*red+0.715158*green+0.072186*blue;
+      break;
+    }
+  }
+}
+
 static MagickRealType GetGrayscaleIntensity(const Image *image,
   const PixelIntensityMethod method,const Quantum *q)
 {
+  GrayscaleSample
+    sample;
+
   MagickRealType
     blue,
     green,
@@ -1742,6 +1933,11 @@ static MagickRealType GetGrayscaleIntensity(const Image *image,
   green=(MagickRealType) GetPixelGreen(image,q);
   blue=(MagickRealType) GetPixelBlue(image,q);
   intensity=0.0;
+  sample.image=image;
+  sample.method=method;
+  sample.blue=blue;
+  sample.green=green;
+  sample.red=red;
   switch (method)
   {
     case AveragePixelIntensityMethod:
@@ -1766,44 +1962,9 @@ static MagickRealType GetGrayscaleIntensity(const Image *image,
         blue*blue)/3.0);
       break;
     }
-    case Rec601LumaPixelIntensityMethod:
-    {
-      EncodeGrayscaleGamma(image,&red,&green,&blue);
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
-    case Rec601LuminancePixelIntensityMethod:
-    {
-      if (image->colorspace == sRGBColorspace)
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
-    case Rec709LumaPixelIntensityMethod:
     default:
     {
-      if (image->colorspace == RGBColorspace)
-        {
-          red=EncodePixelGamma(red);
-          green=EncodePixelGamma(green);
-          blue=EncodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
-      break;
-    }
-    case Rec709LuminancePixelIntensityMethod:
-    {
-      if (image->colorspace == sRGBColorspace)
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
+      GetLuminanceIntensity(&sample,&intensity);
       break;
     }
     case RMSPixelIntensityMethod:
@@ -2608,6 +2769,75 @@ static inline MagickBooleanType IsGrayImageWithColorLevels(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _LevelColors
+{
+  Image
+    *image;
+
+  const PixelInfo
+    *black_color,
+    *white_color;
+
+  ExceptionInfo
+    *exception;
+} LevelColors;
+
+static MagickStatusType LevelColorsPass(const LevelColors *levels,
+  MagickStatusType status)
+{
+  const PixelInfo
+    *const black_color = levels->black_color,
+    *const white_color = levels->white_color;
+
+  ChannelType
+    channel_mask;
+
+  Image
+    *const image = levels->image;
+
+  ExceptionInfo
+    *const exception = levels->exception;
+
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    {
+      channel_mask=SetImageChannelMask(image,RedChannel);
+      status&=(MagickStatusType) LevelImage(image,black_color->red,
+        white_color->red,1.0,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+    }
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    {
+      channel_mask=SetImageChannelMask(image,GreenChannel);
+      status&=(MagickStatusType) LevelImage(image,black_color->green,
+        white_color->green,1.0,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+    }
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    {
+      channel_mask=SetImageChannelMask(image,BlueChannel);
+      status&=(MagickStatusType) LevelImage(image,black_color->blue,
+        white_color->blue,1.0,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+    }
+  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    {
+      channel_mask=SetImageChannelMask(image,BlackChannel);
+      status&=(MagickStatusType) LevelImage(image,black_color->black,
+        white_color->black,1.0,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+    }
+  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->alpha_trait != UndefinedPixelTrait))
+    {
+      channel_mask=SetImageChannelMask(image,AlphaChannel);
+      status&=(MagickStatusType) LevelImage(image,black_color->alpha,
+        white_color->alpha,1.0,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+    }
+  return(status);
+}
+
 MagickExport MagickBooleanType LevelImageColors(Image *image,
   const PixelInfo *black_color,const PixelInfo *white_color,
   const MagickBooleanType invert,ExceptionInfo *exception)
@@ -2630,43 +2860,14 @@ MagickExport MagickBooleanType LevelImageColors(Image *image,
   status=MagickTrue;
   if (invert == MagickFalse)
     {
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        {
-          channel_mask=SetImageChannelMask(image,RedChannel);
-          status&=(MagickStatusType) LevelImage(image,black_color->red,
-            white_color->red,1.0,exception);
-          (void) SetImageChannelMask(image,channel_mask);
-        }
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        {
-          channel_mask=SetImageChannelMask(image,GreenChannel);
-          status&=(MagickStatusType) LevelImage(image,black_color->green,
-            white_color->green,1.0,exception);
-          (void) SetImageChannelMask(image,channel_mask);
-        }
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        {
-          channel_mask=SetImageChannelMask(image,BlueChannel);
-          status&=(MagickStatusType) LevelImage(image,black_color->blue,
-            white_color->blue,1.0,exception);
-          (void) SetImageChannelMask(image,channel_mask);
-        }
-      if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-          (image->colorspace == CMYKColorspace))
-        {
-          channel_mask=SetImageChannelMask(image,BlackChannel);
-          status&=(MagickStatusType) LevelImage(image,black_color->black,
-            white_color->black,1.0,exception);
-          (void) SetImageChannelMask(image,channel_mask);
-        }
-      if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-          (image->alpha_trait != UndefinedPixelTrait))
-        {
-          channel_mask=SetImageChannelMask(image,AlphaChannel);
-          status&=(MagickStatusType) LevelImage(image,black_color->alpha,
-            white_color->alpha,1.0,exception);
-          (void) SetImageChannelMask(image,channel_mask);
-        }
+      LevelColors
+        levels;
+
+      levels.image=image;
+      levels.black_color=black_color;
+      levels.white_color=white_color;
+      levels.exception=exception;
+      status=LevelColorsPass(&levels,status);
     }
   else
     {
@@ -2861,6 +3062,24 @@ static void NegateGrayscaleRow(const NegateInfo *negate,const ssize_t y,
     (*status)=MagickFalse;
 }
 
+static MagickBooleanType NegateGrayscaleImage(const NegateInfo *negate,
+  MagickBooleanType status,MagickOffsetType progress)
+{
+  CacheView
+    *image_view = negate->image_view;
+
+  Image
+    *const image = negate->image;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) image->rows; y++)
+    NegateGrayscaleRow(negate,y,&status,&progress);
+  image_view=DestroyCacheView(image_view);
+  return(MagickTrue);
+}
+
 static MagickBooleanType NegateImageLine(const NegateInfo *negate,
   const ssize_t y,MagickBooleanType *status)
 {
@@ -2920,12 +3139,7 @@ MagickExport MagickBooleanType NegateImage(Image *image,
   negate.image_view=image_view;
   negate.exception=exception;
   if( grayscale != MagickFalse )
-    {
-      for (y=0; y < (ssize_t) image->rows; y++)
-        NegateGrayscaleRow(&negate,y,&status,&progress);
-      image_view=DestroyCacheView(image_view);
-      return(MagickTrue);
-    }
+    return(NegateGrayscaleImage(&negate,status,progress));
   /*
     Negate image.
   */
