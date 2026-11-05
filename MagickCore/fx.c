@@ -995,6 +995,23 @@ static int AddUserSymbol (FxInfo * pfx, char * pex, size_t len)
   return pfx->usedUserSymbols-1;
 }
 
+static const char * NameOfAttrSymbolOrControl (int i, const char * str)
+{
+  if (i >= (int) FirstImgAttr && i < aNull) str = ImgAttrs[i-(int) FirstImgAttr].str;
+  if (i >= (int) FirstSym     && i < sNull) str = Symbols[i-(int) FirstSym].str;
+  if (i >= (int) FirstCont    && i < rNull) str = Controls[i-(int) FirstCont].str;
+  return(str);
+}
+
+static void PrintTableHeading (int i)
+{
+  if      (i==0    ) fprintf (stderr, "Operators:\n ");
+  else if (i==oNull) fprintf (stderr, "\nFunctions:\n ");
+  else if (i==fNull) fprintf (stderr, "\nImage attributes:\n ");
+  else if (i==aNull) fprintf (stderr, "\nSymbols:\n ");
+  else if (i==sNull) fprintf (stderr, "\nControls:\n ");
+}
+
 static void DumpTables (FILE * fh)
 {
 
@@ -1003,14 +1020,8 @@ static void DumpTables (FILE * fh)
     const char * str = "";
     if (                     i < oNull) str = Operators[i].str;
     if (i >= (int) FirstFunc    && i < fNull) str = Functions[i-(int) FirstFunc].str;
-    if (i >= (int) FirstImgAttr && i < aNull) str = ImgAttrs[i-(int) FirstImgAttr].str;
-    if (i >= (int) FirstSym     && i < sNull) str = Symbols[i-(int) FirstSym].str;
-    if (i >= (int) FirstCont    && i < rNull) str = Controls[i-(int) FirstCont].str;
-    if      (i==0    ) fprintf (stderr, "Operators:\n ");
-    else if (i==oNull) fprintf (stderr, "\nFunctions:\n ");
-    else if (i==fNull) fprintf (stderr, "\nImage attributes:\n ");
-    else if (i==aNull) fprintf (stderr, "\nSymbols:\n ");
-    else if (i==sNull) fprintf (stderr, "\nControls:\n ");
+    str = NameOfAttrSymbolOrControl (i, str);
+    PrintTableHeading (i);
     fprintf (fh, " %s", str);
   }
   fprintf (fh, "\n");
