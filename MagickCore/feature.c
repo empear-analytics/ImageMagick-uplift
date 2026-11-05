@@ -767,12 +767,12 @@ static MagickBooleanType ComputeCannyGradients(Image *edge_image,
   return(status);
 }
 
+#define CannyEdgeImageTag  "CannyEdge/Image"
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
 {
-#define CannyEdgeImageTag  "CannyEdge/Image"
-
   CacheView
     *edge_view;
 
