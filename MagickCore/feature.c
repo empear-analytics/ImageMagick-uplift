@@ -681,6 +681,31 @@ static void SetFeatureProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
+static MagickBooleanType GetCannyRow(
+  const ComputeCannyGradientRowInfo *info,const ssize_t y,
+  Quantum *magick_restrict *q,MagickBooleanType *status)
+{
+  CacheView
+    *const edge_view = info->edge_view;
+
+  Image
+    *const edge_image = info->edge_image;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*q)=GetCacheViewAuthenticPixels(edge_view,0,y,edge_image->columns,1,
+    exception);
+  if ((*q) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType BlurCannyImage(const Image *image,
   KernelInfo *kernel_info,Image **edge_image,ExceptionInfo *exception)
 {
@@ -794,21 +819,17 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) edge_image->rows; y++)
   {
+    const ComputeCannyGradientRowInfo
+      info = { edge_view, edge_image, exception, canny_cache };
+
     Quantum
       *magick_restrict q;
 
     ssize_t
       x;
 
-    if (status == MagickFalse)
+    if (GetCannyRow(&info,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(edge_view,0,y,edge_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     for (x=0; x < (ssize_t) edge_image->columns; x++)
     {
       CannyInfo
