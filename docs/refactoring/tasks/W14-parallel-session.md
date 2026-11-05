@@ -254,3 +254,10 @@ Progress): a sequential pass in no parallel region, whose only pragmas are orpha
 `progress=Helper(...,&status,...);`. **Review:** the two tail N steps in `transform.c` (bde214f54..58bcb2cd9) take
 the file's existing `ChopRowImages` and `SpliceRow` typedefs as their input structs (same members, types and
 order) rather than adding duplicates; a reading of N step 3. `quantize.c` unchanged (no legal split left).
+
+## Lane b, fifth batch: effect.c 6.75 -> 9.09, effect-blur.c 6.01 -> 7.36, enhance.c 7.13 -> 7.49 (Opus, 23 commits)
+
+Two splits: `effect-preview.c` (8.40) and `enhance-clahe.c` (8.71); **add both to the Windows build
+configuration.** Tool fix in its own commit (df35436d9): `tools/split_source.py` strips comments before building
+the call graph (the word "Contrast" in a comment counted as a call of the static `Contrast`). Upstream, not
+changed: `effect-blur.c` defines `MagickSigma` twice, identically.
