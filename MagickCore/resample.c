@@ -637,6 +637,96 @@ static void CountEdgeHits(const ResampleFilter *resample_filter,
   }
 }
 
+static void CountImageHits(const ResampleFilter *resample_filter,
+  const double u0,const double v0,ssize_t *hit)
+{
+  if (IsAreaOutsideImage(resample_filter,u0,v0) != MagickFalse)
+    (*hit)++;
+}
+
+static void CountAreaHits(const ResampleFilter *resample_filter,
+  const double u0,const double v0,ssize_t *hit)
+{
+  switch ( resample_filter->virtual_pixel ) {
+    default:
+    {
+      CountEdgeHits(resample_filter,u0,v0,hit);
+      break;
+    }
+    case TileVirtualPixelMethod:
+    case MirrorVirtualPixelMethod:
+    case RandomVirtualPixelMethod:
+    case HorizontalTileEdgeVirtualPixelMethod:
+    case VerticalTileEdgeVirtualPixelMethod:
+    case CheckerTileVirtualPixelMethod:
+      /* resampling of area is always needed - no VP limits */
+      break;
+  }
+}
+
+static ssize_t CountResampleHits(const ResampleFilter *resample_filter,
+  const double u0,const double v0)
+{
+  ssize_t
+    hit;
+
+  hit = 0;
+  switch ( resample_filter->virtual_pixel ) {
+    case BackgroundVirtualPixelMethod:
+    case TransparentVirtualPixelMethod:
+    case BlackVirtualPixelMethod:
+    case GrayVirtualPixelMethod:
+    case WhiteVirtualPixelMethod:
+    case MaskVirtualPixelMethod:
+      CountImageHits(resample_filter,u0,v0,&hit);
+      break;
+
+    default:
+    {
+      CountAreaHits(resample_filter,u0,v0,&hit);
+      break;
+    }
+  }
+  return(hit);
+}
+
+static MagickBooleanType TryResampleShortcut(const ResampleLimitPoint *area,
+  PixelInfo *pixel,MagickBooleanType status,MagickBooleanType *result)
+{
+  ssize_t
+    hit;
+
+  hit = CountResampleHits(area->resample_filter,area->u0,area->v0);
+  if ( hit ) {
+    /* The area being resampled is simply a solid color
+     * just return a single lookup color.
+     *
+     * Should this return the users requested interpolated color?
+     */
+    status=InterpolatePixelInfo(area->resample_filter->image,
+      area->resample_filter->view,IntegerInterpolatePixel,area->u0,area->v0,
+      pixel,area->resample_filter->exception);
+    (*result)=status;
+    return(MagickTrue);
+  }
+
+  /*
+    When Scaling limits reached, return an 'averaged' result.
+  */
+  if ( area->resample_filter->limit_reached ) {
+    ResampleLimitPoint
+      point;
+
+    point.resample_filter=area->resample_filter;
+    point.u0=area->u0;
+    point.v0=area->v0;
+    point.exception=area->exception;
+    (*result)=ResampleLimitedPixel(&point,pixel,status);
+    return(MagickTrue);
+  }
+  return(MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -676,7 +766,11 @@ MagickExport MagickBooleanType ResamplePixelColor(
   PixelInfo *pixel,ExceptionInfo *exception)
 {
   MagickBooleanType
+    returned,
     status;
+
+  ResampleLimitPoint
+    area;
 
   ssize_t u,v, v1, v2, uw, hit;
   double u1;
@@ -708,56 +802,12 @@ MagickExport MagickBooleanType ResamplePixelColor(
     However it probably should be expanded to image bounds plus the filters
     scaled support size.
   */
-  hit = 0;
-  switch ( resample_filter->virtual_pixel ) {
-    case BackgroundVirtualPixelMethod:
-    case TransparentVirtualPixelMethod:
-    case BlackVirtualPixelMethod:
-    case GrayVirtualPixelMethod:
-    case WhiteVirtualPixelMethod:
-    case MaskVirtualPixelMethod:
-      if (IsAreaOutsideImage(resample_filter,u0,v0) != MagickFalse)
-        hit++;
-      break;
-
-    default:
-    {
-      CountEdgeHits(resample_filter,u0,v0,&hit);
-      break;
-    }
-    case TileVirtualPixelMethod:
-    case MirrorVirtualPixelMethod:
-    case RandomVirtualPixelMethod:
-    case HorizontalTileEdgeVirtualPixelMethod:
-    case VerticalTileEdgeVirtualPixelMethod:
-    case CheckerTileVirtualPixelMethod:
-      /* resampling of area is always needed - no VP limits */
-      break;
-  }
-  if ( hit ) {
-    /* The area being resampled is simply a solid color
-     * just return a single lookup color.
-     *
-     * Should this return the users requested interpolated color?
-     */
-    status=InterpolatePixelInfo(resample_filter->image,resample_filter->view,
-      IntegerInterpolatePixel,u0,v0,pixel,resample_filter->exception);
-    return(status);
-  }
-
-  /*
-    When Scaling limits reached, return an 'averaged' result.
-  */
-  if ( resample_filter->limit_reached ) {
-    ResampleLimitPoint
-      point;
-
-    point.resample_filter=resample_filter;
-    point.u0=u0;
-    point.v0=v0;
-    point.exception=exception;
-    return(ResampleLimitedPixel(&point,pixel,status));
-  }
+  area.resample_filter=resample_filter;
+  area.u0=u0;
+  area.v0=v0;
+  area.exception=exception;
+  if (TryResampleShortcut(&area,pixel,status,&returned) != MagickFalse)
+    return(returned);
 
   /*
     Initialize weighted average data collection
@@ -1661,8 +1711,7 @@ MagickExport void SetResampleFilter(ResampleFilter *resample_filter,
 %    o method: the interpolation method.
 %
 */
-MagickExport MagickBooleanType SetResampleFilterInterpolateMethod(
-  ResampleFilter *resample_filter,const PixelInterpolateMethod method)
+static void CheckResampleFilter(const ResampleFilter *resample_filter)
 {
   assert(resample_filter != (ResampleFilter *) NULL);
   assert(resample_filter->signature == MagickCoreSignature);
@@ -1670,6 +1719,12 @@ MagickExport MagickBooleanType SetResampleFilterInterpolateMethod(
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       resample_filter->image->filename);
+}
+
+MagickExport MagickBooleanType SetResampleFilterInterpolateMethod(
+  ResampleFilter *resample_filter,const PixelInterpolateMethod method)
+{
+  CheckResampleFilter(resample_filter);
   resample_filter->interpolate=method;
   return(MagickTrue);
 }
@@ -1703,12 +1758,7 @@ MagickExport MagickBooleanType SetResampleFilterInterpolateMethod(
 MagickExport MagickBooleanType SetResampleFilterVirtualPixelMethod(
   ResampleFilter *resample_filter,const VirtualPixelMethod method)
 {
-  assert(resample_filter != (ResampleFilter *) NULL);
-  assert(resample_filter->signature == MagickCoreSignature);
-  assert(resample_filter->image != (Image *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      resample_filter->image->filename);
+  CheckResampleFilter(resample_filter);
   resample_filter->virtual_pixel=method;
   if (method != UndefinedVirtualPixelMethod)
     (void) SetCacheViewVirtualPixelMethod(resample_filter->view,method);
