@@ -338,3 +338,15 @@ name, which broke configure; it now registers MagickCore entries only. Campaign 
 the mandate, not yet ruled on: **Recipe I step 2** (551c09acc): a temporary whose declaration in the new function
 would leave a variable written but never read (clang's `-Wunused-but-set-variable`, an error in CI) is a written
 variable of the step instead. `transform.c` unchanged.
+
+## Lane c, eleventh batch: the honest fx.c rework (Opus, 7 flat commits)
+
+Seven commits take GetOperator, GetProperty, AcquireFxInfoPrivate, DumpTables, GetOperand, DumpRPN and FxImage out
+of one category each (flat, rule 2); `fx.c` stays 3.62. **ExecuteRPN, measured and not committed:** a split that
+follows the code (20 SD links of adjacent groups in source order, named CopyControl, ConditionalJump, Jump,
+LoopFunction, PixelFunction..., Arithmetic, AssignOrValue; one shared input struct) is finding-free and clone-free and
+lifts the file to 3.74 (5.34 once the five other big functions are done), but makes `-fx` about **17% slower** per
+pixel (median 0.183 s against 0.156 s, 9 runs each); the three control links alone cost 12%. The parked annealed
+chain (`w14-fx-annealed`, 5.93) has the same call-chain structure, so it would cost at least as much. **Owner
+decision:** accept a slower `-fx` for the score, or leave `ExecuteRPN` whole. Note: `DestroyFxInfoOnFailure` now
+has one shared call for four failure returns (call guard -3), stated in 36b1ea6da.
