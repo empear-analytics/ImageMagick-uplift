@@ -257,13 +257,168 @@ static Image *FinishCombineImage(Image *combine_image,
   return(combine_image);
 }
 
-MagickExport Image *CombineImages(const Image *image,
-  const ColorspaceType colorspace,ExceptionInfo *exception)
+static void SetCombineRGBChannels(Image *combine_image,
+  const size_t number_channels,ExceptionInfo *exception)
 {
+  if (number_channels > 3)
+    combine_image->alpha_trait=BlendPixelTrait;
+  if (number_channels > 4)
+    SetPixelMetaChannels(combine_image,number_channels-4,exception);
+}
+
+static void SetCombineGrayChannels(Image *combine_image,
+  const size_t number_channels,ExceptionInfo *exception)
+{
+  if (number_channels > 1)
+    combine_image->alpha_trait=BlendPixelTrait;
+  if (number_channels > 2)
+    SetPixelMetaChannels(combine_image,number_channels-2,exception);
+}
+
+static void SetCombineChannels(Image *combine_image,
+  const size_t number_channels,ExceptionInfo *exception)
+{
+  switch (combine_image->colorspace)
+  {
+    case UndefinedColorspace:
+    case sRGBColorspace:
+    {
+      SetCombineRGBChannels(combine_image,number_channels,exception);
+      break;
+    }
+    case LinearGRAYColorspace:
+    case GRAYColorspace:
+    {
+      SetCombineGrayChannels(combine_image,number_channels,exception);
+      break;
+    }
+    default:
+    {
+      SetCombineCMYKChannels(combine_image,number_channels,exception);
+      break;
+    }
+  }
+}
+
 #define CombineImageTag  "Combine/Image"
+
+static void SetCombineProgress(const Image *image,const Image *combine_image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,CombineImageTag,progress,
+    combine_image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+typedef struct _CombineRows
+{
+  const Image
+    *image;
+
+  Image
+    *combine_image;
 
   CacheView
     *combine_view;
+
+  ExceptionInfo
+    *exception;
+} CombineRows;
+
+static MagickBooleanType CombineImageRows(const CombineRows *rows,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const image = rows->image;
+
+  Image
+    *const combine_image = rows->combine_image;
+
+  CacheView
+    *const combine_view = rows->combine_view;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  CombineImageRowInfo
+    image_row;
+
+  Quantum
+    *pixels;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  pixels=GetCacheViewAuthenticPixels(combine_view,0,y,combine_image->columns,
+    1,exception);
+  if (pixels == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  image_row.image=image;
+  image_row.combine_image=combine_image;
+  image_row.pixels=pixels;
+  image_row.y=y;
+  image_row.exception=exception;
+  CombineImageRow(&image_row);
+  if (SyncCacheViewAuthenticPixels(combine_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static MagickBooleanType CombineRowsLoop(const CombineRows *combine_rows,
+  MagickOffsetType progress,MagickBooleanType status)
+{
+  const Image
+    *const image = combine_rows->image;
+
+  Image
+    *const combine_image = combine_rows->combine_image;
+
+  CacheView
+    *const combine_view = combine_rows->combine_view;
+
+  ExceptionInfo
+    *const exception = combine_rows->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(combine_image,combine_image,combine_image->rows,4)
+#endif
+  for (y=0; y < (ssize_t) combine_image->rows; y++)
+  {
+    const CombineRows
+      rows = { image, combine_image, combine_view, exception };
+
+    if (CombineImageRows(&rows,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetCombineProgress(image,combine_image,progress,&status);
+      }
+  }
+  return(status);
+}
+
+MagickExport Image *CombineImages(const Image *image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
+  CacheView
+    *combine_view;
+
+  CombineRows
+    rows;
 
   Image
     *combine_image;
@@ -276,9 +431,6 @@ MagickExport Image *CombineImages(const Image *image,
 
   size_t
     number_channels;
-
-  ssize_t
-    y;
 
   /*
     Ensure the image are the same size.
@@ -299,82 +451,18 @@ MagickExport Image *CombineImages(const Image *image,
     }
   SetCombineImageColorspace(image,combine_image,colorspace,exception);
   number_channels=GetImageListLength(image);
-  switch (combine_image->colorspace)
-  {
-    case UndefinedColorspace:
-    case sRGBColorspace:
-    {
-      if (number_channels > 3)
-        combine_image->alpha_trait=BlendPixelTrait;
-      if (number_channels > 4)
-        SetPixelMetaChannels(combine_image,number_channels-4,exception);
-      break;
-    }
-    case LinearGRAYColorspace:
-    case GRAYColorspace:
-    {
-      if (number_channels > 1)
-        combine_image->alpha_trait=BlendPixelTrait;
-      if (number_channels > 2)
-        SetPixelMetaChannels(combine_image,number_channels-2,exception);
-      break;
-    }
-    default:
-    {
-      SetCombineCMYKChannels(combine_image,number_channels,exception);
-      break;
-    }
-  }
+  SetCombineChannels(combine_image,number_channels,exception);
   /*
     Combine images.
   */
   status=MagickTrue;
   progress=0;
   combine_view=AcquireAuthenticCacheView(combine_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(combine_image,combine_image,combine_image->rows,4)
-#endif
-  for (y=0; y < (ssize_t) combine_image->rows; y++)
-  {
-    CombineImageRowInfo
-      image_row;
-
-    Quantum
-      *pixels;
-
-    if (status == MagickFalse)
-      continue;
-    pixels=GetCacheViewAuthenticPixels(combine_view,0,y,combine_image->columns,
-      1,exception);
-    if (pixels == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    image_row.image=image;
-    image_row.combine_image=combine_image;
-    image_row.pixels=pixels;
-    image_row.y=y;
-    image_row.exception=exception;
-    CombineImageRow(&image_row);
-    if (SyncCacheViewAuthenticPixels(combine_view,exception) == MagickFalse)
-      status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        proceed=SetImageProgress(image,CombineImageTag,progress,
-          combine_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
-  }
+  rows.image=image;
+  rows.combine_image=combine_image;
+  rows.combine_view=combine_view;
+  rows.exception=exception;
+  status=CombineRowsLoop(&rows,progress,status);
   combine_view=DestroyCacheView(combine_view);
   combine_image=FinishCombineImage(combine_image,status);
   return(combine_image);
