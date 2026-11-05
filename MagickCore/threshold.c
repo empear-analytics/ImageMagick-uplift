@@ -1071,6 +1071,13 @@ static void SetThresholdMapId(ThresholdMap *map,XMLTreeInfo *threshold)
     map->map_id=ConstantString(attribute);
 }
 
+static void ResetThresholdMap(ThresholdMap *map)
+{
+  map->map_id=(char *) NULL;
+  map->description=(char *) NULL;
+  map->levels=(ssize_t *) NULL;
+}
+
 static ThresholdMap *AcquireThresholdMap(XMLTreeInfo *threshold,
   XMLTreeInfo *description)
 {
@@ -1081,9 +1088,7 @@ static ThresholdMap *AcquireThresholdMap(XMLTreeInfo *threshold,
     *map;
 
   map=(ThresholdMap *) AcquireCriticalMemory(sizeof(*map));
-  map->map_id=(char *) NULL;
-  map->description=(char *) NULL;
-  map->levels=(ssize_t *) NULL;
+  ResetThresholdMap(map);
   SetThresholdMapId(map,threshold);
   content=GetXMLTreeContent(description);
   if (content != (char *) NULL)
