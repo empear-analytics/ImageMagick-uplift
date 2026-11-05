@@ -2565,8 +2565,8 @@ through a jump or a `return`.
 1. The block meets Recipe O steps 1 to 3: it lies outside every OpenMP region (or in a
    parallel loop body under O step 1's condition) with no `#pragma` line; every variable
    it writes is a plain local of the caller whose address is not taken elsewhere, at
-   most four of them; it contains no `return`, `goto`, or `continue` or `break` that
-   leaves it.
+   most four of them (five or six in step 7's form); it contains no `return`, `goto`,
+   or `continue` or `break` that leaves it.
 2. Put the variables the block only reads, scalars, pointers and struct values (Recipe N
    step 2), none written in the block, in a struct as Recipe N steps 2 and 3 do: one
    member per variable, the variable's exact type and name, a top-level `const` or
@@ -2584,6 +2584,17 @@ through a jump or a `return`.
    the call.
 6. Call it where the block stood with `&name` and `&v` for each written variable, at
    most four arguments in all; check every member and argument by reading.
+7. Five or six written variables. When the block writes five or six variables of the
+   caller (each meeting step 1), pass their addresses in one `const` struct, Recipe Q
+   step 8's form: a `typedef struct` directly above the new function with one pointer
+   member per written variable, named as the variable, in the order the block first
+   writes them, holding addresses only. The function takes `const Name *name` (step 2,
+   or the one input it needs) and then `const Targets *targets`, binds each member once
+   at the top of its body (`T *const v = targets->v;`) and writes `(*v)` as step 4 says.
+   The caller declares the struct `const` at the top of its body, once, with the
+   addresses as the initialiser (`const Targets targets = { &a, &b, &c, &d, &e };`)
+   and calls `Helper(&name,&targets);`, so step 6's arguments are the two structs.
+   Nothing else in the text changes.
 
 **Before:**
 
@@ -2672,6 +2683,12 @@ static void ConvertColorThresholdRange(const ColorThresholdRange *range,
   tokens and their order stay as they were.
 - Out-parameters must name different objects: two locals of the caller whose addresses
   are not taken elsewhere cannot alias, nor alias a member's pointee.
+- Under step 7 the written variables stay the caller's own locals, read and written
+  directly everywhere else; only their addresses travel, fixed at the declaration, bound
+  once to `*const` locals in the helper, so each `*v` is the object `&v` named in the
+  four-variable form, in the same order (Recipe I's and Recipe Q step 8's argument). The
+  addresses are of distinct locals whose address nothing else takes, so no two members
+  alias, and the struct is read by nothing but the call.
 - The function must be oracle-verified, with a case for each branch the score rests on
   where one exists; the guard sees the moved literals but not a write that went missing.
 
@@ -2682,7 +2699,11 @@ nothing else moved), and steps 1, 2 and 6 checked by reading.
 `switch` sets `start` and `stop` and reads the image, both source colours and the
 illuminant: six arguments under Recipe O. A probe: cc 20 to 13, 146 to 92 lines, 4.46 to
 4.58. Added by Claude Code (Claude Opus 5.5) during task W08, under the mandate of
-2026-10-24.
+2026-10-24. Step 7 (2026-11-05, W13): `fx.c`'s `ExecuteRPN`, whose argument pops (`switch
+(pel->number_args)`, five cases and a default) assign `regA` to `regE` from `PopVal`, one
+variable more than step 1 allowed; a probe moving the pops, the run-time address check and
+the nested push test together: ExecuteRPN leaves Bumpy Road Ahead, 3.33 to 3.35. Added by
+Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -5989,3 +6010,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-04 | AMEND | LB | Step 4: a block inside a loop's body, in a function with no OpenMP region, may take its input struct filled once before the loop (Recipe OC step 6's form), shared by the loop's blocks and passed on unchanged to a helper's own helpers; nothing from the fill to the loop's end writes a member's variable | `resize-scale.c`'s `ScaleImage` (campaign A, W13): its row loop's body holds four blocks (the Y-direction scale, the single-row fetch, the sync and the progress test) and then is itself a block to move; all read the same nine variables, and a struct filled before each call would add the fill's lines to a function whose Large Method is its length | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | LB | Step 8: up to six written variables share the one struct when the caller declares it `const`, once, with the addresses as its initialiser (Recipe Q step 8's form) and passes it to every helper that writes any of them; the helpers take it as one parameter | `resize-scale.c`'s `ScaleImage` (campaign A, W13): the row loop's body and its Y-direction block write `n`, `status`, `number_rows`, `span`, `scale` and `next_row`, the six addresses `AccumulateScaleRows` already takes in `targets`; step 8 stopped at four. A probe of the Y-direction block (the rest of the body as it stood): 8.46 to 8.53; with the single-row fetch, the sync and the progress test as helpers 8.62, and the body itself as a helper over them 8.78 | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | PC | Step 2: body variables that the head writes and the tail reads (at most two) go by pointer, every use `(*v)`, and a shared variable the head only reads goes by pointer to `const`; step 4 places these pointers between the struct and `status`. Still five steps | `statistic-measure.c`'s `GetImageRange` (campaign A, W13): the head fetches the row, copies the shared `range_info` into the body's `channel_range`, and accumulates into it; the `omp critical` tail then merges it, which PC step 2 refused. A probe: 9.68 to 10.00, no finding on the helper | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | Z | Step 1 and new step 7: a selection that sets five or six of the caller's locals passes their addresses in one `const` struct (Recipe Q step 8's form), after the input struct, so the helper takes two parameters; step 1's four-variable limit holds for the separate-pointer form | `fx.c`'s `ExecuteRPN` (campaign A, W13): the `number_args` `switch` pops into `regA` to `regE`, five written locals, one more than step 1; with the nested push test (CN) and the address check (E) it holds two of the function's last three bumps. A probe: ExecuteRPN leaves Bumpy Road Ahead, 3.33 to 3.35, no finding on the helper | mandate (2026-10-24) |
