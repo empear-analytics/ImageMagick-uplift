@@ -2059,6 +2059,13 @@ static inline MagickBooleanType IsAttributeQualified(FxInfo *pfx,
     iaQual != aNull) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsChannelQualifiedAttr(const ImgAttrE iaQual,
+  const PixelChannel chQual)
+{
+  return((iaQual != aNull && chQual != NO_CHAN_QUAL) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline MagickBooleanType IsUnqualifiedAccess(
   const MagickBooleanType coordQual,const PixelChannel chQual,
   const ImgAttrE iaQual)
@@ -2623,7 +2630,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   if (QualifyFunction (pfx, &qualifiers) == MagickFalse)
     return MagickFalse;
 
-  if (iaQual != aNull && chQual != NO_CHAN_QUAL) {
+  if (IsChannelQualifiedAttr(iaQual,chQual) != MagickFalse) {
     if (!CheckAttrChannelQualifier (pfx, iaQual, chQual)) return MagickFalse;
   }
 
