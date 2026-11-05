@@ -113,6 +113,84 @@ typedef enum
   TransferChannelOp
 } ChannelFx;
 
+typedef struct _ChannelRow
+{
+  const Image
+    *source_image;
+
+  Image
+    *destination_image;
+
+  CacheView
+    *source_view,
+    *destination_view;
+
+  PixelChannel
+    destination_channel,
+    source_channel;
+
+  ChannelFx
+    channel_op;
+
+  Quantum
+    pixel;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
+} ChannelRow;
+
+static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  PixelTrait
+    destination_traits,
+    source_traits;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(row->source_view,0,y,row->source_image->columns,1,
+    row->exception);
+  q=GetCacheViewAuthenticPixels(row->destination_view,0,y,
+    row->destination_image->columns,1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  destination_traits=GetPixelChannelTraits(row->destination_image,
+    row->destination_channel);
+  source_traits=GetPixelChannelTraits(row->source_image,row->source_channel);
+  if ((destination_traits == UndefinedPixelTrait) ||
+      (source_traits == UndefinedPixelTrait))
+    return;
+  for (x=0; x < (ssize_t) row->width; x++)
+  {
+    if (row->channel_op == AssignChannelOp)
+      SetPixelChannel(row->destination_image,row->destination_channel,
+        row->pixel,q);
+    else
+      SetPixelChannel(row->destination_image,row->destination_channel,
+        GetPixelChannel(row->source_image,row->source_channel,p),q);
+    p+=(ptrdiff_t) GetPixelChannels(row->source_image);
+    q+=(ptrdiff_t) GetPixelChannels(row->destination_image);
+  }
+  if (SyncCacheViewAuthenticPixels(row->destination_view,row->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType ChannelImage(Image *destination_image,
   const PixelChannel destination_channel,const ChannelFx channel_op,
   const Image *source_image,const PixelChannel source_channel,
@@ -145,48 +223,12 @@ static MagickBooleanType ChannelImage(Image *destination_image,
 #endif
   for (y=0; y < (ssize_t) height; y++)
   {
-    PixelTrait
-      destination_traits,
-      source_traits;
+    const ChannelRow
+      row = { source_image, destination_image, source_view, destination_view,
+        destination_channel, source_channel, channel_op, pixel, width,
+        exception };
 
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
-      exception);
-    q=GetCacheViewAuthenticPixels(destination_view,0,y,
-      destination_image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    destination_traits=GetPixelChannelTraits(destination_image,
-      destination_channel);
-    source_traits=GetPixelChannelTraits(source_image,source_channel);
-    if ((destination_traits == UndefinedPixelTrait) ||
-        (source_traits == UndefinedPixelTrait))
-      continue;
-    for (x=0; x < (ssize_t) width; x++)
-    {
-      if (channel_op == AssignChannelOp)
-        SetPixelChannel(destination_image,destination_channel,pixel,q);
-      else
-        SetPixelChannel(destination_image,destination_channel,
-          GetPixelChannel(source_image,source_channel,p),q);
-      p+=(ptrdiff_t) GetPixelChannels(source_image);
-      q+=(ptrdiff_t) GetPixelChannels(destination_image);
-    }
-    if (SyncCacheViewAuthenticPixels(destination_view,exception) == MagickFalse)
-      status=MagickFalse;
+    ChannelImageRow(&row,y,&status);
   }
   destination_view=DestroyCacheView(destination_view);
   source_view=DestroyCacheView(source_view);
