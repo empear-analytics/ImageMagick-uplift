@@ -949,17 +949,41 @@ static MagickBooleanType SetActivateAssociateAlpha(Image *image,
   return(SyncAlphaChannelCache(image,status,exception));
 }
 
-MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
-  const AlphaChannelOption alpha_type,ExceptionInfo *exception)
+static MagickBooleanType DisassociateAlphaImage(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
 {
   CacheView
     *image_view;
 
-  MagickBooleanType
-    status;
-
   ssize_t
     y;
+
+  image->alpha_trait=BlendPixelTrait;
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    DisassociateAlphaRowsInfo
+      info;
+
+    info.image=image;
+    info.image_view=image_view;
+    info.exception=exception;
+    DisassociateAlphaRows(&status,&info,y);
+  }
+  image_view=DestroyCacheView(image_view);
+  image->alpha_trait=UndefinedPixelTrait;
+  return(status);
+}
+
+MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
+  const AlphaChannelOption alpha_type,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
 
   assert(image != (Image *) NULL);
   if (IsEventLogging() != MagickFalse)
@@ -978,25 +1002,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
       status=SetImageStorageClass(image,DirectClass,exception);
       if (status == MagickFalse)
         break;
-      image->alpha_trait=BlendPixelTrait;
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        DisassociateAlphaRowsInfo
-          info;
-
-        info.image=image;
-        info.image_view=image_view;
-        info.exception=exception;
-        DisassociateAlphaRows(&status,&info,y);
-      }
-      image_view=DestroyCacheView(image_view);
-      image->alpha_trait=UndefinedPixelTrait;
-      return(status);
+      return(DisassociateAlphaImage(image,status,exception));
     }
     case OffAlphaChannel:
     {
