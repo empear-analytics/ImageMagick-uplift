@@ -345,6 +345,13 @@ static RectangleInfo ClampChopExtent(const Image *image,
   return(extent);
 }
 
+static inline MagickBooleanType IsChopExtentTooLarge(const Image *image,
+  const RectangleInfo extent)
+{
+  return(((extent.width >= image->columns) || (extent.height >= image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
 static Image *FinishChopImage(const Image *image,Image *chop_image,
   CacheView *image_view,const MagickBooleanType status)
 {
@@ -393,7 +400,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
   extent=(*chop_info);
   extent=ClampChopExtent(image,extent);
-  if ((extent.width >= image->columns) || (extent.height >= image->rows))
+  if (IsChopExtentTooLarge(image,extent) != MagickFalse)
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
   chop_image=CloneImage(image,image->columns-extent.width,image->rows-
     extent.height,MagickTrue,exception);
