@@ -325,13 +325,21 @@ static void SetGradientCenter(GradientInfo *gradient,const Image *image)
       &gradient->center.y);
 }
 
-MagickExport MagickBooleanType GradientImage(Image *image,
-  const GradientType type,const SpreadMethod method,const StopInfo *stops,
-  const size_t number_stops,ExceptionInfo *exception)
+static void SetGradientAngle(GradientInfo *gradient,const Image *image,
+  const GradientType type)
 {
   const char
     *artifact;
 
+  artifact=GetImageArtifact(image,"gradient:angle");
+  if ((type == LinearGradient) && (artifact != (const char *) NULL))
+    SetGradientAngleVector(gradient,image);
+}
+
+MagickExport MagickBooleanType GradientImage(Image *image,
+  const GradientType type,const SpreadMethod method,const StopInfo *stops,
+  const size_t number_stops,ExceptionInfo *exception)
+{
   DrawInfo
     *draw_info;
 
@@ -356,9 +364,7 @@ MagickExport MagickBooleanType GradientImage(Image *image,
   SetGradientBoundingBox(gradient,image);
   SetGradientVector(gradient,image,type);
   SetGradientCenter(gradient,image);
-  artifact=GetImageArtifact(image,"gradient:angle");
-  if ((type == LinearGradient) && (artifact != (const char *) NULL))
-    SetGradientAngleVector(gradient,image);
+  SetGradientAngle(gradient,image,type);
   SetGradientRadii(gradient,image);
   gradient->spread=method;
   /*
