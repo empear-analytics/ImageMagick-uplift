@@ -170,3 +170,18 @@ other campaign to pick up:** `tools/split_source.py` (in 2b2bbb75b) handles thos
 (inside the split commit 806c5d3fb, not in a commit of its own as AGENTS.md asks) skips `Make.com` when the
 original is not listed there. Upstream, not changed: `WaveletDenoiseImage` reports progress under the AddNoise
 tag; `MorphImages` leaks `morph_images` when `SetImageStorageClass` fails on a resized frame.
+
+## Lane c, sixth file: shear-rotate.c 7.63 -> 10.0, shear.c 8.03 -> 8.61 (Opus, 16 commits)
+
+Amendments under the mandate, not yet ruled on: **PS step 7** (e0c450691: a sequential loop nested in the
+parallel iteration whose whole body is the block), **PC step 1** (582859690: the head of a nested sequential
+loop's body when the tail holds an `omp critical`), **HC step 2** (e66a49696: the block may read, test and assign
+the shared `status` outside the critical constructs, by pointer), **HC step 3** (61d1601d8: a callee that may take
+another lock is allowed because the construct moves whole and unchanged), **LB step 1** (f3711acaa: a PS step 7
+helper's body counts as the loop body). **Review:** 9cd200adc is a rule 1 set that mixes six recipes on
+`IntegralRotateImage`; the 2026-10-31 amendment admits mixed recipes when *Overall Code Complexity* lowers each
+block alone; here the measured chain goes 7.64 -> 7.38 -> ... -> 7.65, so check it against rule 1's text.
+*Overall Code Complexity* is a finding of the file from 9cd200adc to 8cddcdd7d and leaves at bb9e8ad41.
+**Correction:** 9cd200adc says "271 to 198 lines"; the measured value before that step is 270. Upstream, not
+changed: `YShearImage` reports progress against `image->rows` over a width loop; X/YShear skip sync and progress on
+rows with zero displacement.
