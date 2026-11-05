@@ -468,8 +468,20 @@ typedef struct _CCCentroidPass
     *exception;
 } CCCentroidPass;
 
-static MagickBooleanType GetObjectCentroidSums(
-  const CCCentroidPass *centroid_pass,double *M00,double *M10,double *M01)
+typedef struct _CCCentroidTargets
+{
+  MagickBooleanType
+    *status;
+
+  double
+    *M00,
+    *M10,
+    *M01;
+} CCCentroidTargets;
+
+static MagickBooleanType AccumulateCentroidRow(
+  const CCCentroidPass *centroid_pass,const CCCentroidTargets *centroid_targets,
+  const ssize_t y)
 {
   const Image
     *const component_image = centroid_pass->component_image;
@@ -486,37 +498,59 @@ static MagickBooleanType GetObjectCentroidSums(
   ExceptionInfo
     *const exception = centroid_pass->exception;
 
+  MagickBooleanType
+    *const status = centroid_targets->status;
+
+  double
+    *const M00 = centroid_targets->M00,
+    *const M10 = centroid_targets->M10,
+    *const M01 = centroid_targets->M01;
+
   const Quantum
     *magick_restrict p;
+
+  ssize_t
+    x;
+
+  p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
+    bounding_box.y+y,bounding_box.width,1,exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) bounding_box.width; x++)
+  {
+    if ((ssize_t) GetPixelIndex(component_image,p) == i)
+      {
+        (*M00)++;
+        *M10+=x;
+        *M01+=y;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(component_image);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType GetObjectCentroidSums(
+  const CCCentroidPass *centroid_pass,double *M00,double *M10,double *M01)
+{
+  const RectangleInfo
+    bounding_box = centroid_pass->bounding_box;
 
   MagickBooleanType
     status;
 
+  const CCCentroidTargets
+    centroid_targets = { &status, M00, M10, M01 };
+
   ssize_t
-    x,
     y;
 
   status=MagickTrue;
   for (y=0; y < (ssize_t) bounding_box.height; y++)
-  {
-    p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
-      bounding_box.y+y,bounding_box.width,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        break;
-      }
-    for (x=0; x < (ssize_t) bounding_box.width; x++)
-    {
-      if ((ssize_t) GetPixelIndex(component_image,p) == i)
-        {
-          (*M00)++;
-          *M10+=x;
-          *M01+=y;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(component_image);
-    }
-  }
+    if (AccumulateCentroidRow(centroid_pass,&centroid_targets,y) == MagickFalse)
+      break;
   return(status);
 }
 
@@ -1660,9 +1694,41 @@ static MagickBooleanType ResolveRowEquivalences(
   return(status);
 }
 
-static void RemoveObjectsByColor(const Image *component_image,
-  CCObjectInfo *object,const char *artifact,ExceptionInfo *exception)
+typedef struct _CCColorMerge
 {
+  const Image
+    *component_image;
+
+  CCObjectInfo
+    *object;
+
+  const char
+    *artifact;
+
+  MagickBooleanType
+    merge;
+
+  ExceptionInfo
+    *exception;
+} CCColorMerge;
+
+static void MergeObjectsByColor(const CCColorMerge *color_merge)
+{
+  const Image
+    *const component_image = color_merge->component_image;
+
+  CCObjectInfo
+    *const object = color_merge->object;
+
+  const char
+    *const artifact = color_merge->artifact;
+
+  const MagickBooleanType
+    merge = color_merge->merge;
+
+  ExceptionInfo
+    *const exception = color_merge->exception;
+
   const char
     *p;
 
@@ -1683,11 +1749,25 @@ static void RemoveObjectsByColor(const Image *component_image,
     (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
       MagickPathExtent));
     (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
-    SetObjectMergeByColor(object,component_image->colors,&pixel,MagickTrue);
+    SetObjectMergeByColor(object,component_image->colors,&pixel,merge);
     if (*q == '\0')
       break;
     p=q+1;
   }
+}
+
+static void RemoveObjectsByColor(const Image *component_image,
+  CCObjectInfo *object,const char *artifact,ExceptionInfo *exception)
+{
+  CCColorMerge
+    color_merge;
+
+  color_merge.component_image=component_image;
+  color_merge.object=object;
+  color_merge.artifact=artifact;
+  color_merge.merge=MagickTrue;
+  color_merge.exception=exception;
+  MergeObjectsByColor(&color_merge);
 }
 
 static void AreaThreshold(const Image *component_image,CCObjectInfo *object,
@@ -2117,6 +2197,73 @@ static MagickBooleanType ResolveDirectionEquivalences(
   return(status);
 }
 
+typedef struct _CCEquivalenceInputs
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  MatrixInfo
+    *equivalences;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2];
+
+  ExceptionInfo
+    *exception;
+} CCEquivalenceInputs;
+
+static MagickBooleanType ResolveEquivalences(
+  const CCEquivalenceInputs *equivalence_inputs,MagickBooleanType status)
+{
+  const Image
+    *const image = equivalence_inputs->image;
+
+  CacheView
+    *const image_view = equivalence_inputs->image_view;
+
+  MatrixInfo
+    *const equivalences = equivalence_inputs->equivalences;
+
+  const size_t
+    connectivity = equivalence_inputs->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = equivalence_inputs->connect4,
+    (*const connect8)[2] = equivalence_inputs->connect8;
+
+  ExceptionInfo
+    *const exception = equivalence_inputs->exception;
+
+  ssize_t
+    n;
+
+  for (n=0; n < (ssize_t) (connectivity > 4 ? 4 : 2); n++)
+  {
+    CCEquivalencePass
+      equivalence_pass;
+
+    if (status == MagickFalse)
+      continue;
+    equivalence_pass.image=image;
+    equivalence_pass.image_view=image_view;
+    equivalence_pass.equivalences=equivalences;
+    equivalence_pass.connectivity=connectivity;
+    equivalence_pass.connect4=connect4;
+    equivalence_pass.connect8=connect8;
+    equivalence_pass.n=n;
+    equivalence_pass.exception=exception;
+    status=ResolveDirectionEquivalences(&equivalence_pass,status);
+  }
+  return(status);
+}
+
 typedef struct _CCObjectCensus
 {
   CacheView
@@ -2517,6 +2664,93 @@ static MagickBooleanType MergeObject(const CCMergeObject *merge_object,
   return(status);
 }
 
+typedef struct _CCMergeInputs
+{
+  Image
+    *component_image;
+
+  CCObjectInfo
+    *object;
+
+  size_t
+    *neighbors;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    background_id;
+
+  ExceptionInfo
+    *exception;
+} CCMergeInputs;
+
+static MagickBooleanType MergeSelectedObjects(
+  const CCMergeInputs *merge_inputs,MagickBooleanType status)
+{
+  Image
+    *const component_image = merge_inputs->component_image;
+
+  CCObjectInfo
+    *const object = merge_inputs->object;
+
+  size_t
+    *const neighbors = merge_inputs->neighbors;
+
+  const size_t
+    connectivity = merge_inputs->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = merge_inputs->connect4,
+    (*const connect8)[2] = merge_inputs->connect8;
+
+  const ssize_t
+    background_id = merge_inputs->background_id;
+
+  ExceptionInfo
+    *const exception = merge_inputs->exception;
+
+  CacheView
+    *component_view,
+    *object_view;
+
+  ssize_t
+    i;
+
+  component_view=AcquireAuthenticCacheView(component_image,exception);
+  object_view=AcquireVirtualCacheView(component_image,exception);
+  (void) SetCacheViewVirtualPixelMethod(object_view,TileVirtualPixelMethod);
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+  {
+    CCMergeObject
+      merge_object;
+
+    if (status == MagickFalse)
+      continue;
+    if ((object[i].merge == MagickFalse) || (i == background_id))
+      continue;  /* keep object */
+    /*
+      Merge this object.
+    */
+    merge_object.component_view=component_view;
+    merge_object.component_image=component_image;
+    merge_object.object_view=object_view;
+    merge_object.object=object;
+    merge_object.neighbors=neighbors;
+    merge_object.connectivity=connectivity;
+    merge_object.connect4=connect4;
+    merge_object.connect8=connect8;
+    merge_object.i=i;
+    merge_object.exception=exception;
+    status=MergeObject(&merge_object,status);
+  }
+  object_view=DestroyCacheView(object_view);
+  component_view=DestroyCacheView(component_view);
+  return(status);
+}
+
 #define ConnectedComponentsImageTag  "ConnectedComponents/Image"
 
 static void UpdateComponentsProgress(const Image *image,
@@ -2729,231 +2963,28 @@ static void ApplyAxisThresholds(const CCMetricInputs *inputs,
     }
 }
 
-MagickExport Image *ConnectedComponentsImage(const Image *image,
-  const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
+static void KeepSelectedObjects(const Image *image,
+  const Image *component_image,CCObjectInfo *object,ExceptionInfo *exception)
 {
-  CacheView
-    *component_view,
-    *image_view,
-    *object_view;
-
-  CCLabeledObjects
-    labeled_objects;
-
-  CCMetricInputs
-    inputs;
-
-  CCMetricTargets
-    targets;
-
-  CCObjectInfo
-    *object;
-
   const char
-    *artifact,
-    *metrics[CCMaxMetrics];
+    *artifact;
 
-  double
-    max_threshold,
-    min_threshold;
-
-  Image
-    *component_image;
-
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
-  MatrixInfo
-    *equivalences;
-
-  size_t
-    *neighbors,
-    size;
-
-  ssize_t
-    background_id,
-    connect4[2][2] = { { -1,  0 }, {  0, -1 } },
-    connect8[4][2] = { { -1, -1 }, { -1,  0 }, { -1,  1 }, {  0, -1 } },
-    i,
-    n,
-    y;
-
-  /*
-    Initialize connected components image attributes.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (objects != (CCObjectInfo **) NULL)
-    *objects=(CCObjectInfo *) NULL;
-  component_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (component_image == (Image *) NULL)
-    return((Image *) NULL);
-  component_image->depth=MAGICKCORE_QUANTUM_DEPTH;
-  if (AcquireImageColormap(component_image,MaxColormapSize,exception) == MagickFalse)
-    {
-      component_image=DestroyImage(component_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  /*
-    Initialize connected components equivalences.
-  */
-  size=image->columns*image->rows;
-  if (image->columns != (size/image->rows))
-    {
-      component_image=DestroyImage(component_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  equivalences=AcquireMatrixInfo(size,1,sizeof(ssize_t),exception);
-  if (equivalences == (MatrixInfo *) NULL)
-    {
-      component_image=DestroyImage(component_image);
-      return((Image *) NULL);
-    }
-  for (n=0; n < (ssize_t) (image->columns*image->rows); n++)
-    (void) SetMatrixElement(equivalences,n,0,&n);
-  object=(CCObjectInfo *) AcquireQuantumMemory(MaxColormapSize,sizeof(*object));
-  if (object == (CCObjectInfo *) NULL)
-    {
-      equivalences=DestroyMatrixInfo(equivalences);
-      component_image=DestroyImage(component_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  (void) memset(object,0,MaxColormapSize*sizeof(*object));
-  InitializeObjects(image,object);
-  /*
-    Find connected components.
-  */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (n=0; n < (ssize_t) (connectivity > 4 ? 4 : 2); n++)
-  {
-    CCEquivalencePass
-      equivalence_pass;
-
-    if (status == MagickFalse)
-      continue;
-    equivalence_pass.image=image;
-    equivalence_pass.image_view=image_view;
-    equivalence_pass.equivalences=equivalences;
-    equivalence_pass.connectivity=connectivity;
-    equivalence_pass.connect4=connect4;
-    equivalence_pass.connect8=connect8;
-    equivalence_pass.n=n;
-    equivalence_pass.exception=exception;
-    status=ResolveDirectionEquivalences(&equivalence_pass,status);
-  }
-  /*
-    Label connected components.
-  */
-  n=0;
-  component_view=AcquireAuthenticCacheView(component_image,exception);
-  for (y=0; y < (ssize_t) component_image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    const CCLabelTargets
-      label_targets = { &status, &n, &p, &q };
-
-    CCLabelRow
-      label_row;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(component_view,0,y,component_image->columns,
-      1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    label_row.image=image;
-    label_row.equivalences=equivalences;
-    label_row.object=object;
-    label_row.component_image=component_image;
-    label_row.y=y;
-    LabelObjectRow(&label_row,label_targets);
-    if (n > (ssize_t) MaxColormapSize)
-      break;
-    if (SyncCacheViewAuthenticPixels(component_view,exception) == MagickFalse)
-      status=MagickFalse;
-    UpdateComponentsProgress(image,&progress,&status);
-  }
-  component_view=DestroyCacheView(component_view);
-  image_view=DestroyCacheView(image_view);
-  equivalences=DestroyMatrixInfo(equivalences);
-  if (n > (ssize_t) MaxColormapSize)
-    {
-      object=(CCObjectInfo *) RelinquishMagickMemory(object);
-      component_image=DestroyImage(component_image);
-      ThrowImageException(ResourceLimitError,"TooManyObjects");
-    }
-  labeled_objects.image=image;
-  labeled_objects.object=object;
-  labeled_objects.component_image=component_image;
-  labeled_objects.n=n;
-  NormalizeLabeledObjects(&labeled_objects,&background_id,&min_threshold,
-    &max_threshold);
-  n=(-1);
-  artifact=GetImageArtifact(image,"connected-components:background-id");
-  if (artifact != (const char *) NULL)
-    background_id=(ssize_t) StringToLong(artifact);
-  artifact=GetImageArtifact(image,"connected-components:area-threshold");
-  if (artifact != (const char *) NULL)
-    {
-      CCThresholdRange range;
-
-      /*
-        Merge any object not within the min and max area threshold.
-      */
-      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
-        background_id);
-      AreaThreshold(component_image,object,range);
-    }
   artifact=GetImageArtifact(image,"connected-components:keep-colors");
   if (artifact != (const char *) NULL)
     {
-      const char
-        *p;
+      CCColorMerge
+        color_merge;
 
       /*
         Keep selected objects based on color, merge others.
       */
       MergeAllObjects(component_image,object);
-      for (p=artifact;  ; )
-      {
-        char
-          color[MagickPathExtent];
-
-        PixelInfo
-          pixel;
-
-        const char
-          *q;
-
-        for (q=p; *q != '\0'; q++)
-          if (*q == ';')
-            break;
-        (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
-          MagickPathExtent));
-        (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
-        SetObjectMergeByColor(object,component_image->colors,&pixel,MagickFalse);
-        if (*q == '\0')
-          break;
-        p=q+1;
-      }
+      color_merge.component_image=component_image;
+      color_merge.object=object;
+      color_merge.artifact=artifact;
+      color_merge.merge=MagickFalse;
+      color_merge.exception=exception;
+      MergeObjectsByColor(&color_merge);
     }
   artifact=GetImageArtifact(image,"connected-components:keep-ids");
   if (artifact == (const char *) NULL)
@@ -2966,19 +2997,14 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       MergeAllObjects(component_image,object);
       SetObjectMergeByIds(object,component_image->colors,artifact,MagickFalse);
     }
-  artifact=GetImageArtifact(image,"connected-components:keep-top");
-  if (artifact != (const char *) NULL)
-    {
-      /*
-        Keep top objects.
-      */
-      if (KeepTopObjects(component_image,object,artifact) == MagickFalse)
-        {
-          object=(CCObjectInfo *) RelinquishMagickMemory(object);
-          component_image=DestroyImage(component_image);
-          ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-        }
-    }
+}
+
+static void RemoveSelectedObjects(const Image *image,
+  const Image *component_image,CCObjectInfo *object,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
   artifact=GetImageArtifact(image,"connected-components:remove-colors");
   if (artifact != (const char *) NULL)
     {
@@ -2997,67 +3023,49 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       */
       SetObjectMergeByIds(object,component_image->colors,artifact,MagickTrue);
     }
-  inputs.image=image;
-  inputs.component_image=component_image;
-  inputs.object=object;
-  inputs.exception=exception;
-  inputs.background_id=background_id;
-  targets.min_threshold=(&min_threshold);
-  targets.max_threshold=(&max_threshold);
-  targets.n=(&n);
-  targets.metrics=(&metrics);
-  ApplyShapeThresholds(&inputs,&targets);
-  inputs.image=image;
-  inputs.component_image=component_image;
-  inputs.object=object;
-  inputs.exception=exception;
-  inputs.background_id=background_id;
-  targets.min_threshold=(&min_threshold);
-  targets.max_threshold=(&max_threshold);
-  targets.n=(&n);
-  targets.metrics=(&metrics);
-  ApplyAxisThresholds(&inputs,&targets);
-  /*
-    Merge any object not within the min and max area threshold.
-  */
-  neighbors=(size_t *) AcquireQuantumMemory(component_image->colors+1,
-    sizeof(*neighbors));
-  if (neighbors == (size_t *) NULL)
-    {
-      object=(CCObjectInfo *) RelinquishMagickMemory(object);
-      component_image=DestroyImage(component_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  component_view=AcquireAuthenticCacheView(component_image,exception);
-  object_view=AcquireVirtualCacheView(component_image,exception);
-  (void) SetCacheViewVirtualPixelMethod(object_view,TileVirtualPixelMethod);
-  for (i=0; i < (ssize_t) component_image->colors; i++)
-  {
-    CCMergeObject
-      merge_object;
+}
 
-    if (status == MagickFalse)
-      continue;
-    if ((object[i].merge == MagickFalse) || (i == background_id))
-      continue;  /* keep object */
-    /*
-      Merge this object.
-    */
-    merge_object.component_view=component_view;
-    merge_object.component_image=component_image;
-    merge_object.object_view=object_view;
-    merge_object.object=object;
-    merge_object.neighbors=neighbors;
-    merge_object.connectivity=connectivity;
-    merge_object.connect4=connect4;
-    merge_object.connect8=connect8;
-    merge_object.i=i;
-    merge_object.exception=exception;
-    status=MergeObject(&merge_object,status);
-  }
-  object_view=DestroyCacheView(object_view);
-  component_view=DestroyCacheView(component_view);
-  neighbors=(size_t *) RelinquishMagickMemory(neighbors);
+typedef struct _CCReportInputs
+{
+  const Image
+    *image;
+
+  Image
+    *component_image;
+
+  CCObjectInfo
+    *object,
+    **objects;
+
+  ssize_t
+    n;
+
+  ExceptionInfo
+    *exception;
+} CCReportInputs;
+
+static Image *ReportConnectedComponents(const CCReportInputs *report_inputs,
+  const char **metrics,MagickBooleanType status)
+{
+  const Image
+    *const image = report_inputs->image;
+
+  Image
+    *const component_image = report_inputs->component_image;
+
+  CCObjectInfo
+    *object = report_inputs->object,
+    **const objects = report_inputs->objects;
+
+  const ssize_t
+    n = report_inputs->n;
+
+  ExceptionInfo
+    *const exception = report_inputs->exception;
+
+  const char
+    *artifact;
+
   artifact=GetImageArtifact(image,"connected-components:mean-color");
   if (IsStringTrue(artifact) != MagickFalse)
     {
@@ -3087,6 +3095,745 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   else
     *objects=object;
   return(component_image);
+}
+
+static MagickBooleanType SyncComponentView(CacheView *component_view,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  if (SyncCacheViewAuthenticPixels(component_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
+typedef struct _CCLabelInputs
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  MatrixInfo
+    *equivalences;
+
+  CCObjectInfo
+    *object;
+
+  Image
+    *component_image;
+
+  ExceptionInfo
+    *exception;
+} CCLabelInputs;
+
+typedef struct _CCLabelCounts
+{
+  ssize_t
+    *n;
+
+  MagickBooleanType
+    *status;
+
+  MagickOffsetType
+    *progress;
+} CCLabelCounts;
+
+static void LabelConnectedComponents(const CCLabelInputs *label_inputs,
+  const CCLabelCounts *label_counts)
+{
+  const Image
+    *const image = label_inputs->image;
+
+  CacheView
+    *const image_view = label_inputs->image_view;
+
+  MatrixInfo
+    *const equivalences = label_inputs->equivalences;
+
+  CCObjectInfo
+    *const object = label_inputs->object;
+
+  Image
+    *const component_image = label_inputs->component_image;
+
+  ExceptionInfo
+    *const exception = label_inputs->exception;
+
+  ssize_t
+    *const n = label_counts->n;
+
+  MagickBooleanType
+    *const status = label_counts->status;
+
+  MagickOffsetType
+    *const progress = label_counts->progress;
+
+  CacheView
+    *component_view;
+
+  ssize_t
+    y;
+
+  (*n)=0;
+  component_view=AcquireAuthenticCacheView(component_image,exception);
+  for (y=0; y < (ssize_t) component_image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    Quantum
+      *magick_restrict q;
+
+    const CCLabelTargets
+      label_targets = { status, n, &p, &q };
+
+    CCLabelRow
+      label_row;
+
+    if ((*status) == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+    q=QueueCacheViewAuthenticPixels(component_view,0,y,component_image->columns,
+      1,exception);
+    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+      {
+        (*status)=MagickFalse;
+        continue;
+      }
+    label_row.image=image;
+    label_row.equivalences=equivalences;
+    label_row.object=object;
+    label_row.component_image=component_image;
+    label_row.y=y;
+    LabelObjectRow(&label_row,label_targets);
+    if ((*n) > (ssize_t) MaxColormapSize)
+      break;
+    (*status)=SyncComponentView(component_view,(*status),exception);
+    UpdateComponentsProgress(image,progress,status);
+  }
+  component_view=DestroyCacheView(component_view);
+}
+
+static void InitializeEquivalences(const Image *image,
+  MatrixInfo *equivalences)
+{
+  ssize_t
+    n;
+
+  for (n=0; n < (ssize_t) (image->columns*image->rows); n++)
+    (void) SetMatrixElement(equivalences,n,0,&n);
+}
+
+typedef struct _CCFinishInputs
+{
+  const Image
+    *image;
+
+  Image
+    *component_image;
+
+  CCObjectInfo
+    *object,
+    **objects;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    background_id,
+    n;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+} CCFinishInputs;
+
+static Image *MergeAndReportComponents(const CCFinishInputs *finish_inputs,
+  const char **metrics)
+{
+  const Image
+    *const image = finish_inputs->image;
+
+  Image
+    *component_image = finish_inputs->component_image;
+
+  CCObjectInfo
+    *object = finish_inputs->object,
+    **const objects = finish_inputs->objects;
+
+  const size_t
+    connectivity = finish_inputs->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = finish_inputs->connect4,
+    (*const connect8)[2] = finish_inputs->connect8;
+
+  const ssize_t
+    background_id = finish_inputs->background_id,
+    n = finish_inputs->n;
+
+  MagickBooleanType
+    status = finish_inputs->status;
+
+  ExceptionInfo
+    *const exception = finish_inputs->exception;
+
+  CCMergeInputs
+    merge_inputs;
+
+  CCReportInputs
+    report_inputs;
+
+  size_t
+    *neighbors;
+
+  /*
+    Merge any object not within the min and max area threshold.
+  */
+  neighbors=(size_t *) AcquireQuantumMemory(component_image->colors+1,
+    sizeof(*neighbors));
+  if (neighbors == (size_t *) NULL)
+    {
+      object=(CCObjectInfo *) RelinquishMagickMemory(object);
+      component_image=DestroyImage(component_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  merge_inputs.component_image=component_image;
+  merge_inputs.object=object;
+  merge_inputs.neighbors=neighbors;
+  merge_inputs.connectivity=connectivity;
+  merge_inputs.connect4=connect4;
+  merge_inputs.connect8=connect8;
+  merge_inputs.background_id=background_id;
+  merge_inputs.exception=exception;
+  status=MergeSelectedObjects(&merge_inputs,status);
+  neighbors=(size_t *) RelinquishMagickMemory(neighbors);
+  report_inputs.image=image;
+  report_inputs.component_image=component_image;
+  report_inputs.object=object;
+  report_inputs.objects=objects;
+  report_inputs.n=n;
+  report_inputs.exception=exception;
+  return(ReportConnectedComponents(&report_inputs,metrics,status));
+}
+
+typedef struct _CCSelectionInputs
+{
+  const Image
+    *image;
+
+  CCObjectInfo
+    *object;
+
+  Image
+    *component_image;
+} CCSelectionInputs;
+
+typedef struct _CCSelectionTargets
+{
+  ssize_t
+    *background_id;
+
+  double
+    *min_threshold,
+    *max_threshold;
+
+  ssize_t
+    *n;
+} CCSelectionTargets;
+
+static void PrepareObjectSelection(const CCSelectionInputs *selection_inputs,
+  const CCSelectionTargets *selection_targets)
+{
+  const Image
+    *const image = selection_inputs->image;
+
+  CCObjectInfo
+    *const object = selection_inputs->object;
+
+  Image
+    *const component_image = selection_inputs->component_image;
+
+  ssize_t
+    *const background_id = selection_targets->background_id;
+
+  double
+    *const min_threshold = selection_targets->min_threshold,
+    *const max_threshold = selection_targets->max_threshold;
+
+  ssize_t
+    *const n = selection_targets->n;
+
+  CCLabeledObjects
+    labeled_objects;
+
+  const char
+    *artifact;
+
+  labeled_objects.image=image;
+  labeled_objects.object=object;
+  labeled_objects.component_image=component_image;
+  labeled_objects.n=(*n);
+  NormalizeLabeledObjects(&labeled_objects,background_id,min_threshold,
+    max_threshold);
+  (*n)=(-1);
+  artifact=GetImageArtifact(image,"connected-components:background-id");
+  if (artifact != (const char *) NULL)
+    (*background_id)=(ssize_t) StringToLong(artifact);
+  artifact=GetImageArtifact(image,"connected-components:area-threshold");
+  if (artifact != (const char *) NULL)
+    {
+      CCThresholdRange range;
+
+      /*
+        Merge any object not within the min and max area threshold.
+      */
+      range=GetThresholdRange(artifact,min_threshold,max_threshold,
+        (*background_id));
+      AreaThreshold(component_image,object,range);
+    }
+}
+
+typedef struct _CCThresholdInputs
+{
+  const Image
+    *image;
+
+  Image
+    *component_image;
+
+  CCObjectInfo
+    *object,
+    **objects;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    background_id;
+
+  double
+    min_threshold,
+    max_threshold;
+
+  ssize_t
+    n;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+} CCThresholdInputs;
+
+static Image *ApplyObjectThresholds(const CCThresholdInputs *threshold_inputs)
+{
+  CCFinishInputs
+    finish_inputs;
+
+  CCMetricInputs
+    inputs;
+
+  CCMetricTargets
+    targets;
+
+  const char
+    *metrics[CCMaxMetrics];
+
+  double
+    max_threshold = threshold_inputs->max_threshold,
+    min_threshold = threshold_inputs->min_threshold;
+
+  ssize_t
+    n = threshold_inputs->n;
+
+  inputs.image=threshold_inputs->image;
+  inputs.component_image=threshold_inputs->component_image;
+  inputs.object=threshold_inputs->object;
+  inputs.exception=threshold_inputs->exception;
+  inputs.background_id=threshold_inputs->background_id;
+  targets.min_threshold=(&min_threshold);
+  targets.max_threshold=(&max_threshold);
+  targets.n=(&n);
+  targets.metrics=(&metrics);
+  ApplyShapeThresholds(&inputs,&targets);
+  inputs.image=threshold_inputs->image;
+  inputs.component_image=threshold_inputs->component_image;
+  inputs.object=threshold_inputs->object;
+  inputs.exception=threshold_inputs->exception;
+  inputs.background_id=threshold_inputs->background_id;
+  targets.min_threshold=(&min_threshold);
+  targets.max_threshold=(&max_threshold);
+  targets.n=(&n);
+  targets.metrics=(&metrics);
+  ApplyAxisThresholds(&inputs,&targets);
+  finish_inputs.image=threshold_inputs->image;
+  finish_inputs.component_image=threshold_inputs->component_image;
+  finish_inputs.object=threshold_inputs->object;
+  finish_inputs.objects=threshold_inputs->objects;
+  finish_inputs.connectivity=threshold_inputs->connectivity;
+  finish_inputs.connect4=threshold_inputs->connect4;
+  finish_inputs.connect8=threshold_inputs->connect8;
+  finish_inputs.background_id=threshold_inputs->background_id;
+  finish_inputs.n=n;
+  finish_inputs.status=threshold_inputs->status;
+  finish_inputs.exception=threshold_inputs->exception;
+  return(MergeAndReportComponents(&finish_inputs,metrics));
+}
+
+static Image *SelectConnectedComponents(const CCThresholdInputs *selection)
+{
+  const Image
+    *const image = selection->image;
+
+  Image
+    *component_image = selection->component_image;
+
+  CCObjectInfo
+    *object = selection->object,
+    **const objects = selection->objects;
+
+  const size_t
+    connectivity = selection->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = selection->connect4,
+    (*const connect8)[2] = selection->connect8;
+
+  const ssize_t
+    background_id = selection->background_id,
+    n = selection->n;
+
+  const double
+    min_threshold = selection->min_threshold,
+    max_threshold = selection->max_threshold;
+
+  const MagickBooleanType
+    status = selection->status;
+
+  ExceptionInfo
+    *const exception = selection->exception;
+
+  CCThresholdInputs
+    threshold_inputs;
+
+  const char
+    *artifact;
+
+  KeepSelectedObjects(image,component_image,object,exception);
+  artifact=GetImageArtifact(image,"connected-components:keep-top");
+  /*
+    Keep top objects.
+  */
+  if ((artifact != (const char *) NULL) &&
+      (KeepTopObjects(component_image,object,artifact) == MagickFalse))
+    {
+      object=(CCObjectInfo *) RelinquishMagickMemory(object);
+      component_image=DestroyImage(component_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  RemoveSelectedObjects(image,component_image,object,exception);
+  threshold_inputs.image=image;
+  threshold_inputs.component_image=component_image;
+  threshold_inputs.object=object;
+  threshold_inputs.objects=objects;
+  threshold_inputs.connectivity=connectivity;
+  threshold_inputs.connect4=connect4;
+  threshold_inputs.connect8=connect8;
+  threshold_inputs.background_id=background_id;
+  threshold_inputs.min_threshold=min_threshold;
+  threshold_inputs.max_threshold=max_threshold;
+  threshold_inputs.n=n;
+  threshold_inputs.status=status;
+  threshold_inputs.exception=exception;
+  return(ApplyObjectThresholds(&threshold_inputs));
+}
+
+static void ResetObjectsResult(CCObjectInfo **objects)
+{
+  if (objects != (CCObjectInfo **) NULL)
+    *objects=(CCObjectInfo *) NULL;
+}
+
+typedef struct _CCLabeledInputs
+{
+  const Image
+    *image;
+
+  Image
+    *component_image;
+
+  CCObjectInfo
+    *object,
+    **objects;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    n;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+} CCLabeledInputs;
+
+static Image *SelectLabeledComponents(const CCLabeledInputs *labeled)
+{
+  const Image
+    *const image = labeled->image;
+
+  Image
+    *component_image = labeled->component_image;
+
+  CCObjectInfo
+    *object = labeled->object,
+    **const objects = labeled->objects;
+
+  const size_t
+    connectivity = labeled->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = labeled->connect4,
+    (*const connect8)[2] = labeled->connect8,
+    background_id,
+    n = labeled->n;
+
+  const MagickBooleanType
+    status = labeled->status;
+
+  ExceptionInfo
+    *const exception = labeled->exception;
+
+  CCSelectionInputs
+    selection_inputs;
+
+  CCSelectionTargets
+    selection_targets;
+
+  CCThresholdInputs
+    selection;
+
+  double
+    max_threshold,
+    min_threshold;
+
+  if (n > (ssize_t) MaxColormapSize)
+    {
+      object=(CCObjectInfo *) RelinquishMagickMemory(object);
+      component_image=DestroyImage(component_image);
+      ThrowImageException(ResourceLimitError,"TooManyObjects");
+    }
+  selection_inputs.image=image;
+  selection_inputs.object=object;
+  selection_inputs.component_image=component_image;
+  selection_targets.background_id=(&background_id);
+  selection_targets.min_threshold=(&min_threshold);
+  selection_targets.max_threshold=(&max_threshold);
+  selection_targets.n=(&n);
+  PrepareObjectSelection(&selection_inputs,&selection_targets);
+  selection.image=image;
+  selection.component_image=component_image;
+  selection.object=object;
+  selection.objects=objects;
+  selection.connectivity=connectivity;
+  selection.connect4=connect4;
+  selection.connect8=connect8;
+  selection.background_id=background_id;
+  selection.min_threshold=min_threshold;
+  selection.max_threshold=max_threshold;
+  selection.n=n;
+  selection.status=status;
+  selection.exception=exception;
+  return(SelectConnectedComponents(&selection));
+}
+
+typedef struct _CCComponentInputs
+{
+  const Image
+    *image;
+
+  Image
+    *component_image;
+
+  MatrixInfo
+    *equivalences;
+
+  CCObjectInfo
+    *object,
+    **objects;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2];
+
+  ExceptionInfo
+    *exception;
+} CCComponentInputs;
+
+static Image *FindConnectedComponents(const CCComponentInputs *components)
+{
+  CacheView
+    *image_view;
+
+  CCEquivalenceInputs
+    equivalence_inputs;
+
+  CCLabelCounts
+    label_counts;
+
+  CCLabelInputs
+    label_inputs;
+
+  CCLabeledInputs
+    labeled;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  MatrixInfo
+    *equivalences = components->equivalences;
+
+  ssize_t
+    n;
+
+  /*
+    Find connected components.
+  */
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireVirtualCacheView(components->image,components->exception);
+  equivalence_inputs.image=components->image;
+  equivalence_inputs.image_view=image_view;
+  equivalence_inputs.equivalences=equivalences;
+  equivalence_inputs.connectivity=components->connectivity;
+  equivalence_inputs.connect4=components->connect4;
+  equivalence_inputs.connect8=components->connect8;
+  equivalence_inputs.exception=components->exception;
+  status=ResolveEquivalences(&equivalence_inputs,status);
+  /*
+    Label connected components.
+  */
+  label_inputs.image=components->image;
+  label_inputs.image_view=image_view;
+  label_inputs.equivalences=equivalences;
+  label_inputs.object=components->object;
+  label_inputs.component_image=components->component_image;
+  label_inputs.exception=components->exception;
+  label_counts.n=(&n);
+  label_counts.status=(&status);
+  label_counts.progress=(&progress);
+  LabelConnectedComponents(&label_inputs,&label_counts);
+  image_view=DestroyCacheView(image_view);
+  equivalences=DestroyMatrixInfo(equivalences);
+  labeled.image=components->image;
+  labeled.component_image=components->component_image;
+  labeled.object=components->object;
+  labeled.objects=components->objects;
+  labeled.connectivity=components->connectivity;
+  labeled.connect4=components->connect4;
+  labeled.connect8=components->connect8;
+  labeled.n=n;
+  labeled.status=status;
+  labeled.exception=components->exception;
+  return(SelectLabeledComponents(&labeled));
+}
+
+MagickExport Image *ConnectedComponentsImage(const Image *image,
+  const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
+{
+  CCComponentInputs
+    components;
+
+  CCObjectInfo
+    *object;
+
+  Image
+    *component_image;
+
+  MatrixInfo
+    *equivalences;
+
+  size_t
+    size;
+
+  ssize_t
+    connect4[2][2] = { { -1,  0 }, {  0, -1 } },
+    connect8[4][2] = { { -1, -1 }, { -1,  0 }, { -1,  1 }, {  0, -1 } };
+
+  /*
+    Initialize connected components image attributes.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  ResetObjectsResult(objects);
+  component_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (component_image == (Image *) NULL)
+    return((Image *) NULL);
+  component_image->depth=MAGICKCORE_QUANTUM_DEPTH;
+  if (AcquireImageColormap(component_image,MaxColormapSize,exception) == MagickFalse)
+    {
+      component_image=DestroyImage(component_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  /*
+    Initialize connected components equivalences.
+  */
+  size=image->columns*image->rows;
+  if (image->columns != (size/image->rows))
+    {
+      component_image=DestroyImage(component_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  equivalences=AcquireMatrixInfo(size,1,sizeof(ssize_t),exception);
+  if (equivalences == (MatrixInfo *) NULL)
+    {
+      component_image=DestroyImage(component_image);
+      return((Image *) NULL);
+    }
+  InitializeEquivalences(image,equivalences);
+  object=(CCObjectInfo *) AcquireQuantumMemory(MaxColormapSize,sizeof(*object));
+  if (object == (CCObjectInfo *) NULL)
+    {
+      equivalences=DestroyMatrixInfo(equivalences);
+      component_image=DestroyImage(component_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  (void) memset(object,0,MaxColormapSize*sizeof(*object));
+  InitializeObjects(image,object);
+  /*
+    Find connected components.
+  */
+  components.image=image;
+  components.component_image=component_image;
+  components.equivalences=equivalences;
+  components.object=object;
+  components.objects=objects;
+  components.connectivity=connectivity;
+  components.connect4=connect4;
+  components.connect8=connect8;
+  components.exception=exception;
+  return(FindConnectedComponents(&components));
 }
 
 /*
