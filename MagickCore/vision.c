@@ -3453,6 +3453,74 @@ static Image *ApplyObjectThresholds(const CCThresholdInputs *threshold_inputs)
   return(MergeAndReportComponents(&finish_inputs,metrics));
 }
 
+static Image *SelectConnectedComponents(const CCThresholdInputs *selection)
+{
+  const Image
+    *const image = selection->image;
+
+  Image
+    *component_image = selection->component_image;
+
+  CCObjectInfo
+    *object = selection->object,
+    **const objects = selection->objects;
+
+  const size_t
+    connectivity = selection->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = selection->connect4,
+    (*const connect8)[2] = selection->connect8;
+
+  const ssize_t
+    background_id = selection->background_id,
+    n = selection->n;
+
+  const double
+    min_threshold = selection->min_threshold,
+    max_threshold = selection->max_threshold;
+
+  const MagickBooleanType
+    status = selection->status;
+
+  ExceptionInfo
+    *const exception = selection->exception;
+
+  CCThresholdInputs
+    threshold_inputs;
+
+  const char
+    *artifact;
+
+  KeepSelectedObjects(image,component_image,object,exception);
+  artifact=GetImageArtifact(image,"connected-components:keep-top");
+  /*
+    Keep top objects.
+  */
+  if ((artifact != (const char *) NULL) &&
+      (KeepTopObjects(component_image,object,artifact) == MagickFalse))
+    {
+      object=(CCObjectInfo *) RelinquishMagickMemory(object);
+      component_image=DestroyImage(component_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  RemoveSelectedObjects(image,component_image,object,exception);
+  threshold_inputs.image=image;
+  threshold_inputs.component_image=component_image;
+  threshold_inputs.object=object;
+  threshold_inputs.objects=objects;
+  threshold_inputs.connectivity=connectivity;
+  threshold_inputs.connect4=connect4;
+  threshold_inputs.connect8=connect8;
+  threshold_inputs.background_id=background_id;
+  threshold_inputs.min_threshold=min_threshold;
+  threshold_inputs.max_threshold=max_threshold;
+  threshold_inputs.n=n;
+  threshold_inputs.status=status;
+  threshold_inputs.exception=exception;
+  return(ApplyObjectThresholds(&threshold_inputs));
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -3475,13 +3543,10 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     selection_targets;
 
   CCThresholdInputs
-    threshold_inputs;
+    selection;
 
   CCObjectInfo
     *object;
-
-  const char
-    *artifact;
 
   double
     max_threshold,
@@ -3596,33 +3661,20 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   selection_targets.max_threshold=(&max_threshold);
   selection_targets.n=(&n);
   PrepareObjectSelection(&selection_inputs,&selection_targets);
-  KeepSelectedObjects(image,component_image,object,exception);
-  artifact=GetImageArtifact(image,"connected-components:keep-top");
-  /*
-    Keep top objects.
-  */
-  if ((artifact != (const char *) NULL) &&
-      (KeepTopObjects(component_image,object,artifact) == MagickFalse))
-    {
-      object=(CCObjectInfo *) RelinquishMagickMemory(object);
-      component_image=DestroyImage(component_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  RemoveSelectedObjects(image,component_image,object,exception);
-  threshold_inputs.image=image;
-  threshold_inputs.component_image=component_image;
-  threshold_inputs.object=object;
-  threshold_inputs.objects=objects;
-  threshold_inputs.connectivity=connectivity;
-  threshold_inputs.connect4=connect4;
-  threshold_inputs.connect8=connect8;
-  threshold_inputs.background_id=background_id;
-  threshold_inputs.min_threshold=min_threshold;
-  threshold_inputs.max_threshold=max_threshold;
-  threshold_inputs.n=n;
-  threshold_inputs.status=status;
-  threshold_inputs.exception=exception;
-  return(ApplyObjectThresholds(&threshold_inputs));
+  selection.image=image;
+  selection.component_image=component_image;
+  selection.object=object;
+  selection.objects=objects;
+  selection.connectivity=connectivity;
+  selection.connect4=connect4;
+  selection.connect8=connect8;
+  selection.background_id=background_id;
+  selection.min_threshold=min_threshold;
+  selection.max_threshold=max_threshold;
+  selection.n=n;
+  selection.status=status;
+  selection.exception=exception;
+  return(SelectConnectedComponents(&selection));
 }
 
 /*
