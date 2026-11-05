@@ -185,6 +185,61 @@ static void ConvertYDbDrThroughYUVToRGB(const GenericToRGBInput *input)
   }
 }
 
+static void ConvertOklabThroughYCbCrToRGB(const GenericToRGBInput *input)
+{
+  const ColorspaceType
+    colorspace = input->colorspace;
+
+  const double
+    X = input->X,
+    Y = input->Y,
+    Z = input->Z;
+
+  double
+    *const R = input->R,
+    *const G = input->G,
+    *const B = input->B;
+
+  switch (colorspace)
+  {
+    case OklabColorspace:
+    {
+      ConvertOklabToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case OklchColorspace:
+    {
+      ConvertOklchToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case ProPhotoColorspace:
+    {
+      ConvertProPhotoToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case xyYColorspace:
+    {
+      ConvertxyYToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case XYZColorspace:
+    {
+      ConvertXYZToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case YCbCrColorspace:
+    {
+      ConvertYCbCrToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    default:
+    {
+      ConvertYDbDrThroughYUVToRGB(input);
+      break;
+    }
+  }
+}
+
 MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
   const double X,const double Y,const double Z,const double white_luminance,
   const IlluminantType illuminant,double *R,double *G,double *B)
@@ -293,39 +348,9 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
       ConvertLuvToRGB(X,Y,Z,illuminant,R,G,B);
       break;
     }
-    case OklabColorspace:
-    {
-      ConvertOklabToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case OklchColorspace:
-    {
-      ConvertOklchToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case ProPhotoColorspace:
-    {
-      ConvertProPhotoToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case xyYColorspace:
-    {
-      ConvertxyYToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case XYZColorspace:
-    {
-      ConvertXYZToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case YCbCrColorspace:
-    {
-      ConvertYCbCrToRGB(X,Y,Z,R,G,B);
-      break;
-    }
     default:
     {
-      ConvertYDbDrThroughYUVToRGB(&input);
+      ConvertOklabThroughYCbCrToRGB(&input);
       break;
     }
   }
