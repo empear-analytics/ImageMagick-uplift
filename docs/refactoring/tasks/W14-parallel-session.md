@@ -306,3 +306,11 @@ write five or six caller variables, the helper takes Z step 7's `const Targets *
 initialisers into the helper, because every variable they point to moves too; E step 4 was cited, but no sentence
 covers this exactly. Upstream, not changed: the Threshold preview runs `BilevelImage` on the thumbnail after the
 tile has been cloned from it, so the tile shows the unthresholded image.
+
+## Lane a, sixth batch: composite.c 3.02 -> 3.08 (Opus, 15 commits)
+
+**Review:** step 13 (b6abcf5f0) keeps the cursors `p` and `q` as members of a per-row `BlurRow` struct inside a Z
+block, using N step 2's read-then-written clause, while Z step 2 says a written variable is never a member; steps
+4-7 use the member form in the four `DisplaceSetup` helpers because the const-local form made the x and y halves of
+the Distort centre code a clone pair (N's Careful item sanctions this). Upstream, not changed: `white_luminance` is
+set at its declaration and again before use; the Displace path calls `SetGeometryInfo` twice.
