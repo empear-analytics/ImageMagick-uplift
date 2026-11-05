@@ -184,3 +184,23 @@ eleven `Get*Similarity` merges in `compare.c` stay at 2.97 with it.
 just before the critical reads the shared maximum outside the lock (a benign race, kept);
 `GetMEPPSimilarity` takes a non-const `Image *` only to write `image->error`; `SimilarityImageTag` is
 `#define`d inside `GetDPCSimilarity` but used by NCC.
+
+### 05:40: composite.c, a chain that could not finish
+
+`CompositeImage` alone is worth 3.02 to 5.26 on a padded stub. A generator-built chain (28 helpers:
+20 for the per-channel pixel switch, 4 alpha, 4 coverage, 1 source-pixel) was committed on a local
+branch and measured flat at 3.02, because three switch groups with 32, 11 and 7 labels cannot sit in a
+helper under cc 9 (a group of n labels costs cc n+1 wherever it lives) and splitting a label run by
+repeating the body clones (2.64). Rule 2 forbids keeping flat steps of a plan that cannot complete, so
+the four commits are **not in this PR**; they are on the local branch `w13-composite-flat` (WSL clone,
+unpushed) and every helper in them is finding-free.
+
+**Owner decision.** Both the loop body and the setup switch removed, plus three helpers that are pure
+label runs (32, 11 and 7 labels), gives about 4.03 and leaves three Complex Method findings. May a helper
+that is a pure `switch` label run count? If yes, the chain can be finished (about 25 more commits).
+
+**Noticed upstream, not changed.** In `CompositeImage`'s Displace/Distort setup loop a failed
+`InterpolatePixelInfo` ends the loop with `break` but `status=MagickTrue` is reassigned right after the
+setup switch, so the failure is lost; the Blur setup loop exits silently on a failed fetch or sync; the
+alpha switch's `pixel` is read by `GetHueAlpha`, `GetMultiplyAlpha` and `GetDarkenIntensityAlpha` before
+any write, so it relies on its 0.0 initialiser.
