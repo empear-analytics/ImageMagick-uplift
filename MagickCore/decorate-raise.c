@@ -242,6 +242,40 @@ static void SyncRaiseRow(CacheView *image_view,ExceptionInfo *exception,
     (*status)=MagickFalse;
 }
 
+typedef struct _RaiseRows
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  const RectangleInfo
+    *raise_info;
+
+  Quantum
+    foreground,
+    background;
+} RaiseRows;
+
+static MagickBooleanType GetRaiseRow(const RaiseRows *rows,const ssize_t y,
+  Quantum *magick_restrict *q,MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*q)=GetCacheViewAuthenticPixels(rows->image_view,0,y,rows->image->columns,1,
+    rows->exception);
+  if ((*q) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType RaiseImage(Image *image,
   const RectangleInfo *raise_info,const MagickBooleanType raise,
   ExceptionInfo *exception)
@@ -285,20 +319,18 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) raise_info->height; y++)
   {
+    const RaiseRows
+      rows = { image, image_view, exception, raise_info, foreground,
+        background };
+
     Quantum
       *magick_restrict q;
 
     RaiseTop
       raise_top;
 
-    if (status == MagickFalse)
+    if (GetRaiseRow(&rows,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     raise_top.image=image;
     raise_top.foreground=foreground;
     raise_top.background=background;
@@ -319,20 +351,18 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
 #endif
   for (y=(ssize_t) raise_info->height; y < (ssize_t) (image->rows-raise_info->height); y++)
   {
+    const RaiseRows
+      rows = { image, image_view, exception, raise_info, foreground,
+        background };
+
     Quantum
       *magick_restrict q;
 
     RaiseSide
       raise_side;
 
-    if (status == MagickFalse)
+    if (GetRaiseRow(&rows,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     raise_side.image=image;
     raise_side.raise_info=raise_info;
     raise_side.foreground=foreground;
@@ -357,17 +387,15 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
     ssize_t
       x;
 
+    const RaiseRows
+      rows = { image, image_view, exception, raise_info, foreground,
+        background };
+
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    if (GetRaiseRow(&rows,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     for (x=0; x < ((ssize_t) image->rows-y); x++)
     {
       BlendPixelChannels(image,HighlightFactor,foreground,q);
