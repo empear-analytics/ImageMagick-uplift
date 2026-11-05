@@ -225,3 +225,15 @@ return(NULL);` into one check after the if/else and drops that branch's one-line
 checks is not a listed recipe step. One commit to revert if unwanted. Upstream, not changed: `PlasmaImageProxy`'s
 Right block returns MagickFalse on a missing pixel where Left, Bottom and Top return MagickTrue; `*status=Sync...`
 overwrites an earlier failure there and in `SetPlasmaMiddlePixel`.
+
+## Lane c, seventh batch: montage.c 7.66 -> 8.56, resample.c 7.42 -> 8.01, layer.c 7.08 -> 7.10 (Opus, 15 commits)
+
+**Review:** de56319d6 (`resample.c`, Recipe D) moves the shared assert-and-log preamble of
+`SetResampleFilterInterpolateMethod` and `SetResampleFilterVirtualPixelMethod` into `CheckResampleFilter`; its trace
+log now names the helper through `GetMagickModule()` (the oracle normalises it, as the playbook accepts for thrown
+warnings), and its subject line says "deduplicate" instead of "simplify <Function>". Suggested amendment (not
+written): Recipe Z step 7 for four written variables plus an input struct. Upstream, not changed:
+`MontageImageList`'s `ThrowImageException` after a failed `CloneImage` (and at the `AcquireMontageStrings` throw)
+reads `image->filename` with `image` NULL, a NULL dereference; the tile loop's progress monitor is never restored;
+`tiles_per_page` is assigned twice in a row; `resample.c`'s `#if DEBUG_NO_PIXEL_HIT` branch returns `status`
+unassigned.
