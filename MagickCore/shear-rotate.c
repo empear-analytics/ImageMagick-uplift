@@ -204,11 +204,11 @@ static void AppendRotateTransform(const Image *image,const size_t rotations,
     transform,exception);
 }
 
+#define RotateImageTag  "Rotate/Image"
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
-#define RotateImageTag  "Rotate/Image"
-
   CacheView
     *image_view,
     *rotate_view;
