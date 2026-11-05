@@ -37,3 +37,21 @@ building the same baseline in one shared directory corrupted it.
 `DistortResizeImage` ends a statement with a comma operator; the macro name `InitalBounds` is misspelt;
 `ImplodeImage` and `SwirlImage` compute `scale` in different forms; `SelectiveBlurImage` leaks `kernel`
 when its first `CloneImage` fails.
+
+## Lane c, second file: colorspace.c 4.63 -> 6.22 (Opus, 23 commits)
+
+`ConvertGenericToRGB` SD chain (four runs of up to six labels, input struct) leaves Complex and Large Method;
+`sRGBTransformImage` leaves Bumpy Road; `TransformsRGBImage` peeled with E, SD, N, PS step 7. Two amendments
+under the mandate, not yet ruled on: **Recipe N step 1** (208177141) and **Recipe Z step 1** (f693afeef) now
+admit a block outside every OpenMP region that holds whole parallel loops, moved unchanged, with every
+variable the region writes or a clause names a parameter or local of the new function by the same name. The
+row notes that W13's `sRGBToGeneric` commit (9845ba7e4) already did this before the text admitted it.
+
+Whole catalogue on the merged tree: 15,900 cases, 1 diverged: `infra/0fd402f13a` (10,300 frames to files)
+timed out at 30 s. The baseline binary run as candidate times out the same way at load average 21 (four
+lanes running), so it is machine load, not the change.
+
+Rejected: a coefficient-table helper for the OHTA/Rec601/Rec709 loops (more than one differing value for
+Recipe D; and on x87 builds a literal may keep long-double precision where an array element does not).
+Upstream, not changed: the table path of `TransformsRGBImage` returns `MagickTrue` and ignores its row
+loop's `status`.
