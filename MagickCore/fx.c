@@ -1795,6 +1795,32 @@ static MagickBooleanType GetPropertyNumber (FxInfo * pfx,
   return(MagickTrue);
 }
 
+static MagickBooleanType InterpretPropertyValue (FxInfo * pfx,
+  const char * sProperty, fxFltType *val, fxFltType *seconds)
+{
+  {
+    char * text;
+    text = InterpretImageProperties (pfx->image->image_info, pfx->image,
+       sProperty, pfx->exception);
+    if (!text || !*text) {
+      text = DestroyString(text);
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Unknown property", "'%s' at '%s'",
+        sProperty, SetShortExp(pfx));
+      return(MagickFalse);
+    }
+
+    if (seconds != NULL) {
+      if (GetPropertySeconds (pfx, &text, val, seconds) == MagickFalse)
+        return(MagickFalse);
+    } else if (GetPropertyNumber (pfx, sProperty, &text, val) == MagickFalse)
+      return(MagickFalse);
+    text = DestroyString(text);
+  }
+  return(MagickTrue);
+}
+
 static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
 /* Returns number of characters to swallow.
    Returns "-1" means invalid input.
@@ -1833,26 +1859,8 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
 
   (void) CopyMagickString (sProperty, pfx->pex, len+1);
   sProperty[len] = '\0';
-  {
-    char * text;
-    text = InterpretImageProperties (pfx->image->image_info, pfx->image,
-       sProperty, pfx->exception);
-    if (!text || !*text) {
-      text = DestroyString(text);
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Unknown property", "'%s' at '%s'",
-        sProperty, SetShortExp(pfx));
-      return -1;
-    }
-
-    if (seconds != NULL) {
-      if (GetPropertySeconds (pfx, &text, val, seconds) == MagickFalse)
-        return -1;
-    } else if (GetPropertyNumber (pfx, sProperty, &text, val) == MagickFalse)
-      return -1;
-    text = DestroyString(text);
-  }
+  if (InterpretPropertyValue (pfx, sProperty, val, seconds) == MagickFalse)
+    return -1;
   return ((ssize_t) len);
 }
 
