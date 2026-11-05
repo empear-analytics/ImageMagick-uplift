@@ -300,6 +300,18 @@ static void SetGradientVector(GradientInfo *gradient,const Image *image,
       gradient->gradient_vector.x2=0.0;
 }
 
+static void SetGradientBoundingBox(GradientInfo *gradient,const Image *image)
+{
+  const char
+    *artifact;
+
+  gradient->bounding_box.width=image->columns;
+  gradient->bounding_box.height=image->rows;
+  artifact=GetImageArtifact(image,"gradient:bounding-box");
+  if (artifact != (const char *) NULL)
+    (void) ParseAbsoluteGeometry(artifact,&gradient->bounding_box);
+}
+
 MagickExport MagickBooleanType GradientImage(Image *image,
   const GradientType type,const SpreadMethod method,const StopInfo *stops,
   const size_t number_stops,ExceptionInfo *exception)
@@ -328,11 +340,7 @@ MagickExport MagickBooleanType GradientImage(Image *image,
   draw_info=AcquireDrawInfo();
   gradient=(&draw_info->gradient);
   gradient->type=type;
-  gradient->bounding_box.width=image->columns;
-  gradient->bounding_box.height=image->rows;
-  artifact=GetImageArtifact(image,"gradient:bounding-box");
-  if (artifact != (const char *) NULL)
-    (void) ParseAbsoluteGeometry(artifact,&gradient->bounding_box);
+  SetGradientBoundingBox(gradient,image);
   SetGradientVector(gradient,image,type);
   gradient->center.x=(double) gradient->gradient_vector.x2/2.0;
   gradient->center.y=(double) gradient->gradient_vector.y2/2.0;
