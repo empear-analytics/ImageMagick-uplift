@@ -597,6 +597,89 @@ static void RotateRow180(const RotateRowInfo *row,const ssize_t y,
     }
 }
 
+typedef struct _RotateInfo
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  Image
+    *rotate_image;
+
+  CacheView
+    *rotate_view;
+
+  size_t
+    rotations;
+
+  ExceptionInfo
+    *exception;
+} RotateInfo;
+
+static void RotateImage270(const RotateInfo *info,MagickBooleanType *status,
+  MagickOffsetType *progress,RectangleInfo *page)
+{
+  const Image
+    *image = info->image;
+
+  CacheView
+    *image_view = info->image_view;
+
+  Image
+    *rotate_image = info->rotate_image;
+
+  CacheView
+    *rotate_view = info->rotate_view;
+
+  const size_t
+    rotations = info->rotations;
+
+  ExceptionInfo
+    *exception = info->exception;
+
+  switch (rotations)
+  {
+    case 3:
+    {
+      size_t
+        tile_height,
+        tile_width;
+
+      ssize_t
+        tile_y;
+
+      /*
+        Rotate 270 degrees.
+      */
+      GetPixelCacheTileSize(image,&tile_width,&tile_height);
+      tile_width=image->columns;
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static) shared(status) \
+        magick_number_threads(image,rotate_image,image->rows/tile_height,2)
+#endif
+      for (tile_y=0; tile_y < (ssize_t) image->rows; tile_y+=(ssize_t) tile_height)
+      {
+        const RotateTiles tiles = { image, image_view, rotate_image,
+          rotate_view, tile_height, tile_width, exception };
+
+        RotateTileRow270(&tiles,tile_y,status,progress);
+      }
+      (void) SetImageProgress(image,RotateImageTag,(MagickOffsetType)
+        image->rows-1,image->rows);
+      Swap((*page).width,(*page).height);
+      Swap((*page).x,(*page).y);
+      if ((*page).height != 0)
+        (*page).y=(ssize_t) (*page).height-(ssize_t) rotate_image->rows-
+          (*page).y;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -616,6 +699,9 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   RectangleInfo
     page;
 
+  RotateInfo
+    info;
+
   /*
     Initialize rotated image attributes.
   */
@@ -634,6 +720,12 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
   rotate_view=AcquireAuthenticCacheView(rotate_image,exception);
+  info.image=image;
+  info.image_view=image_view;
+  info.rotate_image=rotate_image;
+  info.rotate_view=rotate_view;
+  info.rotations=rotations;
+  info.exception=exception;
   switch (rotations)
   {
     case 1:
@@ -696,41 +788,11 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
         page.y=(ssize_t) page.height-(ssize_t) rotate_image->rows-page.y;
       break;
     }
-    case 3:
+    default:
     {
-      size_t
-        tile_height,
-        tile_width;
-
-      ssize_t
-        tile_y;
-
-      /*
-        Rotate 270 degrees.
-      */
-      GetPixelCacheTileSize(image,&tile_width,&tile_height);
-      tile_width=image->columns;
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,rotate_image,image->rows/tile_height,2)
-#endif
-      for (tile_y=0; tile_y < (ssize_t) image->rows; tile_y+=(ssize_t) tile_height)
-      {
-        const RotateTiles tiles = { image, image_view, rotate_image,
-          rotate_view, tile_height, tile_width, exception };
-
-        RotateTileRow270(&tiles,tile_y,&status,&progress);
-      }
-      (void) SetImageProgress(image,RotateImageTag,(MagickOffsetType)
-        image->rows-1,image->rows);
-      Swap(page.width,page.height);
-      Swap(page.x,page.y);
-      if (page.height != 0)
-        page.y=(ssize_t) page.height-(ssize_t) rotate_image->rows-page.y;
+      RotateImage270(&info,&status,&progress,&page);
       break;
     }
-    default:
-      break;
   }
   rotate_view=DestroyCacheView(rotate_view);
   image_view=DestroyCacheView(image_view);
