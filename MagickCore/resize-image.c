@@ -452,14 +452,26 @@ static MagickBooleanType FilterHorizontalColumn(
   return(MagickTrue);
 }
 
+#define ResizeImageTag  "Resize/Image"
+
+static void SetResizeProgress(const Image *image,
+  const MagickOffsetType progress,const MagickSizeType span,
+  MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,ResizeImageTag,progress,span);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType HorizontalFilter(const HorizontalFilterPass *pass,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
   ExceptionInfo *exception)
 {
   MagickOffsetType
     *magick_restrict const progress = pass->progress;
-
-#define ResizeImageTag  "Resize/Image"
 
   CacheView
     *image_view,
@@ -516,16 +528,11 @@ static MagickBooleanType HorizontalFilter(const HorizontalFilterPass *pass,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         (*progress)++;
-        proceed=SetImageProgress(image,ResizeImageTag,*progress,pass->span);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetResizeProgress(image,*progress,pass->span,&status);
       }
   }
   return(DestroyFilterResources(image_view,resize_view,contributions,status));
@@ -601,6 +608,13 @@ static void FilterVerticalPixel(const Image *image,
     gamma=MagickSafeReciprocal(gamma);
     SetPixelChannel(resize_image,channel,ClampToQuantum(gamma*pixel),q);
   }
+}
+
+static void SyncResizeView(CacheView *resize_view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
 }
 
 static MagickBooleanType VerticalFilter(
@@ -702,20 +716,14 @@ static MagickBooleanType VerticalFilter(
         x,p,q);
       q+=(ptrdiff_t) GetPixelChannels(resize_image);
     }
-    if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncResizeView(resize_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         (*progress)++;
-        proceed=SetImageProgress(image,ResizeImageTag,*progress,span);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetResizeProgress(image,*progress,span,&status);
       }
   }
   return(DestroyFilterResources(image_view,resize_view,contributions,status));
