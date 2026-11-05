@@ -275,6 +275,73 @@ typedef struct _AdaptiveThresholdInfo
     bias;
 } AdaptiveThresholdInfo;
 
+typedef struct _ThresholdChannelInfo
+{
+  const Image
+    *image;
+
+  Image
+    *threshold_image;
+
+  size_t
+    width,
+    height;
+
+  ssize_t
+    center;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  double
+    *channel_bias,
+    *channel_sum;
+} ThresholdChannelInfo;
+
+static void SumThresholdChannel(const ThresholdChannelInfo *info,const ssize_t i)
+{
+  const Image
+    *const image = info->image;
+
+  Image
+    *const threshold_image = info->threshold_image;
+
+  const size_t
+    width = info->width,
+    height = info->height;
+
+  const ssize_t
+    center = info->center;
+
+  const Quantum
+    *magick_restrict p = info->p;
+
+  Quantum
+    *magick_restrict q = info->q;
+
+  double
+    *const channel_bias = info->channel_bias,
+    *const channel_sum = info->channel_sum;
+
+  PixelChannel channel = GetPixelChannelChannel(image,i);
+  PixelTrait traits = GetPixelChannelTraits(image,channel);
+  PixelTrait threshold_traits=GetPixelChannelTraits(threshold_image,
+    channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (threshold_traits == UndefinedPixelTrait))
+    return;
+  if ((threshold_traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(threshold_image,channel,p[center+i],q);
+      return;
+    }
+  SumThresholdWindow(image,p,i,width,height,&channel_bias[channel],
+    &channel_sum[channel]);
+}
+
 static void AdaptiveThresholdRow(const AdaptiveThresholdInfo *info,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
@@ -302,6 +369,9 @@ static void AdaptiveThresholdRow(const AdaptiveThresholdInfo *info,
     pixel_info = { image, threshold_image, width, height, number_pixels,
       bias, channel_bias, channel_sum };
 
+  ThresholdChannelInfo
+    sum_info;
+
   ssize_t
     center,
     i,
@@ -310,23 +380,17 @@ static void AdaptiveThresholdRow(const AdaptiveThresholdInfo *info,
   center=(ssize_t) GetPixelChannels(image)*((ssize_t) image->columns+
     (ssize_t) width)*((ssize_t) height/2L)+(ssize_t) GetPixelChannels(image)*
     ((ssize_t) width/2);
+  sum_info.image=image;
+  sum_info.threshold_image=threshold_image;
+  sum_info.width=width;
+  sum_info.height=height;
+  sum_info.center=center;
+  sum_info.p=p;
+  sum_info.q=q;
+  sum_info.channel_bias=channel_bias;
+  sum_info.channel_sum=channel_sum;
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    PixelChannel channel = GetPixelChannelChannel(image,i);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    PixelTrait threshold_traits=GetPixelChannelTraits(threshold_image,
-      channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (threshold_traits == UndefinedPixelTrait))
-      continue;
-    if ((threshold_traits & CopyPixelTrait) != 0)
-      {
-        SetPixelChannel(threshold_image,channel,p[center+i],q);
-        continue;
-      }
-    SumThresholdWindow(image,p,i,width,height,&channel_bias[channel],
-      &channel_sum[channel]);
-  }
+    SumThresholdChannel(&sum_info,i);
   for (x=0; x < (ssize_t) image->columns; x++)
   {
     AdaptiveThresholdPixel(&pixel_info,p,q,center);
