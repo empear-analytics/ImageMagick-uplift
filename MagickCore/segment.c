@@ -1590,14 +1590,45 @@ static void RelinquishHistogramsBelow(ssize_t i,ssize_t **histogram,
   }
 }
 
+static void ChooseDynamicThreshold(const ssize_t count,Cluster *head,
+  PixelInfo *pixel)
+{
+  Cluster
+    *background,
+    *object;
+
+  object=head;
+  background=head;
+  if (HasObjectAndBackgroundClusters(count,head) != MagickFalse)
+    {
+      object=FindObjectCluster(head);
+      background=head->next;
+      background=FindLargestBackground(background);
+    }
+  SetDynamicThresholdPixel(background,object,pixel);
+}
+
+static MagickBooleanType ThrowClusterAllocationFailed(const Image *image,
+  ExceptionInfo *exception)
+{
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+  return(MagickFalse);
+}
+
+static Cluster *AppendCluster(Cluster *cluster)
+{
+  cluster->next=(Cluster *) AcquireQuantumMemory(1,sizeof(*cluster->next));
+  cluster=cluster->next;
+  return(cluster);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
 {
   Cluster
-    *background,
     *cluster,
-    *object,
     *head,
     *last_cluster,
     *next_cluster;
@@ -1663,9 +1694,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
         */
         if (head != (Cluster *) NULL)
           {
-            cluster->next=(Cluster *) AcquireQuantumMemory(1,
-              sizeof(*cluster->next));
-            cluster=cluster->next;
+            cluster=AppendCluster(cluster);
           }
         else
           {
@@ -1673,12 +1702,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
             head=cluster;
           }
         if (cluster == (Cluster *) NULL)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'",
-              image->filename);
-            return(MagickFalse);
-          }
+          return(ThrowClusterAllocationFailed(image,exception));
         /*
           Initialize a new class.
         */
@@ -1734,15 +1758,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
     cluster=(Cluster *) RelinquishMagickMemory(cluster);
   }
-  object=head;
-  background=head;
-  if (HasObjectAndBackgroundClusters(count,head) != MagickFalse)
-    {
-      object=FindObjectCluster(head);
-      background=head->next;
-      background=FindLargestBackground(background);
-    }
-  SetDynamicThresholdPixel(background,object,pixel);
+  ChooseDynamicThreshold(count,head,pixel);
   /*
     Relinquish resources.
   */
