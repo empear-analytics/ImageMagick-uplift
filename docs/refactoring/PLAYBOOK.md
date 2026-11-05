@@ -1397,7 +1397,16 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
 **How:**
 
 1. The block meets Recipe E steps 1 and 3 to 7, and the OpenMP rule above. It contains
-   no `#pragma omp` line.
+   no `#pragma omp` line, with one exception: a block that lies outside every OpenMP
+   region may hold whole parallel loops, as Recipe O step 1 lets a block outside every
+   region do. Each such loop moves whole and unchanged: the `#if
+   defined(MAGICKCORE_OPENMP_SUPPORT)` line, the pragma with its clauses, the `#endif`
+   and the loop statement the pragma governs all lie inside the block. Every variable
+   the region writes (`status`, `progress`, the loop counter) is a parameter or a local
+   of the new function, never a member (Recipe E steps 3 and 4: a by-value input, the
+   returned value, or a temporary the function declares), and every variable a clause
+   names (`shared(status)`) is a parameter or local of the new function by the same
+   name.
 2. List the variables the block only reads. Choose a group of them that are scalars or
    pointers, none written anywhere in the block, so the new function keeps at most four
    parameters: the struct and what the block writes through (a pixel buffer, say).
@@ -1531,6 +1540,17 @@ static void ThresholdWaveletLevel(float *pixels,
 
 **Careful:**
 
+- Under step 1's whole parallel loops, the `const` locals of step 4 are declared at the
+  top of the new function, before the region, as the caller's variables were declared
+  before it: the region's default data-sharing makes them shared, as it made the
+  caller's, and the region only reads them (step 2: nothing in the block writes a
+  member's variable), so each thread reads the value the caller's variable held. A
+  written variable stays out of the struct, so `shared(status)` and `#pragma omp atomic`
+  `progress++` name the new function's own parameter, one object shared by the threads
+  of the region as the caller's local was, and its value leaves the function the way
+  Recipe E steps 3 and 4 say. The pragma and its clauses are not edited and do not
+  move relative to the loop they govern; nothing moves into, out of or across the
+  region. The oracle builds without OpenMP, so this is checked by reading.
 - The members are read in the caller, directly before the call, from variables the block
   does not write: each holds the value the block would have read at its first use, and
   the `const` locals hold it for the whole block, as the block's own reads of an
@@ -6515,3 +6535,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | SW | Split a Returning Selection into Chained Functions: a run of adjacent groups of a `switch` whose every group ends in `return(R);` (followed by a tail ending the function) moves, with the tail, to a new function of the same return type whose `switch` ends `default: break;`; the caller keeps the other groups and `default:` and returns the call | `distort.c`'s `GenerateCoefficients` (campaign A, W13): the dispatch `switch` of seventeen case helpers (cc 126 of the function); SD refuses `return`, SR wants one constant, E step 7 moves the whole `switch` (a Complex Method). A probe of the whole chain: the function leaves Bumpy Road Ahead, Complex Method and Large Method, 3.55 to 4.25 | owner |
 | 2026-11-05 | NEW | CB | Extract Critical Block Body: the body of a `#pragma omp critical` block moves into a `static void` helper that its call replaces, the pragma and braces staying in the caller; written variables by pointer, read ones by value or pointer to `const`, at most four parameters; checked by reading | `compare.c`'s eleven `Get*Similarity` merges (a probe, one helper call per critical body: 2.97 to 3.15) and `feature.c`'s `CannyEdgeImage` | owner |
 | 2026-11-05 | AMEND | LB | Step 1 (parallel-loop-body form): a block in the body of a parallel loop and inside a loop the iteration runs to its end (a column loop in a row loop) may take its `break;` as `return(MagickFalse);`, with the shared `status` (the only outer variable it writes) by pointer as in Recipe PS step 4 and no pragma in the block; the caller writes `if (Helper(...,&status) == MagickFalse) break;` | `visual-effects.c`'s `SwirlImage` and `ImplodeImage` (campaign A, W14): the column loop's `else` body, which assigns and tests `status` and breaks, at nesting depth 4; a probe of the `else` body as a helper: Deep, Nested Complexity leaves | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | N | Step 1: a block that lies outside every OpenMP region may hold whole parallel loops (the `#if`, the pragma with its clauses, the `#endif` and the loop, all inside the block and unchanged), as Recipe O step 1 already admits for its blocks; every variable the region writes or a clause names is a parameter or local of the new function, never a member. *Careful* gives the data-sharing argument. Still eight steps | `colorspace.c`'s `TransformsRGBImage` (campaign A, W14): the DirectClass row loop of the table conversion (`shared(status)`, an `omp atomic` progress tail) reads the image, three maps and the exception, already in the `TransformsRGBTables` local its PseudoClass sibling takes (Recipe N step 8); with the parameters Recipe E would give it takes eight. A probe of the chain (the table set-up split by SD and E, this loop, the tail by E step 7): 5.33 to 5.75, no new finding. The same form was already used, without the text admitting it, by `sRGBToGeneric` (9845ba7e4) | mandate (2026-10-24) |
