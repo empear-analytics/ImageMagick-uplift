@@ -232,3 +232,14 @@ shared by default.
 0 diverged, reusing the existing `FrameSideLine` and `FrameComposite` structs; no Recipe FI or other new
 recipe was needed. Six W13 files are now at 10.0 (resize-scale, threshold-auto, shear-deskew,
 statistic-measure, prepress, decorate), plus resize-sample from W12.
+
+### 06:30: channel-alpha.c and attribute.c
+
+| File | Score | Commits |
+| --- | --- | ---: |
+| `channel-alpha.c` | 8.14 -> 8.96 | 8 (E five times, SD three times) |
+| `attribute.c` | 7.92 -> 8.94 | 3 (SD chain with `SetImageTypeInput`) |
+
+Whole catalogue after the last commit: 15,900 cases, 0 diverged. **Owner question:** may Recipe PS take
+`&census[i]` and `background+i` as per-iteration elements of function-local arrays (attribute.c
+`GetEdgeBackgroundColor`)? Today PS admits only scalars and `status`.
