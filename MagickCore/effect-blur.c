@@ -524,6 +524,13 @@ static MagickBooleanType PrepareAdaptiveEdge(const AdaptiveEdge *edge,
   return(MagickTrue);
 }
 
+static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    image=DestroyImage(image);
+  return(image);
+}
+
 MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -663,9 +670,7 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   for (w=0; w < (ssize_t) width; w+=2)
     kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
   kernel=(double **) RelinquishAlignedMemory(kernel);
-  if (status == MagickFalse)
-    blur_image=DestroyImage(blur_image);
-  return(blur_image);
+  return(ReleaseFailedImage(blur_image,status));
 }
 
 /*
@@ -956,9 +961,7 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   for (w=0; w < (ssize_t) width; w+=2)
     kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
   kernel=(double **) RelinquishAlignedMemory(kernel);
-  if (status == MagickFalse)
-    sharp_image=DestroyImage(sharp_image);
-  return(sharp_image);
+  return(ReleaseFailedImage(sharp_image,status));
 }
 
 /*
@@ -1642,13 +1645,6 @@ static OffsetInfo FillBilateralSpatial(const size_t width,
   spatial.spatial_sigma=spatial_sigma;
   SetBilateralSpatial(&spatial,n);
   return(mid);
-}
-
-static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
-{
-  if (status == MagickFalse)
-    image=DestroyImage(image);
-  return(image);
 }
 
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
@@ -2544,9 +2540,7 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   image_view=DestroyCacheView(image_view);
   kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
   offset=(OffsetInfo *) RelinquishMagickMemory(offset);
-  if (status == MagickFalse)
-    blur_image=DestroyImage(blur_image);
-  return(blur_image);
+  return(ReleaseFailedImage(blur_image,status));
 }
 
 /*
@@ -3134,9 +3128,7 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   image_view=DestroyCacheView(image_view);
   cos_theta=(double *) RelinquishMagickMemory(cos_theta);
   sin_theta=(double *) RelinquishMagickMemory(sin_theta);
-  if (status == MagickFalse)
-    blur_image=DestroyImage(blur_image);
-  return(blur_image);
+  return(ReleaseFailedImage(blur_image,status));
 }
 
 /*
@@ -3799,9 +3791,7 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   image_view=DestroyCacheView(image_view);
   luminance_image=DestroyImage(luminance_image);
   kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
-  if (status == MagickFalse)
-    blur_image=DestroyImage(blur_image);
-  return(blur_image);
+  return(ReleaseFailedImage(blur_image,status));
 }
 
 /*
