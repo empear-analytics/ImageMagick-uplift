@@ -876,6 +876,80 @@ static void ApplyRollQuantizePreview(const PreviewTile *tile,
   }
 }
 
+typedef struct _PreviewSelection
+{
+  PreviewType
+    preview;
+
+  ssize_t
+    i;
+
+  char
+    *label;
+
+  ExceptionInfo
+    *exception;
+
+  PreviewTile
+    tile;
+
+  PreviewTargets
+    targets;
+} PreviewSelection;
+
+static void ApplyDespeckleSegmentPreview(const PreviewSelection *selection,
+  Image **thumbnail,Image **preview_image,double *threshold)
+{
+  const PreviewType
+    preview = selection->preview;
+
+  const ssize_t
+    i = selection->i;
+
+  char
+    *const label = selection->label;
+
+  ExceptionInfo
+    *const exception = selection->exception;
+
+  const PreviewTile
+    tile = selection->tile;
+
+  const PreviewTargets
+    targets = selection->targets;
+
+  switch (preview)
+  {
+    default:
+    {
+      ApplyRollQuantizePreview(&tile,&targets);
+      break;
+    }
+    case DespecklePreview:
+    {
+      (*thumbnail)=DespeckleThumbnail((*thumbnail),i,exception);
+      (*preview_image)=DespeckleImage((*thumbnail),exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) FormatLocaleString(label,MagickPathExtent,"despeckle (%.17g)",
+        (double) i+1);
+      break;
+    }
+    case SegmentPreview:
+    {
+      (*preview_image)=CloneImage((*thumbnail),0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (*threshold)+=0.4;
+      (void) SegmentImage((*preview_image),sRGBColorspace,MagickFalse,
+        (*threshold),(*threshold),exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"segment %gx%g",
+        (*threshold),(*threshold));
+      break;
+    }
+  }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -943,6 +1017,9 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   threshold=0.0;
   for (i=0; i < NumberTiles; i++)
   {
+    PreviewSelection
+      selection;
+
     PreviewTile
       tile;
 
@@ -970,36 +1047,14 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     tile.percentage=percentage;
     tile.radius=radius;
     tile.sigma=sigma;
-    switch (preview)
-    {
-      default:
-      {
-        ApplyRollQuantizePreview(&tile,&targets);
-        break;
-      }
-      case DespecklePreview:
-      {
-        thumbnail=DespeckleThumbnail(thumbnail,i,exception);
-        preview_image=DespeckleImage(thumbnail,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) FormatLocaleString(label,MagickPathExtent,"despeckle (%.17g)",
-          (double) i+1);
-        break;
-      }
-      case SegmentPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        threshold+=0.4;
-        (void) SegmentImage(preview_image,sRGBColorspace,MagickFalse,threshold,
-          threshold,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"segment %gx%g",
-          threshold,threshold);
-        break;
-      }
-    }
+    selection.preview=preview;
+    selection.i=i;
+    selection.label=label;
+    selection.exception=exception;
+    selection.tile=tile;
+    selection.targets=targets;
+    ApplyDespeckleSegmentPreview(&selection,&thumbnail,&preview_image,
+      &threshold);
     thumbnail=DestroyImage(thumbnail);
     percentage+=12.5;
     radius+=0.5;
