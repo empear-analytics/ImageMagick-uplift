@@ -797,6 +797,17 @@ static MagickBooleanType SeparateImageRow(const SeparateRow *row,
 
 #define SeparateImageTag  "Separate/Image"
 
+static void SetSeparateProgress(const Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,SeparateImageTag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *SeparateImage(const Image *image,
   const ChannelType channel_type,ExceptionInfo *exception)
 {
@@ -857,16 +868,11 @@ MagickExport Image *SeparateImage(const Image *image,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SeparateImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetSeparateProgress(image,progress,&status);
       }
   }
   separate_view=DestroyCacheView(separate_view);
