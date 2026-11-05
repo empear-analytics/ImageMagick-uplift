@@ -2967,17 +2967,15 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       SetObjectMergeByIds(object,component_image->colors,artifact,MagickFalse);
     }
   artifact=GetImageArtifact(image,"connected-components:keep-top");
-  if (artifact != (const char *) NULL)
+  /*
+    Keep top objects.
+  */
+  if ((artifact != (const char *) NULL) &&
+      (KeepTopObjects(component_image,object,artifact) == MagickFalse))
     {
-      /*
-        Keep top objects.
-      */
-      if (KeepTopObjects(component_image,object,artifact) == MagickFalse)
-        {
-          object=(CCObjectInfo *) RelinquishMagickMemory(object);
-          component_image=DestroyImage(component_image);
-          ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-        }
+      object=(CCObjectInfo *) RelinquishMagickMemory(object);
+      component_image=DestroyImage(component_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
   artifact=GetImageArtifact(image,"connected-components:remove-colors");
   if (artifact != (const char *) NULL)
