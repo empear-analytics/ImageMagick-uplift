@@ -2047,6 +2047,16 @@ static void SyncTransformView(CacheView *view,ExceptionInfo *exception,
     (*status)=MagickFalse;
 }
 
+static MagickBooleanType IsSpliceRowPending(Image *splice_image,
+  const ssize_t y,const MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  if (IsSpliceRowOutside(splice_image,y) != MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -2135,9 +2145,7 @@ MagickExport Image *SpliceImage(const Image *image,
       row = { image,splice_image,image_view,splice_view,splice_geometry,
         exception,columns };
 
-    if (status == MagickFalse)
-      continue;
-    if (IsSpliceRowOutside(splice_image,y) != MagickFalse)
+    if (IsSpliceRowPending(splice_image,y,&status) == MagickFalse)
       continue;
     if (SpliceImageRow(&row,y-(ssize_t) splice_geometry.height,y,&status) ==
         MagickFalse)
