@@ -1108,16 +1108,55 @@ static MagickBooleanType RenderPreviewTile(const PreviewTileInput *input,
   return(MagickTrue);
 }
 
-MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
-  ExceptionInfo *exception)
+typedef struct _PreviewSetup
 {
+  const Image
+    *image;
+
+  PreviewType
+    preview;
+
+  ImageInfo
+    *preview_info;
+
+  RectangleInfo
+    geometry;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    colors;
+
+  double
+    degrees,
+    gamma;
+} PreviewSetup;
+
+static Image *AcquirePreviewTiles(const PreviewSetup *setup)
+{
+  const Image
+    *const image = setup->image;
+
+  const PreviewType
+    preview = setup->preview;
+
+  ImageInfo
+    *const preview_info = setup->preview_info;
+
+  const RectangleInfo
+    geometry = setup->geometry;
+
+  ExceptionInfo
+    *const exception = setup->exception;
+
   char
     factor[MagickPathExtent],
     label[MagickPathExtent];
 
   double
-    degrees,
-    gamma,
+    degrees = setup->degrees,
+    gamma = setup->gamma,
     percentage,
     radius,
     sigma,
@@ -1125,21 +1164,14 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
 
   Image
     *images,
-    *montage_image,
     *preview_image,
     *thumbnail;
-
-  ImageInfo
-    *preview_info;
 
   QuantizeInfo
     quantize_info;
 
-  RectangleInfo
-    geometry;
-
   size_t
-    colors;
+    colors = setup->colors;
 
   ssize_t
     i;
@@ -1151,20 +1183,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     tile_targets = { &preview_image, &threshold, &percentage, &radius, &sigma,
       &images };
 
-  /*
-    Open output image file.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  colors=2;
-  degrees=0.0;
-  gamma=(-0.2f);
-  preview_info=AcquireImageInfo();
-  SetGeometry(image,&geometry);
-  (void) ParseMetaGeometry(DefaultPreviewGeometry,&geometry.x,&geometry.y,
-    &geometry.width,&geometry.height);
   images=NewImageList();
   percentage=12.5;
   GetQuantizeInfo(&quantize_info);
@@ -1193,6 +1211,55 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     if (RenderPreviewTile(&input,&tile_targets) == MagickFalse)
       break;
   }
+  return(images);
+}
+
+MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
+  ExceptionInfo *exception)
+{
+  double
+    degrees,
+    gamma;
+
+  Image
+    *images,
+    *montage_image;
+
+  ImageInfo
+    *preview_info;
+
+  PreviewSetup
+    setup;
+
+  RectangleInfo
+    geometry;
+
+  size_t
+    colors;
+
+  /*
+    Open output image file.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  colors=2;
+  degrees=0.0;
+  gamma=(-0.2f);
+  preview_info=AcquireImageInfo();
+  SetGeometry(image,&geometry);
+  (void) ParseMetaGeometry(DefaultPreviewGeometry,&geometry.x,&geometry.y,
+    &geometry.width,&geometry.height);
+  setup.image=image;
+  setup.preview=preview;
+  setup.preview_info=preview_info;
+  setup.geometry=geometry;
+  setup.exception=exception;
+  setup.colors=colors;
+  setup.degrees=degrees;
+  setup.gamma=gamma;
+  images=AcquirePreviewTiles(&setup);
   if (images == (Image *) NULL)
     {
       preview_info=DestroyImageInfo(preview_info);
