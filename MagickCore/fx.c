@@ -2630,9 +2630,9 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   if (QualifyFunction (pfx, &qualifiers) == MagickFalse)
     return MagickFalse;
 
-  if (IsChannelQualifiedAttr(iaQual,chQual) != MagickFalse) {
-    if (!CheckAttrChannelQualifier (pfx, iaQual, chQual)) return MagickFalse;
-  }
+  if ((IsChannelQualifiedAttr(iaQual,chQual) != MagickFalse) &&
+      (!CheckAttrChannelQualifier (pfx, iaQual, chQual)))
+    return MagickFalse;
 
   if (fe==fWhile) {
     pfx->Elements[ndx1].element_index = ndx2+1;
