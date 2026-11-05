@@ -836,9 +836,7 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
   buffer_info=RelinquishVirtualMemory(buffer_info);
   pixel_info=RelinquishVirtualMemory(pixel_info);
   despeckle_image->type=image->type;
-  if (status == MagickFalse)
-    despeckle_image=DestroyImage(despeckle_image);
-  return(despeckle_image);
+  return(ReleaseFailedImage(despeckle_image,status));
 }
 
 /*
@@ -1362,9 +1360,7 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   kuwahara_view=DestroyCacheView(kuwahara_view);
   image_view=DestroyCacheView(image_view);
   gaussian_image=DestroyImage(gaussian_image);
-  if (status == MagickFalse)
-    kuwahara_image=DestroyImage(kuwahara_image);
-  return(kuwahara_image);
+  return(ReleaseFailedImage(kuwahara_image,status));
 }
 
 /*
@@ -1958,9 +1954,7 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   interImage_info=RelinquishVirtualMemory(interImage_info);
   contrast_view=DestroyCacheView(contrast_view);
   image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    contrast_image=DestroyImage(contrast_image);
-  return(contrast_image);
+  return(ReleaseFailedImage(contrast_image,status));
 }
 
 
@@ -3447,9 +3441,7 @@ MagickExport Image *SpreadImage(const Image *image,
   spread_view=DestroyCacheView(spread_view);
   image_view=DestroyCacheView(image_view);
   random_info=DestroyRandomInfoTLS(random_info);
-  if (status == MagickFalse)
-    spread_image=DestroyImage(spread_image);
-  return(spread_image);
+  return(ReleaseFailedImage(spread_image,status));
 }
 
 /*
@@ -3681,7 +3673,5 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
   unsharp_image->type=image->type;
   unsharp_view=DestroyCacheView(unsharp_view);
   image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    unsharp_image=DestroyImage(unsharp_image);
-  return(unsharp_image);
+  return(ReleaseFailedImage(unsharp_image,status));
 }
