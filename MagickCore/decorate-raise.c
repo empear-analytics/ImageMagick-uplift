@@ -276,6 +276,49 @@ static MagickBooleanType GetRaiseRow(const RaiseRows *rows,const ssize_t y,
   return(MagickTrue);
 }
 
+static MagickBooleanType DrawRaiseBottomRows(const RaiseRows *rows,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = rows->image;
+
+  CacheView
+    *const image_view = rows->image_view;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  const Quantum
+    foreground = rows->foreground,
+    background = rows->background;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if (GetRaiseRow(rows,y,&q,status) == MagickFalse)
+    return(MagickFalse);
+  for (x=0; x < ((ssize_t) image->rows-y); x++)
+  {
+    BlendPixelChannels(image,HighlightFactor,foreground,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  for ( ; x < ((ssize_t) image->columns-((ssize_t) image->rows-y)); x++)
+  {
+    BlendPixelChannels(image,TroughFactor,background,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  for ( ; x < (ssize_t) image->columns; x++)
+  {
+    BlendPixelChannels(image,ShadowFactor,background,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  SyncRaiseRow(image_view,exception,status);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType RaiseImage(Image *image,
   const RectangleInfo *raise_info,const MagickBooleanType raise,
   ExceptionInfo *exception)
@@ -384,34 +427,12 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
 #endif
   for (y=(ssize_t) (image->rows-raise_info->height); y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     const RaiseRows
       rows = { image, image_view, exception, raise_info, foreground,
         background };
 
-    Quantum
-      *magick_restrict q;
-
-    if (GetRaiseRow(&rows,y,&q,&status) == MagickFalse)
+    if (DrawRaiseBottomRows(&rows,y,&status) == MagickFalse)
       continue;
-    for (x=0; x < ((ssize_t) image->rows-y); x++)
-    {
-      BlendPixelChannels(image,HighlightFactor,foreground,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    for ( ; x < ((ssize_t) image->columns-((ssize_t) image->rows-y)); x++)
-    {
-      BlendPixelChannels(image,TroughFactor,background,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    for ( ; x < (ssize_t) image->columns; x++)
-    {
-      BlendPixelChannels(image,ShadowFactor,background,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    SyncRaiseRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
