@@ -1165,6 +1165,13 @@ static MagickBooleanType FetchEvaluateRows(const EvaluateRowHead *head,
   return(MagickTrue);
 }
 
+static void FinishEvaluateRows(const Quantum **p,CacheView *evaluate_view,
+  ExceptionInfo *exception,MagickBooleanType *status)
+{
+  p=(const Quantum **) RelinquishMagickMemory((void *) p);
+  SyncEvaluateView(evaluate_view,exception,status);
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -1265,8 +1272,7 @@ MagickExport Image *EvaluateImages(const Image *images,
         median.id=id;
         median.op=op;
         EvaluateMedianRow(&median,p,evaluate_pixel,q);
-        p=(const Quantum **) RelinquishMagickMemory((void *) p);
-        SyncEvaluateView(evaluate_view,exception,&status);
+        FinishEvaluateRows(p,evaluate_view,exception,&status);
         if (images->progress_monitor != (MagickProgressMonitor) NULL)
           {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1318,8 +1324,7 @@ MagickExport Image *EvaluateImages(const Image *images,
         AccumulateEvaluateRows(&rows,p,evaluate_pixel);
         NormalizeEvaluatePixels(image,op,number_images,evaluate_pixel);
         SetEvaluatePixels(image,evaluate_pixel,q);
-        p=(const Quantum **) RelinquishMagickMemory((void *) p);
-        SyncEvaluateView(evaluate_view,exception,&status);
+        FinishEvaluateRows(p,evaluate_view,exception,&status);
         if (images->progress_monitor != (MagickProgressMonitor) NULL)
           {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
