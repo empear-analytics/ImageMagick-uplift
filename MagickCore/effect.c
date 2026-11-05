@@ -1906,17 +1906,10 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
 #endif
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      LocalContrastColumnPass
-        pass;
+      const LocalContrastColumnPass
+        pass = { image, image_view, interImage, scanline, scanLineSize, width,
+          totalWeight, exception };
 
-      pass.image=image;
-      pass.image_view=image_view;
-      pass.interImage=interImage;
-      pass.scanline=scanline;
-      pass.scanLineSize=scanLineSize;
-      pass.width=width;
-      pass.totalWeight=totalWeight;
-      pass.exception=exception;
       RunLocalContrastColumn(&status,&pass,x);
     }
   }
@@ -1933,20 +1926,11 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
 #endif
     for (y=0; y < (ssize_t) image->rows; y++)
     {
-      LocalContrastRowPass
-        pass;
+      const LocalContrastRowPass
+        pass = { image, image_view, contrast_view, interImage, scanline,
+          scanLineSize, width, totalWeight, strength, contrast_image,
+          exception };
 
-      pass.image=image;
-      pass.image_view=image_view;
-      pass.contrast_view=contrast_view;
-      pass.interImage=interImage;
-      pass.scanline=scanline;
-      pass.scanLineSize=scanLineSize;
-      pass.width=width;
-      pass.totalWeight=totalWeight;
-      pass.strength=strength;
-      pass.contrast_image=contrast_image;
-      pass.exception=exception;
       RunLocalContrastRow(&status,&pass,y);
     }
   }
