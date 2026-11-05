@@ -734,6 +734,39 @@ static void UpdateCannyRange(const double intensity,double *min,double *max)
     (*max)=intensity;
 }
 
+static MagickBooleanType ComputeCannyGradients(Image *edge_image,
+  MatrixInfo *canny_cache,ExceptionInfo *exception)
+{
+  CacheView
+    *edge_view;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  edge_view=AcquireVirtualCacheView(edge_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(edge_image,edge_image,edge_image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) edge_image->rows; y++)
+  {
+    ComputeCannyGradientRowInfo
+      info;
+
+    info.edge_view=edge_view;
+    info.edge_image=edge_image;
+    info.exception=exception;
+    info.canny_cache=canny_cache;
+    ComputeCannyGradientRow(&status,&info,y);
+  }
+  edge_view=DestroyCacheView(edge_view);
+  return(status);
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -801,24 +834,7 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
       edge_image=DestroyImage(edge_image);
       return((Image *) NULL);
     }
-  status=MagickTrue;
-  edge_view=AcquireVirtualCacheView(edge_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(edge_image,edge_image,edge_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) edge_image->rows; y++)
-  {
-    ComputeCannyGradientRowInfo
-      info;
-
-    info.edge_view=edge_view;
-    info.edge_image=edge_image;
-    info.exception=exception;
-    info.canny_cache=canny_cache;
-    ComputeCannyGradientRow(&status,&info,y);
-  }
-  edge_view=DestroyCacheView(edge_view);
+  status=ComputeCannyGradients(edge_image,canny_cache,exception);
   /*
     Non-maxima suppression, remove pixels that are not considered to be part
     of an edge.
