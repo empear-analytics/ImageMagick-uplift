@@ -221,6 +221,37 @@ static inline RectangleInfo GetEdgeGeometry(const size_t width,
   return(geometry);
 }
 
+static void GetNorthernEdgePixel(const EdgeTrimScan *scan,
+  const GravityType gravity,const Quantum **p)
+{
+  const CacheView
+    *image_view = scan->edge_view;
+
+  const Image
+    *image = scan->edge_image;
+
+  ExceptionInfo
+    *exception = scan->exception;
+
+  switch (gravity)
+  {
+    case NorthWestGravity:
+    case NorthGravity:
+    default:
+    {
+      (*p)=GetCacheViewVirtualPixels(image_view,0,0,1,1,exception);
+      break;
+    }
+    case NorthEastGravity:
+    case EastGravity:
+    {
+      (*p)=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,0,1,
+        1,exception);
+      break;
+    }
+  }
+}
+
 static double GetEdgeBackgroundCensus(const EdgeTrimScan *scan,
   const GravityType gravity,const RectangleInfo geometry)
 {
@@ -256,18 +287,9 @@ static double GetEdgeBackgroundCensus(const EdgeTrimScan *scan,
   */
   switch (gravity)
   {
-    case NorthWestGravity:
-    case NorthGravity:
     default:
     {
-      p=GetCacheViewVirtualPixels(image_view,0,0,1,1,exception);
-      break;
-    }
-    case NorthEastGravity:
-    case EastGravity:
-    {
-      p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,0,1,1,
-        exception);
+      GetNorthernEdgePixel(scan,gravity,&p);
       break;
     }
     case SouthEastGravity:
