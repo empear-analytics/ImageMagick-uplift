@@ -1940,6 +1940,24 @@ typedef struct _RandomThreshold
     id;
 } RandomThreshold;
 
+static double GetRandomPixelThreshold(
+  const RandomThreshold *random_threshold,const Quantum *magick_restrict q,
+  const ssize_t i)
+{
+  double
+    threshold;
+
+  if ((double) q[i] < random_threshold->min_threshold)
+    threshold=random_threshold->min_threshold;
+  else
+    if ((double) q[i] > random_threshold->max_threshold)
+      threshold=random_threshold->max_threshold;
+    else
+      threshold=((double) QuantumRange*GetPseudoRandomValue(
+        random_threshold->random_info[random_threshold->id]));
+  return(threshold);
+}
+
 static void RandomThresholdPixel(const Image *image,
   const RandomThreshold *random_threshold,Quantum *magick_restrict q)
 {
@@ -1955,14 +1973,7 @@ static void RandomThresholdPixel(const Image *image,
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     if ((traits & UpdatePixelTrait) == 0)
       continue;
-    if ((double) q[i] < random_threshold->min_threshold)
-      threshold=random_threshold->min_threshold;
-    else
-      if ((double) q[i] > random_threshold->max_threshold)
-        threshold=random_threshold->max_threshold;
-      else
-        threshold=((double) QuantumRange*GetPseudoRandomValue(
-          random_threshold->random_info[random_threshold->id]));
+    threshold=GetRandomPixelThreshold(random_threshold,q,i);
     q[i]=(double) q[i] <= threshold ? 0 : QuantumRange;
   }
 }
