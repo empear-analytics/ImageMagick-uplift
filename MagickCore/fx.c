@@ -5041,8 +5041,8 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
             (int)pel->operator_index, OprStr(pel->operator_index));
           break;
     }
-    if (pel->do_push)
-      if (!PushVal (pfx, pfxrt, regA, i)) break;
+    if ((pel->do_push) && (!PushVal (pfx, pfxrt, regA, i)))
+      break;
   }
 
   if (pfxrt->usedValStack > 0) regA = PopVal (pfx, pfxrt, 9999);
