@@ -1361,6 +1361,38 @@ static void CopyPixelChannels(const Image *source,
   }
 }
 
+static MagickBooleanType ImplodePixel(const WarpInfo *warp,
+  const WarpSite *site,Quantum *magick_restrict q,MagickBooleanType *status)
+{
+  double
+    factor;
+
+  PointInfo
+    offset;
+
+  /*
+    Implode the pixel.
+  */
+  factor=1.0;
+  if (site->distance > 0.0)
+    factor=pow(sin(MagickPI*sqrt(site->distance)*
+      MagickSafeReciprocal(warp->radius)/2.0),-warp->amount);
+  offset.x=factor*site->delta.x*MagickSafeReciprocal(warp->scale.x)+
+    warp->center.x;
+  offset.y=factor*site->delta.y*MagickSafeReciprocal(warp->scale.y)+
+    warp->center.y;
+  if ((IsValidPixelOffset((ssize_t) offset.x,warp->image->columns) !=
+       MagickFalse) &&
+      (IsValidPixelOffset((ssize_t) offset.y,warp->image->rows) !=
+       MagickFalse))
+    (*status)=InterpolatePixelChannels(warp->canvas_image,
+      warp->interpolate_view,warp->warp_image,warp->method,offset.x,offset.y,q,
+      warp->exception);
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void ImplodeRow(const WarpInfo *warp,const Quantum *magick_restrict p,
   Quantum *magick_restrict q,MagickBooleanType *status)
 {
@@ -1381,34 +1413,8 @@ static void ImplodeRow(const WarpInfo *warp,const Quantum *magick_restrict p,
     if (site.distance >= (warp->radius*warp->radius))
       CopyPixelChannels(warp->canvas_image,warp->warp_image,p,q);
     else
-      {
-        double
-          factor;
-
-        PointInfo
-          offset;
-
-        /*
-          Implode the pixel.
-        */
-        factor=1.0;
-        if (site.distance > 0.0)
-          factor=pow(sin(MagickPI*sqrt(site.distance)*
-            MagickSafeReciprocal(warp->radius)/2.0),-warp->amount);
-        offset.x=factor*site.delta.x*MagickSafeReciprocal(warp->scale.x)+
-          warp->center.x;
-        offset.y=factor*site.delta.y*MagickSafeReciprocal(warp->scale.y)+
-          warp->center.y;
-        if ((IsValidPixelOffset((ssize_t) offset.x,warp->image->columns) !=
-             MagickFalse) &&
-            (IsValidPixelOffset((ssize_t) offset.y,warp->image->rows) !=
-             MagickFalse))
-          (*status)=InterpolatePixelChannels(warp->canvas_image,
-            warp->interpolate_view,warp->warp_image,warp->method,offset.x,
-            offset.y,q,warp->exception);
-        if ((*status) == MagickFalse)
-          break;
-      }
+      if (ImplodePixel(warp,&site,q,status) == MagickFalse)
+        break;
     p+=(ptrdiff_t) GetPixelChannels(warp->canvas_image);
     q+=(ptrdiff_t) GetPixelChannels(warp->warp_image);
   }
