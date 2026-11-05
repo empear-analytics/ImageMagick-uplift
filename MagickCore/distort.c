@@ -1233,6 +1233,54 @@ static MagickBooleanType SolveBilinearCoefficients(double *coeff,
   return(status);
 }
 
+static void SetBilinearForwardCoefficients(double *coeff,
+  const DistortMethod *method)
+{
+  if ( *method == BilinearForwardDistortion ) {
+     /* Bilinear Forward Mapped Distortion
+
+     The above least-squares solved for coefficients but in the forward
+     direction, due to changes to indexing constants.
+
+        i = c0*x + c1*y + c2*x*y + c3;
+        j = c4*x + c5*y + c6*x*y + c7;
+
+     where i,j are in the destination image, NOT the source.
+
+     Reverse Pixel mapping however needs to use reverse of these
+     functions.  It required a full page of algebra to work out the
+     reversed mapping formula, but resolves down to the following...
+
+        c8 = c0*c5-c1*c4;
+        c9 = 2*(c2*c5-c1*c6);   // '2*a' in the quadratic formula
+
+        i = i - c3;   j = j - c7;
+        b = c6*i - c2*j + c8;   // So that   a*y^2 + b*y + c == 0
+        c = c4*i -  c0*j;       // y = ( -b +- sqrt(bb - 4ac) ) / (2*a)
+
+        r = b*b - c9*(c+c);
+        if ( c9 != 0 )
+          y = ( -b + sqrt(r) ) / c9;
+        else
+          y = -c/b;
+
+        x = ( i - c1*y) / ( c1 - c2*y );
+
+     NB: if 'r' is negative there is no solution!
+     NB: the sign of the sqrt() should be negative if image becomes
+         flipped or flopped, or crosses over itself.
+     NB: technically coefficient c5 is not needed, anymore,
+         but kept for completeness.
+
+     See Anthony Thyssen <A.Thyssen@griffith.edu.au>
+     or  Fred Weinhaus <fmw@alink.net>  for more details.
+
+     */
+     coeff[8] = coeff[0]*coeff[5] - coeff[1]*coeff[4];
+     coeff[9] = 2*(coeff[2]*coeff[5] - coeff[1]*coeff[6]);
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1457,49 +1505,7 @@ static double *GenerateCoefficients(const Image *image,
             CommandOptionToMnemonic(MagickDistortOptions, *method) );
         return((double *) NULL);
       }
-      if ( *method == BilinearForwardDistortion ) {
-         /* Bilinear Forward Mapped Distortion
-
-         The above least-squares solved for coefficients but in the forward
-         direction, due to changes to indexing constants.
-
-            i = c0*x + c1*y + c2*x*y + c3;
-            j = c4*x + c5*y + c6*x*y + c7;
-
-         where i,j are in the destination image, NOT the source.
-
-         Reverse Pixel mapping however needs to use reverse of these
-         functions.  It required a full page of algebra to work out the
-         reversed mapping formula, but resolves down to the following...
-
-            c8 = c0*c5-c1*c4;
-            c9 = 2*(c2*c5-c1*c6);   // '2*a' in the quadratic formula
-
-            i = i - c3;   j = j - c7;
-            b = c6*i - c2*j + c8;   // So that   a*y^2 + b*y + c == 0
-            c = c4*i -  c0*j;       // y = ( -b +- sqrt(bb - 4ac) ) / (2*a)
-
-            r = b*b - c9*(c+c);
-            if ( c9 != 0 )
-              y = ( -b + sqrt(r) ) / c9;
-            else
-              y = -c/b;
-
-            x = ( i - c1*y) / ( c1 - c2*y );
-
-         NB: if 'r' is negative there is no solution!
-         NB: the sign of the sqrt() should be negative if image becomes
-             flipped or flopped, or crosses over itself.
-         NB: technically coefficient c5 is not needed, anymore,
-             but kept for completeness.
-
-         See Anthony Thyssen <A.Thyssen@griffith.edu.au>
-         or  Fred Weinhaus <fmw@alink.net>  for more details.
-
-         */
-         coeff[8] = coeff[0]*coeff[5] - coeff[1]*coeff[4];
-         coeff[9] = 2*(coeff[2]*coeff[5] - coeff[1]*coeff[6]);
-      }
+      SetBilinearForwardCoefficients(coeff,method);
       return(coeff);
     }
 #if 0
