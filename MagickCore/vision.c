@@ -3364,6 +3364,95 @@ static void PrepareObjectSelection(const CCSelectionInputs *selection_inputs,
     }
 }
 
+typedef struct _CCThresholdInputs
+{
+  const Image
+    *image;
+
+  Image
+    *component_image;
+
+  CCObjectInfo
+    *object,
+    **objects;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    background_id;
+
+  double
+    min_threshold,
+    max_threshold;
+
+  ssize_t
+    n;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+} CCThresholdInputs;
+
+static Image *ApplyObjectThresholds(const CCThresholdInputs *threshold_inputs)
+{
+  CCFinishInputs
+    finish_inputs;
+
+  CCMetricInputs
+    inputs;
+
+  CCMetricTargets
+    targets;
+
+  const char
+    *metrics[CCMaxMetrics];
+
+  double
+    max_threshold = threshold_inputs->max_threshold,
+    min_threshold = threshold_inputs->min_threshold;
+
+  ssize_t
+    n = threshold_inputs->n;
+
+  inputs.image=threshold_inputs->image;
+  inputs.component_image=threshold_inputs->component_image;
+  inputs.object=threshold_inputs->object;
+  inputs.exception=threshold_inputs->exception;
+  inputs.background_id=threshold_inputs->background_id;
+  targets.min_threshold=(&min_threshold);
+  targets.max_threshold=(&max_threshold);
+  targets.n=(&n);
+  targets.metrics=(&metrics);
+  ApplyShapeThresholds(&inputs,&targets);
+  inputs.image=threshold_inputs->image;
+  inputs.component_image=threshold_inputs->component_image;
+  inputs.object=threshold_inputs->object;
+  inputs.exception=threshold_inputs->exception;
+  inputs.background_id=threshold_inputs->background_id;
+  targets.min_threshold=(&min_threshold);
+  targets.max_threshold=(&max_threshold);
+  targets.n=(&n);
+  targets.metrics=(&metrics);
+  ApplyAxisThresholds(&inputs,&targets);
+  finish_inputs.image=threshold_inputs->image;
+  finish_inputs.component_image=threshold_inputs->component_image;
+  finish_inputs.object=threshold_inputs->object;
+  finish_inputs.objects=threshold_inputs->objects;
+  finish_inputs.connectivity=threshold_inputs->connectivity;
+  finish_inputs.connect4=threshold_inputs->connect4;
+  finish_inputs.connect8=threshold_inputs->connect8;
+  finish_inputs.background_id=threshold_inputs->background_id;
+  finish_inputs.n=n;
+  finish_inputs.status=threshold_inputs->status;
+  finish_inputs.exception=threshold_inputs->exception;
+  return(MergeAndReportComponents(&finish_inputs,metrics));
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -3372,9 +3461,6 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
 
   CCEquivalenceInputs
     equivalence_inputs;
-
-  CCFinishInputs
-    finish_inputs;
 
   CCLabelCounts
     label_counts;
@@ -3388,18 +3474,14 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   CCSelectionTargets
     selection_targets;
 
-  CCMetricInputs
-    inputs;
-
-  CCMetricTargets
-    targets;
+  CCThresholdInputs
+    threshold_inputs;
 
   CCObjectInfo
     *object;
 
   const char
-    *artifact,
-    *metrics[CCMaxMetrics];
+    *artifact;
 
   double
     max_threshold,
@@ -3527,38 +3609,20 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
   RemoveSelectedObjects(image,component_image,object,exception);
-  inputs.image=image;
-  inputs.component_image=component_image;
-  inputs.object=object;
-  inputs.exception=exception;
-  inputs.background_id=background_id;
-  targets.min_threshold=(&min_threshold);
-  targets.max_threshold=(&max_threshold);
-  targets.n=(&n);
-  targets.metrics=(&metrics);
-  ApplyShapeThresholds(&inputs,&targets);
-  inputs.image=image;
-  inputs.component_image=component_image;
-  inputs.object=object;
-  inputs.exception=exception;
-  inputs.background_id=background_id;
-  targets.min_threshold=(&min_threshold);
-  targets.max_threshold=(&max_threshold);
-  targets.n=(&n);
-  targets.metrics=(&metrics);
-  ApplyAxisThresholds(&inputs,&targets);
-  finish_inputs.image=image;
-  finish_inputs.component_image=component_image;
-  finish_inputs.object=object;
-  finish_inputs.objects=objects;
-  finish_inputs.connectivity=connectivity;
-  finish_inputs.connect4=connect4;
-  finish_inputs.connect8=connect8;
-  finish_inputs.background_id=background_id;
-  finish_inputs.n=n;
-  finish_inputs.status=status;
-  finish_inputs.exception=exception;
-  return(MergeAndReportComponents(&finish_inputs,metrics));
+  threshold_inputs.image=image;
+  threshold_inputs.component_image=component_image;
+  threshold_inputs.object=object;
+  threshold_inputs.objects=objects;
+  threshold_inputs.connectivity=connectivity;
+  threshold_inputs.connect4=connect4;
+  threshold_inputs.connect8=connect8;
+  threshold_inputs.background_id=background_id;
+  threshold_inputs.min_threshold=min_threshold;
+  threshold_inputs.max_threshold=max_threshold;
+  threshold_inputs.n=n;
+  threshold_inputs.status=status;
+  threshold_inputs.exception=exception;
+  return(ApplyObjectThresholds(&threshold_inputs));
 }
 
 /*
