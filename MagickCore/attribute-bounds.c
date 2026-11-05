@@ -359,6 +359,58 @@ static double GetBottomEdgeCensus(const EdgeTrimScan *scan,
     vertex->bottom,scan->exception));
 }
 
+static void TrimLeftEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
+  RectangleInfo *bounds,CensusInfo *edge)
+{
+  /*
+    Trim left edge.
+  */
+  (*vertex).left++;
+  (*bounds).width--;
+  (*edge).left=GetLeftEdgeCensus(scan,vertex,bounds);
+  (*edge).top=GetTopEdgeCensus(scan,vertex,bounds);
+  (*edge).bottom=GetBottomEdgeCensus(scan,vertex,bounds);
+}
+
+static void TrimRightEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
+  RectangleInfo *bounds,CensusInfo *edge)
+{
+  /*
+    Trim right edge.
+  */
+  (*vertex).right++;
+  (*bounds).width--;
+  (*edge).right=GetRightEdgeCensus(scan,vertex,bounds);
+  (*edge).top=GetTopEdgeCensus(scan,vertex,bounds);
+  (*edge).bottom=GetBottomEdgeCensus(scan,vertex,bounds);
+}
+
+static void TrimTopEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
+  RectangleInfo *bounds,CensusInfo *edge)
+{
+  /*
+    Trim top edge.
+  */
+  (*vertex).top++;
+  (*bounds).height--;
+  (*edge).left=GetLeftEdgeCensus(scan,vertex,bounds);
+  (*edge).right=GetRightEdgeCensus(scan,vertex,bounds);
+  (*edge).top=GetTopEdgeCensus(scan,vertex,bounds);
+}
+
+static void TrimBottomEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
+  RectangleInfo *bounds,CensusInfo *edge)
+{
+  /*
+    Trim bottom edge.
+  */
+  (*vertex).bottom++;
+  (*bounds).height--;
+  (*edge).left=GetLeftEdgeCensus(scan,vertex,bounds);
+  (*edge).right=GetRightEdgeCensus(scan,vertex,bounds);
+  (*edge).bottom=GetBottomEdgeCensus(scan,vertex,bounds);
+}
+
 static RectangleInfo GetEdgeBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -409,50 +461,22 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
       break;
     if (fabs(edge.left-background_census) < MagickEpsilon)
       {
-        /*
-          Trim left edge.
-        */
-        vertex.left++;
-        bounds.width--;
-        edge.left=GetLeftEdgeCensus(&scan,&vertex,&bounds);
-        edge.top=GetTopEdgeCensus(&scan,&vertex,&bounds);
-        edge.bottom=GetBottomEdgeCensus(&scan,&vertex,&bounds);
+        TrimLeftEdge(&scan,&vertex,&bounds,&edge);
         continue;
       }
     if (fabs(edge.right-background_census) < MagickEpsilon)
       {
-        /*
-          Trim right edge.
-        */
-        vertex.right++;
-        bounds.width--;
-        edge.right=GetRightEdgeCensus(&scan,&vertex,&bounds);
-        edge.top=GetTopEdgeCensus(&scan,&vertex,&bounds);
-        edge.bottom=GetBottomEdgeCensus(&scan,&vertex,&bounds);
+        TrimRightEdge(&scan,&vertex,&bounds,&edge);
         continue;
       }
     if (fabs(edge.top-background_census) < MagickEpsilon)
       {
-        /*
-          Trim top edge.
-        */
-        vertex.top++;
-        bounds.height--;
-        edge.left=GetLeftEdgeCensus(&scan,&vertex,&bounds);
-        edge.right=GetRightEdgeCensus(&scan,&vertex,&bounds);
-        edge.top=GetTopEdgeCensus(&scan,&vertex,&bounds);
+        TrimTopEdge(&scan,&vertex,&bounds,&edge);
         continue;
       }
     if (fabs(edge.bottom-background_census) < MagickEpsilon)
       {
-        /*
-          Trim bottom edge.
-        */
-        vertex.bottom++;
-        bounds.height--;
-        edge.left=GetLeftEdgeCensus(&scan,&vertex,&bounds);
-        edge.right=GetRightEdgeCensus(&scan,&vertex,&bounds);
-        edge.bottom=GetBottomEdgeCensus(&scan,&vertex,&bounds);
+        TrimBottomEdge(&scan,&vertex,&bounds,&edge);
         continue;
       }
   }
