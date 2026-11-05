@@ -1069,6 +1069,12 @@ merges code, not parameters.
    initialiser has no member access or cast, declare it `const` with the initialiser.
    Otherwise declare it without `const` or initialiser, and fill it at that point,
    `name.member=expr;` for every member in declaration order, with nothing between.
+   Form for a call in a loop (2026-11-05): when the calls stand in the body of a loop of
+   a function that has no OpenMP region of its own (no `#pragma omp` in its body, even
+   if a parallel loop calls it), the struct may be filled once directly before the
+   loop, as Recipe OC step 6 and Recipe LB step 4 fill theirs, when nothing from the
+   fill to the loop's end writes an identifier or a member that an initialiser reads
+   (row pointers advanced along the row are not members). Every other step holds.
 6. A struct declared outside a `#pragma omp` region and read inside it is `const`, and
    none of its members point to data the region writes through the struct. A struct
    the function reaches only through its `const Name *name` parameter, a local of the
@@ -1150,6 +1156,11 @@ static inline void CopyPixels(const MagnifyPixels *magnify,
   value is rounded to it exactly as the argument was.
 - An address member (`(&offset)`) is the value the argument `&offset` had: the same
   address at every call, whatever the earlier calls wrote to `offset` through it.
+- The loop form of step 5 reads each initialiser once, before the loop, instead of at
+  every call; the condition on writes between the fill and the loop's end makes the
+  value the same at every call, and the function has no region, so one thread runs the
+  fill and the calls (the pixel loop of `SeparateImageRow`, whose `row` members nothing
+  in the loop writes).
 - A struct reached through a pointer to `const` (step 6) is read by every thread of the
   region and written by none: the caller filled it before the call and runs nothing
   until the call returns. A thread reading `name->member` in the region reads the value
@@ -3613,6 +3624,12 @@ function).
 5. Where the `default` group stood, write the group `default:` alone, whose body is a
    compound block holding `if (Helper(...) == MagickFalse)` `return(R);` with the
    original `R`, then `break;`.
+   Form for a link of a chain (2026-11-05): in a function whose `switch` is followed by
+   `return(MagickTrue);` and whose moved groups return `MagickFalse` (step 4's function,
+   step 7's chain), the group may instead be `default:` followed by
+   `return(Helper(...));`, with the same arguments. The helper returns only `MagickTrue`
+   or `MagickFalse`, so this is the value the `if` form returns on both paths, and the
+   function has one test fewer.
 6. The kept groups stay where they were, unchanged. Check by reading that every label
    of the original `switch` is in exactly one of the two, `default` in the new one, and
    every argument fills the parameter it names.
@@ -3713,6 +3730,13 @@ static MagickBooleanType ExportMapQuantumOPR(const char *map,const ssize_t i,
 - A plain local the moved groups write (`quantum_map=...RelinquishMagickMemory(...)`)
   is written only on paths that return: the caller's copy keeps the old value, which
   nothing reads on the way out (W step 3).
+- The `return(Helper(...));` form of step 5: the `if` form returns `MagickFalse` when the
+  helper does and otherwise `break;`s into `return(MagickTrue);`; the helper's result is
+  `MagickTrue` or `MagickFalse` and nothing else, so returning it gives `MagickFalse` for
+  `MagickFalse` and `MagickTrue` for `MagickTrue`, the same value after the same
+  statements. Each `case` label counts once in cyclomatic complexity, so a chain link
+  that keeps six labels and a `default:` stays at 8 with the form and reaches 9
+  without it.
 - `default` must move, for the reason SD gives; no group may fall through, kept groups
   included, since after the split a kept group falling through would run into whatever
   now follows it.
@@ -7546,3 +7570,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | PD | Name a Parameter-or-Default Selection: the whole right-hand side `(n >= k) ? values[k-1] : d` of an assignment, at three or more sites of one file, becomes a call of one `static inline` function taking `n`, `values`, `k` and `d`; oracle evidence (the object code is not byte-identical) | `statistic-function.c`'s three case helpers (campaign A, W14 lane d): twelve parameter defaults held *Overall Code Complexity*; a probe 9.09 to 9.68 | mandate (2026-10-24) |
 | 2026-11-05 | NEW | RP | Extract Progress Loop Returning the Progress: a sequential pass whose progress block holds an orphaned `#pragma omp atomic` `progress++` (moving whole and unchanged, Recipe N step 1) and which may clear `status` moves into a `static` function that returns `progress` (declared there, or by value) and takes `status` by pointer (`(*status)`, PS step 4's text); other writes are Recipe E step 4 temporaries; at most four parameters. *Careful* gives the binding and return arguments | `segment.c`'s `Classify` (campaign A, W14 lane a): after H, I and N its sequential counting pass, writing `progress` and `status` that the parallel pass reads, held the last *Complex Method* (cc 9) and *Large Method* (90 lines); E, N, O, K and Q refuse it (second written variable, or `(*progress)++` under the atomic). A probe: 6.67 to 7.01, no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | NEW | ST | Split a Selection at its Default, Copying the Return Tail: the `default:` group of a `switch` and groups adjacent to it, which leave through `return(R);` (any `R`) or through `break;` to a single `return(R_T);` that ends the function, move to a `static` function of the caller's return type whose body is the moved groups' `switch` followed by a copy of `return(R_T);`; the caller's `default:` becomes `return(Helper(...));` and keeps its own `return(R_T);` for the kept groups. Variables the groups write go by value (only `R_T` read them after the `switch`). *Careful* gives the argument | `channel-alpha.c`'s `SetImageAlphaChannel` (campaign A, W14 lane c): cc 16, 81 lines, groups mixing `break;` to the tail with `return(...)`, refused by SD, SR, SW, RV and BR. A probe of the chain (E step 7 on the tail, then two steps of this recipe): 8.96 to 8.98, 9.07 and 9.38, no finding on a new function | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | SR | Step 5: in a function whose `switch` is followed by `return(MagickTrue);` and whose moved groups return `MagickFalse` (a link of step 7's chain), the `default:` group may be `return(Helper(...));` instead of the `if`/`return`/`break;` group; same value on both paths. *Careful* gives the argument. Still seven steps | `channel.c`'s `ChannelFxImage` (campaign A, W14 lane d): the destination-channel `switch` (nine labels, a throwing `default:`) moved by Recipe V step 7 is cc 14; its chain by the `if` form leaves the head link at cc 9 (six labels, `default:`, the `if`), a *Complex Method* the gate refuses; the `return` form makes it 8 | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | B | Step 5: calls in a loop of a function with no OpenMP region of its own may take a struct filled once directly before the loop, when nothing from the fill to the loop's end writes what an initialiser reads (the form Recipe OC step 6 and Recipe LB step 4 already use for their structs). *Careful* gives the argument. Still eight steps | `channel.c`'s `SeparatePixelChannel` (5 arguments, called once per pixel by `SeparateImageRow`): B refuses the per-call fill of member accesses in a hot loop; with `ChannelImage` the last two *Excess Number of Function Arguments* of the file, a probe 7.81 to 8.06 | mandate (2026-10-24) |

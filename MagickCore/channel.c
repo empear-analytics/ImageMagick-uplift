@@ -113,11 +113,118 @@ typedef enum
   TransferChannelOp
 } ChannelFx;
 
-static MagickBooleanType ChannelImage(Image *destination_image,
-  const PixelChannel destination_channel,const ChannelFx channel_op,
-  const Image *source_image,const PixelChannel source_channel,
-  const Quantum pixel,ExceptionInfo *exception)
+typedef struct _ChannelRow
 {
+  const Image
+    *source_image;
+
+  Image
+    *destination_image;
+
+  CacheView
+    *source_view,
+    *destination_view;
+
+  PixelChannel
+    destination_channel,
+    source_channel;
+
+  ChannelFx
+    channel_op;
+
+  Quantum
+    pixel;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
+} ChannelRow;
+
+static void CopyChannelPixels(const ChannelRow *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) row->width; x++)
+  {
+    if (row->channel_op == AssignChannelOp)
+      SetPixelChannel(row->destination_image,row->destination_channel,
+        row->pixel,q);
+    else
+      SetPixelChannel(row->destination_image,row->destination_channel,
+        GetPixelChannel(row->source_image,row->source_channel,p),q);
+    p+=(ptrdiff_t) GetPixelChannels(row->source_image);
+    q+=(ptrdiff_t) GetPixelChannels(row->destination_image);
+  }
+}
+
+static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  PixelTrait
+    destination_traits,
+    source_traits;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(row->source_view,0,y,row->source_image->columns,1,
+    row->exception);
+  q=GetCacheViewAuthenticPixels(row->destination_view,0,y,
+    row->destination_image->columns,1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  destination_traits=GetPixelChannelTraits(row->destination_image,
+    row->destination_channel);
+  source_traits=GetPixelChannelTraits(row->source_image,row->source_channel);
+  if ((destination_traits == UndefinedPixelTrait) ||
+      (source_traits == UndefinedPixelTrait))
+    return;
+  CopyChannelPixels(row,p,q);
+  if (SyncCacheViewAuthenticPixels(row->destination_view,row->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+}
+
+typedef struct _ChannelPlan
+{
+  PixelChannel
+    destination_channel;
+
+  ChannelFx
+    channel_op;
+
+  const Image
+    *source_image;
+
+  PixelChannel
+    source_channel;
+} ChannelPlan;
+
+static MagickBooleanType ChannelImage(Image *destination_image,
+  const ChannelPlan *plan,const Quantum pixel,ExceptionInfo *exception)
+{
+  const ChannelFx
+    channel_op = plan->channel_op;
+
+  const Image
+    *const source_image = plan->source_image;
+
+  const PixelChannel
+    destination_channel = plan->destination_channel,
+    source_channel = plan->source_channel;
+
   CacheView
     *source_view,
     *destination_view;
@@ -145,59 +252,333 @@ static MagickBooleanType ChannelImage(Image *destination_image,
 #endif
   for (y=0; y < (ssize_t) height; y++)
   {
-    PixelTrait
-      destination_traits,
-      source_traits;
+    const ChannelRow
+      row = { source_image, destination_image, source_view, destination_view,
+        destination_channel, source_channel, channel_op, pixel, width,
+        exception };
 
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
-      exception);
-    q=GetCacheViewAuthenticPixels(destination_view,0,y,
-      destination_image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    destination_traits=GetPixelChannelTraits(destination_image,
-      destination_channel);
-    source_traits=GetPixelChannelTraits(source_image,source_channel);
-    if ((destination_traits == UndefinedPixelTrait) ||
-        (source_traits == UndefinedPixelTrait))
-      continue;
-    for (x=0; x < (ssize_t) width; x++)
-    {
-      if (channel_op == AssignChannelOp)
-        SetPixelChannel(destination_image,destination_channel,pixel,q);
-      else
-        SetPixelChannel(destination_image,destination_channel,
-          GetPixelChannel(source_image,source_channel,p),q);
-      p+=(ptrdiff_t) GetPixelChannels(source_image);
-      q+=(ptrdiff_t) GetPixelChannels(destination_image);
-    }
-    if (SyncCacheViewAuthenticPixels(destination_view,exception) == MagickFalse)
-      status=MagickFalse;
+    ChannelImageRow(&row,y,&status);
   }
   destination_view=DestroyCacheView(destination_view);
   source_view=DestroyCacheView(source_view);
   return(status);
 }
 
+static MagickBooleanType AddDestinationMetaChannel(
+  Image *destination_image,const PixelChannel destination_channel,
+  const char *token,ExceptionInfo *exception)
+{
+  PixelTrait
+    traits;
+
+  switch (destination_channel)
+  {
+    case MetaPixelChannels:
+    default:
+    {
+      traits=GetPixelChannelTraits(destination_image,
+        destination_channel);
+      if (traits != UndefinedPixelTrait)
+        break;
+      (void) SetPixelMetaChannels(destination_image,
+        GetPixelMetaChannels(destination_image)+1,exception);
+      traits=GetPixelChannelTraits(destination_image,
+       destination_channel);
+      if (traits == UndefinedPixelTrait)
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            CorruptImageError,"MissingImageChannel","`%s'",token);
+          return(MagickFalse);
+        }
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AddDestinationMaskChannel(
+  Image *destination_image,const PixelChannel destination_channel,
+  const char *token,ExceptionInfo *exception)
+{
+  switch (destination_channel)
+  {
+    case CompositeMaskPixelChannel:
+    {
+      destination_image->channels=(ChannelType)
+        (destination_image->channels | CompositeMaskChannel);
+      break;
+    }
+    case ReadMaskPixelChannel:
+    {
+      destination_image->channels=(ChannelType)
+        (destination_image->channels | ReadMaskChannel);
+      break;
+    }
+    case WriteMaskPixelChannel:
+    {
+      destination_image->channels=(ChannelType)
+        (destination_image->channels | WriteMaskChannel);
+      break;
+    }
+    default:
+      return(AddDestinationMetaChannel(destination_image,destination_channel,
+        token,exception));
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType RegisterDestinationChannel(
+  Image *destination_image,const PixelChannel destination_channel,
+  const char *token,ExceptionInfo *exception)
+{
+  switch (destination_channel)
+  {
+    case RedPixelChannel:
+    case GreenPixelChannel:
+    case BluePixelChannel:
+    case BlackPixelChannel:
+    case AlphaPixelChannel:
+    case IndexPixelChannel:
+      break;
+    default:
+      return(AddDestinationMaskChannel(destination_image,destination_channel,
+        token,exception));
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseDestinationChannel(Image *destination_image,
+  const char *token,ssize_t *i,ExceptionInfo *exception)
+{
+  (*i)=ParsePixelChannelOption(token);
+  if (LocaleCompare(token,"alpha") == 0)
+    destination_image->alpha_trait=BlendPixelTrait;
+  if ((*i) < 0)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionError,"UnrecognizedChannelType","`%s'",token);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType CheckSourceChannel(const Image *source_image,
+  const PixelChannel source_channel,const char *token,
+  ExceptionInfo *exception)
+{
+  PixelTrait
+    traits;
+
+  traits=GetPixelChannelTraits(source_image,source_channel);
+  if (traits == UndefinedPixelTrait)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        CorruptImageError,"MissingImageChannel","`%s'",token);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void ParseTransferOperator(ChannelFx *channel_op,const char **p,
+  char *token)
+{
+  if (*token == '>')
+    {
+      if ((*channel_op) != ExchangeChannelOp)
+        (*channel_op)=TransferChannelOp;
+      (void) GetNextToken((*p),p,MagickPathExtent,token);
+    }
+}
+
+static void ParseChannelOperator(ChannelFx *channel_op,const char **p,
+  char *token)
+{
+  (*channel_op)=ExtractChannelOp;
+  (void) GetNextToken((*p),p,MagickPathExtent,token);
+  if (*token == '<')
+    {
+      (*channel_op)=ExchangeChannelOp;
+      (void) GetNextToken((*p),p,MagickPathExtent,token);
+    }
+  if (*token == '=')
+    {
+      if ((*channel_op) != ExchangeChannelOp)
+        (*channel_op)=AssignChannelOp;
+      (void) GetNextToken((*p),p,MagickPathExtent,token);
+    }
+  ParseTransferOperator(channel_op,p,token);
+}
+
+static void AdvanceDestinationChannel(const ChannelFx channel_op,
+  ChannelType *channel_mask,PixelChannel *destination_channel)
+{
+  switch (channel_op)
+  {
+    case ExtractChannelOp:
+    {
+      (*channel_mask)=(ChannelType) ((*channel_mask) |
+        (MagickLLConstant(1) << (*destination_channel)));
+      (*destination_channel)=(PixelChannel) ((*destination_channel)+1);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+#define ChannelFxImageTag  "ChannelFx/Image"
+
+static MagickBooleanType SetChannelFxProgress(const Image *source_image,
+  const char *p,const char *expression)
+{
+  MagickBooleanType
+    status;
+
+  status=SetImageProgress(source_image,ChannelFxImageTag,p-expression,
+    strlen(expression));
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static void SetGrayChannelImage(Image *destination_image,
+  const ChannelFx channel_op,const ssize_t channels,ExceptionInfo *exception)
+{
+  if ((channel_op == ExtractChannelOp) && (channels == 1))
+    {
+      (void) SetPixelMetaChannels(destination_image,0,exception);
+      (void) SetImageColorspace(destination_image,GRAYColorspace,exception);
+    }
+}
+
+typedef struct _ChannelFxApply
+{
+  PixelChannel
+    destination_channel;
+
+  ChannelFx
+    channel_op;
+
+  const Image
+    *source_image;
+
+  PixelChannel
+    source_channel;
+
+  double
+    pixel;
+
+  ExceptionInfo
+    *exception;
+} ChannelFxApply;
+
+typedef struct _ChannelFxTargets
+{
+  Image
+    **destination_image;
+
+  ssize_t
+    *channels;
+} ChannelFxTargets;
+
+static MagickBooleanType ApplyChannelOperation(const ChannelFxApply *apply,
+  const ChannelFxTargets *targets)
+{
+  const ChannelFx
+    channel_op = apply->channel_op;
+
+  const double
+    pixel = apply->pixel;
+
+  const Image
+    *const source_image = apply->source_image;
+
+  const PixelChannel
+    destination_channel = apply->destination_channel,
+    source_channel = apply->source_channel;
+
+  ExceptionInfo
+    *const exception = apply->exception;
+
+  ChannelPlan
+    plan;
+
+  Image
+    **const destination_image = targets->destination_image;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    *const channels = targets->channels;
+
+  plan.destination_channel=destination_channel;
+  plan.channel_op=channel_op;
+  plan.source_image=source_image;
+  plan.source_channel=source_channel;
+  status=ChannelImage((*destination_image),&plan,ClampToQuantum(pixel),
+    exception);
+  if (status == MagickFalse)
+    {
+      (*destination_image)=DestroyImageList((*destination_image));
+      return(MagickFalse);
+    }
+  (*channels)++;
+  if (channel_op == ExchangeChannelOp)
+    {
+      plan.destination_channel=source_channel;
+      plan.channel_op=channel_op;
+      plan.source_image=source_image;
+      plan.source_channel=destination_channel;
+      status=ChannelImage((*destination_image),&plan,ClampToQuantum(pixel),
+        exception);
+      if (status == MagickFalse)
+        {
+          (*destination_image)=DestroyImageList((*destination_image));
+          return(MagickFalse);
+        }
+      (*channels)++;
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireChannelCanvas(const Image *source_image,
+  Image **canvas,ExceptionInfo *exception)
+{
+  (*canvas)=CloneImage(source_image,0,0,MagickTrue,exception);
+  if ((*canvas) == (Image *) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType AppendChannelCanvas(Image **destination_image,
+  Image *canvas,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  AppendImageToList(destination_image,canvas);
+  (*destination_image)=GetLastImageInList((*destination_image));
+  status=SetImageStorageClass((*destination_image),DirectClass,exception);
+  if (status == MagickFalse)
+    {
+      (*destination_image)=GetLastImageInList((*destination_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void AdvanceSourceImage(const Image **source_image,const char **p,
+  char *token)
+{
+  if (GetNextImageInList((*source_image)) != (Image *) NULL)
+    (*source_image)=GetNextImageInList((*source_image));
+  (void) GetNextToken((*p),p,MagickPathExtent,token);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
-#define ChannelFxImageTag  "ChannelFx/Image"
-
   ChannelFx
     channel_op = ExtractChannelOp;
 
@@ -252,8 +633,11 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   (void) GetNextToken(p,&p,MagickPathExtent,token);
   while (*token != '\0')
   {
-    PixelTrait
-      traits;
+    ChannelFxApply
+      apply;
+
+    const ChannelFxTargets
+      targets = { &destination_image, &channels };
 
     ssize_t
       i;
@@ -270,9 +654,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
       }
       case '|':
       {
-        if (GetNextImageInList(source_image) != (Image *) NULL)
-          source_image=GetNextImageInList(source_image);
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
+        AdvanceSourceImage(&source_image,&p,token);
         break;
       }
       case ';':
@@ -281,26 +663,15 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
           *canvas;
 
         (void) SetPixelChannelMask(destination_image,channel_mask);
-        if ((channel_op == ExtractChannelOp) && (channels == 1))
-          {
-            (void) SetPixelMetaChannels(destination_image,0,exception);
-            (void) SetImageColorspace(destination_image,GRAYColorspace,
-              exception);
-          }
-        canvas=CloneImage(source_image,0,0,MagickTrue,exception);
-        if (canvas == (Image *) NULL)
+        SetGrayChannelImage(destination_image,channel_op,channels,exception);
+        if (AcquireChannelCanvas(source_image,&canvas,exception) == MagickFalse)
           {
             destination_image=DestroyImageList(destination_image);
             return(destination_image);
           }
-        AppendImageToList(&destination_image,canvas);
-        destination_image=GetLastImageInList(destination_image);
-        status=SetImageStorageClass(destination_image,DirectClass,exception);
-        if (status == MagickFalse)
-          {
-            destination_image=GetLastImageInList(destination_image);
-            return((Image *) NULL);
-          }
+        if (AppendChannelCanvas(&destination_image,canvas,exception) ==
+            MagickFalse)
+          return((Image *) NULL);
         (void) GetNextToken(p,&p,MagickPathExtent,token);
         channels=0;
         destination_channel=RedPixelChannel;
@@ -312,33 +683,13 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
     }
     i=ParsePixelChannelOption(token);
     source_channel=(PixelChannel) i;
-    traits=GetPixelChannelTraits(source_image,source_channel);
-    if (traits == UndefinedPixelTrait)
+    if (CheckSourceChannel(source_image,source_channel,token,
+          exception) == MagickFalse)
       {
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          CorruptImageError,"MissingImageChannel","`%s'",token);
         destination_image=DestroyImageList(destination_image);
         return(destination_image);
       }
-    channel_op=ExtractChannelOp;
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (*token == '<')
-      {
-        channel_op=ExchangeChannelOp;
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-      }
-    if (*token == '=')
-      {
-        if (channel_op != ExchangeChannelOp)
-          channel_op=AssignChannelOp;
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-      }
-    if (*token == '>')
-      {
-        if (channel_op != ExchangeChannelOp)
-          channel_op=TransferChannelOp;
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-      }
+    ParseChannelOperator(&channel_op,&p,token);
     switch (channel_op)
     {
       case AssignChannelOp:
@@ -348,68 +699,20 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
         if (channel_op == AssignChannelOp)
           pixel=StringToDoubleInterval(token,(double) QuantumRange+1.0);
         else
-          {
-            i=ParsePixelChannelOption(token);
-            if (LocaleCompare(token,"alpha") == 0)
-              destination_image->alpha_trait=BlendPixelTrait;
-            if (i < 0)
-              {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  OptionError,"UnrecognizedChannelType","`%s'",token);
-                destination_image=DestroyImageList(destination_image);
-                return(destination_image);
-              }
-          }
+          if (ParseDestinationChannel(destination_image,token,&i,
+                exception) == MagickFalse)
+            {
+              destination_image=DestroyImageList(destination_image);
+              return(destination_image);
+            }
         destination_channel=(PixelChannel) i;
         if (image->colorspace != UndefinedColorspace)
-          switch (destination_channel)
-          {
-            case RedPixelChannel:
-            case GreenPixelChannel:
-            case BluePixelChannel:
-            case BlackPixelChannel:
-            case AlphaPixelChannel:
-            case IndexPixelChannel:
-              break;
-            case CompositeMaskPixelChannel:
+          if (RegisterDestinationChannel(destination_image,destination_channel,
+                token,exception) == MagickFalse)
             {
-              destination_image->channels=(ChannelType)
-                (destination_image->channels | CompositeMaskChannel);
-              break;
+              destination_image=DestroyImageList(destination_image);
+              return(destination_image);
             }
-            case ReadMaskPixelChannel:
-            {
-              destination_image->channels=(ChannelType)
-                (destination_image->channels | ReadMaskChannel);
-              break;
-            }
-            case WriteMaskPixelChannel:
-            {
-              destination_image->channels=(ChannelType)
-                (destination_image->channels | WriteMaskChannel);
-              break;
-            }
-            case MetaPixelChannels:
-            default:
-            {
-              traits=GetPixelChannelTraits(destination_image,
-                destination_channel);
-              if (traits != UndefinedPixelTrait)
-                break;
-              (void) SetPixelMetaChannels(destination_image,
-                GetPixelMetaChannels(destination_image)+1,exception);
-              traits=GetPixelChannelTraits(destination_image,
-               destination_channel);
-              if (traits == UndefinedPixelTrait)
-                {
-                  (void) ThrowMagickException(exception,GetMagickModule(),
-                    CorruptImageError,"MissingImageChannel","`%s'",token);
-                  destination_image=DestroyImageList(destination_image);
-                  return(destination_image);
-                }
-              break;
-            }
-          }
         channel_mask=(ChannelType) (channel_mask |
           (MagickLLConstant(1) << ParseChannelOption(token)));
         (void) GetNextToken(p,&p,MagickPathExtent,token);
@@ -418,50 +721,22 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
       default:
         break;
     }
-    status=ChannelImage(destination_image,destination_channel,channel_op,
-      source_image,source_channel,ClampToQuantum(pixel),exception);
-    if (status == MagickFalse)
-      {
-        destination_image=DestroyImageList(destination_image);
-        break;
-      }
-    channels++;
-    if (channel_op == ExchangeChannelOp)
-      {
-        status=ChannelImage(destination_image,source_channel,channel_op,
-          source_image,destination_channel,ClampToQuantum(pixel),exception);
-        if (status == MagickFalse)
-          {
-            destination_image=DestroyImageList(destination_image);
-            break;
-          }
-        channels++;
-      }
-    switch (channel_op)
-    {
-      case ExtractChannelOp:
-      {
-        channel_mask=(ChannelType) (channel_mask |
-          (MagickLLConstant(1) << destination_channel));
-        destination_channel=(PixelChannel) (destination_channel+1);
-        break;
-      }
-      default:
-        break;
-    }
-    status=SetImageProgress(source_image,ChannelFxImageTag,p-expression,
-      strlen(expression));
-    if (status == MagickFalse)
+    apply.destination_channel=destination_channel;
+    apply.channel_op=channel_op;
+    apply.source_image=source_image;
+    apply.source_channel=source_channel;
+    apply.pixel=pixel;
+    apply.exception=exception;
+    if (ApplyChannelOperation(&apply,&targets) == MagickFalse)
+      break;
+    AdvanceDestinationChannel(channel_op,&channel_mask,&destination_channel);
+    if (SetChannelFxProgress(source_image,p,expression) == MagickFalse)
       break;
   }
   if (destination_image == (Image *) NULL)
     return(destination_image);
   (void) SetPixelChannelMask(destination_image,channel_mask);
-  if ((channel_op == ExtractChannelOp) && (channels == 1))
-    {
-      (void) SetPixelMetaChannels(destination_image,0,exception);
-      (void) SetImageColorspace(destination_image,GRAYColorspace,exception);
-    }
+  SetGrayChannelImage(destination_image,channel_op,channels,exception);
   return(GetFirstImageInList(destination_image));
 }
 
@@ -529,10 +804,26 @@ MagickExport MagickBooleanType GetImageAlphaChannel(const Image *image)
 */
 #define GetChannelBit(mask,bit)  (((size_t) (mask) >> (size_t) (bit)) & 0x01)
 
-static void SeparatePixelChannel(const Image *image,
-  const Image *separate_image,const ChannelType channel_type,
+typedef struct _SeparatePixels
+{
+  const Image
+    *image,
+    *separate_image;
+
+  ChannelType
+    channel_type;
+} SeparatePixels;
+
+static void SeparatePixelChannel(const SeparatePixels *pixels,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
+  const ChannelType
+    channel_type = pixels->channel_type;
+
+  const Image
+    *const image = pixels->image,
+    *const separate_image = pixels->separate_image;
+
   ssize_t
     i;
 
@@ -547,17 +838,87 @@ static void SeparatePixelChannel(const Image *image,
   }
 }
 
-MagickExport Image *SeparateImage(const Image *image,
-  const ChannelType channel_type,ExceptionInfo *exception)
+typedef struct _SeparateRow
 {
-#define SeparateImageTag  "Separate/Image"
+  const Image
+    *image;
+
+  Image
+    *separate_image;
 
   CacheView
     *image_view,
     *separate_view;
 
-  Image
-    *separate_image;
+  ChannelType
+    channel_type;
+
+  ExceptionInfo
+    *exception;
+} SeparateRow;
+
+static MagickBooleanType SeparateImageRow(const SeparateRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  SeparatePixels
+    pixels;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(row->image_view,0,y,row->image->columns,1,
+    row->exception);
+  q=QueueCacheViewAuthenticPixels(row->separate_view,0,y,
+    row->separate_image->columns,1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  pixels.image=row->image;
+  pixels.separate_image=row->separate_image;
+  pixels.channel_type=row->channel_type;
+  for (x=0; x < (ssize_t) row->image->columns; x++)
+  {
+    SetPixelChannel(row->separate_image,GrayPixelChannel,(Quantum) 0,q);
+    SeparatePixelChannel(&pixels,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(row->image);
+    q+=(ptrdiff_t) GetPixelChannels(row->separate_image);
+  }
+  if (SyncCacheViewAuthenticPixels(row->separate_view,row->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+#define SeparateImageTag  "Separate/Image"
+
+static void SetSeparateProgress(const Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,SeparateImageTag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static MagickBooleanType SeparateImageRows(const Image *image,
+  Image *separate_image,const ChannelType channel_type,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view,
+    *separate_view;
 
   MagickBooleanType
     status;
@@ -567,6 +928,45 @@ MagickExport Image *SeparateImage(const Image *image,
 
   ssize_t
     y;
+
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  separate_view=AcquireAuthenticCacheView(separate_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const SeparateRow
+      row = { image, separate_image, image_view, separate_view, channel_type,
+        exception };
+
+    if (SeparateImageRow(&row,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetSeparateProgress(image,progress,&status);
+      }
+  }
+  separate_view=DestroyCacheView(separate_view);
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport Image *SeparateImage(const Image *image,
+  const ChannelType channel_type,ExceptionInfo *exception)
+{
+  Image
+    *separate_image;
+
+  MagickBooleanType
+    status;
 
   /*
     Initialize separate image attributes.
@@ -591,60 +991,7 @@ MagickExport Image *SeparateImage(const Image *image,
   /*
     Separate image.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  separate_view=AcquireAuthenticCacheView(separate_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,image,image->rows,2)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(separate_view,0,y,separate_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SetPixelChannel(separate_image,GrayPixelChannel,(Quantum) 0,q);
-      SeparatePixelChannel(image,separate_image,channel_type,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(separate_image);
-    }
-    if (SyncCacheViewAuthenticPixels(separate_view,exception) == MagickFalse)
-      status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        proceed=SetImageProgress(image,SeparateImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
-  }
-  separate_view=DestroyCacheView(separate_view);
-  image_view=DestroyCacheView(image_view);
+  status=SeparateImageRows(image,separate_image,channel_type,exception);
   (void) SetImageChannelMask(separate_image,AllChannels);
   if (status == MagickFalse)
     separate_image=DestroyImage(separate_image);

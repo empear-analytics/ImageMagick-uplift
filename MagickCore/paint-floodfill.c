@@ -459,6 +459,64 @@ static MagickBooleanType CheckFloodfillOffsets(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _FloodfillPlane
+{
+  Image
+    *image,
+    *floodplane_image;
+
+  CacheView
+    *floodplane_view,
+    *image_view;
+
+  const DrawInfo
+    *draw_info;
+
+  ExceptionInfo
+    *exception;
+} FloodfillPlane;
+
+static MagickBooleanType TileFloodplaneImage(const FloodfillPlane *plane)
+{
+  CacheView
+    *const floodplane_view = plane->floodplane_view,
+    *const image_view = plane->image_view;
+
+  const DrawInfo
+    *const draw_info = plane->draw_info;
+
+  ExceptionInfo
+    *const exception = plane->exception;
+
+  Image
+    *const floodplane_image = plane->floodplane_image,
+    *const image = plane->image;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(floodplane_image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const FloodfillTileView
+      view = { image, floodplane_image, floodplane_view, image_view,
+        draw_info, y, exception };
+
+    /*
+      Tile fill color onto floodplane.
+    */
+    TileFloodplaneLine(&view,&status);
+  }
+  return(status);
+}
+
 MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
   const ssize_t y_offset,const MagickBooleanType invert,
@@ -498,6 +556,9 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   MagickBooleanType
     skip,
     status;
+
+  FloodfillPlane
+    plane;
 
   MemoryInfo
     *segment_info;
@@ -609,22 +670,13 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
         break;
     } while (x <= x2);
   }
-  status=MagickTrue;
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(floodplane_image,image,image->rows,2)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const FloodfillTileView
-      view = { image, floodplane_image, floodplane_view, image_view,
-        draw_info, y, exception };
-
-    /*
-      Tile fill color onto floodplane.
-    */
-    TileFloodplaneLine(&view,&status);
-  }
+  plane.image=image;
+  plane.floodplane_image=floodplane_image;
+  plane.floodplane_view=floodplane_view;
+  plane.image_view=image_view;
+  plane.draw_info=draw_info;
+  plane.exception=exception;
+  status=TileFloodplaneImage(&plane);
   floodplane_view=DestroyCacheView(floodplane_view);
   image_view=DestroyCacheView(image_view);
   segment_info=RelinquishVirtualMemory(segment_info);
