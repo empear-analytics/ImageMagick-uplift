@@ -4542,12 +4542,12 @@ static PixelInfo InverseSparseColor(const SparseColorWeights *inverse,
   return(pixel);
 }
 
+#define SparseColorTag  "Distort/SparseColor"
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
 {
-#define SparseColorTag  "Distort/SparseColor"
-
   double
     *coeff;
 
