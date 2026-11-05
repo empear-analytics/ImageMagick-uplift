@@ -1887,6 +1887,107 @@ static void RunLocalContrastRow(MagickBooleanType *status,
     (*status)=MagickFalse;
 }
 
+typedef struct _LocalContrastPasses
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view,
+    *contrast_view;
+
+  float
+    *interImage,
+    *scanline;
+
+  ssize_t
+    scanLineSize,
+    width;
+
+  double
+    totalWeight,
+    strength;
+
+  Image
+    *contrast_image;
+
+  ExceptionInfo
+    *exception;
+} LocalContrastPasses;
+
+static MagickBooleanType RunLocalContrastPasses(
+  const LocalContrastPasses *passes)
+{
+  const Image
+    *const image = passes->image;
+
+  CacheView
+    *const image_view = passes->image_view,
+    *const contrast_view = passes->contrast_view;
+
+  float
+    *const interImage = passes->interImage,
+    *const scanline = passes->scanline;
+
+  const ssize_t
+    scanLineSize = passes->scanLineSize,
+    width = passes->width;
+
+  const double
+    totalWeight = passes->totalWeight,
+    strength = passes->strength;
+
+  Image
+    *const contrast_image = passes->contrast_image;
+
+  ExceptionInfo
+    *const exception = passes->exception;
+
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  {
+    ssize_t
+      x;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+#pragma omp parallel for schedule(static) \
+    magick_number_threads(image,image,image->columns,1)
+#endif
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      const LocalContrastColumnPass
+        pass = { image, image_view, interImage, scanline, scanLineSize, width,
+          totalWeight, exception };
+
+      RunLocalContrastColumn(&status,&pass,x);
+    }
+  }
+  /*
+    Horizontal pass.
+  */
+  {
+    ssize_t
+      y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+#pragma omp parallel for schedule(static) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+    for (y=0; y < (ssize_t) image->rows; y++)
+    {
+      const LocalContrastRowPass
+        pass = { image, image_view, contrast_view, interImage, scanline,
+          scanLineSize, width, totalWeight, strength, contrast_image,
+          exception };
+
+      RunLocalContrastRow(&status,&pass,y);
+    }
+  }
+  return(status);
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -1905,6 +2006,9 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
 
   Image
     *contrast_image;
+
+  LocalContrastPasses
+    passes;
 
   MagickBooleanType
     status;
@@ -1966,45 +2070,18 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   /*
     Vertical pass.
   */
-  status=MagickTrue;
-  {
-    ssize_t
-      x;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-#pragma omp parallel for schedule(static) \
-    magick_number_threads(image,image,image->columns,1)
-#endif
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      const LocalContrastColumnPass
-        pass = { image, image_view, interImage, scanline, scanLineSize, width,
-          totalWeight, exception };
-
-      RunLocalContrastColumn(&status,&pass,x);
-    }
-  }
-  /*
-    Horizontal pass.
-  */
-  {
-    ssize_t
-      y;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-#pragma omp parallel for schedule(static) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-    for (y=0; y < (ssize_t) image->rows; y++)
-    {
-      const LocalContrastRowPass
-        pass = { image, image_view, contrast_view, interImage, scanline,
-          scanLineSize, width, totalWeight, strength, contrast_image,
-          exception };
-
-      RunLocalContrastRow(&status,&pass,y);
-    }
-  }
+  passes.image=image;
+  passes.image_view=image_view;
+  passes.contrast_view=contrast_view;
+  passes.interImage=interImage;
+  passes.scanline=scanline;
+  passes.scanLineSize=scanLineSize;
+  passes.width=width;
+  passes.totalWeight=totalWeight;
+  passes.strength=strength;
+  passes.contrast_image=contrast_image;
+  passes.exception=exception;
+  status=RunLocalContrastPasses(&passes);
   scanline_info=RelinquishVirtualMemory(scanline_info);
   interImage_info=RelinquishVirtualMemory(interImage_info);
   contrast_view=DestroyCacheView(contrast_view);
