@@ -3228,6 +3228,50 @@ static MagickBooleanType PrintPerspectiveFX(double *coeff,
   return(MagickTrue);
 }
 
+static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
+  const char *lookup)
+{
+  (void) FormatLocaleFile(stderr,"BilinearForward Mapping Equations:\n");
+  (void) FormatLocaleFile(stderr,"%s", image_gen);
+  (void) FormatLocaleFile(stderr,"    i = %+lf*x %+lf*y %+lf*x*y %+lf;\n",
+    coeff[0],coeff[1],coeff[2],coeff[3]);
+  (void) FormatLocaleFile(stderr,"    j = %+lf*x %+lf*y %+lf*x*y %+lf;\n",
+    coeff[4],coeff[5],coeff[6],coeff[7]);
+#if 0
+        /* for debugging */
+        (void) FormatLocaleFile(stderr, "   c8 = %+lf  c9 = 2*a = %+lf;\n",
+            coeff[8], coeff[9]);
+#endif
+  (void) FormatLocaleFile(stderr,
+    "BilinearForward Distort, FX Equivalent:\n");
+  (void) FormatLocaleFile(stderr,"%s", image_gen);
+  (void) FormatLocaleFile(stderr,
+    "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",0.5-coeff[3],0.5-
+    coeff[7]);
+  (void) FormatLocaleFile(stderr,"       bb=%lf*ii %+lf*jj %+lf;\n",
+    coeff[6], -coeff[2], coeff[8]);
+  /* Handle Special degenerate (non-quadratic) or trapezoidal case */
+  if (coeff[9] != 0)
+    {
+      (void) FormatLocaleFile(stderr,
+        "       rt=bb*bb %+lf*(%lf*ii%+lf*jj);\n",-2*coeff[9],coeff[4],
+        -coeff[0]);
+    (void) FormatLocaleFile(stderr,
+      "       yy=( -bb + sqrt(rt) ) / %lf;\n",coeff[9]);
+    }
+  else
+    (void) FormatLocaleFile(stderr,"       yy=(%lf*ii%+lf*jj)/bb;\n",
+      -coeff[4],coeff[0]);
+  (void) FormatLocaleFile(stderr,
+    "       xx=(ii %+lf*yy)/(%lf %+lf*yy);\n",-coeff[1],coeff[0],
+    coeff[2]);
+  if ( coeff[9] != 0 )
+    (void) FormatLocaleFile(stderr,"       (rt < 0 ) ? red : %s'\n",
+      lookup);
+  else
+    (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3550,45 +3594,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       }
       case BilinearForwardDistortion:
       {
-        (void) FormatLocaleFile(stderr,"BilinearForward Mapping Equations:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,"    i = %+lf*x %+lf*y %+lf*x*y %+lf;\n",
-          coeff[0],coeff[1],coeff[2],coeff[3]);
-        (void) FormatLocaleFile(stderr,"    j = %+lf*x %+lf*y %+lf*x*y %+lf;\n",
-          coeff[4],coeff[5],coeff[6],coeff[7]);
-#if 0
-        /* for debugging */
-        (void) FormatLocaleFile(stderr, "   c8 = %+lf  c9 = 2*a = %+lf;\n",
-            coeff[8], coeff[9]);
-#endif
-        (void) FormatLocaleFile(stderr,
-          "BilinearForward Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",0.5-coeff[3],0.5-
-          coeff[7]);
-        (void) FormatLocaleFile(stderr,"       bb=%lf*ii %+lf*jj %+lf;\n",
-          coeff[6], -coeff[2], coeff[8]);
-        /* Handle Special degenerate (non-quadratic) or trapezoidal case */
-        if (coeff[9] != 0)
-          {
-            (void) FormatLocaleFile(stderr,
-              "       rt=bb*bb %+lf*(%lf*ii%+lf*jj);\n",-2*coeff[9],coeff[4],
-              -coeff[0]);
-          (void) FormatLocaleFile(stderr,
-            "       yy=( -bb + sqrt(rt) ) / %lf;\n",coeff[9]);
-          }
-        else
-          (void) FormatLocaleFile(stderr,"       yy=(%lf*ii%+lf*jj)/bb;\n",
-            -coeff[4],coeff[0]);
-        (void) FormatLocaleFile(stderr,
-          "       xx=(ii %+lf*yy)/(%lf %+lf*yy);\n",-coeff[1],coeff[0],
-          coeff[2]);
-        if ( coeff[9] != 0 )
-          (void) FormatLocaleFile(stderr,"       (rt < 0 ) ? red : %s'\n",
-            lookup);
-        else
-          (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+        PrintBilinearForwardFX(coeff,image_gen,lookup);
         break;
       }
       case BilinearReverseDistortion:
