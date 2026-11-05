@@ -1590,14 +1590,30 @@ static void RelinquishHistogramsBelow(ssize_t i,ssize_t **histogram,
   }
 }
 
+static void ChooseDynamicThreshold(const ssize_t count,Cluster *head,
+  PixelInfo *pixel)
+{
+  Cluster
+    *background,
+    *object;
+
+  object=head;
+  background=head;
+  if (HasObjectAndBackgroundClusters(count,head) != MagickFalse)
+    {
+      object=FindObjectCluster(head);
+      background=head->next;
+      background=FindLargestBackground(background);
+    }
+  SetDynamicThresholdPixel(background,object,pixel);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
 {
   Cluster
-    *background,
     *cluster,
-    *object,
     *head,
     *last_cluster,
     *next_cluster;
@@ -1734,15 +1750,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
     cluster=(Cluster *) RelinquishMagickMemory(cluster);
   }
-  object=head;
-  background=head;
-  if (HasObjectAndBackgroundClusters(count,head) != MagickFalse)
-    {
-      object=FindObjectCluster(head);
-      background=head->next;
-      background=FindLargestBackground(background);
-    }
-  SetDynamicThresholdPixel(background,object,pixel);
+  ChooseDynamicThreshold(count,head,pixel);
   /*
     Relinquish resources.
   */
