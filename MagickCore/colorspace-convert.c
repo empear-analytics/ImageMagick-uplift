@@ -218,10 +218,83 @@ MagickExport void ConvertHSLToRGB(const double hue,const double saturation,
 %      generic color space.
 %
 */
+typedef struct _RGBToGenericInput
+{
+  ColorspaceType
+    colorspace;
+
+  double
+    R,
+    G,
+    B;
+
+  double
+    *X,
+    *Y,
+    *Z;
+} RGBToGenericInput;
+
+static void ConvertRGBToYDbDrThroughYUV(const RGBToGenericInput *input)
+{
+  const ColorspaceType
+    colorspace = input->colorspace;
+
+  const double
+    R = input->R,
+    G = input->G,
+    B = input->B;
+
+  double
+    *const X = input->X,
+    *const Y = input->Y,
+    *const Z = input->Z;
+
+  switch (colorspace)
+  {
+    case YDbDrColorspace:
+    {
+      ConvertRGBToYDbDr(R,G,B,X,Y,Z);
+      break;
+    }
+    case YIQColorspace:
+    {
+      ConvertRGBToYIQ(R,G,B,X,Y,Z);
+      break;
+    }
+    case YPbPrColorspace:
+    {
+      ConvertRGBToYPbPr(R,G,B,X,Y,Z);
+      break;
+    }
+    case YUVColorspace:
+    {
+      ConvertRGBToYUV(R,G,B,X,Y,Z);
+      break;
+    }
+    default:
+    {
+      *X=QuantumScale*R;
+      *Y=QuantumScale*G;
+      *Z=QuantumScale*B;
+      break;
+    }
+  }
+}
+
 MagickPrivate void ConvertRGBToGeneric(const ColorspaceType colorspace,
   const double R,const double G,const double B,const double white_luminance,
   const IlluminantType illuminant,double *X,double *Y,double *Z)
 {
+  RGBToGenericInput
+    input;
+
+  input.colorspace=colorspace;
+  input.R=R;
+  input.G=G;
+  input.B=B;
+  input.X=X;
+  input.Y=Y;
+  input.Z=Z;
   switch (colorspace)
   {
     case Adobe98Colorspace:
@@ -346,31 +419,9 @@ MagickPrivate void ConvertRGBToGeneric(const ColorspaceType colorspace,
       ConvertRGBToYCbCr(R,G,B,X,Y,Z);
       break;
     }
-    case YDbDrColorspace:
-    {
-      ConvertRGBToYDbDr(R,G,B,X,Y,Z);
-      break;
-    }
-    case YIQColorspace:
-    {
-      ConvertRGBToYIQ(R,G,B,X,Y,Z);
-      break;
-    }
-    case YPbPrColorspace:
-    {
-      ConvertRGBToYPbPr(R,G,B,X,Y,Z);
-      break;
-    }
-    case YUVColorspace:
-    {
-      ConvertRGBToYUV(R,G,B,X,Y,Z);
-      break;
-    }
     default:
     {
-      *X=QuantumScale*R;
-      *Y=QuantumScale*G;
-      *Z=QuantumScale*B;
+      ConvertRGBToYDbDrThroughYUV(&input);
       break;
     }
   }
