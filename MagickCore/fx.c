@@ -2556,6 +2556,48 @@ static void ApplyZeroUFunction (FxInfo * pfx, const ImgAttrE iaQual,
     }
 }
 
+typedef struct _PixelAccessQualifiers
+{
+  FunctionE
+    fe;
+
+  char
+    expChLimit;
+
+  PixelChannel
+    chQual;
+
+  ImgAttrE
+    iaQual;
+} PixelAccessQualifiers;
+
+static void ApplyPixelAccessQualifiers (
+  const PixelAccessQualifiers *qualifiers, FxInfo * pfx)
+{
+  const FunctionE
+    fe = qualifiers->fe;
+
+  const char
+    expChLimit = qualifiers->expChLimit;
+
+  const PixelChannel
+    chQual = qualifiers->chQual;
+
+  const ImgAttrE
+    iaQual = qualifiers->iaQual;
+
+    if (IsPixelAccessFunction(fe) != MagickFalse)
+    {
+      ElementT * pel = &pfx->Elements[pfx->usedElements-1];
+      pel->is_relative = (expChLimit == ']' ? MagickTrue : MagickFalse);
+      if (chQual >= 0) pel->channel_qual = chQual;
+      if (IsQualifiedCoordFunction(iaQual,fe) != MagickFalse) {
+        /* Note: we don't allow "p[2,3].mean" or "p.mean" etc. */
+        pel->img_attr_qual = iaQual;
+      }
+    }
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2737,18 +2779,15 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
     pfx->Elements[ndx1].element_index = ndx2 + 1;
     pfx->Elements[ndx2].element_index = ndx3;
   } else {
+    PixelAccessQualifiers access;
+
     ApplyZeroUFunction (pfx, iaQual, &fe);
     (void) AddElement (pfx, (fxFltType) 0, (int) fe);
-    if (IsPixelAccessFunction(fe) != MagickFalse)
-    {
-      ElementT * pel = &pfx->Elements[pfx->usedElements-1];
-      pel->is_relative = (expChLimit == ']' ? MagickTrue : MagickFalse);
-      if (chQual >= 0) pel->channel_qual = chQual;
-      if (IsQualifiedCoordFunction(iaQual,fe) != MagickFalse) {
-        /* Note: we don't allow "p[2,3].mean" or "p.mean" etc. */
-        pel->img_attr_qual = iaQual;
-      }
-    }
+    access.fe=fe;
+    access.expChLimit=expChLimit;
+    access.chQual=chQual;
+    access.iaQual=iaQual;
+    ApplyPixelAccessQualifiers (&access, pfx);
   }
 
   if (pExpStart && lenExp) {
