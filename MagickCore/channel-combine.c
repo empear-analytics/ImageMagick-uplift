@@ -300,11 +300,11 @@ static void SetCombineChannels(Image *combine_image,
   }
 }
 
+#define CombineImageTag  "Combine/Image"
+
 MagickExport Image *CombineImages(const Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
-#define CombineImageTag  "Combine/Image"
-
   CacheView
     *combine_view;
 
