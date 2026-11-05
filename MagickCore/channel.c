@@ -349,11 +349,11 @@ static void AdvanceDestinationChannel(const ChannelFx channel_op,
   }
 }
 
+#define ChannelFxImageTag  "ChannelFx/Image"
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
-#define ChannelFxImageTag  "ChannelFx/Image"
-
   ChannelFx
     channel_op = ExtractChannelOp;
 
