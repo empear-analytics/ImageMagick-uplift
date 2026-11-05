@@ -1256,6 +1256,38 @@ static void AccumulateEqualizeHistogram(const Image *image,
   }
 }
 
+typedef struct _EqualizeColors
+{
+  Image
+    *image;
+
+  const double
+    *black,
+    *white,
+    *equalize_map;
+} EqualizeColors;
+
+static void EqualizeColormapRed(const EqualizeColors *colors,const ssize_t j)
+{
+  Image
+    *const image = colors->image;
+
+  const double
+    *const black = colors->black,
+    *const white = colors->white,
+    *const equalize_map = colors->equalize_map;
+
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,
+        RedPixelChannel);
+      if (black[channel] != white[channel])
+        image->colormap[j].red=equalize_map[(ssize_t)
+          GetPixelChannels(image)*ScaleQuantumToMap(
+          ClampToQuantum(image->colormap[j].red))+channel];
+    }
+}
+
 static void EqualizeColormap(Image *image,const double *black,
   const double *white,const double *equalize_map)
 {
@@ -1264,15 +1296,14 @@ static void EqualizeColormap(Image *image,const double *black,
 
   for (j=0; j < (ssize_t) image->colors; j++)
   {
-    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,
-          RedPixelChannel);
-        if (black[channel] != white[channel])
-          image->colormap[j].red=equalize_map[(ssize_t)
-            GetPixelChannels(image)*ScaleQuantumToMap(
-            ClampToQuantum(image->colormap[j].red))+channel];
-      }
+    EqualizeColors
+      colors;
+
+    colors.image=image;
+    colors.black=black;
+    colors.white=white;
+    colors.equalize_map=equalize_map;
+    EqualizeColormapRed(&colors,j);
     if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
       {
         PixelChannel channel = GetPixelChannelChannel(image,
