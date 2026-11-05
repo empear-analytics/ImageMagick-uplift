@@ -1788,6 +1788,36 @@ static double *BarrelCoefficients(double *coeff,const DistortMethod *method,
   return(coeff);
 }
 
+static double *ShepardsCoefficients(double *coeff,const DistortMethod *method,
+  const CoefficientContext *context)
+{
+  const Image
+    *const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments,
+    cp_size = context->cp_size;
+
+  /* Shepards Distortion  input arguments are the coefficients!
+     Just check the number of arguments is valid!
+     Args:  u1,v1, x1,y1, ...
+      OR :  u1,v1, r1,g1,c1, ...
+  */
+  if ( number_arguments%cp_size != 0 ||
+       number_arguments < cp_size ) {
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "InvalidArgument", "%s : 'requires CP's (4 numbers each)'",
+          CommandOptionToMnemonic(MagickDistortOptions, *method));
+    coeff=(double *) RelinquishMagickMemory(coeff);
+    return((double *) NULL);
+  }
+  /* User defined weighting power for Shepard's Method */
+  return(SetShepardsPower(image,coeff,exception));
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1991,23 +2021,7 @@ static double *GenerateCoefficients(const Image *image,
     case BarrelInverseDistortion:
       return(BarrelCoefficients(coeff,method,&context));
     case ShepardsDistortion:
-    {
-      /* Shepards Distortion  input arguments are the coefficients!
-         Just check the number of arguments is valid!
-         Args:  u1,v1, x1,y1, ...
-          OR :  u1,v1, r1,g1,c1, ...
-      */
-      if ( number_arguments%cp_size != 0 ||
-           number_arguments < cp_size ) {
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument", "%s : 'requires CP's (4 numbers each)'",
-              CommandOptionToMnemonic(MagickDistortOptions, *method));
-        coeff=(double *) RelinquishMagickMemory(coeff);
-        return((double *) NULL);
-      }
-      /* User defined weighting power for Shepard's Method */
-      return(SetShepardsPower(image,coeff,exception));
-    }
+      return(ShepardsCoefficients(coeff,method,&context));
     default:
       break;
   }
