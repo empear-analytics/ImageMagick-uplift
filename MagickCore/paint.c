@@ -574,19 +574,13 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    FloodfillTileView
-      view;
+    const FloodfillTileView
+      view = { image, floodplane_image, floodplane_view, image_view,
+        draw_info, y, exception };
 
     /*
       Tile fill color onto floodplane.
     */
-    view.image=image;
-    view.floodplane_image=floodplane_image;
-    view.floodplane_view=floodplane_view;
-    view.image_view=image_view;
-    view.draw_info=draw_info;
-    view.y=y;
-    view.exception=exception;
     TileFloodplaneLine(&view,&status);
   }
   floodplane_view=DestroyCacheView(floodplane_view);
