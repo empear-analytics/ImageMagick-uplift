@@ -767,6 +767,19 @@ static void StoreCLAHEPixels(const CLAHEPixelLoad *pixel_load,
   }
 }
 
+static RectangleInfo GetCLAHEInfo(const Image *image,
+  const RectangleInfo tile_info)
+{
+  RectangleInfo
+    clahe_info;
+
+  clahe_info.width=(size_t) ((ssize_t) image->columns+tile_info.x);
+  clahe_info.height=(size_t) ((ssize_t) image->rows+tile_info.y);
+  clahe_info.x=(ssize_t) (clahe_info.width/tile_info.width);
+  clahe_info.y=(ssize_t) (clahe_info.height/tile_info.height);
+  return(clahe_info);
+}
+
 MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   const size_t height,const size_t number_bins,const double clip_limit,
   ExceptionInfo *exception)
@@ -809,10 +822,7 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   range_info.min=0;
   range_info.max=NumberCLAHEGrays-1;
   tile_info=GetCLAHETileInfo(image,width,height);
-  clahe_info.width=(size_t) ((ssize_t) image->columns+tile_info.x);
-  clahe_info.height=(size_t) ((ssize_t) image->rows+tile_info.y);
-  clahe_info.x=(ssize_t) (clahe_info.width/tile_info.width);
-  clahe_info.y=(ssize_t) (clahe_info.height/tile_info.height);
+  clahe_info=GetCLAHEInfo(image,tile_info);
   pixel_cache=AcquireVirtualMemory(clahe_info.width,clahe_info.height*
     sizeof(*pixels));
   if (pixel_cache == (MemoryInfo *) NULL)
