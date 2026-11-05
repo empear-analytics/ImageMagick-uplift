@@ -3785,6 +3785,13 @@ text once each copy's variables are renamed consistently, differing in at most o
 more inputs. Moving one copy alone lowers the score (one more function raises the file's
 mean complexity while the twin keeps its findings), and a second helper of the same text
 would be *Code Duplication*.
+Or on one function only, when the other copy is the whole body of an existing `static`
+helper of the file (`vision.c`'s `RemoveObjectsByColor`, whose colour-list loop recurs in
+`ConnectedComponentsImage` with `MagickFalse` for `MagickTrue`): moving the reported copy
+alone (Recipe E, the differing value a fifth parameter, or a second helper of the same
+text) adds *Excess Number of Function Arguments* or *Code Duplication*. The differing
+value counts among the five inputs; the helper's body becomes step 5's fill and call, and
+it keeps its name and parameters for its own callers.
 
 **Not covered by:** Recipe N, which moves one block, names each member after the variable
 it holds and fills it only from the variable of that name; Recipe D, whose *Use when* is
@@ -3961,6 +3968,12 @@ Complexity*. Added by Claude Code (Claude Opus 5.5) during task W10, under the m
 Step 2's struct of pointers (2026-10-31, task W10): `compare.c`'s `GetDPCSimilarity` and
 `GetNCCSimilarity`, whose column loops are the same text, each passing its row's
 `CorrelationSums` to `AccumulateCorrelationPixel` as `&sums`.
+*Use when*'s one-sided form (2026-11-05, task W14 lane b): `vision.c`'s
+`ConnectedComponentsImage`, whose keep-colors block (a bump and four of its decisions) is
+`RemoveObjectsByColor`'s loop with `MagickFalse` for `MagickTrue`; as a second helper it
+switched *Code Duplication* on (7.16 to 6.77 in a probe), as a shared helper with a `merge`
+member it measured 7.52 to 7.63, the function leaving *Bumpy Road Ahead*. Added by Claude
+Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -7006,3 +7019,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | N | Step 8: the statements of one loop body are sibling blocks too (each moved under N, I or Y), the struct may be filled before the loop when nothing in it writes a member's variable, and a later block that holds the siblings' calls (the loop around them) takes the same `const Name *name`, the typedef gaining the members it reads, read as `name->member`, its inner calls passing `name` for `&name`; *Careful* gives the argument | `morphology.c`'s `MorphologyApply` (campaign A, W14): its kernel-iteration loop (Recipe I), the two verbose reports around it (N) and the stage loop that holds them (I) read the same nine to twelve inputs; one struct per helper would take the stage-loop helper past *Large Method* (77 lines in a probe). A probe of the chain with one shared `MorphologyStages`: MorphologyApply leaves Brain Method and Deep, Nested Complexity, 2.71 to 3.04, no finding on a helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | NS | Step 1: the selection may be the whole right-hand side of an assignment statement (`sign=c ? 1 : -1;`), no parentheses needed since nothing can regroup it, may be a single site when the step takes the function out of *Complex Method*, and may select between signed integer literals. *Careful* is unchanged: the argument is evaluated once, the function returns the same constant under the same test, the call replaces the right-hand side as a whole, and `tools/obj_identical.sh` must print `IDENTICAL` | `enhance.c`'s `ContrastImage` (campaign A, W14 lane d): `sign=sharpen != MagickFalse ? 1 : -1;` is one decision of its cc 9; NS step 1 asked for a parenthesised selection that recurs. A probe: ContrastImage leaves Complex Method, enhance.c 6.49 to 6.65 | mandate (2026-10-24) |
 | 2026-11-05 | NEW | HC | Extract Block Holding a Named Critical Region: a statement of a parallel loop body (a column loop) that holds whole named `#pragma omp critical (name)` constructs moves, constructs included and unchanged, into a `static void` helper called from that body alone; outside the constructs the block writes only body variables (Recipe O step 1's rule), inside them shared memory through the same pointers; no lock taken; checked by reading | `quantize.c`'s `SetGrayscaleImage` (campaign A, W14): the column loop of its colormap-building parallel loop holds a double-checked insert whose critical governs an unbraced `if` (outside CB step 1), the function's Deep, Nested Complexity (5); a probe 6.11 to 6.57 with no finding on the helper | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | TW | *Use when*: the findings may stand on one function only, when the other copy is the whole body of an existing `static` helper, so that moving the reported copy alone would add a fifth parameter (the differing value) or a second helper of the same text (*Code Duplication*); the differing value counts among the five inputs, and the existing helper's body becomes step 5's fill and call, its name and parameters kept. Steps and *Careful* unchanged | `vision.c`'s `ConnectedComponentsImage` (campaign A, W14 lane b): its keep-colors loop is `RemoveObjectsByColor`'s body with `MagickFalse` for `MagickTrue`; a second helper switched *Code Duplication* on (7.16 to 6.77), one shared `MergeObjectsByColor` with a `merge` member measured 7.52 to 7.63, the function leaving *Bumpy Road Ahead*, no finding on the helper | mandate (2026-10-24) |
