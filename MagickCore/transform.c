@@ -2112,24 +2112,39 @@ static Image *SpliceImageBelow(const SpliceRow *splice,
   return(FinishSpliceImage(splice_image,splice_view,image_view,status));
 }
 
-MagickExport Image *SpliceImage(const Image *image,
-  const RectangleInfo *geometry,ExceptionInfo *exception)
+typedef struct _SpliceImageInputs
 {
+  const Image
+    *image;
+
+  RectangleInfo
+    splice_geometry;
+
+  ExceptionInfo
+    *exception;
+} SpliceImageInputs;
+
+static Image *SpliceImageRows(Image *splice_image,
+  const SpliceImageInputs *inputs)
+{
+  const Image
+    *const image = inputs->image;
+
+  const RectangleInfo
+    splice_geometry = inputs->splice_geometry;
+
+  ExceptionInfo
+    *const exception = inputs->exception;
+
   CacheView
     *image_view,
     *splice_view;
-
-  Image
-    *splice_image;
 
   MagickBooleanType
     status;
 
   MagickOffsetType
     progress;
-
-  RectangleInfo
-    splice_geometry;
 
   SpliceRow
     splice;
@@ -2138,30 +2153,6 @@ MagickExport Image *SpliceImage(const Image *image,
     columns,
     y;
 
-  /*
-    Allocate splice image.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  assert(geometry != (const RectangleInfo *) NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  splice_geometry=(*geometry);
-  splice_image=CloneImage(image,image->columns+splice_geometry.width,
-    image->rows+splice_geometry.height,MagickTrue,exception);
-  if (splice_image == (Image *) NULL)
-    return((Image *) NULL);
-  if (PrepareSpliceImage(splice_image,exception) == MagickFalse)
-    return((Image *) NULL);
-  /*
-    Respect image geometry.
-  */
-  splice_geometry=ApplySpliceGravity(image,splice_geometry);
-  /*
-    Splice image.
-  */
   status=MagickTrue;
   progress=0;
   columns=MagickMin(splice_geometry.x,(ssize_t) splice_image->columns);
@@ -2199,6 +2190,48 @@ MagickExport Image *SpliceImage(const Image *image,
   splice.exception=exception;
   splice.columns=columns;
   return(SpliceImageBelow(&splice,progress,status));
+}
+
+MagickExport Image *SpliceImage(const Image *image,
+  const RectangleInfo *geometry,ExceptionInfo *exception)
+{
+  Image
+    *splice_image;
+
+  RectangleInfo
+    splice_geometry;
+
+  SpliceImageInputs
+    inputs;
+
+  /*
+    Allocate splice image.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  assert(geometry != (const RectangleInfo *) NULL);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  splice_geometry=(*geometry);
+  splice_image=CloneImage(image,image->columns+splice_geometry.width,
+    image->rows+splice_geometry.height,MagickTrue,exception);
+  if (splice_image == (Image *) NULL)
+    return((Image *) NULL);
+  if (PrepareSpliceImage(splice_image,exception) == MagickFalse)
+    return((Image *) NULL);
+  /*
+    Respect image geometry.
+  */
+  splice_geometry=ApplySpliceGravity(image,splice_geometry);
+  /*
+    Splice image.
+  */
+  inputs.image=image;
+  inputs.splice_geometry=splice_geometry;
+  inputs.exception=exception;
+  return(SpliceImageRows(splice_image,&inputs));
 }
 
 /*
