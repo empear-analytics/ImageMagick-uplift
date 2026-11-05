@@ -637,6 +637,26 @@ static void CountEdgeHits(const ResampleFilter *resample_filter,
   }
 }
 
+static void CountAreaHits(const ResampleFilter *resample_filter,
+  const double u0,const double v0,ssize_t *hit)
+{
+  switch ( resample_filter->virtual_pixel ) {
+    default:
+    {
+      CountEdgeHits(resample_filter,u0,v0,hit);
+      break;
+    }
+    case TileVirtualPixelMethod:
+    case MirrorVirtualPixelMethod:
+    case RandomVirtualPixelMethod:
+    case HorizontalTileEdgeVirtualPixelMethod:
+    case VerticalTileEdgeVirtualPixelMethod:
+    case CheckerTileVirtualPixelMethod:
+      /* resampling of area is always needed - no VP limits */
+      break;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -722,17 +742,9 @@ MagickExport MagickBooleanType ResamplePixelColor(
 
     default:
     {
-      CountEdgeHits(resample_filter,u0,v0,&hit);
+      CountAreaHits(resample_filter,u0,v0,&hit);
       break;
     }
-    case TileVirtualPixelMethod:
-    case MirrorVirtualPixelMethod:
-    case RandomVirtualPixelMethod:
-    case HorizontalTileEdgeVirtualPixelMethod:
-    case VerticalTileEdgeVirtualPixelMethod:
-    case CheckerTileVirtualPixelMethod:
-      /* resampling of area is always needed - no VP limits */
-      break;
   }
   if ( hit ) {
     /* The area being resampled is simply a solid color
