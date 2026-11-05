@@ -4663,6 +4663,99 @@ static void SparseColorPixel(const SparseColorPixelInput *pixel_input,
   }
 }
 
+typedef struct _SparseColorRowInput
+{
+  SparseColorMethod
+    sparse_method;
+
+  const Image
+    *image;
+
+  Image
+    *sparse_image;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  size_t
+    number_colors;
+
+  double
+    *coeff;
+} SparseColorRowInput;
+
+static void SparseColorRow(const SparseColorRowInput *row,const ssize_t j,
+  Quantum *q,PixelInfo pixel)
+{
+  const SparseColorMethod
+    sparse_method = row->sparse_method;
+
+  const Image
+    *const image = row->image;
+
+  Image
+    *const sparse_image = row->sparse_image;
+
+  const size_t
+    number_arguments = row->number_arguments;
+
+  const double
+    *const arguments = row->arguments;
+
+  const size_t
+    number_colors = row->number_colors;
+
+  double
+    *const coeff = row->coeff;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) sparse_image->columns; i++)
+  {
+    GetPixelInfoPixel(sparse_image,q,&pixel);
+    switch (sparse_method)
+    {
+      case BarycentricColorInterpolate:
+      {
+        SparseColorPlane
+          plane;
+
+        plane.sparse_image=sparse_image;
+        plane.coeff=coeff;
+        plane.i=i;
+        plane.j=j;
+        pixel=BarycentricSparseColor(&plane,pixel);
+        break;
+      }
+      default:
+      {
+        SparseColorPixelInput
+          pixel_input;
+
+        pixel_input.sparse_method=sparse_method;
+        pixel_input.image=image;
+        pixel_input.sparse_image=sparse_image;
+        pixel_input.number_arguments=number_arguments;
+        pixel_input.arguments=arguments;
+        pixel_input.number_colors=number_colors;
+        pixel_input.coeff=coeff;
+        pixel_input.i=i;
+        pixel_input.j=j;
+        SparseColorPixel(&pixel_input,&pixel);
+        break;
+      }
+    }
+    /* set the color directly back into the source image */
+    pixel=ClampSparseColor(image,sparse_image,pixel);
+    SetPixelViaPixelInfo(sparse_image,&pixel,q);
+    q+=(ptrdiff_t) GetPixelChannels(sparse_image);
+  }
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -4765,8 +4858,8 @@ MagickExport Image *SparseColorImage(const Image *image,
       Quantum
         *magick_restrict q;
 
-      ssize_t
-        i;
+      SparseColorRowInput
+        row;
 
       q=GetCacheViewAuthenticPixels(sparse_view,0,j,sparse_image->columns,1,
         exception);
@@ -4776,46 +4869,14 @@ MagickExport Image *SparseColorImage(const Image *image,
           continue;
         }
       GetPixelInfo(sparse_image,&pixel);
-      for (i=0; i < (ssize_t) sparse_image->columns; i++)
-      {
-        GetPixelInfoPixel(sparse_image,q,&pixel);
-        switch (sparse_method)
-        {
-          case BarycentricColorInterpolate:
-          {
-            SparseColorPlane
-              plane;
-
-            plane.sparse_image=sparse_image;
-            plane.coeff=coeff;
-            plane.i=i;
-            plane.j=j;
-            pixel=BarycentricSparseColor(&plane,pixel);
-            break;
-          }
-          default:
-          {
-            SparseColorPixelInput
-              pixel_input;
-
-            pixel_input.sparse_method=sparse_method;
-            pixel_input.image=image;
-            pixel_input.sparse_image=sparse_image;
-            pixel_input.number_arguments=number_arguments;
-            pixel_input.arguments=arguments;
-            pixel_input.number_colors=number_colors;
-            pixel_input.coeff=coeff;
-            pixel_input.i=i;
-            pixel_input.j=j;
-            SparseColorPixel(&pixel_input,&pixel);
-            break;
-          }
-        }
-        /* set the color directly back into the source image */
-        pixel=ClampSparseColor(image,sparse_image,pixel);
-        SetPixelViaPixelInfo(sparse_image,&pixel,q);
-        q+=(ptrdiff_t) GetPixelChannels(sparse_image);
-      }
+      row.sparse_method=sparse_method;
+      row.image=image;
+      row.sparse_image=sparse_image;
+      row.number_arguments=number_arguments;
+      row.arguments=arguments;
+      row.number_colors=number_colors;
+      row.coeff=coeff;
+      SparseColorRow(&row,j,q,pixel);
       SyncDistortRow(&status,sparse_view,exception);
       if (image->progress_monitor != (MagickProgressMonitor) NULL)
         {
