@@ -2687,11 +2687,10 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
     return MagickFalse;
   }
-  if (IsNoArgsFunction(fe,FndArgs) != MagickFalse) {
-    /* This is for "rand()" and similar. */
-    if (ExpectNoArgsClose (pfx, expChLimit, &chLimit) == MagickFalse)
-      return MagickFalse;
-  }
+  /* This is for "rand()" and similar. */
+  if ((IsNoArgsFunction(fe,FndArgs) != MagickFalse) &&
+      (ExpectNoArgsClose (pfx, expChLimit, &chLimit) == MagickFalse))
+    return MagickFalse;
 
   if (chLimit != expChLimit) {
     (void) ThrowMagickException (
