@@ -2598,6 +2598,14 @@ static void ApplyPixelAccessQualifiers (
     }
 }
 
+static void AddThirdArgAddressing (FxInfo * pfx, FunctionE fe, int ndx1)
+{
+  if (fe==fFor) {
+    pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
+    (void) AddAddressingElement (pfx, rGotoChk, ndx1);
+  }
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2702,10 +2710,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
             funStr, SetShortExp(pfx));
           return MagickFalse;
         }
-        if (fe==fFor) {
-          pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
-          (void) AddAddressingElement (pfx, rGotoChk, ndx1);
-        }
+        AddThirdArgAddressing (pfx, fe, ndx1);
         ndx3 = pfx->usedElements;
         break;
       default:
