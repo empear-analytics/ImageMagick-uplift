@@ -2640,6 +2640,21 @@ static void SetDisplaceScaleArguments(const DisplaceSetup *displace,
     (*vertical_scale)=(*horizontal_scale);
 }
 
+static void SetDisplaceScaleDefaults(const DisplaceSetup *displace,
+  MagickRealType *horizontal_scale,MagickRealType *vertical_scale)
+{
+  if ((displace->flags & AspectValue) == 0)
+    {
+      (*horizontal_scale)=(MagickRealType) (displace->source_image->columns-1)/2.0;
+      (*vertical_scale)=(MagickRealType) (displace->source_image->rows-1)/2.0;
+    }
+  else
+    {
+      (*horizontal_scale)=(MagickRealType) (displace->image->columns-1)/2.0;
+      (*vertical_scale)=(MagickRealType) (displace->image->rows-1)/2.0;
+    }
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3031,18 +3046,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       displace.image=image;
       displace.source_image=source_image;
       if ((flags & (WidthValue | HeightValue)) == 0 )
-        {
-          if ((flags & AspectValue) == 0)
-            {
-              horizontal_scale=(MagickRealType) (source_image->columns-1)/2.0;
-              vertical_scale=(MagickRealType) (source_image->rows-1)/2.0;
-            }
-          else
-            {
-              horizontal_scale=(MagickRealType) (image->columns-1)/2.0;
-              vertical_scale=(MagickRealType) (image->rows-1)/2.0;
-            }
-        }
+        SetDisplaceScaleDefaults(&displace,&horizontal_scale,&vertical_scale);
       else
         SetDisplaceScaleArguments(&displace,&horizontal_scale,&vertical_scale);
       /*
