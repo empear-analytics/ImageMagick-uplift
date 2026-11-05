@@ -62,6 +62,7 @@ if ( ! GetOptions(
 	 'monitor.c',
 	 'montage.c',
    'paint.c',
+   'paint-floodfill.c',
 	 'pixel-iterator.c',
 	 'pixel-wand.c',
 	 'profile.c',
