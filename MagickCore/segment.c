@@ -938,6 +938,42 @@ static void ClassifyImagePixels(Image *image,const ClassifyPixelsInputs *inputs,
   status&=(MagickStatusType) SyncImage(image,exception);
 }
 
+static MagickOffsetType CountClassifyPixels(Image *image,Cluster *head,
+  MagickStatusType *status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    count,
+    y;
+
+  count=0;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const ClassifyCountInputs
+      inputs = { image, image_view, head, exception };
+
+    if (CountClassifyRow(&inputs,y,&count) == MagickFalse)
+      break;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ReportClassifyProgress(image,SegmentImageTag,progress,status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  return(progress);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -947,9 +983,6 @@ static MagickBooleanType Classify(Image *image,short **extrema,
 
   const MagickBooleanType
     verbose = settings->verbose;
-
-  CacheView
-    *image_view;
 
   ClassifyPixelsInputs
     pixels_inputs;
@@ -984,8 +1017,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
     number_clusters;
 
   ssize_t
-    count,
-    y;
+    count;
 
   /*
     Form clusters.
@@ -1003,26 +1035,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
     Count the pixels for each cluster.
   */
   status=MagickTrue;
-  count=0;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const ClassifyCountInputs
-      inputs = { image, image_view, head, exception };
-
-    if (CountClassifyRow(&inputs,y,&count) == MagickFalse)
-      break;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        ReportClassifyProgress(image,SegmentImageTag,progress,&status);
-      }
-  }
-  image_view=DestroyCacheView(image_view);
+  progress=CountClassifyPixels(image,head,&status,exception);
   /*
     Remove clusters that do not meet minimum cluster threshold.
   */
