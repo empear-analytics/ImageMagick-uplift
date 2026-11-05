@@ -780,6 +780,45 @@ static RectangleInfo GetCLAHEInfo(const Image *image,
   return(clahe_info);
 }
 
+typedef struct _CLAHEPixelSource
+{
+  Image
+    *image;
+
+  RectangleInfo
+    clahe_info,
+    tile_info;
+
+  unsigned short
+    *pixels;
+
+  ExceptionInfo
+    *exception;
+} CLAHEPixelSource;
+
+static void InitializeCLAHEPixels(const CLAHEPixelSource *pixel_source,
+  MagickBooleanType *status,MagickOffsetType *progress)
+{
+  CacheView
+    *image_view;
+
+  CLAHEPixelLoad
+    pixel_load;
+
+  image_view=AcquireVirtualCacheView(pixel_source->image,
+    pixel_source->exception);
+  (*progress)=0;
+  (*status)=MagickTrue;
+  pixel_load.image=pixel_source->image;
+  pixel_load.image_view=image_view;
+  pixel_load.clahe_info=pixel_source->clahe_info;
+  pixel_load.tile_info=pixel_source->tile_info;
+  pixel_load.pixels=pixel_source->pixels;
+  pixel_load.exception=pixel_source->exception;
+  LoadCLAHEPixels(&pixel_load,&(*status),&(*progress));
+  image_view=DestroyCacheView(image_view);
+}
+
 MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   const size_t height,const size_t number_bins,const double clip_limit,
   ExceptionInfo *exception)
@@ -789,6 +828,9 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
 
   CLAHEPixelLoad
     pixel_load;
+
+  CLAHEPixelSource
+    pixel_source;
 
   ColorspaceType
     colorspace;
@@ -838,17 +880,12 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   /*
     Initialize CLAHE pixels.
   */
-  image_view=AcquireVirtualCacheView(image,exception);
-  progress=0;
-  status=MagickTrue;
-  pixel_load.image=image;
-  pixel_load.image_view=image_view;
-  pixel_load.clahe_info=clahe_info;
-  pixel_load.tile_info=tile_info;
-  pixel_load.pixels=pixels;
-  pixel_load.exception=exception;
-  LoadCLAHEPixels(&pixel_load,&status,&progress);
-  image_view=DestroyCacheView(image_view);
+  pixel_source.image=image;
+  pixel_source.clahe_info=clahe_info;
+  pixel_source.tile_info=tile_info;
+  pixel_source.pixels=pixels;
+  pixel_source.exception=exception;
+  InitializeCLAHEPixels(&pixel_source,&status,&progress);
   status=CLAHE(&clahe_info,&tile_info,&range_info,number_bins == 0 ?
     (size_t) 128 : MagickMin(number_bins,256),clip_limit,pixels);
   if (status == MagickFalse)
