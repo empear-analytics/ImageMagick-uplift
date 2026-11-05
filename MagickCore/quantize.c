@@ -4427,6 +4427,42 @@ static void IndexGrayscaleRow(Image *image,ssize_t *colormap_index,
   }
 }
 
+static void BuildGrayscaleColormap(Image *image,ssize_t *colormap_index,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    y;
+
+  image->colors=0;
+  status=MagickTrue;
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    const QuantizeRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    IndexGrayscaleRow(image,colormap_index,q);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      status=MagickFalse;
+  }
+  image_view=DestroyCacheView(image_view);
+}
+
 static MagickBooleanType SetGrayscaleImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -4466,28 +4502,7 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
           ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
             image->filename);
         }
-      image->colors=0;
-      status=MagickTrue;
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,1)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        Quantum
-          *magick_restrict q;
-
-        const QuantizeRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        IndexGrayscaleRow(image,colormap_index,q);
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-          status=MagickFalse;
-      }
-      image_view=DestroyCacheView(image_view);
+      BuildGrayscaleColormap(image,colormap_index,exception);
     }
   (void) memset(colormap_index,0,extent*sizeof(*colormap_index));
   SortGrayscaleColormap(image);
