@@ -169,3 +169,18 @@ is unreached.
 **Noticed upstream, not changed.** The `shared(status)` clause of the TransformsRGB Pseudo loop names a
 variable the loop never uses; `SimilarityImage`'s `threshold_trigger` guard is dead and its `progress++`
 is non-atomic.
+
+### 05:00: Recipe CB, Extract Critical Block Body
+
+New recipe (337f38c8d, `mandate`, **not ruled on**): the body of an `omp critical` block moves into a
+`static void` helper called between the pragma's braces; the pragma and braces stay in the caller, so
+the helper runs in the same critical region, at the same point, on the same memory, in the same order
+(the argument Recipe PS makes for the loop status). The oracle is single-threaded, so steps 1 to 3 are
+checked by reading. Used on `prepress.c` (9.61 to **10.0**, `UpdateInkDensity`), `feature.c`
+(`UpdateCannyRange`, 7.39 to 7.40) and `attribute-bounds.c` (`MergeBoundingBox`, 7.91 to 7.94). The
+eleven `Get*Similarity` merges in `compare.c` stay at 2.97 with it.
+
+**Noticed upstream, not changed.** In `GetImageTotalInkDensity` the test `density > total_ink_density`
+just before the critical reads the shared maximum outside the lock (a benign race, kept);
+`GetMEPPSimilarity` takes a non-const `Image *` only to write `image->error`; `SimilarityImageTag` is
+`#define`d inside `GetDPCSimilarity` but used by NCC.
