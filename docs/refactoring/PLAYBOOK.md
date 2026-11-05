@@ -6277,6 +6277,12 @@ exits in the block.
 6. When the block is the statement after an `else` (`else if (C) { ... }`), it is cut
    the same way and the two statements of step 5 take braces, `else { ... }`; Recipe EI
    may then chain them, in a commit of its own.
+7. A block that holds the call of an earlier helper of this recipe (`&broke` among its
+   arguments) and tests `broke` after it passes the new function's own `broke` on:
+   `&broke` in the block becomes `broke`, and every other use of `broke` becomes
+   `(*broke)`, as Recipe O step 5 writes a written variable (`&v` becomes `v`). The
+   block's `break;` statements are rewritten as step 3 says, those under the test
+   included. Nothing else in the text changes.
 
 **Before:**
 
@@ -6348,6 +6354,13 @@ static MagickBooleanType ExpectOperandAfterOperator (FxInfo * pfx,
 - Step 6 is C's own grammar: `else if (C) S` is `else` followed by the statement `if (C)
   S`, so the block is that statement and nothing else changes; the braces hold the two
   statements of step 5 where one stood.
+- Under step 7 the block's `broke` was the caller's local, which the earlier helper
+  writes through `&broke` and the block's test then reads. The new function's
+  parameter points at that same local, so the earlier helper, now given `broke`, writes
+  the object the test `(*broke) != MagickFalse` reads, the value the block's test read
+  before; nothing else writes it between the two. The new function's own first
+  statement clears it before that call, which clears it again, so no value from before
+  the block is read, as step 5's argument requires.
 - The `return` and `break` paths are mostly error paths: the oracle checks the paths its
   cases take; each `break;` and `return(R);` is checked by reading against its rewrite,
   and `refactor_guard.py --calls` moves only `+2` for each new function.
@@ -6362,7 +6375,12 @@ missing-operand test, the in-place operator target), the plateau W13 recorded ("
 that exits by both `break` and `return`"). A probe of the chain (Recipe CN on the
 final copy test, this recipe on the three blocks, Recipe EI on the last): bumps 8 to 4,
 fx.c 3.52 to 3.59, no finding on any new function. Added by Claude Code (Claude Opus 5.5)
-under the mandate of 2026-10-24.
+under the mandate of 2026-10-24. Step 7 (2026-11-05, W14): the same function's
+assignment-target chain in the operator-stack loop (`if (op == oAssign) { ... break; }
+else if (SetInPlaceOperatorTarget(...,&broke) == MagickFalse) { return MagickFalse; }
+else if (broke != MagickFalse) { break; }`), whose first branch keeps the loop's bump; a
+probe of it as one helper, then the loop moved by Recipe W: `TranslateExpression` leaves
+Bumpy Road Ahead, fx.c 3.59 to 3.62, no finding on any new function.
 
 ---
 
@@ -6621,3 +6639,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | SW | Split a Returning Selection into Chained Functions: a run of adjacent groups of a `switch` whose every group ends in `return(R);` (followed by a tail ending the function) moves, with the tail, to a new function of the same return type whose `switch` ends `default: break;`; the caller keeps the other groups and `default:` and returns the call | `distort.c`'s `GenerateCoefficients` (campaign A, W13): the dispatch `switch` of seventeen case helpers (cc 126 of the function); SD refuses `return`, SR wants one constant, E step 7 moves the whole `switch` (a Complex Method). A probe of the whole chain: the function leaves Bumpy Road Ahead, Complex Method and Large Method, 3.55 to 4.25 | owner |
 | 2026-11-05 | NEW | CB | Extract Critical Block Body: the body of a `#pragma omp critical` block moves into a `static void` helper that its call replaces, the pragma and braces staying in the caller; written variables by pointer, read ones by value or pointer to `const`, at most four parameters; checked by reading | `compare.c`'s eleven `Get*Similarity` merges (a probe, one helper call per critical body: 2.97 to 3.15) and `feature.c`'s `CannyEdgeImage` | owner |
 | 2026-11-05 | NEW | BR | Extract Block Leaving Through a Loop Break or a Return: a block in a loop that leaves through `break;` of the loop on some paths and `return(R);` (one `R`, Recipe W step 2) on others moves to a `static MagickBooleanType` function taking `MagickBooleanType *broke` last, which it clears first; each `return(R);` becomes `return(MagickFalse);`, each `break;` `(*broke)=MagickTrue; return(MagickTrue);`; the caller writes `if (Helper(...,&broke) == MagickFalse) return(R);` and `if (broke != MagickFalse) break;` | `fx.c`'s `TranslateExpression` (campaign A, W14): the ternary colon, the missing-operand test and the in-place operator target each leave the operator loop through `break;` and the function through `return MagickFalse;`, which LB, W, V, Y, I and RV each refuse (the W13 plateau). A probe of the chain (CN, this recipe on the three blocks, EI): bumps 8 to 4, fx.c 3.52 to 3.59, no finding on any new function | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | BR | Step 7: a block holding the call of an earlier helper of this recipe (with `&broke`) and the test of `broke` after it passes the new function's own `broke` on: `&broke` becomes `broke`, other uses `(*broke)` (Recipe O step 5); *Careful* gives the argument | `fx.c`'s `TranslateExpression` (campaign A, W14): the assignment-target chain of the operator-stack loop, after step 6 and Recipe EI, still holds the loop's bump in its first branch, and its `broke` would clash with the helper's parameter. A probe (this step, then Recipe W on the loop): the function leaves Bumpy Road Ahead, fx.c 3.59 to 3.62 | mandate (2026-10-24) |
