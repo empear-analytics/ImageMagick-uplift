@@ -258,6 +258,17 @@ static void SetGradientExtent(GradientInfo *gradient,const Image *image,
     }
 }
 
+static void ParseGradientRadii(GradientInfo *gradient,const Image *image)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"gradient:radii");
+  if (artifact != (const char *) NULL)
+    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->radii.x,
+      &gradient->radii.y);
+}
+
 static void SetGradientRadii(GradientInfo *gradient,const Image *image)
 {
   const char
@@ -269,10 +280,7 @@ static void SetGradientRadii(GradientInfo *gradient,const Image *image)
   artifact=GetImageArtifact(image,"gradient:extent");
   if (artifact != (const char *) NULL)
     SetGradientExtent(gradient,image,artifact);
-  artifact=GetImageArtifact(image,"gradient:radii");
-  if (artifact != (const char *) NULL)
-    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->radii.x,
-      &gradient->radii.y);
+  ParseGradientRadii(gradient,image);
   gradient->radius=MagickMax(gradient->radii.x,gradient->radii.y);
 }
 
