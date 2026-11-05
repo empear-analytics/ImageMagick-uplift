@@ -2456,7 +2456,7 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     q=QueueCacheViewAuthenticPixels(transverse_view,(ssize_t) image->rows-y-1,
       0,1,transverse_image->rows,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsPixelRowMissing(p,q) != MagickFalse)
       {
         status=MagickFalse;
         continue;
