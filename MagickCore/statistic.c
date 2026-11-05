@@ -1075,6 +1075,13 @@ static MagickBooleanType AcquireEvaluateCanvas(const Image *images,
 
 #define EvaluateImageTag  "Evaluate/Image"
 
+static void SetEvaluateProgress(const Image *images,const Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  if (SetProgress(images,image,EvaluateImageTag,progress) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void SyncEvaluateView(CacheView *evaluate_view,
   ExceptionInfo *exception,MagickBooleanType *status)
 {
@@ -1213,9 +1220,7 @@ MagickExport Image *EvaluateImages(const Image *images,
             #pragma omp atomic
 #endif
             progress++;
-            if (SetProgress(images,image,EvaluateImageTag,progress) ==
-                MagickFalse)
-              status=MagickFalse;
+            SetEvaluateProgress(images,image,progress,&status);
           }
       }
     }
@@ -1291,9 +1296,7 @@ MagickExport Image *EvaluateImages(const Image *images,
             #pragma omp atomic
 #endif
             progress++;
-            if (SetProgress(images,image,EvaluateImageTag,progress) ==
-                MagickFalse)
-              status=MagickFalse;
+            SetEvaluateProgress(images,image,progress,&status);
           }
       }
     }
@@ -1433,8 +1436,7 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
         #pragma omp atomic
 #endif
         progress++;
-        if (SetProgress(image,image,EvaluateImageTag,progress) == MagickFalse)
-          status=MagickFalse;
+        SetEvaluateProgress(image,image,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
