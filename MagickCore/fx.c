@@ -5747,11 +5747,44 @@ static FxInfo *DestroyFxInfoOnFailure (FxInfo * pfx)
   return NULL;
 }
 
-static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
-  MagickBooleanType CalcAllStats, ExceptionInfo *exception)
+static MagickBooleanType TranslateFxExpression (FxInfo * pfx)
 {
   char chLimit;
 
+  pfx->teDepth = 0;
+  if (!TranslateStatementList (pfx, ";", &chLimit)) {
+    return(MagickFalse);
+  }
+
+  if (pfx->teDepth) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Translate expression depth", "(%i) not 0",
+      pfx->teDepth);
+
+    return(MagickFalse);
+  }
+
+  if (chLimit != '\0' && chLimit != ';') {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "AcquireFxInfo: TranslateExpression did not exhaust input", "(chLimit=%i) at'%s'",
+      (int)chLimit, pfx->pex);
+
+    return(MagickFalse);
+  }
+
+  if (IsStatisticsPending(pfx) != MagickFalse) {
+    if (!CollectStatistics (pfx)) {
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
+static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
+  MagickBooleanType CalcAllStats, ExceptionInfo *exception)
+{
   FxInfo * pfx = (FxInfo*) AcquireCriticalMemory (sizeof (*pfx));
 
   memset (pfx, 0, sizeof (*pfx));
@@ -5773,34 +5806,8 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
     pfx->expression=ConstantString(expression);
   pfx->pex = (char *) pfx->expression;
 
-  pfx->teDepth = 0;
-  if (!TranslateStatementList (pfx, ";", &chLimit)) {
+  if (TranslateFxExpression (pfx) == MagickFalse)
     return (DestroyFxInfoOnFailure (pfx));
-  }
-
-  if (pfx->teDepth) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "Translate expression depth", "(%i) not 0",
-      pfx->teDepth);
-
-    return (DestroyFxInfoOnFailure (pfx));
-  }
-
-  if (chLimit != '\0' && chLimit != ';') {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "AcquireFxInfo: TranslateExpression did not exhaust input", "(chLimit=%i) at'%s'",
-      (int)chLimit, pfx->pex);
-
-    return (DestroyFxInfoOnFailure (pfx));
-  }
-
-  if (IsStatisticsPending(pfx) != MagickFalse) {
-    if (!CollectStatistics (pfx)) {
-      return (DestroyFxInfoOnFailure (pfx));
-    }
-  }
 
   if (pfx->DebugOpt) {
     DumpTables (stderr);
