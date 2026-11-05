@@ -1549,6 +1549,88 @@ static MagickBooleanType sRGBToLog(Image *image,const ColorspaceType colorspace,
   return(status);
 }
 
+typedef struct _sRGBTransformRowInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  TransformPacket
+    *x_map,
+    *y_map,
+    *z_map;
+
+  PrimaryInfo
+    primary_info;
+} sRGBTransformRowInfo;
+
+static MagickBooleanType sRGBTransformRow(const sRGBTransformRowInfo *info,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = info->image;
+
+  CacheView
+    *const image_view = info->image_view;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  TransformPacket
+    *const x_map = info->x_map,
+    *const y_map = info->y_map,
+    *const z_map = info->z_map;
+
+  const PrimaryInfo
+    primary_info = info->primary_info;
+
+  PixelInfo
+    pixel;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  unsigned int
+    blue,
+    green,
+    red;
+
+  const ColorspaceRowInfo
+    row = { image,image_view,exception };
+
+  if (FetchColorspaceRow(&row,y,&q,&(*status)) == MagickFalse)
+    return(MagickFalse);
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    red=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
+      GetPixelRed(image,q)));
+    green=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
+      GetPixelGreen(image,q)));
+    blue=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
+      GetPixelBlue(image,q)));
+    pixel.red=(x_map[red].x+y_map[green].x+z_map[blue].x)+
+      primary_info.x;
+    pixel.green=(x_map[red].y+y_map[green].y+z_map[blue].y)+
+      primary_info.y;
+    pixel.blue=(x_map[red].z+y_map[green].z+z_map[blue].z)+
+      primary_info.z;
+    SetPixelRed(image,ScaleMapToQuantum(pixel.red),q);
+    SetPixelGreen(image,ScaleMapToQuantum(pixel.green),q);
+    SetPixelBlue(image,ScaleMapToQuantum(pixel.blue),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  SyncColorspaceRow(image_view,exception,&(*status));
+  return(MagickTrue);
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1824,45 +1906,12 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        PixelInfo
-          pixel;
+        const sRGBTransformRowInfo
+          info = { image,image_view,exception,x_map,y_map,z_map,
+            primary_info };
 
-        Quantum
-          *magick_restrict q;
-
-        ssize_t
-          x;
-
-        unsigned int
-          blue,
-          green,
-          red;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+        if (sRGBTransformRow(&info,y,&status) == MagickFalse)
           continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          red=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
-            GetPixelRed(image,q)));
-          green=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
-            GetPixelGreen(image,q)));
-          blue=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
-            GetPixelBlue(image,q)));
-          pixel.red=(x_map[red].x+y_map[green].x+z_map[blue].x)+
-            primary_info.x;
-          pixel.green=(x_map[red].y+y_map[green].y+z_map[blue].y)+
-            primary_info.y;
-          pixel.blue=(x_map[red].z+y_map[green].z+z_map[blue].z)+
-            primary_info.z;
-          SetPixelRed(image,ScaleMapToQuantum(pixel.red),q);
-          SetPixelGreen(image,ScaleMapToQuantum(pixel.green),q);
-          SetPixelBlue(image,ScaleMapToQuantum(pixel.blue),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
