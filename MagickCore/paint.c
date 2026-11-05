@@ -258,6 +258,17 @@ static void SetGradientExtent(GradientInfo *gradient,const Image *image,
     }
 }
 
+static void ParseGradientRadii(GradientInfo *gradient,const Image *image)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"gradient:radii");
+  if (artifact != (const char *) NULL)
+    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->radii.x,
+      &gradient->radii.y);
+}
+
 static void SetGradientRadii(GradientInfo *gradient,const Image *image)
 {
   const char
@@ -269,11 +280,28 @@ static void SetGradientRadii(GradientInfo *gradient,const Image *image)
   artifact=GetImageArtifact(image,"gradient:extent");
   if (artifact != (const char *) NULL)
     SetGradientExtent(gradient,image,artifact);
-  artifact=GetImageArtifact(image,"gradient:radii");
-  if (artifact != (const char *) NULL)
-    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->radii.x,
-      &gradient->radii.y);
+  ParseGradientRadii(gradient,image);
   gradient->radius=MagickMax(gradient->radii.x,gradient->radii.y);
+}
+
+static void ParseGradientVector(GradientInfo *gradient,const Image *image)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"gradient:vector");
+  if (artifact != (const char *) NULL)
+    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf%*[ ,]%lf%*[ ,]%lf",
+      &gradient->gradient_vector.x1,&gradient->gradient_vector.y1,
+      &gradient->gradient_vector.x2,&gradient->gradient_vector.y2);
+}
+
+static void SetGradientDefaultVector(GradientInfo *gradient,const Image *image,
+  const GradientType type)
+{
+  if (IsGradientDefaultDirection(image) != MagickFalse)
+    if ((type == LinearGradient) && (gradient->gradient_vector.y2 != 0.0))
+      gradient->gradient_vector.x2=0.0;
 }
 
 static void SetGradientVector(GradientInfo *gradient,const Image *image,
@@ -290,23 +318,50 @@ static void SetGradientVector(GradientInfo *gradient,const Image *image,
   artifact=GetImageArtifact(image,"gradient:angle");
   if (artifact != (const char *) NULL)
     gradient->angle=StringToDouble(artifact,(char **) NULL);
-  artifact=GetImageArtifact(image,"gradient:vector");
+  ParseGradientVector(gradient,image);
+  SetGradientDefaultVector(gradient,image,type);
+}
+
+static void SetGradientBoundingBox(GradientInfo *gradient,const Image *image)
+{
+  const char
+    *artifact;
+
+  gradient->bounding_box.width=image->columns;
+  gradient->bounding_box.height=image->rows;
+  artifact=GetImageArtifact(image,"gradient:bounding-box");
   if (artifact != (const char *) NULL)
-    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf%*[ ,]%lf%*[ ,]%lf",
-      &gradient->gradient_vector.x1,&gradient->gradient_vector.y1,
-      &gradient->gradient_vector.x2,&gradient->gradient_vector.y2);
-  if (IsGradientDefaultDirection(image) != MagickFalse)
-    if ((type == LinearGradient) && (gradient->gradient_vector.y2 != 0.0))
-      gradient->gradient_vector.x2=0.0;
+    (void) ParseAbsoluteGeometry(artifact,&gradient->bounding_box);
+}
+
+static void SetGradientCenter(GradientInfo *gradient,const Image *image)
+{
+  const char
+    *artifact;
+
+  gradient->center.x=(double) gradient->gradient_vector.x2/2.0;
+  gradient->center.y=(double) gradient->gradient_vector.y2/2.0;
+  artifact=GetImageArtifact(image,"gradient:center");
+  if (artifact != (const char *) NULL)
+    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->center.x,
+      &gradient->center.y);
+}
+
+static void SetGradientAngle(GradientInfo *gradient,const Image *image,
+  const GradientType type)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"gradient:angle");
+  if ((type == LinearGradient) && (artifact != (const char *) NULL))
+    SetGradientAngleVector(gradient,image);
 }
 
 MagickExport MagickBooleanType GradientImage(Image *image,
   const GradientType type,const SpreadMethod method,const StopInfo *stops,
   const size_t number_stops,ExceptionInfo *exception)
 {
-  const char
-    *artifact;
-
   DrawInfo
     *draw_info;
 
@@ -328,21 +383,10 @@ MagickExport MagickBooleanType GradientImage(Image *image,
   draw_info=AcquireDrawInfo();
   gradient=(&draw_info->gradient);
   gradient->type=type;
-  gradient->bounding_box.width=image->columns;
-  gradient->bounding_box.height=image->rows;
-  artifact=GetImageArtifact(image,"gradient:bounding-box");
-  if (artifact != (const char *) NULL)
-    (void) ParseAbsoluteGeometry(artifact,&gradient->bounding_box);
+  SetGradientBoundingBox(gradient,image);
   SetGradientVector(gradient,image,type);
-  gradient->center.x=(double) gradient->gradient_vector.x2/2.0;
-  gradient->center.y=(double) gradient->gradient_vector.y2/2.0;
-  artifact=GetImageArtifact(image,"gradient:center");
-  if (artifact != (const char *) NULL)
-    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->center.x,
-      &gradient->center.y);
-  artifact=GetImageArtifact(image,"gradient:angle");
-  if ((type == LinearGradient) && (artifact != (const char *) NULL))
-    SetGradientAngleVector(gradient,image);
+  SetGradientCenter(gradient,image);
+  SetGradientAngle(gradient,image,type);
   SetGradientRadii(gradient,image);
   gradient->spread=method;
   /*
@@ -669,6 +713,12 @@ typedef struct _OilPaintRows
     *exception;
 } OilPaintRows;
 
+static ssize_t GetOilPaintCenter(const Image *linear_image,const size_t width)
+{
+  return((ssize_t) (GetPixelChannels(linear_image)*(linear_image->columns+
+    width)*(width/2L)+GetPixelChannels(linear_image)*(width/2L)));
+}
+
 static MagickBooleanType OilPaintImageRows(const OilPaintRows *rows)
 {
   CacheView
@@ -703,8 +753,7 @@ static MagickBooleanType OilPaintImageRows(const OilPaintRows *rows)
   */
   status=MagickTrue;
   progress=0;
-  center=(ssize_t) (GetPixelChannels(linear_image)*(linear_image->columns+
-    width)*(width/2L)+GetPixelChannels(linear_image)*(width/2L));
+  center=GetOilPaintCenter(linear_image,width);
   image_view=AcquireVirtualCacheView(linear_image,exception);
   paint_view=AcquireAuthenticCacheView(paint_image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
