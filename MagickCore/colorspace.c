@@ -1875,6 +1875,39 @@ static PrimaryInfo InitializesRGBTransformMaps(
   return(primary_info);
 }
 
+typedef struct _TransformMapTargets
+{
+  TransformPacket
+    **x_map,
+    **y_map,
+    **z_map;
+} TransformMapTargets;
+
+static MagickBooleanType AcquiresRGBTransformMaps(Image *image,
+  ExceptionInfo *exception,const TransformMapTargets *targets)
+{
+  TransformPacket
+    **const x_map = targets->x_map,
+    **const y_map = targets->y_map,
+    **const z_map = targets->z_map;
+
+  *x_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(**x_map));
+  *y_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(**y_map));
+  *z_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(**z_map));
+  if (IsTransformMapMissing(*x_map,*y_map,*z_map) != MagickFalse)
+    {
+      *x_map=RelinquishTransformMap(*x_map);
+      *y_map=RelinquishTransformMap(*y_map);
+      *z_map=RelinquishTransformMap(*z_map);
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1900,6 +1933,9 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 
   sRGBTransformTables
     tables;
+
+  TransformMapTargets
+    targets;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1966,20 +2002,11 @@ static MagickBooleanType sRGBTransformImage(Image *image,
   /*
     Allocate the tables.
   */
-  x_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*x_map));
-  y_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*y_map));
-  z_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*z_map));
-  if (IsTransformMapMissing(x_map,y_map,z_map) != MagickFalse)
-    {
-      x_map=RelinquishTransformMap(x_map);
-      y_map=RelinquishTransformMap(y_map);
-      z_map=RelinquishTransformMap(z_map);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
+  targets.x_map=(&x_map);
+  targets.y_map=(&y_map);
+  targets.z_map=(&z_map);
+  if (AcquiresRGBTransformMaps(image,exception,&targets) == MagickFalse)
+    return(MagickFalse);
   primary_info=InitializesRGBTransformMaps(colorspace,x_map,y_map,z_map);
   /*
     Convert from sRGB.
