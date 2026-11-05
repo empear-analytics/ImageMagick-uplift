@@ -243,3 +243,11 @@ statistic-measure, prepress, decorate), plus resize-sample from W12.
 Whole catalogue after the last commit: 15,900 cases, 0 diverged. **Owner question:** may Recipe PS take
 `&census[i]` and `background+i` as per-iteration elements of function-local arrays (attribute.c
 `GetEdgeBackgroundColor`)? Today PS admits only scalars and `status`.
+
+### 06:30: attribute-bounds.c to 9.57
+
+`GetEdgeBoundingBox` N, Z, OC and `GetEdgeBackgroundCensus` B, SD: 7.94 -> 9.57, 13 cases, 0 diverged,
+whole catalogue 15,900 cases 0 diverged. One commit is parked on the local branch `w13-ab-wip`
+(`GetImageTargets`, Recipe W with a returned value that is not a constant, 9.57 -> 9.60): **owner
+ruling** on whether W step 2 allows it. Noticed upstream, not changed: the trim loop spins forever if no
+edge census equals the minimum (unreachable in practice).
