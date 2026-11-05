@@ -1413,6 +1413,14 @@ static void SetMagnifyProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
+static Image *MagnifyImageResult(Image *magnify_image,
+  const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    magnify_image=DestroyImage(magnify_image);
+  return(magnify_image);
+}
+
 MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
 {
 #define MagnifyImageTag  "Magnify/Image"
@@ -1499,7 +1507,5 @@ MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
   magnify_view=DestroyCacheView(magnify_view);
   image_view=DestroyCacheView(image_view);
   source_image=DestroyImage(source_image);
-  if (status == MagickFalse)
-    magnify_image=DestroyImage(magnify_image);
-  return(magnify_image);
+  return(MagnifyImageResult(magnify_image,status));
 }
