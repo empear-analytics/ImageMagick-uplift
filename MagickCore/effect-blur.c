@@ -1644,6 +1644,13 @@ static OffsetInfo FillBilateralSpatial(const size_t width,
   return(mid);
 }
 
+static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    image=DestroyImage(image);
+  return(image);
+}
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
@@ -1742,9 +1749,7 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   blur_view=DestroyCacheView(blur_view);
   image_view=DestroyCacheView(image_view);
   weights=DestroyBilateralTLS(number_threads,weights);
-  if (status == MagickFalse)
-    blur_image=DestroyImage(blur_image);
-  return(blur_image);
+  return(ReleaseFailedImage(blur_image,status));
 }
 
 /*
