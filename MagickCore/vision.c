@@ -468,8 +468,20 @@ typedef struct _CCCentroidPass
     *exception;
 } CCCentroidPass;
 
-static MagickBooleanType GetObjectCentroidSums(
-  const CCCentroidPass *centroid_pass,double *M00,double *M10,double *M01)
+typedef struct _CCCentroidTargets
+{
+  MagickBooleanType
+    *status;
+
+  double
+    *M00,
+    *M10,
+    *M01;
+} CCCentroidTargets;
+
+static MagickBooleanType AccumulateCentroidRow(
+  const CCCentroidPass *centroid_pass,const CCCentroidTargets *centroid_targets,
+  const ssize_t y)
 {
   const Image
     *const component_image = centroid_pass->component_image;
@@ -486,37 +498,59 @@ static MagickBooleanType GetObjectCentroidSums(
   ExceptionInfo
     *const exception = centroid_pass->exception;
 
+  MagickBooleanType
+    *const status = centroid_targets->status;
+
+  double
+    *const M00 = centroid_targets->M00,
+    *const M10 = centroid_targets->M10,
+    *const M01 = centroid_targets->M01;
+
   const Quantum
     *magick_restrict p;
+
+  ssize_t
+    x;
+
+  p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
+    bounding_box.y+y,bounding_box.width,1,exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) bounding_box.width; x++)
+  {
+    if ((ssize_t) GetPixelIndex(component_image,p) == i)
+      {
+        (*M00)++;
+        *M10+=x;
+        *M01+=y;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(component_image);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType GetObjectCentroidSums(
+  const CCCentroidPass *centroid_pass,double *M00,double *M10,double *M01)
+{
+  const RectangleInfo
+    bounding_box = centroid_pass->bounding_box;
 
   MagickBooleanType
     status;
 
+  const CCCentroidTargets
+    centroid_targets = { &status, M00, M10, M01 };
+
   ssize_t
-    x,
     y;
 
   status=MagickTrue;
   for (y=0; y < (ssize_t) bounding_box.height; y++)
-  {
-    p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
-      bounding_box.y+y,bounding_box.width,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        break;
-      }
-    for (x=0; x < (ssize_t) bounding_box.width; x++)
-    {
-      if ((ssize_t) GetPixelIndex(component_image,p) == i)
-        {
-          (*M00)++;
-          *M10+=x;
-          *M01+=y;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(component_image);
-    }
-  }
+    if (AccumulateCentroidRow(centroid_pass,&centroid_targets,y) == MagickFalse)
+      break;
   return(status);
 }
 
