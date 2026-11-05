@@ -1273,6 +1273,70 @@ static MagickBooleanType TransformImageToGray(Image *image,
   return(status);
 }
 
+typedef struct _SetImageTypeInput
+{
+  Image
+    *image;
+
+  ImageInfo
+    *image_info;
+
+  ImageType
+    type;
+
+  ExceptionInfo
+    *exception;
+} SetImageTypeInput;
+
+static void SetColorTrueColorType(const SetImageTypeInput *tile,
+  MagickBooleanType *status)
+{
+  Image
+    *const image = tile->image;
+
+  const ImageType
+    type = tile->type;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  switch (type)
+  {
+    case TrueColorType:
+    {
+      (*status)=TransformImageTosRGB(image,(*status),exception);
+      (*status)=SetImageDirectClass(image,(*status),exception);
+      image->alpha_trait=UndefinedPixelTrait;
+      break;
+    }
+    case TrueColorAlphaType:
+    {
+      (*status)=TransformImageTosRGB(image,(*status),exception);
+      (*status)=SetImageDirectClass(image,(*status),exception);
+      SetOpaqueAlphaIfMissing(image,exception);
+      break;
+    }
+    case ColorSeparationType:
+    {
+      (*status)=TransformImageToCMYK(image,(*status),exception);
+      (*status)=SetImageDirectClass(image,(*status),exception);
+      image->alpha_trait=UndefinedPixelTrait;
+      break;
+    }
+    case ColorSeparationAlphaType:
+    {
+      if (image->colorspace != CMYKColorspace)
+        (*status)=TransformImageColorspace(image,CMYKColorspace,exception);
+      (*status)=SetImageDirectClass(image,(*status),exception);
+      if ((image->alpha_trait & BlendPixelTrait) == 0)
+        (*status)=SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   ExceptionInfo *exception)
 {
@@ -1285,12 +1349,19 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   QuantizeInfo
     *quantize_info;
 
+  SetImageTypeInput
+    tile;
+
   assert(image != (Image *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   assert(image->signature == MagickCoreSignature);
   status=MagickTrue;
   image_info=AcquireImageTypeInfo(image);
+  tile.image=image;
+  tile.image_info=image_info;
+  tile.type=type;
+  tile.exception=exception;
   switch (type)
   {
     case BilevelType:
@@ -1341,34 +1412,9 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
       quantize_info=DestroyQuantizeInfo(quantize_info);
       break;
     }
-    case TrueColorType:
+    default:
     {
-      status=TransformImageTosRGB(image,status,exception);
-      status=SetImageDirectClass(image,status,exception);
-      image->alpha_trait=UndefinedPixelTrait;
-      break;
-    }
-    case TrueColorAlphaType:
-    {
-      status=TransformImageTosRGB(image,status,exception);
-      status=SetImageDirectClass(image,status,exception);
-      SetOpaqueAlphaIfMissing(image,exception);
-      break;
-    }
-    case ColorSeparationType:
-    {
-      status=TransformImageToCMYK(image,status,exception);
-      status=SetImageDirectClass(image,status,exception);
-      image->alpha_trait=UndefinedPixelTrait;
-      break;
-    }
-    case ColorSeparationAlphaType:
-    {
-      if (image->colorspace != CMYKColorspace)
-        status=TransformImageColorspace(image,CMYKColorspace,exception);
-      status=SetImageDirectClass(image,status,exception);
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        status=SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+      SetColorTrueColorType(&tile,&status);
       break;
     }
     case OptimizeType:
