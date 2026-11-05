@@ -1769,12 +1769,9 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
     return((Image *) NULL);
   if (GetNextImageInList(image) == (Image *) NULL)
     {
-      MorphSingleInfo
-        single;
+      const MorphSingleInfo
+        single = { image, number_frames, exception };
 
-      single.image=image;
-      single.number_frames=number_frames;
-      single.exception=exception;
       return(MorphSingleImage(&single,morph_images,&status));
     }
   /*
@@ -1824,16 +1821,10 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
 #endif
       for (y=0; y < (ssize_t) morph_images->rows; y++)
       {
-        MorphFrameRowInfo
-          info;
+        const MorphFrameRowInfo
+          info = { image_view, morph_image, exception, morph_view,
+            morph_images, alpha, beta };
 
-        info.image_view=image_view;
-        info.morph_image=morph_image;
-        info.exception=exception;
-        info.morph_view=morph_view;
-        info.morph_images=morph_images;
-        info.alpha=alpha;
-        info.beta=beta;
         MorphFrameRow(&status,&info,y);
       }
       morph_view=DestroyCacheView(morph_view);
