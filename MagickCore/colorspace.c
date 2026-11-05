@@ -124,10 +124,81 @@ static MagickBooleanType
 %    o red, green, blue: A pointer to a pixel component of type Quantum.
 %
 */
+typedef struct _GenericToRGBInput
+{
+  ColorspaceType
+    colorspace;
+
+  double
+    X,
+    Y,
+    Z,
+    *R,
+    *G,
+    *B;
+} GenericToRGBInput;
+
+static void ConvertYDbDrThroughYUVToRGB(const GenericToRGBInput *input)
+{
+  const ColorspaceType
+    colorspace = input->colorspace;
+
+  const double
+    X = input->X,
+    Y = input->Y,
+    Z = input->Z;
+
+  double
+    *const R = input->R,
+    *const G = input->G,
+    *const B = input->B;
+
+  switch (colorspace)
+  {
+    case YDbDrColorspace:
+    {
+      ConvertYDbDrToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case YIQColorspace:
+    {
+      ConvertYIQToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case YPbPrColorspace:
+    {
+      ConvertYPbPrToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case YUVColorspace:
+    {
+      ConvertYUVToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    default:
+    {
+      *R=(double) QuantumRange*X;
+      *G=(double) QuantumRange*Y;
+      *B=(double) QuantumRange*Z;
+      break;
+    }
+  }
+}
+
 MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
   const double X,const double Y,const double Z,const double white_luminance,
   const IlluminantType illuminant,double *R,double *G,double *B)
 {
+  GenericToRGBInput
+    input;
+
+  input.colorspace=colorspace;
+  input.X=X;
+  input.Y=Y;
+  input.Z=Z;
+  input.R=R;
+  input.G=G;
+  input.B=B;
   switch (colorspace)
   {
     case Adobe98Colorspace:
@@ -252,31 +323,9 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
       ConvertYCbCrToRGB(X,Y,Z,R,G,B);
       break;
     }
-    case YDbDrColorspace:
-    {
-      ConvertYDbDrToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case YIQColorspace:
-    {
-      ConvertYIQToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case YPbPrColorspace:
-    {
-      ConvertYPbPrToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case YUVColorspace:
-    {
-      ConvertYUVToRGB(X,Y,Z,R,G,B);
-      break;
-    }
     default:
     {
-      *R=(double) QuantumRange*X;
-      *G=(double) QuantumRange*Y;
-      *B=(double) QuantumRange*Z;
+      ConvertYDbDrThroughYUVToRGB(&input);
       break;
     }
   }
