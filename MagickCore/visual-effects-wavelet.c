@@ -433,6 +433,9 @@ static MagickBooleanType ReportWaveletProgress(const Image *image,
 
 typedef struct _WaveletDenoise
 {
+  const Image
+    *image;
+
   size_t
     number_levels;
 
@@ -449,6 +452,18 @@ typedef struct _WaveletDenoise
   float
     *pixels,
     *kernel;
+
+  CacheView
+    *image_view;
+
+  Image
+    *noise_image;
+
+  CacheView
+    *noise_view;
+
+  ExceptionInfo
+    *exception;
 } WaveletDenoise;
 
 static void ThresholdWaveletCoefficients(const WaveletDenoise *denoise,
@@ -533,6 +548,68 @@ static size_t DecomposeWaveletLevels(const WaveletDenoise *denoise,
   return(low_pass);
 }
 
+static MagickBooleanType DenoiseWaveletChannels(
+  const WaveletDenoise *denoise,MagickBooleanType status)
+{
+  ssize_t
+    channel;
+
+  for (channel=0; channel < (ssize_t) GetPixelChannels(denoise->image);
+       channel++)
+  {
+    size_t
+      low_pass = 0;
+
+    PixelChannel
+      pixel_channel;
+
+    PixelTrait
+      traits;
+
+    WaveletChannel
+      wavelet_channel;
+
+    WaveletReconstruct
+      wavelet_reconstruct;
+
+    if (status == MagickFalse)
+      continue;
+    traits=GetPixelChannelTraits(denoise->image,(PixelChannel) channel);
+    if (traits == UndefinedPixelTrait)
+      continue;
+    pixel_channel=GetPixelChannelChannel(denoise->image,channel);
+    if (IsNonRGBPixelChannel(pixel_channel) != MagickFalse)
+      continue;
+    /*
+      Copy channel from image to wavelet pixel array.
+    */
+    wavelet_channel.image=denoise->image;
+    wavelet_channel.image_view=denoise->image_view;
+    wavelet_channel.channel=channel;
+    wavelet_channel.exception=denoise->exception;
+    status=CopyWaveletChannel(&wavelet_channel,denoise->pixels,status);
+    /*
+      Low pass filter outputs are called approximation kernel & high pass
+      filters are referred to as detail kernel. The detail kernel
+      have high values in the noisy parts of the signal.
+    */
+    low_pass=DecomposeWaveletLevels(denoise,denoise->image,low_pass);
+    /*
+      Reconstruct image from the thresholded wavelet kernel.
+    */
+    wavelet_reconstruct.image=denoise->image;
+    wavelet_reconstruct.noise_image=denoise->noise_image;
+    wavelet_reconstruct.noise_view=denoise->noise_view;
+    wavelet_reconstruct.pixel_channel=pixel_channel;
+    wavelet_reconstruct.pixels=denoise->pixels;
+    wavelet_reconstruct.low_pass=low_pass;
+    wavelet_reconstruct.exception=denoise->exception;
+    status=ReconstructWaveletChannel(&wavelet_reconstruct,status);
+    status=ReportWaveletProgress(denoise->image,channel,status);
+  }
+  return(status);
+}
+
 MagickExport Image *WaveletDenoiseImage(const Image *image,
   const double threshold,const double softness,ExceptionInfo *exception)
 {
@@ -559,8 +636,8 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
   size_t
     number_levels = 5;
 
-  ssize_t
-    channel;
+  WaveletDenoise
+    denoise;
 
   static const float
     noise_levels[] = { 0.8002f, 0.2735f, 0.1202f, 0.0585f, 0.0291f, 0.0152f,
@@ -617,68 +694,19 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
   status=MagickTrue;
   image_view=AcquireAuthenticCacheView(image,exception);
   noise_view=AcquireAuthenticCacheView(noise_image,exception);
-  for (channel=0; channel < (ssize_t) GetPixelChannels(image); channel++)
-  {
-    size_t
-      low_pass = 0;
-
-    PixelChannel
-      pixel_channel;
-
-    PixelTrait
-      traits;
-
-    WaveletChannel
-      wavelet_channel;
-
-    WaveletDenoise
-      denoise;
-
-    WaveletReconstruct
-      wavelet_reconstruct;
-
-    if (status == MagickFalse)
-      continue;
-    traits=GetPixelChannelTraits(image,(PixelChannel) channel);
-    if (traits == UndefinedPixelTrait)
-      continue;
-    pixel_channel=GetPixelChannelChannel(image,channel);
-    if (IsNonRGBPixelChannel(pixel_channel) != MagickFalse)
-      continue;
-    /*
-      Copy channel from image to wavelet pixel array.
-    */
-    wavelet_channel.image=image;
-    wavelet_channel.image_view=image_view;
-    wavelet_channel.channel=channel;
-    wavelet_channel.exception=exception;
-    status=CopyWaveletChannel(&wavelet_channel,pixels,status);
-    /*
-      Low pass filter outputs are called approximation kernel & high pass
-      filters are referred to as detail kernel. The detail kernel
-      have high values in the noisy parts of the signal.
-    */
-    denoise.number_levels=number_levels;
-    denoise.number_pixels=number_pixels;
-    denoise.threshold=threshold;
-    denoise.softness=softness;
-    denoise.noise_levels=noise_levels;
-    denoise.pixels=pixels;
-    denoise.kernel=kernel;
-    low_pass=DecomposeWaveletLevels(&denoise,image,low_pass);
-    /*
-      Reconstruct image from the thresholded wavelet kernel.
-    */
-    wavelet_reconstruct.image=image;
-    wavelet_reconstruct.noise_image=noise_image;
-    wavelet_reconstruct.noise_view=noise_view;
-    wavelet_reconstruct.pixel_channel=pixel_channel;
-    wavelet_reconstruct.pixels=pixels;
-    wavelet_reconstruct.low_pass=low_pass;
-    wavelet_reconstruct.exception=exception;
-    status=ReconstructWaveletChannel(&wavelet_reconstruct,status);
-    status=ReportWaveletProgress(image,channel,status);
-  }
+  denoise.image=image;
+  denoise.number_levels=number_levels;
+  denoise.number_pixels=number_pixels;
+  denoise.threshold=threshold;
+  denoise.softness=softness;
+  denoise.noise_levels=noise_levels;
+  denoise.pixels=pixels;
+  denoise.kernel=kernel;
+  denoise.image_view=image_view;
+  denoise.noise_image=noise_image;
+  denoise.noise_view=noise_view;
+  denoise.exception=exception;
+  status=DenoiseWaveletChannels(&denoise,status);
   noise_view=DestroyCacheView(noise_view);
   image_view=DestroyCacheView(image_view);
   kernel=(float *) RelinquishMagickMemory(kernel);
