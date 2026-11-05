@@ -886,14 +886,8 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  colorize_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (colorize_image == (Image *) NULL)
+  if (CloneEffectImage(image,&colorize_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(colorize_image,DirectClass,exception) == MagickFalse)
-    {
-      colorize_image=DestroyImage(colorize_image);
-      return((Image *) NULL);
-    }
   ConformColorizeImage(colorize_image,colorize,exception);
   if (blend == (const char *) NULL)
     return(colorize_image);
