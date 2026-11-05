@@ -2909,6 +2909,78 @@ static void RemoveSelectedObjects(const Image *image,
     }
 }
 
+typedef struct _CCReportInputs
+{
+  const Image
+    *image;
+
+  Image
+    *component_image;
+
+  CCObjectInfo
+    *object,
+    **objects;
+
+  ssize_t
+    n;
+
+  ExceptionInfo
+    *exception;
+} CCReportInputs;
+
+static Image *ReportConnectedComponents(const CCReportInputs *report_inputs,
+  const char **metrics,MagickBooleanType status)
+{
+  const Image
+    *const image = report_inputs->image;
+
+  Image
+    *const component_image = report_inputs->component_image;
+
+  CCObjectInfo
+    *object = report_inputs->object,
+    **const objects = report_inputs->objects;
+
+  const ssize_t
+    n = report_inputs->n;
+
+  ExceptionInfo
+    *const exception = report_inputs->exception;
+
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"connected-components:mean-color");
+  if (IsStringTrue(artifact) != MagickFalse)
+    {
+      /*
+        Replace object with mean color.
+      */
+      SetObjectMeanColors(component_image,object);
+    }
+  (void) SyncImage(component_image,exception);
+  artifact=GetImageArtifact(image,"connected-components:verbose");
+  if ((IsStringTrue(artifact) != MagickFalse) ||
+      (objects != (CCObjectInfo **) NULL))
+    {
+      /*
+        Report statistics on each unique object.
+      */
+      status=ComputeObjectStatistics(component_image,object,status,exception);
+      SortObjects(image,component_image,object);
+      if (objects == (CCObjectInfo **) NULL)
+        {
+          PrintObjectsHeader(image,metrics,n);
+          PrintObjects(image,component_image,object,n);
+        }
+    }
+  if (objects == (CCObjectInfo **) NULL)
+    object=(CCObjectInfo *) RelinquishMagickMemory(object);
+  else
+    *objects=object;
+  return(component_image);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2927,6 +2999,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
 
   CCMetricInputs
     inputs;
+
+  CCReportInputs
+    report_inputs;
 
   CCMetricTargets
     targets;
@@ -3194,35 +3269,13 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   merge_inputs.exception=exception;
   status=MergeSelectedObjects(&merge_inputs,status);
   neighbors=(size_t *) RelinquishMagickMemory(neighbors);
-  artifact=GetImageArtifact(image,"connected-components:mean-color");
-  if (IsStringTrue(artifact) != MagickFalse)
-    {
-      /*
-        Replace object with mean color.
-      */
-      SetObjectMeanColors(component_image,object);
-    }
-  (void) SyncImage(component_image,exception);
-  artifact=GetImageArtifact(image,"connected-components:verbose");
-  if ((IsStringTrue(artifact) != MagickFalse) ||
-      (objects != (CCObjectInfo **) NULL))
-    {
-      /*
-        Report statistics on each unique object.
-      */
-      status=ComputeObjectStatistics(component_image,object,status,exception);
-      SortObjects(image,component_image,object);
-      if (objects == (CCObjectInfo **) NULL)
-        {
-          PrintObjectsHeader(image,metrics,n);
-          PrintObjects(image,component_image,object,n);
-        }
-    }
-  if (objects == (CCObjectInfo **) NULL)
-    object=(CCObjectInfo *) RelinquishMagickMemory(object);
-  else
-    *objects=object;
-  return(component_image);
+  report_inputs.image=image;
+  report_inputs.component_image=component_image;
+  report_inputs.object=object;
+  report_inputs.objects=objects;
+  report_inputs.n=n;
+  report_inputs.exception=exception;
+  return(ReportConnectedComponents(&report_inputs,metrics,status));
 }
 
 /*
