@@ -96,6 +96,7 @@ $call Make mime.c
 $call Make module.c
 $call Make monitor.c
 $call Make montage.c
+$call Make montage-info.c
 $call Make morphology.c
 $call Make opencl.c
 $call Make option.c

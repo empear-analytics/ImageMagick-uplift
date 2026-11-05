@@ -64,6 +64,7 @@ if ( ! GetOptions(
 	 'memory.c',
 	 'monitor.c',
 	 'montage.c',
+	 'montage-info.c',
    'paint.c',
    'paint-floodfill.c',
 	 'pixel-iterator.c',
