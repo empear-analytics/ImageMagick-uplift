@@ -854,6 +854,72 @@ static double *AffineProjectionCoefficients(double *coeff,
   return(coeff);
 }
 
+typedef struct _ScaleRotateTranslateTargets
+{
+  double
+    *sx,
+    *sy,
+    *a,
+    *nx,
+    *ny;
+} ScaleRotateTranslateTargets;
+
+static MagickBooleanType ParseScaleRotateTranslateArguments(double *coeff,
+  const DistortMethod *method,const CoefficientContext *context,
+  const ScaleRotateTranslateTargets *targets)
+{
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
+  double
+    *const sx = targets->sx,
+    *const sy = targets->sy,
+    *const a = targets->a,
+    *const nx = targets->nx,
+    *const ny = targets->ny;
+
+  switch ( number_arguments ) {
+  case 3:
+    *a = arguments[2];
+    break;
+  case 4:
+    *sx = *sy = arguments[2];
+    *a = arguments[3];
+    break;
+  case 5:
+    *sx = arguments[2];
+    *sy = arguments[3];
+    *a = arguments[4];
+    break;
+  case 6:
+    *sx = *sy = arguments[2];
+    *a = arguments[3];
+    *nx = arguments[4];
+    *ny = arguments[5];
+    break;
+  case 7:
+    *sx = arguments[2];
+    *sy = arguments[3];
+    *a = arguments[4];
+    *nx = arguments[5];
+    *ny = arguments[6];
+    break;
+  default:
+    coeff = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument","%s : 'Too Many Arguments (7 or less)'",
+        CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1045,6 +1111,9 @@ static double *GenerateCoefficients(const Image *image,
         cosine, sine,
         x,y,sx,sy,a,nx,ny;
 
+      const ScaleRotateTranslateTargets
+        targets = { &sx,&sy,&a,&nx,&ny };
+
       /* set default center, and default scale */
       x = nx = (double)(image->columns)/2.0 + (double)image->page.x;
       y = ny = (double)(image->rows)/2.0    + (double)image->page.y;
@@ -1066,39 +1135,9 @@ static double *GenerateCoefficients(const Image *image,
       default:
         x = nx = arguments[0];
         y = ny = arguments[1];
-        switch ( number_arguments ) {
-        case 3:
-          a = arguments[2];
-          break;
-        case 4:
-          sx = sy = arguments[2];
-          a = arguments[3];
-          break;
-        case 5:
-          sx = arguments[2];
-          sy = arguments[3];
-          a = arguments[4];
-          break;
-        case 6:
-          sx = sy = arguments[2];
-          a = arguments[3];
-          nx = arguments[4];
-          ny = arguments[5];
-          break;
-        case 7:
-          sx = arguments[2];
-          sy = arguments[3];
-          a = arguments[4];
-          nx = arguments[5];
-          ny = arguments[6];
-          break;
-        default:
-          coeff = (double *) RelinquishMagickMemory(coeff);
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument","%s : 'Too Many Arguments (7 or less)'",
-              CommandOptionToMnemonic(MagickDistortOptions, *method) );
+        if (ParseScaleRotateTranslateArguments(coeff,method,&context,&targets) ==
+            MagickFalse)
           return((double *) NULL);
-        }
         break;
       }
       /* Trap if sx or sy == 0 -- image is scaled out of existence! */
