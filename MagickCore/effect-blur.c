@@ -3731,21 +3731,10 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    SelectiveRow
-      row;
+    const SelectiveRow
+      row = { image, blur_image, luminance_image, blur_view, image_view,
+        luminance_view, kernel, center, y, threshold, width, exception };
 
-    row.image=image;
-    row.blur_image=blur_image;
-    row.luminance_image=luminance_image;
-    row.blur_view=blur_view;
-    row.image_view=image_view;
-    row.luminance_view=luminance_view;
-    row.kernel=kernel;
-    row.center=center;
-    row.y=y;
-    row.threshold=threshold;
-    row.width=width;
-    row.exception=exception;
     if (BlurSelectiveLine(&row,&status) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
