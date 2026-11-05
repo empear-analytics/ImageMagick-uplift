@@ -152,6 +152,13 @@ typedef struct _AdaptiveThresholdPixelInfo
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsThresholdChannelUndefined(
+  const PixelTrait traits,const PixelTrait threshold_traits)
+{
+  return(((traits == UndefinedPixelTrait) ||
+    (threshold_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 static void SumThresholdWindow(const Image *image,
   const Quantum *magick_restrict p,const ssize_t i,const size_t width,
   const size_t height,double *channel_bias,double *channel_sum)
@@ -241,8 +248,7 @@ static void AdaptiveThresholdPixel(
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     PixelTrait threshold_traits=GetPixelChannelTraits(threshold_image,
       channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (threshold_traits == UndefinedPixelTrait))
+    if (IsThresholdChannelUndefined(traits,threshold_traits) != MagickFalse)
       continue;
     if ((threshold_traits & CopyPixelTrait) != 0)
       {
@@ -330,8 +336,7 @@ static void SumThresholdChannel(const ThresholdChannelInfo *info,const ssize_t i
   PixelTrait traits = GetPixelChannelTraits(image,channel);
   PixelTrait threshold_traits=GetPixelChannelTraits(threshold_image,
     channel);
-  if ((traits == UndefinedPixelTrait) ||
-      (threshold_traits == UndefinedPixelTrait))
+  if (IsThresholdChannelUndefined(traits,threshold_traits) != MagickFalse)
     return;
   if ((threshold_traits & CopyPixelTrait) != 0)
     {
