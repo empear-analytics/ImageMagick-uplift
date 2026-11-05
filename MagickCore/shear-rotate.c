@@ -403,6 +403,44 @@ static void RotateTileRow270(const RotateTiles *tiles,const ssize_t tile_y,
   UpdateRotateTileProgress(image,tile_height,status,progress);
 }
 
+static void RotateTileLine90(const RotateTile *tile,const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict tile_pixels;
+
+  MagickBooleanType
+    sync;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=QueueCacheViewAuthenticPixels(tile->rotate_view,(ssize_t)
+    tile->rotate_image->columns-(tile->tile_y+(ssize_t) tile->height),y+
+    tile->tile_x,tile->height,1,tile->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  tile_pixels=tile->p+(((ssize_t) tile->height-1)*(ssize_t) tile->width+y)*
+    (ssize_t) GetPixelChannels(tile->image);
+  for (x=0; x < (ssize_t) tile->height; x++)
+  {
+    CopyRotatedPixelChannels(tile->image,tile->rotate_image,tile_pixels,q);
+    tile_pixels-=tile->width*GetPixelChannels(tile->image);
+    q+=(ptrdiff_t) GetPixelChannels(tile->rotate_image);
+  }
+  sync=SyncCacheViewAuthenticPixels(tile->rotate_view,tile->exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -473,11 +511,8 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
           const Quantum
             *magick_restrict p;
 
-          MagickBooleanType
-            sync;
-
-          Quantum
-            *magick_restrict q;
+          RotateTile
+            tile;
 
           size_t
             height,
@@ -495,35 +530,18 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
               status=MagickFalse;
               break;
             }
+          tile.image=image;
+          tile.rotate_image=rotate_image;
+          tile.rotate_view=rotate_view;
+          tile.p=p;
+          tile.height=height;
+          tile.width=width;
+          tile.tile_x=tile_x;
+          tile.tile_y=tile_y;
+          tile.exception=exception;
           for (y=0; y < (ssize_t) width; y++)
           {
-            const Quantum
-              *magick_restrict tile_pixels;
-
-            ssize_t
-              x;
-
-            if (status == MagickFalse)
-              continue;
-            q=QueueCacheViewAuthenticPixels(rotate_view,(ssize_t)
-              rotate_image->columns-(tile_y+(ssize_t) height),y+tile_x,height,
-              1,exception);
-            if (q == (Quantum *) NULL)
-              {
-                status=MagickFalse;
-                continue;
-              }
-            tile_pixels=p+(((ssize_t) height-1)*(ssize_t) width+y)*(ssize_t)
-              GetPixelChannels(image);
-            for (x=0; x < (ssize_t) height; x++)
-            {
-              CopyRotatedPixelChannels(image,rotate_image,tile_pixels,q);
-              tile_pixels-=width*GetPixelChannels(image);
-              q+=(ptrdiff_t) GetPixelChannels(rotate_image);
-            }
-            sync=SyncCacheViewAuthenticPixels(rotate_view,exception);
-            if (sync == MagickFalse)
-              status=MagickFalse;
+            RotateTileLine90(&tile,y,&status);
           }
         }
         UpdateRotateTileProgress(image,tile_height,&status,&progress);
