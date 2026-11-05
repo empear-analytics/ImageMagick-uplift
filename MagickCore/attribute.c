@@ -1337,6 +1337,65 @@ static void SetColorTrueColorType(const SetImageTypeInput *tile,
   }
 }
 
+static void SetPaletteImageType(const SetImageTypeInput *tile,
+  MagickBooleanType *status)
+{
+  Image
+    *const image = tile->image;
+
+  ImageInfo
+    *const image_info = tile->image_info;
+
+  const ImageType
+    type = tile->type;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  QuantizeInfo
+    *quantize_info;
+
+  switch (type)
+  {
+    case PaletteType:
+    {
+      (*status)=TransformImageTosRGB(image,(*status),exception);
+      (*status)=QuantizeImageToPalette(image,image_info,(*status),exception);
+      image->alpha_trait=UndefinedPixelTrait;
+      break;
+    }
+    case PaletteBilevelAlphaType:
+    {
+      ChannelType
+        channel_mask;
+
+      (*status)=TransformImageTosRGB(image,(*status),exception);
+      SetOpaqueAlphaIfMissing(image,exception);
+      channel_mask=SetImageChannelMask(image,AlphaChannel);
+      (void) BilevelImage(image,(double) QuantumRange/2.0,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+      quantize_info=AcquireQuantizeInfo(image_info);
+      (*status)=QuantizeImage(quantize_info,image,exception);
+      quantize_info=DestroyQuantizeInfo(quantize_info);
+      break;
+    }
+    case PaletteAlphaType:
+    {
+      (*status)=TransformImageTosRGB(image,(*status),exception);
+      SetOpaqueAlphaIfMissing(image,exception);
+      quantize_info=AcquireQuantizeInfo(image_info);
+      (*status)=QuantizeImage(quantize_info,image,exception);
+      quantize_info=DestroyQuantizeInfo(quantize_info);
+      break;
+    }
+    default:
+    {
+      SetColorTrueColorType(tile,status);
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   ExceptionInfo *exception)
 {
@@ -1345,9 +1404,6 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
 
   MagickBooleanType
     status;
-
-  QuantizeInfo
-    *quantize_info;
 
   SetImageTypeInput
     tile;
@@ -1381,40 +1437,9 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
       SetOpaqueAlphaIfMissing(image,exception);
       break;
     }
-    case PaletteType:
-    {
-      status=TransformImageTosRGB(image,status,exception);
-      status=QuantizeImageToPalette(image,image_info,status,exception);
-      image->alpha_trait=UndefinedPixelTrait;
-      break;
-    }
-    case PaletteBilevelAlphaType:
-    {
-      ChannelType
-        channel_mask;
-
-      status=TransformImageTosRGB(image,status,exception);
-      SetOpaqueAlphaIfMissing(image,exception);
-      channel_mask=SetImageChannelMask(image,AlphaChannel);
-      (void) BilevelImage(image,(double) QuantumRange/2.0,exception);
-      (void) SetImageChannelMask(image,channel_mask);
-      quantize_info=AcquireQuantizeInfo(image_info);
-      status=QuantizeImage(quantize_info,image,exception);
-      quantize_info=DestroyQuantizeInfo(quantize_info);
-      break;
-    }
-    case PaletteAlphaType:
-    {
-      status=TransformImageTosRGB(image,status,exception);
-      SetOpaqueAlphaIfMissing(image,exception);
-      quantize_info=AcquireQuantizeInfo(image_info);
-      status=QuantizeImage(quantize_info,image,exception);
-      quantize_info=DestroyQuantizeInfo(quantize_info);
-      break;
-    }
     default:
     {
-      SetColorTrueColorType(&tile,&status);
+      SetPaletteImageType(&tile,&status);
       break;
     }
     case OptimizeType:
