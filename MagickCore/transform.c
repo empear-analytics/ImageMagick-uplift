@@ -1960,6 +1960,13 @@ static Image *FinishSpliceImage(Image *splice_image,CacheView *splice_view,
   return(splice_image);
 }
 
+static inline MagickBooleanType IsSpliceRowOutside(const Image *splice_image,
+  const ssize_t y)
+{
+  return(((y < 0) || (y >= (ssize_t) splice_image->rows)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -2051,7 +2058,7 @@ MagickExport Image *SpliceImage(const Image *image,
 
     if (status == MagickFalse)
       continue;
-    if ((y < 0) || (y >= (ssize_t) splice_image->rows))
+    if (IsSpliceRowOutside(splice_image,y) != MagickFalse)
       continue;
     if (SpliceImageRow(&row,y-(ssize_t) splice_geometry.height,y,&status) ==
         MagickFalse)
