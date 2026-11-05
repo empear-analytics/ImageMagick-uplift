@@ -142,6 +142,25 @@ typedef struct _ChannelRow
     *exception;
 } ChannelRow;
 
+static void CopyChannelPixels(const ChannelRow *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) row->width; x++)
+  {
+    if (row->channel_op == AssignChannelOp)
+      SetPixelChannel(row->destination_image,row->destination_channel,
+        row->pixel,q);
+    else
+      SetPixelChannel(row->destination_image,row->destination_channel,
+        GetPixelChannel(row->source_image,row->source_channel,p),q);
+    p+=(ptrdiff_t) GetPixelChannels(row->source_image);
+    q+=(ptrdiff_t) GetPixelChannels(row->destination_image);
+  }
+}
+
 static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
   MagickBooleanType *status)
 {
@@ -154,9 +173,6 @@ static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
 
   Quantum
     *magick_restrict q;
-
-  ssize_t
-    x;
 
   if ((*status) == MagickFalse)
     return;
@@ -175,17 +191,7 @@ static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
   if ((destination_traits == UndefinedPixelTrait) ||
       (source_traits == UndefinedPixelTrait))
     return;
-  for (x=0; x < (ssize_t) row->width; x++)
-  {
-    if (row->channel_op == AssignChannelOp)
-      SetPixelChannel(row->destination_image,row->destination_channel,
-        row->pixel,q);
-    else
-      SetPixelChannel(row->destination_image,row->destination_channel,
-        GetPixelChannel(row->source_image,row->source_channel,p),q);
-    p+=(ptrdiff_t) GetPixelChannels(row->source_image);
-    q+=(ptrdiff_t) GetPixelChannels(row->destination_image);
-  }
+  CopyChannelPixels(row,p,q);
   if (SyncCacheViewAuthenticPixels(row->destination_view,row->exception) ==
       MagickFalse)
     (*status)=MagickFalse;
