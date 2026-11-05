@@ -495,6 +495,99 @@ static void TransferXShearSpan(const XShearSpanInfo *span_info,
   }
 }
 
+typedef struct _XShearRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  PixelInfo
+    background;
+
+  double
+    degrees;
+
+  size_t
+    height,
+    width;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+} XShearRow;
+
+static MagickBooleanType XShearLine(const XShearRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  const PixelInfo
+    background = row->background;
+
+  const double
+    degrees = row->degrees;
+
+  const size_t
+    height = row->height,
+    width = row->width;
+
+  const ssize_t
+    x_offset = row->x_offset,
+    y_offset = row->y_offset;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  double
+    displacement;
+
+  Quantum
+    *magick_restrict p;
+
+  ShearDirection
+    direction;
+
+  XShearSpanInfo
+    span_info;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewAuthenticPixels(image_view,0,y_offset+y,image->columns,1,
+    exception);
+  if (p == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  p+=(ptrdiff_t) x_offset*(ssize_t) GetPixelChannels(image);
+  displacement=degrees*(double) (y-height/2.0);
+  if (displacement == 0.0)
+    return(MagickFalse);
+  if (displacement > 0.0)
+    direction=RIGHT;
+  else
+    {
+      displacement*=(-1.0);
+      direction=LEFT;
+    }
+  span_info.image=image;
+  span_info.background=background;
+  span_info.width=width;
+  span_info.x_offset=x_offset;
+  TransferXShearSpan(&span_info,direction,displacement,p);
+  SyncShearView(image_view,exception,status);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XShearImage(Image *image,const double degrees,
   const ShearRegion *region,ExceptionInfo *exception)
 {
@@ -540,44 +633,11 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
 #endif
   for (y=0; y < (ssize_t) height; y++)
   {
-    double
-      displacement;
+    const XShearRow row = { image, image_view, background, degrees, height,
+      width, x_offset, y_offset, exception };
 
-    Quantum
-      *magick_restrict p;
-
-    ShearDirection
-      direction;
-
-    XShearSpanInfo
-      span_info;
-
-    if (status == MagickFalse)
+    if (XShearLine(&row,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewAuthenticPixels(image_view,0,y_offset+y,image->columns,1,
-      exception);
-    if (p == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    p+=(ptrdiff_t) x_offset*(ssize_t) GetPixelChannels(image);
-    displacement=degrees*(double) (y-height/2.0);
-    if (displacement == 0.0)
-      continue;
-    if (displacement > 0.0)
-      direction=RIGHT;
-    else
-      {
-        displacement*=(-1.0);
-        direction=LEFT;
-      }
-    span_info.image=image;
-    span_info.background=background;
-    span_info.width=width;
-    span_info.x_offset=x_offset;
-    TransferXShearSpan(&span_info,direction,displacement,p);
-    SyncShearView(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
