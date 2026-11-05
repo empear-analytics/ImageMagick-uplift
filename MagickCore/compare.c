@@ -5383,6 +5383,102 @@ static void SetSimilarityChannels(const SimilarityChannels *channels,
   }
 }
 
+typedef struct _SimilarityRow
+{
+  const Image
+    *image,
+    *reconstruct;
+
+  Image
+    *similarity_image;
+
+  CacheView
+    *similarity_view;
+
+  MetricType
+    metric;
+
+  MagickBooleanType
+    threshold_trigger;
+
+  ExceptionInfo
+    *exception;
+} SimilarityRow;
+
+static MagickBooleanType ScanSimilarityRow(const SimilarityRow *row,
+  const ssize_t y,SimilarityInfo *channel_info,MagickBooleanType *status)
+{
+  const Image
+    *const image = row->image,
+    *const reconstruct = row->reconstruct;
+
+  Image
+    *const similarity_image = row->similarity_image;
+
+  CacheView
+    *const similarity_view = row->similarity_view;
+
+  const MetricType
+    metric = row->metric;
+
+  const MagickBooleanType
+    threshold_trigger = row->threshold_trigger;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  double
+    similarity;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  if (threshold_trigger != MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(similarity_view,0,y,
+    similarity_image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) similarity_image->columns; x++)
+  {
+    SimilarityCandidate
+      tile;
+
+    SimilarityChannels
+      channels;
+
+    similarity=GetSimilarityMetric((Image *) image,reconstruct,metric,x,y,
+      exception);
+    tile.metric=metric;
+    tile.similarity=similarity;
+    tile.x=x;
+    tile.y=y;
+    switch (metric)
+    {
+      default:
+      {
+        SelectBestSimilarity(&tile,channel_info);
+        break;
+      }
+    }
+    channels.image=image;
+    channels.similarity_image=similarity_image;
+    channels.metric=metric;
+    channels.similarity=similarity;
+    SetSimilarityChannels(&channels,q);
+    q+=(ptrdiff_t) GetPixelChannels(similarity_image);
+  }
+  return(MagickTrue);
+}
+
 MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
@@ -5501,61 +5597,17 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
 #endif
   for (y=0; y < (ssize_t) similarity_image->rows; y++)
   {
-    double
-      similarity;
-
     MagickBooleanType
       threshold_trigger = MagickFalse;
-
-    Quantum
-      *magick_restrict q;
 
     SimilarityInfo
       channel_info = similarity_info;
 
-    ssize_t
-      x;
+    const SimilarityRow row = { image, reconstruct, similarity_image,
+      similarity_view, metric, threshold_trigger, exception };
 
-    if (status == MagickFalse)
+    if (ScanSimilarityRow(&row,y,&channel_info,&status) == MagickFalse)
       continue;
-    if (threshold_trigger != MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(similarity_view,0,y,
-      similarity_image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) similarity_image->columns; x++)
-    {
-      SimilarityCandidate
-        tile;
-
-      SimilarityChannels
-        channels;
-
-      similarity=GetSimilarityMetric((Image *) image,reconstruct,metric,x,y,
-        exception);
-      tile.metric=metric;
-      tile.similarity=similarity;
-      tile.x=x;
-      tile.y=y;
-      switch (metric)
-      {
-        default:
-        {
-          SelectBestSimilarity(&tile,&channel_info);
-          break;
-        }
-      }
-      channels.image=image;
-      channels.similarity_image=similarity_image;
-      channels.metric=metric;
-      channels.similarity=similarity;
-      SetSimilarityChannels(&channels,q);
-      q+=(ptrdiff_t) GetPixelChannels(similarity_image);
-    }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_GetSimilarityMetric)
 #endif
