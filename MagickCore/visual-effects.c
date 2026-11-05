@@ -1398,6 +1398,15 @@ static MagickBooleanType CloneWarpImage(Image *canvas_image,
   return(MagickTrue);
 }
 
+static void DestroyWarpResources(CacheView *warp_view,
+  CacheView *interpolate_view,CacheView *canvas_view,Image *canvas_image)
+{
+  warp_view=DestroyCacheView(warp_view);
+  interpolate_view=DestroyCacheView(interpolate_view);
+  canvas_view=DestroyCacheView(canvas_view);
+  canvas_image=DestroyImage(canvas_image);
+}
+
 static void SetImplodeCanvasAlpha(Image *canvas_image,
   ExceptionInfo *exception)
 {
@@ -1515,10 +1524,7 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
         SetEffectProgress(canvas_image,ImplodeImageTag,progress,&status);
       }
   }
-  implode_view=DestroyCacheView(implode_view);
-  interpolate_view=DestroyCacheView(interpolate_view);
-  canvas_view=DestroyCacheView(canvas_view);
-  canvas_image=DestroyImage(canvas_image);
+  DestroyWarpResources(implode_view,interpolate_view,canvas_view,canvas_image);
   return(ReleaseFailedImage(implode_image,status));
 }
 
