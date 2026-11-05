@@ -3442,6 +3442,30 @@ static void TransformLinearRGBRowTosRGB(const ColorspaceRowInfo *info,
   SyncColorspaceRow(image_view,exception,status);
 }
 
+static void TransformLinearGrayRowTosRGB(const ColorspaceRowInfo *info,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = info->image;
+
+  CacheView
+    *const image_view = info->image_view;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  const ColorspaceRowInfo
+    row = { image,image_view,exception };
+
+  if (FetchColorspaceRow(&row,y,&q,status) == MagickFalse)
+    return;
+  LinearGrayPixelsTosRGB(image,q);
+  SyncColorspaceRow(image_view,exception,status);
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -3493,16 +3517,10 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        Quantum
-          *magick_restrict q;
-
         const ColorspaceRowInfo
-          row = { image,image_view,exception };
+          info = { image,image_view,exception };
 
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        LinearGrayPixelsTosRGB(image,q);
-        SyncColorspaceRow(image_view,exception,&status);
+        TransformLinearGrayRowTosRGB(&info,y,&status);
       }
       finish.image=image;
       finish.image_view=image_view;
