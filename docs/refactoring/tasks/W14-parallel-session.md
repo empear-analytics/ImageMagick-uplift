@@ -195,3 +195,23 @@ same ternary; checked by script and by the oracle (the object code differs in br
 Recipe E step 7; the text that admits a block carrying whole parallel loops is Recipe N and Z step 1 (amended this
 morning), not E: check whether E should be amended to match or these should be relabelled N. The two
 `--no-verify` messages in `statistic-function.c` say "of 6" steps; the plan took 5 and its measured end, 9.68, held.
+
+## Lane a, fourth batch: colorspace.c 6.22 -> 7.14 merged; enhance-tone.c splits parked
+
+`colorspace.c`: the `Convert*` family split into `colorspace-convert.c` (7.14; **add it to the Windows build
+configuration**) and one E step. **Parked, owner decision:** five `enhance-tone.c` splits take that file to 10.0
+(new files: level 8.79, stretch 9.38, equalize 9.92, clut 10.0, gray 10.0), but they need a Recipe S amendment
+(2ad9eb859) and a tool option (`split_source.py --copy-static`, 316ec54d6) that copy short shared static helpers
+verbatim into each new file, so the same three helpers and one typedef would exist in six files that must change
+together. CodeScene measures duplication within a file, so the copies are invisible to it. The agent's
+alternative: a `MagickCore/enhance-tone-private.h` with `static inline` helpers included by each file. On the
+local branch `w14-tone-splits`.
+
+## Lane b: fx.c chain parked
+
+Lane b took `fx.c` from 3.62 to 5.93 (58 commits, oracle clean), but most of it is an SD chain that splits
+`ExecuteRPN`'s operator switch into `ExecuteRpnPart01`..`ExecuteRpnPart32`, with case groupings chosen by a search
+for arrangements that CodeScene does not flag as clones (unrelated operators per helper, not adjacent source
+runs), and each operator dispatch now walks a chain of up to 32 nested calls in the `-fx` per-pixel interpreter.
+Parked on the local branch `w14-fx-annealed`, with a Recipe P amendment and later small steps built on it. **Owner
+decision:** rework along the code's own structure, or accept.
