@@ -781,6 +781,101 @@ static void ApplyWavePreview(const PreviewTile *tile,Image **preview_image,
 #define PreviewImageTag  "Preview/Image"
 #define DefaultPreviewGeometry  "204x204+10+10"
 
+typedef struct _PreviewTargets
+{
+  Image
+    **preview_image;
+
+  double
+    *degrees,
+    *gamma;
+
+  size_t
+    *colors;
+
+  QuantizeInfo
+    *quantize_info;
+} PreviewTargets;
+
+static void ApplyRollQuantizePreview(const PreviewTile *tile,
+  const PreviewTargets *targets)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const ssize_t
+    i = tile->i;
+
+  Image
+    **const preview_image = targets->preview_image;
+
+  double
+    *const degrees = targets->degrees,
+    *const gamma = targets->gamma;
+
+  size_t
+    *const colors = targets->colors;
+
+  QuantizeInfo
+    *const quantize_info = targets->quantize_info;
+
+  ssize_t
+    x = 0,
+    y = 0;
+
+  switch (preview)
+  {
+    case RollPreview:
+    {
+      x=((i+1)*(ssize_t) thumbnail->columns)/NumberTiles;
+      y=((i+1)*(ssize_t) thumbnail->rows)/NumberTiles;
+      (*preview_image)=RollImage(thumbnail,x,y,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"roll %+.20gx%+.20g",
+        (double) x,(double) y);
+      break;
+    }
+    default:
+    {
+      ApplyWavePreview(tile,&(*preview_image),&(*degrees),&(*gamma));
+      break;
+    }
+    case GrayscalePreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (*colors)<<=1;
+      (*quantize_info).number_colors=(*colors);
+      (*quantize_info).colorspace=GRAYColorspace;
+      (void) QuantizeImage(&(*quantize_info),(*preview_image),exception);
+      (void) FormatLocaleString(label,MagickPathExtent,
+        "-colorspace gray -colors %.17g",(double) (*colors));
+      break;
+    }
+    case QuantizePreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (*colors)<<=1;
+      (*quantize_info).number_colors=(*colors);
+      (void) QuantizeImage(&(*quantize_info),(*preview_image),exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"colors %.17g",
+        (double) (*colors));
+      break;
+    }
+  }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -821,9 +916,10 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     colors;
 
   ssize_t
-    i,
-    x = 0,
-    y = 0;
+    i;
+
+  const PreviewTargets
+    targets = { &preview_image, &degrees, &gamma, &colors, &quantize_info };
 
   /*
     Open output image file.
@@ -876,43 +972,9 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     tile.sigma=sigma;
     switch (preview)
     {
-      case RollPreview:
-      {
-        x=((i+1)*(ssize_t) thumbnail->columns)/NumberTiles;
-        y=((i+1)*(ssize_t) thumbnail->rows)/NumberTiles;
-        preview_image=RollImage(thumbnail,x,y,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"roll %+.20gx%+.20g",
-          (double) x,(double) y);
-        break;
-      }
       default:
       {
-        ApplyWavePreview(&tile,&preview_image,&degrees,&gamma);
-        break;
-      }
-      case GrayscalePreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        colors<<=1;
-        quantize_info.number_colors=colors;
-        quantize_info.colorspace=GRAYColorspace;
-        (void) QuantizeImage(&quantize_info,preview_image,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,
-          "-colorspace gray -colors %.17g",(double) colors);
-        break;
-      }
-      case QuantizePreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        colors<<=1;
-        quantize_info.number_colors=colors;
-        (void) QuantizeImage(&quantize_info,preview_image,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"colors %.17g",
-          (double) colors);
+        ApplyRollQuantizePreview(&tile,&targets);
         break;
       }
       case DespecklePreview:
