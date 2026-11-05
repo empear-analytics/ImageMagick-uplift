@@ -3394,17 +3394,10 @@ MagickExport Image *SpreadImage(const Image *image,
     const int
       id = GetOpenMPThreadId();
 
-    SpreadInfo
-      spread;
+    const SpreadInfo
+      spread = { image, spread_image, image_view, spread_view, exception,
+        method, width, y };
 
-    spread.image=image;
-    spread.spread_image=spread_image;
-    spread.image_view=image_view;
-    spread.spread_view=spread_view;
-    spread.exception=exception;
-    spread.method=method;
-    spread.width=width;
-    spread.y=y;
     if (SpreadHeadRow(&status,&spread,random_info[id]) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
