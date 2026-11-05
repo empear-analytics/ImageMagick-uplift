@@ -1079,6 +1079,13 @@ static ThresholdMap *AcquireThresholdMap(XMLTreeInfo *threshold,
   return(map);
 }
 
+static inline MagickBooleanType IsThresholdMapAttribute(const char *attribute,
+  const char *map_id)
+{
+  return(((attribute != (char *) NULL) &&
+    (LocaleCompare(map_id,attribute) == 0)) ? MagickTrue : MagickFalse);
+}
+
 static XMLTreeInfo *FindThresholdMap(XMLTreeInfo *thresholds,
   const char *map_id)
 {
@@ -1093,10 +1100,10 @@ static XMLTreeInfo *FindThresholdMap(XMLTreeInfo *thresholds,
        threshold=GetNextXMLTreeTag(threshold))
   {
     attribute=GetXMLTreeAttribute(threshold,"map");
-    if ((attribute != (char *) NULL) && (LocaleCompare(map_id,attribute) == 0))
+    if (IsThresholdMapAttribute(attribute,map_id) != MagickFalse)
       break;
     attribute=GetXMLTreeAttribute(threshold,"alias");
-    if ((attribute != (char *) NULL) && (LocaleCompare(map_id,attribute) == 0))
+    if (IsThresholdMapAttribute(attribute,map_id) != MagickFalse)
       break;
   }
   return(threshold);
