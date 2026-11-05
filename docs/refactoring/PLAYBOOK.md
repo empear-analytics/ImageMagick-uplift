@@ -5526,7 +5526,11 @@ outside every region, not a block inside one).
    parameters; that is the only change step 5 makes to the text.
 3. Inside the critical constructs nothing takes a lock or calls a function that could (no
    `omp_set_lock`, no `LockSemaphoreInfo`, no function that enters a critical of the same
-   name), as Recipe CB step 1 says. Check each callee by reading.
+   name), as Recipe CB step 1 says. Check each callee by reading. A callee of a
+   construct's statement that may take another lock (a pixel cache's `file_semaphore`,
+   which `SyncCacheViewAuthenticPixels` takes on a disk cache) is allowed, because the
+   construct moves whole and unchanged; a function that enters a critical of the same
+   name, or that takes `omp_set_lock` on a lock the caller holds, stays refused.
 4. A body variable the block writes and that nothing after it in the body reads (the row
    pointer `q`, advanced along the row) goes by value, Recipe E step 4; a body variable
    only the block uses (the column counter `x`) is declared in the new function and its
@@ -5610,6 +5614,10 @@ static void IndexGrayscaleRow(Image *image,ssize_t *colormap_index,
   lock and written back after it.
 - With OpenMP off the pragma is not compiled, and the helper is a plain function holding
   the same statements.
+- Under step 3's other locks the construct and its statement are unchanged and run
+  inside the same named critical, so a callee that takes a semaphore takes it while the
+  thread holds that critical, exactly as before: the move adds no lock, takes none in a
+  new order and nests none differently, which is what a new deadlock would need.
 - A `status` by pointer (step 2) is the shared flag itself, read and written at the same
   program points, in the same order, outside the lock as before (Recipe PS's argument);
   nothing is copied before a critical construct or written back after it, and no
@@ -5631,7 +5639,10 @@ helper. Step 2's `status` (2026-11-05, W14 lane c): `shear-rotate.c`'s
 `IntegralRotateImage`, whose 270-degree tile row loop holds the sync under
 `critical (MagickCore_IntegralRotateImage)` and sets `status` through its head and its
 sync test outside it; the plateau has recorded since W10 that the critical pinned the
-function. A probe of the whole chain: 7.63 to 10.00. Added by Claude Code (Claude Opus
+function. A probe of the whole chain: 7.63 to 10.00. Step 3's other locks (the same
+day): that critical governs `sync=SyncCacheViewAuthenticPixels(rotate_view,exception);`,
+which on a disk or distributed cache takes the cache's `file_semaphore` in
+`WritePixelCachePixels`. Added by Claude Code (Claude Opus
 5.5) under the mandate of 2026-10-24.
 
 ---
@@ -7078,3 +7089,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | PC | Step 1: the loop may also be a sequential loop nested in the parallel loop's iteration (a tile's row loop), the head the start of that loop's body and the tail the rest of it, kept because it holds a `#pragma omp critical` construct; the head's and the caller's `continue;` are that loop's own; the struct is declared in the parallel body and may be filled before the loop (Recipe N steps 7 and 8). Still five steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree tile row loop's body tests `status`, queues a row, copies it and syncs under a named critical; PS refuses the pragma and PC step 1 took only the parallel loop's own body. A probe of the whole chain: 7.63 to 10.00 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | HC | Step 2: outside the critical constructs the block may also read, test and assign the shared `status` (Recipe PS step 2's conditions), directly or through `&status` passed to a callee; it goes by pointer, last, `(*status)` at every use and `status` for `&status` (PS step 4), the only text change step 5 makes; inside the constructs `status` is not touched. *Careful* gives the argument. Still six steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree tile row loop holds the named critical sync and sets `status` through its head and sync test, which step 2 refused; a probe of the whole chain: 7.63 to 10.00 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | LB | Step 1: the body of a Recipe PS step 7 helper (the parallel loop's whole body, called once per iteration with the shared `status`'s address) counts as the parallel loop body for the parallel-loop-body form; a block in it passes `status` on and may take the helper's own `const Name *name` unchanged (Recipe N step 2's pass-through). *Careful* gives the argument. Still eight steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): `RotateTileRow270`'s tile loop body ends the tile loop through `break;` on a failed fetch; left in place it is reported as *Code Duplication* with the 90-degree helper (7.58 in a probe); as an LB helper the chain reaches 10.00 | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | HC | Step 3: a callee of a construct's statement that may take another lock (the pixel cache's `file_semaphore`, taken by `SyncCacheViewAuthenticPixels` on a disk cache) is allowed, since the construct moves whole and unchanged and the thread takes the same locks in the same order and nesting; a function entering a critical of the same name, or `omp_set_lock` on a lock the caller holds, stays refused. *Careful* gives the argument. Still six steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree critical governs the row sync, whose `WritePixelCachePixels` locks `file_semaphore` for disk and distributed caches; step 3 as written refused every such callee | mandate (2026-10-24) |
