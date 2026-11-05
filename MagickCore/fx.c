@@ -2606,6 +2606,86 @@ static void AddThirdArgAddressing (FxInfo * pfx, FunctionE fe, int ndx1)
   }
 }
 
+typedef struct _ArgumentAddressing
+{
+  FunctionE
+    fe;
+
+  const char
+    *funStr;
+
+  int
+    FndArgs,
+    ndx0;
+} ArgumentAddressing;
+
+typedef struct _ArgumentIndexes
+{
+  int
+    *ndx1,
+    *ndx2,
+    *ndx3;
+} ArgumentIndexes;
+
+static MagickBooleanType AddArgumentAddressing (
+  const ArgumentAddressing *addressing, FxInfo * pfx,
+  const ArgumentIndexes *targets)
+{
+  const FunctionE
+    fe = addressing->fe;
+
+  const char
+    *const funStr = addressing->funStr;
+
+  const int
+    FndArgs = addressing->FndArgs,
+    ndx0 = addressing->ndx0;
+
+  int
+    *const ndx1 = targets->ndx1,
+    *const ndx2 = targets->ndx2,
+    *const ndx3 = targets->ndx3;
+
+    switch (FndArgs) {
+      case 1:
+        if (*ndx1 != NULL_ADDRESS) {
+          (void) ThrowMagickException (
+            pfx->exception, GetMagickModule(), OptionError,
+            "For function", "'%s' required argument is missing at '%s'",
+            funStr, SetShortExp(pfx));
+          return MagickFalse;
+        }
+        *ndx1 = pfx->usedElements;
+        AddFirstArgAddressing (pfx, fe);
+        break;
+      case 2:
+        if (*ndx2 != NULL_ADDRESS) {
+          (void) ThrowMagickException (
+            pfx->exception, GetMagickModule(), OptionError,
+            "For function", "'%s' required argument is missing at '%s'",
+            funStr, SetShortExp(pfx));
+          return MagickFalse;
+        }
+        *ndx2 = pfx->usedElements;
+        AddSecondArgAddressing (pfx, fe, ndx0);
+        break;
+      case 3:
+        if (*ndx3 != NULL_ADDRESS) {
+          (void) ThrowMagickException (
+            pfx->exception, GetMagickModule(), OptionError,
+            "For function", "'%s' required argument is missing at '%s'",
+            funStr, SetShortExp(pfx));
+          return MagickFalse;
+        }
+        AddThirdArgAddressing (pfx, fe, *ndx1);
+        *ndx3 = pfx->usedElements;
+        break;
+      default:
+        break;
+    }
+  return MagickTrue;
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2652,6 +2732,8 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
   while (nArgs > 0) {
     int FndOne = 0;
+    ArgumentAddressing addressing;
+    const ArgumentIndexes indexes = { &ndx1, &ndx2, &ndx3 };
     if (TranslateStatementList (pfx, strLimit, &chLimit)) {
       FndOne = 1;
     } else if (!*pfx->pex) {
@@ -2679,43 +2761,12 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       FndArgs++;
       nArgs--;
     }
-    switch (FndArgs) {
-      case 1:
-        if (ndx1 != NULL_ADDRESS) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "For function", "'%s' required argument is missing at '%s'",
-            funStr, SetShortExp(pfx));
-          return MagickFalse;
-        }
-        ndx1 = pfx->usedElements;
-        AddFirstArgAddressing (pfx, fe);
-        break;
-      case 2:
-        if (ndx2 != NULL_ADDRESS) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "For function", "'%s' required argument is missing at '%s'",
-            funStr, SetShortExp(pfx));
-          return MagickFalse;
-        }
-        ndx2 = pfx->usedElements;
-        AddSecondArgAddressing (pfx, fe, ndx0);
-        break;
-      case 3:
-        if (ndx3 != NULL_ADDRESS) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "For function", "'%s' required argument is missing at '%s'",
-            funStr, SetShortExp(pfx));
-          return MagickFalse;
-        }
-        AddThirdArgAddressing (pfx, fe, ndx1);
-        ndx3 = pfx->usedElements;
-        break;
-      default:
-        break;
-    }
+    addressing.fe=fe;
+    addressing.funStr=funStr;
+    addressing.FndArgs=FndArgs;
+    addressing.ndx0=ndx0;
+    if (AddArgumentAddressing (&addressing, pfx, &indexes) == MagickFalse)
+      return MagickFalse;
     if (chLimit == expChLimit) {
       lenExp = (size_t) (pfx->pex - pExpStart - 1);
       break;
