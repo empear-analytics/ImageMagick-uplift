@@ -371,17 +371,10 @@ MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    AddNoiseRow
-      noise_row;
+    const AddNoiseRow
+      noise_row = { image, noise_image, image_view, noise_view, random_info,
+        noise_type, attenuate, exception };
 
-    noise_row.image=image;
-    noise_row.noise_image=noise_image;
-    noise_row.image_view=image_view;
-    noise_row.noise_view=noise_view;
-    noise_row.random_info=random_info;
-    noise_row.noise_type=noise_type;
-    noise_row.attenuate=attenuate;
-    noise_row.exception=exception;
     if (AddNoiseImageRow(&noise_row,y,&status) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
