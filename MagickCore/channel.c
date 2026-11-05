@@ -486,6 +486,14 @@ static MagickBooleanType AppendChannelCanvas(Image **destination_image,
   return(MagickTrue);
 }
 
+static void AdvanceSourceImage(const Image **source_image,const char **p,
+  char *token)
+{
+  if (GetNextImageInList((*source_image)) != (Image *) NULL)
+    (*source_image)=GetNextImageInList((*source_image));
+  (void) GetNextToken((*p),p,MagickPathExtent,token);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -564,9 +572,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
       }
       case '|':
       {
-        if (GetNextImageInList(source_image) != (Image *) NULL)
-          source_image=GetNextImageInList(source_image);
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
+        AdvanceSourceImage(&source_image,&p,token);
         break;
       }
       case ';':
