@@ -664,6 +664,32 @@ static void CountAreaHits(const ResampleFilter *resample_filter,
   }
 }
 
+static ssize_t CountResampleHits(const ResampleFilter *resample_filter,
+  const double u0,const double v0)
+{
+  ssize_t
+    hit;
+
+  hit = 0;
+  switch ( resample_filter->virtual_pixel ) {
+    case BackgroundVirtualPixelMethod:
+    case TransparentVirtualPixelMethod:
+    case BlackVirtualPixelMethod:
+    case GrayVirtualPixelMethod:
+    case WhiteVirtualPixelMethod:
+    case MaskVirtualPixelMethod:
+      CountImageHits(resample_filter,u0,v0,&hit);
+      break;
+
+    default:
+    {
+      CountAreaHits(resample_filter,u0,v0,&hit);
+      break;
+    }
+  }
+  return(hit);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -735,23 +761,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
     However it probably should be expanded to image bounds plus the filters
     scaled support size.
   */
-  hit = 0;
-  switch ( resample_filter->virtual_pixel ) {
-    case BackgroundVirtualPixelMethod:
-    case TransparentVirtualPixelMethod:
-    case BlackVirtualPixelMethod:
-    case GrayVirtualPixelMethod:
-    case WhiteVirtualPixelMethod:
-    case MaskVirtualPixelMethod:
-      CountImageHits(resample_filter,u0,v0,&hit);
-      break;
-
-    default:
-    {
-      CountAreaHits(resample_filter,u0,v0,&hit);
-      break;
-    }
-  }
+  hit = CountResampleHits(resample_filter,u0,v0);
   if ( hit ) {
     /* The area being resampled is simply a solid color
      * just return a single lookup color.
