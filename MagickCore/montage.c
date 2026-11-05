@@ -1065,6 +1065,21 @@ static size_t GetMontageTitleOffset(const MontageInfo *montage_info,
   return(title_offset);
 }
 
+static void InitializeMontageCanvas(const MontageInfo *montage_info,
+  RectangleInfo *bounds,Image *montage,ExceptionInfo *exception)
+{
+  if (montage_info->shadow != MagickFalse)
+    (*bounds).width+=4;
+  /*
+    Initialize montage image.
+  */
+  (void) CopyMagickString(montage->filename,montage_info->filename,
+    MagickPathExtent);
+  montage->columns=(size_t) MagickMax((ssize_t) (*bounds).width,1);
+  montage->rows=(size_t) MagickMax((ssize_t) (*bounds).height,1);
+  (void) SetImageBackgroundColor(montage,exception);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1261,16 +1276,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     bounds_info.extract_info=extract_info;
     bounds_info.metrics=metrics;
     GetMontageBounds(x_offset,y_offset,&bounds_info,&bounds);
-    if (montage_info->shadow != MagickFalse)
-      bounds.width+=4;
-    /*
-      Initialize montage image.
-    */
-    (void) CopyMagickString(montage->filename,montage_info->filename,
-      MagickPathExtent);
-    montage->columns=(size_t) MagickMax((ssize_t) bounds.width,1);
-    montage->rows=(size_t) MagickMax((ssize_t) bounds.height,1);
-    (void) SetImageBackgroundColor(montage,exception);
+    InitializeMontageCanvas(montage_info,&bounds,montage,exception);
     /*
       Set montage geometry.
     */
