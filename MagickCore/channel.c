@@ -460,6 +460,15 @@ static MagickBooleanType ApplyChannelOperation(const ChannelFxApply *apply,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireChannelCanvas(const Image *source_image,
+  Image **canvas,ExceptionInfo *exception)
+{
+  (*canvas)=CloneImage(source_image,0,0,MagickTrue,exception);
+  if ((*canvas) == (Image *) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -550,8 +559,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
 
         (void) SetPixelChannelMask(destination_image,channel_mask);
         SetGrayChannelImage(destination_image,channel_op,channels,exception);
-        canvas=CloneImage(source_image,0,0,MagickTrue,exception);
-        if (canvas == (Image *) NULL)
+        if (AcquireChannelCanvas(source_image,&canvas,exception) == MagickFalse)
           {
             destination_image=DestroyImageList(destination_image);
             return(destination_image);
