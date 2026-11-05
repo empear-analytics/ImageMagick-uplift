@@ -2419,6 +2419,23 @@ static inline double InverseScaledSigmoidal(const double a,const double b,
   InverseScaledSigmoidal(contrast,QuantumScale*midpoint,QuantumScale* \
   ((double) x))) )
 
+static void InverseSigmoidalColormapEntry(Image *image,const ssize_t i,
+  const double contrast,const double midpoint)
+{
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].red=(MagickRealType) InverseScaledSig(
+      image->colormap[i].red);
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].green=(MagickRealType) InverseScaledSig(
+      image->colormap[i].green);
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].blue=(MagickRealType) InverseScaledSig(
+      image->colormap[i].blue);
+  if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].alpha=(MagickRealType) InverseScaledSig(
+      image->colormap[i].alpha);
+}
+
 static void SigmoidalContrastColormap(Image *image,
   const MagickBooleanType sharpen,const double contrast,const double midpoint)
 {
@@ -2443,20 +2460,7 @@ static void SigmoidalContrastColormap(Image *image,
     }
   else
     for (i=0; i < (ssize_t) image->colors; i++)
-    {
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].red=(MagickRealType) InverseScaledSig(
-          image->colormap[i].red);
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].green=(MagickRealType) InverseScaledSig(
-          image->colormap[i].green);
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].blue=(MagickRealType) InverseScaledSig(
-          image->colormap[i].blue);
-      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].alpha=(MagickRealType) InverseScaledSig(
-          image->colormap[i].alpha);
-    }
+      InverseSigmoidalColormapEntry(image,i,contrast,midpoint);
 }
 
 static void SigmoidalContrastImageRow(const Image *image,
