@@ -1856,6 +1856,23 @@ static void PerceptiblePixel(const Image *image,const double epsilon,
   }
 }
 
+static void PerceptibleColormapEntry(const Image *image,const double epsilon,
+  PixelInfo *magick_restrict q)
+{
+  if ((GetPixelChannelTraits(image,RedPixelChannel) & UpdatePixelTrait) != 0)
+    q->red=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->red),
+      epsilon);
+  if ((GetPixelChannelTraits(image,GreenPixelChannel) & UpdatePixelTrait) != 0)
+    q->green=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->green),
+      epsilon);
+  if ((GetPixelChannelTraits(image,BluePixelChannel) & UpdatePixelTrait) != 0)
+    q->blue=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->blue),
+      epsilon);
+  if ((GetPixelChannelTraits(image,AlphaPixelChannel) & UpdatePixelTrait) != 0)
+    q->alpha=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->alpha),
+      epsilon);
+}
+
 static MagickBooleanType PerceptibleImageColormap(Image *image,
   const double epsilon,ExceptionInfo *exception)
 {
@@ -1868,18 +1885,7 @@ static MagickBooleanType PerceptibleImageColormap(Image *image,
   q=image->colormap;
   for (i=0; i < (ssize_t) image->colors; i++)
   {
-    if ((GetPixelChannelTraits(image,RedPixelChannel) & UpdatePixelTrait) != 0)
-      q->red=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->red),
-        epsilon);
-    if ((GetPixelChannelTraits(image,GreenPixelChannel) & UpdatePixelTrait) != 0)
-      q->green=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->green),
-        epsilon);
-    if ((GetPixelChannelTraits(image,BluePixelChannel) & UpdatePixelTrait) != 0)
-      q->blue=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->blue),
-        epsilon);
-    if ((GetPixelChannelTraits(image,AlphaPixelChannel) & UpdatePixelTrait) != 0)
-      q->alpha=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->alpha),
-        epsilon);
+    PerceptibleColormapEntry(image,epsilon,q);
     q++;
   }
   return(SyncImage(image,exception));
