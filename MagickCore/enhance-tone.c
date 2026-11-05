@@ -2738,6 +2738,75 @@ static inline MagickBooleanType IsGrayImageWithColorLevels(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _LevelColors
+{
+  Image
+    *image;
+
+  const PixelInfo
+    *black_color,
+    *white_color;
+
+  ExceptionInfo
+    *exception;
+} LevelColors;
+
+static MagickStatusType LevelColorsPass(const LevelColors *levels,
+  MagickStatusType status)
+{
+  const PixelInfo
+    *const black_color = levels->black_color,
+    *const white_color = levels->white_color;
+
+  ChannelType
+    channel_mask;
+
+  Image
+    *const image = levels->image;
+
+  ExceptionInfo
+    *const exception = levels->exception;
+
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    {
+      channel_mask=SetImageChannelMask(image,RedChannel);
+      status&=(MagickStatusType) LevelImage(image,black_color->red,
+        white_color->red,1.0,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+    }
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    {
+      channel_mask=SetImageChannelMask(image,GreenChannel);
+      status&=(MagickStatusType) LevelImage(image,black_color->green,
+        white_color->green,1.0,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+    }
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    {
+      channel_mask=SetImageChannelMask(image,BlueChannel);
+      status&=(MagickStatusType) LevelImage(image,black_color->blue,
+        white_color->blue,1.0,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+    }
+  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    {
+      channel_mask=SetImageChannelMask(image,BlackChannel);
+      status&=(MagickStatusType) LevelImage(image,black_color->black,
+        white_color->black,1.0,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+    }
+  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->alpha_trait != UndefinedPixelTrait))
+    {
+      channel_mask=SetImageChannelMask(image,AlphaChannel);
+      status&=(MagickStatusType) LevelImage(image,black_color->alpha,
+        white_color->alpha,1.0,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+    }
+  return(status);
+}
+
 MagickExport MagickBooleanType LevelImageColors(Image *image,
   const PixelInfo *black_color,const PixelInfo *white_color,
   const MagickBooleanType invert,ExceptionInfo *exception)
@@ -2760,43 +2829,14 @@ MagickExport MagickBooleanType LevelImageColors(Image *image,
   status=MagickTrue;
   if (invert == MagickFalse)
     {
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        {
-          channel_mask=SetImageChannelMask(image,RedChannel);
-          status&=(MagickStatusType) LevelImage(image,black_color->red,
-            white_color->red,1.0,exception);
-          (void) SetImageChannelMask(image,channel_mask);
-        }
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        {
-          channel_mask=SetImageChannelMask(image,GreenChannel);
-          status&=(MagickStatusType) LevelImage(image,black_color->green,
-            white_color->green,1.0,exception);
-          (void) SetImageChannelMask(image,channel_mask);
-        }
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        {
-          channel_mask=SetImageChannelMask(image,BlueChannel);
-          status&=(MagickStatusType) LevelImage(image,black_color->blue,
-            white_color->blue,1.0,exception);
-          (void) SetImageChannelMask(image,channel_mask);
-        }
-      if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-          (image->colorspace == CMYKColorspace))
-        {
-          channel_mask=SetImageChannelMask(image,BlackChannel);
-          status&=(MagickStatusType) LevelImage(image,black_color->black,
-            white_color->black,1.0,exception);
-          (void) SetImageChannelMask(image,channel_mask);
-        }
-      if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-          (image->alpha_trait != UndefinedPixelTrait))
-        {
-          channel_mask=SetImageChannelMask(image,AlphaChannel);
-          status&=(MagickStatusType) LevelImage(image,black_color->alpha,
-            white_color->alpha,1.0,exception);
-          (void) SetImageChannelMask(image,channel_mask);
-        }
+      LevelColors
+        levels;
+
+      levels.image=image;
+      levels.black_color=black_color;
+      levels.white_color=white_color;
+      levels.exception=exception;
+      status=LevelColorsPass(&levels,status);
     }
   else
     {
