@@ -618,6 +618,20 @@ static size_t CountWaveletLevels(const Image *image,size_t number_levels)
   return(number_levels);
 }
 
+static MagickBooleanType CloneWaveletImage(const Image *image,
+  Image **noise_image,ExceptionInfo *exception)
+{
+  *noise_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (*noise_image == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass(*noise_image,DirectClass,exception) == MagickFalse)
+    {
+      *noise_image=DestroyImage(*noise_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *WaveletDenoiseImage(const Image *image,
   const double threshold,const double softness,ExceptionInfo *exception)
 {
@@ -670,14 +684,8 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
          return(noise_image);
     }
 #endif
-  noise_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (noise_image == (Image *) NULL)
+  if (CloneWaveletImage(image,&noise_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(noise_image,DirectClass,exception) == MagickFalse)
-    {
-      noise_image=DestroyImage(noise_image);
-      return((Image *) NULL);
-    }
   if (AcquireMagickResource(WidthResource,4*image->columns) == MagickFalse)
     {
       noise_image=DestroyImage(noise_image);
