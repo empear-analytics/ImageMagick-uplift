@@ -2793,6 +2793,10 @@ typedef struct _BlurComposite
     *image,
     *source_image;
 
+  CacheView
+    *canvas_view,
+    *source_view;
+
   ResampleFilter
     *resample_filter;
 
@@ -2888,6 +2892,59 @@ static void BlurCompositeColumns(const BlurComposite *blur_composite,
     SetPixelViaPixelInfo(canvas_image,pixel,q);
     p+=(ptrdiff_t) GetPixelChannels(source_image);
     q+=(ptrdiff_t) GetPixelChannels(canvas_image);
+  }
+}
+
+static void BlurCompositeRows(const BlurComposite *blur_composite,
+  SegmentInfo *blur,PixelInfo *pixel)
+{
+  Image
+    *const canvas_image = blur_composite->canvas_image,
+    *const image = blur_composite->image,
+    *const source_image = blur_composite->source_image;
+
+  CacheView
+    *const canvas_view = blur_composite->canvas_view,
+    *const source_view = blur_composite->source_view;
+
+  const ssize_t
+    y_offset = blur_composite->y_offset;
+
+  ExceptionInfo
+    *const exception = blur_composite->exception;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) source_image->rows; y++)
+  {
+    MagickBooleanType
+      sync;
+
+    const Quantum
+      *magick_restrict p;
+
+    Quantum
+      *magick_restrict q;
+
+    BlurRow
+      row;
+
+    if (((y+y_offset) < 0) || ((y+y_offset) >= (ssize_t) image->rows))
+      continue;
+    p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
+      exception);
+    q=QueueCacheViewAuthenticPixels(canvas_view,0,y,canvas_image->columns,1,
+      exception);
+    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+      break;
+    row.y=y;
+    row.p=p;
+    row.q=q;
+    BlurCompositeColumns(blur_composite,&row,blur,pixel);
+    sync=SyncCacheViewAuthenticPixels(canvas_view,exception);
+    if (sync == MagickFalse)
+      break;
   }
 }
 
@@ -3188,40 +3245,13 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       blur_composite.canvas_image=canvas_image;
       blur_composite.image=image;
       blur_composite.source_image=source_image;
+      blur_composite.canvas_view=canvas_view;
+      blur_composite.source_view=source_view;
       blur_composite.resample_filter=resample_filter;
       blur_composite.x_offset=x_offset;
       blur_composite.y_offset=y_offset;
       blur_composite.exception=exception;
-      for (y=0; y < (ssize_t) source_image->rows; y++)
-      {
-        MagickBooleanType
-          sync;
-
-        const Quantum
-          *magick_restrict p;
-
-        Quantum
-          *magick_restrict q;
-
-        BlurRow
-          row;
-
-        if (((y+y_offset) < 0) || ((y+y_offset) >= (ssize_t) image->rows))
-          continue;
-        p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
-          exception);
-        q=QueueCacheViewAuthenticPixels(canvas_view,0,y,canvas_image->columns,1,
-          exception);
-        if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-          break;
-        row.y=y;
-        row.p=p;
-        row.q=q;
-        BlurCompositeColumns(&blur_composite,&row,&blur,&pixel);
-        sync=SyncCacheViewAuthenticPixels(canvas_view,exception);
-        if (sync == MagickFalse)
-          break;
-      }
+      BlurCompositeRows(&blur_composite,&blur,&pixel);
       resample_filter=DestroyResampleFilter(resample_filter);
       source_view=DestroyCacheView(source_view);
       canvas_view=DestroyCacheView(canvas_view);
