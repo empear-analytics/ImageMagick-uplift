@@ -419,6 +419,15 @@ static void ApplyBrightnessSpiffThresholdPreview(const PreviewTile *tile,
   }
 }
 
+static void SolarizePreviewTile(Image **preview_image,const double percentage,
+  char *label,ExceptionInfo *exception)
+{
+  (void) SolarizeImage((*preview_image),(double) QuantumRange*percentage/
+    100.0,exception);
+  (void) FormatLocaleString(label,MagickPathExtent,"solarize %g",
+    ((double) QuantumRange*percentage)/100.0);
+}
+
 static void ApplyDullSolarizeEdgePreview(const PreviewTile *tile,
   Image **preview_image,double *gamma)
 {
@@ -462,10 +471,7 @@ static void ApplyDullSolarizeEdgePreview(const PreviewTile *tile,
       (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
       if ((*preview_image) == (Image *) NULL)
         break;
-      (void) SolarizeImage((*preview_image),(double) QuantumRange*percentage/
-        100.0,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"solarize %g",
-        ((double) QuantumRange*percentage)/100.0);
+      SolarizePreviewTile(preview_image,percentage,label,exception);
       break;
     }
     case EdgeDetectPreview:
