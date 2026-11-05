@@ -809,9 +809,6 @@ static MagickBooleanType ClassifyImageLine(const ClassifyLine *line,
   return(MagickTrue);
 }
 
-static MagickBooleanType Classify(Image *image,short **extrema,
-  const ClassifySettings *settings,ExceptionInfo *exception)
-{
 #define SegmentImageTag  "Segment/Image"
 #define ThrowClassifyException(severity,tag,label) \
 {\
@@ -829,6 +826,9 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   ThrowBinaryException(severity,tag,label); \
 }
 
+static MagickBooleanType Classify(Image *image,short **extrema,
+  const ClassifySettings *settings,ExceptionInfo *exception)
+{
   const double
     cluster_threshold = settings->cluster_threshold,
     weighting_exponent = settings->weighting_exponent;
