@@ -282,12 +282,9 @@ static Quantum ApplyFunction(Quantum pixel,
 }
 
 static void ApplyFunctionToPixel(const Image *image,
-  const MagickFunction function,const size_t number_parameters,
-  const double *parameters,ExceptionInfo *exception,Quantum *magick_restrict q)
+  const FunctionArguments *arguments,ExceptionInfo *exception,
+  Quantum *magick_restrict q)
 {
-  const FunctionArguments
-    arguments = { function, number_parameters, parameters };
-
   ssize_t
     i;
 
@@ -297,7 +294,7 @@ static void ApplyFunctionToPixel(const Image *image,
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     if ((traits & UpdatePixelTrait) == 0)
       continue;
-    q[i]=ApplyFunction(q[i],&arguments,exception);
+    q[i]=ApplyFunction(q[i],arguments,exception);
   }
 }
 
@@ -306,6 +303,9 @@ MagickExport MagickBooleanType FunctionImage(Image *image,
   const double *parameters,ExceptionInfo *exception)
 {
 #define FunctionImageTag  "Function/Image "
+
+  const FunctionArguments
+    arguments = { function, number_parameters, parameters };
 
   CacheView
     *image_view;
@@ -357,8 +357,7 @@ MagickExport MagickBooleanType FunctionImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ApplyFunctionToPixel(image,function,number_parameters,parameters,exception,
-        q);
+      ApplyFunctionToPixel(image,&arguments,exception,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
