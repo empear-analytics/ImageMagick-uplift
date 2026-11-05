@@ -920,6 +920,97 @@ static MagickBooleanType ParseScaleRotateTranslateArguments(double *coeff,
   return(MagickTrue);
 }
 
+static double *ScaleRotateTranslateCoefficients(double *coeff,
+  DistortMethod *method,const CoefficientContext *context)
+{
+  const Image
+    *const image = context->image;
+
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
+  /* Scale, Rotate and Translate Distortion
+     An alternative Affine Distortion
+     Argument options, by number of arguments given:
+       7: x,y, sx,sy, a, nx,ny
+       6: x,y,   s,   a, nx,ny
+       5: x,y, sx,sy, a
+       4: x,y,   s,   a
+       3: x,y,        a
+       2:        s,   a
+       1:             a
+     Where actions are (in order of application)
+        x,y     'center' of transforms     (default = image center)
+        sx,sy   scale image by this amount (default = 1)
+        a       angle of rotation          (argument required)
+        nx,ny   move 'center' here         (default = x,y or no movement)
+     And convert to affine mapping coefficients
+
+     ScaleRotateTranslate Distortion Notes...
+       + Does not use a set of CPs in any normal way
+       + Will only work with a 2 number_valuesal Image Distortion
+       + Cannot be used for generating a sparse gradient (interpolation)
+  */
+  double
+    cosine, sine,
+    x,y,sx,sy,a,nx,ny;
+
+  const ScaleRotateTranslateTargets
+    targets = { &sx,&sy,&a,&nx,&ny };
+
+  /* set default center, and default scale */
+  x = nx = (double)(image->columns)/2.0 + (double)image->page.x;
+  y = ny = (double)(image->rows)/2.0    + (double)image->page.y;
+  sx = sy = 1.0;
+  switch ( number_arguments ) {
+  case 0:
+    coeff = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "InvalidArgument","%s : 'Needs at least 1 argument'",
+          CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    return((double *) NULL);
+  case 1:
+    a = arguments[0];
+    break;
+  case 2:
+    sx = sy = arguments[0];
+    a = arguments[1];
+    break;
+  default:
+    x = nx = arguments[0];
+    y = ny = arguments[1];
+    if (ParseScaleRotateTranslateArguments(coeff,method,context,&targets) ==
+        MagickFalse)
+      return((double *) NULL);
+    break;
+  }
+  /* Trap if sx or sy == 0 -- image is scaled out of existence! */
+  if ( fabs(sx) < MagickEpsilon || fabs(sy) < MagickEpsilon ) {
+    coeff = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "InvalidArgument","%s : 'Zero Scale Given'",
+          CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    return((double *) NULL);
+  }
+  /* Save the given arguments as an affine distortion */
+  a=DegreesToRadians(a); cosine=cos(a); sine=sin(a);
+
+  *method = AffineDistortion;
+  coeff[0]=cosine/sx;
+  coeff[1]=sine/sx;
+  coeff[2]=x-nx*coeff[0]-ny*coeff[1];
+  coeff[3]=(-sine)/sy;
+  coeff[4]=cosine/sy;
+  coeff[5]=y-nx*coeff[3]-ny*coeff[4];
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1084,82 +1175,7 @@ static double *GenerateCoefficients(const Image *image,
     case AffineProjectionDistortion:
       return(AffineProjectionCoefficients(coeff,method,&context));
     case ScaleRotateTranslateDistortion:
-    {
-      /* Scale, Rotate and Translate Distortion
-         An alternative Affine Distortion
-         Argument options, by number of arguments given:
-           7: x,y, sx,sy, a, nx,ny
-           6: x,y,   s,   a, nx,ny
-           5: x,y, sx,sy, a
-           4: x,y,   s,   a
-           3: x,y,        a
-           2:        s,   a
-           1:             a
-         Where actions are (in order of application)
-            x,y     'center' of transforms     (default = image center)
-            sx,sy   scale image by this amount (default = 1)
-            a       angle of rotation          (argument required)
-            nx,ny   move 'center' here         (default = x,y or no movement)
-         And convert to affine mapping coefficients
-
-         ScaleRotateTranslate Distortion Notes...
-           + Does not use a set of CPs in any normal way
-           + Will only work with a 2 number_valuesal Image Distortion
-           + Cannot be used for generating a sparse gradient (interpolation)
-      */
-      double
-        cosine, sine,
-        x,y,sx,sy,a,nx,ny;
-
-      const ScaleRotateTranslateTargets
-        targets = { &sx,&sy,&a,&nx,&ny };
-
-      /* set default center, and default scale */
-      x = nx = (double)(image->columns)/2.0 + (double)image->page.x;
-      y = ny = (double)(image->rows)/2.0    + (double)image->page.y;
-      sx = sy = 1.0;
-      switch ( number_arguments ) {
-      case 0:
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument","%s : 'Needs at least 1 argument'",
-              CommandOptionToMnemonic(MagickDistortOptions, *method) );
-        return((double *) NULL);
-      case 1:
-        a = arguments[0];
-        break;
-      case 2:
-        sx = sy = arguments[0];
-        a = arguments[1];
-        break;
-      default:
-        x = nx = arguments[0];
-        y = ny = arguments[1];
-        if (ParseScaleRotateTranslateArguments(coeff,method,&context,&targets) ==
-            MagickFalse)
-          return((double *) NULL);
-        break;
-      }
-      /* Trap if sx or sy == 0 -- image is scaled out of existence! */
-      if ( fabs(sx) < MagickEpsilon || fabs(sy) < MagickEpsilon ) {
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument","%s : 'Zero Scale Given'",
-              CommandOptionToMnemonic(MagickDistortOptions, *method) );
-        return((double *) NULL);
-      }
-      /* Save the given arguments as an affine distortion */
-      a=DegreesToRadians(a); cosine=cos(a); sine=sin(a);
-
-      *method = AffineDistortion;
-      coeff[0]=cosine/sx;
-      coeff[1]=sine/sx;
-      coeff[2]=x-nx*coeff[0]-ny*coeff[1];
-      coeff[3]=(-sine)/sy;
-      coeff[4]=cosine/sy;
-      coeff[5]=y-nx*coeff[3]-ny*coeff[4];
-      return(coeff);
-    }
+      return(ScaleRotateTranslateCoefficients(coeff,method,&context));
     case PerspectiveDistortion:
     { /*
          Perspective Distortion (a ratio of affine distortions)
