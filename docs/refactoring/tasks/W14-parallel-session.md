@@ -297,3 +297,12 @@ filled once before the loop, the form OC step 6 and LB step 4 use). **Temporary 
 `channel.c` from 6.93 to 6.06 with `--no-verify` as step 1 of a 22-step plan measured end to end (7.81 planned,
 8.06 reached), a larger dip than earlier ones. Upstream, not changed: `ChannelFxImage`'s `;` case and setup failure
 paths leak (`destination_image=GetLastImageInList(...)` then `return NULL`).
+
+## Lane b, seventh batch: effect-preview.c to 10.0, enhance-clahe.c 8.71 -> 9.68 (Opus, 19 commits)
+
+Amendment under the mandate, not yet ruled on: **Recipe SD step 8** (7e261e567): when the groups one step moves
+write five or six caller variables, the helper takes Z step 7's `const Targets *targets` after `tile`.
+**Review:** cf17c9d4c (`PreviewImage`'s tile loop, N) moves the two const structs of addresses with their
+initialisers into the helper, because every variable they point to moves too; E step 4 was cited, but no sentence
+covers this exactly. Upstream, not changed: the Threshold preview runs `BilevelImage` on the thumbnail after the
+tile has been cloned from it, so the tile shows the unthresholded image.
