@@ -1863,6 +1863,27 @@ static MagickBooleanType GetPolynomialCoefficientCount(const CoefficientContext 
   return(MagickTrue);
 }
 
+static void CountProjectionCoefficients(const DistortMethod *method,
+  size_t *number_coefficients)
+{
+  switch (*method) {
+    case PolarDistortion:
+    case DePolarDistortion:
+      *number_coefficients=8;
+      break;
+    case PerspectiveDistortion:
+    case PerspectiveProjectionDistortion:
+      *number_coefficients=9;
+      break;
+    case BarrelDistortion:
+    case BarrelInverseDistortion:
+      *number_coefficients=10;
+      break;
+    default:
+      perror("unknown method given"); /* just fail assertion */
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1962,20 +1983,11 @@ static double *GenerateCoefficients(const Image *image,
     case Cylinder2PlaneDistortion:
       number_coefficients=6;
       break;
-    case PolarDistortion:
-    case DePolarDistortion:
-      number_coefficients=8;
-      break;
-    case PerspectiveDistortion:
-    case PerspectiveProjectionDistortion:
-      number_coefficients=9;
-      break;
-    case BarrelDistortion:
-    case BarrelInverseDistortion:
-      number_coefficients=10;
-      break;
     default:
-      perror("unknown method given"); /* just fail assertion */
+    {
+      CountProjectionCoefficients(method,&number_coefficients);
+      break;
+    }
   }
 
   context.cp_x=cp_x;
