@@ -403,6 +403,15 @@ static MagickBooleanType TileFloodplaneView(const FloodfillTileView *view)
   return(status);
 }
 
+static void TileFloodplaneLine(const FloodfillTileView *view,
+  MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return;
+  if (TileFloodplaneView(view) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
   const ssize_t y_offset,const MagickBooleanType invert,
@@ -571,8 +580,6 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     /*
       Tile fill color onto floodplane.
     */
-    if (status == MagickFalse)
-      continue;
     view.image=image;
     view.floodplane_image=floodplane_image;
     view.floodplane_view=floodplane_view;
@@ -580,8 +587,7 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     view.draw_info=draw_info;
     view.y=y;
     view.exception=exception;
-    if (TileFloodplaneView(&view) == MagickFalse)
-      status=MagickFalse;
+    TileFloodplaneLine(&view,&status);
   }
   floodplane_view=DestroyCacheView(floodplane_view);
   image_view=DestroyCacheView(image_view);
