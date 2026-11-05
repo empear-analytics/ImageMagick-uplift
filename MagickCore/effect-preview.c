@@ -996,6 +996,16 @@ static MagickBooleanType AppendMiddlePreviewTile(const ssize_t i,
   return(MagickTrue);
 }
 
+static Image *AppendPreviewTile(Image *images,Image *preview_image,
+  char *label,ExceptionInfo *exception)
+{
+  preview_image->alpha_trait=UndefinedPixelTrait;
+  (void) DeleteImageProperty(preview_image,"label");
+  (void) SetImageProperty(preview_image,"label",label,exception);
+  AppendImageToList(&images,preview_image);
+  return(images);
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -1096,10 +1106,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     sigma+=0.25;
     if (preview_image == (Image *) NULL)
       break;
-    preview_image->alpha_trait=UndefinedPixelTrait;
-    (void) DeleteImageProperty(preview_image,"label");
-    (void) SetImageProperty(preview_image,"label",label,exception);
-    AppendImageToList(&images,preview_image);
+    images=AppendPreviewTile(images,preview_image,label,exception);
     proceed=SetImageProgress(image,PreviewImageTag,(MagickOffsetType) i,
       NumberTiles);
     if (proceed == MagickFalse)
