@@ -6773,6 +6773,88 @@ during task W14, under the mandate of 2026-10-24.
 
 ---
 
+## Recipe PD - Name a Parameter-or-Default Selection
+
+**Use when:** CodeScene reports *Complex Method* or *Overall Code Complexity*, and much of
+the complexity is one conditional expression of the shape
+`(n >= k) ? values[k-1] : d` that reads the k-th optional parameter or falls back to a
+default, repeated at many sites with different `k` and `d`, as `statistic-function.c`'s
+`ApplySinusoidFunction`, `ApplyArcsinFunction` and `ApplyArctanFunction` do: twelve sites,
+each counted as a decision, differing in the position and the default.
+
+**Not covered by:** Recipe NS, whose expression picks between two constants under a
+condition and takes one argument. Recipe SV, whose copies are statements differing in one
+value. Recipe D, which merges identical statements. Recipes E, O and SD, which move
+statements: the decision moves with them and the helper inherits it.
+
+**How:**
+
+1. Each site is the whole right-hand side of an assignment statement. `n` is a plain
+   identifier, `values` a plain identifier of pointer type, `k` an integer literal that
+   stands once as `k` and once as the literal `k-1` written out (`1` and `0`), and `d` a
+   literal of the element type; no call, assignment or increment appears in the site. At
+   least three sites in the file have this shape.
+2. Write one `static inline` function directly above the first function that holds a
+   site, taking `const size_t n`, `const double *values`, `const size_t k` and
+   `const double default_value` (the types of the site's `n`, the element type of
+   `values` and the literals' own type) and returning
+   `(n >= k) ? values[k-1] : default_value`.
+3. Replace each site's right-hand side by a call passing the site's `n`, `values`, `k`
+   and `d`. Check by script that every site becomes the helper's body with those
+   arguments substituted, and that no site was left or altered.
+4. Check by reading that each case helper that holds sites is reached by oracle cases
+   (`tools/oracle/casemap.py` on its caller) and that the case list names the option that
+   reaches each helper. The object code need not be byte-identical (the compiler may order
+   the branches of the inlined helper differently); the argument is *Careful*'s.
+5. All sites of one file go in one commit; the message gives the score of the first site
+   moved alone.
+
+**Before:**
+
+```c
+  frequency=(number_parameters >= 1) ? parameters[0] : 1.0;
+  phase=(number_parameters >= 2) ? parameters[1] : 0.0;
+```
+
+**After:**
+
+```c
+static inline double GetFunctionParameter(const size_t number_parameters,
+  const double *parameters,const size_t index,const double default_value)
+{
+  return((number_parameters >= index) ? parameters[index-1] : default_value);
+}
+...
+  frequency=GetFunctionParameter(number_parameters,parameters,1,1.0);
+  phase=GetFunctionParameter(number_parameters,parameters,2,0.0);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The arguments are evaluated once, as the site read them
+  once (identifiers and literals, no side effect); passing them converts nothing, because
+  each parameter has the type of its argument. The function evaluates the same comparison
+  and, only when it holds, reads the same element `values[k-1]`, so the element is never
+  read when `n < k`, as before. The literal `k` and the index `k-1` agree at every site
+  (step 1).
+- The helper is `static inline`, so the compiler inlines it; a probe on
+  `statistic-function.c` gave object code of the same size class with branches and
+  registers ordered differently (`tools/obj_identical.sh` prints `DIFFERENT`), which is
+  why the evidence is the oracle and not identity.
+- A site whose element index is not `k-1`, or whose default is a variable, is not this
+  recipe.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+one call per site) and steps 1 and 4 checked by reading.
+
+**Provenance:** 2026-11-05, from `statistic-function.c`'s three case helpers (campaign A,
+W14 lane d): twelve `(number_parameters >= k) ? parameters[k-1] : d` defaults, which the
+W10 and W13 plateau rows recorded as covered by no recipe; a probe: 9.09 to 9.68 beside
+the chain of helpers of `FunctionImage`. Added by Claude Code (Claude Sonnet 5.5) under
+the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -7046,3 +7128,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | HC | Extract Block Holding a Named Critical Region: a statement of a parallel loop body (a column loop) that holds whole named `#pragma omp critical (name)` constructs moves, constructs included and unchanged, into a `static void` helper called from that body alone; outside the constructs the block writes only body variables (Recipe O step 1's rule), inside them shared memory through the same pointers; no lock taken; checked by reading | `quantize.c`'s `SetGrayscaleImage` (campaign A, W14): the column loop of its colormap-building parallel loop holds a double-checked insert whose critical governs an unbraced `if` (outside CB step 1), the function's Deep, Nested Complexity (5); a probe 6.11 to 6.57 with no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | TW | *Use when*: the findings may stand on one function only, when the other copy is the whole body of an existing `static` helper, so that moving the reported copy alone would add a fifth parameter (the differing value) or a second helper of the same text (*Code Duplication*); the differing value counts among the five inputs, and the existing helper's body becomes step 5's fill and call, its name and parameters kept. Steps and *Careful* unchanged | `vision.c`'s `ConnectedComponentsImage` (campaign A, W14 lane b): its keep-colors loop is `RemoveObjectsByColor`'s body with `MagickFalse` for `MagickTrue`; a second helper switched *Code Duplication* on (7.16 to 6.77), one shared `MergeObjectsByColor` with a `merge` member measured 7.52 to 7.63, the function leaving *Bumpy Road Ahead*, no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | N | Step 1: an orphaned `#pragma omp atomic` construct (in no parallel region of the function, such as a sequential loop's `progress++`) may lie inside the block and moves whole and unchanged, its variable a parameter or local of the new function by the same name; *Careful* gives the binding argument (an orphaned construct binds at run time to the region enclosing the executing thread, the same from the helper called at the same point). Still eight steps | `feature.c`'s `CannyEdgeImage` (campaign A, W14 lane b): its hysteresis pass, a sequential row loop with an `omp atomic` progress increment, ends the function and holds its last bump; step 1 refused the pragma. A probe of the pass as an Image-returning helper: 7.50 to 7.65, the function leaving *Bumpy Road Ahead*, no finding on the helper. The same shape stands in `HoughLineImage`'s vote loop | mandate (2026-10-24) |
+| 2026-11-05 | NEW | PD | Name a Parameter-or-Default Selection: the whole right-hand side `(n >= k) ? values[k-1] : d` of an assignment, at three or more sites of one file, becomes a call of one `static inline` function taking `n`, `values`, `k` and `d`; oracle evidence (the object code is not byte-identical) | `statistic-function.c`'s three case helpers (campaign A, W14 lane d): twelve parameter defaults held *Overall Code Complexity*; a probe 9.09 to 9.68 | mandate (2026-10-24) |
