@@ -3192,6 +3192,86 @@ static MagickBooleanType AssignKmeansPixels(const KmeansPass *kmeans,
   return(status);
 }
 
+typedef struct _KmeansRefinement
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  KmeansInfo
+    **kmeans_pixels;
+
+  size_t
+    number_threads,
+    max_iterations;
+
+  double
+    tolerance;
+
+  ExceptionInfo
+    *exception;
+} KmeansRefinement;
+
+static MagickBooleanType RefineKmeansClusters(const KmeansRefinement *refine,
+  double previous_tolerance,MagickBooleanType status)
+{
+  Image
+    *const image = refine->image;
+
+  CacheView
+    *const image_view = refine->image_view;
+
+  KmeansInfo
+    **const kmeans_pixels = refine->kmeans_pixels;
+
+  const size_t
+    number_threads = refine->number_threads,
+    max_iterations = refine->max_iterations;
+
+  const double
+    tolerance = refine->tolerance;
+
+  ExceptionInfo
+    *const exception = refine->exception;
+
+  ssize_t
+    n;
+
+  for (n=0; n < (ssize_t) max_iterations; n++)
+  {
+    double
+      distortion;
+
+    KmeansPass
+      kmeans;
+
+    ClearKmeansPixels(image,kmeans_pixels,number_threads);
+    kmeans.image=image;
+    kmeans.image_view=image_view;
+    kmeans.kmeans_pixels=kmeans_pixels;
+    kmeans.exception=exception;
+    status=AssignKmeansPixels(&kmeans,status);
+    if (status == MagickFalse)
+      break;
+    /*
+      Reduce sums to [0] entry.
+    */
+    ReduceKmeansPixels(image,kmeans_pixels,number_threads);
+    /*
+      Calculate the new means (centroids) of the pixels in the new clusters.
+    */
+    distortion=UpdateKmeansCentroids(image,kmeans_pixels);
+    LogKmeansDistortion(image,n,distortion,previous_tolerance);
+    if (fabs(distortion-previous_tolerance) <= tolerance)
+      break;
+    previous_tolerance=distortion;
+    ReportKmeansProgress(image,n,max_iterations,&status);
+  }
+  return(status);
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -3208,15 +3288,15 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
   KmeansInfo
     **kmeans_pixels;
 
+  KmeansRefinement
+    refine;
+
   MagickBooleanType
     verbose,
     status;
 
   size_t
     number_threads;
-
-  ssize_t
-    n;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -3257,36 +3337,14 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
   verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
   number_threads=(size_t) GetMagickResourceLimit(ThreadResource);
   image_view=AcquireAuthenticCacheView(image,exception);
-  for (n=0; n < (ssize_t) max_iterations; n++)
-  {
-    double
-      distortion;
-
-    KmeansPass
-      kmeans;
-
-    ClearKmeansPixels(image,kmeans_pixels,number_threads);
-    kmeans.image=image;
-    kmeans.image_view=image_view;
-    kmeans.kmeans_pixels=kmeans_pixels;
-    kmeans.exception=exception;
-    status=AssignKmeansPixels(&kmeans,status);
-    if (status == MagickFalse)
-      break;
-    /*
-      Reduce sums to [0] entry.
-    */
-    ReduceKmeansPixels(image,kmeans_pixels,number_threads);
-    /*
-      Calculate the new means (centroids) of the pixels in the new clusters.
-    */
-    distortion=UpdateKmeansCentroids(image,kmeans_pixels);
-    LogKmeansDistortion(image,n,distortion,previous_tolerance);
-    if (fabs(distortion-previous_tolerance) <= tolerance)
-      break;
-    previous_tolerance=distortion;
-    ReportKmeansProgress(image,n,max_iterations,&status);
-  }
+  refine.image=image;
+  refine.image_view=image_view;
+  refine.kmeans_pixels=kmeans_pixels;
+  refine.number_threads=number_threads;
+  refine.max_iterations=max_iterations;
+  refine.tolerance=tolerance;
+  refine.exception=exception;
+  status=RefineKmeansClusters(&refine,previous_tolerance,status);
   image_view=DestroyCacheView(image_view);
   ReleaseKmeansClusters(image,verbose,kmeans_pixels,exception);
   return(FinishKmeansImage(image,max_iterations,status,exception));
