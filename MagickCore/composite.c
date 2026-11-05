@@ -2948,6 +2948,107 @@ static void BlurCompositeRows(const BlurComposite *blur_composite,
   }
 }
 
+typedef struct _DisplaceColumns
+{
+  Image
+    *canvas_image,
+    *image,
+    *source_image;
+
+  CacheView
+    *image_view;
+
+  PointInfo
+    center;
+
+  CompositeOperator
+    compose;
+
+  MagickRealType
+    horizontal_scale,
+    vertical_scale;
+
+  ssize_t
+    x_offset,
+    y;
+
+  ExceptionInfo
+    *exception;
+} DisplaceColumns;
+
+static MagickBooleanType DisplaceCompositeColumns(
+  const DisplaceColumns *columns,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q,PixelInfo *pixel)
+{
+  Image
+    *const canvas_image = columns->canvas_image,
+    *const image = columns->image,
+    *const source_image = columns->source_image;
+
+  CacheView
+    *const image_view = columns->image_view;
+
+  const PointInfo
+    center = columns->center;
+
+  const CompositeOperator
+    compose = columns->compose;
+
+  const MagickRealType
+    horizontal_scale = columns->horizontal_scale,
+    vertical_scale = columns->vertical_scale;
+
+  const ssize_t
+    x_offset = columns->x_offset,
+    y = columns->y;
+
+  ExceptionInfo
+    *const exception = columns->exception;
+
+  MagickBooleanType
+    status;
+
+  PointInfo
+    offset;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) source_image->columns; x++)
+  {
+    if (((x_offset+x) < 0) || ((x_offset+x) >= (ssize_t) image->columns))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(source_image);
+        continue;
+      }
+    /*
+      Displace the offset.
+    */
+    offset.x=(double) (horizontal_scale*((double) GetPixelRed(
+      source_image,p)-(((MagickRealType) QuantumRange+1.0)/2.0)))/
+      (((MagickRealType) QuantumRange+1.0)/2.0)+center.x+
+      ((compose == DisplaceCompositeOp) ? x : 0);
+    offset.y=(double) (vertical_scale*((double) GetPixelGreen(
+      source_image,p)-(((MagickRealType) QuantumRange+1.0)/2.0)))/
+      (((MagickRealType) QuantumRange+1.0)/2.0)+center.y+
+      ((compose == DisplaceCompositeOp) ? y : 0);
+    status=InterpolatePixelInfo(image,image_view,
+      UndefinedInterpolatePixel,(double) offset.x,(double) offset.y,
+      pixel,exception);
+    if (status == MagickFalse)
+      break;
+    /*
+      Mask with the 'invalid (*pixel) mask' in alpha channel.
+    */
+    (*pixel).alpha=(MagickRealType) QuantumRange*(QuantumScale*(*pixel).alpha)*
+      (QuantumScale*(double) GetPixelAlpha(source_image,p));
+    SetPixelViaPixelInfo(canvas_image,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(source_image);
+    q+=(ptrdiff_t) GetPixelChannels(canvas_image);
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3273,8 +3374,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         pixel;
 
       PointInfo
-        center,
-        offset;
+        center;
 
       DisplaceSetup
         displace;
@@ -3336,8 +3436,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
+        DisplaceColumns
+          columns;
 
         if (((y+y_offset) < 0) || ((y+y_offset) >= (ssize_t) image->rows))
           continue;
@@ -3347,39 +3447,18 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           exception);
         if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
           break;
-        for (x=0; x < (ssize_t) source_image->columns; x++)
-        {
-          if (((x_offset+x) < 0) || ((x_offset+x) >= (ssize_t) image->columns))
-            {
-              p+=(ptrdiff_t) GetPixelChannels(source_image);
-              continue;
-            }
-          /*
-            Displace the offset.
-          */
-          offset.x=(double) (horizontal_scale*((double) GetPixelRed(
-            source_image,p)-(((MagickRealType) QuantumRange+1.0)/2.0)))/
-            (((MagickRealType) QuantumRange+1.0)/2.0)+center.x+
-            ((compose == DisplaceCompositeOp) ? x : 0);
-          offset.y=(double) (vertical_scale*((double) GetPixelGreen(
-            source_image,p)-(((MagickRealType) QuantumRange+1.0)/2.0)))/
-            (((MagickRealType) QuantumRange+1.0)/2.0)+center.y+
-            ((compose == DisplaceCompositeOp) ? y : 0);
-          status=InterpolatePixelInfo(image,image_view,
-            UndefinedInterpolatePixel,(double) offset.x,(double) offset.y,
-            &pixel,exception);
-          if (status == MagickFalse)
-            break;
-          /*
-            Mask with the 'invalid pixel mask' in alpha channel.
-          */
-          pixel.alpha=(MagickRealType) QuantumRange*(QuantumScale*pixel.alpha)*
-            (QuantumScale*(double) GetPixelAlpha(source_image,p));
-          SetPixelViaPixelInfo(canvas_image,&pixel,q);
-          p+=(ptrdiff_t) GetPixelChannels(source_image);
-          q+=(ptrdiff_t) GetPixelChannels(canvas_image);
-        }
-        if (x < (ssize_t) source_image->columns)
+        columns.canvas_image=canvas_image;
+        columns.image=image;
+        columns.source_image=source_image;
+        columns.image_view=image_view;
+        columns.center=center;
+        columns.compose=compose;
+        columns.horizontal_scale=horizontal_scale;
+        columns.vertical_scale=vertical_scale;
+        columns.x_offset=x_offset;
+        columns.y=y;
+        columns.exception=exception;
+        if (DisplaceCompositeColumns(&columns,p,q,&pixel) == MagickFalse)
           break;
         sync=SyncCacheViewAuthenticPixels(canvas_view,exception);
         if (sync == MagickFalse)
