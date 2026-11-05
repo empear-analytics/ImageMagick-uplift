@@ -1402,6 +1402,25 @@ static MagickBooleanType MagnifyImageLine(const MagnifyLoop *loop,
   return(MagickTrue);
 }
 
+static void SetMagnifyProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static Image *MagnifyImageResult(Image *magnify_image,
+  const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    magnify_image=DestroyImage(magnify_image);
+  return(magnify_image);
+}
+
 MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
 {
 #define MagnifyImageTag  "Magnify/Image"
@@ -1478,22 +1497,15 @@ MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,MagnifyImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetMagnifyProgress(image,MagnifyImageTag,progress,&status);
       }
   }
   magnify_view=DestroyCacheView(magnify_view);
   image_view=DestroyCacheView(image_view);
   source_image=DestroyImage(source_image);
-  if (status == MagickFalse)
-    magnify_image=DestroyImage(magnify_image);
-  return(magnify_image);
+  return(MagnifyImageResult(magnify_image,status));
 }

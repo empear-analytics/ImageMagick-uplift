@@ -2115,18 +2115,14 @@ static void ReportInterpolativeProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
-MagickExport Image *InterpolativeResizeImage(const Image *image,
-  const size_t columns,const size_t rows,const PixelInterpolateMethod method,
-  ExceptionInfo *exception)
+static Image *InterpolateResizeRows(const Image *image,Image *resize_image,
+  const PixelInterpolateMethod method,ExceptionInfo *exception)
 {
 #define InterpolativeResizeImageTag  "Resize/Image"
 
   CacheView
     *image_view,
     *resize_view;
-
-  Image
-    *resize_image;
 
   MagickBooleanType
     status;
@@ -2140,24 +2136,6 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
   ssize_t
     y;
 
-  /*
-    Interpolatively resize image.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (IsResizeSizeZero(columns,rows) != MagickFalse)
-    ThrowImageException(ImageError,"NegativeOrZeroImageSize");
-  if (IsResizeSizeUnchanged(image,columns,rows) != MagickFalse)
-    return(CloneImage(image,0,0,MagickTrue,exception));
-  resize_image=CloneImage(image,columns,rows,MagickTrue,exception);
-  if (resize_image == (Image *) NULL)
-    return((Image *) NULL);
-  if (SetDirectClassOrDestroy(resize_image,exception) == MagickFalse)
-    return((Image *) NULL);
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
@@ -2186,6 +2164,34 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
       }
   }
   return(FinishInterpolativeResize(image_view,resize_view,resize_image,status));
+}
+
+MagickExport Image *InterpolativeResizeImage(const Image *image,
+  const size_t columns,const size_t rows,const PixelInterpolateMethod method,
+  ExceptionInfo *exception)
+{
+  Image
+    *resize_image;
+
+  /*
+    Interpolatively resize image.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (IsResizeSizeZero(columns,rows) != MagickFalse)
+    ThrowImageException(ImageError,"NegativeOrZeroImageSize");
+  if (IsResizeSizeUnchanged(image,columns,rows) != MagickFalse)
+    return(CloneImage(image,0,0,MagickTrue,exception));
+  resize_image=CloneImage(image,columns,rows,MagickTrue,exception);
+  if (resize_image == (Image *) NULL)
+    return((Image *) NULL);
+  if (SetDirectClassOrDestroy(resize_image,exception) == MagickFalse)
+    return((Image *) NULL);
+  return(InterpolateResizeRows(image,resize_image,method,exception));
 }
 #if defined(MAGICKCORE_LQR_DELEGATE)
 

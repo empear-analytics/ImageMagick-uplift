@@ -727,14 +727,115 @@ static void DespeckleChannel(const DespeckleChannelPass *despeckle,
   (*status)=ReportDespeckleProgress(image,i,(*status));
 }
 
-MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
+static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
 {
+  if (status == MagickFalse)
+    image=DestroyImage(image);
+  return(image);
+}
+
+typedef struct _DespeckleReduction
+{
+  const Image
+    *image;
+
+  Image
+    *despeckle_image;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    length;
+
+  const ssize_t
+    *X,
+    *Y;
+
+  MemoryInfo
+    *pixel_info,
+    *buffer_info;
+} DespeckleReduction;
+
+static Image *ReduceSpeckle(const DespeckleReduction *reduction)
+{
+  const Image
+    *const image = reduction->image;
+
+  Image
+    *const despeckle_image = reduction->despeckle_image;
+
+  ExceptionInfo
+    *const exception = reduction->exception;
+
+  const size_t
+    length = reduction->length;
+
+  const ssize_t
+    *const X = reduction->X,
+    *const Y = reduction->Y;
+
+  MemoryInfo
+    *pixel_info = reduction->pixel_info,
+    *buffer_info = reduction->buffer_info;
+
   CacheView
     *despeckle_view,
     *image_view;
 
   DespeckleChannelPass
     despeckle;
+
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict buffer,
+    *magick_restrict pixels;
+
+  ssize_t
+    i;
+
+  pixels=(Quantum *) GetVirtualMemoryBlob(pixel_info);
+  buffer=(Quantum *) GetVirtualMemoryBlob(buffer_info);
+  /*
+    Reduce speckle in the image.
+  */
+  status=MagickTrue;
+  image_view=AcquireVirtualCacheView(image,exception);
+  despeckle_view=AcquireAuthenticCacheView(despeckle_image,exception);
+  despeckle.image=image;
+  despeckle.despeckle_image=despeckle_image;
+  despeckle.image_view=image_view;
+  despeckle.despeckle_view=despeckle_view;
+  despeckle.exception=exception;
+  despeckle.buffer=buffer;
+  despeckle.pixels=pixels;
+  despeckle.length=length;
+  despeckle.X=X;
+  despeckle.Y=Y;
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    DespeckleChannel(&despeckle,i,&status);
+  }
+  despeckle_view=DestroyCacheView(despeckle_view);
+  image_view=DestroyCacheView(image_view);
+  buffer_info=RelinquishVirtualMemory(buffer_info);
+  pixel_info=RelinquishVirtualMemory(pixel_info);
+  despeckle_image->type=image->type;
+  return(ReleaseFailedImage(despeckle_image,status));
+}
+
+static inline MagickBooleanType IsDespeckleSizeOverflow(const Image *image)
+{
+  return(((image->columns > (MAGICK_SIZE_MAX-2)) ||
+    (image->rows > (MAGICK_SIZE_MAX-2))) ? MagickTrue : MagickFalse);
+}
+
+MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
+{
+  DespeckleReduction
+    reduction;
 
   Image
     *despeckle_image;
@@ -752,9 +853,6 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 
   size_t
     length;
-
-  ssize_t
-    i;
 
   static const ssize_t
     X[4] = {0, 1, 1,-1},
@@ -786,8 +884,7 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
   /*
     Allocate image buffer.
   */
-  if ((image->columns > (MAGICK_SIZE_MAX-2)) ||
-      (image->rows > (MAGICK_SIZE_MAX-2)))
+  if (IsDespeckleSizeOverflow(image) != MagickFalse)
     {
       despeckle_image=DestroyImage(despeckle_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
@@ -802,36 +899,15 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
       despeckle_image=DestroyImage(despeckle_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  pixels=(Quantum *) GetVirtualMemoryBlob(pixel_info);
-  buffer=(Quantum *) GetVirtualMemoryBlob(buffer_info);
-  /*
-    Reduce speckle in the image.
-  */
-  status=MagickTrue;
-  image_view=AcquireVirtualCacheView(image,exception);
-  despeckle_view=AcquireAuthenticCacheView(despeckle_image,exception);
-  despeckle.image=image;
-  despeckle.despeckle_image=despeckle_image;
-  despeckle.image_view=image_view;
-  despeckle.despeckle_view=despeckle_view;
-  despeckle.exception=exception;
-  despeckle.buffer=buffer;
-  despeckle.pixels=pixels;
-  despeckle.length=length;
-  despeckle.X=X;
-  despeckle.Y=Y;
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    DespeckleChannel(&despeckle,i,&status);
-  }
-  despeckle_view=DestroyCacheView(despeckle_view);
-  image_view=DestroyCacheView(image_view);
-  buffer_info=RelinquishVirtualMemory(buffer_info);
-  pixel_info=RelinquishVirtualMemory(pixel_info);
-  despeckle_image->type=image->type;
-  if (status == MagickFalse)
-    despeckle_image=DestroyImage(despeckle_image);
-  return(despeckle_image);
+  reduction.image=image;
+  reduction.despeckle_image=despeckle_image;
+  reduction.exception=exception;
+  reduction.length=length;
+  reduction.X=X;
+  reduction.Y=Y;
+  reduction.pixel_info=pixel_info;
+  reduction.buffer_info=buffer_info;
+  return(ReduceSpeckle(&reduction));
 }
 
 /*
@@ -1271,6 +1347,13 @@ static MagickBooleanType KuwaharaHeadRow(MagickBooleanType *status,
   return(MagickTrue);
 }
 
+static void SyncKuwaharaRow(MagickBooleanType *status,CacheView *kuwahara_view,
+  ExceptionInfo *exception)
+{
+  if (SyncCacheViewAuthenticPixels(kuwahara_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1329,20 +1412,13 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) gaussian_image->rows; y++)
   {
-    KuwaharaInfo
-      kuwahara;
+    const KuwaharaInfo
+      kuwahara = { gaussian_image, kuwahara_image, image_view, kuwahara_view,
+        exception, width, y };
 
-    kuwahara.gaussian_image=gaussian_image;
-    kuwahara.kuwahara_image=kuwahara_image;
-    kuwahara.image_view=image_view;
-    kuwahara.kuwahara_view=kuwahara_view;
-    kuwahara.exception=exception;
-    kuwahara.width=width;
-    kuwahara.y=y;
     if (KuwaharaHeadRow(&status,&kuwahara) == MagickFalse)
       continue;
-    if (SyncCacheViewAuthenticPixels(kuwahara_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncKuwaharaRow(&status,kuwahara_view,exception);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1355,9 +1431,7 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   kuwahara_view=DestroyCacheView(kuwahara_view);
   image_view=DestroyCacheView(image_view);
   gaussian_image=DestroyImage(gaussian_image);
-  if (status == MagickFalse)
-    kuwahara_image=DestroyImage(kuwahara_image);
-  return(kuwahara_image);
+  return(ReleaseFailedImage(kuwahara_image,status));
 }
 
 /*
@@ -1813,6 +1887,216 @@ static void RunLocalContrastRow(MagickBooleanType *status,
     (*status)=MagickFalse;
 }
 
+typedef struct _LocalContrastPasses
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view,
+    *contrast_view;
+
+  float
+    *interImage,
+    *scanline;
+
+  ssize_t
+    scanLineSize,
+    width;
+
+  double
+    totalWeight,
+    strength;
+
+  Image
+    *contrast_image;
+
+  ExceptionInfo
+    *exception;
+} LocalContrastPasses;
+
+static MagickBooleanType RunLocalContrastPasses(
+  const LocalContrastPasses *passes)
+{
+  const Image
+    *const image = passes->image;
+
+  CacheView
+    *const image_view = passes->image_view,
+    *const contrast_view = passes->contrast_view;
+
+  float
+    *const interImage = passes->interImage,
+    *const scanline = passes->scanline;
+
+  const ssize_t
+    scanLineSize = passes->scanLineSize,
+    width = passes->width;
+
+  const double
+    totalWeight = passes->totalWeight,
+    strength = passes->strength;
+
+  Image
+    *const contrast_image = passes->contrast_image;
+
+  ExceptionInfo
+    *const exception = passes->exception;
+
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  {
+    ssize_t
+      x;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+#pragma omp parallel for schedule(static) \
+    magick_number_threads(image,image,image->columns,1)
+#endif
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      const LocalContrastColumnPass
+        pass = { image, image_view, interImage, scanline, scanLineSize, width,
+          totalWeight, exception };
+
+      RunLocalContrastColumn(&status,&pass,x);
+    }
+  }
+  /*
+    Horizontal pass.
+  */
+  {
+    ssize_t
+      y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+#pragma omp parallel for schedule(static) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+    for (y=0; y < (ssize_t) image->rows; y++)
+    {
+      const LocalContrastRowPass
+        pass = { image, image_view, contrast_view, interImage, scanline,
+          scanLineSize, width, totalWeight, strength, contrast_image,
+          exception };
+
+      RunLocalContrastRow(&status,&pass,y);
+    }
+  }
+  return(status);
+}
+
+typedef struct _LocalContrastFilter
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view,
+    *contrast_view;
+
+  float
+    *scanline;
+
+  ssize_t
+    scanLineSize,
+    width;
+
+  double
+    strength;
+
+  Image
+    *contrast_image;
+
+  ExceptionInfo
+    *exception;
+
+  MemoryInfo
+    *scanline_info;
+} LocalContrastFilter;
+
+static Image *FilterLocalContrast(const LocalContrastFilter *filter)
+{
+  const Image
+    *const image = filter->image;
+
+  CacheView
+    *image_view = filter->image_view,
+    *contrast_view = filter->contrast_view;
+
+  float
+    *const scanline = filter->scanline;
+
+  const ssize_t
+    scanLineSize = filter->scanLineSize,
+    width = filter->width;
+
+  const double
+    strength = filter->strength;
+
+  Image
+    *contrast_image = filter->contrast_image;
+
+  ExceptionInfo
+    *const exception = filter->exception;
+
+  MemoryInfo
+    *scanline_info = filter->scanline_info;
+
+  double
+    totalWeight;
+
+  float
+    *interImage;
+
+  LocalContrastPasses
+    passes;
+
+  MagickBooleanType
+    status;
+
+  MemoryInfo
+    *interImage_info;
+
+  /*
+    Create intermediate buffer.
+  */
+  interImage_info=AcquireVirtualMemory(image->rows*(image->columns+(size_t)
+    (2*width)),sizeof(*interImage));
+  if (interImage_info == (MemoryInfo *) NULL)
+    {
+      scanline_info=RelinquishVirtualMemory(scanline_info);
+      contrast_view=DestroyCacheView(contrast_view);
+      image_view=DestroyCacheView(image_view);
+      contrast_image=DestroyImage(contrast_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  interImage=(float *) GetVirtualMemoryBlob(interImage_info);
+  totalWeight=(float) ((width+1)*(width+1));
+  /*
+    Vertical pass.
+  */
+  passes.image=image;
+  passes.image_view=image_view;
+  passes.contrast_view=contrast_view;
+  passes.interImage=interImage;
+  passes.scanline=scanline;
+  passes.scanLineSize=scanLineSize;
+  passes.width=width;
+  passes.totalWeight=totalWeight;
+  passes.strength=strength;
+  passes.contrast_image=contrast_image;
+  passes.exception=exception;
+  status=RunLocalContrastPasses(&passes);
+  scanline_info=RelinquishVirtualMemory(scanline_info);
+  interImage_info=RelinquishVirtualMemory(interImage_info);
+  contrast_view=DestroyCacheView(contrast_view);
+  image_view=DestroyCacheView(image_view);
+  return(ReleaseFailedImage(contrast_image,status));
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -1822,22 +2106,17 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
     *image_view,
     *contrast_view;
 
-  double
-    totalWeight;
-
   float
-    *interImage,
     *scanline;
 
   Image
     *contrast_image;
 
-  MagickBooleanType
-    status;
+  LocalContrastFilter
+    filter;
 
   MemoryInfo
-    *scanline_info,
-    *interImage_info;
+    *scanline_info;
 
   ssize_t
     scanLineSize,
@@ -1874,968 +2153,20 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
   scanline=(float *) GetVirtualMemoryBlob(scanline_info);
-  /*
-    Create intermediate buffer.
-  */
-  interImage_info=AcquireVirtualMemory(image->rows*(image->columns+(size_t)
-    (2*width)),sizeof(*interImage));
-  if (interImage_info == (MemoryInfo *) NULL)
-    {
-      scanline_info=RelinquishVirtualMemory(scanline_info);
-      contrast_view=DestroyCacheView(contrast_view);
-      image_view=DestroyCacheView(image_view);
-      contrast_image=DestroyImage(contrast_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  interImage=(float *) GetVirtualMemoryBlob(interImage_info);
-  totalWeight=(float) ((width+1)*(width+1));
-  /*
-    Vertical pass.
-  */
-  status=MagickTrue;
-  {
-    ssize_t
-      x;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-#pragma omp parallel for schedule(static) \
-    magick_number_threads(image,image,image->columns,1)
-#endif
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      LocalContrastColumnPass
-        pass;
-
-      pass.image=image;
-      pass.image_view=image_view;
-      pass.interImage=interImage;
-      pass.scanline=scanline;
-      pass.scanLineSize=scanLineSize;
-      pass.width=width;
-      pass.totalWeight=totalWeight;
-      pass.exception=exception;
-      RunLocalContrastColumn(&status,&pass,x);
-    }
-  }
-  /*
-    Horizontal pass.
-  */
-  {
-    ssize_t
-      y;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-#pragma omp parallel for schedule(static) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-    for (y=0; y < (ssize_t) image->rows; y++)
-    {
-      LocalContrastRowPass
-        pass;
-
-      pass.image=image;
-      pass.image_view=image_view;
-      pass.contrast_view=contrast_view;
-      pass.interImage=interImage;
-      pass.scanline=scanline;
-      pass.scanLineSize=scanLineSize;
-      pass.width=width;
-      pass.totalWeight=totalWeight;
-      pass.strength=strength;
-      pass.contrast_image=contrast_image;
-      pass.exception=exception;
-      RunLocalContrastRow(&status,&pass,y);
-    }
-  }
-  scanline_info=RelinquishVirtualMemory(scanline_info);
-  interImage_info=RelinquishVirtualMemory(interImage_info);
-  contrast_view=DestroyCacheView(contrast_view);
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    contrast_image=DestroyImage(contrast_image);
-  return(contrast_image);
+  filter.image=image;
+  filter.image_view=image_view;
+  filter.contrast_view=contrast_view;
+  filter.scanline=scanline;
+  filter.scanLineSize=scanLineSize;
+  filter.width=width;
+  filter.strength=strength;
+  filter.contrast_image=contrast_image;
+  filter.exception=exception;
+  filter.scanline_info=scanline_info;
+  return(FilterLocalContrast(&filter));
 }
 
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%     P r e v i e w I m a g e                                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  PreviewImage() tiles 9 thumbnails of the specified image with an image
-%  processing operation applied with varying parameters.  This may be helpful
-%  pin-pointing an appropriate parameter for a particular image processing
-%  operation.
-%
-%  The format of the PreviewImages method is:
-%
-%      Image *PreviewImages(const Image *image,const PreviewType preview,
-%        ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image: the image.
-%
-%    o preview: the image processing operation.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-static void FormatQualityLabel(char *label,const char *factor,
-  const Image *preview_image,const Image *thumbnail)
-{
-  if ((GetBlobSize(preview_image)/1024) >= 1024)
-    (void) FormatLocaleString(label,MagickPathExtent,"quality %s\n%gmb ",
-      factor,(double) ((MagickOffsetType) GetBlobSize(preview_image))/
-      1024.0/1024.0);
-  else
-    if (GetBlobSize(preview_image) >= 1024)
-      (void) FormatLocaleString(label,MagickPathExtent,
-        "quality %s\n%gkb ",factor,(double) ((MagickOffsetType)
-        GetBlobSize(preview_image))/1024.0);
-    else
-      (void) FormatLocaleString(label,MagickPathExtent,
-        "quality %s\n%.17gb ",factor,(double) ((MagickOffsetType)
-        GetBlobSize(thumbnail)));
-}
-
-static Image *WriteAndReadQualityPreview(ImageInfo *preview_info,
-  Image *preview_image,ExceptionInfo *exception)
-{
-  MagickBooleanType
-    status;
-
-  status=WriteImage(preview_info,preview_image,exception);
-  if (status != MagickFalse)
-    {
-      Image
-        *quality_image;
-
-      (void) CopyMagickString(preview_info->filename,
-        preview_image->filename,MagickPathExtent);
-      quality_image=ReadImage(preview_info,exception);
-      if (quality_image != (Image *) NULL)
-        {
-          preview_image=DestroyImage(preview_image);
-          preview_image=quality_image;
-        }
-    }
-  return(preview_image);
-}
-
-static Image *DespeckleThumbnail(Image *thumbnail,const ssize_t i,
-  ExceptionInfo *exception)
-{
-  Image
-    *preview_image;
-
-  ssize_t
-    x;
-
-  for (x=0; x < (i-1); x++)
-  {
-    preview_image=DespeckleImage(thumbnail,exception);
-    if (preview_image == (Image *) NULL)
-      break;
-    thumbnail=DestroyImage(thumbnail);
-    thumbnail=preview_image;
-  }
-  return(thumbnail);
-}
-
-static void SharpenContrastRepeatedly(Image *preview_image,const ssize_t i,
-  ExceptionInfo *exception)
-{
-  ssize_t
-    x;
-
-  for (x=0; x < i; x++)
-    (void) ContrastImage(preview_image,MagickTrue,exception);
-}
-
-static void SelectNoiseFactor(const ssize_t i,Image *thumbnail,char *factor)
-{
-  switch ((int) i)
-  {
-    case 0:
-    {
-      (void) CopyMagickString(factor,"uniform",MagickPathExtent);
-      break;
-    }
-    case 1:
-    {
-      (void) CopyMagickString(factor,"gaussian",MagickPathExtent);
-      break;
-    }
-    case 2:
-    {
-      (void) CopyMagickString(factor,"multiplicative",MagickPathExtent);
-      break;
-    }
-    case 3:
-    {
-      (void) CopyMagickString(factor,"impulse",MagickPathExtent);
-      break;
-    }
-    case 5:
-    {
-      (void) CopyMagickString(factor,"laplacian",MagickPathExtent);
-      break;
-    }
-    case 6:
-    {
-      (void) CopyMagickString(factor,"Poisson",MagickPathExtent);
-      break;
-    }
-    default:
-    {
-      (void) CopyMagickString(thumbnail->magick,"NULL",MagickPathExtent);
-      break;
-    }
-  }
-}
-
-static void RelinquishMontageDirectory(const Image *image,
-  Image *montage_image)
-{
-  if (montage_image->montage != (char *) NULL)
-    {
-      /*
-        Free image directory.
-      */
-      montage_image->montage=(char *) RelinquishMagickMemory(
-        montage_image->montage);
-      if (image->directory != (char *) NULL)
-        montage_image->directory=(char *) RelinquishMagickMemory(
-          montage_image->directory);
-    }
-}
-
-typedef struct _PreviewTile
-{
-  const Image
-    *image;
-
-  Image
-    *thumbnail;
-
-  ExceptionInfo
-    *exception;
-
-  char
-    *factor;
-
-  char
-    *label;
-
-  ImageInfo
-    *preview_info;
-
-  PreviewType
-    preview;
-
-  ssize_t
-    i;
-
-  double
-    percentage;
-
-  double
-    radius;
-
-  double
-    sigma;
-} PreviewTile;
-
-static void ApplyGammaHueSaturationPreview(const PreviewTile *tile,
-  Image **preview_image,double *gamma)
-{
-  Image
-    *const thumbnail = tile->thumbnail;
-
-  ExceptionInfo
-    *const exception = tile->exception;
-
-  char
-    *const factor = tile->factor,
-    *const label = tile->label;
-
-  const PreviewType
-    preview = tile->preview;
-
-  const double
-    percentage = tile->percentage;
-
-  switch (preview)
-  {
-    case GammaPreview:
-    default:
-    {
-      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
-      if ((*preview_image) == (Image *) NULL)
-        break;
-      (*gamma)+=0.4;
-      (void) GammaImage((*preview_image),(*gamma),exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"gamma %g",(*gamma));
-      break;
-    }
-    case HuePreview:
-    {
-      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
-      if ((*preview_image) == (Image *) NULL)
-        break;
-      (void) FormatLocaleString(factor,MagickPathExtent,"100,100,%g",2.0*
-        percentage);
-      (void) ModulateImage((*preview_image),factor,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
-      break;
-    }
-    case SaturationPreview:
-    {
-      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
-      if ((*preview_image) == (Image *) NULL)
-        break;
-      (void) FormatLocaleString(factor,MagickPathExtent,"100,%g",2.0*
-        percentage);
-      (void) ModulateImage((*preview_image),factor,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
-      break;
-    }
-  }
-}
-
-static void ApplyBrightnessSpiffThresholdPreview(const PreviewTile *tile,
-  Image **preview_image,double *gamma)
-{
-  Image
-    *const thumbnail = tile->thumbnail;
-
-  ExceptionInfo
-    *const exception = tile->exception;
-
-  char
-    *const factor = tile->factor,
-    *const label = tile->label;
-
-  const PreviewType
-    preview = tile->preview;
-
-  const ssize_t
-    i = tile->i;
-
-  const double
-    percentage = tile->percentage;
-
-  switch (preview)
-  {
-    case BrightnessPreview:
-    {
-      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
-      if ((*preview_image) == (Image *) NULL)
-        break;
-      (void) FormatLocaleString(factor,MagickPathExtent,"%g",2.0*percentage);
-      (void) ModulateImage((*preview_image),factor,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
-      break;
-    }
-    case SpiffPreview:
-    {
-      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
-      if ((*preview_image) != (Image *) NULL)
-        SharpenContrastRepeatedly((*preview_image),i,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"contrast (%.17g)",
-        (double) i+1);
-      break;
-    }
-    case ThresholdPreview:
-    {
-      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
-      if ((*preview_image) == (Image *) NULL)
-        break;
-      (void) BilevelImage(thumbnail,(double) (percentage*((double)
-        QuantumRange+1.0))/100.0,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"threshold %g",
-        (double) (percentage*((double) QuantumRange+1.0))/100.0);
-      break;
-    }
-    default:
-    {
-      ApplyGammaHueSaturationPreview(tile,&(*preview_image),&(*gamma));
-      break;
-    }
-  }
-}
-
-static void ApplyDullSolarizeEdgePreview(const PreviewTile *tile,
-  Image **preview_image,double *gamma)
-{
-  Image
-    *const thumbnail = tile->thumbnail;
-
-  ExceptionInfo
-    *const exception = tile->exception;
-
-  char
-    *const label = tile->label;
-
-  const PreviewType
-    preview = tile->preview;
-
-  const ssize_t
-    i = tile->i;
-
-  const double
-    percentage = tile->percentage,
-    radius = tile->radius;
-
-  ssize_t
-    x;
-
-  switch (preview)
-  {
-    case DullPreview:
-    {
-      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
-      if ((*preview_image) == (Image *) NULL)
-        break;
-      for (x=0; x < i; x++)
-        (void) ContrastImage((*preview_image),MagickFalse,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"+contrast (%.17g)",
-        (double) i+1);
-      break;
-    }
-    case SolarizePreview:
-    {
-      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
-      if ((*preview_image) == (Image *) NULL)
-        break;
-      (void) SolarizeImage((*preview_image),(double) QuantumRange*percentage/
-        100.0,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"solarize %g",
-        ((double) QuantumRange*percentage)/100.0);
-      break;
-    }
-    case EdgeDetectPreview:
-    {
-      (*preview_image)=EdgeImage(thumbnail,radius,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"edge %g",radius);
-      break;
-    }
-    default:
-    {
-      ApplyBrightnessSpiffThresholdPreview(tile,&(*preview_image),&(*gamma));
-      break;
-    }
-  }
-}
-
-static void ApplyRaiseJpegPreview(const PreviewTile *tile,Image **preview_image,
-  double *gamma)
-{
-  Image
-    *const thumbnail = tile->thumbnail;
-
-  ExceptionInfo
-    *const exception = tile->exception;
-
-  char
-    *const factor = tile->factor,
-    *const label = tile->label;
-
-  ImageInfo
-    *const preview_info = tile->preview_info;
-
-  const PreviewType
-    preview = tile->preview;
-
-  const ssize_t
-    i = tile->i;
-
-  const double
-    percentage = tile->percentage;
-
-  switch (preview)
-  {
-    case RaisePreview:
-    {
-      RectangleInfo
-        raise;
-
-      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
-      if ((*preview_image) == (Image *) NULL)
-        break;
-      raise.width=(size_t) (2*i+2);
-      raise.height=(size_t) (2*i+2);
-      raise.x=(i-1)/2;
-      raise.y=(i-1)/2;
-      (void) RaiseImage((*preview_image),&raise,MagickTrue,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,
-        "raise %.17gx%.17g%+.20g%+.20g",(double) raise.width,(double)
-        raise.height,(double) raise.x,(double) raise.y);
-      break;
-    }
-    case JPEGPreview:
-    {
-      char
-        filename[MagickPathExtent];
-
-      int
-        file;
-
-      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
-      if ((*preview_image) == (Image *) NULL)
-        break;
-      preview_info->quality=(size_t) percentage;
-      (void) FormatLocaleString(factor,MagickPathExtent,"%.17g",(double)
-        preview_info->quality);
-      file=AcquireUniqueFileResource(filename);
-      if (file != -1)
-        file=close_utf8(file)-1;
-      (void) FormatLocaleString((*preview_image)->filename,MagickPathExtent,
-        "jpeg:%s",filename);
-      (*preview_image)=WriteAndReadQualityPreview(preview_info,(*preview_image),
-        exception);
-      (void) RelinquishUniqueFileResource((*preview_image)->filename);
-      FormatQualityLabel(label,factor,(*preview_image),thumbnail);
-      break;
-    }
-    default:
-    {
-      ApplyDullSolarizeEdgePreview(tile,&(*preview_image),&(*gamma));
-      break;
-    }
-  }
-}
-
-static void ApplyOilPaintNoiseSharpenBlurPreview(const PreviewTile *tile,
-  Image **preview_image,double *gamma)
-{
-  Image
-    *const thumbnail = tile->thumbnail;
-
-  ExceptionInfo
-    *const exception = tile->exception;
-
-  char
-    *const factor = tile->factor,
-    *const label = tile->label;
-
-  const PreviewType
-    preview = tile->preview;
-
-  const ssize_t
-    i = tile->i;
-
-  const double
-    radius = tile->radius,
-    sigma = tile->sigma;
-
-  switch (preview)
-  {
-    case OilPaintPreview:
-    {
-      (*preview_image)=OilPaintImage(thumbnail,(double) radius,(double) sigma,
-        exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"charcoal %gx%g",
-        radius,sigma);
-      break;
-    }
-    case ReduceNoisePreview:
-    {
-      (*preview_image)=StatisticImage(thumbnail,NonpeakStatistic,(size_t)
-        radius,(size_t) radius,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"noise %g",radius);
-      break;
-    }
-    case AddNoisePreview:
-    {
-      SelectNoiseFactor(i,thumbnail,factor);
-      (*preview_image)=StatisticImage(thumbnail,NonpeakStatistic,(size_t) i,
-        (size_t) i,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"+noise %s",factor);
-      break;
-    }
-    case SharpenPreview:
-    {
-      (*preview_image)=SharpenImage(thumbnail,radius,sigma,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"sharpen %gx%g",
-        radius,sigma);
-      break;
-    }
-    case BlurPreview:
-    {
-      (*preview_image)=BlurImage(thumbnail,radius,sigma,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"blur %gx%g",radius,
-        sigma);
-      break;
-    }
-    default:
-    {
-      ApplyRaiseJpegPreview(tile,&(*preview_image),&(*gamma));
-      break;
-    }
-  }
-}
-
-static void ApplySpreadCharcoalPreview(const PreviewTile *tile,
-  Image **preview_image,double *gamma)
-{
-  const Image
-    *const image = tile->image;
-
-  Image
-    *const thumbnail = tile->thumbnail;
-
-  ExceptionInfo
-    *const exception = tile->exception;
-
-  char
-    *const label = tile->label;
-
-  const PreviewType
-    preview = tile->preview;
-
-  const double
-    radius = tile->radius,
-    sigma = tile->sigma;
-
-  switch (preview)
-  {
-    case SpreadPreview:
-    {
-      (*preview_image)=SpreadImage(thumbnail,image->interpolate,radius,
-        exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"spread %g",
-        radius+0.5);
-      break;
-    }
-    case CharcoalDrawingPreview:
-    {
-      (*preview_image)=CharcoalImage(thumbnail,(double) radius,(double) sigma,
-        exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"charcoal %gx%g",
-        radius,sigma);
-      break;
-    }
-    default:
-    {
-      ApplyOilPaintNoiseSharpenBlurPreview(tile,&(*preview_image),&(*gamma));
-      break;
-    }
-  }
-}
-
-static void ApplyAnglePreview(const PreviewTile *tile,Image **preview_image,
-  double *degrees,double *gamma)
-{
-  const Image
-    *const image = tile->image;
-
-  Image
-    *const thumbnail = tile->thumbnail;
-
-  ExceptionInfo
-    *const exception = tile->exception;
-
-  char
-    *const label = tile->label;
-
-  const PreviewType
-    preview = tile->preview;
-
-  switch (preview)
-  {
-    case RotatePreview:
-    {
-      (*degrees)+=45.0;
-      (*preview_image)=RotateImage(thumbnail,(*degrees),exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"rotate %g",(*degrees));
-      break;
-    }
-    case ShearPreview:
-    {
-      (*degrees)+=5.0;
-      (*preview_image)=ShearImage(thumbnail,(*degrees),(*degrees),exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"shear %gx%g",(*degrees),
-        2.0*(*degrees));
-      break;
-    }
-    case ShadePreview:
-    {
-      (*degrees)+=10.0;
-      (*preview_image)=ShadeImage(thumbnail,MagickTrue,(*degrees),(*degrees),
-        exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"shade %gx%g",(*degrees),
-        (*degrees));
-      break;
-    }
-    case SwirlPreview:
-    {
-      (*preview_image)=SwirlImage(thumbnail,(*degrees),image->interpolate,
-        exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"swirl %g",(*degrees));
-      (*degrees)+=45.0;
-      break;
-    }
-    case ImplodePreview:
-    {
-      (*degrees)+=0.1;
-      (*preview_image)=ImplodeImage(thumbnail,(*degrees),image->interpolate,
-        exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"implode %g",(*degrees));
-      break;
-    }
-    default:
-    {
-      ApplySpreadCharcoalPreview(tile,&(*preview_image),&(*gamma));
-      break;
-    }
-  }
-}
-
-static void ApplyWavePreview(const PreviewTile *tile,Image **preview_image,
-  double *degrees,double *gamma)
-{
-  const Image
-    *const image = tile->image;
-
-  Image
-    *const thumbnail = tile->thumbnail;
-
-  ExceptionInfo
-    *const exception = tile->exception;
-
-  char
-    *const label = tile->label;
-
-  const PreviewType
-    preview = tile->preview;
-
-  switch (preview)
-  {
-    case WavePreview:
-    {
-      (*degrees)+=5.0;
-      (*preview_image)=WaveImage(thumbnail,0.5*(*degrees),2.0*(*degrees),
-        image->interpolate,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"wave %gx%g",0.5*
-        (*degrees),2.0*(*degrees));
-      break;
-    }
-    default:
-    {
-      ApplyAnglePreview(tile,&(*preview_image),&(*degrees),&(*gamma));
-      break;
-    }
-  }
-}
-
-MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
-  ExceptionInfo *exception)
-{
-#define NumberTiles  9
-#define PreviewImageTag  "Preview/Image"
-#define DefaultPreviewGeometry  "204x204+10+10"
-
-  char
-    factor[MagickPathExtent],
-    label[MagickPathExtent];
-
-  double
-    degrees,
-    gamma,
-    percentage,
-    radius,
-    sigma,
-    threshold;
-
-  Image
-    *images,
-    *montage_image,
-    *preview_image,
-    *thumbnail;
-
-  ImageInfo
-    *preview_info;
-
-  MagickBooleanType
-    proceed;
-
-  MontageInfo
-    *montage_info;
-
-  QuantizeInfo
-    quantize_info;
-
-  RectangleInfo
-    geometry;
-
-  size_t
-    colors;
-
-  ssize_t
-    i,
-    x = 0,
-    y = 0;
-
-  /*
-    Open output image file.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  colors=2;
-  degrees=0.0;
-  gamma=(-0.2f);
-  preview_info=AcquireImageInfo();
-  SetGeometry(image,&geometry);
-  (void) ParseMetaGeometry(DefaultPreviewGeometry,&geometry.x,&geometry.y,
-    &geometry.width,&geometry.height);
-  images=NewImageList();
-  percentage=12.5;
-  GetQuantizeInfo(&quantize_info);
-  radius=0.0;
-  sigma=1.0;
-  threshold=0.0;
-  for (i=0; i < NumberTiles; i++)
-  {
-    PreviewTile
-      tile;
-
-    thumbnail=ThumbnailImage(image,geometry.width,geometry.height,exception);
-    if (thumbnail == (Image *) NULL)
-      break;
-    (void) SetImageProgressMonitor(thumbnail,(MagickProgressMonitor) NULL,
-      (void *) NULL);
-    (void) SetImageProperty(thumbnail,"label",DefaultTileLabel,exception);
-    if (i == (NumberTiles/2))
-      {
-        (void) QueryColorCompliance("#dfdfdf",AllCompliance,
-          &thumbnail->matte_color,exception);
-        AppendImageToList(&images,thumbnail);
-        continue;
-      }
-    tile.image=image;
-    tile.thumbnail=thumbnail;
-    tile.exception=exception;
-    tile.factor=factor;
-    tile.label=label;
-    tile.preview_info=preview_info;
-    tile.preview=preview;
-    tile.i=i;
-    tile.percentage=percentage;
-    tile.radius=radius;
-    tile.sigma=sigma;
-    switch (preview)
-    {
-      case RollPreview:
-      {
-        x=((i+1)*(ssize_t) thumbnail->columns)/NumberTiles;
-        y=((i+1)*(ssize_t) thumbnail->rows)/NumberTiles;
-        preview_image=RollImage(thumbnail,x,y,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"roll %+.20gx%+.20g",
-          (double) x,(double) y);
-        break;
-      }
-      default:
-      {
-        ApplyWavePreview(&tile,&preview_image,&degrees,&gamma);
-        break;
-      }
-      case GrayscalePreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        colors<<=1;
-        quantize_info.number_colors=colors;
-        quantize_info.colorspace=GRAYColorspace;
-        (void) QuantizeImage(&quantize_info,preview_image,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,
-          "-colorspace gray -colors %.17g",(double) colors);
-        break;
-      }
-      case QuantizePreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        colors<<=1;
-        quantize_info.number_colors=colors;
-        (void) QuantizeImage(&quantize_info,preview_image,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"colors %.17g",
-          (double) colors);
-        break;
-      }
-      case DespecklePreview:
-      {
-        thumbnail=DespeckleThumbnail(thumbnail,i,exception);
-        preview_image=DespeckleImage(thumbnail,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) FormatLocaleString(label,MagickPathExtent,"despeckle (%.17g)",
-          (double) i+1);
-        break;
-      }
-      case SegmentPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        threshold+=0.4;
-        (void) SegmentImage(preview_image,sRGBColorspace,MagickFalse,threshold,
-          threshold,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"segment %gx%g",
-          threshold,threshold);
-        break;
-      }
-    }
-    thumbnail=DestroyImage(thumbnail);
-    percentage+=12.5;
-    radius+=0.5;
-    sigma+=0.25;
-    if (preview_image == (Image *) NULL)
-      break;
-    preview_image->alpha_trait=UndefinedPixelTrait;
-    (void) DeleteImageProperty(preview_image,"label");
-    (void) SetImageProperty(preview_image,"label",label,exception);
-    AppendImageToList(&images,preview_image);
-    proceed=SetImageProgress(image,PreviewImageTag,(MagickOffsetType) i,
-      NumberTiles);
-    if (proceed == MagickFalse)
-      break;
-  }
-  if (images == (Image *) NULL)
-    {
-      preview_info=DestroyImageInfo(preview_info);
-      return((Image *) NULL);
-    }
-  /*
-    Create the montage.
-  */
-  montage_info=CloneMontageInfo(preview_info,(MontageInfo *) NULL);
-  (void) CopyMagickString(montage_info->filename,image->filename,
-    MagickPathExtent);
-  montage_info->shadow=MagickTrue;
-  (void) CloneString(&montage_info->tile,"3x3");
-  (void) CloneString(&montage_info->geometry,DefaultPreviewGeometry);
-  (void) CloneString(&montage_info->frame,DefaultTileFrame);
-  montage_image=MontageImages(images,montage_info,exception);
-  montage_info=DestroyMontageInfo(montage_info);
-  images=DestroyImageList(images);
-  if (montage_image == (Image *) NULL)
-    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  RelinquishMontageDirectory(image,montage_image);
-  preview_info=DestroyImageInfo(preview_info);
-  return(montage_image);
-}
 
 
 /*
@@ -3216,9 +2547,7 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   shade_view=DestroyCacheView(shade_view);
   image_view=DestroyCacheView(image_view);
   linear_image=DestroyImage(linear_image);
-  if (status == MagickFalse)
-    shade_image=DestroyImage(shade_image);
-  return(shade_image);
+  return(ReleaseFailedImage(shade_image,status));
 }
 
 
@@ -3417,17 +2746,10 @@ MagickExport Image *SpreadImage(const Image *image,
     const int
       id = GetOpenMPThreadId();
 
-    SpreadInfo
-      spread;
+    const SpreadInfo
+      spread = { image, spread_image, image_view, spread_view, exception,
+        method, width, y };
 
-    spread.image=image;
-    spread.spread_image=spread_image;
-    spread.image_view=image_view;
-    spread.spread_view=spread_view;
-    spread.exception=exception;
-    spread.method=method;
-    spread.width=width;
-    spread.y=y;
     if (SpreadHeadRow(&status,&spread,random_info[id]) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -3442,9 +2764,7 @@ MagickExport Image *SpreadImage(const Image *image,
   spread_view=DestroyCacheView(spread_view);
   image_view=DestroyCacheView(image_view);
   random_info=DestroyRandomInfoTLS(random_info);
-  if (status == MagickFalse)
-    spread_image=DestroyImage(spread_image);
-  return(spread_image);
+  return(ReleaseFailedImage(spread_image,status));
 }
 
 /*
@@ -3676,7 +2996,5 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
   unsharp_image->type=image->type;
   unsharp_view=DestroyCacheView(unsharp_view);
   image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    unsharp_image=DestroyImage(unsharp_image);
-  return(unsharp_image);
+  return(ReleaseFailedImage(unsharp_image,status));
 }

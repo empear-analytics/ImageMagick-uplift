@@ -92,566 +92,6 @@ typedef struct _TransformPacket
 static MagickBooleanType
   TransformsRGBImage(Image *,ExceptionInfo *);
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   C o n v e r t G e n e r i c T o R G B                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  ConvertGenericToRGB() transforms a generic pixel (X, Y, Z) to a (red,
-%  green, blue) triple.
-%
-%  The format of the ConvertGenericToRGBImage method is:
-%
-%      void ConvertHSLToRGB(const double hue,const double saturation,
-%        const double lightness,const double white_luminance,
-%        const double illuminant,double *red,double *green,double *blue)
-%
-%  A description of each parameter follows:
-%
-%    o X, Y, Z: A double value representing a component of a generic color
-%      space.
-%
-%    o white_luminance: white luminance.
-%
-%    o illuminant: illuminant, typically D65.
-%
-%    o red, green, blue: A pointer to a pixel component of type Quantum.
-%
-*/
-MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
-  const double X,const double Y,const double Z,const double white_luminance,
-  const IlluminantType illuminant,double *R,double *G,double *B)
-{
-  switch (colorspace)
-  {
-    case Adobe98Colorspace:
-    {
-      ConvertAdobe98ToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case CAT02LMSColorspace:
-    {
-      double
-        L,
-        M,
-        S;
-
-      ConvertXYZToCAT02LMS(X,Y,Z,&L,&M,&S);
-      ConvertCAT02LMSToRGB(L,M,S,R,G,B);
-      break;
-    }
-    case CMYColorspace:
-    {
-      ConvertCMYToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case DisplayP3Colorspace:
-    {
-      ConvertDisplayP3ToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case HCLColorspace:
-    {
-      ConvertHCLToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case HCLpColorspace:
-    {
-      ConvertHCLpToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case HSBColorspace:
-    {
-      ConvertHSBToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case HSIColorspace:
-    {
-      ConvertHSIToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case HSLColorspace:
-    {
-      ConvertHSLToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case HSVColorspace:
-    {
-      ConvertHSVToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case HWBColorspace:
-    {
-      ConvertHWBToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case JzazbzColorspace:
-    {
-      ConvertJzazbzToRGB(X,Y,Z,white_luminance,R,G,B);
-      break;
-    }
-    case LabColorspace:
-    {
-      ConvertLabToRGB(X,Y,Z,illuminant,R,G,B);
-      break;
-    }
-    case LCHColorspace:
-    case LCHabColorspace:
-    {
-      ConvertLCHabToRGB(X,Y,Z,illuminant,R,G,B);
-      break;
-    }
-    case LCHuvColorspace:
-    {
-      ConvertLCHuvToRGB(X,Y,Z,illuminant,R,G,B);
-      break;
-    }
-    case LMSColorspace:
-    {
-      ConvertLMSToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case LuvColorspace:
-    {
-      ConvertLuvToRGB(X,Y,Z,illuminant,R,G,B);
-      break;
-    }
-    case OklabColorspace:
-    {
-      ConvertOklabToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case OklchColorspace:
-    {
-      ConvertOklchToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case ProPhotoColorspace:
-    {
-      ConvertProPhotoToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case xyYColorspace:
-    {
-      ConvertxyYToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case XYZColorspace:
-    {
-      ConvertXYZToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case YCbCrColorspace:
-    {
-      ConvertYCbCrToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case YDbDrColorspace:
-    {
-      ConvertYDbDrToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case YIQColorspace:
-    {
-      ConvertYIQToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case YPbPrColorspace:
-    {
-      ConvertYPbPrToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case YUVColorspace:
-    {
-      ConvertYUVToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    default:
-    {
-      *R=(double) QuantumRange*X;
-      *G=(double) QuantumRange*Y;
-      *B=(double) QuantumRange*Z;
-      break;
-    }
-  }
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   C o n v e r t H S L T o R G B                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  ConvertHSLToRGB() transforms a (hue, saturation, lightness) to a (red,
-%  green, blue) triple.
-%
-%  The format of the ConvertHSLToRGBImage method is:
-%
-%      void ConvertHSLToRGB(const double hue,const double saturation,
-%        const double lightness,double *red,double *green,double *blue)
-%
-%  A description of each parameter follows:
-%
-%    o hue, saturation, lightness: A double value representing a
-%      component of the HSL color space.
-%
-%    o red, green, blue: A pointer to a pixel component of type Quantum.
-%
-*/
-static double ComputeHSLChroma(const double saturation,
-  const double lightness)
-{
-  double
-    c;
-
-  if (lightness <= 0.5)
-    c=2.0*lightness*saturation;
-  else
-    c=(2.0-2.0*lightness)*saturation;
-  return(c);
-}
-
-MagickExport void ConvertHSLToRGB(const double hue,const double saturation,
-  const double lightness,double *red,double *green,double *blue)
-{
-  double
-    c,
-    h,
-    min,
-    x;
-
-  /*
-    Convert HSL to RGB colorspace.
-  */
-  assert(red != (double *) NULL);
-  assert(green != (double *) NULL);
-  assert(blue != (double *) NULL);
-  h=hue*360.0;
-  c=ComputeHSLChroma(saturation,lightness);
-  min=lightness-0.5*c;
-  h-=360.0*floor(h/360.0);
-  h/=60.0;
-  x=c*(1.0-fabs(h-2.0*floor(h/2.0)-1.0));
-  switch ((int) floor(h))
-  {
-    case 0:
-    default:
-    {
-      *red=(double) QuantumRange*(min+c);
-      *green=(double) QuantumRange*(min+x);
-      *blue=(double) QuantumRange*min;
-      break;
-    }
-    case 1:
-    {
-      *red=(double) QuantumRange*(min+x);
-      *green=(double) QuantumRange*(min+c);
-      *blue=(double) QuantumRange*min;
-      break;
-    }
-    case 2:
-    {
-      *red=(double) QuantumRange*min;
-      *green=(double) QuantumRange*(min+c);
-      *blue=(double) QuantumRange*(min+x);
-      break;
-    }
-    case 3:
-    {
-      *red=(double) QuantumRange*min;
-      *green=(double) QuantumRange*(min+x);
-      *blue=(double) QuantumRange*(min+c);
-      break;
-    }
-    case 4:
-    {
-      *red=(double) QuantumRange*(min+x);
-      *green=(double) QuantumRange*min;
-      *blue=(double) QuantumRange*(min+c);
-      break;
-    }
-    case 5:
-    {
-      *red=(double) QuantumRange*(min+c);
-      *green=(double) QuantumRange*min;
-      *blue=(double) QuantumRange*(min+x);
-      break;
-    }
-  }
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   C o n v e r t R G B T o G e n e r i c                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  ConvertRGBToGeneric() transforms a (red, green, blue) to a generic (X, Y, Z)
-%  triple.
-%
-%  The format of the ConvertRGBToGeneric method is:
-%
-%      void ConvertRGBToGeneric(const double red,const double green,
-%        const double blue,double *hue,double *saturation,double *lightness)
-%
-%  A description of each parameter follows:
-%
-%    o red, green, blue: A Quantum value representing the red, green, and
-%      blue component of a pixel..
-%
-%    o white_luminance: white luminance.
-%
-%    o illuminant: illuminant, typically D65.
-%
-%    o X, Y, Z: A pointer to a double value representing a component of a
-%      generic color space.
-%
-*/
-MagickPrivate void ConvertRGBToGeneric(const ColorspaceType colorspace,
-  const double R,const double G,const double B,const double white_luminance,
-  const IlluminantType illuminant,double *X,double *Y,double *Z)
-{
-  switch (colorspace)
-  {
-    case Adobe98Colorspace:
-    {
-      ConvertRGBToAdobe98(R,G,B,X,Y,Z);
-      break;
-    }
-    case CAT02LMSColorspace:
-    {
-      double
-        L,
-        M,
-        S;
-
-      ConvertRGBToCAT02LMS(R,G,B,&L,&M,&S);
-      ConvertCAT02LMSToXYZ(L,M,S,X,Y,Z);
-      break;
-    }
-    case CMYColorspace:
-    {
-      ConvertRGBToCMY(R,G,B,X,Y,Z);
-      break;
-    }
-    case DisplayP3Colorspace:
-    {
-      ConvertRGBToDisplayP3(R,G,B,X,Y,Z);
-      break;
-    }
-    case HCLColorspace:
-    {
-      ConvertRGBToHCL(R,G,B,X,Y,Z);
-      break;
-    }
-    case HCLpColorspace:
-    {
-      ConvertRGBToHCLp(R,G,B,X,Y,Z);
-      break;
-    }
-    case HSBColorspace:
-    {
-      ConvertRGBToHSB(R,G,B,X,Y,Z);
-      break;
-    }
-    case HSIColorspace:
-    {
-      ConvertRGBToHSI(R,G,B,X,Y,Z);
-      break;
-    }
-    case HSLColorspace:
-    {
-      ConvertRGBToHSL(R,G,B,X,Y,Z);
-      break;
-    }
-    case HSVColorspace:
-    {
-      ConvertRGBToHSV(R,G,B,X,Y,Z);
-      break;
-    }
-    case HWBColorspace:
-    {
-      ConvertRGBToHWB(R,G,B,X,Y,Z);
-      break;
-    }
-    case JzazbzColorspace:
-    {
-      ConvertRGBToJzazbz(R,G,B,white_luminance,X,Y,Z);
-      break;
-    }
-    case LabColorspace:
-    {
-      ConvertRGBToLab(R,G,B,illuminant,X,Y,Z);
-      break;
-    }
-    case LCHColorspace:
-    case LCHabColorspace:
-    {
-      ConvertRGBToLCHab(R,G,B,illuminant,X,Y,Z);
-      break;
-    }
-    case LCHuvColorspace:
-    {
-      ConvertRGBToLCHuv(R,G,B,illuminant,X,Y,Z);
-      break;
-    }
-    case LMSColorspace:
-    {
-      ConvertRGBToLMS(R,G,B,X,Y,Z);
-      break;
-    }
-    case LuvColorspace:
-    {
-      ConvertRGBToLuv(R,G,B,illuminant,X,Y,Z);
-      break;
-    }
-    case OklabColorspace:
-    {
-      ConvertRGBToOklab(R,G,B,X,Y,Z);
-      break;
-    }
-    case OklchColorspace:
-    {
-      ConvertRGBToOklch(R,G,B,X,Y,Z);
-      break;
-    }
-    case ProPhotoColorspace:
-    {
-      ConvertRGBToProPhoto(R,G,B,X,Y,Z);
-      break;
-    }
-    case xyYColorspace:
-    {
-      ConvertRGBToxyY(R,G,B,X,Y,Z);
-      break;
-    }
-    case XYZColorspace:
-    {
-      ConvertRGBToXYZ(R,G,B,X,Y,Z);
-      break;
-    }
-    case YCbCrColorspace:
-    {
-      ConvertRGBToYCbCr(R,G,B,X,Y,Z);
-      break;
-    }
-    case YDbDrColorspace:
-    {
-      ConvertRGBToYDbDr(R,G,B,X,Y,Z);
-      break;
-    }
-    case YIQColorspace:
-    {
-      ConvertRGBToYIQ(R,G,B,X,Y,Z);
-      break;
-    }
-    case YPbPrColorspace:
-    {
-      ConvertRGBToYPbPr(R,G,B,X,Y,Z);
-      break;
-    }
-    case YUVColorspace:
-    {
-      ConvertRGBToYUV(R,G,B,X,Y,Z);
-      break;
-    }
-    default:
-    {
-      *X=QuantumScale*R;
-      *Y=QuantumScale*G;
-      *Z=QuantumScale*B;
-      break;
-    }
-  }
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   C o n v e r t R G B T o H S L                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  ConvertRGBToHSL() transforms a (red, green, blue) to a (hue, saturation,
-%  lightness) triple.
-%
-%  The format of the ConvertRGBToHSL method is:
-%
-%      void ConvertRGBToHSL(const double red,const double green,
-%        const double blue,double *hue,double *saturation,double *lightness)
-%
-%  A description of each parameter follows:
-%
-%    o red, green, blue: A Quantum value representing the red, green, and
-%      blue component of a pixel..
-%
-%    o hue, saturation, lightness: A pointer to a double value representing a
-%      component of the HSL color space.
-%
-*/
-MagickExport void ConvertRGBToHSL(const double red,const double green,
-  const double blue,double *hue,double *saturation,double *lightness)
-{
-  double
-    c,
-    max,
-    min;
-
-  /*
-    Convert RGB to HSL colorspace.
-  */
-  assert(hue != (double *) NULL);
-  assert(saturation != (double *) NULL);
-  assert(lightness != (double *) NULL);
-  max=MagickMax(QuantumScale*red,MagickMax(QuantumScale*green,
-    QuantumScale*blue));
-  min=MagickMin(QuantumScale*red,MagickMin(QuantumScale*green,
-    QuantumScale*blue));
-  c=max-min;
-  *lightness=(max+min)/2.0;
-  if (c <= 0.0)
-    {
-      *hue=0.0;
-      *saturation=0.0;
-      return;
-    }
-  if (fabs(max-QuantumScale*red) < MagickEpsilon)
-    {
-      *hue=(QuantumScale*green-QuantumScale*blue)/c;
-      if ((QuantumScale*green) < (QuantumScale*blue))
-        *hue+=6.0;
-    }
-  else
-    if (fabs(max-QuantumScale*green) < MagickEpsilon)
-      *hue=2.0+(QuantumScale*blue-QuantumScale*red)/c;
-    else
-      *hue=4.0+(QuantumScale*red-QuantumScale*green)/c;
-  *hue*=60.0/360.0;
-  if (*lightness <= 0.5)
-    *saturation=c*MagickSafeReciprocal(2.0*(*lightness));
-  else
-    *saturation=c*MagickSafeReciprocal(2.0-2.0*(*lightness));
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1318,198 +758,346 @@ static void sRGBTransformColormap(const sRGBTransformTables *tables)
   (void) SyncImage(image,exception);
 }
 
-static MagickBooleanType sRGBTransformImage(Image *image,
-  const ColorspaceType colorspace,ExceptionInfo *exception)
+static void sRGBToLogPixels(Image *image,Quantum *logmap,
+  Quantum *magick_restrict q)
 {
-#define sRGBTransformImageTag  "RGBTransform/Image"
+  ssize_t
+    x;
 
+  for (x=(ssize_t) image->columns; x != 0; x--)
+  {
+    double
+      blue,
+      green,
+      red;
+
+    red=(double) DecodePixelGamma((MagickRealType)
+      GetPixelRed(image,q));
+    green=(double) DecodePixelGamma((MagickRealType)
+      GetPixelGreen(image,q));
+    blue=(double) DecodePixelGamma((MagickRealType)
+      GetPixelBlue(image,q));
+    SetPixelRed(image,logmap[ScaleQuantumToMap(ClampToQuantum(red))],q);
+    SetPixelGreen(image,logmap[ScaleQuantumToMap(ClampToQuantum(green))],
+      q);
+    SetPixelBlue(image,logmap[ScaleQuantumToMap(ClampToQuantum(blue))],q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static MagickBooleanType sRGBToLog(Image *image,const ColorspaceType colorspace,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
   CacheView
     *image_view;
-
-  const char
-    *artifact;
-
-  IlluminantType
-    illuminant = D65Illuminant;
-
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
-  PrimaryInfo
-    primary_info;
 
   ssize_t
     i,
     y;
+
+  double
+    black,
+    density,
+    film_gamma,
+    gamma,
+    reference_black,
+    reference_white;
+
+  const LogProperties
+    targets = { &density,&gamma,&film_gamma,&reference_black,
+      &reference_white };
+
+  Quantum
+    *logmap;
+
+  /*
+    Transform RGB to Log colorspace.
+  */
+  GetLogProperties(image,exception,&targets);
+  logmap=(Quantum *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(*logmap));
+  if (logmap == (Quantum *) NULL)
+    ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+      image->filename);
+  black=pow(10.0,(reference_black-reference_white)*(gamma/density)*0.002*
+    MagickSafeReciprocal(film_gamma));
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static)
+#endif
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+    logmap[i]=ScaleMapToQuantum(((double) MaxMap*(reference_white+
+      log10(black+(1.0*i/MaxMap)*(1.0-black))/((gamma/density)*0.002*
+      MagickSafeReciprocal(film_gamma)))/MaximumLogarithmicColorspace));
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    const ColorspaceRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    sRGBToLogPixels(image,logmap,q);
+    SyncColorspaceRow(image_view,exception,&status);
+  }
+  image_view=DestroyCacheView(image_view);
+  logmap=(Quantum *) RelinquishMagickMemory(logmap);
+  if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
+    return(MagickFalse);
+  return(status);
+}
+
+typedef struct _sRGBTransformRowInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
 
   TransformPacket
     *x_map,
     *y_map,
     *z_map;
 
-  sRGBTransformTables
-    tables;
+  PrimaryInfo
+    primary_info;
+} sRGBTransformRowInfo;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(colorspace != sRGBColorspace);
-  assert(colorspace != TransparentColorspace);
-  assert(colorspace != UndefinedColorspace);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  GetIlluminantArtifact(image,&artifact,&illuminant);
-  status=MagickTrue;
-  progress=0;
+static MagickBooleanType sRGBTransformRow(const sRGBTransformRowInfo *info,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = info->image;
+
+  CacheView
+    *const image_view = info->image_view;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  TransformPacket
+    *const x_map = info->x_map,
+    *const y_map = info->y_map,
+    *const z_map = info->z_map;
+
+  const PrimaryInfo
+    primary_info = info->primary_info;
+
+  PixelInfo
+    pixel;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  unsigned int
+    blue,
+    green,
+    red;
+
+  const ColorspaceRowInfo
+    row = { image,image_view,exception };
+
+  if (FetchColorspaceRow(&row,y,&q,&(*status)) == MagickFalse)
+    return(MagickFalse);
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    red=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
+      GetPixelRed(image,q)));
+    green=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
+      GetPixelGreen(image,q)));
+    blue=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
+      GetPixelBlue(image,q)));
+    pixel.red=(x_map[red].x+y_map[green].x+z_map[blue].x)+
+      primary_info.x;
+    pixel.green=(x_map[red].y+y_map[green].y+z_map[blue].y)+
+      primary_info.y;
+    pixel.blue=(x_map[red].z+y_map[green].z+z_map[blue].z)+
+      primary_info.z;
+    SetPixelRed(image,ScaleMapToQuantum(pixel.red),q);
+    SetPixelGreen(image,ScaleMapToQuantum(pixel.green),q);
+    SetPixelBlue(image,ScaleMapToQuantum(pixel.blue),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  SyncColorspaceRow(image_view,exception,&(*status));
+  return(MagickTrue);
+}
+
+static MagickBooleanType sRGBTransformPixels(
+  const sRGBTransformTables *tables,MagickBooleanType status,
+  MagickOffsetType progress)
+{
+#define sRGBTransformImageTag  "RGBTransform/Image"
+
+  const PrimaryInfo
+    primary_info = tables->primary_info;
+
+  ExceptionInfo
+    *const exception = tables->exception;
+
+  Image
+    *const image = tables->image;
+
+  TransformPacket
+    *const x_map = tables->x_map,
+    *const y_map = tables->y_map,
+    *const z_map = tables->z_map;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const sRGBTransformRowInfo
+      info = { image,image_view,exception,x_map,y_map,z_map,
+        primary_info };
+
+    if (sRGBTransformRow(&info,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetColorspaceProgress(image,sRGBTransformImageTag,progress,&status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+typedef struct _sRGBMapsInput
+{
+  ColorspaceType
+    colorspace;
+
+  TransformPacket
+    *x_map,
+    *y_map,
+    *z_map;
+} sRGBMapsInput;
+
+static void InitializesRGBRec709ThroughIdentityMaps(const sRGBMapsInput *maps,
+  PrimaryInfo *primary_info)
+{
+  const ColorspaceType
+    colorspace = maps->colorspace;
+
+  TransformPacket
+    *const x_map = maps->x_map,
+    *const y_map = maps->y_map,
+    *const z_map = maps->z_map;
+
+  ssize_t
+    i;
+
   switch (colorspace)
   {
-    case CMYKColorspace:
-      return(sRGBToCMYK(image,colorspace,status,exception));
-    case LinearGRAYColorspace:
-      return(sRGBToLinearGray(image,colorspace,status,exception));
-    case GRAYColorspace:
-      return(sRGBToGray(image,colorspace,status,exception));
-    case CMYColorspace:
-    case Adobe98Colorspace:
-    case CAT02LMSColorspace:
-    case DisplayP3Colorspace:
-    case HCLColorspace:
-    case HCLpColorspace:
-    case HSBColorspace:
-    case HSIColorspace:
-    case HSLColorspace:
-    case HSVColorspace:
-    case HWBColorspace:
-    case JzazbzColorspace:
-    case LabColorspace:
-    case LCHColorspace:
-    case LCHabColorspace:
-    case LCHuvColorspace:
-    case LMSColorspace:
-    case LuvColorspace:
-    case OklabColorspace:
-    case OklchColorspace:
-    case ProPhotoColorspace:
-    case xyYColorspace:
-    case XYZColorspace:
-    case YCbCrColorspace:
-    case YDbDrColorspace:
-    case YIQColorspace:
-    case YPbPrColorspace:
-    case YUVColorspace:
+    case Rec709YCbCrColorspace:
     {
-      sRGBGenericInput
-        input;
-
-      input.colorspace=colorspace;
-      input.illuminant=illuminant;
-      return(sRGBToGeneric(&input,image,status,exception));
-    }
-    case LogColorspace:
-    {
-      double
-        black,
-        density,
-        film_gamma,
-        gamma,
-        reference_black,
-        reference_white;
-
-      const LogProperties
-        targets = { &density,&gamma,&film_gamma,&reference_black,
-          &reference_white };
-
-      Quantum
-        *logmap;
-
       /*
-        Transform RGB to Log colorspace.
+        Initialize YCbCr tables (ITU-R BT.709):
+
+          Y =  0.212656*R+0.715158*G+0.072186*B
+          Cb= -0.114572*R-0.385428*G+0.500000*B
+          Cr=  0.500000*R-0.454153*G-0.045847*B
+
+        Cb and Cr, normally -0.5 through 0.5, are normalized to the range 0
+        through QuantumRange.
       */
-      GetLogProperties(image,exception,&targets);
-      logmap=(Quantum *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-        sizeof(*logmap));
-      if (logmap == (Quantum *) NULL)
-        ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-          image->filename);
-      black=pow(10.0,(reference_black-reference_white)*(gamma/density)*0.002*
-        MagickSafeReciprocal(film_gamma));
+      (*primary_info).y=(double) ((MaxMap+1)/2);
+      (*primary_info).z=(double) ((MaxMap+1)/2);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp parallel for schedule(static)
 #endif
       for (i=0; i <= (ssize_t) MaxMap; i++)
-        logmap[i]=ScaleMapToQuantum(((double) MaxMap*(reference_white+
-          log10(black+(1.0*i/MaxMap)*(1.0-black))/((gamma/density)*0.002*
-          MagickSafeReciprocal(film_gamma)))/MaximumLogarithmicColorspace));
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
       {
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=(ssize_t) image->columns; x != 0; x--)
-        {
-          double
-            blue,
-            green,
-            red;
-
-          red=(double) DecodePixelGamma((MagickRealType)
-            GetPixelRed(image,q));
-          green=(double) DecodePixelGamma((MagickRealType)
-            GetPixelGreen(image,q));
-          blue=(double) DecodePixelGamma((MagickRealType)
-            GetPixelBlue(image,q));
-          SetPixelRed(image,logmap[ScaleQuantumToMap(ClampToQuantum(red))],q);
-          SetPixelGreen(image,logmap[ScaleQuantumToMap(ClampToQuantum(green))],
-            q);
-          SetPixelBlue(image,logmap[ScaleQuantumToMap(ClampToQuantum(blue))],q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
+        x_map[i].x=(MagickRealType) (0.212656*(double) i);
+        x_map[i].y=(MagickRealType) (-0.114572*(double) i);
+        x_map[i].z=(MagickRealType) (0.500000*(double) i);
+        y_map[i].x=(MagickRealType) (0.715158*(double) i);
+        y_map[i].y=(MagickRealType) (-0.385428*(double) i);
+        y_map[i].z=(MagickRealType) (-0.454153*(double) i);
+        z_map[i].x=(MagickRealType) (0.072186*(double) i);
+        z_map[i].y=(MagickRealType) (0.500000*(double) i);
+        z_map[i].z=(MagickRealType) (-0.045847*(double) i);
       }
-      image_view=DestroyCacheView(image_view);
-      logmap=(Quantum *) RelinquishMagickMemory(logmap);
-      if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
-        return(MagickFalse);
-      return(status);
-    }
-    case RGBColorspace:
-    case scRGBColorspace:
-      return(sRGBToLinearRGB(image,colorspace,status,exception));
-    default:
       break;
-  }
-  /*
-    Allocate the tables.
-  */
-  x_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*x_map));
-  y_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*y_map));
-  z_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*z_map));
-  if (IsTransformMapMissing(x_map,y_map,z_map) != MagickFalse)
-    {
-      x_map=RelinquishTransformMap(x_map);
-      y_map=RelinquishTransformMap(y_map);
-      z_map=RelinquishTransformMap(z_map);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
     }
+    case YCCColorspace:
+    {
+      /*
+        Initialize YCC tables:
+
+          Y =  0.298839*R+0.586811*G+0.114350*B
+          C1= -0.298839*R-0.586811*G+0.88600*B
+          C2=  0.70100*R-0.586811*G-0.114350*B
+
+        YCC is scaled by 1.3584.  C1 zero is 156 and C2 is at 137.
+      */
+      (*primary_info).y=(MagickRealType) ScaleQuantumToMap(
+        ScaleCharToQuantum(156));
+      (*primary_info).z=(MagickRealType) ScaleQuantumToMap(
+        ScaleCharToQuantum(137));
+      InitializeYCCTransformMaps(x_map,y_map,z_map);
+      break;
+    }
+    default:
+    {
+      /*
+        Linear conversion tables.
+      */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static)
+#endif
+      for (i=0; i <= (ssize_t) MaxMap; i++)
+      {
+        x_map[i].x=(MagickRealType) (1.0*(double) i);
+        x_map[i].y=(MagickRealType) 0.0;
+        x_map[i].z=(MagickRealType) 0.0;
+        y_map[i].x=(MagickRealType) 0.0;
+        y_map[i].y=(MagickRealType) (1.0*(double) i);
+        y_map[i].z=(MagickRealType) 0.0;
+        z_map[i].x=(MagickRealType) 0.0;
+        z_map[i].y=(MagickRealType) 0.0;
+        z_map[i].z=(MagickRealType) (1.0*(double) i);
+      }
+      break;
+    }
+  }
+}
+
+static PrimaryInfo InitializesRGBTransformMaps(
+  const ColorspaceType colorspace,TransformPacket *x_map,
+  TransformPacket *y_map,TransformPacket *z_map)
+{
+  PrimaryInfo
+    primary_info;
+
+  ssize_t
+    i;
+
   (void) memset(&primary_info,0,sizeof(primary_info));
   switch (colorspace)
   {
@@ -1575,78 +1163,96 @@ static MagickBooleanType sRGBTransformImage(Image *image,
       }
       break;
     }
-    case Rec709YCbCrColorspace:
-    {
-      /*
-        Initialize YCbCr tables (ITU-R BT.709):
-
-          Y =  0.212656*R+0.715158*G+0.072186*B
-          Cb= -0.114572*R-0.385428*G+0.500000*B
-          Cr=  0.500000*R-0.454153*G-0.045847*B
-
-        Cb and Cr, normally -0.5 through 0.5, are normalized to the range 0
-        through QuantumRange.
-      */
-      primary_info.y=(double) ((MaxMap+1)/2);
-      primary_info.z=(double) ((MaxMap+1)/2);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=(MagickRealType) (0.212656*(double) i);
-        x_map[i].y=(MagickRealType) (-0.114572*(double) i);
-        x_map[i].z=(MagickRealType) (0.500000*(double) i);
-        y_map[i].x=(MagickRealType) (0.715158*(double) i);
-        y_map[i].y=(MagickRealType) (-0.385428*(double) i);
-        y_map[i].z=(MagickRealType) (-0.454153*(double) i);
-        z_map[i].x=(MagickRealType) (0.072186*(double) i);
-        z_map[i].y=(MagickRealType) (0.500000*(double) i);
-        z_map[i].z=(MagickRealType) (-0.045847*(double) i);
-      }
-      break;
-    }
-    case YCCColorspace:
-    {
-      /*
-        Initialize YCC tables:
-
-          Y =  0.298839*R+0.586811*G+0.114350*B
-          C1= -0.298839*R-0.586811*G+0.88600*B
-          C2=  0.70100*R-0.586811*G-0.114350*B
-
-        YCC is scaled by 1.3584.  C1 zero is 156 and C2 is at 137.
-      */
-      primary_info.y=(MagickRealType) ScaleQuantumToMap(
-        ScaleCharToQuantum(156));
-      primary_info.z=(MagickRealType) ScaleQuantumToMap(
-        ScaleCharToQuantum(137));
-      InitializeYCCTransformMaps(x_map,y_map,z_map);
-      break;
-    }
     default:
     {
-      /*
-        Linear conversion tables.
-      */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=(MagickRealType) (1.0*(double) i);
-        x_map[i].y=(MagickRealType) 0.0;
-        x_map[i].z=(MagickRealType) 0.0;
-        y_map[i].x=(MagickRealType) 0.0;
-        y_map[i].y=(MagickRealType) (1.0*(double) i);
-        y_map[i].z=(MagickRealType) 0.0;
-        z_map[i].x=(MagickRealType) 0.0;
-        z_map[i].y=(MagickRealType) 0.0;
-        z_map[i].z=(MagickRealType) (1.0*(double) i);
-      }
+      sRGBMapsInput
+        maps;
+
+      maps.colorspace=colorspace;
+      maps.x_map=x_map;
+      maps.y_map=y_map;
+      maps.z_map=z_map;
+      InitializesRGBRec709ThroughIdentityMaps(&maps,&primary_info);
       break;
     }
   }
+  return(primary_info);
+}
+
+typedef struct _TransformMapTargets
+{
+  TransformPacket
+    **x_map,
+    **y_map,
+    **z_map;
+} TransformMapTargets;
+
+static MagickBooleanType AcquiresRGBTransformMaps(Image *image,
+  ExceptionInfo *exception,const TransformMapTargets *targets)
+{
+  TransformPacket
+    **const x_map = targets->x_map,
+    **const y_map = targets->y_map,
+    **const z_map = targets->z_map;
+
+  *x_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(**x_map));
+  *y_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(**y_map));
+  *z_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(**z_map));
+  if (IsTransformMapMissing(*x_map,*y_map,*z_map) != MagickFalse)
+    {
+      *x_map=RelinquishTransformMap(*x_map);
+      *y_map=RelinquishTransformMap(*y_map);
+      *z_map=RelinquishTransformMap(*z_map);
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _sRGBTableInput
+{
+  ColorspaceType
+    colorspace;
+
+  MagickOffsetType
+    progress;
+} sRGBTableInput;
+
+static MagickBooleanType sRGBTransformByTables(const sRGBTableInput *table,
+  Image *image,MagickBooleanType status,ExceptionInfo *exception)
+{
+  const ColorspaceType
+    colorspace = table->colorspace;
+
+  const MagickOffsetType
+    progress = table->progress;
+
+  PrimaryInfo
+    primary_info;
+
+  TransformPacket
+    *x_map,
+    *y_map,
+    *z_map;
+
+  sRGBTransformTables
+    tables;
+
+  TransformMapTargets
+    targets;
+
+  /*
+    Allocate the tables.
+  */
+  targets.x_map=(&x_map);
+  targets.y_map=(&y_map);
+  targets.z_map=(&z_map);
+  if (AcquiresRGBTransformMaps(image,exception,&targets) == MagickFalse)
+    return(MagickFalse);
+  primary_info=InitializesRGBTransformMaps(colorspace,x_map,y_map,z_map);
   /*
     Convert from sRGB.
   */
@@ -1664,62 +1270,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
       /*
         Convert DirectClass image.
       */
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        PixelInfo
-          pixel;
-
-        Quantum
-          *magick_restrict q;
-
-        ssize_t
-          x;
-
-        unsigned int
-          blue,
-          green,
-          red;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          red=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
-            GetPixelRed(image,q)));
-          green=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
-            GetPixelGreen(image,q)));
-          blue=ScaleQuantumToMap(ClampToQuantum((MagickRealType)
-            GetPixelBlue(image,q)));
-          pixel.red=(x_map[red].x+y_map[green].x+z_map[blue].x)+
-            primary_info.x;
-          pixel.green=(x_map[red].y+y_map[green].y+z_map[blue].y)+
-            primary_info.y;
-          pixel.blue=(x_map[red].z+y_map[green].z+z_map[blue].z)+
-            primary_info.z;
-          SetPixelRed(image,ScaleMapToQuantum(pixel.red),q);
-          SetPixelGreen(image,ScaleMapToQuantum(pixel.green),q);
-          SetPixelBlue(image,ScaleMapToQuantum(pixel.blue),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp atomic
-#endif
-            progress++;
-            SetColorspaceProgress(image,sRGBTransformImageTag,progress,&status);
-          }
-      }
-      image_view=DestroyCacheView(image_view);
+      status=sRGBTransformPixels(&tables,status,progress);
       break;
     }
     case PseudoClass:
@@ -1737,6 +1288,121 @@ static MagickBooleanType sRGBTransformImage(Image *image,
   if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
     return(MagickFalse);
   return(status);
+}
+
+static MagickBooleanType sRGBTransformLogOrLinear(
+  const sRGBTableInput *table,Image *image,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  const ColorspaceType
+    colorspace = table->colorspace;
+
+  switch (colorspace)
+  {
+    case LogColorspace:
+      return(sRGBToLog(image,colorspace,status,exception));
+    case RGBColorspace:
+    case scRGBColorspace:
+      return(sRGBToLinearRGB(image,colorspace,status,exception));
+    default:
+      break;
+  }
+  return(sRGBTransformByTables(table,image,status,exception));
+}
+
+static MagickBooleanType sRGBTransformCMYKOrGray(
+  const sRGBTableInput *table,Image *image,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  const ColorspaceType
+    colorspace = table->colorspace;
+
+  switch (colorspace)
+  {
+    case CMYKColorspace:
+      return(sRGBToCMYK(image,colorspace,status,exception));
+    case LinearGRAYColorspace:
+      return(sRGBToLinearGray(image,colorspace,status,exception));
+    case GRAYColorspace:
+      return(sRGBToGray(image,colorspace,status,exception));
+    default:
+      break;
+  }
+  return(sRGBTransformLogOrLinear(table,image,status,exception));
+}
+
+static MagickBooleanType sRGBTransformImage(Image *image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  sRGBTableInput
+    table;
+
+  IlluminantType
+    illuminant = D65Illuminant;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(colorspace != sRGBColorspace);
+  assert(colorspace != TransparentColorspace);
+  assert(colorspace != UndefinedColorspace);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  GetIlluminantArtifact(image,&artifact,&illuminant);
+  status=MagickTrue;
+  progress=0;
+  switch (colorspace)
+  {
+    case CMYColorspace:
+    case Adobe98Colorspace:
+    case CAT02LMSColorspace:
+    case DisplayP3Colorspace:
+    case HCLColorspace:
+    case HCLpColorspace:
+    case HSBColorspace:
+    case HSIColorspace:
+    case HSLColorspace:
+    case HSVColorspace:
+    case HWBColorspace:
+    case JzazbzColorspace:
+    case LabColorspace:
+    case LCHColorspace:
+    case LCHabColorspace:
+    case LCHuvColorspace:
+    case LMSColorspace:
+    case LuvColorspace:
+    case OklabColorspace:
+    case OklchColorspace:
+    case ProPhotoColorspace:
+    case xyYColorspace:
+    case XYZColorspace:
+    case YCbCrColorspace:
+    case YDbDrColorspace:
+    case YIQColorspace:
+    case YPbPrColorspace:
+    case YUVColorspace:
+    {
+      sRGBGenericInput
+        input;
+
+      input.colorspace=colorspace;
+      input.illuminant=illuminant;
+      return(sRGBToGeneric(&input,image,status,exception));
+    }
+    default:
+      break;
+  }
+  table.colorspace=colorspace;
+  table.progress=progress;
+  return(sRGBTransformCMYKOrGray(&table,image,status,exception));
 }
 
 /*
@@ -2641,325 +2307,146 @@ static void TransformsRGBColormap(const TransformsRGBTables *tables,
   (void) SyncImage(image,exception);
 }
 
-static MagickBooleanType TransformsRGBImage(Image *image,
-  ExceptionInfo *exception)
+static void GenericPixelsTosRGB(Image *image,const double white_luminance,
+  const IlluminantType illuminant,Quantum *magick_restrict q)
 {
-#define TransformsRGBImageTag  "Transform/Image"
+  ssize_t
+    x;
 
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      blue,
+      green,
+      red;
+
+    ConvertGenericToRGB(image->colorspace,QuantumScale*
+      GetPixelRed(image,q),QuantumScale*GetPixelGreen(image,q),
+      QuantumScale*GetPixelBlue(image,q),white_luminance,illuminant,
+      &red,&green,&blue);
+    SetPixelRed(image,ClampToQuantum(red),q);
+    SetPixelGreen(image,ClampToQuantum(green),q);
+    SetPixelBlue(image,ClampToQuantum(blue),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void LinearGrayPixelsTosRGB(Image *image,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MagickRealType
+      gray;
+
+    gray=0.212656*EncodePixelGamma(GetPixelRed(image,q))+0.715158*
+      EncodePixelGamma(GetPixelGreen(image,q))+0.072186*
+      EncodePixelGamma(GetPixelBlue(image,q));
+    SetPixelRed(image,ClampToQuantum(gray),q);
+    SetPixelGreen(image,ClampToQuantum(gray),q);
+    SetPixelBlue(image,ClampToQuantum(gray),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static MagickBooleanType GenericTosRGB(Image *image,const IlluminantType illuminant,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
   CacheView
     *image_view;
 
-  const char
-    *artifact;
-
-  IlluminantType
-    illuminant = D65Illuminant;
-
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
   ssize_t
-    i,
     y;
 
-  TransformPacket
-    *y_map,
-    *x_map,
-    *z_map;
+  ColorspaceRowInfo
+    finish;
 
-  TransformsRGBTables
-    tables;
+  const char
+    *value;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  GetIlluminantArtifact(image,&artifact,&illuminant);
-  status=MagickTrue;
-  progress=0;
+  double
+    white_luminance;
+
+  /*
+    Transform image from source colorspace to sRGB.
+  */
+  white_luminance=10000.0;
+  value=GetImageProperty(image,"white-luminance",exception);
+  if (value != (const char *) NULL)
+    white_luminance=StringToDouble(value,(char **) NULL);
+  if (SyncImageToDirectClass(image,exception) == MagickFalse)
+    return(MagickFalse);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    const ColorspaceRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    GenericPixelsTosRGB(image,white_luminance,illuminant,q);
+    SyncColorspaceRow(image_view,exception,&status);
+  }
+  finish.image=image;
+  finish.image_view=image_view;
+  finish.exception=exception;
+  return(FinishColorspace(&finish,sRGBColorspace,status));
+}
+
+static void InitializeYCCOrIdentityMaps(const Image *image,
+  TransformPacket *x_map,
+  TransformPacket *y_map,TransformPacket *z_map)
+{
+  ssize_t
+    i;
+
   switch (image->colorspace)
   {
-    case CMYKColorspace:
-      return(CMYKTosRGB(image,status,exception));
-    case LinearGRAYColorspace:
+    case YCCColorspace:
     {
-      ColorspaceRowInfo
-        finish;
-
       /*
-        Transform linear GRAY to sRGB colorspace.
+        Initialize YCC tables:
+
+          R = Y            +1.340762*C2
+          G = Y-0.317038*C1-0.682243*C2
+          B = Y+1.632639*C1
+
+        YCC is scaled by 1.3584.  C1 zero is 156 and C2 is at 137.
       */
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
-        return(MagickFalse);
-      image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
+      #pragma omp parallel for schedule(static)
 #endif
-      for (y=0; y < (ssize_t) image->rows; y++)
+      for (i=0; i <= (ssize_t) MaxMap; i++)
       {
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          MagickRealType
-            gray;
-
-          gray=0.212656*EncodePixelGamma(GetPixelRed(image,q))+0.715158*
-            EncodePixelGamma(GetPixelGreen(image,q))+0.072186*
-            EncodePixelGamma(GetPixelBlue(image,q));
-          SetPixelRed(image,ClampToQuantum(gray),q);
-          SetPixelGreen(image,ClampToQuantum(gray),q);
-          SetPixelBlue(image,ClampToQuantum(gray),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
+        x_map[i].x=(MagickRealType) (1.3584000*(double) i);
+        y_map[i].x=(MagickRealType) 0.0000000;
+        z_map[i].x=(MagickRealType) (1.8215000*(1.0*(double) i-(double)
+          ScaleQuantumToMap(ScaleCharToQuantum(137))));
+        x_map[i].y=(MagickRealType) (1.3584000*(double) i);
+        y_map[i].y=(MagickRealType) (-0.4302726*(1.0*(double) i-(double)
+          ScaleQuantumToMap(ScaleCharToQuantum(156))));
+        z_map[i].y=(MagickRealType) (-0.9271435*(1.0*(double) i-(double)
+          ScaleQuantumToMap(ScaleCharToQuantum(137))));
+        x_map[i].z=(MagickRealType) (1.3584000*(double) i);
+        y_map[i].z=(MagickRealType) (2.2179000*(1.0*(double) i-(double)
+          ScaleQuantumToMap(ScaleCharToQuantum(156))));
+        z_map[i].z=(MagickRealType) 0.0000000;
       }
-      finish.image=image;
-      finish.image_view=image_view;
-      finish.exception=exception;
-      return(FinishColorspace(&finish,sRGBColorspace,status));
-    }
-    case GRAYColorspace:
-    {
-      ColorspaceRowInfo
-        finish;
-
-      /*
-        Transform linear GRAY to sRGB colorspace.
-      */
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
-        return(MagickFalse);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          MagickRealType
-            gray;
-
-          gray=0.212656*(double) GetPixelRed(image,q)+0.715158*(double)
-            GetPixelGreen(image,q)+0.072186*(double) GetPixelBlue(image,q);
-          SetPixelRed(image,ClampToQuantum(gray),q);
-          SetPixelGreen(image,ClampToQuantum(gray),q);
-          SetPixelBlue(image,ClampToQuantum(gray),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
-      }
-      finish.image=image;
-      finish.image_view=image_view;
-      finish.exception=exception;
-      return(FinishColorspace(&finish,sRGBColorspace,status));
-    }
-    case Adobe98Colorspace:
-    case CMYColorspace:
-    case CAT02LMSColorspace:
-    case DisplayP3Colorspace:
-    case HCLColorspace:
-    case HCLpColorspace:
-    case HSBColorspace:
-    case HSIColorspace:
-    case HSLColorspace:
-    case HSVColorspace:
-    case HWBColorspace:
-    case JzazbzColorspace:
-    case LabColorspace:
-    case LCHColorspace:
-    case LCHabColorspace:
-    case LCHuvColorspace:
-    case LMSColorspace:
-    case LuvColorspace:
-    case OklabColorspace:
-    case OklchColorspace:
-    case ProPhotoColorspace:
-    case xyYColorspace:
-    case XYZColorspace:
-    case YCbCrColorspace:
-    case YDbDrColorspace:
-    case YIQColorspace:
-    case YPbPrColorspace:
-    case YUVColorspace:
-    {
-      ColorspaceRowInfo
-        finish;
-
-      const char
-        *value;
-
-      double
-        white_luminance;
-
-      /*
-        Transform image from source colorspace to sRGB.
-      */
-      white_luminance=10000.0;
-      value=GetImageProperty(image,"white-luminance",exception);
-      if (value != (const char *) NULL)
-        white_luminance=StringToDouble(value,(char **) NULL);
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          double
-            blue,
-            green,
-            red;
-
-          ConvertGenericToRGB(image->colorspace,QuantumScale*
-            GetPixelRed(image,q),QuantumScale*GetPixelGreen(image,q),
-            QuantumScale*GetPixelBlue(image,q),white_luminance,illuminant,
-            &red,&green,&blue);
-          SetPixelRed(image,ClampToQuantum(red),q);
-          SetPixelGreen(image,ClampToQuantum(green),q);
-          SetPixelBlue(image,ClampToQuantum(blue),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
-      }
-      finish.image=image;
-      finish.image_view=image_view;
-      finish.exception=exception;
-      return(FinishColorspace(&finish,sRGBColorspace,status));
-    }
-    case LogColorspace:
-      return(LogTosRGB(image,status,exception));
-    case RGBColorspace:
-    case scRGBColorspace:
-    {
-      ColorspaceRowInfo
-        finish;
-
-      /*
-        Transform linear RGB to sRGB colorspace.
-      */
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=(ssize_t) image->columns; x != 0; x--)
-        {
-          double
-            blue,
-            green,
-            red;
-
-          red=EncodePixelGamma((MagickRealType) GetPixelRed(image,q));
-          green=EncodePixelGamma((MagickRealType) GetPixelGreen(image,q));
-          blue=EncodePixelGamma((MagickRealType) GetPixelBlue(image,q));
-          SetPixelRed(image,ClampToQuantum(red),q);
-          SetPixelGreen(image,ClampToQuantum(green),q);
-          SetPixelBlue(image,ClampToQuantum(blue),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
-      }
-      finish.image=image;
-      finish.image_view=image_view;
-      finish.exception=exception;
-      return(FinishColorspace(&finish,sRGBColorspace,status));
+      break;
     }
     default:
-      break;
-  }
-  /*
-    Allocate the tables.
-  */
-  x_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*x_map));
-  y_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*y_map));
-  z_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*z_map));
-  if (IsTransformMapMissing(x_map,y_map,z_map) != MagickFalse)
-    {
-      z_map=RelinquishTransformMap(z_map);
-      y_map=RelinquishTransformMap(y_map);
-      x_map=RelinquishTransformMap(x_map);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
-  switch (image->colorspace)
-  {
-    case OHTAColorspace:
     {
       /*
-        Initialize OHTA tables:
-
-          I1 = 0.33333*R+0.33334*G+0.33333*B
-          I2 = 0.50000*R+0.00000*G-0.50000*B
-          I3 =-0.25000*R+0.50000*G-0.25000*B
-          R = I1+1.00000*I2-0.66668*I3
-          G = I1+0.00000*I2+1.33333*I3
-          B = I1-1.00000*I2-0.66668*I3
-
-        I and Q, normally -0.5 through 0.5, must be normalized to the range 0
-        through QuantumRange.
+        Linear conversion tables.
       */
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp parallel for schedule(static)
@@ -2967,17 +2454,29 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       for (i=0; i <= (ssize_t) MaxMap; i++)
       {
         x_map[i].x=(MagickRealType) (1.0*(double) i);
-        y_map[i].x=(MagickRealType) (0.5*1.00000*(2.0*(double) i-MaxMap));
-        z_map[i].x=(MagickRealType) (-0.5*0.66668*(2.0*(double) i-MaxMap));
-        x_map[i].y=(MagickRealType) (1.0*(double) i);
-        y_map[i].y=(MagickRealType) (0.5*0.00000*(2.0*(double) i-MaxMap));
-        z_map[i].y=(MagickRealType) (0.5*1.33333*(2.0*(double) i-MaxMap));
-        x_map[i].z=(MagickRealType) (1.0*(double) i);
-        y_map[i].z=(MagickRealType) (-0.5*1.00000*(2.0*(double) i-MaxMap));
-        z_map[i].z=(MagickRealType) (-0.5*0.66668*(2.0*(double) i-MaxMap));
+        y_map[i].x=(MagickRealType) 0.0;
+        z_map[i].x=(MagickRealType) 0.0;
+        x_map[i].y=(MagickRealType) 0.0;
+        y_map[i].y=(MagickRealType) (1.0*(double) i);
+        z_map[i].y=(MagickRealType) 0.0;
+        x_map[i].z=(MagickRealType) 0.0;
+        y_map[i].z=(MagickRealType) 0.0;
+        z_map[i].z=(MagickRealType) (1.0*(double) i);
       }
       break;
     }
+  }
+}
+
+static void InitializeRec601OrRec709Maps(const Image *image,
+  TransformPacket *x_map,
+  TransformPacket *y_map,TransformPacket *z_map)
+{
+  ssize_t
+    i;
+
+  switch (image->colorspace)
+  {
     case Rec601YCbCrColorspace:
     {
       /*
@@ -3036,42 +2535,37 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       }
       break;
     }
-    case YCCColorspace:
-    {
-      /*
-        Initialize YCC tables:
-
-          R = Y            +1.340762*C2
-          G = Y-0.317038*C1-0.682243*C2
-          B = Y+1.632639*C1
-
-        YCC is scaled by 1.3584.  C1 zero is 156 and C2 is at 137.
-      */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=(MagickRealType) (1.3584000*(double) i);
-        y_map[i].x=(MagickRealType) 0.0000000;
-        z_map[i].x=(MagickRealType) (1.8215000*(1.0*(double) i-(double)
-          ScaleQuantumToMap(ScaleCharToQuantum(137))));
-        x_map[i].y=(MagickRealType) (1.3584000*(double) i);
-        y_map[i].y=(MagickRealType) (-0.4302726*(1.0*(double) i-(double)
-          ScaleQuantumToMap(ScaleCharToQuantum(156))));
-        z_map[i].y=(MagickRealType) (-0.9271435*(1.0*(double) i-(double)
-          ScaleQuantumToMap(ScaleCharToQuantum(137))));
-        x_map[i].z=(MagickRealType) (1.3584000*(double) i);
-        y_map[i].z=(MagickRealType) (2.2179000*(1.0*(double) i-(double)
-          ScaleQuantumToMap(ScaleCharToQuantum(156))));
-        z_map[i].z=(MagickRealType) 0.0000000;
-      }
-      break;
-    }
     default:
     {
+      InitializeYCCOrIdentityMaps(image,x_map,y_map,z_map);
+      break;
+    }
+  }
+}
+
+static void InitializeTosRGBMaps(const Image *image,
+  TransformPacket *x_map,
+  TransformPacket *y_map,TransformPacket *z_map)
+{
+  ssize_t
+    i;
+
+  switch (image->colorspace)
+  {
+    case OHTAColorspace:
+    {
       /*
-        Linear conversion tables.
+        Initialize OHTA tables:
+
+          I1 = 0.33333*R+0.33334*G+0.33333*B
+          I2 = 0.50000*R+0.00000*G-0.50000*B
+          I3 =-0.25000*R+0.50000*G-0.25000*B
+          R = I1+1.00000*I2-0.66668*I3
+          G = I1+0.00000*I2+1.33333*I3
+          B = I1-1.00000*I2-0.66668*I3
+
+        I and Q, normally -0.5 through 0.5, must be normalized to the range 0
+        through QuantumRange.
       */
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp parallel for schedule(static)
@@ -3079,18 +2573,132 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       for (i=0; i <= (ssize_t) MaxMap; i++)
       {
         x_map[i].x=(MagickRealType) (1.0*(double) i);
-        y_map[i].x=(MagickRealType) 0.0;
-        z_map[i].x=(MagickRealType) 0.0;
-        x_map[i].y=(MagickRealType) 0.0;
-        y_map[i].y=(MagickRealType) (1.0*(double) i);
-        z_map[i].y=(MagickRealType) 0.0;
-        x_map[i].z=(MagickRealType) 0.0;
-        y_map[i].z=(MagickRealType) 0.0;
-        z_map[i].z=(MagickRealType) (1.0*(double) i);
+        y_map[i].x=(MagickRealType) (0.5*1.00000*(2.0*(double) i-MaxMap));
+        z_map[i].x=(MagickRealType) (-0.5*0.66668*(2.0*(double) i-MaxMap));
+        x_map[i].y=(MagickRealType) (1.0*(double) i);
+        y_map[i].y=(MagickRealType) (0.5*0.00000*(2.0*(double) i-MaxMap));
+        z_map[i].y=(MagickRealType) (0.5*1.33333*(2.0*(double) i-MaxMap));
+        x_map[i].z=(MagickRealType) (1.0*(double) i);
+        y_map[i].z=(MagickRealType) (-0.5*1.00000*(2.0*(double) i-MaxMap));
+        z_map[i].z=(MagickRealType) (-0.5*0.66668*(2.0*(double) i-MaxMap));
       }
       break;
     }
+    default:
+    {
+      InitializeRec601OrRec709Maps(image,x_map,y_map,z_map);
+      break;
+    }
   }
+}
+
+static MagickBooleanType TransformsRGBPixels(
+  const TransformsRGBTables *tables,MagickBooleanType status,
+  MagickOffsetType progress)
+{
+#define TransformsRGBImageTag  "Transform/Image"
+
+  ExceptionInfo
+    *const exception = tables->exception;
+
+  Image
+    *const image = tables->image;
+
+  TransformPacket
+    *const x_map = tables->x_map,
+    *const y_map = tables->y_map,
+    *const z_map = tables->z_map;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    PixelInfo
+      pixel;
+
+    ssize_t
+      x;
+
+    Quantum
+      *magick_restrict q;
+
+    const ColorspaceRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      size_t
+        blue,
+        green,
+        red;
+
+      red=ScaleQuantumToMap(GetPixelRed(image,q));
+      green=ScaleQuantumToMap(GetPixelGreen(image,q));
+      blue=ScaleQuantumToMap(GetPixelBlue(image,q));
+      pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x;
+      pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y;
+      pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z;
+      pixel=ScaleTransformedPixel(image,YCCMap,pixel);
+      SetPixelRed(image,ClampToQuantum(pixel.red),q);
+      SetPixelGreen(image,ClampToQuantum(pixel.green),q);
+      SetPixelBlue(image,ClampToQuantum(pixel.blue),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    SyncColorspaceRow(image_view,exception,&status);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetColorspaceProgress(image,TransformsRGBImageTag,progress,&status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+static MagickBooleanType TransformsRGBByTables(Image *image,
+  MagickBooleanType status,MagickOffsetType progress,
+  ExceptionInfo *exception)
+{
+  TransformPacket
+    *y_map,
+    *x_map,
+    *z_map;
+
+  TransformsRGBTables
+    tables;
+
+  /*
+    Allocate the tables.
+  */
+  x_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(*x_map));
+  y_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(*y_map));
+  z_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(*z_map));
+  if (IsTransformMapMissing(x_map,y_map,z_map) != MagickFalse)
+    {
+      z_map=RelinquishTransformMap(z_map);
+      y_map=RelinquishTransformMap(y_map);
+      x_map=RelinquishTransformMap(x_map);
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  InitializeTosRGBMaps(image,x_map,y_map,z_map);
   /*
     Convert to sRGB.
   */
@@ -3107,57 +2715,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       /*
         Convert DirectClass image.
       */
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        PixelInfo
-          pixel;
-
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          size_t
-            blue,
-            green,
-            red;
-
-          red=ScaleQuantumToMap(GetPixelRed(image,q));
-          green=ScaleQuantumToMap(GetPixelGreen(image,q));
-          blue=ScaleQuantumToMap(GetPixelBlue(image,q));
-          pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x;
-          pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y;
-          pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z;
-          pixel=ScaleTransformedPixel(image,YCCMap,pixel);
-          SetPixelRed(image,ClampToQuantum(pixel.red),q);
-          SetPixelGreen(image,ClampToQuantum(pixel.green),q);
-          SetPixelBlue(image,ClampToQuantum(pixel.blue),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp atomic
-#endif
-            progress++;
-            SetColorspaceProgress(image,TransformsRGBImageTag,progress,&status);
-          }
-      }
-      image_view=DestroyCacheView(image_view);
+      status=TransformsRGBPixels(&tables,status,progress);
       break;
     }
     case PseudoClass:
@@ -3175,4 +2733,275 @@ static MagickBooleanType TransformsRGBImage(Image *image,
   if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
     return(MagickFalse);
   return(MagickTrue);
+}
+
+static void TransformLinearRGBRowTosRGB(const ColorspaceRowInfo *info,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = info->image;
+
+  CacheView
+    *const image_view = info->image_view;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  const ColorspaceRowInfo
+    row = { image,image_view,exception };
+
+  if (FetchColorspaceRow(&row,y,&q,status) == MagickFalse)
+    return;
+  for (x=(ssize_t) image->columns; x != 0; x--)
+  {
+    double
+      blue,
+      green,
+      red;
+
+    red=EncodePixelGamma((MagickRealType) GetPixelRed(image,q));
+    green=EncodePixelGamma((MagickRealType) GetPixelGreen(image,q));
+    blue=EncodePixelGamma((MagickRealType) GetPixelBlue(image,q));
+    SetPixelRed(image,ClampToQuantum(red),q);
+    SetPixelGreen(image,ClampToQuantum(green),q);
+    SetPixelBlue(image,ClampToQuantum(blue),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  SyncColorspaceRow(image_view,exception,status);
+}
+
+static void TransformLinearGrayRowTosRGB(const ColorspaceRowInfo *info,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = info->image;
+
+  CacheView
+    *const image_view = info->image_view;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  const ColorspaceRowInfo
+    row = { image,image_view,exception };
+
+  if (FetchColorspaceRow(&row,y,&q,status) == MagickFalse)
+    return;
+  LinearGrayPixelsTosRGB(image,q);
+  SyncColorspaceRow(image_view,exception,status);
+}
+
+static MagickBooleanType LinearGrayTosRGB(Image *image,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  ColorspaceRowInfo
+    finish;
+
+  /*
+    Transform linear GRAY to sRGB colorspace.
+  */
+  if (SyncImageToDirectClass(image,exception) == MagickFalse)
+    return(MagickFalse);
+  if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
+    return(MagickFalse);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const ColorspaceRowInfo
+      info = { image,image_view,exception };
+
+    TransformLinearGrayRowTosRGB(&info,y,&status);
+  }
+  finish.image=image;
+  finish.image_view=image_view;
+  finish.exception=exception;
+  return(FinishColorspace(&finish,sRGBColorspace,status));
+}
+
+static MagickBooleanType GrayTosRGB(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  ColorspaceRowInfo
+    finish;
+
+  /*
+    Transform linear GRAY to sRGB colorspace.
+  */
+  if (SyncImageToDirectClass(image,exception) == MagickFalse)
+    return(MagickFalse);
+  if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
+    return(MagickFalse);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ssize_t
+      x;
+
+    Quantum
+      *magick_restrict q;
+
+    const ColorspaceRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      MagickRealType
+        gray;
+
+      gray=0.212656*(double) GetPixelRed(image,q)+0.715158*(double)
+        GetPixelGreen(image,q)+0.072186*(double) GetPixelBlue(image,q);
+      SetPixelRed(image,ClampToQuantum(gray),q);
+      SetPixelGreen(image,ClampToQuantum(gray),q);
+      SetPixelBlue(image,ClampToQuantum(gray),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    SyncColorspaceRow(image_view,exception,&status);
+  }
+  finish.image=image;
+  finish.image_view=image_view;
+  finish.exception=exception;
+  return(FinishColorspace(&finish,sRGBColorspace,status));
+}
+
+static MagickBooleanType LogOrLinearRGBTosRGB(Image *image,
+  MagickBooleanType status,MagickOffsetType progress,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  switch (image->colorspace)
+  {
+    case LogColorspace:
+      return(LogTosRGB(image,status,exception));
+    case RGBColorspace:
+    case scRGBColorspace:
+    {
+      ColorspaceRowInfo
+        finish;
+
+      /*
+        Transform linear RGB to sRGB colorspace.
+      */
+      if (SyncImageToDirectClass(image,exception) == MagickFalse)
+        return(MagickFalse);
+      image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static) shared(status) \
+        magick_number_threads(image,image,image->rows,2)
+#endif
+      for (y=0; y < (ssize_t) image->rows; y++)
+      {
+        const ColorspaceRowInfo
+          info = { image,image_view,exception };
+
+        TransformLinearRGBRowTosRGB(&info,y,&status);
+      }
+      finish.image=image;
+      finish.image_view=image_view;
+      finish.exception=exception;
+      return(FinishColorspace(&finish,sRGBColorspace,status));
+    }
+    default:
+      break;
+  }
+  return(TransformsRGBByTables(image,status,progress,exception));
+}
+
+static MagickBooleanType TransformsRGBImage(Image *image,
+  ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  IlluminantType
+    illuminant = D65Illuminant;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  GetIlluminantArtifact(image,&artifact,&illuminant);
+  status=MagickTrue;
+  progress=0;
+  switch (image->colorspace)
+  {
+    case CMYKColorspace:
+      return(CMYKTosRGB(image,status,exception));
+    case LinearGRAYColorspace:
+      return(LinearGrayTosRGB(image,status,exception));
+    case GRAYColorspace:
+      return(GrayTosRGB(image,status,exception));
+    case Adobe98Colorspace:
+    case CMYColorspace:
+    case CAT02LMSColorspace:
+    case DisplayP3Colorspace:
+    case HCLColorspace:
+    case HCLpColorspace:
+    case HSBColorspace:
+    case HSIColorspace:
+    case HSLColorspace:
+    case HSVColorspace:
+    case HWBColorspace:
+    case JzazbzColorspace:
+    case LabColorspace:
+    case LCHColorspace:
+    case LCHabColorspace:
+    case LCHuvColorspace:
+    case LMSColorspace:
+    case LuvColorspace:
+    case OklabColorspace:
+    case OklchColorspace:
+    case ProPhotoColorspace:
+    case xyYColorspace:
+    case XYZColorspace:
+    case YCbCrColorspace:
+    case YDbDrColorspace:
+    case YIQColorspace:
+    case YPbPrColorspace:
+    case YUVColorspace:
+      return(GenericTosRGB(image,illuminant,status,exception));
+    default:
+      break;
+  }
+  return(LogOrLinearRGBTosRGB(image,status,progress,exception));
 }

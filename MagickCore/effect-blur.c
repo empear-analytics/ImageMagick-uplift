@@ -391,6 +391,41 @@ static MagickBooleanType AcquireAdaptiveBlurKernel(double **kernel,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireAdaptiveBlurKernels(double **kernel,
+  const size_t width,const double sigma)
+{
+  ssize_t
+    w;
+
+  for (w=0; w < (ssize_t) width; w+=2)
+  {
+    if (AcquireAdaptiveBlurKernel(kernel,width,w,sigma) == MagickFalse)
+      break;
+  }
+  if (w < (ssize_t) width)
+    {
+      RelinquishAdaptiveKernels(kernel,w);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireAdaptiveBlurKernelSet(double ***kernel,
+  const size_t width,const double sigma)
+{
+  *kernel=(double **) MagickAssumeAligned(AcquireAlignedMemory((size_t) width,
+    sizeof(**kernel)));
+  if (*kernel == (double **) NULL)
+    return(MagickFalse);
+  (void) memset(*kernel,0,(size_t) width*sizeof(**kernel));
+  if (AcquireAdaptiveBlurKernels(*kernel,width,sigma) == MagickFalse)
+    {
+      *kernel=(double **) RelinquishAlignedMemory(*kernel);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 typedef struct _AdaptiveBlurRow
 {
   const Image
@@ -505,6 +540,104 @@ static MagickBooleanType PrepareAdaptiveEdge(const AdaptiveEdge *edge,
   return(MagickTrue);
 }
 
+static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    image=DestroyImage(image);
+  return(image);
+}
+
+static void RelinquishAdaptiveKernelSet(double **kernel,const size_t width)
+{
+  ssize_t
+    w;
+
+  for (w=0; w < (ssize_t) width; w+=2)
+    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
+  kernel=(double **) RelinquishAlignedMemory(kernel);
+}
+
+typedef struct _AdaptiveBlurLine
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image,
+    *edge_image;
+
+  CacheView
+    *image_view,
+    *edge_view,
+    *blur_view;
+
+  double
+    **kernel;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
+} AdaptiveBlurLine;
+
+static MagickBooleanType BlurAdaptiveLine(const AdaptiveBlurLine *line,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const image = line->image;
+
+  Image
+    *const blur_image = line->blur_image,
+    *const edge_image = line->edge_image;
+
+  CacheView
+    *const image_view = line->image_view,
+    *const edge_view = line->edge_view,
+    *const blur_view = line->blur_view;
+
+  double
+    **const kernel = line->kernel;
+
+  const size_t
+    width = line->width;
+
+  ExceptionInfo
+    *const exception = line->exception;
+
+  const Quantum
+    *magick_restrict r;
+
+  Quantum
+    *magick_restrict q;
+
+  AdaptiveBlurRow
+    row;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  r=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
+    exception);
+  if ((r == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  row.image=image;
+  row.blur_image=blur_image;
+  row.edge_image=edge_image;
+  row.image_view=image_view;
+  row.kernel=kernel;
+  row.width=width;
+  row.y=y;
+  row.exception=exception;
+  BlurAdaptiveRow(&row,r,q);
+  if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -533,7 +666,6 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
     width;
 
   ssize_t
-    w,
     y;
 
   assert(image != (const Image *) NULL);
@@ -567,24 +699,8 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
     Create a set of kernels from maximum (radius,sigma) to minimum.
   */
   width=GetOptimalKernelWidth2D(radius,sigma);
-  kernel=(double **) MagickAssumeAligned(AcquireAlignedMemory((size_t) width,
-    sizeof(*kernel)));
-  if (kernel == (double **) NULL)
+  if (AcquireAdaptiveBlurKernelSet(&kernel,width,sigma) == MagickFalse)
     {
-      edge_image=DestroyImage(edge_image);
-      blur_image=DestroyImage(blur_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  (void) memset(kernel,0,(size_t) width*sizeof(*kernel));
-  for (w=0; w < (ssize_t) width; w+=2)
-  {
-    if (AcquireAdaptiveBlurKernel(kernel,width,w,sigma) == MagickFalse)
-      break;
-  }
-  if (w < (ssize_t) width)
-    {
-      RelinquishAdaptiveKernels(kernel,w);
-      kernel=(double **) RelinquishAlignedMemory(kernel);
       edge_image=DestroyImage(edge_image);
       blur_image=DestroyImage(blur_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
@@ -603,36 +719,12 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) blur_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict r;
+    const AdaptiveBlurLine
+      line = { image, blur_image, edge_image, image_view, edge_view, blur_view,
+        kernel, width, exception };
 
-    Quantum
-      *magick_restrict q;
-
-    AdaptiveBlurRow
-      row;
-
-    if (status == MagickFalse)
+    if (BlurAdaptiveLine(&line,y,&status) == MagickFalse)
       continue;
-    r=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
-      exception);
-    if ((r == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.blur_image=blur_image;
-    row.edge_image=edge_image;
-    row.image_view=image_view;
-    row.kernel=kernel;
-    row.width=width;
-    row.y=y;
-    row.exception=exception;
-    BlurAdaptiveRow(&row,r,q);
-    if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -647,12 +739,8 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   edge_view=DestroyCacheView(edge_view);
   image_view=DestroyCacheView(image_view);
   edge_image=DestroyImage(edge_image);
-  for (w=0; w < (ssize_t) width; w+=2)
-    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
-  kernel=(double **) RelinquishAlignedMemory(kernel);
-  if (status == MagickFalse)
-    blur_image=DestroyImage(blur_image);
-  return(blur_image);
+  RelinquishAdaptiveKernelSet(kernel,width);
+  return(ReleaseFailedImage(blur_image,status));
 }
 
 /*
@@ -808,24 +896,52 @@ static MagickBooleanType SharpenAdaptiveLine(const AdaptiveBlurRow *row,
   return(MagickTrue);
 }
 
-MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
-  const double sigma,ExceptionInfo *exception)
-{
 #define AdaptiveSharpenImageTag  "Convolve/Image"
 #define MagickSigma  (fabs(sigma) < MagickEpsilon ? MagickEpsilon : sigma)
+
+typedef struct _AdaptiveSharpen
+{
+  const Image
+    *image;
+
+  Image
+    *sharp_image,
+    *edge_image;
+
+  double
+    **kernel;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
+} AdaptiveSharpen;
+
+static Image *SharpenAdaptiveRows(const AdaptiveSharpen *adaptive)
+{
+  const Image
+    *const image = adaptive->image;
+
+  Image
+    *const sharp_image = adaptive->sharp_image;
+
+  Image
+    *edge_image = adaptive->edge_image;
+
+  double
+    **kernel = adaptive->kernel;
+
+  const size_t
+    width = adaptive->width;
+
+  ExceptionInfo
+    *const exception = adaptive->exception;
 
   CacheView
     *sharp_view,
     *edge_view,
     *image_view;
-
-  double
-    **kernel;
-
-  Image
-    *sharp_image,
-    *edge_image,
-    *gaussian_image;
 
   MagickBooleanType
     status;
@@ -833,12 +949,82 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   MagickOffsetType
     progress;
 
+  ssize_t
+    w,
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  edge_view=AcquireVirtualCacheView(edge_image,exception);
+  sharp_view=AcquireAuthenticCacheView(sharp_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,sharp_image,sharp_image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) sharp_image->rows; y++)
+  {
+    const AdaptiveBlurRow
+      row = { image, sharp_image, edge_image, image_view, kernel, width, y,
+        exception };
+
+    if (SharpenAdaptiveLine(&row,edge_view,sharp_view,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetBlurProgress(image,AdaptiveSharpenImageTag,progress,&status);
+      }
+  }
+  sharp_image->type=image->type;
+  sharp_view=DestroyCacheView(sharp_view);
+  edge_view=DestroyCacheView(edge_view);
+  image_view=DestroyCacheView(image_view);
+  edge_image=DestroyImage(edge_image);
+  for (w=0; w < (ssize_t) width; w+=2)
+    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
+  kernel=(double **) RelinquishAlignedMemory(kernel);
+  return(ReleaseFailedImage(sharp_image,status));
+}
+
+static ssize_t AcquireAdaptiveSharpenKernelRun(double **kernel,
+  const size_t width,const double sigma)
+{
+  ssize_t
+    w;
+
+  for (w=0; w < (ssize_t) width; w+=2)
+  {
+    if (AcquireAdaptiveSharpenKernel(kernel,width,w,sigma) == MagickFalse)
+      break;
+  }
+  return(w);
+}
+
+MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
+  const double sigma,ExceptionInfo *exception)
+{
+  AdaptiveEdge
+    edge;
+
+  AdaptiveSharpen
+    adaptive;
+
+  double
+    **kernel;
+
+  Image
+    *sharp_image,
+    *edge_image;
+
   size_t
     width;
 
   ssize_t
-    w,
-    y;
+    w;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -859,20 +1045,14 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   /*
     Edge detect the image brightness channel, level, sharp, and level again.
   */
-  edge_image=EdgeImage(image,radius,exception);
-  if (edge_image == (Image *) NULL)
+  edge.image=image;
+  edge.radius=radius;
+  edge.sigma=sigma;
+  if (PrepareAdaptiveEdge(&edge,&edge_image,exception) == MagickFalse)
     {
       sharp_image=DestroyImage(sharp_image);
       return((Image *) NULL);
     }
-  (void) AutoLevelImage(edge_image,exception);
-  gaussian_image=BlurImage(edge_image,radius,sigma,exception);
-  if (gaussian_image != (Image *) NULL)
-    {
-      edge_image=DestroyImage(edge_image);
-      edge_image=gaussian_image;
-    }
-  (void) AutoLevelImage(edge_image,exception);
   /*
     Create a set of kernels from maximum (radius,sigma) to minimum.
   */
@@ -886,11 +1066,7 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
   (void) memset(kernel,0,(size_t) width*sizeof(*kernel));
-  for (w=0; w < (ssize_t) width; w+=2)
-  {
-    if (AcquireAdaptiveSharpenKernel(kernel,width,w,sigma) == MagickFalse)
-      break;
-  }
+  w=AcquireAdaptiveSharpenKernelRun(kernel,width,sigma);
   if (w < (ssize_t) width)
     {
       RelinquishAdaptiveKernels(kernel,w);
@@ -902,50 +1078,13 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   /*
     Adaptively sharpen image.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  edge_view=AcquireVirtualCacheView(edge_image,exception);
-  sharp_view=AcquireAuthenticCacheView(sharp_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,sharp_image,sharp_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) sharp_image->rows; y++)
-  {
-    AdaptiveBlurRow
-      row;
-
-    row.image=image;
-    row.blur_image=sharp_image;
-    row.edge_image=edge_image;
-    row.image_view=image_view;
-    row.kernel=kernel;
-    row.width=width;
-    row.y=y;
-    row.exception=exception;
-    if (SharpenAdaptiveLine(&row,edge_view,sharp_view,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetBlurProgress(image,AdaptiveSharpenImageTag,progress,&status);
-      }
-  }
-  sharp_image->type=image->type;
-  sharp_view=DestroyCacheView(sharp_view);
-  edge_view=DestroyCacheView(edge_view);
-  image_view=DestroyCacheView(image_view);
-  edge_image=DestroyImage(edge_image);
-  for (w=0; w < (ssize_t) width; w+=2)
-    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
-  kernel=(double **) RelinquishAlignedMemory(kernel);
-  if (status == MagickFalse)
-    sharp_image=DestroyImage(sharp_image);
-  return(sharp_image);
+  adaptive.image=image;
+  adaptive.sharp_image=sharp_image;
+  adaptive.edge_image=edge_image;
+  adaptive.kernel=kernel;
+  adaptive.width=width;
+  adaptive.exception=exception;
+  return(SharpenAdaptiveRows(&adaptive));
 }
 
 /*
@@ -1631,13 +1770,120 @@ static OffsetInfo FillBilateralSpatial(const size_t width,
   return(mid);
 }
 
+typedef struct _BilateralBlur
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  OffsetInfo
+    mid;
+
+  size_t
+    width,
+    height;
+
+  double
+    *intensity_gaussian,
+    *spatial_gaussian,
+    **weights,
+    intensity_sigma,
+    spatial_sigma;
+
+  size_t
+    number_threads;
+
+  ExceptionInfo
+    *exception;
+} BilateralBlur;
+
+static Image *BlurBilateralRows(const BilateralBlur *bilateral)
+{
+  const Image
+    *const image = bilateral->image;
+
+  Image
+    *const blur_image = bilateral->blur_image;
+
+  const OffsetInfo
+    mid = bilateral->mid;
+
+  const size_t
+    width = bilateral->width,
+    height = bilateral->height;
+
+  double
+    *const intensity_gaussian = bilateral->intensity_gaussian,
+    *const spatial_gaussian = bilateral->spatial_gaussian,
+    **weights = bilateral->weights;
+
+  const double
+    intensity_sigma = bilateral->intensity_sigma,
+    spatial_sigma = bilateral->spatial_sigma;
+
+  const size_t
+    number_threads = bilateral->number_threads;
+
+  ExceptionInfo
+    *const exception = bilateral->exception;
+
+  CacheView
+    *blur_view,
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  blur_view=AcquireAuthenticCacheView(blur_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,blur_image,blur_image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) blur_image->rows; y++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    const BilateralRow
+      row = { image, blur_image, image_view, mid, width, height,
+        intensity_gaussian, spatial_gaussian, weights, intensity_sigma,
+        spatial_sigma, id, y, exception };
+
+    if (BlurBilateralLine(&row,blur_view,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetBlurProgress(image,BilateralBlurImageTag,progress,&status);
+      }
+  }
+  blur_image->type=image->type;
+  blur_view=DestroyCacheView(blur_view);
+  image_view=DestroyCacheView(image_view);
+  weights=DestroyBilateralTLS(number_threads,weights);
+  return(ReleaseFailedImage(blur_image,status));
+}
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
 {
-  CacheView
-    *blur_view,
-    *image_view;
+  BilateralBlur
+    bilateral;
 
   double
     intensity_gaussian[2*(MaxIntensity+1)],
@@ -1647,20 +1893,11 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   Image
     *blur_image;
 
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
   OffsetInfo
     mid;
 
   size_t
     number_threads;
-
-  ssize_t
-    y;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1684,54 +1921,19 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   /*
     Bilateral blur image.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  blur_view=AcquireAuthenticCacheView(blur_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,blur_image,blur_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) blur_image->rows; y++)
-  {
-    const int
-      id = GetOpenMPThreadId();
-
-    BilateralRow
-      row;
-
-    row.image=image;
-    row.blur_image=blur_image;
-    row.image_view=image_view;
-    row.mid=mid;
-    row.width=width;
-    row.height=height;
-    row.intensity_gaussian=intensity_gaussian;
-    row.spatial_gaussian=spatial_gaussian;
-    row.weights=weights;
-    row.intensity_sigma=intensity_sigma;
-    row.spatial_sigma=spatial_sigma;
-    row.id=id;
-    row.y=y;
-    row.exception=exception;
-    if (BlurBilateralLine(&row,blur_view,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetBlurProgress(image,BilateralBlurImageTag,progress,&status);
-      }
-  }
-  blur_image->type=image->type;
-  blur_view=DestroyCacheView(blur_view);
-  image_view=DestroyCacheView(image_view);
-  weights=DestroyBilateralTLS(number_threads,weights);
-  if (status == MagickFalse)
-    blur_image=DestroyImage(blur_image);
-  return(blur_image);
+  bilateral.image=image;
+  bilateral.blur_image=blur_image;
+  bilateral.mid=mid;
+  bilateral.width=width;
+  bilateral.height=height;
+  bilateral.intensity_gaussian=intensity_gaussian;
+  bilateral.spatial_gaussian=spatial_gaussian;
+  bilateral.weights=weights;
+  bilateral.intensity_sigma=intensity_sigma;
+  bilateral.spatial_sigma=spatial_sigma;
+  bilateral.number_threads=number_threads;
+  bilateral.exception=exception;
+  return(BlurBilateralRows(&bilateral));
 }
 
 /*
@@ -2499,17 +2701,10 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    MotionRow
-      row;
+    const MotionRow
+      row = { image, blur_image, kernel, motion_view, offset, width, y,
+        exception };
 
-    row.image=image;
-    row.blur_image=blur_image;
-    row.kernel=kernel;
-    row.motion_view=motion_view;
-    row.offset=offset;
-    row.width=width;
-    row.y=y;
-    row.exception=exception;
     if (BlurMotionLine(&row,image_view,blur_view,&status) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -2526,9 +2721,7 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   image_view=DestroyCacheView(image_view);
   kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
   offset=(OffsetInfo *) RelinquishMagickMemory(offset);
-  if (status == MagickFalse)
-    blur_image=DestroyImage(blur_image);
-  return(blur_image);
+  return(ReleaseFailedImage(blur_image,status));
 }
 
 /*
@@ -3011,14 +3204,104 @@ static void FillRotationalTables(double *cos_theta,double *sin_theta,
   }
 }
 
-MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
-  ExceptionInfo *exception)
+typedef struct _RotationalBlur
 {
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  PointInfo
+    blur_center;
+
+  double
+    blur_radius,
+    *cos_theta,
+    *sin_theta;
+
+  size_t
+    n;
+
+  ExceptionInfo
+    *exception;
+} RotationalBlur;
+
+static Image *BlurRotationalRows(const RotationalBlur *rotational)
+{
+  const Image
+    *const image = rotational->image;
+
+  Image
+    *const blur_image = rotational->blur_image;
+
+  const PointInfo
+    blur_center = rotational->blur_center;
+
+  const double
+    blur_radius = rotational->blur_radius;
+
+  double
+    *cos_theta = rotational->cos_theta,
+    *sin_theta = rotational->sin_theta;
+
+  const size_t
+    n = rotational->n;
+
+  ExceptionInfo
+    *const exception = rotational->exception;
+
   CacheView
     *blur_view,
     *image_view,
     *radial_view;
 
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  radial_view=AcquireVirtualCacheView(image,exception);
+  blur_view=AcquireAuthenticCacheView(blur_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,blur_image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const RotationalRow
+      row = { image, blur_image, radial_view, blur_center, blur_radius,
+        cos_theta, sin_theta, n, y, exception };
+
+    if (BlurRotationalLine(&row,image_view,blur_view,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetBlurProgress(image,BlurImageTag,progress,&status);
+      }
+  }
+  blur_view=DestroyCacheView(blur_view);
+  radial_view=DestroyCacheView(radial_view);
+  image_view=DestroyCacheView(image_view);
+  cos_theta=(double *) RelinquishMagickMemory(cos_theta);
+  sin_theta=(double *) RelinquishMagickMemory(sin_theta);
+  return(ReleaseFailedImage(blur_image,status));
+}
+
+MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
+  ExceptionInfo *exception)
+{
   double
     blur_radius,
     *cos_theta,
@@ -3028,20 +3311,14 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   Image
     *blur_image;
 
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
   PointInfo
     blur_center;
 
+  RotationalBlur
+    rotational;
+
   size_t
     n;
-
-  ssize_t
-    y;
 
   /*
     Allocate blur image.
@@ -3076,49 +3353,15 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   /*
     Radial blur image.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  radial_view=AcquireVirtualCacheView(image,exception);
-  blur_view=AcquireAuthenticCacheView(blur_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,blur_image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    RotationalRow
-      row;
-
-    row.image=image;
-    row.blur_image=blur_image;
-    row.radial_view=radial_view;
-    row.blur_center=blur_center;
-    row.blur_radius=blur_radius;
-    row.cos_theta=cos_theta;
-    row.sin_theta=sin_theta;
-    row.n=n;
-    row.y=y;
-    row.exception=exception;
-    if (BlurRotationalLine(&row,image_view,blur_view,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetBlurProgress(image,BlurImageTag,progress,&status);
-      }
-  }
-  blur_view=DestroyCacheView(blur_view);
-  radial_view=DestroyCacheView(radial_view);
-  image_view=DestroyCacheView(image_view);
-  cos_theta=(double *) RelinquishMagickMemory(cos_theta);
-  sin_theta=(double *) RelinquishMagickMemory(sin_theta);
-  if (status == MagickFalse)
-    blur_image=DestroyImage(blur_image);
-  return(blur_image);
+  rotational.image=image;
+  rotational.blur_image=blur_image;
+  rotational.blur_center=blur_center;
+  rotational.blur_radius=blur_radius;
+  rotational.cos_theta=cos_theta;
+  rotational.sin_theta=sin_theta;
+  rotational.n=n;
+  rotational.exception=exception;
+  return(BlurRotationalRows(&rotational));
 }
 
 /*
@@ -3670,19 +3913,57 @@ static MagickBooleanType AcquireSelectiveLuminance(const Image *image,
   return(MagickTrue);
 }
 
-MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
-  const double sigma,const double threshold,ExceptionInfo *exception)
-{
 #define SelectiveBlurImageTag  "SelectiveBlur/Image"
+
+typedef struct _SelectiveBlur
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image,
+    *luminance_image;
+
+  MagickRealType
+    *kernel;
+
+  double
+    threshold;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
+} SelectiveBlur;
+
+static Image *BlurSelectiveRows(const SelectiveBlur *selective)
+{
+  const Image
+    *const image = selective->image;
+
+  Image
+    *const blur_image = selective->blur_image;
+
+  Image
+    *luminance_image = selective->luminance_image;
+
+  MagickRealType
+    *kernel = selective->kernel;
+
+  const double
+    threshold = selective->threshold;
+
+  const size_t
+    width = selective->width;
+
+  ExceptionInfo
+    *const exception = selective->exception;
 
   CacheView
     *blur_view,
     *image_view,
     *luminance_view;
-
-  Image
-    *blur_image,
-    *luminance_image;
 
   MagickBooleanType
     status;
@@ -3690,15 +3971,62 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   MagickOffsetType
     progress;
 
-  MagickRealType
-    *kernel;
-
-  size_t
-    width;
-
   ssize_t
     center,
     y;
+
+  status=MagickTrue;
+  progress=0;
+  center=(ssize_t) (GetPixelChannels(image)*(image->columns+width)*
+    ((width-1)/2L)+GetPixelChannels(image)*((width-1)/2L));
+  image_view=AcquireVirtualCacheView(image,exception);
+  luminance_view=AcquireVirtualCacheView(luminance_image,exception);
+  blur_view=AcquireAuthenticCacheView(blur_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,blur_image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const SelectiveRow
+      row = { image, blur_image, luminance_image, blur_view, image_view,
+        luminance_view, kernel, center, y, threshold, width, exception };
+
+    if (BlurSelectiveLine(&row,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetBlurProgress(image,SelectiveBlurImageTag,progress,&status);
+      }
+  }
+  blur_image->type=image->type;
+  blur_view=DestroyCacheView(blur_view);
+  luminance_view=DestroyCacheView(luminance_view);
+  image_view=DestroyCacheView(image_view);
+  luminance_image=DestroyImage(luminance_image);
+  kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
+  return(ReleaseFailedImage(blur_image,status));
+}
+
+MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
+  const double sigma,const double threshold,ExceptionInfo *exception)
+{
+  Image
+    *blur_image,
+    *luminance_image;
+
+  MagickRealType
+    *kernel;
+
+  SelectiveBlur
+    selective;
+
+  size_t
+    width;
 
   /*
     Initialize blur image attributes.
@@ -3736,54 +4064,14 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   /*
     Threshold blur image.
   */
-  status=MagickTrue;
-  progress=0;
-  center=(ssize_t) (GetPixelChannels(image)*(image->columns+width)*
-    ((width-1)/2L)+GetPixelChannels(image)*((width-1)/2L));
-  image_view=AcquireVirtualCacheView(image,exception);
-  luminance_view=AcquireVirtualCacheView(luminance_image,exception);
-  blur_view=AcquireAuthenticCacheView(blur_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,blur_image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    SelectiveRow
-      row;
-
-    row.image=image;
-    row.blur_image=blur_image;
-    row.luminance_image=luminance_image;
-    row.blur_view=blur_view;
-    row.image_view=image_view;
-    row.luminance_view=luminance_view;
-    row.kernel=kernel;
-    row.center=center;
-    row.y=y;
-    row.threshold=threshold;
-    row.width=width;
-    row.exception=exception;
-    if (BlurSelectiveLine(&row,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetBlurProgress(image,SelectiveBlurImageTag,progress,&status);
-      }
-  }
-  blur_image->type=image->type;
-  blur_view=DestroyCacheView(blur_view);
-  luminance_view=DestroyCacheView(luminance_view);
-  image_view=DestroyCacheView(image_view);
-  luminance_image=DestroyImage(luminance_image);
-  kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
-  if (status == MagickFalse)
-    blur_image=DestroyImage(blur_image);
-  return(blur_image);
+  selective.image=image;
+  selective.blur_image=blur_image;
+  selective.luminance_image=luminance_image;
+  selective.kernel=kernel;
+  selective.threshold=threshold;
+  selective.width=width;
+  selective.exception=exception;
+  return(BlurSelectiveRows(&selective));
 }
 
 /*

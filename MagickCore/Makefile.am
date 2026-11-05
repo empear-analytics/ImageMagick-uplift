@@ -115,6 +115,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colormap.h \
   MagickCore/colormap-private.h \
   MagickCore/colorspace.c \
+  MagickCore/colorspace-convert.c \
+  MagickCore/colorspace-generic-rgb.c \
   MagickCore/colorspace.h \
   MagickCore/colorspace-private.h \
   MagickCore/compare.c \
@@ -142,6 +144,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display.h \
   MagickCore/display-private.h \
   MagickCore/distort.c \
+  MagickCore/distort-affine.c \
+  MagickCore/distort-resize.c \
   MagickCore/distort.h \
   MagickCore/distribute-cache.c \
   MagickCore/distribute-cache.h \
@@ -150,9 +154,11 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/draw.h \
   MagickCore/draw-private.h \
   MagickCore/effect.c \
+  MagickCore/effect-preview.c \
   MagickCore/effect-blur.c \
   MagickCore/effect.h \
   MagickCore/enhance.c \
+  MagickCore/enhance-clahe.c \
   MagickCore/enhance-tone.c \
   MagickCore/enhance.h \
   MagickCore/exception.c \
@@ -218,6 +224,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/monitor.h \
   MagickCore/monitor-private.h \
   MagickCore/montage.c \
+  MagickCore/montage-info.c \
   MagickCore/montage.h \
   MagickCore/morphology.c \
   MagickCore/morphology.h \
@@ -233,6 +240,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/option.h \
   MagickCore/option-private.h \
   MagickCore/paint.c \
+  MagickCore/paint-floodfill.c \
   MagickCore/paint.h \
   MagickCore/pixel.c \
   MagickCore/pixel-import.c \
@@ -251,6 +259,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/profile.h \
   MagickCore/profile-private.h \
   MagickCore/quantize.c \
+  MagickCore/quantize-error.c \
+  MagickCore/quantize-info.c \
   MagickCore/quantize-posterize.c \
   MagickCore/quantize.h \
   MagickCore/quantum.c \
@@ -335,6 +345,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/version.h \
   MagickCore/version-private.h \
   MagickCore/visual-effects.c \
+  MagickCore/visual-effects-wavelet.c \
+  MagickCore/visual-effects-plasma.c \
+  MagickCore/visual-effects-stegano.c \
   MagickCore/visual-effects.h \
   MagickCore/vision.c \
   MagickCore/vision.h \

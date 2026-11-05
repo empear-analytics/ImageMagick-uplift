@@ -523,6 +523,92 @@ static MagickBooleanType PosterizeThroughMap(
   return(status);
 }
 
+static void SetPosterizeProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+typedef struct _PosterizeRows
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  size_t
+    levels;
+
+  ExceptionInfo
+    *exception;
+} PosterizeRows;
+
+static MagickBooleanType PosterizeImageRow(const PosterizeRows *rows,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = rows->image;
+
+  CacheView
+    *const image_view = rows->image_view;
+
+  const size_t
+    levels = rows->levels;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  PosterizeRowPixels(image,levels,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static MagickOffsetType PosterizeColormap(Image *image,const size_t levels,
+  const MagickBooleanType status)
+{
+  MagickOffsetType
+    progress;
+
+  if (image->storage_class == PseudoClass)
+    {
+      ssize_t
+        i;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+          #pragma omp parallel for schedule(static) shared(progress,status) \
+            magick_number_threads(image,image,image->colors,1)
+#endif
+      for (i=0; i < (ssize_t) image->colors; i++)
+      {
+        PosterizeColormapEntry(image,i,levels);
+      }
+    }
+  /*
+    Posterize image.
+  */
+  progress=0;
+  return(progress);
+}
+
 MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   const DitherMethod dither_method,ExceptionInfo *exception)
 {
@@ -560,24 +646,7 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   /*
     No dither or too many levels.
   */
-  if (image->storage_class == PseudoClass)
-    {
-      ssize_t
-        i;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-          #pragma omp parallel for schedule(static) shared(progress,status) \
-            magick_number_threads(image,image,image->colors,1)
-#endif
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        PosterizeColormapEntry(image,i,levels);
-      }
-    }
-  /*
-    Posterize image.
-  */
-  progress=0;
+  progress=PosterizeColormap(image,levels,status);
   image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp parallel for schedule(static) shared(progress,status) \
@@ -585,34 +654,18 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
-  
-    if (status == MagickFalse)
+    const PosterizeRows
+      rows = { image, image_view, levels, exception };
+
+    if (PosterizeImageRow(&rows,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    PosterizeRowPixels(image,levels,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
             #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,PosterizeImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetPosterizeProgress(image,PosterizeImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);

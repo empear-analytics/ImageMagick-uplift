@@ -185,6 +185,15 @@ typedef struct _ClassifySettings
   MagickBooleanType
     verbose;
 } ClassifySettings;
+
+typedef struct _ZeroCrossingInputs
+{
+  double
+    max_tau,
+    min_tau,
+    delta_tau,
+    smooth_threshold;
+} ZeroCrossingInputs;
 
 /*
   Constant declarations.
@@ -200,8 +209,7 @@ static const int
   Method prototypes.
 */
 static double
-  OptimalTau(const ssize_t *,const double,const double,const double,
-    const double,short *);
+  OptimalTau(const ssize_t *,const ZeroCrossingInputs *,short *);
 
 static ssize_t
   DefineRegion(const short *,ExtentPacket *);
@@ -801,9 +809,6 @@ static MagickBooleanType ClassifyImageLine(const ClassifyLine *line,
   return(MagickTrue);
 }
 
-static MagickBooleanType Classify(Image *image,short **extrema,
-  const ClassifySettings *settings,ExceptionInfo *exception)
-{
 #define SegmentImageTag  "Segment/Image"
 #define ThrowClassifyException(severity,tag,label) \
 {\
@@ -821,124 +826,87 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   ThrowBinaryException(severity,tag,label); \
 }
 
-  const double
-    cluster_threshold = settings->cluster_threshold,
-    weighting_exponent = settings->weighting_exponent;
-
-  const MagickBooleanType
-    verbose = settings->verbose;
-
-  CacheView
-    *image_view;
+typedef struct _ClassifyClusterTargets
+{
+  ExtentPacket
+    *red;
 
   Cluster
-    *cluster,
-    *head,
-    *last_cluster,
-    *next_cluster;
-
-  double
-    *free_squares;
+    **cluster,
+    **head;
 
   ExtentPacket
-    blue,
-    green,
-    red;
+    *green,
+    *blue;
+} ClassifyClusterTargets;
 
-  MagickOffsetType
-    progress;
+static MagickBooleanType FormClassifyClusters(short **extrema,
+  const ClassifyClusterTargets *targets)
+{
+  ExtentPacket
+    *const red = targets->red;
 
-  MagickStatusType
-    status;
+  Cluster
+    **const cluster = targets->cluster,
+    **const head = targets->head;
 
-  double
-    *squares;
+  ExtentPacket
+    *const green = targets->green,
+    *const blue = targets->blue;
 
-  size_t
-    number_clusters;
-
-  ssize_t
-    count,
-    y;
-
-  /*
-    Form clusters.
-  */
-  cluster=(Cluster *) NULL;
-  head=(Cluster *) NULL;
-  squares=(double *) NULL;
-  (void) memset(&red,0,sizeof(red));
-  (void) memset(&green,0,sizeof(green));
-  (void) memset(&blue,0,sizeof(blue));
-  while (DefineRegion(extrema[Red],&red) != 0)
+  while (DefineRegion(extrema[Red],red) != 0)
   {
     GreenClusterTargets
       green_targets;
 
-    green_targets.cluster=(&cluster);
-    green_targets.head=(&head);
-    green_targets.green=(&green);
-    green_targets.blue=(&blue);
-    if (FormGreenClusters(extrema,red,&green_targets) == MagickFalse)
-      ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
+    green_targets.cluster=(cluster);
+    green_targets.head=(head);
+    green_targets.green=(green);
+    green_targets.blue=(blue);
+    if (FormGreenClusters(extrema,*red,&green_targets) == MagickFalse)
+      return(MagickFalse);
   }
-  if (AcquireDefaultCluster(red,green,blue,&head) == MagickFalse)
-    ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
-      image->filename);
-  /*
-    Count the pixels for each cluster.
-  */
-  status=MagickTrue;
-  count=0;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const ClassifyCountInputs
-      inputs = { image, image_view, head, exception };
+  if (AcquireDefaultCluster(*red,*green,*blue,head) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
 
-    if (CountClassifyRow(&inputs,y,&count) == MagickFalse)
-      break;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        ReportClassifyProgress(image,SegmentImageTag,progress,&status);
-      }
-  }
-  image_view=DestroyCacheView(image_view);
-  /*
-    Remove clusters that do not meet minimum cluster threshold.
-  */
-  count=0;
-  last_cluster=head;
-  next_cluster=head;
-  RemoveSmallClusters(cluster_threshold,&head,&count,&last_cluster);
-  number_clusters=(size_t) count;
-  if (verbose != MagickFalse)
-    PrintClusterStatistics(head,cluster_threshold,weighting_exponent,
-      number_clusters);
-  if (number_clusters > 256)
-    ThrowClassifyException(ImageError,"TooManyClusters",image->filename);
-  /*
-    Speed up distance calculations.
-  */
-  if (AcquireSquares(&squares) == MagickFalse)
-    ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
-      image->filename);
-  /*
-    Allocate image colormap.
-  */
-  if (AcquireImageColormap(image,number_clusters,exception) == MagickFalse)
-    ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
-      image->filename);
-  SetClusterColormap(image,head);
-  /*
-    Do course grain classes.
-  */
+typedef struct _ClassifyPixelsInputs
+{
+  ExceptionInfo
+    *exception;
+
+  Cluster
+    *head;
+
+  double
+    *squares;
+
+  double
+    weighting_exponent;
+} ClassifyPixelsInputs;
+
+static void ClassifyImagePixels(Image *image,const ClassifyPixelsInputs *inputs,
+  MagickOffsetType progress,MagickStatusType status)
+{
+  ExceptionInfo
+    *const exception = inputs->exception;
+
+  Cluster
+    *const head = inputs->head;
+
+  double
+    *const squares = inputs->squares;
+
+  const double
+    weighting_exponent = inputs->weighting_exponent;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
   image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(progress,status) \
@@ -968,6 +936,140 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   }
   image_view=DestroyCacheView(image_view);
   status&=(MagickStatusType) SyncImage(image,exception);
+}
+
+static MagickOffsetType CountClassifyPixels(Image *image,Cluster *head,
+  MagickStatusType *status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    count,
+    y;
+
+  count=0;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const ClassifyCountInputs
+      inputs = { image, image_view, head, exception };
+
+    if (CountClassifyRow(&inputs,y,&count) == MagickFalse)
+      break;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ReportClassifyProgress(image,SegmentImageTag,progress,status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  return(progress);
+}
+
+static MagickBooleanType Classify(Image *image,short **extrema,
+  const ClassifySettings *settings,ExceptionInfo *exception)
+{
+  const double
+    cluster_threshold = settings->cluster_threshold,
+    weighting_exponent = settings->weighting_exponent;
+
+  const MagickBooleanType
+    verbose = settings->verbose;
+
+  ClassifyPixelsInputs
+    pixels_inputs;
+
+  Cluster
+    *cluster,
+    *head,
+    *last_cluster,
+    *next_cluster;
+
+  double
+    *free_squares;
+
+  ExtentPacket
+    blue,
+    green,
+    red;
+
+  const ClassifyClusterTargets
+    cluster_targets = { &red, &cluster, &head, &green, &blue };
+
+  MagickOffsetType
+    progress;
+
+  MagickStatusType
+    status;
+
+  double
+    *squares;
+
+  size_t
+    number_clusters;
+
+  ssize_t
+    count;
+
+  /*
+    Form clusters.
+  */
+  cluster=(Cluster *) NULL;
+  head=(Cluster *) NULL;
+  squares=(double *) NULL;
+  (void) memset(&red,0,sizeof(red));
+  (void) memset(&green,0,sizeof(green));
+  (void) memset(&blue,0,sizeof(blue));
+  if (FormClassifyClusters(extrema,&cluster_targets) == MagickFalse)
+    ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
+      image->filename);
+  /*
+    Count the pixels for each cluster.
+  */
+  status=MagickTrue;
+  progress=CountClassifyPixels(image,head,&status,exception);
+  /*
+    Remove clusters that do not meet minimum cluster threshold.
+  */
+  count=0;
+  last_cluster=head;
+  next_cluster=head;
+  RemoveSmallClusters(cluster_threshold,&head,&count,&last_cluster);
+  number_clusters=(size_t) count;
+  if (verbose != MagickFalse)
+    PrintClusterStatistics(head,cluster_threshold,weighting_exponent,
+      number_clusters);
+  if (number_clusters > 256)
+    ThrowClassifyException(ImageError,"TooManyClusters",image->filename);
+  /*
+    Speed up distance calculations.
+  */
+  if (AcquireSquares(&squares) == MagickFalse)
+    ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
+      image->filename);
+  /*
+    Allocate image colormap.
+  */
+  if (AcquireImageColormap(image,number_clusters,exception) == MagickFalse)
+    ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
+      image->filename);
+  SetClusterColormap(image,head);
+  /*
+    Do course grain classes.
+  */
+  pixels_inputs.exception=exception;
+  pixels_inputs.head=head;
+  pixels_inputs.squares=squares;
+  pixels_inputs.weighting_exponent=weighting_exponent;
+  ClassifyImagePixels(image,&pixels_inputs,progress,status);
   /*
     Relinquish resources.
   */
@@ -1466,14 +1568,67 @@ static Cluster *FindLargestBackground(Cluster *background)
   return(background);
 }
 
+static void FindDynamicExtrema(ssize_t **histogram,
+  const double smooth_threshold,short **extrema)
+{
+  const ZeroCrossingInputs
+    tau_inputs = { Tau, 0.2f, DeltaTau,
+      (smooth_threshold == 0.0 ? 1.0 : smooth_threshold) };
+
+  (void) OptimalTau(histogram[Red],&tau_inputs,extrema[Red]);
+  (void) OptimalTau(histogram[Green],&tau_inputs,extrema[Green]);
+  (void) OptimalTau(histogram[Blue],&tau_inputs,extrema[Blue]);
+}
+
+static void RelinquishHistogramsBelow(ssize_t i,ssize_t **histogram,
+  short **extrema)
+{
+  for (i-- ; i >= 0; i--)
+  {
+    extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
+    histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
+  }
+}
+
+static void ChooseDynamicThreshold(const ssize_t count,Cluster *head,
+  PixelInfo *pixel)
+{
+  Cluster
+    *background,
+    *object;
+
+  object=head;
+  background=head;
+  if (HasObjectAndBackgroundClusters(count,head) != MagickFalse)
+    {
+      object=FindObjectCluster(head);
+      background=head->next;
+      background=FindLargestBackground(background);
+    }
+  SetDynamicThresholdPixel(background,object,pixel);
+}
+
+static MagickBooleanType ThrowClusterAllocationFailed(const Image *image,
+  ExceptionInfo *exception)
+{
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+  return(MagickFalse);
+}
+
+static Cluster *AppendCluster(Cluster *cluster)
+{
+  cluster->next=(Cluster *) AcquireQuantumMemory(1,sizeof(*cluster->next));
+  cluster=cluster->next;
+  return(cluster);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
 {
   Cluster
-    *background,
     *cluster,
-    *object,
     *head,
     *last_cluster,
     *next_cluster;
@@ -1507,11 +1662,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     extrema[i]=(short *) AcquireQuantumMemory(256UL,sizeof(**histogram));
     if ((histogram[i] == (ssize_t *) NULL) || (extrema[i] == (short *) NULL))
       {
-        for (i-- ; i >= 0; i--)
-        {
-          extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
-          histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
-        }
+        RelinquishHistogramsBelow(i,histogram,extrema);
         (void) ThrowMagickException(exception,GetMagickModule(),
           ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
         return(MagickFalse);
@@ -1521,12 +1672,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     Initialize histogram.
   */
   InitializeHistogram(image,histogram,exception);
-  (void) OptimalTau(histogram[Red],Tau,0.2f,DeltaTau,
-    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Red]);
-  (void) OptimalTau(histogram[Green],Tau,0.2f,DeltaTau,
-    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Green]);
-  (void) OptimalTau(histogram[Blue],Tau,0.2f,DeltaTau,
-    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Blue]);
+  FindDynamicExtrema(histogram,smooth_threshold,extrema);
   /*
     Form clusters.
   */
@@ -1548,9 +1694,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
         */
         if (head != (Cluster *) NULL)
           {
-            cluster->next=(Cluster *) AcquireQuantumMemory(1,
-              sizeof(*cluster->next));
-            cluster=cluster->next;
+            cluster=AppendCluster(cluster);
           }
         else
           {
@@ -1558,12 +1702,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
             head=cluster;
           }
         if (cluster == (Cluster *) NULL)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'",
-              image->filename);
-            return(MagickFalse);
-          }
+          return(ThrowClusterAllocationFailed(image,exception));
         /*
           Initialize a new class.
         */
@@ -1619,15 +1758,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
     cluster=(Cluster *) RelinquishMagickMemory(cluster);
   }
-  object=head;
-  background=head;
-  if (HasObjectAndBackgroundClusters(count,head) != MagickFalse)
-    {
-      object=FindObjectCluster(head);
-      background=head->next;
-      background=FindLargestBackground(background);
-    }
-  SetDynamicThresholdPixel(background,object,pixel);
+  ChooseDynamicThreshold(count,head,pixel);
   /*
     Relinquish resources.
   */
@@ -2169,15 +2300,6 @@ static void SetActiveNodeExtrema(const ActiveNodeInputs *inputs,
   }
 }
 
-typedef struct _ZeroCrossingInputs
-{
-  double
-    max_tau,
-    min_tau,
-    delta_tau,
-    smooth_threshold;
-} ZeroCrossingInputs;
-
 static size_t InitializeZeroCrossings(const ssize_t *histogram,
   const ZeroCrossingInputs *crossing_inputs,ZeroCrossing *zero_crossing)
 {
@@ -2229,10 +2351,15 @@ static size_t InitializeZeroCrossings(const ssize_t *histogram,
   return(number_crossings);
 }
 
-static double OptimalTau(const ssize_t *histogram,const double max_tau,
-  const double min_tau,const double delta_tau,const double smooth_threshold,
-  short *extrema)
+static double OptimalTau(const ssize_t *histogram,
+  const ZeroCrossingInputs *tau_inputs,short *extrema)
 {
+  const double
+    max_tau = tau_inputs->max_tau,
+    min_tau = tau_inputs->min_tau,
+    delta_tau = tau_inputs->delta_tau,
+    smooth_threshold = tau_inputs->smooth_threshold;
+
   double
     average_tau;
 
@@ -2479,6 +2606,10 @@ MagickExport MagickBooleanType SegmentImage(Image *image,
   const ClassifySettings settings = { cluster_threshold, WeightingExponent,
     verbose };
 
+  const ZeroCrossingInputs
+    tau_inputs = { Tau, 0.2, DeltaTau,
+      smooth_threshold == 0.0 ? 1.0 : smooth_threshold };
+
   ColorspaceType
     previous_colorspace;
 
@@ -2510,12 +2641,9 @@ MagickExport MagickBooleanType SegmentImage(Image *image,
   previous_colorspace=image->colorspace;
   (void) TransformImageColorspace(image,colorspace,exception);
   InitializeHistogram(image,histogram,exception);
-  (void) OptimalTau(histogram[Red],Tau,0.2,DeltaTau,smooth_threshold == 0.0 ?
-    1.0 : smooth_threshold,extrema[Red]);
-  (void) OptimalTau(histogram[Green],Tau,0.2,DeltaTau,smooth_threshold == 0.0 ?
-    1.0 : smooth_threshold,extrema[Green]);
-  (void) OptimalTau(histogram[Blue],Tau,0.2,DeltaTau,smooth_threshold == 0.0 ?
-    1.0 : smooth_threshold,extrema[Blue]);
+  (void) OptimalTau(histogram[Red],&tau_inputs,extrema[Red]);
+  (void) OptimalTau(histogram[Green],&tau_inputs,extrema[Green]);
+  (void) OptimalTau(histogram[Blue],&tau_inputs,extrema[Blue]);
   /*
     Classify using the fuzzy c-Means technique.
   */

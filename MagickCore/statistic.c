@@ -186,11 +186,18 @@ static void ClearPixelChannelsRow(PixelChannels **pixels,const ssize_t i,
   }
 }
 
-static PixelChannels **AcquirePixelTLS(const Image *images)
+static size_t GetWidestEvaluateColumns(const Image *images,size_t columns)
 {
   const Image
     *next;
 
+  for (next=images; next != (Image *) NULL; next=next->next)
+    columns=MagickMax(next->columns,columns);
+  return(columns);
+}
+
+static PixelChannels **AcquirePixelTLS(const Image *images)
+{
   PixelChannels
     **pixels;
 
@@ -208,9 +215,8 @@ static PixelChannels **AcquirePixelTLS(const Image *images)
   if (pixels == (PixelChannels **) NULL)
     return((PixelChannels **) NULL);
   (void) memset(pixels,0,rows*sizeof(*pixels));
-  columns=MagickMax(number_images,MaxPixelChannels);
-  for (next=images; next != (Image *) NULL; next=next->next)
-    columns=MagickMax(next->columns,columns);
+  columns=GetWidestEvaluateColumns(images,MagickMax(number_images,
+    MaxPixelChannels));
   for (i=0; i < (ssize_t) rows; i++)
   {
     pixels[i]=(PixelChannels *) AcquireQuantumMemory(columns,sizeof(**pixels));
@@ -366,12 +372,23 @@ static void ApplyThresholdEvaluateOperator(const Quantum pixel,
   }
 }
 
-static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
-  const MagickEvaluateOperator op,const double value,double *result)
+static double EvaluateRightShift(const Quantum pixel,const double value)
 {
+  double
+    result;
+
   ssize_t
     i;
 
+  result=(double) pixel;
+  for (i=0; i < (ssize_t) value; i++)
+    result/=2.0;
+  return(result);
+}
+
+static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
   switch (op)
   {
     default:
@@ -391,9 +408,7 @@ static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
     }
     case RightShiftEvaluateOperator:
     {
-      (*result)=(double) pixel;
-      for (i=0; i < (ssize_t) value; i++)
-        (*result)/=2.0;
+      (*result)=EvaluateRightShift(pixel,value);
       break;
     }
     case XorEvaluateOperator:
@@ -659,6 +674,16 @@ static void ScaleEvaluateProduct(const Image *image,
   }
 }
 
+static void DivideEvaluatePixel(const Image *image,const size_t number_images,
+  PixelChannels *evaluate_pixel,const ssize_t x)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    evaluate_pixel[x].channel[i]/=(double) number_images;
+}
+
 static void NormalizeEvaluatePixels(const Image *image,
   const MagickEvaluateOperator op,const size_t number_images,
   PixelChannels *evaluate_pixel)
@@ -673,8 +698,7 @@ static void NormalizeEvaluatePixels(const Image *image,
     {
       case MeanEvaluateOperator:
       {
-        for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          evaluate_pixel[x].channel[i]/=(double) number_images;
+        DivideEvaluatePixel(image,number_images,evaluate_pixel,x);
         break;
       }
       case MultiplyEvaluateOperator:
@@ -733,6 +757,13 @@ static void SetEvaluatePixels(const Image *image,
   }
 }
 
+static inline MagickBooleanType IsEvaluateChannelSkipped(
+  const PixelTrait traits,const PixelTrait evaluate_traits)
+{
+  return((((traits & UpdatePixelTrait) == 0) ||
+    ((evaluate_traits & UpdatePixelTrait) == 0)) ? MagickTrue : MagickFalse);
+}
+
 typedef struct _EvaluateRow
 {
   Image
@@ -786,8 +817,7 @@ static void AccumulateEvaluateRow(const EvaluateRow *row,const Quantum **p,
       PixelChannel channel = GetPixelChannelChannel(image,i);
       PixelTrait traits = GetPixelChannelTraits(next,channel);
       PixelTrait evaluate_traits = GetPixelChannelTraits(image,channel);
-      if (((traits & UpdatePixelTrait) == 0) ||
-          ((evaluate_traits & UpdatePixelTrait) == 0))
+      if (IsEvaluateChannelSkipped(traits,evaluate_traits) != MagickFalse)
         continue;
       evaluate_pixel[x].channel[i]=ApplyEvaluateOperator(
         random_info[id],GetPixelChannel(next,channel,p[j]),j == 0 ?
@@ -810,8 +840,7 @@ static void AccumulateEvaluateMedianPixel(const EvaluateRow *row,
     PixelChannel channel = GetPixelChannelChannel(row->image,i);
     PixelTrait traits = GetPixelChannelTraits(row->next,channel);
     PixelTrait evaluate_traits = GetPixelChannelTraits(row->image,channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((evaluate_traits & UpdatePixelTrait) == 0))
+    if (IsEvaluateChannelSkipped(traits,evaluate_traits) != MagickFalse)
       continue;
     evaluate_pixel[row->j].channel[i]=ApplyEvaluateOperator(
       row->random_info[row->id],GetPixelChannel(row->next,channel,p[row->j]),
@@ -1073,14 +1102,323 @@ static MagickBooleanType AcquireEvaluateCanvas(const Image *images,
   return(MagickTrue);
 }
 
+#define EvaluateImageTag  "Evaluate/Image"
+
+static void SetEvaluateProgress(const Image *images,const Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  if (SetProgress(images,image,EvaluateImageTag,progress) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static void SyncEvaluateView(CacheView *evaluate_view,
+  ExceptionInfo *exception,MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(evaluate_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+typedef struct _EvaluateRowHead
+{
+  const Image
+    *images;
+
+  Image
+    *image;
+
+  CacheView
+    **image_view,
+    *evaluate_view;
+
+  size_t
+    number_images;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} EvaluateRowHead;
+
+static MagickBooleanType FetchEvaluateRows(const EvaluateRowHead *head,
+  const Quantum ***p,Quantum *magick_restrict *q,MagickBooleanType *status)
+{
+  const Image
+    *const images = head->images;
+
+  Image
+    *const image = head->image;
+
+  CacheView
+    **const image_view = head->image_view,
+    *const evaluate_view = head->evaluate_view;
+
+  const size_t
+    number_images = head->number_images;
+
+  const ssize_t
+    y = head->y;
+
+  ExceptionInfo
+    *const exception = head->exception;
+
+  EvaluateFetch
+    fetch;
+
+  ssize_t
+    j;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*p)=(const Quantum **) AcquireQuantumMemory(number_images,sizeof(*(*p)));
+  if ((*p) == (const Quantum **) NULL)
+    {
+      (*status)=MagickFalse;
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",
+        images->filename);
+      return(MagickFalse);
+    }
+  fetch.image_view=image_view;
+  fetch.image=image;
+  fetch.y=y;
+  fetch.number_images=number_images;
+  j=GetEvaluateRows(&fetch,(*p),exception);
+  (*q)=QueueCacheViewAuthenticPixels(evaluate_view,0,y,image->columns,1,
+    exception);
+  if ((j < (ssize_t) number_images) || ((*q) == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void FinishEvaluateRows(const Quantum **p,CacheView *evaluate_view,
+  ExceptionInfo *exception,MagickBooleanType *status)
+{
+  p=(const Quantum **) RelinquishMagickMemory((void *) p);
+  SyncEvaluateView(evaluate_view,exception,status);
+}
+
+typedef struct _EvaluateImagesLoop
+{
+  Image
+    *image;
+
+  const Image
+    *images;
+
+  size_t
+    number_images;
+
+  CacheView
+    **image_view,
+    *evaluate_view;
+
+  PixelChannels
+    **magick_restrict evaluate_pixels;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  MagickEvaluateOperator
+    op;
+
+  ExceptionInfo
+    *exception;
+} EvaluateImagesLoop;
+
+static MagickBooleanType EvaluateMedianImages(const EvaluateImagesLoop *loop,
+  MagickBooleanType status,MagickOffsetType progress)
+{
+  Image
+    *const image = loop->image;
+
+  const Image
+    *const images = loop->images;
+
+  const size_t
+    number_images = loop->number_images;
+
+  CacheView
+    **const image_view = loop->image_view,
+    *const evaluate_view = loop->evaluate_view;
+
+  PixelChannels
+    **magick_restrict const evaluate_pixels = loop->evaluate_pixels;
+
+  RandomInfo
+    **magick_restrict const random_info = loop->random_info;
+
+  const MagickEvaluateOperator
+    op = loop->op;
+
+  ExceptionInfo
+    *const exception = loop->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  unsigned long
+    key;
+#endif
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  key=GetRandomSecretKey(random_info[0]);
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,images,image->rows,key == ~0UL)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    const Quantum
+      **p;
+
+    EvaluateMedian
+      median;
+
+    PixelChannels
+      *evaluate_pixel;
+
+    Quantum
+      *magick_restrict q;
+
+    const EvaluateRowHead
+      head = { images, image, image_view, evaluate_view, number_images, y,
+        exception };
+
+    if (FetchEvaluateRows(&head,&p,&q,&status) == MagickFalse)
+      continue;
+    evaluate_pixel=evaluate_pixels[id];
+    median.image=image;
+    median.images=images;
+    median.number_images=number_images;
+    median.random_info=random_info;
+    median.id=id;
+    median.op=op;
+    EvaluateMedianRow(&median,p,evaluate_pixel,q);
+    FinishEvaluateRows(p,evaluate_view,exception,&status);
+    if (images->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetEvaluateProgress(images,image,progress,&status);
+      }
+  }
+  return(status);
+}
+
+static PixelChannels *ClearEvaluatePixels(const Image *image,
+  PixelChannels **magick_restrict evaluate_pixels,const int id)
+{
+  PixelChannels
+    *evaluate_pixel;
+
+  evaluate_pixel=evaluate_pixels[id];
+  ClearPolynomialPixels(image,evaluate_pixel);
+  return(evaluate_pixel);
+}
+
+static MagickBooleanType EvaluateOtherImages(const EvaluateImagesLoop *loop,
+  RandomInfo **magick_restrict random_info,MagickBooleanType status,
+  MagickOffsetType progress)
+{
+  Image
+    *const image = loop->image;
+
+  const Image
+    *const images = loop->images;
+
+  const size_t
+    number_images = loop->number_images;
+
+  CacheView
+    **const image_view = loop->image_view,
+    *const evaluate_view = loop->evaluate_view;
+
+  PixelChannels
+    **magick_restrict const evaluate_pixels = loop->evaluate_pixels;
+
+  const MagickEvaluateOperator
+    op = loop->op;
+
+  ExceptionInfo
+    *const exception = loop->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  unsigned long
+    key;
+#endif
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  key=GetRandomSecretKey(random_info[0]);
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,images,image->rows,key == ~0UL)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    const Quantum
+      **p;
+
+    EvaluateImagesRows
+      rows;
+
+    PixelChannels
+      *evaluate_pixel;
+
+    Quantum
+      *magick_restrict q;
+
+    const EvaluateRowHead
+      head = { images, image, image_view, evaluate_view, number_images, y,
+        exception };
+
+    if (FetchEvaluateRows(&head,&p,&q,&status) == MagickFalse)
+      continue;
+    evaluate_pixel=ClearEvaluatePixels(image,evaluate_pixels,id);
+    rows.image=image;
+    rows.images=images;
+    rows.number_images=number_images;
+    rows.random_info=random_info;
+    rows.id=id;
+    rows.op=op;
+    AccumulateEvaluateRows(&rows,p,evaluate_pixel);
+    NormalizeEvaluatePixels(image,op,number_images,evaluate_pixel);
+    SetEvaluatePixels(image,evaluate_pixel,q);
+    FinishEvaluateRows(p,evaluate_view,exception,&status);
+    if (images->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetEvaluateProgress(images,image,progress,&status);
+      }
+  }
+  return(status);
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
-#define EvaluateImageTag  "Evaluate/Image"
-
   CacheView
     *evaluate_view,
     **image_view;
+
+  EvaluateImagesLoop
+    loop;
 
   Image
     *image;
@@ -1099,14 +1437,6 @@ MagickExport Image *EvaluateImages(const Image *images,
 
   size_t
     number_images;
-
-  ssize_t
-    y;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  unsigned long
-    key;
-#endif
 
   const EvaluateCanvasTargets
     targets = { &image, &number_images, &evaluate_pixels };
@@ -1137,161 +1467,19 @@ MagickExport Image *EvaluateImages(const Image *images,
   progress=0;
   random_info=AcquireRandomInfoTLS();
   evaluate_view=AcquireAuthenticCacheView(image,exception);
+  loop.image=image;
+  loop.images=images;
+  loop.number_images=number_images;
+  loop.image_view=image_view;
+  loop.evaluate_view=evaluate_view;
+  loop.evaluate_pixels=evaluate_pixels;
+  loop.random_info=random_info;
+  loop.op=op;
+  loop.exception=exception;
   if (op == MedianEvaluateOperator)
-    {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      key=GetRandomSecretKey(random_info[0]);
-      #pragma omp parallel for schedule(static) shared(progress,status) \
-        magick_number_threads(image,images,image->rows,key == ~0UL)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const int
-          id = GetOpenMPThreadId();
-
-        const Quantum
-          **p;
-
-        EvaluateFetch
-          fetch;
-
-        EvaluateMedian
-          median;
-
-        PixelChannels
-          *evaluate_pixel;
-
-        Quantum
-          *magick_restrict q;
-
-        ssize_t
-          j;
-
-        if (status == MagickFalse)
-          continue;
-        p=(const Quantum **) AcquireQuantumMemory(number_images,sizeof(*p));
-        if (p == (const Quantum **) NULL)
-          {
-            status=MagickFalse;
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'",
-              images->filename);
-            continue;
-          }
-        fetch.image_view=image_view;
-        fetch.image=image;
-        fetch.y=y;
-        fetch.number_images=number_images;
-        j=GetEvaluateRows(&fetch,p,exception);
-        q=QueueCacheViewAuthenticPixels(evaluate_view,0,y,image->columns,1,
-          exception);
-        if ((j < (ssize_t) number_images) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
-        evaluate_pixel=evaluate_pixels[id];
-        median.image=image;
-        median.images=images;
-        median.number_images=number_images;
-        median.random_info=random_info;
-        median.id=id;
-        median.op=op;
-        EvaluateMedianRow(&median,p,evaluate_pixel,q);
-        p=(const Quantum **) RelinquishMagickMemory((void *) p);
-        if (SyncCacheViewAuthenticPixels(evaluate_view,exception) == MagickFalse)
-          status=MagickFalse;
-        if (images->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp atomic
-#endif
-            progress++;
-            if (SetProgress(images,image,EvaluateImageTag,progress) ==
-                MagickFalse)
-              status=MagickFalse;
-          }
-      }
-    }
+    status=EvaluateMedianImages(&loop,status,progress);
   else
-    {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      key=GetRandomSecretKey(random_info[0]);
-      #pragma omp parallel for schedule(static) shared(progress,status) \
-        magick_number_threads(image,images,image->rows,key == ~0UL)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const int
-          id = GetOpenMPThreadId();
-
-        const Quantum
-          **p;
-
-        EvaluateFetch
-          fetch;
-
-        EvaluateImagesRows
-          rows;
-
-        PixelChannels
-          *evaluate_pixel;
-
-        Quantum
-          *magick_restrict q;
-
-        ssize_t
-          j;
-
-        if (status == MagickFalse)
-          continue;
-        p=(const Quantum **) AcquireQuantumMemory(number_images,sizeof(*p));
-        if (p == (const Quantum **) NULL)
-          {
-            status=MagickFalse;
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'",
-              images->filename);
-            continue;
-          }
-        fetch.image_view=image_view;
-        fetch.image=image;
-        fetch.y=y;
-        fetch.number_images=number_images;
-        j=GetEvaluateRows(&fetch,p,exception);
-        q=QueueCacheViewAuthenticPixels(evaluate_view,0,y,image->columns,1,
-          exception);
-        if ((j < (ssize_t) number_images) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
-        evaluate_pixel=evaluate_pixels[id];
-        ClearPolynomialPixels(image,evaluate_pixel);
-        rows.image=image;
-        rows.images=images;
-        rows.number_images=number_images;
-        rows.random_info=random_info;
-        rows.id=id;
-        rows.op=op;
-        AccumulateEvaluateRows(&rows,p,evaluate_pixel);
-        NormalizeEvaluatePixels(image,op,number_images,evaluate_pixel);
-        SetEvaluatePixels(image,evaluate_pixel,q);
-        p=(const Quantum **) RelinquishMagickMemory((void *) p);
-        if (SyncCacheViewAuthenticPixels(evaluate_view,exception) == MagickFalse)
-          status=MagickFalse;
-        if (images->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp atomic
-#endif
-            progress++;
-            if (SetProgress(images,image,EvaluateImageTag,progress) ==
-                MagickFalse)
-              status=MagickFalse;
-          }
-      }
-    }
+    status=EvaluateOtherImages(&loop,random_info,status,progress);
   DestroyEvaluateViews(number_images,image_view);
   image_view=(CacheView **) RelinquishMagickMemory(image_view);
   evaluate_view=DestroyCacheView(evaluate_view);
@@ -1359,6 +1547,64 @@ static void EvaluateRowPixels(const Image *image,RandomInfo *random_info,
   }
 }
 
+typedef struct _EvaluateImageRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  int
+    id;
+
+  EvaluateOperation
+    operation;
+
+  ExceptionInfo
+    *exception;
+} EvaluateImageRow;
+
+static MagickBooleanType EvaluateImageLine(const EvaluateImageRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = row->image;
+
+  CacheView
+    *const image_view = row->image_view;
+
+  RandomInfo
+    **magick_restrict const random_info = row->random_info;
+
+  const int
+    id = row->id;
+
+  const EvaluateOperation
+    operation = row->operation;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  EvaluateRowPixels(image,random_info[id],operation,q);
+  SyncEvaluateView(image_view,exception,status);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType EvaluateImage(Image *image,
   const MagickEvaluateOperator op,const double value,ExceptionInfo *exception)
 {
@@ -1409,28 +1655,18 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
     const EvaluateOperation
       operation = { op, value, clamp };
 
-    Quantum
-      *magick_restrict q;
+    const EvaluateImageRow
+      row = { image, image_view, random_info, id, operation, exception };
 
-    if (status == MagickFalse)
+    if (EvaluateImageLine(&row,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    EvaluateRowPixels(image,random_info[id],operation,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        if (SetProgress(image,image,EvaluateImageTag,progress) == MagickFalse)
-          status=MagickFalse;
+        SetEvaluateProgress(image,image,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -1613,11 +1849,106 @@ static void AccumulatePolynomialImages(const PolynomialRows *rows,
   }
 }
 
+#define PolynomialImageTag  "Polynomial/Image"
+
+static void SetPolynomialProgress(const Image *images,const Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  if (SetProgress(images,image,PolynomialImageTag,progress) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+typedef struct _PolynomialLine
+{
+  Image
+    *image;
+
+  const Image
+    *images;
+
+  CacheView
+    *polynomial_view;
+
+  PixelChannels
+    **magick_restrict polynomial_pixels;
+
+  int
+    id;
+
+  size_t
+    number_images,
+    number_terms;
+
+  const double
+    *terms;
+
+  ExceptionInfo
+    *exception;
+} PolynomialLine;
+
+static MagickBooleanType PolynomialImageLine(const PolynomialLine *line,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = line->image;
+
+  const Image
+    *const images = line->images;
+
+  CacheView
+    *const polynomial_view = line->polynomial_view;
+
+  PixelChannels
+    **magick_restrict const polynomial_pixels = line->polynomial_pixels;
+
+  const int
+    id = line->id;
+
+  const size_t
+    number_images = line->number_images,
+    number_terms = line->number_terms;
+
+  const double
+    *const terms = line->terms;
+
+  ExceptionInfo
+    *const exception = line->exception;
+
+  PixelChannels
+    *polynomial_pixel;
+
+  PolynomialRows
+    rows;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(polynomial_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  polynomial_pixel=polynomial_pixels[id];
+  ClearPolynomialPixels(image,polynomial_pixel);
+  rows.image=image;
+  rows.images=images;
+  rows.number_images=number_images;
+  rows.number_terms=number_terms;
+  rows.terms=terms;
+  rows.y=y;
+  AccumulatePolynomialImages(&rows,polynomial_pixel,exception);
+  SetPolynomialPixels(image,polynomial_pixel,q);
+  SyncEvaluateView(polynomial_view,exception,status);
+  return(MagickTrue);
+}
+
 MagickExport Image *PolynomialImage(const Image *images,
   const size_t number_terms,const double *terms,ExceptionInfo *exception)
 {
-#define PolynomialImageTag  "Polynomial/Image"
-
   CacheView
     *polynomial_view;
 
@@ -1665,45 +1996,19 @@ MagickExport Image *PolynomialImage(const Image *images,
     const int
       id = GetOpenMPThreadId();
 
-    PixelChannels
-      *polynomial_pixel;
+    const PolynomialLine
+      line = { image, images, polynomial_view, polynomial_pixels, id,
+        number_images, number_terms, terms, exception };
 
-    PolynomialRows
-      rows;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    if (PolynomialImageLine(&line,y,&status) == MagickFalse)
       continue;
-    q=QueueCacheViewAuthenticPixels(polynomial_view,0,y,image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    polynomial_pixel=polynomial_pixels[id];
-    ClearPolynomialPixels(image,polynomial_pixel);
-    rows.image=image;
-    rows.images=images;
-    rows.number_images=number_images;
-    rows.number_terms=number_terms;
-    rows.terms=terms;
-    rows.y=y;
-    AccumulatePolynomialImages(&rows,polynomial_pixel,exception);
-    SetPolynomialPixels(image,polynomial_pixel,q);
-    if (SyncCacheViewAuthenticPixels(polynomial_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        if (SetProgress(images,image,PolynomialImageTag,progress) ==
-            MagickFalse)
-          status=MagickFalse;
+        SetPolynomialProgress(images,image,progress,&status);
       }
   }
   polynomial_view=DestroyCacheView(polynomial_view);

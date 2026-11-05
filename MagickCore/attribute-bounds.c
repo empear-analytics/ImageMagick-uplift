@@ -732,14 +732,11 @@ static void MergeBoundingBox(const RectangleInfo bounding_box,
     (*bounds).height=bounding_box.height;
 }
 
-MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
-  ExceptionInfo *exception)
+static RectangleInfo ScanImageBoundingBox(const Image *image,
+  RectangleInfo bounds,ExceptionInfo *exception)
 {
   CacheView
     *image_view;
-
-  const char
-    *artifact;
 
   const Quantum
     *p;
@@ -751,21 +748,9 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
     target[4],
     zero;
 
-  RectangleInfo
-    bounds;
-
   ssize_t
     y;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  artifact=GetImageArtifact(image,"trim:percent-background");
-  if (artifact != (const char *) NULL)
-    return(GetEdgeBoundingBox(image,exception));
-  artifact=GetImageArtifact(image,"trim:edges");
-  bounds=GetTrimBounds(image,artifact);
   GetPixelInfo(image,&target[0]);
   image_view=AcquireVirtualCacheView(image,exception);
   p=GetCacheViewVirtualPixels(image_view,0,0,1,1,exception);
@@ -818,4 +803,25 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
   }
   image_view=DestroyCacheView(image_view);
   return(FinishBoundingBox(image,bounds,exception));
+}
+
+MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
+  ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  RectangleInfo
+    bounds;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  artifact=GetImageArtifact(image,"trim:percent-background");
+  if (artifact != (const char *) NULL)
+    return(GetEdgeBoundingBox(image,exception));
+  artifact=GetImageArtifact(image,"trim:edges");
+  bounds=GetTrimBounds(image,artifact);
+  return(ScanImageBoundingBox(image,bounds,exception));
 }

@@ -995,6 +995,23 @@ static int AddUserSymbol (FxInfo * pfx, char * pex, size_t len)
   return pfx->usedUserSymbols-1;
 }
 
+static const char * NameOfAttrSymbolOrControl (int i, const char * str)
+{
+  if (i >= (int) FirstImgAttr && i < aNull) str = ImgAttrs[i-(int) FirstImgAttr].str;
+  if (i >= (int) FirstSym     && i < sNull) str = Symbols[i-(int) FirstSym].str;
+  if (i >= (int) FirstCont    && i < rNull) str = Controls[i-(int) FirstCont].str;
+  return(str);
+}
+
+static void PrintTableHeading (int i)
+{
+  if      (i==0    ) fprintf (stderr, "Operators:\n ");
+  else if (i==oNull) fprintf (stderr, "\nFunctions:\n ");
+  else if (i==fNull) fprintf (stderr, "\nImage attributes:\n ");
+  else if (i==aNull) fprintf (stderr, "\nSymbols:\n ");
+  else if (i==sNull) fprintf (stderr, "\nControls:\n ");
+}
+
 static void DumpTables (FILE * fh)
 {
 
@@ -1003,14 +1020,8 @@ static void DumpTables (FILE * fh)
     const char * str = "";
     if (                     i < oNull) str = Operators[i].str;
     if (i >= (int) FirstFunc    && i < fNull) str = Functions[i-(int) FirstFunc].str;
-    if (i >= (int) FirstImgAttr && i < aNull) str = ImgAttrs[i-(int) FirstImgAttr].str;
-    if (i >= (int) FirstSym     && i < sNull) str = Symbols[i-(int) FirstSym].str;
-    if (i >= (int) FirstCont    && i < rNull) str = Controls[i-(int) FirstCont].str;
-    if      (i==0    ) fprintf (stderr, "Operators:\n ");
-    else if (i==oNull) fprintf (stderr, "\nFunctions:\n ");
-    else if (i==fNull) fprintf (stderr, "\nImage attributes:\n ");
-    else if (i==aNull) fprintf (stderr, "\nSymbols:\n ");
-    else if (i==sNull) fprintf (stderr, "\nControls:\n ");
+    str = NameOfAttrSymbolOrControl (i, str);
+    PrintTableHeading (i);
     fprintf (fh, " %s", str);
   }
   fprintf (fh, "\n");
@@ -1203,10 +1214,8 @@ static void DumpChannelQualifier (ElementT * pel)
   }
 }
 
-static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
+static void DumpRpnHeader (FxInfo * pfx, FILE * fh)
 {
-  int i;
-
   fprintf (fh, "DumpRPN:");
   fprintf (fh, "  numElements=%i", pfx->numElements);
   fprintf (fh, "  usedElements=%i", pfx->usedElements);
@@ -1218,6 +1227,47 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
   if      (pfx->runType==rtEntireImage) fprintf (stderr, "EntireImage");
   else if (pfx->runType==rtCornerOnly)  fprintf (stderr, "CornerOnly");
   fprintf (fh, "\n");
+}
+
+static void DumpRpnElement (FxInfo * pfx, FILE * fh, ElementT * pel, int i)
+{
+  const char * str = OprStr (pel->operator_index);
+  const char *sRelAbs = "";
+
+  if (IsPixelReferenceElement(pel) != MagickFalse)
+    sRelAbs = pel->is_relative ? "[]" : "{}";
+
+  if (pel->type == etColourConstant)
+    fprintf (fh, "  %i: %s vals=%.*Lg,%.*Lg,%.*Lg '%s%s' nArgs=%i ndx=%i  %s",
+             i, sElementTypes[pel->type],
+             pfx->precision, pel->val, pfx->precision, pel->val1, pfx->precision, pel->val2,
+             str, sRelAbs, pel->number_args, pel->element_index,
+             pel->do_push ? "push" : "NO push");
+  else
+    fprintf (fh, "  %i: %s val=%.*Lg '%s%s' nArgs=%i ndx=%i  %s",
+             i, sElementTypes[pel->type], pfx->precision, pel->val, str, sRelAbs,
+             pel->number_args, pel->element_index,
+             pel->do_push ? "push" : "NO push");
+}
+
+static void DumpRpnUserSymbolLink (FxInfo * pfx, FILE * fh, ElementT * pel)
+{
+  char UserSym[MagickPathExtent];
+
+  if (pel->operator_index == rCopyTo) {
+    fprintf (fh, "  CopyTo ==> %s", NameOfUserSym (pfx, pel->element_index, UserSym));
+  } else if (pel->operator_index == rCopyFrom) {
+    fprintf (fh, "  CopyFrom <== %s", NameOfUserSym (pfx, pel->element_index, UserSym));
+  } else if (OprInPlace (pel->operator_index)) {
+    fprintf (fh, "  <==> %s", NameOfUserSym (pfx, pel->element_index, UserSym));
+  }
+}
+
+static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
+{
+  int i;
+
+  DumpRpnHeader (pfx, fh);
 
 
   for (i=0; i < pfx->usedElements; i++) {
@@ -1228,39 +1278,15 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
     CountJumpDestination (pfx, i);
   }
   for (i=0; i < pfx->usedElements; i++) {
-    char UserSym[MagickPathExtent];
-
     ElementT * pel = &pfx->Elements[i];
-    const char * str = OprStr (pel->operator_index);
-    const char *sRelAbs = "";
-
-    if (IsPixelReferenceElement(pel) != MagickFalse)
-      sRelAbs = pel->is_relative ? "[]" : "{}";
-
-    if (pel->type == etColourConstant)
-      fprintf (fh, "  %i: %s vals=%.*Lg,%.*Lg,%.*Lg '%s%s' nArgs=%i ndx=%i  %s",
-               i, sElementTypes[pel->type],
-               pfx->precision, pel->val, pfx->precision, pel->val1, pfx->precision, pel->val2,
-               str, sRelAbs, pel->number_args, pel->element_index,
-               pel->do_push ? "push" : "NO push");
-    else
-      fprintf (fh, "  %i: %s val=%.*Lg '%s%s' nArgs=%i ndx=%i  %s",
-               i, sElementTypes[pel->type], pfx->precision, pel->val, str, sRelAbs,
-               pel->number_args, pel->element_index,
-               pel->do_push ? "push" : "NO push");
+    DumpRpnElement (pfx, fh, pel, i);
 
     if (pel->img_attr_qual != aNull)
       fprintf (fh, " ia=%s", OprStr((int) pel->img_attr_qual));
 
     DumpChannelQualifier (pel);
 
-    if (pel->operator_index == rCopyTo) {
-      fprintf (fh, "  CopyTo ==> %s", NameOfUserSym (pfx, pel->element_index, UserSym));
-    } else if (pel->operator_index == rCopyFrom) {
-      fprintf (fh, "  CopyFrom <== %s", NameOfUserSym (pfx, pel->element_index, UserSym));
-    } else if (OprInPlace (pel->operator_index)) {
-      fprintf (fh, "  <==> %s", NameOfUserSym (pfx, pel->element_index, UserSym));
-    }
+    DumpRpnUserSymbolLink (pfx, fh, pel);
     if (pel->number_dest > 0)  fprintf (fh, "  <==dest(%i)", pel->number_dest);
     fprintf (fh, "\n");
   }
@@ -1795,6 +1821,32 @@ static MagickBooleanType GetPropertyNumber (FxInfo * pfx,
   return(MagickTrue);
 }
 
+static MagickBooleanType InterpretPropertyValue (FxInfo * pfx,
+  const char * sProperty, fxFltType *val, fxFltType *seconds)
+{
+  {
+    char * text;
+    text = InterpretImageProperties (pfx->image->image_info, pfx->image,
+       sProperty, pfx->exception);
+    if (!text || !*text) {
+      text = DestroyString(text);
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Unknown property", "'%s' at '%s'",
+        sProperty, SetShortExp(pfx));
+      return(MagickFalse);
+    }
+
+    if (seconds != NULL) {
+      if (GetPropertySeconds (pfx, &text, val, seconds) == MagickFalse)
+        return(MagickFalse);
+    } else if (GetPropertyNumber (pfx, sProperty, &text, val) == MagickFalse)
+      return(MagickFalse);
+    text = DestroyString(text);
+  }
+  return(MagickTrue);
+}
+
 static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
 /* Returns number of characters to swallow.
    Returns "-1" means invalid input.
@@ -1833,26 +1885,8 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
 
   (void) CopyMagickString (sProperty, pfx->pex, len+1);
   sProperty[len] = '\0';
-  {
-    char * text;
-    text = InterpretImageProperties (pfx->image->image_info, pfx->image,
-       sProperty, pfx->exception);
-    if (!text || !*text) {
-      text = DestroyString(text);
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Unknown property", "'%s' at '%s'",
-        sProperty, SetShortExp(pfx));
-      return -1;
-    }
-
-    if (seconds != NULL) {
-      if (GetPropertySeconds (pfx, &text, val, seconds) == MagickFalse)
-        return -1;
-    } else if (GetPropertyNumber (pfx, sProperty, &text, val) == MagickFalse)
-      return -1;
-    text = DestroyString(text);
-  }
+  if (InterpretPropertyValue (pfx, sProperty, val, seconds) == MagickFalse)
+    return -1;
   return ((ssize_t) len);
 }
 
@@ -3223,6 +3257,71 @@ static MagickBooleanType TryFunctionOperand (FxInfo * pfx,
   return MagickFalse;
 }
 
+static MagickBooleanType TryNamedOperand (FxInfo * pfx,
+  const OperandSymbols * operand, MagickBooleanType * result)
+{
+  MagickBooleanType
+    *const UserSymbol = operand->UserSymbol,
+    *const NewUserSymbol = operand->NewUserSymbol;
+
+  int
+    *const UserSymNdx = operand->UserSymNdx;
+
+  /* Try image attribute
+  */
+  {
+    ImgAttrE ia = GetImgAttrToken (pfx);
+    if (ia != aNull) {
+      (*result)=(AddImgAttrOperand (pfx, ia));
+      return(MagickTrue);
+    }
+  }
+
+  /* Try symbol
+  */
+  if (NotASymbolOperand (pfx) == MagickFalse) {
+    (*result)=MagickTrue;
+    return(MagickTrue);
+  }
+
+  /* Try constant colour.
+  */
+  {
+    fxFltType v0, v1, v2;
+    ssize_t ColLen = GetConstantColour (pfx, &v0, &v1, &v2);
+    if (ColLen < 0) {
+      (*result)=MagickFalse;
+      return(MagickTrue);
+    }
+    if (ColLen > 0) {
+      (void) AddColourElement (pfx, v0, v1, v2);
+      pfx->pex+=ColLen;
+      (*result)=MagickTrue;
+      return(MagickTrue);
+    }
+  }
+
+  /* Try image artifact.
+  */
+  {
+    const char *artifact;
+    artifact = GetImageArtifact (pfx->image, pfx->token);
+    if (artifact != (const char *) NULL) {
+      (*result)=(AddArtifactOperand (pfx, artifact));
+      return(MagickTrue);
+    }
+  }
+
+  /* Try user symbols. If it is, don't AddElement yet.
+  */
+  if (NotAUserSymbolOperand (pfx, UserSymbol, NewUserSymbol, UserSymNdx) ==
+      MagickFalse) {
+    (*result)=MagickTrue;
+    return(MagickTrue);
+  }
+  return(MagickFalse);
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, const OperandSymbols * operand)
 {
@@ -3260,48 +3359,8 @@ static MagickBooleanType GetOperand (
     if (TryFunctionOperand (pfx, needPopAll, &returned) != MagickFalse)
       return returned;
 
-    /* Try image attribute
-    */
-    {
-      ImgAttrE ia = GetImgAttrToken (pfx);
-      if (ia != aNull) {
-        return (AddImgAttrOperand (pfx, ia));
-      }
-    }
-
-    /* Try symbol
-    */
-    if (NotASymbolOperand (pfx) == MagickFalse)
-      return MagickTrue;
-
-    /* Try constant colour.
-    */
-    {
-      fxFltType v0, v1, v2;
-      ssize_t ColLen = GetConstantColour (pfx, &v0, &v1, &v2);
-      if (ColLen < 0) return MagickFalse;
-      if (ColLen > 0) {
-        (void) AddColourElement (pfx, v0, v1, v2);
-        pfx->pex+=ColLen;
-        return MagickTrue;
-      }
-    }
-
-    /* Try image artifact.
-    */
-    {
-      const char *artifact;
-      artifact = GetImageArtifact (pfx->image, pfx->token);
-      if (artifact != (const char *) NULL) {
-        return (AddArtifactOperand (pfx, artifact));
-      }
-    }
-
-    /* Try user symbols. If it is, don't AddElement yet.
-    */
-    if (NotAUserSymbolOperand (pfx, UserSymbol, NewUserSymbol, UserSymNdx) ==
-        MagickFalse)
-      return MagickTrue;
+    if (TryNamedOperand (pfx, operand, &returned) != MagickFalse)
+      return(returned);
   }
 
   (void) ThrowMagickException (
@@ -3432,6 +3491,17 @@ static MagickBooleanType PushOperatorUnlessDone (FxInfo * pfx, OperatorE op,
   return(MagickTrue);
 }
 
+static void FindOperatorToken (FxInfo * pfx, OperatorE * op, size_t * len)
+{
+  for (*op = (OperatorE)0; *op != oNull; *op=(OperatorE) (*op+1)) {
+    const char * opStr = Operators[*op].str;
+    *len = strlen(opStr);
+    if (LocaleNCompare (opStr, pfx->pex, *len)==0) {
+      break;
+    }
+  }
+}
+
 static MagickBooleanType GetOperator (
   FxInfo * pfx,
   MagickBooleanType * Assign, MagickBooleanType * Update, MagickBooleanType * IncrDecr)
@@ -3440,13 +3510,7 @@ static MagickBooleanType GetOperator (
   size_t len = 0;
   MagickBooleanType DoneIt = MagickFalse;
   SkipSpaces (pfx);
-  for (op = (OperatorE)0; op != oNull; op=(OperatorE) (op+1)) {
-    const char * opStr = Operators[op].str;
-    len = strlen(opStr);
-    if (LocaleNCompare (opStr, pfx->pex, len)==0) {
-      break;
-    }
-  }
+  FindOperatorToken (pfx, &op, &len);
 
   if (!IsRealOperator (op)) {
     (void) ThrowMagickException (
@@ -3622,6 +3686,172 @@ static MagickBooleanType SetInPlaceTarget (FxInfo * pfx, int UserSymNdx0)
   return MagickTrue;
 }
 
+static MagickBooleanType ExpectOperandAfterOperator (FxInfo * pfx,
+  const char * strLimit, MagickBooleanType IncrDecr, MagickBooleanType * broke)
+{
+  (*broke)=MagickFalse;
+  if (IsExpressionEnd(pfx,strLimit) != MagickFalse)
+  {
+    if (IncrDecr) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Expected operand after operator", "at '%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  return(MagickTrue);
+}
+
+typedef struct _ExpressionContext
+{
+  FxInfo
+    *pfx;
+
+  char
+    *chLimit;
+
+  MagickBooleanType
+    *needPopAll;
+} ExpressionContext;
+
+static MagickBooleanType TranslateTernaryElse (
+  const ExpressionContext * context, TernaryT ternary,
+  MagickBooleanType * broke)
+{
+  FxInfo
+    *const pfx = context->pfx;
+
+  char
+    *const chLimit = context->chLimit;
+
+  MagickBooleanType
+    *const needPopAll = context->needPopAll;
+
+  (*broke)=MagickFalse;
+  if (ternary.addr_colon != NULL_ADDRESS) {
+    if (!TranslateExpression (pfx, ",);", chLimit, needPopAll)) return MagickFalse;
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetInPlaceOperatorTarget (FxInfo * pfx,
+  OperatorE op, int UserSymNdx0, MagickBooleanType * broke)
+{
+  (*broke)=MagickFalse;
+  if (OprInPlace ((int) op)) {
+    if (!SetInPlaceTarget (pfx, UserSymNdx0)) return MagickFalse;
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  }
+  return(MagickTrue);
+}
+
+typedef struct _UserSymbolAssignment
+{
+  FxInfo
+    *pfx;
+
+  const char
+    *strLimit;
+
+  char
+    *chLimit;
+
+  MagickBooleanType
+    *needPopAll,
+    UserSymbol,
+    Assign,
+    Update,
+    IncrDecr;
+} UserSymbolAssignment;
+
+static MagickBooleanType TranslateAssignedExpression (
+  const UserSymbolAssignment * assignment, MagickBooleanType * broke)
+{
+  FxInfo
+    *const pfx = assignment->pfx;
+
+  const char
+    *const strLimit = assignment->strLimit;
+
+  char
+    *const chLimit = assignment->chLimit;
+
+  MagickBooleanType
+    *const needPopAll = assignment->needPopAll;
+
+  const MagickBooleanType
+    UserSymbol = assignment->UserSymbol,
+    Assign = assignment->Assign,
+    Update = assignment->Update,
+    IncrDecr = assignment->IncrDecr;
+
+  (*broke)=MagickFalse;
+  if (IsUserSymbolAssignment(UserSymbol,Assign,Update,IncrDecr) != MagickFalse) {
+
+    if (!TranslateExpression (pfx, strLimit, chLimit, needPopAll)) return MagickFalse;
+    if (!*pfx->pex) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+    if (!*strLimit) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+    if (strchr(strLimit,*chLimit)!=NULL) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetAssignmentTarget (FxInfo * pfx,
+  OperatorE op, int UserSymNdx0, MagickBooleanType * broke)
+{
+  (*broke)=MagickFalse;
+  if (op == oAssign) {
+    if (!AddAssignmentCopyTo (pfx, UserSymNdx0)) return MagickFalse;
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  } else if (SetInPlaceOperatorTarget (pfx, op, UserSymNdx0, broke) ==
+      MagickFalse) {
+    return MagickFalse;
+  } else if ((*broke) != MagickFalse) {
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType FlushOperatorStack (FxInfo * pfx,
+  MagickBooleanType Assign, MagickBooleanType Update, int UserSymNdx0)
+{
+  MagickBooleanType broke = MagickFalse;
+
+  while (pfx->usedOprStack) {
+    OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
+    if (IsOpenGroupOperator(op) != MagickFalse) {
+      break;
+    }
+    if (IsMisplacedAssignment(op,Assign,Update) != MagickFalse) {
+      break;
+    }
+    pfx->usedOprStack--;
+    (void) AddElement (pfx, (fxFltType) 0, (int) op);
+    if (SetAssignmentTarget (pfx, op, UserSymNdx0, &broke) == MagickFalse)
+      return(MagickFalse);
+    if (broke != MagickFalse) break;
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -3637,9 +3867,15 @@ static MagickBooleanType TranslateExpression (
 
   int StartEleNdx;
 
+  MagickBooleanType broke = MagickFalse;
+
   const OperandSymbols
     operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll },
     operand1 = { &UserSymbol, &NewUserSymbol, &UserSymNdx1, needPopAll };
+
+  ExpressionContext context;
+
+  UserSymbolAssignment assignment;
 
   TernaryT ternary;
   ternary.addr_query = NULL_ADDRESS;
@@ -3679,6 +3915,9 @@ static MagickBooleanType TranslateExpression (
 
   /* Loop through Operator, Operand, Operator, Operand, ...
   */
+  context.pfx=pfx;
+  context.chLimit=chLimit;
+  context.needPopAll=needPopAll;
   while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
     if (!GetOperator (pfx, &Assign, &Update, &IncrDecr)) return MagickFalse;
     SkipSpaces (pfx);
@@ -3703,13 +3942,17 @@ static MagickBooleanType TranslateExpression (
         pfx->token, SetShortExp(pfx));
       return MagickFalse;
     }
-    if (IsUserSymbolAssignment(UserSymbol,Assign,Update,IncrDecr) != MagickFalse) {
-
-      if (!TranslateExpression (pfx, strLimit, chLimit, needPopAll)) return MagickFalse;
-      if (!*pfx->pex) break;
-      if (!*strLimit) break;
-      if (strchr(strLimit,*chLimit)!=NULL) break;
-    }
+    assignment.pfx=pfx;
+    assignment.strLimit=strLimit;
+    assignment.chLimit=chLimit;
+    assignment.needPopAll=needPopAll;
+    assignment.UserSymbol=UserSymbol;
+    assignment.Assign=Assign;
+    assignment.Update=Update;
+    assignment.IncrDecr=IncrDecr;
+    if (TranslateAssignedExpression (&assignment, &broke) == MagickFalse)
+      return MagickFalse;
+    if (broke != MagickFalse) break;
     if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
         MagickFalse) {
       ElementT * pel;
@@ -3725,23 +3968,16 @@ static MagickBooleanType TranslateExpression (
 
     if (!ProcessTernaryOpr (pfx, &ternary)) return MagickFalse;
 
-    if (ternary.addr_colon != NULL_ADDRESS) {
-      if (!TranslateExpression (pfx, ",);", chLimit, needPopAll)) return MagickFalse;
-      break;
-    }
+    if (TranslateTernaryElse (&context, ternary, &broke) == MagickFalse)
+      return MagickFalse;
+    if (broke != MagickFalse) break;
 
     UserSymbol = NewUserSymbol = MagickFalse;
 
-    if (IsExpressionEnd(pfx,strLimit) != MagickFalse)
-    {
-      if (IncrDecr) break;
-
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Expected operand after operator", "at '%s'",
-        SetShortExp(pfx));
+    if (ExpectOperandAfterOperator (pfx, strLimit, IncrDecr, &broke) ==
+        MagickFalse)
       return MagickFalse;
-    }
+    if (broke != MagickFalse) break;
 
     if (IncrDecr) {
       (void) ThrowMagickException (
@@ -3773,33 +4009,16 @@ static MagickBooleanType TranslateExpression (
     UserSymNdx0 = UserSymNdx1;
   }
 
-  if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
-      MagickFalse) {
-    if (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)) return MagickFalse;
-  }
+  if ((IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
+      MagickFalse) && (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)))
+    return MagickFalse;
 
   if (IsPendingLimitChar(pfx,chLimit,strLimit) != MagickFalse) {
     *chLimit = *pfx->pex;
     pfx->pex++;
   }
-  while (pfx->usedOprStack) {
-    OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
-    if (IsOpenGroupOperator(op) != MagickFalse) {
-      break;
-    }
-    if (IsMisplacedAssignment(op,Assign,Update) != MagickFalse) {
-      break;
-    }
-    pfx->usedOprStack--;
-    (void) AddElement (pfx, (fxFltType) 0, (int) op);
-    if (op == oAssign) {
-      if (!AddAssignmentCopyTo (pfx, UserSymNdx0)) return MagickFalse;
-      break;
-    } else if (OprInPlace ((int) op)) {
-      if (!SetInPlaceTarget (pfx, UserSymNdx0)) return MagickFalse;
-      break;
-    }
-  }
+  if (FlushOperatorStack (pfx, Assign, Update, UserSymNdx0) == MagickFalse)
+    return MagickFalse;
 
   if (ternary.addr_query != NULL_ADDRESS) *needPopAll = MagickTrue;
 
@@ -5579,11 +5798,44 @@ static FxInfo *DestroyFxInfoOnFailure (FxInfo * pfx)
   return NULL;
 }
 
-static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
-  MagickBooleanType CalcAllStats, ExceptionInfo *exception)
+static MagickBooleanType TranslateFxExpression (FxInfo * pfx)
 {
   char chLimit;
 
+  pfx->teDepth = 0;
+  if (!TranslateStatementList (pfx, ";", &chLimit)) {
+    return(MagickFalse);
+  }
+
+  if (pfx->teDepth) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Translate expression depth", "(%i) not 0",
+      pfx->teDepth);
+
+    return(MagickFalse);
+  }
+
+  if (chLimit != '\0' && chLimit != ';') {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "AcquireFxInfo: TranslateExpression did not exhaust input", "(chLimit=%i) at'%s'",
+      (int)chLimit, pfx->pex);
+
+    return(MagickFalse);
+  }
+
+  if (IsStatisticsPending(pfx) != MagickFalse) {
+    if (!CollectStatistics (pfx)) {
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
+static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
+  MagickBooleanType CalcAllStats, ExceptionInfo *exception)
+{
   FxInfo * pfx = (FxInfo*) AcquireCriticalMemory (sizeof (*pfx));
 
   memset (pfx, 0, sizeof (*pfx));
@@ -5605,34 +5857,8 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
     pfx->expression=ConstantString(expression);
   pfx->pex = (char *) pfx->expression;
 
-  pfx->teDepth = 0;
-  if (!TranslateStatementList (pfx, ";", &chLimit)) {
+  if (TranslateFxExpression (pfx) == MagickFalse)
     return (DestroyFxInfoOnFailure (pfx));
-  }
-
-  if (pfx->teDepth) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "Translate expression depth", "(%i) not 0",
-      pfx->teDepth);
-
-    return (DestroyFxInfoOnFailure (pfx));
-  }
-
-  if (chLimit != '\0' && chLimit != ';') {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "AcquireFxInfo: TranslateExpression did not exhaust input", "(chLimit=%i) at'%s'",
-      (int)chLimit, pfx->pex);
-
-    return (DestroyFxInfoOnFailure (pfx));
-  }
-
-  if (IsStatisticsPending(pfx) != MagickFalse) {
-    if (!CollectStatistics (pfx)) {
-      return (DestroyFxInfoOnFailure (pfx));
-    }
-  }
 
   if (pfx->DebugOpt) {
     DumpTables (stderr);
@@ -5846,6 +6072,22 @@ static void SetFxProgress (const Image *image, const char *tag,
 
 /* Following is substitute for FxImage().
 */
+static Image *FinishFxImage (FxInfo * pfx, MagickBooleanType status,
+  Image *fx_image)
+{
+  /* Before destroying the user symbol values, dump them to stderr.
+  */
+  if (pfx->DebugOpt && pfx->usedUserSymbols)
+    DumpUserSymbolValues (pfx);
+
+  if ((status == MagickFalse) || (pfx->exception->severity >= ErrorException))
+    fx_image=DestroyImage(fx_image);
+
+  pfx=DestroyFxInfo(pfx);
+
+  return(fx_image);
+}
+
 MagickExport Image *FxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -5927,15 +6169,5 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
   fx_view = DestroyCacheView (fx_view);
   image_view = DestroyCacheView (image_view);
 
-  /* Before destroying the user symbol values, dump them to stderr.
-  */
-  if (pfx->DebugOpt && pfx->usedUserSymbols)
-    DumpUserSymbolValues (pfx);
-
-  if ((status == MagickFalse) || (pfx->exception->severity >= ErrorException))
-    fx_image=DestroyImage(fx_image);
-
-  pfx=DestroyFxInfo(pfx);
-
-  return(fx_image);
+  return(FinishFxImage (pfx, status, fx_image));
 }

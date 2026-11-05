@@ -44,6 +44,8 @@ $call Make color.c
 $call Make color-equivalent.c
 $call Make colormap.c
 $call Make colorspace.c
+$call Make colorspace-convert.c
+$call Make colorspace-generic-rgb.c
 $call Make compare.c
 $call Make composite.c
 $call Make compress.c
@@ -56,11 +58,15 @@ $call Make delegate.c
 $call Make deprecate.c
 $call Make display.c
 $call Make distort.c
+$call Make distort-affine.c
+$call Make distort-resize.c
 $call Make distribute-cache.c
 $call Make draw.c
 $call Make effect.c
+$call Make effect-preview.c
 $call Make effect-blur.c
 $call Make enhance.c
+$call Make enhance-clahe.c
 $call Make enhance-tone.c
 $call Make exception.c
 $call Make feature.c
@@ -90,10 +96,12 @@ $call Make mime.c
 $call Make module.c
 $call Make monitor.c
 $call Make montage.c
+$call Make montage-info.c
 $call Make morphology.c
 $call Make opencl.c
 $call Make option.c
 $call Make paint.c
+$call Make paint-floodfill.c
 $call Make pixel.c
 $call Make pixel-import.c
 $call Make pixel-export.c
@@ -103,6 +111,8 @@ $call Make property.c
 $call Make PreRvIcccm.c
 $call Make profile.c
 $call Make quantize.c
+$call Make quantize-error.c
+$call Make quantize-info.c
 $call Make quantize-posterize.c
 $call Make quantum.c
 $call Make quantum-export.c

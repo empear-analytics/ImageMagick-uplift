@@ -12,6 +12,10 @@ and balanced conditionals lies between the moved functions, or when a file-level
 macro crosses the boundary. NEW gets FILE's licence header, with a banner for
 NEW's name (letters taken from the other MagickCore headers) and TITLE, and
 FILE's include block. Register NEW with tools/register_source.py.
+
+Also moved: a forward declaration of a moved static, and a typedef struct elsewhere
+in FILE that only the family uses. --copy-macro NAME (repeatable) defines a one-line
+`#define NAME "literal"` of the kept part again in NEW (Recipe S step 2).
 """
 import collections, glob, os, re, sys
 
@@ -58,14 +62,21 @@ def macro_block_start(L, c):
     return u if L[u].lstrip().startswith("#define") else None
 
 def typedef_names(L, starts):
-    """The names closing each `typedef struct _X` that begins at one of the lines STARTS."""
+    """The names closing each `typedef struct [_X]` that begins at one of the lines STARTS."""
     names = []
     for n in starts:
         while not re.match(r"^} \w+;$", L[n]): n += 1
         names.append(L[n][2:-1])
     return names
 
-args = sys.argv[1:]; out = None
+def brace_delta(line):
+    """Opening minus closing braces on LINE, outside string and character literals and comments."""
+    t = re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', "", line)
+    t = re.sub(r"/\*.*?\*/|//.*$", "", t)
+    return t.count("{") - t.count("}")
+
+args = sys.argv[1:]; out = None; copy_macros = []
+while "--copy-macro" in args: k = args.index("--copy-macro"); copy_macros.append(args[k + 1]); del args[k:k + 2]
 if "--out" in args: k = args.index("--out"); out = args[k + 1]; del args[k:k + 2]
 path, new, title, roots = args[0], args[1], args[2], args[3:]
 src = open(path).read(); L = src.split("\n")
@@ -76,13 +87,27 @@ while i < len(L):
         j = i
         while j < len(L) and L[j] != "{" and not L[j].rstrip().endswith(";"): j += 1
         if j < len(L) and L[j] == "{":
-            k = j + 1
-            while k < len(L) and L[k] != "}": k += 1
+            k = j + 1; depth = 1; alt = []
+            # the closing brace of a function stands alone in column 0; a macro body's own `}` follows a line ending in `\`,
+            # and a column-0 block inside the body (`{` ... `}` under an #if) keeps the brace depth above zero; braces
+            # in an #else or #elif branch are not counted (the first branch alone is a whole function)
+            while k < len(L):
+                w = L[k].strip()
+                if re.match(r"#\s*(if|ifdef|ifndef)\b", w): alt.append(False)
+                elif re.match(r"#\s*(else|elif)\b", w):
+                    if alt: alt[-1] = True
+                    else: alt.append(True)
+                elif re.match(r"#\s*endif\b", w):
+                    if alt: alt.pop()
+                elif not any(alt): depth += brace_delta(L[k])
+                if L[k] == "}" and not L[k - 1].rstrip().endswith("\\") and depth == 0: break
+                k += 1
             defs.append((m.group(2), i, k, bool(m.group(1) and m.group(1).startswith("static"))))
             i = k + 1; continue
     i += 1
 names = {d[0] for d in defs}
-body = {d[0]: "\n".join(L[d[1]:d[2] + 1]) for d in defs}
+# a name that only a comment mentions ("Contrast limited ...") is not a call
+body = {d[0]: re.sub(r"/\*.*?\*/", "", "\n".join(L[d[1]:d[2] + 1]), flags=re.S) for d in defs}
 calls = {n: {x for x in names if x != n and re.search(r"\b%s\b" % re.escape(x), body[n])} for n in names}
 static = {d[0] for d in defs if d[3]}
 reach = set(roots); st = list(roots)
@@ -129,13 +154,18 @@ for run in runs:
         if u is None: break
         a = u
     b = last[2] + 1
-    incomment = False; intype = False; bad = []; depth = 0; inner = []
+    incomment = False; intype = False; bad = []; depth = 0; inner = []; inproto = False
     for n in range(a, b):
         if any(s <= n <= e for s, e in spans): continue
         t = L[n].strip()
+        if inproto:
+            inproto = not t.endswith(";"); continue
+        mp = re.match(r"^static\s+[\w \*]*?\b([A-Za-z_]\w*)\s*\(", L[n])
+        if mp and mp.group(1) in moved and mp.group(1) in static:
+            inproto = not t.endswith(";"); continue
         if intype:
             intype = not re.match(r"^} \w+;$", L[n]); continue
-        if re.match(r"^typedef struct _\w+$", L[n]):
+        if re.match(r"^typedef struct( _\w+)?$", L[n]):
             intype = True; inner.append(n); continue
         if t.startswith("#define") or (n > 0 and L[n - 1].rstrip().endswith("\\")):
             continue
@@ -164,10 +194,33 @@ rest = "\n".join(rest_lines)
 for tname in typedefs:
     if re.search(r"\b%s\b" % tname, rest): sys.exit("refused: type %s moves with the region but the kept part uses it" % tname)
 defined = lambda text: set(re.findall(r"^\s*#\s*define\s+(\w+)", text, re.M))
+macro_lines = []
 for mname in defined(rest):
-    if re.search(r"\b%s\b" % mname, region): sys.exit("refused: macro %s used in the region" % mname)
+    if not re.search(r"\b%s\b" % mname, region): continue
+    dl = [l for l in rest_lines if re.match(r"^#define\s+%s\b" % mname, l)]
+    if mname in copy_macros and len(dl) == 1 and re.fullmatch(r'#define\s+%s\s+"[^"\\]*"' % mname, dl[0]) \
+        and not re.search(r"^\s*#\s*define\s+%s\b" % mname, region, re.M):
+        macro_lines.append(dl[0]); continue
+    sys.exit("refused: macro %s used in the region" % mname)
 for mname in defined(region):
     if re.search(r"\b%s\b" % mname, rest): sys.exit("refused: macro %s used outside" % mname)
+# a typedef elsewhere in the original that only the region uses moves with it
+moved_types = []
+for tname in sorted(set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M))):
+    if not re.search(r"\b%s\b" % tname, region): continue
+    t1 = next(k for k, l in enumerate(rest_lines) if l == "} %s;" % tname)
+    t0 = next(k for k in range(t1, -1, -1) if re.match(r"^typedef struct( _\w+)?$", rest_lines[k]))
+    others = "\n".join(rest_lines[:t0] + rest_lines[t1 + 1:])
+    if re.search(r"\b%s\b" % tname, others): continue
+    moved_types.append("\n".join(rest_lines[t0:t1 + 1]))
+    e = t1 + 1
+    if e < len(rest_lines) and rest_lines[e] == "": e += 1
+    del rest_lines[t0:e]
+    # a "Typedef declarations." comment left with nothing under it goes too
+    if rest_lines[t0 - 3:t0] == ["/*", "  Typedef declarations.", "*/"] and \
+        not rest_lines[t0].startswith("typedef"):
+        del rest_lines[t0 - 3:t0]
+    rest = "\n".join(rest_lines)
 # a type the original defines and keeps must not be used by the region
 types = set(re.findall(r"^typedef\s+(?:struct|enum|union)\s+(\w+)", rest, re.M)) | \
     set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M)) | \
@@ -191,7 +244,7 @@ for n in sorted(names - moved - static):
 hend = L.index("*/")
 hdr = L[:hend + 1]
 art_rows = [k for k in range(hend) if re.fullmatch(r"%[A-Z ]+%", L[k]) and L[k].strip("% ")]
-assert len(art_rows) == 5, art_rows
+assert art_rows and len(art_rows) % 5 == 0, art_rows
 g = harvest_glyphs()
 row = lambda t, w: "%" + (" " * ((77 - w) // 2) + t.rstrip()).ljust(77) + "%"
 words = [re.sub(r"[^A-Za-z]", "", x).upper() for x in os.path.basename(new)[:-2].split("-")]
@@ -206,13 +259,18 @@ art_lines = blocks[0]
 for blk in blocks[1:]: art_lines = art_lines + [blank] + blk
 hdr = L[:art_rows[0]] + art_lines + L[art_rows[-1] + 1:tk] + [row(title, len(title))] + L[tk + 1:hend + 1]
 assert all(len(x) == 79 for x in art_lines), "header width"
-inc_a = L.index("  Include declarations.") - 1
+inc_a = next(k for k, l in enumerate(L) if l.strip() == "Include declarations.") - 1
 inc_b = max(k for k in range(len(L)) if L[k].startswith("#include") and k < first[1])
 # carry a trailing #endif etc. that closes a conditional include
 while L[inc_b + 1].startswith("#"): inc_b += 1
 if defined("\n".join(L[inc_a:inc_b + 1])):
     sys.exit("refused: the include block defines macros %s; both files would define them" % sorted(defined("\n".join(L[inc_a:inc_b + 1]))))
-text = "\n".join(hdr) + "\n\n" + "\n".join(L[inc_a:inc_b + 1]) + "\n\n" + region + "\n"
+extra = ""
+if moved_types:
+    extra += "/*\n  Typedef declarations.\n*/\n" + "\n\n".join(moved_types) + "\n\n"
+if macro_lines:
+    extra += "/*\n  Define declarations.\n*/\n" + "\n".join(macro_lines) + "\n\n"
+text = "\n".join(hdr) + "\n\n" + "\n".join(L[inc_a:inc_b + 1]) + "\n\n" + extra + region + "\n"
 dst_new = os.path.join(out, os.path.basename(new)) if out else new
 dst_old = os.path.join(out, os.path.basename(path)) if out else path
 open(dst_new, "w").write(text)

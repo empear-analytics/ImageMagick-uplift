@@ -117,6 +117,21 @@ typedef struct _FunctionArguments
     *parameters;
 } FunctionArguments;
 
+typedef struct _FunctionRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  const FunctionArguments
+    *arguments;
+
+  ExceptionInfo
+    *exception;
+} FunctionRow;
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -151,6 +166,12 @@ typedef struct _FunctionArguments
 %
 */
 
+static double GetFunctionParameter(const size_t number_parameters,
+  const double *parameters,const size_t index,const double default_value)
+{
+  return((number_parameters >= index) ? parameters[index-1] : default_value);
+}
+
 static double ApplySinusoidFunction(Quantum pixel,
   const size_t number_parameters,const double *parameters)
 {
@@ -164,10 +185,10 @@ static double ApplySinusoidFunction(Quantum pixel,
   /*
     Sinusoid: frequency, phase, amplitude, bias.
   */
-  frequency=(number_parameters >= 1) ? parameters[0] : 1.0;
-  phase=(number_parameters >= 2) ? parameters[1] : 0.0;
-  amplitude=(number_parameters >= 3) ? parameters[2] : 0.5;
-  bias=(number_parameters >= 4) ? parameters[3] : 0.5;
+  frequency=GetFunctionParameter(number_parameters,parameters,1,1.0);
+  phase=GetFunctionParameter(number_parameters,parameters,2,0.0);
+  amplitude=GetFunctionParameter(number_parameters,parameters,3,0.5);
+  bias=GetFunctionParameter(number_parameters,parameters,4,0.5);
   result=(double) QuantumRange*(amplitude*sin((double) (2.0*
     MagickPI*(frequency*QuantumScale*(double) pixel+phase/360.0)))+bias);
   return(result);
@@ -187,10 +208,10 @@ static double ApplyArcsinFunction(Quantum pixel,
     Arcsin (pegged at range limits for invalid results): width, center,
     range, and bias.
   */
-  width=(number_parameters >= 1) ? parameters[0] : 1.0;
-  center=(number_parameters >= 2) ? parameters[1] : 0.5;
-  range=(number_parameters >= 3) ? parameters[2] : 1.0;
-  bias=(number_parameters >= 4) ? parameters[3] : 0.5;
+  width=GetFunctionParameter(number_parameters,parameters,1,1.0);
+  center=GetFunctionParameter(number_parameters,parameters,2,0.5);
+  range=GetFunctionParameter(number_parameters,parameters,3,1.0);
+  bias=GetFunctionParameter(number_parameters,parameters,4,0.5);
   result=2.0*MagickSafeReciprocal(width)*(QuantumScale*(double) pixel-
     center);
   if (result <= -1.0)
@@ -217,10 +238,10 @@ static double ApplyArctanFunction(Quantum pixel,
   /*
     Arctan: slope, center, range, and bias.
   */
-  slope=(number_parameters >= 1) ? parameters[0] : 1.0;
-  center=(number_parameters >= 2) ? parameters[1] : 0.5;
-  range=(number_parameters >= 3) ? parameters[2] : 1.0;
-  bias=(number_parameters >= 4) ? parameters[3] : 0.5;
+  slope=GetFunctionParameter(number_parameters,parameters,1,1.0);
+  center=GetFunctionParameter(number_parameters,parameters,2,0.5);
+  range=GetFunctionParameter(number_parameters,parameters,3,1.0);
+  bias=GetFunctionParameter(number_parameters,parameters,4,0.5);
   result=MagickPI*slope*(QuantumScale*(double) pixel-center);
   result=(double) QuantumRange*(range/MagickPI*atan((double) result)+bias);
   return(result);
@@ -276,12 +297,9 @@ static Quantum ApplyFunction(Quantum pixel,
 }
 
 static void ApplyFunctionToPixel(const Image *image,
-  const MagickFunction function,const size_t number_parameters,
-  const double *parameters,ExceptionInfo *exception,Quantum *magick_restrict q)
+  const FunctionArguments *arguments,ExceptionInfo *exception,
+  Quantum *magick_restrict q)
 {
-  const FunctionArguments
-    arguments = { function, number_parameters, parameters };
-
   ssize_t
     i;
 
@@ -291,15 +309,72 @@ static void ApplyFunctionToPixel(const Image *image,
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     if ((traits & UpdatePixelTrait) == 0)
       continue;
-    q[i]=ApplyFunction(q[i],&arguments,exception);
+    q[i]=ApplyFunction(q[i],arguments,exception);
   }
+}
+
+static void ApplyFunctionToRow(const Image *image,
+  const FunctionArguments *arguments,ExceptionInfo *exception,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ApplyFunctionToPixel(image,arguments,exception,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static MagickBooleanType ApplyFunctionToLine(const FunctionRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  CacheView
+    *const image_view = row->image_view;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  Image
+    *const image = row->image;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ApplyFunctionToRow(image,row->arguments,exception,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static void ReportFunctionProgress(const Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+#define FunctionImageTag  "Function/Image "
+
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,FunctionImageTag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
 }
 
 MagickExport MagickBooleanType FunctionImage(Image *image,
   const MagickFunction function,const size_t number_parameters,
   const double *parameters,ExceptionInfo *exception)
 {
-#define FunctionImageTag  "Function/Image "
+  const FunctionArguments
+    arguments = { function, number_parameters, parameters };
 
   CacheView
     *image_view;
@@ -335,40 +410,18 @@ MagickExport MagickBooleanType FunctionImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const FunctionRow
+      row = { image, image_view, &arguments, exception };
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    if (ApplyFunctionToLine(&row,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ApplyFunctionToPixel(image,function,number_parameters,parameters,exception,
-        q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,FunctionImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportFunctionProgress(image,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
