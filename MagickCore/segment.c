@@ -1608,6 +1608,14 @@ static void ChooseDynamicThreshold(const ssize_t count,Cluster *head,
   SetDynamicThresholdPixel(background,object,pixel);
 }
 
+static MagickBooleanType ThrowClusterAllocationFailed(const Image *image,
+  ExceptionInfo *exception)
+{
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+  return(MagickFalse);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1689,12 +1697,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
             head=cluster;
           }
         if (cluster == (Cluster *) NULL)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'",
-              image->filename);
-            return(MagickFalse);
-          }
+          return(ThrowClusterAllocationFailed(image,exception));
         /*
           Initialize a new class.
         */
