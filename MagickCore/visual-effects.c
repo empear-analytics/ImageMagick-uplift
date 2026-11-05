@@ -1380,6 +1380,26 @@ static void ImplodeRow(const WarpInfo *warp,const Quantum *magick_restrict p,
   }
 }
 
+static void GetImplodeGeometry(const Image *canvas_image,PointInfo *scale,
+  PointInfo *center,double *radius)
+{
+  (*scale).x=1.0;
+  (*scale).y=1.0;
+  (*center).x=0.5*canvas_image->columns;
+  (*center).y=0.5*canvas_image->rows;
+  *radius=(*center).x;
+  if (canvas_image->columns > canvas_image->rows)
+    (*scale).y=(double) canvas_image->columns*MagickSafeReciprocal((double)
+      canvas_image->rows);
+  else
+    if (canvas_image->columns < canvas_image->rows)
+      {
+        (*scale).x=(double) canvas_image->rows*MagickSafeReciprocal((double)
+          canvas_image->columns);
+        *radius=(*center).y;
+      }
+}
+
 MagickExport Image *ImplodeImage(const Image *image,const double amount,
   const PixelInterpolateMethod method,ExceptionInfo *exception)
 {
@@ -1440,21 +1460,7 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
   /*
     Compute scaling factor.
   */
-  scale.x=1.0;
-  scale.y=1.0;
-  center.x=0.5*canvas_image->columns;
-  center.y=0.5*canvas_image->rows;
-  radius=center.x;
-  if (canvas_image->columns > canvas_image->rows)
-    scale.y=(double) canvas_image->columns*MagickSafeReciprocal((double)
-      canvas_image->rows);
-  else
-    if (canvas_image->columns < canvas_image->rows)
-      {
-        scale.x=(double) canvas_image->rows*MagickSafeReciprocal((double)
-          canvas_image->columns);
-        radius=center.y;
-      }
+  GetImplodeGeometry(canvas_image,&scale,&center,&radius);
   /*
     Implode image.
   */
