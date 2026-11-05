@@ -3156,6 +3156,72 @@ static MagickBooleanType TransformsRGBPixels(
   return(status);
 }
 
+static MagickBooleanType TransformsRGBByTables(Image *image,
+  MagickBooleanType status,MagickOffsetType progress,
+  ExceptionInfo *exception)
+{
+  TransformPacket
+    *y_map,
+    *x_map,
+    *z_map;
+
+  TransformsRGBTables
+    tables;
+
+  /*
+    Allocate the tables.
+  */
+  x_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(*x_map));
+  y_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(*y_map));
+  z_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(*z_map));
+  if (IsTransformMapMissing(x_map,y_map,z_map) != MagickFalse)
+    {
+      z_map=RelinquishTransformMap(z_map);
+      y_map=RelinquishTransformMap(y_map);
+      x_map=RelinquishTransformMap(x_map);
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  InitializeTosRGBMaps(image,x_map,y_map,z_map);
+  /*
+    Convert to sRGB.
+  */
+  tables.image=image;
+  tables.x_map=x_map;
+  tables.y_map=y_map;
+  tables.z_map=z_map;
+  tables.exception=exception;
+  switch (image->storage_class)
+  {
+    case DirectClass:
+    default:
+    {
+      /*
+        Convert DirectClass image.
+      */
+      status=TransformsRGBPixels(&tables,status,progress);
+      break;
+    }
+    case PseudoClass:
+    {
+      TransformsRGBColormap(&tables,status);
+      break;
+    }
+  }
+  /*
+    Relinquish resources.
+  */
+  z_map=(TransformPacket *) RelinquishMagickMemory(z_map);
+  y_map=(TransformPacket *) RelinquishMagickMemory(y_map);
+  x_map=(TransformPacket *) RelinquishMagickMemory(x_map);
+  if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -3176,14 +3242,6 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 
   ssize_t
     y;
-
-  TransformPacket
-    *y_map,
-    *x_map,
-    *z_map;
-
-  TransformsRGBTables
-    tables;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -3365,56 +3423,5 @@ static MagickBooleanType TransformsRGBImage(Image *image,
     default:
       break;
   }
-  /*
-    Allocate the tables.
-  */
-  x_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*x_map));
-  y_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*y_map));
-  z_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-    sizeof(*z_map));
-  if (IsTransformMapMissing(x_map,y_map,z_map) != MagickFalse)
-    {
-      z_map=RelinquishTransformMap(z_map);
-      y_map=RelinquishTransformMap(y_map);
-      x_map=RelinquishTransformMap(x_map);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
-  InitializeTosRGBMaps(image,x_map,y_map,z_map);
-  /*
-    Convert to sRGB.
-  */
-  tables.image=image;
-  tables.x_map=x_map;
-  tables.y_map=y_map;
-  tables.z_map=z_map;
-  tables.exception=exception;
-  switch (image->storage_class)
-  {
-    case DirectClass:
-    default:
-    {
-      /*
-        Convert DirectClass image.
-      */
-      status=TransformsRGBPixels(&tables,status,progress);
-      break;
-    }
-    case PseudoClass:
-    {
-      TransformsRGBColormap(&tables,status);
-      break;
-    }
-  }
-  /*
-    Relinquish resources.
-  */
-  z_map=(TransformPacket *) RelinquishMagickMemory(z_map);
-  y_map=(TransformPacket *) RelinquishMagickMemory(y_map);
-  x_map=(TransformPacket *) RelinquishMagickMemory(x_map);
-  if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
-    return(MagickFalse);
-  return(MagickTrue);
+  return(TransformsRGBByTables(image,status,progress,exception));
 }
