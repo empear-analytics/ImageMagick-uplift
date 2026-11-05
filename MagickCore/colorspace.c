@@ -132,7 +132,12 @@ typedef struct _GenericToRGBInput
   double
     X,
     Y,
-    Z,
+    Z;
+
+  IlluminantType
+    illuminant;
+
+  double
     *R,
     *G,
     *B;
@@ -240,6 +245,60 @@ static void ConvertOklabThroughYCbCrToRGB(const GenericToRGBInput *input)
   }
 }
 
+static void ConvertLabThroughLuvToRGB(const GenericToRGBInput *input)
+{
+  const ColorspaceType
+    colorspace = input->colorspace;
+
+  const double
+    X = input->X,
+    Y = input->Y,
+    Z = input->Z;
+
+  const IlluminantType
+    illuminant = input->illuminant;
+
+  double
+    *const R = input->R,
+    *const G = input->G,
+    *const B = input->B;
+
+  switch (colorspace)
+  {
+    case LabColorspace:
+    {
+      ConvertLabToRGB(X,Y,Z,illuminant,R,G,B);
+      break;
+    }
+    case LCHColorspace:
+    case LCHabColorspace:
+    {
+      ConvertLCHabToRGB(X,Y,Z,illuminant,R,G,B);
+      break;
+    }
+    case LCHuvColorspace:
+    {
+      ConvertLCHuvToRGB(X,Y,Z,illuminant,R,G,B);
+      break;
+    }
+    case LMSColorspace:
+    {
+      ConvertLMSToRGB(X,Y,Z,R,G,B);
+      break;
+    }
+    case LuvColorspace:
+    {
+      ConvertLuvToRGB(X,Y,Z,illuminant,R,G,B);
+      break;
+    }
+    default:
+    {
+      ConvertOklabThroughYCbCrToRGB(input);
+      break;
+    }
+  }
+}
+
 MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
   const double X,const double Y,const double Z,const double white_luminance,
   const IlluminantType illuminant,double *R,double *G,double *B)
@@ -251,6 +310,7 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
   input.X=X;
   input.Y=Y;
   input.Z=Z;
+  input.illuminant=illuminant;
   input.R=R;
   input.G=G;
   input.B=B;
@@ -322,35 +382,9 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
       ConvertJzazbzToRGB(X,Y,Z,white_luminance,R,G,B);
       break;
     }
-    case LabColorspace:
-    {
-      ConvertLabToRGB(X,Y,Z,illuminant,R,G,B);
-      break;
-    }
-    case LCHColorspace:
-    case LCHabColorspace:
-    {
-      ConvertLCHabToRGB(X,Y,Z,illuminant,R,G,B);
-      break;
-    }
-    case LCHuvColorspace:
-    {
-      ConvertLCHuvToRGB(X,Y,Z,illuminant,R,G,B);
-      break;
-    }
-    case LMSColorspace:
-    {
-      ConvertLMSToRGB(X,Y,Z,R,G,B);
-      break;
-    }
-    case LuvColorspace:
-    {
-      ConvertLuvToRGB(X,Y,Z,illuminant,R,G,B);
-      break;
-    }
     default:
     {
-      ConvertOklabThroughYCbCrToRGB(&input);
+      ConvertLabThroughLuvToRGB(&input);
       break;
     }
   }
