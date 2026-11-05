@@ -727,6 +727,13 @@ static void DespeckleChannel(const DespeckleChannelPass *despeckle,
   (*status)=ReportDespeckleProgress(image,i,(*status));
 }
 
+static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    image=DestroyImage(image);
+  return(image);
+}
+
 MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -3216,9 +3223,7 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   shade_view=DestroyCacheView(shade_view);
   image_view=DestroyCacheView(image_view);
   linear_image=DestroyImage(linear_image);
-  if (status == MagickFalse)
-    shade_image=DestroyImage(shade_image);
-  return(shade_image);
+  return(ReleaseFailedImage(shade_image,status));
 }
 
 
