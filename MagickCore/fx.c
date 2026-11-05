@@ -2866,6 +2866,28 @@ static MagickBooleanType TryNumberOperand (FxInfo * pfx,
   return MagickFalse;
 }
 
+static MagickBooleanType TryLeadingOperand (FxInfo * pfx,
+  const OperandSymbols * operand, MagickBooleanType * result)
+{
+  MagickBooleanType
+    returned;
+
+  if (pfx->lenToken==0) {
+
+    if (TryPrefixOperand (pfx, operand, &returned) != MagickFalse) {
+      (*result)=returned;
+      return MagickTrue;
+    }
+
+    if (TryNumberOperand (pfx, &returned) != MagickFalse) {
+      (*result)=returned;
+      return MagickTrue;
+    }
+
+  } /* end of lenToken==0 */
+  return MagickFalse;
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, const OperandSymbols * operand)
 {
@@ -2889,15 +2911,8 @@ static MagickBooleanType GetOperand (
   if (!*pfx->pex) return MagickFalse;
   (void) GetToken (pfx);
 
-  if (pfx->lenToken==0) {
-
-    if (TryPrefixOperand (pfx, operand, &returned) != MagickFalse)
-      return returned;
-
-    if (TryNumberOperand (pfx, &returned) != MagickFalse)
-      return returned;
-
-  } /* end of lenToken==0 */
+  if (TryLeadingOperand (pfx, operand, &returned) != MagickFalse)
+    return returned;
 
   if (pfx->lenToken > 0) {
     /* Try a constant
