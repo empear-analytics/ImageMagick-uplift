@@ -77,3 +77,17 @@ whole right-hand side of an assignment (`sign=c ? 1 : -1;`) at a single site whe
 function out of *Complex Method*, with signed integer literals as `k1` and `k2`. FI steps proven IDENTICAL by
 `obj_identical.sh`. A first verification loop in the lane lost its function name in the WSL quoting and
 started two empty-name casemap re-indexes; stopped, scripts used afterwards.
+
+## Lane c, third file: quantize.c 5.60 -> 7.38 (Opus, 9 commits incl. two splits)
+
+Two Recipe S splits under the owner's standing go-ahead for splits: `quantize-info.c` (AcquireQuantizeInfo,
+CloneQuantizeInfo, DestroyQuantizeInfo, GetQuantizeInfo; 10.0) and `quantize-error.c` (GetImageQuantizeError;
+10.0), registered by `tools/register_source.py`. **The Windows build configuration outside the repository must
+add both files.** New recipe under the mandate, not yet ruled on: **Recipe HC** (567b22031, Extract Block
+Holding a Named Critical Region): a statement of a parallel loop body that holds whole named `omp critical
+(name)` constructs moves, constructs unchanged, into a `static void` helper called from that body alone; an
+orphaned critical binds to the enclosing region at run time and a named critical excludes every critical of
+that name wherever it stands. **Correction:** commit 401d9e9da says quantize.c went from 2,721 to 2,568
+lines; the measured count after that commit is 2,664. Upstream, not changed: `SetGrayscaleImage` overwrites
+its colormap loop's `status` with `MagickTrue`; the first, unlocked `colormap_index[intensity] < 0` read is a
+double-checked race.
