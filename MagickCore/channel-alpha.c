@@ -884,6 +884,15 @@ static void SetCopyExtractAlpha(Image *image,const AlphaChannelOption alpha_type
   }
 }
 
+static MagickBooleanType SyncAlphaChannelCache(Image *image,
+  const MagickBooleanType status,ExceptionInfo *exception)
+{
+  if (status == MagickFalse)
+    return(status);
+  (void) SetPixelChannelMask(image,image->channel_mask);
+  return(SyncImagePixelCache(image,exception));
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -973,8 +982,5 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
       break;
     }
   }
-  if (status == MagickFalse)
-    return(status);
-  (void) SetPixelChannelMask(image,image->channel_mask);
-  return(SyncImagePixelCache(image,exception));
+  return(SyncAlphaChannelCache(image,status,exception));
 }
