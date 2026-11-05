@@ -3793,6 +3793,17 @@ static void SetDistortProgress(MagickBooleanType *status,const Image *image,
     (*status)=MagickFalse;
 }
 
+static void SyncDistortRow(MagickBooleanType *status,CacheView *view,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    sync;
+
+  sync=SyncCacheViewAuthenticPixels(view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -4070,9 +4081,6 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       double
         validity;  /* how mathematically valid is this the mapping */
 
-      MagickBooleanType
-        sync;
-
       PixelInfo
         pixel;    /* pixel color to assign to distorted image */
 
@@ -4261,9 +4269,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         }
         q+=(ptrdiff_t) GetPixelChannels(distort_image);
       }
-      sync=SyncCacheViewAuthenticPixels(distort_view,exception);
-      if (sync == MagickFalse)
-        status=MagickFalse;
+      SyncDistortRow(&status,distort_view,exception);
       if (image->progress_monitor != (MagickProgressMonitor) NULL)
         {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
