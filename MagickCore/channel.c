@@ -469,6 +469,23 @@ static MagickBooleanType AcquireChannelCanvas(const Image *source_image,
   return(MagickTrue);
 }
 
+static MagickBooleanType AppendChannelCanvas(Image **destination_image,
+  Image *canvas,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  AppendImageToList(destination_image,canvas);
+  (*destination_image)=GetLastImageInList((*destination_image));
+  status=SetImageStorageClass((*destination_image),DirectClass,exception);
+  if (status == MagickFalse)
+    {
+      (*destination_image)=GetLastImageInList((*destination_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -564,14 +581,9 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
             destination_image=DestroyImageList(destination_image);
             return(destination_image);
           }
-        AppendImageToList(&destination_image,canvas);
-        destination_image=GetLastImageInList(destination_image);
-        status=SetImageStorageClass(destination_image,DirectClass,exception);
-        if (status == MagickFalse)
-          {
-            destination_image=GetLastImageInList(destination_image);
-            return((Image *) NULL);
-          }
+        if (AppendChannelCanvas(&destination_image,canvas,exception) ==
+            MagickFalse)
+          return((Image *) NULL);
         (void) GetNextToken(p,&p,MagickPathExtent,token);
         channels=0;
         destination_channel=RedPixelChannel;
