@@ -3242,6 +3242,71 @@ static MagickBooleanType TryFunctionOperand (FxInfo * pfx,
   return MagickFalse;
 }
 
+static MagickBooleanType TryNamedOperand (FxInfo * pfx,
+  const OperandSymbols * operand, MagickBooleanType * result)
+{
+  MagickBooleanType
+    *const UserSymbol = operand->UserSymbol,
+    *const NewUserSymbol = operand->NewUserSymbol;
+
+  int
+    *const UserSymNdx = operand->UserSymNdx;
+
+  /* Try image attribute
+  */
+  {
+    ImgAttrE ia = GetImgAttrToken (pfx);
+    if (ia != aNull) {
+      (*result)=(AddImgAttrOperand (pfx, ia));
+      return(MagickTrue);
+    }
+  }
+
+  /* Try symbol
+  */
+  if (NotASymbolOperand (pfx) == MagickFalse) {
+    (*result)=MagickTrue;
+    return(MagickTrue);
+  }
+
+  /* Try constant colour.
+  */
+  {
+    fxFltType v0, v1, v2;
+    ssize_t ColLen = GetConstantColour (pfx, &v0, &v1, &v2);
+    if (ColLen < 0) {
+      (*result)=MagickFalse;
+      return(MagickTrue);
+    }
+    if (ColLen > 0) {
+      (void) AddColourElement (pfx, v0, v1, v2);
+      pfx->pex+=ColLen;
+      (*result)=MagickTrue;
+      return(MagickTrue);
+    }
+  }
+
+  /* Try image artifact.
+  */
+  {
+    const char *artifact;
+    artifact = GetImageArtifact (pfx->image, pfx->token);
+    if (artifact != (const char *) NULL) {
+      (*result)=(AddArtifactOperand (pfx, artifact));
+      return(MagickTrue);
+    }
+  }
+
+  /* Try user symbols. If it is, don't AddElement yet.
+  */
+  if (NotAUserSymbolOperand (pfx, UserSymbol, NewUserSymbol, UserSymNdx) ==
+      MagickFalse) {
+    (*result)=MagickTrue;
+    return(MagickTrue);
+  }
+  return(MagickFalse);
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, const OperandSymbols * operand)
 {
@@ -3279,48 +3344,8 @@ static MagickBooleanType GetOperand (
     if (TryFunctionOperand (pfx, needPopAll, &returned) != MagickFalse)
       return returned;
 
-    /* Try image attribute
-    */
-    {
-      ImgAttrE ia = GetImgAttrToken (pfx);
-      if (ia != aNull) {
-        return (AddImgAttrOperand (pfx, ia));
-      }
-    }
-
-    /* Try symbol
-    */
-    if (NotASymbolOperand (pfx) == MagickFalse)
-      return MagickTrue;
-
-    /* Try constant colour.
-    */
-    {
-      fxFltType v0, v1, v2;
-      ssize_t ColLen = GetConstantColour (pfx, &v0, &v1, &v2);
-      if (ColLen < 0) return MagickFalse;
-      if (ColLen > 0) {
-        (void) AddColourElement (pfx, v0, v1, v2);
-        pfx->pex+=ColLen;
-        return MagickTrue;
-      }
-    }
-
-    /* Try image artifact.
-    */
-    {
-      const char *artifact;
-      artifact = GetImageArtifact (pfx->image, pfx->token);
-      if (artifact != (const char *) NULL) {
-        return (AddArtifactOperand (pfx, artifact));
-      }
-    }
-
-    /* Try user symbols. If it is, don't AddElement yet.
-    */
-    if (NotAUserSymbolOperand (pfx, UserSymbol, NewUserSymbol, UserSymNdx) ==
-        MagickFalse)
-      return MagickTrue;
+    if (TryNamedOperand (pfx, operand, &returned) != MagickFalse)
+      return(returned);
   }
 
   (void) ThrowMagickException (
