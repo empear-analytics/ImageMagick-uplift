@@ -2579,6 +2579,68 @@ static MagickBooleanType LogTosRGB(Image *image,MagickBooleanType status,Excepti
   return(status);
 }
 
+typedef struct _TransformsRGBTables
+{
+  Image
+    *image;
+
+  TransformPacket
+    *x_map,
+    *y_map,
+    *z_map;
+
+  ExceptionInfo
+    *exception;
+} TransformsRGBTables;
+
+static void TransformsRGBColormap(const TransformsRGBTables *tables,
+  const MagickBooleanType status)
+{
+  ExceptionInfo
+    *const exception = tables->exception;
+
+  Image
+    *const image = tables->image;
+
+  TransformPacket
+    *const x_map = tables->x_map,
+    *const y_map = tables->y_map,
+    *const z_map = tables->z_map;
+
+  ssize_t
+    i;
+
+  /*
+    Convert PseudoClass image.
+  */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    PixelInfo
+      pixel;
+
+    size_t
+      blue,
+      green,
+      red;
+
+    red=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].red));
+    green=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].green));
+    blue=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].blue));
+    pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x;
+    pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y;
+    pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z;
+    pixel=ScaleTransformedPixel(image,YCCMap,pixel);
+    image->colormap[i].red=(double) ClampToQuantum(pixel.red);
+    image->colormap[i].green=(double) ClampToQuantum(pixel.green);
+    image->colormap[i].blue=(double) ClampToQuantum(pixel.blue);
+  }
+  (void) SyncImage(image,exception);
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2607,6 +2669,9 @@ static MagickBooleanType TransformsRGBImage(Image *image,
     *y_map,
     *x_map,
     *z_map;
+
+  TransformsRGBTables
+    tables;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -3029,6 +3094,11 @@ static MagickBooleanType TransformsRGBImage(Image *image,
   /*
     Convert to sRGB.
   */
+  tables.image=image;
+  tables.x_map=x_map;
+  tables.y_map=y_map;
+  tables.z_map=z_map;
+  tables.exception=exception;
   switch (image->storage_class)
   {
     case DirectClass:
@@ -3092,35 +3162,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
     }
     case PseudoClass:
     {
-      /*
-        Convert PseudoClass image.
-      */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,1)
-#endif
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        PixelInfo
-          pixel;
-
-        size_t
-          blue,
-          green,
-          red;
-
-        red=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].red));
-        green=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].green));
-        blue=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].blue));
-        pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x;
-        pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y;
-        pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z;
-        pixel=ScaleTransformedPixel(image,YCCMap,pixel);
-        image->colormap[i].red=(double) ClampToQuantum(pixel.red);
-        image->colormap[i].green=(double) ClampToQuantum(pixel.green);
-        image->colormap[i].blue=(double) ClampToQuantum(pixel.blue);
-      }
-      (void) SyncImage(image,exception);
+      TransformsRGBColormap(&tables,status);
       break;
     }
   }
