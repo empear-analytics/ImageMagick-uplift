@@ -71,7 +71,8 @@ def makefile_in(s):
 
 def make_com(s):
     a = "$call Make %s.c\n" % orig
-    assert s.count(a) == 1
+    if s.count(a) != 1:  # not every source is listed (visual-effects.c is not)
+        return s, 0
     return s.replace(a, a + "$call Make %s.c\n" % new), 1
 
 

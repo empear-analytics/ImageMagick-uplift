@@ -619,15 +619,28 @@ is worth it.
 **How:** once the owner has approved the file,
 
 1. Move a group of `static` functions that share a theme, together with the one public
-   function that uses them, to a new `.c` file beside the original.
+   function that uses them, to a new `.c` file beside the original. A forward declaration
+   of a moved `static` travels with it, and so does a `typedef struct` that stands
+   elsewhere in the file (at its top, say) and that only the moved functions use: it goes
+   to a *Typedef declarations* block after the new file's include block, and a *Typedef
+   declarations* comment it leaves with nothing under it in the original goes with it.
 2. No function may change linkage: a `static` stays `static` and must travel with every
-   caller. A split that would need one widened is refused.
+   caller. A split that would need one widened is refused. A macro that the kept part
+   defines and the family uses refuses the split too, with one exception: a one-line
+   `#define NAME "literal"` (a progress tag) that nothing redefines is defined again,
+   verbatim, in a *Define declarations* block after the new file's include block
+   (`split_source.py --copy-macro NAME`), and the original keeps its definition. Both
+   files then expand `NAME` to the same string literal, so no object code changes;
+   `refactor_guard.py --combined` reports that string once more and nothing else, which
+   the commit message states.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
    generates), `MagickCore/Make.com` and `scripts/format_c_api_docs`.
    `tools/split_source.py` does steps 1 and 2 and refuses a family that would need a
-   linkage change or a file-level macro on both sides; `--out` scores a split first.
+   linkage change or a file-level macro on both sides (except under `--copy-macro`, step
+   2); `--out` scores a split first. It accepts an original whose banner draws its name
+   in several words (`visual-effects.c`).
 
 **Careful:**
 
@@ -2243,7 +2256,14 @@ Q and U, whose first step refuses a block containing `goto`.
    another function and identical to it once the variables are renamed consistently
    (Recipe D's test, checked by script), may call the same function the same way, with
    its own variables as arguments and its own `c`, one commit per caller, as Recipe W
-   step 7 allows. In a function returning `void`, `return;` plays the
+   step 7 allows. Under this step a variable `w` of the caller that the block writes
+   only as `w=F(w);` directly before a `return(c);` (the release of an earlier
+   allocation on a failure exit, `canvas_image=DestroyImage(canvas_image);`), and
+   otherwise only reads, is not `v`: it goes by value, its text unchanged. On the
+   fall-through path the block does not write it, so the caller's variable holds the
+   value the copy holds; on an exit the caller returns `c` at once, so nothing reads the
+   variable the block would have written, and `F` releases the same object through a
+   copy of the same pointer. In a function returning `void`, `return;` plays the
    part of `return(c);`: every `return` in the block is `return;`, each becomes
    `return(MagickFalse);`, and the caller writes `if (Helper(...) == MagickFalse)
    return;`.
@@ -7046,3 +7066,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | HC | Extract Block Holding a Named Critical Region: a statement of a parallel loop body (a column loop) that holds whole named `#pragma omp critical (name)` constructs moves, constructs included and unchanged, into a `static void` helper called from that body alone; outside the constructs the block writes only body variables (Recipe O step 1's rule), inside them shared memory through the same pointers; no lock taken; checked by reading | `quantize.c`'s `SetGrayscaleImage` (campaign A, W14): the column loop of its colormap-building parallel loop holds a double-checked insert whose critical governs an unbraced `if` (outside CB step 1), the function's Deep, Nested Complexity (5); a probe 6.11 to 6.57 with no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | TW | *Use when*: the findings may stand on one function only, when the other copy is the whole body of an existing `static` helper, so that moving the reported copy alone would add a fifth parameter (the differing value) or a second helper of the same text (*Code Duplication*); the differing value counts among the five inputs, and the existing helper's body becomes step 5's fill and call, its name and parameters kept. Steps and *Careful* unchanged | `vision.c`'s `ConnectedComponentsImage` (campaign A, W14 lane b): its keep-colors loop is `RemoveObjectsByColor`'s body with `MagickFalse` for `MagickTrue`; a second helper switched *Code Duplication* on (7.16 to 6.77), one shared `MergeObjectsByColor` with a `merge` member measured 7.52 to 7.63, the function leaving *Bumpy Road Ahead*, no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | N | Step 1: an orphaned `#pragma omp atomic` construct (in no parallel region of the function, such as a sequential loop's `progress++`) may lie inside the block and moves whole and unchanged, its variable a parameter or local of the new function by the same name; *Careful* gives the binding argument (an orphaned construct binds at run time to the region enclosing the executing thread, the same from the helper called at the same point). Still eight steps | `feature.c`'s `CannyEdgeImage` (campaign A, W14 lane b): its hysteresis pass, a sequential row loop with an `omp atomic` progress increment, ends the function and holds its last bump; step 1 refused the pragma. A probe of the pass as an Image-returning helper: 7.50 to 7.65, the function leaving *Bumpy Road Ahead*, no finding on the helper. The same shape stands in `HoughLineImage`'s vote loop | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | S | Step 1: a forward declaration of a moved `static`, and a family-only `typedef struct` standing elsewhere in the file, travel with the family (the typedef to a *Typedef declarations* block of the new file). Step 2: a one-line `#define NAME "literal"` of the kept part that the family uses is defined again, verbatim, in the new file (`--copy-macro`), the combined guard reporting that string once more and nothing else. Step 4: `split_source.py` reads a banner of several words | `visual-effects.c` (campaign A, W14 lane a): `WaveletDenoiseImage`'s progress helper reports under `AddNoiseImageTag`, defined in `AddNoiseImage` (upstream uses that tag); `PlasmaImage`'s family needs `PlasmaContext` (typedef at the top) and the forward declaration of `PlasmaImageProxy`. Dry runs: visual-effects.c 4.59 to 5.04 (wavelet) and 4.87 (plasma); the new files 8.20 and 8.50 | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | V | Step 6: a variable `w` the block writes only as `w=F(w);` directly before a `return(c);` (the release of an earlier allocation on a failure exit), and otherwise only reads, goes by value and is not `v` | `visual-effects.c`'s `ImplodeImage` and `SwirlImage` (campaign A, W14 lane a): the clone of the warp image from the canvas and its switch to DirectClass return `(Image *) NULL` at both exits, each after `canvas_image=DestroyImage(canvas_image);`; with `canvas_image` counted as a second written variable, V, Y and O refuse the block and I's *Use when* (five or more parameters) does not hold. A probe of one helper shared by both: 6.28 to 6.32 to 6.35, no finding on the helper, no Code Duplication | mandate (2026-10-24) |

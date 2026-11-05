@@ -12,6 +12,10 @@ and balanced conditionals lies between the moved functions, or when a file-level
 macro crosses the boundary. NEW gets FILE's licence header, with a banner for
 NEW's name (letters taken from the other MagickCore headers) and TITLE, and
 FILE's include block. Register NEW with tools/register_source.py.
+
+Also moved: a forward declaration of a moved static, and a typedef struct elsewhere
+in FILE that only the family uses. --copy-macro NAME (repeatable) defines a one-line
+`#define NAME "literal"` of the kept part again in NEW (Recipe S step 2).
 """
 import collections, glob, os, re, sys
 
@@ -65,7 +69,8 @@ def typedef_names(L, starts):
         names.append(L[n][2:-1])
     return names
 
-args = sys.argv[1:]; out = None
+args = sys.argv[1:]; out = None; copy_macros = []
+while "--copy-macro" in args: k = args.index("--copy-macro"); copy_macros.append(args[k + 1]); del args[k:k + 2]
 if "--out" in args: k = args.index("--out"); out = args[k + 1]; del args[k:k + 2]
 path, new, title, roots = args[0], args[1], args[2], args[3:]
 src = open(path).read(); L = src.split("\n")
@@ -129,10 +134,15 @@ for run in runs:
         if u is None: break
         a = u
     b = last[2] + 1
-    incomment = False; intype = False; bad = []; depth = 0; inner = []
+    incomment = False; intype = False; bad = []; depth = 0; inner = []; inproto = False
     for n in range(a, b):
         if any(s <= n <= e for s, e in spans): continue
         t = L[n].strip()
+        if inproto:
+            inproto = not t.endswith(";"); continue
+        mp = re.match(r"^static\s+[\w \*]*?\b([A-Za-z_]\w*)\s*\(", L[n])
+        if mp and mp.group(1) in moved and mp.group(1) in static:
+            inproto = not t.endswith(";"); continue
         if intype:
             intype = not re.match(r"^} \w+;$", L[n]); continue
         if re.match(r"^typedef struct _\w+$", L[n]):
@@ -164,10 +174,33 @@ rest = "\n".join(rest_lines)
 for tname in typedefs:
     if re.search(r"\b%s\b" % tname, rest): sys.exit("refused: type %s moves with the region but the kept part uses it" % tname)
 defined = lambda text: set(re.findall(r"^\s*#\s*define\s+(\w+)", text, re.M))
+macro_lines = []
 for mname in defined(rest):
-    if re.search(r"\b%s\b" % mname, region): sys.exit("refused: macro %s used in the region" % mname)
+    if not re.search(r"\b%s\b" % mname, region): continue
+    dl = [l for l in rest_lines if re.match(r"^#define\s+%s\b" % mname, l)]
+    if mname in copy_macros and len(dl) == 1 and re.fullmatch(r'#define\s+%s\s+"[^"\\]*"' % mname, dl[0]) \
+        and not re.search(r"^\s*#\s*define\s+%s\b" % mname, region, re.M):
+        macro_lines.append(dl[0]); continue
+    sys.exit("refused: macro %s used in the region" % mname)
 for mname in defined(region):
     if re.search(r"\b%s\b" % mname, rest): sys.exit("refused: macro %s used outside" % mname)
+# a typedef elsewhere in the original that only the region uses moves with it
+moved_types = []
+for tname in sorted(set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M))):
+    if not re.search(r"\b%s\b" % tname, region): continue
+    t0 = next(k for k, l in enumerate(rest_lines) if re.match(r"^typedef struct _%s$" % tname, l))
+    t1 = next(k for k in range(t0, len(rest_lines)) if rest_lines[k] == "} %s;" % tname)
+    others = "\n".join(rest_lines[:t0] + rest_lines[t1 + 1:])
+    if re.search(r"\b%s\b" % tname, others): continue
+    moved_types.append("\n".join(rest_lines[t0:t1 + 1]))
+    e = t1 + 1
+    if e < len(rest_lines) and rest_lines[e] == "": e += 1
+    del rest_lines[t0:e]
+    # a "Typedef declarations." comment left with nothing under it goes too
+    if rest_lines[t0 - 3:t0] == ["/*", "  Typedef declarations.", "*/"] and \
+        not rest_lines[t0].startswith("typedef"):
+        del rest_lines[t0 - 3:t0]
+    rest = "\n".join(rest_lines)
 # a type the original defines and keeps must not be used by the region
 types = set(re.findall(r"^typedef\s+(?:struct|enum|union)\s+(\w+)", rest, re.M)) | \
     set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M)) | \
@@ -191,7 +224,7 @@ for n in sorted(names - moved - static):
 hend = L.index("*/")
 hdr = L[:hend + 1]
 art_rows = [k for k in range(hend) if re.fullmatch(r"%[A-Z ]+%", L[k]) and L[k].strip("% ")]
-assert len(art_rows) == 5, art_rows
+assert art_rows and len(art_rows) % 5 == 0, art_rows
 g = harvest_glyphs()
 row = lambda t, w: "%" + (" " * ((77 - w) // 2) + t.rstrip()).ljust(77) + "%"
 words = [re.sub(r"[^A-Za-z]", "", x).upper() for x in os.path.basename(new)[:-2].split("-")]
@@ -212,7 +245,12 @@ inc_b = max(k for k in range(len(L)) if L[k].startswith("#include") and k < firs
 while L[inc_b + 1].startswith("#"): inc_b += 1
 if defined("\n".join(L[inc_a:inc_b + 1])):
     sys.exit("refused: the include block defines macros %s; both files would define them" % sorted(defined("\n".join(L[inc_a:inc_b + 1]))))
-text = "\n".join(hdr) + "\n\n" + "\n".join(L[inc_a:inc_b + 1]) + "\n\n" + region + "\n"
+extra = ""
+if moved_types:
+    extra += "/*\n  Typedef declarations.\n*/\n" + "\n\n".join(moved_types) + "\n\n"
+if macro_lines:
+    extra += "/*\n  Define declarations.\n*/\n" + "\n".join(macro_lines) + "\n\n"
+text = "\n".join(hdr) + "\n\n" + "\n".join(L[inc_a:inc_b + 1]) + "\n\n" + extra + region + "\n"
 dst_new = os.path.join(out, os.path.basename(new)) if out else new
 dst_old = os.path.join(out, os.path.basename(path)) if out else path
 open(dst_new, "w").write(text)
