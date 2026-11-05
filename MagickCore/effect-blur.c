@@ -2501,17 +2501,10 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    MotionRow
-      row;
+    const MotionRow
+      row = { image, blur_image, kernel, motion_view, offset, width, y,
+        exception };
 
-    row.image=image;
-    row.blur_image=blur_image;
-    row.kernel=kernel;
-    row.motion_view=motion_view;
-    row.offset=offset;
-    row.width=width;
-    row.y=y;
-    row.exception=exception;
     if (BlurMotionLine(&row,image_view,blur_view,&status) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
