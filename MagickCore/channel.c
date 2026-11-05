@@ -380,6 +380,86 @@ static void SetGrayChannelImage(Image *destination_image,
     }
 }
 
+typedef struct _ChannelFxApply
+{
+  PixelChannel
+    destination_channel;
+
+  ChannelFx
+    channel_op;
+
+  const Image
+    *source_image;
+
+  PixelChannel
+    source_channel;
+
+  double
+    pixel;
+
+  ExceptionInfo
+    *exception;
+} ChannelFxApply;
+
+typedef struct _ChannelFxTargets
+{
+  Image
+    **destination_image;
+
+  ssize_t
+    *channels;
+} ChannelFxTargets;
+
+static MagickBooleanType ApplyChannelOperation(const ChannelFxApply *apply,
+  const ChannelFxTargets *targets)
+{
+  const ChannelFx
+    channel_op = apply->channel_op;
+
+  const double
+    pixel = apply->pixel;
+
+  const Image
+    *const source_image = apply->source_image;
+
+  const PixelChannel
+    destination_channel = apply->destination_channel,
+    source_channel = apply->source_channel;
+
+  ExceptionInfo
+    *const exception = apply->exception;
+
+  Image
+    **const destination_image = targets->destination_image;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    *const channels = targets->channels;
+
+  status=ChannelImage((*destination_image),destination_channel,channel_op,
+    source_image,source_channel,ClampToQuantum(pixel),exception);
+  if (status == MagickFalse)
+    {
+      (*destination_image)=DestroyImageList((*destination_image));
+      return(MagickFalse);
+    }
+  (*channels)++;
+  if (channel_op == ExchangeChannelOp)
+    {
+      status=ChannelImage((*destination_image),source_channel,channel_op,
+        source_image,destination_channel,ClampToQuantum(pixel),exception);
+      if (status == MagickFalse)
+        {
+          (*destination_image)=DestroyImageList((*destination_image));
+          return(MagickFalse);
+        }
+      (*channels)++;
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -437,6 +517,12 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   (void) GetNextToken(p,&p,MagickPathExtent,token);
   while (*token != '\0')
   {
+    ChannelFxApply
+      apply;
+
+    const ChannelFxTargets
+      targets = { &destination_image, &channels };
+
     ssize_t
       i;
 
@@ -527,25 +613,14 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
       default:
         break;
     }
-    status=ChannelImage(destination_image,destination_channel,channel_op,
-      source_image,source_channel,ClampToQuantum(pixel),exception);
-    if (status == MagickFalse)
-      {
-        destination_image=DestroyImageList(destination_image);
-        break;
-      }
-    channels++;
-    if (channel_op == ExchangeChannelOp)
-      {
-        status=ChannelImage(destination_image,source_channel,channel_op,
-          source_image,destination_channel,ClampToQuantum(pixel),exception);
-        if (status == MagickFalse)
-          {
-            destination_image=DestroyImageList(destination_image);
-            break;
-          }
-        channels++;
-      }
+    apply.destination_channel=destination_channel;
+    apply.channel_op=channel_op;
+    apply.source_image=source_image;
+    apply.source_channel=source_channel;
+    apply.pixel=pixel;
+    apply.exception=exception;
+    if (ApplyChannelOperation(&apply,&targets) == MagickFalse)
+      break;
     AdvanceDestinationChannel(channel_op,&channel_mask,&destination_channel);
     if (SetChannelFxProgress(source_image,p,expression) == MagickFalse)
       break;
