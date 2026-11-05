@@ -204,3 +204,24 @@ that is a pure `switch` label run count? If yes, the chain can be finished (abou
 setup switch, so the failure is lost; the Blur setup loop exits silently on a failed fetch or sync; the
 alpha switch's `pixel` is read by `GetHueAlpha`, `GetMultiplyAlpha` and `GetDarkenIntensityAlpha` before
 any write, so it relies on its 0.0 initialiser.
+
+### 05:55: a rule I got wrong, and transform.c
+
+**Rule check.** AGENTS.md: for a function no case executes, only Recipes E, G and P and D's *Unreached
+functions* form apply. Recipes PS and PC were applied to unreached functions in two places tonight:
+`transform.c` `ExcerptImage` (three commits) and `paint.c` `TransparentPaintImageChroma` (parts of
+b487df898, 274447d3e and b5af16405). The transform commits are **not in the PR** (local branch
+`w13-transform-excerpt`). The paint commits were already pushed: **owner decision**, keep them (checked by
+reading, `refactor_guard --calls`, the whole catalogue) or have the Chroma parts restored (paint.c would
+drop below 7.02; the hook refuses a drop, so that needs a `--no-verify` approval).
+
+| File | Score | Commits |
+| --- | --- | ---: |
+| `transform.c` | 6.26 -> 6.42 | 3 (Chop PC, Splice PC, Splice PS) |
+
+Deviation from PC step 1 in the Chop and Splice commits: the block starts after the `if (status ==
+MagickFalse) continue;` guard (with the guard in the helper the row helpers clone Crop/Flip and each other,
+5.85 and 5.87). Each message says so. Owner to rule.
+
+**Noticed upstream, not changed.** `ChopImage`'s first loop lists only `shared(status)`; `progress` is
+shared by default.
