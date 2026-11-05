@@ -777,13 +777,13 @@ static void ApplyWavePreview(const PreviewTile *tile,Image **preview_image,
   }
 }
 
-MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
-  ExceptionInfo *exception)
-{
 #define NumberTiles  9
 #define PreviewImageTag  "Preview/Image"
 #define DefaultPreviewGeometry  "204x204+10+10"
 
+MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
+  ExceptionInfo *exception)
+{
   char
     factor[MagickPathExtent],
     label[MagickPathExtent];
