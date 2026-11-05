@@ -619,15 +619,28 @@ is worth it.
 **How:** once the owner has approved the file,
 
 1. Move a group of `static` functions that share a theme, together with the one public
-   function that uses them, to a new `.c` file beside the original.
+   function that uses them, to a new `.c` file beside the original. A forward declaration
+   of a moved `static` travels with it, and so does a `typedef struct` that stands
+   elsewhere in the file (at its top, say) and that only the moved functions use: it goes
+   to a *Typedef declarations* block after the new file's include block, and a *Typedef
+   declarations* comment it leaves with nothing under it in the original goes with it.
 2. No function may change linkage: a `static` stays `static` and must travel with every
-   caller. A split that would need one widened is refused.
+   caller. A split that would need one widened is refused. A macro that the kept part
+   defines and the family uses refuses the split too, with one exception: a one-line
+   `#define NAME "literal"` (a progress tag) that nothing redefines is defined again,
+   verbatim, in a *Define declarations* block after the new file's include block
+   (`split_source.py --copy-macro NAME`), and the original keeps its definition. Both
+   files then expand `NAME` to the same string literal, so no object code changes;
+   `refactor_guard.py --combined` reports that string once more and nothing else, which
+   the commit message states.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
    generates), `MagickCore/Make.com` and `scripts/format_c_api_docs`.
    `tools/split_source.py` does steps 1 and 2 and refuses a family that would need a
-   linkage change or a file-level macro on both sides; `--out` scores a split first.
+   linkage change or a file-level macro on both sides (except under `--copy-macro`, step
+   2); `--out` scores a split first. It accepts an original whose banner draws its name
+   in several words (`visual-effects.c`).
 
 **Careful:**
 
@@ -7006,3 +7019,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | N | Step 8: the statements of one loop body are sibling blocks too (each moved under N, I or Y), the struct may be filled before the loop when nothing in it writes a member's variable, and a later block that holds the siblings' calls (the loop around them) takes the same `const Name *name`, the typedef gaining the members it reads, read as `name->member`, its inner calls passing `name` for `&name`; *Careful* gives the argument | `morphology.c`'s `MorphologyApply` (campaign A, W14): its kernel-iteration loop (Recipe I), the two verbose reports around it (N) and the stage loop that holds them (I) read the same nine to twelve inputs; one struct per helper would take the stage-loop helper past *Large Method* (77 lines in a probe). A probe of the chain with one shared `MorphologyStages`: MorphologyApply leaves Brain Method and Deep, Nested Complexity, 2.71 to 3.04, no finding on a helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | NS | Step 1: the selection may be the whole right-hand side of an assignment statement (`sign=c ? 1 : -1;`), no parentheses needed since nothing can regroup it, may be a single site when the step takes the function out of *Complex Method*, and may select between signed integer literals. *Careful* is unchanged: the argument is evaluated once, the function returns the same constant under the same test, the call replaces the right-hand side as a whole, and `tools/obj_identical.sh` must print `IDENTICAL` | `enhance.c`'s `ContrastImage` (campaign A, W14 lane d): `sign=sharpen != MagickFalse ? 1 : -1;` is one decision of its cc 9; NS step 1 asked for a parenthesised selection that recurs. A probe: ContrastImage leaves Complex Method, enhance.c 6.49 to 6.65 | mandate (2026-10-24) |
 | 2026-11-05 | NEW | HC | Extract Block Holding a Named Critical Region: a statement of a parallel loop body (a column loop) that holds whole named `#pragma omp critical (name)` constructs moves, constructs included and unchanged, into a `static void` helper called from that body alone; outside the constructs the block writes only body variables (Recipe O step 1's rule), inside them shared memory through the same pointers; no lock taken; checked by reading | `quantize.c`'s `SetGrayscaleImage` (campaign A, W14): the column loop of its colormap-building parallel loop holds a double-checked insert whose critical governs an unbraced `if` (outside CB step 1), the function's Deep, Nested Complexity (5); a probe 6.11 to 6.57 with no finding on the helper | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | S | Step 1: a forward declaration of a moved `static`, and a family-only `typedef struct` standing elsewhere in the file, travel with the family (the typedef to a *Typedef declarations* block of the new file). Step 2: a one-line `#define NAME "literal"` of the kept part that the family uses is defined again, verbatim, in the new file (`--copy-macro`), the combined guard reporting that string once more and nothing else. Step 4: `split_source.py` reads a banner of several words | `visual-effects.c` (campaign A, W14 lane a): `WaveletDenoiseImage`'s progress helper reports under `AddNoiseImageTag`, defined in `AddNoiseImage` (upstream uses that tag); `PlasmaImage`'s family needs `PlasmaContext` (typedef at the top) and the forward declaration of `PlasmaImageProxy`. Dry runs: visual-effects.c 4.59 to 5.04 (wavelet) and 4.87 (plasma); the new files 8.20 and 8.50 | mandate (2026-10-24) |
