@@ -3425,6 +3425,45 @@ static void PrintRadialDistortFX(const DistortVerboseFX *fx)
   }
 }
 
+static void PrintDistortFX(const DistortVerboseFX *fx)
+{
+  const DistortMethod
+    method = fx->method;
+
+  double
+    *const coeff = fx->coeff;
+
+  char
+    *const image_gen = fx->image_gen;
+
+  const char
+    *const lookup = fx->lookup;
+
+  switch (method)
+  {
+    case BilinearForwardDistortion:
+    {
+      PrintBilinearForwardFX(coeff,image_gen,lookup);
+      break;
+    }
+    case BilinearReverseDistortion:
+    {
+      PrintBilinearReverseFX(coeff,image_gen,lookup);
+      break;
+    }
+    case PolynomialDistortion:
+    {
+      PrintPolynomialFX(coeff,image_gen,lookup);
+      break;
+    }
+    default:
+    {
+      PrintRadialDistortFX(fx);
+      break;
+    }
+  }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3750,24 +3789,9 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           return((Image *) NULL);
         break;
       }
-      case BilinearForwardDistortion:
-      {
-        PrintBilinearForwardFX(coeff,image_gen,lookup);
-        break;
-      }
-      case BilinearReverseDistortion:
-      {
-        PrintBilinearReverseFX(coeff,image_gen,lookup);
-        break;
-      }
-      case PolynomialDistortion:
-      {
-        PrintPolynomialFX(coeff,image_gen,lookup);
-        break;
-      }
       default:
       {
-        PrintRadialDistortFX(&fx);
+        PrintDistortFX(&fx);
         break;
       }
     }
