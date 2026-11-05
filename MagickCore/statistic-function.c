@@ -312,12 +312,23 @@ static void ApplyFunctionToRow(const Image *image,
   }
 }
 
+static void ReportFunctionProgress(const Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+#define FunctionImageTag  "Function/Image "
+
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,FunctionImageTag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType FunctionImage(Image *image,
   const MagickFunction function,const size_t number_parameters,
   const double *parameters,ExceptionInfo *exception)
 {
-#define FunctionImageTag  "Function/Image "
-
   const FunctionArguments
     arguments = { function, number_parameters, parameters };
 
@@ -371,16 +382,11 @@ MagickExport MagickBooleanType FunctionImage(Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,FunctionImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportFunctionProgress(image,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
