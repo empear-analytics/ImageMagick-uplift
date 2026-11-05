@@ -5279,6 +5279,57 @@ static void SelectBestSimilarity(const SimilarityCandidate *tile,
   }
 }
 
+typedef struct _SimilarityPixel
+{
+  Image
+    *similarity_image;
+
+  PixelChannel
+    channel;
+
+  MetricType
+    metric;
+
+  double
+    similarity;
+} SimilarityPixel;
+
+static void SetSimilarityChannel(const SimilarityPixel *pixel,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const similarity_image = pixel->similarity_image;
+
+  const PixelChannel
+    channel = pixel->channel;
+
+  const MetricType
+    metric = pixel->metric;
+
+  const double
+    similarity = pixel->similarity;
+
+  switch (metric)
+  {
+    case DotProductCorrelationErrorMetric:
+    case NormalizedCrossCorrelationErrorMetric:
+    case PeakSignalToNoiseRatioErrorMetric:
+    case PhaseCorrelationErrorMetric:
+    case StructuralSimilarityErrorMetric:
+    {
+      SetPixelChannel(similarity_image,channel,ClampToQuantum((double)
+        QuantumRange*similarity),q);
+      break;
+    }
+    default:
+    {
+      SetPixelChannel(similarity_image,channel,ClampToQuantum((double)
+        QuantumRange*(1.0-similarity)),q);
+      break;
+    }
+  }
+}
+
 MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
@@ -5451,28 +5502,17 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
         PixelTrait traits = GetPixelChannelTraits(image,channel);
         PixelTrait similarity_traits = GetPixelChannelTraits(similarity_image,
           channel);
+        SimilarityPixel
+          pixel;
+
         if (((traits & UpdatePixelTrait) == 0) ||
             ((similarity_traits & UpdatePixelTrait) == 0))
           continue;
-        switch (metric)
-        {
-          case DotProductCorrelationErrorMetric:
-          case NormalizedCrossCorrelationErrorMetric:
-          case PeakSignalToNoiseRatioErrorMetric:
-          case PhaseCorrelationErrorMetric:
-          case StructuralSimilarityErrorMetric:
-          {
-            SetPixelChannel(similarity_image,channel,ClampToQuantum((double)
-              QuantumRange*similarity),q);
-            break;
-          }
-          default:
-          {
-            SetPixelChannel(similarity_image,channel,ClampToQuantum((double)
-              QuantumRange*(1.0-similarity)),q);
-            break;
-          }
-        }
+        pixel.similarity_image=similarity_image;
+        pixel.channel=channel;
+        pixel.metric=metric;
+        pixel.similarity=similarity;
+        SetSimilarityChannel(&pixel,q);
       }
       q+=(ptrdiff_t) GetPixelChannels(similarity_image);
     }
