@@ -2043,6 +2043,29 @@ static double *GenerateMappedCoefficients(double *coeff,DistortMethod *method,
   return(GenerateRadialCoefficients(coeff,method,context));
 }
 
+static double *GenerateAffineFamilyCoefficients(double *coeff,
+  DistortMethod *method,const CoefficientContext *context)
+{
+  switch (*method)
+  {
+    case AffineDistortion:
+      return(AffineCoefficients(coeff,method,context));
+    case RigidAffineDistortion:
+      return(RigidAffineCoefficients(coeff,method,context));
+    case AffineProjectionDistortion:
+      return(AffineProjectionCoefficients(coeff,method,context));
+    case ScaleRotateTranslateDistortion:
+      return(ScaleRotateTranslateCoefficients(coeff,method,context));
+    case PerspectiveDistortion:
+      return(PerspectiveCoefficients(coeff,method,context));
+    case PerspectiveProjectionDistortion:
+      return(PerspectiveProjectionCoefficients(coeff,method,context));
+    default:
+      break;
+  }
+  return(GenerateMappedCoefficients(coeff,method,context));
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -2126,24 +2149,7 @@ static double *GenerateCoefficients(const Image *image,
   for (i=0; i < number_coefficients; i++)
     coeff[i] = 0.0;
 
-  switch (*method)
-  {
-    case AffineDistortion:
-      return(AffineCoefficients(coeff,method,&context));
-    case RigidAffineDistortion:
-      return(RigidAffineCoefficients(coeff,method,&context));
-    case AffineProjectionDistortion:
-      return(AffineProjectionCoefficients(coeff,method,&context));
-    case ScaleRotateTranslateDistortion:
-      return(ScaleRotateTranslateCoefficients(coeff,method,&context));
-    case PerspectiveDistortion:
-      return(PerspectiveCoefficients(coeff,method,&context));
-    case PerspectiveProjectionDistortion:
-      return(PerspectiveProjectionCoefficients(coeff,method,&context));
-    default:
-      break;
-  }
-  return(GenerateMappedCoefficients(coeff,method,&context));
+  return(GenerateAffineFamilyCoefficients(coeff,method,&context));
 }
 
 /*
