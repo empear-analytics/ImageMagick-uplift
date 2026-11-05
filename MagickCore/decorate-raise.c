@@ -365,6 +365,74 @@ static MagickBooleanType RaiseBottomRows(const RaiseRows *raise_rows,
   return(status);
 }
 
+static MagickBooleanType RaiseSideRows(const RaiseRows *raise_input,
+  MagickOffsetType progress,MagickBooleanType status)
+{
+  Image
+    *const image = raise_input->image;
+
+  CacheView
+    *const image_view = raise_input->image_view;
+
+  ExceptionInfo
+    *const exception = raise_input->exception;
+
+  const RectangleInfo
+    *const raise_info = raise_input->raise_info;
+
+  const Quantum
+    foreground = raise_input->foreground,
+    background = raise_input->background;
+
+  RaiseRows
+    raise_rows;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,image,image->rows-2*raise_info->height,1)
+#endif
+  for (y=(ssize_t) raise_info->height; y < (ssize_t) (image->rows-raise_info->height); y++)
+  {
+    const RaiseRows
+      rows = { image, image_view, exception, raise_info, foreground,
+        background };
+
+    Quantum
+      *magick_restrict q;
+
+    RaiseSide
+      raise_side;
+
+    if (GetRaiseRow(&rows,y,&q,&status) == MagickFalse)
+      continue;
+    raise_side.image=image;
+    raise_side.raise_info=raise_info;
+    raise_side.foreground=foreground;
+    raise_side.background=background;
+    DrawRaiseSideRow(&raise_side,q);
+    SyncRaiseRow(image_view,exception,&status);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetRaiseProgress(image,progress,&status);
+      }
+  }
+  raise_rows.image=image;
+  raise_rows.image_view=image_view;
+  raise_rows.exception=exception;
+  raise_rows.raise_info=raise_info;
+  raise_rows.foreground=foreground;
+  raise_rows.background=background;
+  status=RaiseBottomRows(&raise_rows,progress,status);
+  return(status);
+}
+
 MagickExport MagickBooleanType RaiseImage(Image *image,
   const RectangleInfo *raise_info,const MagickBooleanType raise,
   ExceptionInfo *exception)
@@ -437,46 +505,13 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
         SetRaiseProgress(image,progress,&status);
       }
   }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,image,image->rows-2*raise_info->height,1)
-#endif
-  for (y=(ssize_t) raise_info->height; y < (ssize_t) (image->rows-raise_info->height); y++)
-  {
-    const RaiseRows
-      rows = { image, image_view, exception, raise_info, foreground,
-        background };
-
-    Quantum
-      *magick_restrict q;
-
-    RaiseSide
-      raise_side;
-
-    if (GetRaiseRow(&rows,y,&q,&status) == MagickFalse)
-      continue;
-    raise_side.image=image;
-    raise_side.raise_info=raise_info;
-    raise_side.foreground=foreground;
-    raise_side.background=background;
-    DrawRaiseSideRow(&raise_side,q);
-    SyncRaiseRow(image_view,exception,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetRaiseProgress(image,progress,&status);
-      }
-  }
   raise_rows.image=image;
   raise_rows.image_view=image_view;
   raise_rows.exception=exception;
   raise_rows.raise_info=raise_info;
   raise_rows.foreground=foreground;
   raise_rows.background=background;
-  status=RaiseBottomRows(&raise_rows,progress,status);
+  status=RaiseSideRows(&raise_rows,progress,status);
   image_view=DestroyCacheView(image_view);
   return(status);
 }
