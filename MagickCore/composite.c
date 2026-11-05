@@ -2789,7 +2789,19 @@ typedef struct _BlurComposite
     width;
 
   Image
+    *canvas_image,
+    *image,
     *source_image;
+
+  ResampleFilter
+    *resample_filter;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
 } BlurComposite;
 
 static void RotateBlurEllipse(const BlurComposite *blur_composite,
@@ -2816,6 +2828,67 @@ static void RotateBlurEllipse(const BlurComposite *blur_composite,
       (*blur).y1=(-height*sin(angle));
       (*blur).y2=height*cos(angle);
     }
+}
+
+typedef struct _BlurRow
+{
+  ssize_t
+    y;
+
+  const Quantum
+    *p;
+
+  Quantum
+    *q;
+} BlurRow;
+
+static void BlurCompositeColumns(const BlurComposite *blur_composite,
+  const BlurRow *row,SegmentInfo *blur,PixelInfo *pixel)
+{
+  Image
+    *const canvas_image = blur_composite->canvas_image,
+    *const image = blur_composite->image,
+    *const source_image = blur_composite->source_image;
+
+  ResampleFilter
+    *const resample_filter = blur_composite->resample_filter;
+
+  const ssize_t
+    x_offset = blur_composite->x_offset,
+    y_offset = blur_composite->y_offset,
+    y = row->y;
+
+  ExceptionInfo
+    *const exception = blur_composite->exception;
+
+  const Quantum
+    *p = row->p;
+
+  Quantum
+    *q = row->q;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) source_image->columns; x++)
+  {
+    if (((x_offset+x) < 0) || ((x_offset+x) >= (ssize_t) image->columns))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(source_image);
+        continue;
+      }
+    RotateBlurEllipse(blur_composite,p,blur);
+    ScaleResampleFilter(resample_filter,
+      (*blur).x1*QuantumScale*(double) GetPixelRed(source_image,p),
+      (*blur).y1*QuantumScale*(double) GetPixelGreen(source_image,p),
+      (*blur).x2*QuantumScale*(double) GetPixelRed(source_image,p),
+      (*blur).y2*QuantumScale*(double) GetPixelGreen(source_image,p) );
+    (void) ResamplePixelColor(resample_filter,(double) x_offset+x,
+      (double) y_offset+y,pixel,exception);
+    SetPixelViaPixelInfo(canvas_image,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(source_image);
+    q+=(ptrdiff_t) GetPixelChannels(canvas_image);
+  }
 }
 
 MagickExport MagickBooleanType CompositeImage(Image *image,
@@ -3112,7 +3185,13 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       blur_composite.angle_start=angle_start;
       blur_composite.height=height;
       blur_composite.width=width;
+      blur_composite.canvas_image=canvas_image;
+      blur_composite.image=image;
       blur_composite.source_image=source_image;
+      blur_composite.resample_filter=resample_filter;
+      blur_composite.x_offset=x_offset;
+      blur_composite.y_offset=y_offset;
+      blur_composite.exception=exception;
       for (y=0; y < (ssize_t) source_image->rows; y++)
       {
         MagickBooleanType
@@ -3124,8 +3203,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
+        BlurRow
+          row;
 
         if (((y+y_offset) < 0) || ((y+y_offset) >= (ssize_t) image->rows))
           continue;
@@ -3135,25 +3214,10 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           exception);
         if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
           break;
-        for (x=0; x < (ssize_t) source_image->columns; x++)
-        {
-          if (((x_offset+x) < 0) || ((x_offset+x) >= (ssize_t) image->columns))
-            {
-              p+=(ptrdiff_t) GetPixelChannels(source_image);
-              continue;
-            }
-          RotateBlurEllipse(&blur_composite,p,&blur);
-          ScaleResampleFilter(resample_filter,
-            blur.x1*QuantumScale*(double) GetPixelRed(source_image,p),
-            blur.y1*QuantumScale*(double) GetPixelGreen(source_image,p),
-            blur.x2*QuantumScale*(double) GetPixelRed(source_image,p),
-            blur.y2*QuantumScale*(double) GetPixelGreen(source_image,p) );
-          (void) ResamplePixelColor(resample_filter,(double) x_offset+x,
-            (double) y_offset+y,&pixel,exception);
-          SetPixelViaPixelInfo(canvas_image,&pixel,q);
-          p+=(ptrdiff_t) GetPixelChannels(source_image);
-          q+=(ptrdiff_t) GetPixelChannels(canvas_image);
-        }
+        row.y=y;
+        row.p=p;
+        row.q=q;
+        BlurCompositeColumns(&blur_composite,&row,&blur,&pixel);
         sync=SyncCacheViewAuthenticPixels(canvas_view,exception);
         if (sync == MagickFalse)
           break;
