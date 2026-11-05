@@ -193,6 +193,63 @@ static MagickBooleanType ChannelImage(Image *destination_image,
   return(status);
 }
 
+static MagickBooleanType RegisterDestinationChannel(
+  Image *destination_image,const PixelChannel destination_channel,
+  const char *token,ExceptionInfo *exception)
+{
+  PixelTrait
+    traits;
+
+  switch (destination_channel)
+  {
+    case RedPixelChannel:
+    case GreenPixelChannel:
+    case BluePixelChannel:
+    case BlackPixelChannel:
+    case AlphaPixelChannel:
+    case IndexPixelChannel:
+      break;
+    case CompositeMaskPixelChannel:
+    {
+      destination_image->channels=(ChannelType)
+        (destination_image->channels | CompositeMaskChannel);
+      break;
+    }
+    case ReadMaskPixelChannel:
+    {
+      destination_image->channels=(ChannelType)
+        (destination_image->channels | ReadMaskChannel);
+      break;
+    }
+    case WriteMaskPixelChannel:
+    {
+      destination_image->channels=(ChannelType)
+        (destination_image->channels | WriteMaskChannel);
+      break;
+    }
+    case MetaPixelChannels:
+    default:
+    {
+      traits=GetPixelChannelTraits(destination_image,
+        destination_channel);
+      if (traits != UndefinedPixelTrait)
+        break;
+      (void) SetPixelMetaChannels(destination_image,
+        GetPixelMetaChannels(destination_image)+1,exception);
+      traits=GetPixelChannelTraits(destination_image,
+       destination_channel);
+      if (traits == UndefinedPixelTrait)
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            CorruptImageError,"MissingImageChannel","`%s'",token);
+          return(MagickFalse);
+        }
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -362,54 +419,12 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
           }
         destination_channel=(PixelChannel) i;
         if (image->colorspace != UndefinedColorspace)
-          switch (destination_channel)
-          {
-            case RedPixelChannel:
-            case GreenPixelChannel:
-            case BluePixelChannel:
-            case BlackPixelChannel:
-            case AlphaPixelChannel:
-            case IndexPixelChannel:
-              break;
-            case CompositeMaskPixelChannel:
+          if (RegisterDestinationChannel(destination_image,destination_channel,
+                token,exception) == MagickFalse)
             {
-              destination_image->channels=(ChannelType)
-                (destination_image->channels | CompositeMaskChannel);
-              break;
+              destination_image=DestroyImageList(destination_image);
+              return(destination_image);
             }
-            case ReadMaskPixelChannel:
-            {
-              destination_image->channels=(ChannelType)
-                (destination_image->channels | ReadMaskChannel);
-              break;
-            }
-            case WriteMaskPixelChannel:
-            {
-              destination_image->channels=(ChannelType)
-                (destination_image->channels | WriteMaskChannel);
-              break;
-            }
-            case MetaPixelChannels:
-            default:
-            {
-              traits=GetPixelChannelTraits(destination_image,
-                destination_channel);
-              if (traits != UndefinedPixelTrait)
-                break;
-              (void) SetPixelMetaChannels(destination_image,
-                GetPixelMetaChannels(destination_image)+1,exception);
-              traits=GetPixelChannelTraits(destination_image,
-               destination_channel);
-              if (traits == UndefinedPixelTrait)
-                {
-                  (void) ThrowMagickException(exception,GetMagickModule(),
-                    CorruptImageError,"MissingImageChannel","`%s'",token);
-                  destination_image=DestroyImageList(destination_image);
-                  return(destination_image);
-                }
-              break;
-            }
-          }
         channel_mask=(ChannelType) (channel_mask |
           (MagickLLConstant(1) << ParseChannelOption(token)));
         (void) GetNextToken(p,&p,MagickPathExtent,token);
