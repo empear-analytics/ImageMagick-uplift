@@ -607,6 +607,39 @@ static void ScanOpaqueAlphaRow(MagickBooleanType *status,
     (*opaque)=MagickFalse;
 }
 
+static MagickBooleanType RemoveOpaqueAlpha(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    opaque = MagickTrue;
+
+  ssize_t
+    y;
+
+  image_view=AcquireVirtualCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(opaque,status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    RemoveAlphaRowInfo
+      info;
+
+    info.image_view=image_view;
+    info.image=image;
+    info.exception=exception;
+    ScanOpaqueAlphaRow(&status,&opaque,&info,y);
+  }
+  image_view=DestroyCacheView(image_view);
+  if (opaque != MagickFalse)
+    image->alpha_trait=UndefinedPixelTrait;
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -754,32 +787,12 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
     }
     case OffIfOpaqueAlphaChannel:
     {
-      MagickBooleanType
-        opaque = MagickTrue;
-
       /*
         Remove opaque alpha channel.
       */
       if ((image->alpha_trait & BlendPixelTrait) == 0)
         break;
-      image_view=AcquireVirtualCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(opaque,status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        RemoveAlphaRowInfo
-          info;
-
-        info.image_view=image_view;
-        info.image=image;
-        info.exception=exception;
-        ScanOpaqueAlphaRow(&status,&opaque,&info,y);
-      }
-      image_view=DestroyCacheView(image_view);
-      if (opaque != MagickFalse)
-        image->alpha_trait=UndefinedPixelTrait;
+      status=RemoveOpaqueAlpha(image,status,exception);
       break;
     }
     case OnAlphaChannel:
