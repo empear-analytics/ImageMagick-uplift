@@ -3652,9 +3652,7 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
   interpolate_view=DestroyCacheView(interpolate_view);
   canvas_view=DestroyCacheView(canvas_view);
   canvas_image=DestroyImage(canvas_image);
-  if (status == MagickFalse)
-    swirl_image=DestroyImage(swirl_image);
-  return(swirl_image);
+  return(ReleaseFailedImage(swirl_image,status));
 }
 
 /*
@@ -3847,9 +3845,7 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
   }
   tint_view=DestroyCacheView(tint_view);
   image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    tint_image=DestroyImage(tint_image);
-  return(tint_image);
+  return(ReleaseFailedImage(tint_image,status));
 }
 
 /*
@@ -4171,8 +4167,6 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
   canvas_image_view=DestroyCacheView(canvas_image_view);
   canvas_image=DestroyImage(canvas_image);
   sine_map=(float *) RelinquishMagickMemory(sine_map);
-  if (status == MagickFalse)
-    wave_image=DestroyImage(wave_image);
-  return(wave_image);
+  return(ReleaseFailedImage(wave_image,status));
 }
 
