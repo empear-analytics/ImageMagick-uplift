@@ -2794,6 +2794,30 @@ static void TransformsRGBColormap(const TransformsRGBTables *tables,
   (void) SyncImage(image,exception);
 }
 
+static void GenericPixelsTosRGB(Image *image,const double white_luminance,
+  const IlluminantType illuminant,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      blue,
+      green,
+      red;
+
+    ConvertGenericToRGB(image->colorspace,QuantumScale*
+      GetPixelRed(image,q),QuantumScale*GetPixelGreen(image,q),
+      QuantumScale*GetPixelBlue(image,q),white_luminance,illuminant,
+      &red,&green,&blue);
+    SetPixelRed(image,ClampToQuantum(red),q);
+    SetPixelGreen(image,ClampToQuantum(green),q);
+    SetPixelBlue(image,ClampToQuantum(blue),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2990,9 +3014,6 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        ssize_t
-          x;
-
         Quantum
           *magick_restrict q;
 
@@ -3001,22 +3022,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 
         if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          double
-            blue,
-            green,
-            red;
-
-          ConvertGenericToRGB(image->colorspace,QuantumScale*
-            GetPixelRed(image,q),QuantumScale*GetPixelGreen(image,q),
-            QuantumScale*GetPixelBlue(image,q),white_luminance,illuminant,
-            &red,&green,&blue);
-          SetPixelRed(image,ClampToQuantum(red),q);
-          SetPixelGreen(image,ClampToQuantum(green),q);
-          SetPixelBlue(image,ClampToQuantum(blue),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        GenericPixelsTosRGB(image,white_luminance,illuminant,q);
         SyncColorspaceRow(image_view,exception,&status);
       }
       finish.image=image;
