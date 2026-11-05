@@ -193,19 +193,54 @@ static void QueryArtifactColor(const Image *image,const char *key,
     (void) QueryColorCompliance(artifact,AllCompliance,color,exception);
 }
 
-static double GetEdgeBackgroundCensus(const Image *image,
-  const CacheView *image_view,const GravityType gravity,const size_t width,
-  const size_t height,const ssize_t x_offset,const ssize_t y_offset,
-  ExceptionInfo *exception)
+typedef struct _EdgeTrimScan
+{
+  const Image
+    *edge_image;
+
+  const CacheView
+    *edge_view;
+
+  ExceptionInfo
+    *exception;
+
+  double
+    background_census;
+} EdgeTrimScan;
+
+static inline RectangleInfo GetEdgeGeometry(const size_t width,
+  const size_t height,const ssize_t x_offset,const ssize_t y_offset)
+{
+  RectangleInfo
+    geometry;
+
+  geometry.width=width;
+  geometry.height=height;
+  geometry.x=x_offset;
+  geometry.y=y_offset;
+  return(geometry);
+}
+
+static double GetEdgeBackgroundCensus(const EdgeTrimScan *scan,
+  const GravityType gravity,const RectangleInfo geometry)
 {
   CacheView
     *edge_view;
+
+  const CacheView
+    *image_view = scan->edge_view;
+
+  const Image
+    *image = scan->edge_image;
 
   const Quantum
     *p;
 
   double
     census;
+
+  ExceptionInfo
+    *exception = scan->exception;
 
   Image
     *edge_image;
@@ -255,10 +290,7 @@ static double GetEdgeBackgroundCensus(const Image *image,
   GetPixelInfoPixel(image,p,&background);
   QueryArtifactColor(image,"background",&background,exception);
   QueryArtifactColor(image,"trim:background-color",&background,exception);
-  edge_geometry.width=width;
-  edge_geometry.height=height;
-  edge_geometry.x=x_offset;
-  edge_geometry.y=y_offset;
+  edge_geometry=geometry;
   GravityAdjustGeometry(image->columns,image->rows,gravity,&edge_geometry);
   edge_image=CropImage(image,&edge_geometry,exception);
   if (edge_image == (Image *) NULL)
@@ -304,62 +336,53 @@ static CensusInfo GetInitialEdgeCensus(const Image *edge_image,
   CensusInfo
     edge;
 
-  edge.left=GetEdgeBackgroundCensus(edge_image,edge_view,WestGravity,
-    1,0,0,0,exception);
-  edge.right=GetEdgeBackgroundCensus(edge_image,edge_view,EastGravity,
-    1,0,0,0,exception);
-  edge.top=GetEdgeBackgroundCensus(edge_image,edge_view,NorthGravity,
-    0,1,0,0,exception);
-  edge.bottom=GetEdgeBackgroundCensus(edge_image,edge_view,SouthGravity,
-    0,1,0,0,exception);
+  EdgeTrimScan
+    scan;
+
+  scan.edge_image=edge_image;
+  scan.edge_view=edge_view;
+  scan.exception=exception;
+  edge.left=GetEdgeBackgroundCensus(&scan,WestGravity,
+    GetEdgeGeometry(1,0,0,0));
+  edge.right=GetEdgeBackgroundCensus(&scan,EastGravity,
+    GetEdgeGeometry(1,0,0,0));
+  edge.top=GetEdgeBackgroundCensus(&scan,NorthGravity,
+    GetEdgeGeometry(0,1,0,0));
+  edge.bottom=GetEdgeBackgroundCensus(&scan,SouthGravity,
+    GetEdgeGeometry(0,1,0,0));
   return(edge);
 }
-
-typedef struct _EdgeTrimScan
-{
-  const Image
-    *edge_image;
-
-  const CacheView
-    *edge_view;
-
-  ExceptionInfo
-    *exception;
-
-  double
-    background_census;
-} EdgeTrimScan;
 
 static double GetLeftEdgeCensus(const EdgeTrimScan *scan,
   const CensusInfo *vertex,const RectangleInfo *bounds)
 {
-  return(GetEdgeBackgroundCensus(scan->edge_image,scan->edge_view,
-    NorthWestGravity,1,bounds->height,(ssize_t) vertex->left,(ssize_t)
-    vertex->top,scan->exception));
+  return(GetEdgeBackgroundCensus(scan,NorthWestGravity,
+    GetEdgeGeometry(1,bounds->height,(ssize_t) vertex->left,(ssize_t)
+    vertex->top)));
 }
 
 static double GetRightEdgeCensus(const EdgeTrimScan *scan,
   const CensusInfo *vertex,const RectangleInfo *bounds)
 {
-  return(GetEdgeBackgroundCensus(scan->edge_image,scan->edge_view,
-    NorthEastGravity,1,bounds->height,(ssize_t) vertex->right,(ssize_t)
-    vertex->top,scan->exception));
+  return(GetEdgeBackgroundCensus(scan,NorthEastGravity,
+    GetEdgeGeometry(1,bounds->height,(ssize_t) vertex->right,(ssize_t)
+    vertex->top)));
 }
 
 static double GetTopEdgeCensus(const EdgeTrimScan *scan,
   const CensusInfo *vertex,const RectangleInfo *bounds)
 {
-  return(GetEdgeBackgroundCensus(scan->edge_image,scan->edge_view,
-    NorthWestGravity,bounds->width,1,(ssize_t) vertex->left,(ssize_t)
-    vertex->top,scan->exception));
+  return(GetEdgeBackgroundCensus(scan,NorthWestGravity,
+    GetEdgeGeometry(bounds->width,1,(ssize_t) vertex->left,(ssize_t)
+    vertex->top)));
 }
 
 static double GetBottomEdgeCensus(const EdgeTrimScan *scan,
   const CensusInfo *vertex,const RectangleInfo *bounds)
 {
-  return(GetEdgeBackgroundCensus(scan->edge_image,scan->edge_view,
-    SouthWestGravity,bounds->width,1,(ssize_t) vertex->left,(ssize_t)
-    vertex->bottom,scan->exception));
+  return(GetEdgeBackgroundCensus(scan,SouthWestGravity,
+    GetEdgeGeometry(bounds->width,1,(ssize_t) vertex->left,(ssize_t)
+    vertex->bottom)));
 }
 
 static void TrimLeftEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
