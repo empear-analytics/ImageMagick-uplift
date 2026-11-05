@@ -3765,6 +3765,14 @@ static void TintPixel(const Image *image,const Image *tint_image,
   SetPixelViaPixelInfo(tint_image,&pixel,q);
 }
 
+static void SetTintColorspace(const Image *image,const PixelInfo *tint,
+  Image *tint_image,ExceptionInfo *exception)
+{
+  if ((IsGrayColorspace(image->colorspace) != MagickFalse) &&
+      (IsPixelInfoGray(tint) == MagickFalse))
+    (void) SetImageColorspace(tint_image,sRGBColorspace,exception);
+}
+
 MagickExport Image *TintImage(const Image *image,const char *blend,
   const PixelInfo *tint,ExceptionInfo *exception)
 {
@@ -3803,9 +3811,7 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (CloneEffectImage(image,&tint_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if ((IsGrayColorspace(image->colorspace) != MagickFalse) &&
-      (IsPixelInfoGray(tint) == MagickFalse))
-    (void) SetImageColorspace(tint_image,sRGBColorspace,exception);
+  SetTintColorspace(image,tint,tint_image,exception);
   if (blend == (const char *) NULL)
     return(tint_image);
   /*
