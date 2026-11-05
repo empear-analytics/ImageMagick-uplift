@@ -157,3 +157,16 @@ focus on the long term goal of CH 10"); every plan ended at or above its startin
 `decorate-raise.c` messages 1-5 say the plan ends with FI; it ended with PC (FI is illegal there). Upstream, not
 changed: `CombineImageRow` leaks its per-channel view on the `p == NULL` continue; `PosterizeImage` overwrites
 its row loop's `status` with `QuantizePosterizeImage`'s result.
+
+## Lane a, third file: visual-effects.c 4.59 -> 7.33 with three splits (Opus, 48 commits)
+
+New files: `visual-effects-wavelet.c` (9.55), `visual-effects-plasma.c` (8.50), `visual-effects-stegano.c` (9.09);
+**the Windows build configuration must add all three** (the original is not in `Make.com` or
+`format_c_api_docs` upstream, so the split-offs are not either). Amendments under the mandate, not yet ruled on:
+**Recipe S** (2b2bbb75b: a forward declaration and a file-local typedef travel with the moved functions; a
+one-line progress-tag `#define` is defined again verbatim in the new file) and **Recipe V step 6** (98e7a7ee3: a
+caller variable the block writes only as `w=F(w);` before a `return(c);` goes by value). **Tool changes, for the
+other campaign to pick up:** `tools/split_source.py` (in 2b2bbb75b) handles those cases; `tools/register_source.py`
+(inside the split commit 806c5d3fb, not in a commit of its own as AGENTS.md asks) skips `Make.com` when the
+original is not listed there. Upstream, not changed: `WaveletDenoiseImage` reports progress under the AddNoise
+tag; `MorphImages` leaks `morph_images` when `SetImageStorageClass` fails on a resized frame.
