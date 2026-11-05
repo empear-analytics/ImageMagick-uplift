@@ -2191,10 +2191,26 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void SepiaTonePixel(const Image *image,const Image *sepia_image,
-  const double threshold,const Quantum *magick_restrict p,
-  Quantum *magick_restrict q)
+typedef struct _SepiaTonePixelInfo
 {
+  const Image
+    *image,
+    *sepia_image;
+
+  double
+    threshold;
+} SepiaTonePixelInfo;
+
+static void SepiaTonePixel(const SepiaTonePixelInfo *pixel_info,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = pixel_info->image,
+    *const sepia_image = pixel_info->sepia_image;
+
+  const double
+    threshold = pixel_info->threshold;
+
   double
     intensity,
     tone;
@@ -2240,12 +2256,15 @@ static void SepiaToneImageRow(const SepiaToneRow *sepia_row,
   const double
     threshold = sepia_row->threshold;
 
+  const SepiaTonePixelInfo
+    pixel_info = { image, sepia_image, threshold };
+
   ssize_t
     x;
 
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    SepiaTonePixel(image,sepia_image,threshold,p,q);
+    SepiaTonePixel(&pixel_info,p,q);
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(sepia_image);
   }
