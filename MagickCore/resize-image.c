@@ -452,14 +452,14 @@ static MagickBooleanType FilterHorizontalColumn(
   return(MagickTrue);
 }
 
+#define ResizeImageTag  "Resize/Image"
+
 static MagickBooleanType HorizontalFilter(const HorizontalFilterPass *pass,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
   ExceptionInfo *exception)
 {
   MagickOffsetType
     *magick_restrict const progress = pass->progress;
-
-#define ResizeImageTag  "Resize/Image"
 
   CacheView
     *image_view,
