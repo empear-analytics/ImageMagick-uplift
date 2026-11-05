@@ -1285,6 +1285,17 @@ static MagickBooleanType EvaluateMedianImages(const EvaluateImagesLoop *loop,
   return(status);
 }
 
+static PixelChannels *ClearEvaluatePixels(const Image *image,
+  PixelChannels **magick_restrict evaluate_pixels,const int id)
+{
+  PixelChannels
+    *evaluate_pixel;
+
+  evaluate_pixel=evaluate_pixels[id];
+  ClearPolynomialPixels(image,evaluate_pixel);
+  return(evaluate_pixel);
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -1391,8 +1402,7 @@ MagickExport Image *EvaluateImages(const Image *images,
 
         if (FetchEvaluateRows(&head,&p,&q,&status) == MagickFalse)
           continue;
-        evaluate_pixel=evaluate_pixels[id];
-        ClearPolynomialPixels(image,evaluate_pixel);
+        evaluate_pixel=ClearEvaluatePixels(image,evaluate_pixels,id);
         rows.image=image;
         rows.images=images;
         rows.number_images=number_images;
