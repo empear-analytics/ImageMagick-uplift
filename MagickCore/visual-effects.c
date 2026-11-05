@@ -1189,14 +1189,8 @@ MagickExport Image *ColorMatrixImage(const Image *image,
   /*
     Initialize color image.
   */
-  color_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (color_image == (Image *) NULL)
+  if (CloneEffectImage(image,&color_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(color_image,DirectClass,exception) == MagickFalse)
-    {
-      color_image=DestroyImage(color_image);
-      return((Image *) NULL);
-    }
   if (image->debug != MagickFalse)
     LogColorMatrix(ColorMatrix);
   /*
