@@ -1122,6 +1122,26 @@ static MagickBooleanType CheckThresholdLevel(const ThresholdMap *map,
   return(MagickTrue);
 }
 
+static MagickBooleanType CheckThresholdLevelsEnd(const char *content,
+  const char *map_id,ExceptionInfo *exception)
+{
+  char
+    *p;
+
+  double
+    value;
+
+  value=(double) strtol(content,&p,10);
+  (void) value;
+  if (p != content)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlInvalidContent", "<level> too many values, map \"%s\"",map_id);
+     return(MagickFalse);
+   }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ReadThresholdLevels(ThresholdMap *map,
   XMLTreeInfo *levels,const char *map_id,ExceptionInfo *exception)
 {
@@ -1130,9 +1150,6 @@ static MagickBooleanType ReadThresholdLevels(ThresholdMap *map,
 
   const char
     *content;
-
-  double
-    value;
 
   ssize_t
     i;
@@ -1161,14 +1178,8 @@ static MagickBooleanType ReadThresholdLevels(ThresholdMap *map,
       return(MagickFalse);
     content=p;
   }
-  value=(double) strtol(content,&p,10);
-  (void) value;
-  if (p != content)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlInvalidContent", "<level> too many values, map \"%s\"",map_id);
-     return(MagickFalse);
-   }
+  if (CheckThresholdLevelsEnd(content,map_id,exception) == MagickFalse)
+    return(MagickFalse);
   return(MagickTrue);
 }
 
