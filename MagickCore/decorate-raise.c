@@ -235,6 +235,13 @@ static void SetRaiseProgress(const Image *image,
     (*status)=MagickFalse;
 }
 
+static void SyncRaiseRow(CacheView *image_view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType RaiseImage(Image *image,
   const RectangleInfo *raise_info,const MagickBooleanType raise,
   ExceptionInfo *exception)
@@ -296,8 +303,7 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
     raise_top.foreground=foreground;
     raise_top.background=background;
     DrawRaiseTopRow(&raise_top,y,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncRaiseRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -332,8 +338,7 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
     raise_side.foreground=foreground;
     raise_side.background=background;
     DrawRaiseSideRow(&raise_side,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncRaiseRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -378,8 +383,7 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
       BlendPixelChannels(image,ShadowFactor,background,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncRaiseRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
