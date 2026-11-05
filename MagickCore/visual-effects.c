@@ -2024,6 +2024,12 @@ static Image *FinishPolaroidImage(const PolaroidFinish *polaroid_finish,
   return(polaroid_image);
 }
 
+static void DestroyPolaroidCaption(Image *caption_image)
+{
+  if (caption_image != (Image *) NULL)
+    caption_image=DestroyImage(caption_image);
+}
+
 MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
   const char *caption,const double angle,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -2075,8 +2081,7 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
     height,MagickTrue,exception);
   if (picture_image == (Image *) NULL)
     {
-      if (caption_image != (Image *) NULL)
-        caption_image=DestroyImage(caption_image);
+      DestroyPolaroidCaption(caption_image);
       return((Image *) NULL);
     }
   picture_image->background_color=image->border_color;
