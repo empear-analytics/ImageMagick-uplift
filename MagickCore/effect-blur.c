@@ -3080,19 +3080,10 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    RotationalRow
-      row;
+    const RotationalRow
+      row = { image, blur_image, radial_view, blur_center, blur_radius,
+        cos_theta, sin_theta, n, y, exception };
 
-    row.image=image;
-    row.blur_image=blur_image;
-    row.radial_view=radial_view;
-    row.blur_center=blur_center;
-    row.blur_radius=blur_radius;
-    row.cos_theta=cos_theta;
-    row.sin_theta=sin_theta;
-    row.n=n;
-    row.y=y;
-    row.exception=exception;
     if (BlurRotationalLine(&row,image_view,blur_view,&status) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
