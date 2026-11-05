@@ -632,6 +632,14 @@ static MagickBooleanType CloneWaveletImage(const Image *image,
   return(MagickTrue);
 }
 
+static void RelinquishWaveletBuffers(float *kernel,MemoryInfo *pixels_info)
+{
+  if (kernel != (float *) NULL)
+    kernel=(float *) RelinquishMagickMemory(kernel);
+  if (pixels_info != (MemoryInfo *) NULL)
+    pixels_info=RelinquishVirtualMemory(pixels_info);
+}
+
 MagickExport Image *WaveletDenoiseImage(const Image *image,
   const double threshold,const double softness,ExceptionInfo *exception)
 {
@@ -697,10 +705,7 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
     GetOpenMPMaximumThreads()*sizeof(*kernel));
   if ((pixels_info == (MemoryInfo *) NULL) || (kernel == (float *) NULL))
     {
-      if (kernel != (float *) NULL)
-        kernel=(float *) RelinquishMagickMemory(kernel);
-      if (pixels_info != (MemoryInfo *) NULL)
-        pixels_info=RelinquishVirtualMemory(pixels_info);
+      RelinquishWaveletBuffers(kernel,pixels_info);
       noise_image=DestroyImage(noise_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
