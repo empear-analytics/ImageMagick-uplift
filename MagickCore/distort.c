@@ -705,6 +705,30 @@ static double *AffineCoefficients(double *coeff,const DistortMethod *method,
   return(coeff);
 }
 
+static void AddRigidAffineTerms(double **matrix,double *vectors[1],
+  const double *arguments,const size_t number_arguments)
+{
+  double
+    terms[5];
+
+  size_t
+    i;
+
+  for (i=0; i < number_arguments; i+=4)
+  {
+    terms[0]=arguments[i+0];
+    terms[1]=(-arguments[i+1]);
+    terms[2]=1.0;
+    terms[3]=0.0;
+    LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+2]),4UL,1UL);
+    terms[0]=arguments[i+1];
+    terms[1]=arguments[i+0];
+    terms[2]=0.0;
+    terms[3]=1.0;
+    LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+3]),4UL,1UL);
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -869,7 +893,6 @@ static double *GenerateCoefficients(const Image *image,
       double
         inverse[6],
         **matrix,
-        terms[5],
         *vectors[1];
 
       MagickBooleanType
@@ -904,19 +927,7 @@ static double *GenerateCoefficients(const Image *image,
         Add control points for least squares solving.
       */
       vectors[0]=(&(coeff[0]));
-      for (i=0; i < number_arguments; i+=4)
-      {
-        terms[0]=arguments[i+0];
-        terms[1]=(-arguments[i+1]);
-        terms[2]=1.0;
-        terms[3]=0.0;
-        LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+2]),4UL,1UL);
-        terms[0]=arguments[i+1];
-        terms[1]=arguments[i+0];
-        terms[2]=0.0;
-        terms[3]=1.0;
-        LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+3]),4UL,1UL);
-      }
+      AddRigidAffineTerms(matrix,vectors,arguments,number_arguments);
       /*
         Solve for least-squares coefficients.
       */
