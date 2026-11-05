@@ -495,6 +495,22 @@ static void WriteJpegQualityPreview(ImageInfo *preview_info,
   (void) RelinquishUniqueFileResource((*preview_image)->filename);
 }
 
+static void RaisePreviewTile(const ssize_t i,Image **preview_image,
+  char *label,ExceptionInfo *exception)
+{
+  RectangleInfo
+    raise;
+
+  raise.width=(size_t) (2*i+2);
+  raise.height=(size_t) (2*i+2);
+  raise.x=(i-1)/2;
+  raise.y=(i-1)/2;
+  (void) RaiseImage((*preview_image),&raise,MagickTrue,exception);
+  (void) FormatLocaleString(label,MagickPathExtent,
+    "raise %.17gx%.17g%+.20g%+.20g",(double) raise.width,(double)
+    raise.height,(double) raise.x,(double) raise.y);
+}
+
 static void ApplyRaiseJpegPreview(const PreviewTile *tile,Image **preview_image,
   double *gamma)
 {
@@ -524,20 +540,10 @@ static void ApplyRaiseJpegPreview(const PreviewTile *tile,Image **preview_image,
   {
     case RaisePreview:
     {
-      RectangleInfo
-        raise;
-
       (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
       if ((*preview_image) == (Image *) NULL)
         break;
-      raise.width=(size_t) (2*i+2);
-      raise.height=(size_t) (2*i+2);
-      raise.x=(i-1)/2;
-      raise.y=(i-1)/2;
-      (void) RaiseImage((*preview_image),&raise,MagickTrue,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,
-        "raise %.17gx%.17g%+.20g%+.20g",(double) raise.width,(double)
-        raise.height,(double) raise.x,(double) raise.y);
+      RaisePreviewTile(i,preview_image,label,exception);
       break;
     }
     case JPEGPreview:
