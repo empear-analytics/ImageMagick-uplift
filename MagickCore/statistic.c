@@ -748,6 +748,13 @@ static void SetEvaluatePixels(const Image *image,
   }
 }
 
+static inline MagickBooleanType IsEvaluateChannelSkipped(
+  const PixelTrait traits,const PixelTrait evaluate_traits)
+{
+  return((((traits & UpdatePixelTrait) == 0) ||
+    ((evaluate_traits & UpdatePixelTrait) == 0)) ? MagickTrue : MagickFalse);
+}
+
 typedef struct _EvaluateRow
 {
   Image
@@ -801,8 +808,7 @@ static void AccumulateEvaluateRow(const EvaluateRow *row,const Quantum **p,
       PixelChannel channel = GetPixelChannelChannel(image,i);
       PixelTrait traits = GetPixelChannelTraits(next,channel);
       PixelTrait evaluate_traits = GetPixelChannelTraits(image,channel);
-      if (((traits & UpdatePixelTrait) == 0) ||
-          ((evaluate_traits & UpdatePixelTrait) == 0))
+      if (IsEvaluateChannelSkipped(traits,evaluate_traits) != MagickFalse)
         continue;
       evaluate_pixel[x].channel[i]=ApplyEvaluateOperator(
         random_info[id],GetPixelChannel(next,channel,p[j]),j == 0 ?
@@ -825,8 +831,7 @@ static void AccumulateEvaluateMedianPixel(const EvaluateRow *row,
     PixelChannel channel = GetPixelChannelChannel(row->image,i);
     PixelTrait traits = GetPixelChannelTraits(row->next,channel);
     PixelTrait evaluate_traits = GetPixelChannelTraits(row->image,channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((evaluate_traits & UpdatePixelTrait) == 0))
+    if (IsEvaluateChannelSkipped(traits,evaluate_traits) != MagickFalse)
       continue;
     evaluate_pixel[row->j].channel[i]=ApplyEvaluateOperator(
       row->random_info[row->id],GetPixelChannel(row->next,channel,p[row->j]),
