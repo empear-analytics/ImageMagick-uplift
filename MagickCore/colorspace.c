@@ -1683,6 +1683,107 @@ static MagickBooleanType sRGBTransformPixels(
   return(status);
 }
 
+typedef struct _sRGBMapsInput
+{
+  ColorspaceType
+    colorspace;
+
+  TransformPacket
+    *x_map,
+    *y_map,
+    *z_map;
+} sRGBMapsInput;
+
+static void InitializesRGBRec709ThroughIdentityMaps(const sRGBMapsInput *maps,
+  PrimaryInfo *primary_info)
+{
+  const ColorspaceType
+    colorspace = maps->colorspace;
+
+  TransformPacket
+    *const x_map = maps->x_map,
+    *const y_map = maps->y_map,
+    *const z_map = maps->z_map;
+
+  ssize_t
+    i;
+
+  switch (colorspace)
+  {
+    case Rec709YCbCrColorspace:
+    {
+      /*
+        Initialize YCbCr tables (ITU-R BT.709):
+
+          Y =  0.212656*R+0.715158*G+0.072186*B
+          Cb= -0.114572*R-0.385428*G+0.500000*B
+          Cr=  0.500000*R-0.454153*G-0.045847*B
+
+        Cb and Cr, normally -0.5 through 0.5, are normalized to the range 0
+        through QuantumRange.
+      */
+      (*primary_info).y=(double) ((MaxMap+1)/2);
+      (*primary_info).z=(double) ((MaxMap+1)/2);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static)
+#endif
+      for (i=0; i <= (ssize_t) MaxMap; i++)
+      {
+        x_map[i].x=(MagickRealType) (0.212656*(double) i);
+        x_map[i].y=(MagickRealType) (-0.114572*(double) i);
+        x_map[i].z=(MagickRealType) (0.500000*(double) i);
+        y_map[i].x=(MagickRealType) (0.715158*(double) i);
+        y_map[i].y=(MagickRealType) (-0.385428*(double) i);
+        y_map[i].z=(MagickRealType) (-0.454153*(double) i);
+        z_map[i].x=(MagickRealType) (0.072186*(double) i);
+        z_map[i].y=(MagickRealType) (0.500000*(double) i);
+        z_map[i].z=(MagickRealType) (-0.045847*(double) i);
+      }
+      break;
+    }
+    case YCCColorspace:
+    {
+      /*
+        Initialize YCC tables:
+
+          Y =  0.298839*R+0.586811*G+0.114350*B
+          C1= -0.298839*R-0.586811*G+0.88600*B
+          C2=  0.70100*R-0.586811*G-0.114350*B
+
+        YCC is scaled by 1.3584.  C1 zero is 156 and C2 is at 137.
+      */
+      (*primary_info).y=(MagickRealType) ScaleQuantumToMap(
+        ScaleCharToQuantum(156));
+      (*primary_info).z=(MagickRealType) ScaleQuantumToMap(
+        ScaleCharToQuantum(137));
+      InitializeYCCTransformMaps(x_map,y_map,z_map);
+      break;
+    }
+    default:
+    {
+      /*
+        Linear conversion tables.
+      */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static)
+#endif
+      for (i=0; i <= (ssize_t) MaxMap; i++)
+      {
+        x_map[i].x=(MagickRealType) (1.0*(double) i);
+        x_map[i].y=(MagickRealType) 0.0;
+        x_map[i].z=(MagickRealType) 0.0;
+        y_map[i].x=(MagickRealType) 0.0;
+        y_map[i].y=(MagickRealType) (1.0*(double) i);
+        y_map[i].z=(MagickRealType) 0.0;
+        z_map[i].x=(MagickRealType) 0.0;
+        z_map[i].y=(MagickRealType) 0.0;
+        z_map[i].z=(MagickRealType) (1.0*(double) i);
+      }
+      break;
+    }
+  }
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1856,75 +1957,16 @@ static MagickBooleanType sRGBTransformImage(Image *image,
       }
       break;
     }
-    case Rec709YCbCrColorspace:
-    {
-      /*
-        Initialize YCbCr tables (ITU-R BT.709):
-
-          Y =  0.212656*R+0.715158*G+0.072186*B
-          Cb= -0.114572*R-0.385428*G+0.500000*B
-          Cr=  0.500000*R-0.454153*G-0.045847*B
-
-        Cb and Cr, normally -0.5 through 0.5, are normalized to the range 0
-        through QuantumRange.
-      */
-      primary_info.y=(double) ((MaxMap+1)/2);
-      primary_info.z=(double) ((MaxMap+1)/2);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=(MagickRealType) (0.212656*(double) i);
-        x_map[i].y=(MagickRealType) (-0.114572*(double) i);
-        x_map[i].z=(MagickRealType) (0.500000*(double) i);
-        y_map[i].x=(MagickRealType) (0.715158*(double) i);
-        y_map[i].y=(MagickRealType) (-0.385428*(double) i);
-        y_map[i].z=(MagickRealType) (-0.454153*(double) i);
-        z_map[i].x=(MagickRealType) (0.072186*(double) i);
-        z_map[i].y=(MagickRealType) (0.500000*(double) i);
-        z_map[i].z=(MagickRealType) (-0.045847*(double) i);
-      }
-      break;
-    }
-    case YCCColorspace:
-    {
-      /*
-        Initialize YCC tables:
-
-          Y =  0.298839*R+0.586811*G+0.114350*B
-          C1= -0.298839*R-0.586811*G+0.88600*B
-          C2=  0.70100*R-0.586811*G-0.114350*B
-
-        YCC is scaled by 1.3584.  C1 zero is 156 and C2 is at 137.
-      */
-      primary_info.y=(MagickRealType) ScaleQuantumToMap(
-        ScaleCharToQuantum(156));
-      primary_info.z=(MagickRealType) ScaleQuantumToMap(
-        ScaleCharToQuantum(137));
-      InitializeYCCTransformMaps(x_map,y_map,z_map);
-      break;
-    }
     default:
     {
-      /*
-        Linear conversion tables.
-      */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=(MagickRealType) (1.0*(double) i);
-        x_map[i].y=(MagickRealType) 0.0;
-        x_map[i].z=(MagickRealType) 0.0;
-        y_map[i].x=(MagickRealType) 0.0;
-        y_map[i].y=(MagickRealType) (1.0*(double) i);
-        y_map[i].z=(MagickRealType) 0.0;
-        z_map[i].x=(MagickRealType) 0.0;
-        z_map[i].y=(MagickRealType) 0.0;
-        z_map[i].z=(MagickRealType) (1.0*(double) i);
-      }
+      sRGBMapsInput
+        maps;
+
+      maps.colorspace=colorspace;
+      maps.x_map=x_map;
+      maps.y_map=y_map;
+      maps.z_map=z_map;
+      InitializesRGBRec709ThroughIdentityMaps(&maps,&primary_info);
       break;
     }
   }
