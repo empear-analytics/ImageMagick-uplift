@@ -1345,6 +1345,74 @@ static void sRGBToLogPixels(Image *image,Quantum *logmap,
   }
 }
 
+static MagickBooleanType sRGBToLog(Image *image,const ColorspaceType colorspace,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    i,
+    y;
+
+  double
+    black,
+    density,
+    film_gamma,
+    gamma,
+    reference_black,
+    reference_white;
+
+  const LogProperties
+    targets = { &density,&gamma,&film_gamma,&reference_black,
+      &reference_white };
+
+  Quantum
+    *logmap;
+
+  /*
+    Transform RGB to Log colorspace.
+  */
+  GetLogProperties(image,exception,&targets);
+  logmap=(Quantum *) AcquireQuantumMemory((size_t) MaxMap+1UL,
+    sizeof(*logmap));
+  if (logmap == (Quantum *) NULL)
+    ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+      image->filename);
+  black=pow(10.0,(reference_black-reference_white)*(gamma/density)*0.002*
+    MagickSafeReciprocal(film_gamma));
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static)
+#endif
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+    logmap[i]=ScaleMapToQuantum(((double) MaxMap*(reference_white+
+      log10(black+(1.0*i/MaxMap)*(1.0-black))/((gamma/density)*0.002*
+      MagickSafeReciprocal(film_gamma)))/MaximumLogarithmicColorspace));
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    const ColorspaceRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    sRGBToLogPixels(image,logmap,q);
+    SyncColorspaceRow(image_view,exception,&status);
+  }
+  image_view=DestroyCacheView(image_view);
+  logmap=(Quantum *) RelinquishMagickMemory(logmap);
+  if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
+    return(MagickFalse);
+  return(status);
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1435,64 +1503,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
       return(sRGBToGeneric(&input,image,status,exception));
     }
     case LogColorspace:
-    {
-      double
-        black,
-        density,
-        film_gamma,
-        gamma,
-        reference_black,
-        reference_white;
-
-      const LogProperties
-        targets = { &density,&gamma,&film_gamma,&reference_black,
-          &reference_white };
-
-      Quantum
-        *logmap;
-
-      /*
-        Transform RGB to Log colorspace.
-      */
-      GetLogProperties(image,exception,&targets);
-      logmap=(Quantum *) AcquireQuantumMemory((size_t) MaxMap+1UL,
-        sizeof(*logmap));
-      if (logmap == (Quantum *) NULL)
-        ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-          image->filename);
-      black=pow(10.0,(reference_black-reference_white)*(gamma/density)*0.002*
-        MagickSafeReciprocal(film_gamma));
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-        logmap[i]=ScaleMapToQuantum(((double) MaxMap*(reference_white+
-          log10(black+(1.0*i/MaxMap)*(1.0-black))/((gamma/density)*0.002*
-          MagickSafeReciprocal(film_gamma)))/MaximumLogarithmicColorspace));
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        sRGBToLogPixels(image,logmap,q);
-        SyncColorspaceRow(image_view,exception,&status);
-      }
-      image_view=DestroyCacheView(image_view);
-      logmap=(Quantum *) RelinquishMagickMemory(logmap);
-      if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
-        return(MagickFalse);
-      return(status);
-    }
+      return(sRGBToLog(image,colorspace,status,exception));
     case RGBColorspace:
     case scRGBColorspace:
       return(sRGBToLinearRGB(image,colorspace,status,exception));
