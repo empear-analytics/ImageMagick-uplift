@@ -186,11 +186,18 @@ static void ClearPixelChannelsRow(PixelChannels **pixels,const ssize_t i,
   }
 }
 
-static PixelChannels **AcquirePixelTLS(const Image *images)
+static size_t GetWidestEvaluateColumns(const Image *images,size_t columns)
 {
   const Image
     *next;
 
+  for (next=images; next != (Image *) NULL; next=next->next)
+    columns=MagickMax(next->columns,columns);
+  return(columns);
+}
+
+static PixelChannels **AcquirePixelTLS(const Image *images)
+{
   PixelChannels
     **pixels;
 
@@ -208,9 +215,8 @@ static PixelChannels **AcquirePixelTLS(const Image *images)
   if (pixels == (PixelChannels **) NULL)
     return((PixelChannels **) NULL);
   (void) memset(pixels,0,rows*sizeof(*pixels));
-  columns=MagickMax(number_images,MaxPixelChannels);
-  for (next=images; next != (Image *) NULL; next=next->next)
-    columns=MagickMax(next->columns,columns);
+  columns=GetWidestEvaluateColumns(images,MagickMax(number_images,
+    MaxPixelChannels));
   for (i=0; i < (ssize_t) rows; i++)
   {
     pixels[i]=(PixelChannels *) AcquireQuantumMemory(columns,sizeof(**pixels));
@@ -366,12 +372,23 @@ static void ApplyThresholdEvaluateOperator(const Quantum pixel,
   }
 }
 
-static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
-  const MagickEvaluateOperator op,const double value,double *result)
+static double EvaluateRightShift(const Quantum pixel,const double value)
 {
+  double
+    result;
+
   ssize_t
     i;
 
+  result=(double) pixel;
+  for (i=0; i < (ssize_t) value; i++)
+    result/=2.0;
+  return(result);
+}
+
+static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
   switch (op)
   {
     default:
@@ -391,9 +408,7 @@ static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
     }
     case RightShiftEvaluateOperator:
     {
-      (*result)=(double) pixel;
-      for (i=0; i < (ssize_t) value; i++)
-        (*result)/=2.0;
+      (*result)=EvaluateRightShift(pixel,value);
       break;
     }
     case XorEvaluateOperator:
@@ -659,6 +674,16 @@ static void ScaleEvaluateProduct(const Image *image,
   }
 }
 
+static void DivideEvaluatePixel(const Image *image,const size_t number_images,
+  PixelChannels *evaluate_pixel,const ssize_t x)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    evaluate_pixel[x].channel[i]/=(double) number_images;
+}
+
 static void NormalizeEvaluatePixels(const Image *image,
   const MagickEvaluateOperator op,const size_t number_images,
   PixelChannels *evaluate_pixel)
@@ -673,8 +698,7 @@ static void NormalizeEvaluatePixels(const Image *image,
     {
       case MeanEvaluateOperator:
       {
-        for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          evaluate_pixel[x].channel[i]/=(double) number_images;
+        DivideEvaluatePixel(image,number_images,evaluate_pixel,x);
         break;
       }
       case MultiplyEvaluateOperator:
@@ -733,6 +757,13 @@ static void SetEvaluatePixels(const Image *image,
   }
 }
 
+static inline MagickBooleanType IsEvaluateChannelSkipped(
+  const PixelTrait traits,const PixelTrait evaluate_traits)
+{
+  return((((traits & UpdatePixelTrait) == 0) ||
+    ((evaluate_traits & UpdatePixelTrait) == 0)) ? MagickTrue : MagickFalse);
+}
+
 typedef struct _EvaluateRow
 {
   Image
@@ -786,8 +817,7 @@ static void AccumulateEvaluateRow(const EvaluateRow *row,const Quantum **p,
       PixelChannel channel = GetPixelChannelChannel(image,i);
       PixelTrait traits = GetPixelChannelTraits(next,channel);
       PixelTrait evaluate_traits = GetPixelChannelTraits(image,channel);
-      if (((traits & UpdatePixelTrait) == 0) ||
-          ((evaluate_traits & UpdatePixelTrait) == 0))
+      if (IsEvaluateChannelSkipped(traits,evaluate_traits) != MagickFalse)
         continue;
       evaluate_pixel[x].channel[i]=ApplyEvaluateOperator(
         random_info[id],GetPixelChannel(next,channel,p[j]),j == 0 ?
@@ -810,8 +840,7 @@ static void AccumulateEvaluateMedianPixel(const EvaluateRow *row,
     PixelChannel channel = GetPixelChannelChannel(row->image,i);
     PixelTrait traits = GetPixelChannelTraits(row->next,channel);
     PixelTrait evaluate_traits = GetPixelChannelTraits(row->image,channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((evaluate_traits & UpdatePixelTrait) == 0))
+    if (IsEvaluateChannelSkipped(traits,evaluate_traits) != MagickFalse)
       continue;
     evaluate_pixel[row->j].channel[i]=ApplyEvaluateOperator(
       row->random_info[row->id],GetPixelChannel(row->next,channel,p[row->j]),

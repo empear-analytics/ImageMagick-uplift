@@ -388,6 +388,22 @@ static void HideSteganoPlane(const SteganoPlane *stegano_plane,int *c,
   }
 }
 
+static MagickBooleanType ReportSteganoProgress(const Image *image,
+  const size_t depth,const ssize_t i,MagickBooleanType status)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,SteganoImageTag,(MagickOffsetType)
+        depth-i,depth);
+      if (proceed == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
 MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   ExceptionInfo *exception)
 {
@@ -452,16 +468,7 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
     stegano_plane.i=i;
     stegano_plane.exception=exception;
     HideSteganoPlane(&stegano_plane,&c,&k,&j);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,SteganoImageTag,(MagickOffsetType)
-          depth-i,depth);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    status=ReportSteganoProgress(image,depth,i,status);
   }
   stegano_view=DestroyCacheView(stegano_view);
   watermark_view=DestroyCacheView(watermark_view);
@@ -648,6 +655,13 @@ static MagickBooleanType CloneStereoImage(const Image *left_image,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsStereoSizeMismatch(const Image *left_image,
+  const Image *right_image)
+{
+  return(((left_image->columns != right_image->columns) ||
+    (left_image->rows != right_image->rows)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   const Image *right_image,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
@@ -674,8 +688,7 @@ MagickExport Image *StereoAnaglyphImage(const Image *left_image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       left_image->filename);
   image=left_image;
-  if ((left_image->columns != right_image->columns) ||
-      (left_image->rows != right_image->rows))
+  if (IsStereoSizeMismatch(left_image,right_image) != MagickFalse)
     ThrowImageException(ImageError,"LeftAndRightImageSizesDiffer");
   /*
     Initialize stereo image attributes.

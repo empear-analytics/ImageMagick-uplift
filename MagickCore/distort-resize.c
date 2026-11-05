@@ -188,6 +188,25 @@ static Image *CropDistortResizeImage(Image *resize_image,
   return(resize_image);
 }
 
+static Image *DistortResizeOpaqueImage(Image *tmp_image,
+  const double *distort_args,ExceptionInfo *exception)
+{
+  Image
+    *resize_image;
+
+  /*
+    Image has no alpha channel, so we are free to use it.
+  */
+  (void) SetImageAlphaChannel(tmp_image,SetAlphaChannel,exception);
+  resize_image=DistortImage(tmp_image,AffineDistortion,12,distort_args,
+    MagickTrue,exception),
+  tmp_image=DestroyImage(tmp_image);
+  if (resize_image == (Image *) NULL)
+    return((Image *) NULL);
+  (void) SetImageAlphaChannel(resize_image,OffAlphaChannel,exception);
+  return(resize_image);
+}
+
 MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -231,28 +250,12 @@ MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
     exception);
 
   if ((image->alpha_trait & BlendPixelTrait) == 0)
-    {
-      /*
-        Image has no alpha channel, so we are free to use it.
-      */
-      (void) SetImageAlphaChannel(tmp_image,SetAlphaChannel,exception);
-      resize_image=DistortImage(tmp_image,AffineDistortion,12,distort_args,
-        MagickTrue,exception),
-      tmp_image=DestroyImage(tmp_image);
-      if (resize_image == (Image *) NULL)
-        return((Image *) NULL);
-      (void) SetImageAlphaChannel(resize_image,OffAlphaChannel,exception);
-    }
+    resize_image=DistortResizeOpaqueImage(tmp_image,distort_args,exception);
   else
-    {
-      /*
-        Image has transparency so handle colors and alpha separately.
-      */
-      resize_image=DistortResizeAlphaImage(image,tmp_image,distort_args,
-        exception);
-      if (resize_image == (Image *) NULL)
-        return((Image *) NULL);
-    }
+    resize_image=DistortResizeAlphaImage(image,tmp_image,distort_args,
+      exception);
+  if (resize_image == (Image *) NULL)
+    return((Image *) NULL);
   (void) SetImageVirtualPixelMethod(resize_image,vp_save,exception);
   return(CropDistortResizeImage(resize_image,columns,rows,exception));
 }

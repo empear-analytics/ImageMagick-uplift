@@ -684,22 +684,85 @@ static void DestroyWaveletResources(CacheView *image_view,
   pixels_info=RelinquishVirtualMemory(pixels_info);
 }
 
-MagickExport Image *WaveletDenoiseImage(const Image *image,
-  const double threshold,const double softness,ExceptionInfo *exception)
+typedef struct _WaveletDenoiseInput
+{
+  const Image
+    *image;
+
+  Image
+    *noise_image;
+
+  size_t
+    number_levels;
+
+  MagickSizeType
+    number_pixels;
+
+  double
+    threshold,
+    softness;
+
+  const float
+    *noise_levels;
+
+  float
+    *pixels,
+    *kernel;
+
+  MemoryInfo
+    *pixels_info;
+
+  ExceptionInfo
+    *exception;
+} WaveletDenoiseInput;
+
+static Image *DenoiseWaveletImage(const WaveletDenoiseInput *input)
 {
   CacheView
     *image_view,
     *noise_view;
 
+  Image
+    *noise_image = input->noise_image;
+
+  MagickBooleanType
+    status;
+
+  WaveletDenoise
+    denoise;
+
+  status=MagickTrue;
+  image_view=AcquireAuthenticCacheView(input->image,input->exception);
+  noise_view=AcquireAuthenticCacheView(noise_image,input->exception);
+  denoise.image=input->image;
+  denoise.number_levels=input->number_levels;
+  denoise.number_pixels=input->number_pixels;
+  denoise.threshold=input->threshold;
+  denoise.softness=input->softness;
+  denoise.noise_levels=input->noise_levels;
+  denoise.pixels=input->pixels;
+  denoise.kernel=input->kernel;
+  denoise.image_view=image_view;
+  denoise.noise_image=noise_image;
+  denoise.noise_view=noise_view;
+  denoise.exception=input->exception;
+  status=DenoiseWaveletChannels(&denoise,status);
+  DestroyWaveletResources(image_view,noise_view,input->kernel,
+    input->pixels_info);
+  if (status == MagickFalse)
+    noise_image=DestroyImage(noise_image);
+  return(noise_image);
+}
+
+MagickExport Image *WaveletDenoiseImage(const Image *image,
+  const double threshold,const double softness,ExceptionInfo *exception)
+{
   float
     *kernel,
     *pixels;
 
   Image
     *noise_image;
-
-  MagickBooleanType
-    status;
 
   MagickSizeType
     number_pixels;
@@ -710,8 +773,8 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
   size_t
     number_levels = 5;
 
-  WaveletDenoise
-    denoise;
+  WaveletDenoiseInput
+    input;
 
   static const float
     noise_levels[] = { 0.8002f, 0.2735f, 0.1202f, 0.0585f, 0.0291f, 0.0152f,
@@ -754,24 +817,16 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
   pixels=(float *) GetVirtualMemoryBlob(pixels_info);
-  status=MagickTrue;
-  image_view=AcquireAuthenticCacheView(image,exception);
-  noise_view=AcquireAuthenticCacheView(noise_image,exception);
-  denoise.image=image;
-  denoise.number_levels=number_levels;
-  denoise.number_pixels=number_pixels;
-  denoise.threshold=threshold;
-  denoise.softness=softness;
-  denoise.noise_levels=noise_levels;
-  denoise.pixels=pixels;
-  denoise.kernel=kernel;
-  denoise.image_view=image_view;
-  denoise.noise_image=noise_image;
-  denoise.noise_view=noise_view;
-  denoise.exception=exception;
-  status=DenoiseWaveletChannels(&denoise,status);
-  DestroyWaveletResources(image_view,noise_view,kernel,pixels_info);
-  if (status == MagickFalse)
-    noise_image=DestroyImage(noise_image);
-  return(noise_image);
+  input.image=image;
+  input.noise_image=noise_image;
+  input.number_levels=number_levels;
+  input.number_pixels=number_pixels;
+  input.threshold=threshold;
+  input.softness=softness;
+  input.noise_levels=noise_levels;
+  input.pixels=pixels;
+  input.kernel=kernel;
+  input.pixels_info=pixels_info;
+  input.exception=exception;
+  return(DenoiseWaveletImage(&input));
 }
