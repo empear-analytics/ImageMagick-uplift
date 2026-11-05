@@ -4953,9 +4953,6 @@ MagickExport Image *SparseColorImage(const Image *image,
 #endif
     for (j=0; j < (ssize_t) sparse_image->rows; j++)
     {
-      MagickBooleanType
-        sync;
-
       PixelInfo
         pixel;    /* pixel to assign to distorted image */
 
@@ -5072,9 +5069,7 @@ MagickExport Image *SparseColorImage(const Image *image,
         SetPixelViaPixelInfo(sparse_image,&pixel,q);
         q+=(ptrdiff_t) GetPixelChannels(sparse_image);
       }
-      sync=SyncCacheViewAuthenticPixels(sparse_view,exception);
-      if (sync == MagickFalse)
-        status=MagickFalse;
+      SyncDistortRow(&status,sparse_view,exception);
       if (image->progress_monitor != (MagickProgressMonitor) NULL)
         {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
