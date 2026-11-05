@@ -562,6 +562,73 @@ static void AddAffineThirdPoint(const AffineThirdPoint *point,double *terms)
   }
 }
 
+typedef struct _CoefficientContext
+{
+  const Image
+    *image;
+
+  const double
+    *arguments;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    number_arguments,
+    number_values,
+    cp_size,
+    cp_x,
+    cp_y,
+    cp_values;
+} CoefficientContext;
+
+static void AddAffineTerms(double *coeff,double **matrix,double **vectors,
+  const CoefficientContext *context)
+{
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    number_arguments = context->number_arguments,
+    number_values = context->number_values,
+    cp_size = context->cp_size,
+    cp_x = context->cp_x,
+    cp_y = context->cp_y,
+    cp_values = context->cp_values;
+
+  double
+    terms[3];
+
+  size_t
+    i;
+
+  /* fake a number_values x3 vectors matrix from coefficients array */
+  for (i=0; i < number_values; i++)
+    vectors[i] = &(coeff[i*3]);
+  /* Add given control point pairs for least squares solving */
+  for (i=0; i < number_arguments; i+=cp_size) {
+    terms[0] = arguments[i+cp_x];  /* x */
+    terms[1] = arguments[i+cp_y];  /* y */
+    terms[2] = 1;                  /* 1 */
+    LeastSquaresAddTerms(matrix,vectors,terms,
+             &(arguments[i+cp_values]),3UL,number_values);
+  }
+  if ( number_arguments == 2*cp_size ) {
+    AffineThirdPoint
+      point;
+
+    point.matrix=matrix;
+    point.vectors=vectors;
+    point.arguments=arguments;
+    point.number_values=number_values;
+    point.cp_size=cp_size;
+    point.cp_x=cp_x;
+    point.cp_y=cp_y;
+    point.cp_values=cp_values;
+    AddAffineThirdPoint(&point,terms);
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -587,6 +654,9 @@ static double *GenerateCoefficients(const Image *image,
     cp_values;    /* index of values for this control point */
     /* number_values   Number of values given per control point */
 
+  CoefficientContext
+    context;
+
   if ( number_values == 0 ) {
     /* Image distortion using control points (or other distortion)
        That is generate a mapping so that   x,y->u,v   given  u,v,x,y
@@ -610,6 +680,12 @@ static double *GenerateCoefficients(const Image *image,
   */
   if (IsAffineFallback(number_arguments,cp_size,method) != MagickFalse)
     *method = AffineDistortion;
+  context.image=image;
+  context.arguments=arguments;
+  context.exception=exception;
+  context.number_arguments=number_arguments;
+  context.number_values=number_values;
+  context.cp_size=cp_size;
 
   number_coefficients=0;
   switch (*method) {
@@ -690,6 +766,10 @@ static double *GenerateCoefficients(const Image *image,
       perror("unknown method given"); /* just fail assertion */
   }
 
+  context.cp_x=cp_x;
+  context.cp_y=cp_y;
+  context.cp_values=cp_values;
+
   /* allocate the array of coefficients needed */
   coeff=(double *) AcquireQuantumMemory(number_coefficients,sizeof(*coeff));
   if (coeff == (double *) NULL)
@@ -718,8 +798,7 @@ static double *GenerateCoefficients(const Image *image,
       */
       double
         **matrix,
-        **vectors,
-        terms[3];
+        **vectors;
 
       MagickBooleanType
         status;
@@ -755,31 +834,7 @@ static double *GenerateCoefficients(const Image *image,
                 "%s", "DistortCoefficients");
         return((double *) NULL);
       }
-      /* fake a number_values x3 vectors matrix from coefficients array */
-      for (i=0; i < number_values; i++)
-        vectors[i] = &(coeff[i*3]);
-      /* Add given control point pairs for least squares solving */
-      for (i=0; i < number_arguments; i+=cp_size) {
-        terms[0] = arguments[i+cp_x];  /* x */
-        terms[1] = arguments[i+cp_y];  /* y */
-        terms[2] = 1;                  /* 1 */
-        LeastSquaresAddTerms(matrix,vectors,terms,
-                 &(arguments[i+cp_values]),3UL,number_values);
-      }
-      if ( number_arguments == 2*cp_size ) {
-        AffineThirdPoint
-          point;
-
-        point.matrix=matrix;
-        point.vectors=vectors;
-        point.arguments=arguments;
-        point.number_values=number_values;
-        point.cp_size=cp_size;
-        point.cp_x=cp_x;
-        point.cp_y=cp_y;
-        point.cp_values=cp_values;
-        AddAffineThirdPoint(&point,terms);
-      }
+      AddAffineTerms(coeff,matrix,vectors,&context);
       /* Solve for LeastSquares Coefficients */
       status=GaussJordanElimination(matrix,vectors,3UL,number_values);
       matrix = RelinquishMagickMatrix(matrix, 3UL);
