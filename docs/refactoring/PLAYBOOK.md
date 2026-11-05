@@ -5224,6 +5224,143 @@ Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe CB - Extract Critical Block Body
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Complex
+Method* or *Large Method*, and the block that would fix it is the body of a `#pragma omp
+critical` (or `critical (name)`) region, usually the merge of a parallel loop body's
+private partial results into shared totals (a `for` over the channels with an `if`, then a
+few `+=`). Recipes E, O, Q, T and PS refuse it: each takes a block with no `#pragma omp`
+line, and the shared totals are written under the lock.
+
+**Not covered by:** Recipe PS (step 1: the block contains no `#pragma omp` line, so no
+`critical` block moves, and its shared scalars are written outside any `atomic` or
+`critical`); Recipes E and O (the OpenMP rule: a block in a parallel loop body writes no
+variable declared outside it); Recipe Q (the block of a function with no OpenMP region, or
+a per-pixel accumulation with no lock); Recipes T and AS (they write `status` back after
+the block, which a lock around the write forbids). This recipe moves only what stands
+inside the region's braces and leaves the pragma and the braces in the caller.
+
+**How:**
+
+1. The block is the braced statement a `#pragma omp critical` or `#pragma omp critical
+   (name)` governs, written as `{ ... }` after the pragma (and after the `#endif` that
+   closes the `#if defined(MAGICKCORE_OPENMP_SUPPORT)` around it). Inside it there is no
+   `#pragma` line, no `return` or `goto`, and no `break` or `continue` that leaves it (those
+   of a loop inside it stay); it takes no lock and calls nothing that could (no
+   `omp_set_lock`, no `LockSemaphoreInfo`, no function that enters a `critical` of the same
+   name, which would deadlock). Check each callee by reading.
+2. What moves is the body between the braces. It may instead be the body less one leading
+   or one trailing run of expression statements (`area+=channel_area;`, `mean_error+=...;`)
+   that stay between the braces, beside the call, in the order they had; what moves is then
+   one run of consecutive statements, named as such in the commit message.
+3. Every variable the body writes, other than ones it declares, is reached through a pointer
+   or an array the helper receives: an array or pointer the body writes through
+   (`similarity[j]+=...`) is a parameter of that type with its uses unchanged; a scalar
+   (`area`, `mean_error`) is a pointer parameter and each use becomes `(*v)`, as Recipe PS
+   step 4 does. Every other variable the body reads is a by-value parameter or a pointer to
+   `const`, read at the same point: a shared variable the body reads (a running maximum it
+   compares against) is a pointer parameter, read in the helper through its address. No
+   address of a variable of the caller is stored anywhere.
+4. A variable the body declares moves with it; a counter the caller declared and the body
+   writes before reading it moves too if the caller does not read it afterwards, as Recipe E
+   step 4 says.
+5. Cut the body into a new `static void` function directly above the caller. At most four
+   parameters, as Recipe N steps 2 to 4 do when more inputs are needed: a `const` input
+   struct of the read-only inputs, and, for up to six written variables, one `const` struct
+   of their addresses as Recipe I step 2 and Recipe Z step 7 allow. Otherwise skip the
+   block. Parameters are in the order read-only inputs, then written ones. In the body each
+   pointer-to-scalar use becomes `(*v)`; nothing else in the text changes.
+6. Where the body stood, write one call, `Helper(...);` (with the kept run of step 2 beside
+   it), and check every argument against its parameter by reading. The `#if`, the pragma
+   with its name, and the braces stay as they were, so the helper runs inside the same
+   critical region, at the same point of the iteration, on the same memory.
+7. Two or more critical blocks, in one function or in several, whose bodies are identical,
+   or differ only in a value or in a kept run of step 2, share one helper (checked by
+   script). Calling one helper from several places creates no clone.
+
+**Before:**
+
+```c
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+    #pragma omp critical (MagickCore_GetAESimilarity)
+#endif
+    {
+      ssize_t
+        j;
+
+      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+      {
+        PixelChannel channel = GetPixelChannelChannel(image,j);
+        ...
+        similarity[j]+=channel_similarity[j];
+      }
+      similarity[CompositePixelChannel]+=
+        channel_similarity[CompositePixelChannel];
+    }
+```
+
+**After:**
+
+```c
+static void MergeChannelSimilarity(const Image *image,
+  const Image *reconstruct_image,const double *channel_similarity,
+  double *similarity)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    ...
+    similarity[j]+=channel_similarity[j];
+  }
+  similarity[CompositePixelChannel]+=
+    channel_similarity[CompositePixelChannel];
+}
+...
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+    #pragma omp critical (MagickCore_GetAESimilarity)
+#endif
+    {
+      MergeChannelSimilarity(image,reconstruct_image,channel_similarity,
+        similarity);
+    }
+```
+
+**Careful:**
+
+- The oracle runs on one thread and cannot see a race or a lock: steps 1 to 3 are checked by
+  reading. The argument is the one Recipe PS gives for the loop status. The pragma, its name
+  and its braces do not move, so the thread enters and leaves the same critical region at
+  the same points. The helper runs between them, on the same thread, and reads and writes
+  the very memory the body did (`similarity` is the caller's pointer, `(*area)` is the
+  caller's `area`), in the same order, with the same values; nothing is copied, deferred or
+  written back, so what another thread sees on leaving the region is what the body left.
+- The helper takes no lock and calls nothing that could, so it adds no synchronisation and
+  cannot deadlock: mutual exclusion is still the caller's `critical` and nothing else.
+- A shared variable the body reads is read in the helper at the same point of the same
+  region, through its address; a copy taken before the region would be read outside the
+  lock and is not this recipe.
+- An `#if defined(MAGICKCORE_OPENMP_SUPPORT)` around the pragma stays around the pragma
+  alone; with OpenMP off the braces are a plain block holding the same call, as before.
+- A merge body that is the same text in several functions becomes one helper called from
+  each region under that region's own name: the names of the critical sections stay
+  distinct, so two functions still do not exclude one another.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (the guard counts the new
+helper's `+2` and the callees of the moved body), and steps 1 to 3 checked by reading.
+
+**Provenance:** 2026-11-05, task W13 (campaign A, Claude Code, Claude Sonnet 5.5, under the
+mandate of 2026-10-24), from `compare.c`: the eleven `Get*Similarity` functions each end
+their row loop in an `omp critical` merge (a `for j` loop with an `if` and a few sums), their
+last bump; a probe replacing each critical body by one helper call measured 2.97 to 3.15
+(+0.18) and took the bumps and most *Complex Method* hits off all eleven. Also `feature.c`'s
+`CannyEdgeImage` (a min/max update under `critical`) and the other `omp critical` sites of
+campaign A's files.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -6344,3 +6481,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | I | Step 2: the block may write up to six variables when the caller declares the targets struct `const`, once, with the addresses as its initialiser, and passes it to every helper that writes any of them (Recipe LB step 8's and Recipe Z step 7's form); a struct of Z step 7 counts for the address exception. *Careful* gives the argument. Still eight steps | `fx.c`'s `GetFunction` (campaign A, W13): the opening chain writes five locals and the qualifier block six, both returning `MagickFalse`; I stopped at four, Z has no `return`, and the two blocks hold bumps the loop cannot be left alone with. A probe of the whole chain (these two blocks and the steps around them): `GetFunction` leaves Bumpy Road Ahead, fx.c 3.37 to 3.52 | mandate (2026-10-24) |
 | 2026-11-05 | NEW | EI | Chain Exiting Guards into an Else-If: an `else` block that is only a run of `if` statements, each but the last leaving the flow when it fires, becomes an `else if` chain with the conditions and bodies copied unchanged; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `fx.c`'s `GetFunction` (campaign A, W13): the argument loop's `else` block (a throw with `return MagickFalse`, a `break`, a pad test) is a bump that CN does not reach (statements, not one nested `if`) and no extraction recipe takes (a `break` and a `return` in one block). A probe of the whole chain: that bump gone, the loop's switch moved, `GetFunction` leaves Bumpy Road Ahead, fx.c 3.37 to 3.52 | mandate (2026-10-24) |
 | 2026-11-05 | NEW | SW | Split a Returning Selection into Chained Functions: a run of adjacent groups of a `switch` whose every group ends in `return(R);` (followed by a tail ending the function) moves, with the tail, to a new function of the same return type whose `switch` ends `default: break;`; the caller keeps the other groups and `default:` and returns the call | `distort.c`'s `GenerateCoefficients` (campaign A, W13): the dispatch `switch` of seventeen case helpers (cc 126 of the function); SD refuses `return`, SR wants one constant, E step 7 moves the whole `switch` (a Complex Method). A probe of the whole chain: the function leaves Bumpy Road Ahead, Complex Method and Large Method, 3.55 to 4.25 | mandate (2026-10-24) |
+| 2026-11-05 | NEW | CB | Extract Critical Block Body: the body of a `#pragma omp critical` block moves into a `static void` helper that its call replaces, the pragma and braces staying in the caller; written variables by pointer, read ones by value or pointer to `const`, at most four parameters; checked by reading | `compare.c`'s eleven `Get*Similarity` merges (a probe, one helper call per critical body: 2.97 to 3.15) and `feature.c`'s `CannyEdgeImage` | mandate (2026-10-24) |
