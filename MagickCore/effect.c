@@ -1276,6 +1276,13 @@ static MagickBooleanType KuwaharaHeadRow(MagickBooleanType *status,
   return(MagickTrue);
 }
 
+static void SyncKuwaharaRow(MagickBooleanType *status,CacheView *kuwahara_view,
+  ExceptionInfo *exception)
+{
+  if (SyncCacheViewAuthenticPixels(kuwahara_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1340,8 +1347,7 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
 
     if (KuwaharaHeadRow(&status,&kuwahara) == MagickFalse)
       continue;
-    if (SyncCacheViewAuthenticPixels(kuwahara_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncKuwaharaRow(&status,kuwahara_view,exception);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
