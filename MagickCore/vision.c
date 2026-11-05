@@ -3027,6 +3027,14 @@ static Image *ReportConnectedComponents(const CCReportInputs *report_inputs,
   return(component_image);
 }
 
+static MagickBooleanType SyncComponentView(CacheView *component_view,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  if (SyncCacheViewAuthenticPixels(component_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -3183,8 +3191,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     LabelObjectRow(&label_row,label_targets);
     if (n > (ssize_t) MaxColormapSize)
       break;
-    if (SyncCacheViewAuthenticPixels(component_view,exception) == MagickFalse)
-      status=MagickFalse;
+    status=SyncComponentView(component_view,status,exception);
     UpdateComponentsProgress(image,&progress,&status);
   }
   component_view=DestroyCacheView(component_view);
