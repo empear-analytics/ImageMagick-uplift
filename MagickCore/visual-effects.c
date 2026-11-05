@@ -3588,18 +3588,8 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
   canvas_image=CloneImage(image,0,0,MagickTrue,exception);
   if (canvas_image == (Image *) NULL)
     return((Image *) NULL);
-  swirl_image=CloneImage(canvas_image,0,0,MagickTrue,exception);
-  if (swirl_image == (Image *) NULL)
-    {
-      canvas_image=DestroyImage(canvas_image);
-      return((Image *) NULL);
-    }
-  if (SetImageStorageClass(swirl_image,DirectClass,exception) == MagickFalse)
-    {
-      canvas_image=DestroyImage(canvas_image);
-      swirl_image=DestroyImage(swirl_image);
-      return((Image *) NULL);
-    }
+  if (CloneWarpImage(canvas_image,&swirl_image,exception) == MagickFalse)
+    return((Image *) NULL);
   if (swirl_image->background_color.alpha_trait != UndefinedPixelTrait)
     (void) SetImageAlphaChannel(swirl_image,OnAlphaChannel,exception);
   /*
