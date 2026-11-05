@@ -576,14 +576,8 @@ MagickExport Image *BlueShiftImage(const Image *image,const double factor,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  shift_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (shift_image == (Image *) NULL)
+  if (CloneEffectImage(image,&shift_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(shift_image,DirectClass,exception) == MagickFalse)
-    {
-      shift_image=DestroyImage(shift_image);
-      return((Image *) NULL);
-    }
   /*
     Blue-shift DirectClass image.
   */
