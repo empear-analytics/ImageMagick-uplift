@@ -1567,6 +1567,62 @@ static void SetPolarCoefficients(double *coeff,const Image *image,
     coeff[5] += Magick2PI; /* same angle is a full circle */
 }
 
+static double *PolarCoefficients(double *coeff,const DistortMethod *method,
+  const CoefficientContext *context)
+{
+  const Image
+    *const image = context->image;
+
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
+  /* (De)Polar Distortion   (same set of arguments)
+     Args:  Rmax, Rmin,  Xcenter,Ycenter,  Afrom,Ato
+     DePolar can also have the extra arguments of Width, Height
+
+     Coefficients 0 to 5 is the sanitized version first 6 input args
+     Coefficient 6  is the angle to coord ratio  and visa-versa
+     Coefficient 7  is the radius to coord ratio and visa-versa
+
+     WARNING: It is possible for  Radius max<min  and/or  Angle from>to
+  */
+  if (IsInvalidPolarArgumentCount(number_arguments,method) != MagickFalse) {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionError,"InvalidArgument", "%s : number of arguments",
+        CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    coeff=(double *) RelinquishMagickMemory(coeff);
+    return((double *) NULL);
+  }
+  SetPolarCoefficients(coeff,image,arguments,number_arguments);
+  /* if radius 0 or negative,  its a special value... */
+  if ( coeff[0] < MagickEpsilon )
+    SetPolarSpecialRadius(image,coeff);
+  /* IF Rmax <= 0 or Rmin < 0 OR Rmax < Rmin, THEN error */
+  if (IsInvalidPolarRadius(coeff) != MagickFalse) {
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument", "%s : Invalid Radius",
+        CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    coeff=(double *) RelinquishMagickMemory(coeff);
+    return((double *) NULL);
+  }
+  /* conversion ratios */
+  if ( *method == PolarDistortion ) {
+    coeff[6]=(double) image->columns/(coeff[5]-coeff[4]);
+    coeff[7]=(double) image->rows/(coeff[0]-coeff[1]);
+  }
+  else { /* *method == DePolarDistortion */
+    coeff[6]=(coeff[5]-coeff[4])/image->columns;
+    coeff[7]=(coeff[0]-coeff[1])/image->rows;
+  }
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1762,47 +1818,7 @@ static double *GenerateCoefficients(const Image *image,
       return(ArcCoefficients(coeff,method,&context));
     case PolarDistortion:
     case DePolarDistortion:
-    {
-      /* (De)Polar Distortion   (same set of arguments)
-         Args:  Rmax, Rmin,  Xcenter,Ycenter,  Afrom,Ato
-         DePolar can also have the extra arguments of Width, Height
-
-         Coefficients 0 to 5 is the sanitized version first 6 input args
-         Coefficient 6  is the angle to coord ratio  and visa-versa
-         Coefficient 7  is the radius to coord ratio and visa-versa
-
-         WARNING: It is possible for  Radius max<min  and/or  Angle from>to
-      */
-      if (IsInvalidPolarArgumentCount(number_arguments,method) != MagickFalse) {
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            OptionError,"InvalidArgument", "%s : number of arguments",
-            CommandOptionToMnemonic(MagickDistortOptions, *method) );
-        coeff=(double *) RelinquishMagickMemory(coeff);
-        return((double *) NULL);
-      }
-      SetPolarCoefficients(coeff,image,arguments,number_arguments);
-      /* if radius 0 or negative,  its a special value... */
-      if ( coeff[0] < MagickEpsilon )
-        SetPolarSpecialRadius(image,coeff);
-      /* IF Rmax <= 0 or Rmin < 0 OR Rmax < Rmin, THEN error */
-      if (IsInvalidPolarRadius(coeff) != MagickFalse) {
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "InvalidArgument", "%s : Invalid Radius",
-            CommandOptionToMnemonic(MagickDistortOptions, *method) );
-        coeff=(double *) RelinquishMagickMemory(coeff);
-        return((double *) NULL);
-      }
-      /* conversion ratios */
-      if ( *method == PolarDistortion ) {
-        coeff[6]=(double) image->columns/(coeff[5]-coeff[4]);
-        coeff[7]=(double) image->rows/(coeff[0]-coeff[1]);
-      }
-      else { /* *method == DePolarDistortion */
-        coeff[6]=(coeff[5]-coeff[4])/image->columns;
-        coeff[7]=(coeff[0]-coeff[1])/image->rows;
-      }
-      return(coeff);
-    }
+      return(PolarCoefficients(coeff,method,&context));
     case Cylinder2PlaneDistortion:
     case Plane2CylinderDistortion:
     {
