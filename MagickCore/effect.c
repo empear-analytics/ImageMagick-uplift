@@ -826,6 +826,12 @@ static Image *ReduceSpeckle(const DespeckleReduction *reduction)
   return(ReleaseFailedImage(despeckle_image,status));
 }
 
+static inline MagickBooleanType IsDespeckleSizeOverflow(const Image *image)
+{
+  return(((image->columns > (MAGICK_SIZE_MAX-2)) ||
+    (image->rows > (MAGICK_SIZE_MAX-2))) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 {
   DespeckleReduction
@@ -878,8 +884,7 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
   /*
     Allocate image buffer.
   */
-  if ((image->columns > (MAGICK_SIZE_MAX-2)) ||
-      (image->rows > (MAGICK_SIZE_MAX-2)))
+  if (IsDespeckleSizeOverflow(image) != MagickFalse)
     {
       despeckle_image=DestroyImage(despeckle_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
