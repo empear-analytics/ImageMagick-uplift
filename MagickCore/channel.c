@@ -808,15 +808,13 @@ static void SetSeparateProgress(const Image *image,
     (*status)=MagickFalse;
 }
 
-MagickExport Image *SeparateImage(const Image *image,
-  const ChannelType channel_type,ExceptionInfo *exception)
+static MagickBooleanType SeparateImageRows(const Image *image,
+  Image *separate_image,const ChannelType channel_type,
+  ExceptionInfo *exception)
 {
   CacheView
     *image_view,
     *separate_view;
-
-  Image
-    *separate_image;
 
   MagickBooleanType
     status;
@@ -827,29 +825,6 @@ MagickExport Image *SeparateImage(const Image *image,
   ssize_t
     y;
 
-  /*
-    Initialize separate image attributes.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  separate_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (separate_image == (Image *) NULL)
-    return((Image *) NULL);
-  if (SetImageStorageClass(separate_image,DirectClass,exception) == MagickFalse)
-    {
-      separate_image=DestroyImage(separate_image);
-      return((Image *) NULL);
-    }
-  separate_image->alpha_trait=UndefinedPixelTrait;
-  (void) SetImageColorspace(separate_image,GRAYColorspace,exception);
-  separate_image->gamma=image->gamma;
-  /*
-    Separate image.
-  */
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
@@ -877,6 +852,42 @@ MagickExport Image *SeparateImage(const Image *image,
   }
   separate_view=DestroyCacheView(separate_view);
   image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport Image *SeparateImage(const Image *image,
+  const ChannelType channel_type,ExceptionInfo *exception)
+{
+  Image
+    *separate_image;
+
+  MagickBooleanType
+    status;
+
+  /*
+    Initialize separate image attributes.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  separate_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (separate_image == (Image *) NULL)
+    return((Image *) NULL);
+  if (SetImageStorageClass(separate_image,DirectClass,exception) == MagickFalse)
+    {
+      separate_image=DestroyImage(separate_image);
+      return((Image *) NULL);
+    }
+  separate_image->alpha_trait=UndefinedPixelTrait;
+  (void) SetImageColorspace(separate_image,GRAYColorspace,exception);
+  separate_image->gamma=image->gamma;
+  /*
+    Separate image.
+  */
+  status=SeparateImageRows(image,separate_image,channel_type,exception);
   (void) SetImageChannelMask(separate_image,AllChannels);
   if (status == MagickFalse)
     separate_image=DestroyImage(separate_image);
