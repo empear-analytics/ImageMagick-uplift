@@ -6870,6 +6870,88 @@ during task W14, under the mandate of 2026-10-24.
 
 ---
 
+## Recipe PD - Name a Parameter-or-Default Selection
+
+**Use when:** CodeScene reports *Complex Method* or *Overall Code Complexity*, and much of
+the complexity is one conditional expression of the shape
+`(n >= k) ? values[k-1] : d` that reads the k-th optional parameter or falls back to a
+default, repeated at many sites with different `k` and `d`, as `statistic-function.c`'s
+`ApplySinusoidFunction`, `ApplyArcsinFunction` and `ApplyArctanFunction` do: twelve sites,
+each counted as a decision, differing in the position and the default.
+
+**Not covered by:** Recipe NS, whose expression picks between two constants under a
+condition and takes one argument. Recipe SV, whose copies are statements differing in one
+value. Recipe D, which merges identical statements. Recipes E, O and SD, which move
+statements: the decision moves with them and the helper inherits it.
+
+**How:**
+
+1. Each site is the whole right-hand side of an assignment statement. `n` is a plain
+   identifier, `values` a plain identifier of pointer type, `k` an integer literal that
+   stands once as `k` and once as the literal `k-1` written out (`1` and `0`), and `d` a
+   literal of the element type; no call, assignment or increment appears in the site. At
+   least three sites in the file have this shape.
+2. Write one `static inline` function directly above the first function that holds a
+   site, taking `const size_t n`, `const double *values`, `const size_t k` and
+   `const double default_value` (the types of the site's `n`, the element type of
+   `values` and the literals' own type) and returning
+   `(n >= k) ? values[k-1] : default_value`.
+3. Replace each site's right-hand side by a call passing the site's `n`, `values`, `k`
+   and `d`. Check by script that every site becomes the helper's body with those
+   arguments substituted, and that no site was left or altered.
+4. Check by reading that each case helper that holds sites is reached by oracle cases
+   (`tools/oracle/casemap.py` on its caller) and that the case list names the option that
+   reaches each helper. The object code need not be byte-identical (the compiler may order
+   the branches of the inlined helper differently); the argument is *Careful*'s.
+5. All sites of one file go in one commit; the message gives the score of the first site
+   moved alone.
+
+**Before:**
+
+```c
+  frequency=(number_parameters >= 1) ? parameters[0] : 1.0;
+  phase=(number_parameters >= 2) ? parameters[1] : 0.0;
+```
+
+**After:**
+
+```c
+static inline double GetFunctionParameter(const size_t number_parameters,
+  const double *parameters,const size_t index,const double default_value)
+{
+  return((number_parameters >= index) ? parameters[index-1] : default_value);
+}
+...
+  frequency=GetFunctionParameter(number_parameters,parameters,1,1.0);
+  phase=GetFunctionParameter(number_parameters,parameters,2,0.0);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The arguments are evaluated once, as the site read them
+  once (identifiers and literals, no side effect); passing them converts nothing, because
+  each parameter has the type of its argument. The function evaluates the same comparison
+  and, only when it holds, reads the same element `values[k-1]`, so the element is never
+  read when `n < k`, as before. The literal `k` and the index `k-1` agree at every site
+  (step 1).
+- The helper is `static inline`, so the compiler inlines it; a probe on
+  `statistic-function.c` gave object code of the same size class with branches and
+  registers ordered differently (`tools/obj_identical.sh` prints `DIFFERENT`), which is
+  why the evidence is the oracle and not identity.
+- A site whose element index is not `k-1`, or whose default is a variable, is not this
+  recipe.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+one call per site) and steps 1 and 4 checked by reading.
+
+**Provenance:** 2026-11-05, from `statistic-function.c`'s three case helpers (campaign A,
+W14 lane d): twelve `(number_parameters >= k) ? parameters[k-1] : d` defaults, which the
+W10 and W13 plateau rows recorded as covered by no recipe; a probe: 9.09 to 9.68 beside
+the chain of helpers of `FunctionImage`. Added by Claude Code (Claude Sonnet 5.5) under
+the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -7153,3 +7235,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | HC | Step 2: outside the critical constructs the block may also read, test and assign the shared `status` (Recipe PS step 2's conditions), directly or through `&status` passed to a callee; it goes by pointer, last, `(*status)` at every use and `status` for `&status` (PS step 4), the only text change step 5 makes; inside the constructs `status` is not touched. *Careful* gives the argument. Still six steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree tile row loop holds the named critical sync and sets `status` through its head and sync test, which step 2 refused; a probe of the whole chain: 7.63 to 10.00 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | LB | Step 1: the body of a Recipe PS step 7 helper (the parallel loop's whole body, called once per iteration with the shared `status`'s address) counts as the parallel loop body for the parallel-loop-body form; a block in it passes `status` on and may take the helper's own `const Name *name` unchanged (Recipe N step 2's pass-through). *Careful* gives the argument. Still eight steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): `RotateTileRow270`'s tile loop body ends the tile loop through `break;` on a failed fetch; left in place it is reported as *Code Duplication* with the 90-degree helper (7.58 in a probe); as an LB helper the chain reaches 10.00 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | HC | Step 3: a callee of a construct's statement that may take another lock (the pixel cache's `file_semaphore`, taken by `SyncCacheViewAuthenticPixels` on a disk cache) is allowed, since the construct moves whole and unchanged and the thread takes the same locks in the same order and nesting; a function entering a critical of the same name, or `omp_set_lock` on a lock the caller holds, stays refused. *Careful* gives the argument. Still six steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree critical governs the row sync, whose `WritePixelCachePixels` locks `file_semaphore` for disk and distributed caches; step 3 as written refused every such callee | mandate (2026-10-24) |
+| 2026-11-05 | NEW | PD | Name a Parameter-or-Default Selection: the whole right-hand side `(n >= k) ? values[k-1] : d` of an assignment, at three or more sites of one file, becomes a call of one `static inline` function taking `n`, `values`, `k` and `d`; oracle evidence (the object code is not byte-identical) | `statistic-function.c`'s three case helpers (campaign A, W14 lane d): twelve parameter defaults held *Overall Code Complexity*; a probe 9.09 to 9.68 | mandate (2026-10-24) |
