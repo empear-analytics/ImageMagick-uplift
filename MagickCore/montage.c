@@ -881,6 +881,22 @@ static void GetMontageTileGeometry(const char *geometry,
     }
 }
 
+static void GetMontageTileCounts(const MontageInfo *montage_info,
+  const size_t number_images,size_t *tiles_per_column,size_t *tiles_per_row)
+{
+  ssize_t
+    x_offset,
+    y_offset;
+
+  *tiles_per_column=(size_t) sqrt((double) number_images);
+  *tiles_per_row=(size_t) ceil((double) number_images/(*tiles_per_column));
+  x_offset=0;
+  y_offset=0;
+  if (montage_info->tile != (char *) NULL)
+    GetMontageGeometry(montage_info->tile,number_images,&x_offset,&y_offset,
+      tiles_per_column,tiles_per_row);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1005,13 +1021,8 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   /*
     Determine tiles per row and column.
   */
-  tiles_per_column=(size_t) sqrt((double) number_images);
-  tiles_per_row=(size_t) ceil((double) number_images/tiles_per_column);
-  x_offset=0;
-  y_offset=0;
-  if (montage_info->tile != (char *) NULL)
-    GetMontageGeometry(montage_info->tile,number_images,&x_offset,&y_offset,
-      &tiles_per_column,&tiles_per_row);
+  GetMontageTileCounts(montage_info,number_images,&tiles_per_column,
+    &tiles_per_row);
   /*
     Determine tile sizes.
   */
