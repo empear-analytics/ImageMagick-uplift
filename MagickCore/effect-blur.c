@@ -829,13 +829,102 @@ static MagickBooleanType SharpenAdaptiveLine(const AdaptiveBlurRow *row,
 #define AdaptiveSharpenImageTag  "Convolve/Image"
 #define MagickSigma  (fabs(sigma) < MagickEpsilon ? MagickEpsilon : sigma)
 
-MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
-  const double sigma,ExceptionInfo *exception)
+typedef struct _AdaptiveSharpen
 {
+  const Image
+    *image;
+
+  Image
+    *sharp_image,
+    *edge_image;
+
+  double
+    **kernel;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
+} AdaptiveSharpen;
+
+static Image *SharpenAdaptiveRows(const AdaptiveSharpen *adaptive)
+{
+  const Image
+    *const image = adaptive->image;
+
+  Image
+    *const sharp_image = adaptive->sharp_image;
+
+  Image
+    *edge_image = adaptive->edge_image;
+
+  double
+    **kernel = adaptive->kernel;
+
+  const size_t
+    width = adaptive->width;
+
+  ExceptionInfo
+    *const exception = adaptive->exception;
+
   CacheView
     *sharp_view,
     *edge_view,
     *image_view;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    w,
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  edge_view=AcquireVirtualCacheView(edge_image,exception);
+  sharp_view=AcquireAuthenticCacheView(sharp_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,sharp_image,sharp_image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) sharp_image->rows; y++)
+  {
+    const AdaptiveBlurRow
+      row = { image, sharp_image, edge_image, image_view, kernel, width, y,
+        exception };
+
+    if (SharpenAdaptiveLine(&row,edge_view,sharp_view,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetBlurProgress(image,AdaptiveSharpenImageTag,progress,&status);
+      }
+  }
+  sharp_image->type=image->type;
+  sharp_view=DestroyCacheView(sharp_view);
+  edge_view=DestroyCacheView(edge_view);
+  image_view=DestroyCacheView(image_view);
+  edge_image=DestroyImage(edge_image);
+  for (w=0; w < (ssize_t) width; w+=2)
+    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
+  kernel=(double **) RelinquishAlignedMemory(kernel);
+  return(ReleaseFailedImage(sharp_image,status));
+}
+
+MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
+  const double sigma,ExceptionInfo *exception)
+{
+  AdaptiveSharpen
+    adaptive;
 
   double
     **kernel;
@@ -845,18 +934,11 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
     *edge_image,
     *gaussian_image;
 
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
   size_t
     width;
 
   ssize_t
-    w,
-    y;
+    w;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -920,41 +1002,13 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   /*
     Adaptively sharpen image.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  edge_view=AcquireVirtualCacheView(edge_image,exception);
-  sharp_view=AcquireAuthenticCacheView(sharp_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,sharp_image,sharp_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) sharp_image->rows; y++)
-  {
-    const AdaptiveBlurRow
-      row = { image, sharp_image, edge_image, image_view, kernel, width, y,
-        exception };
-
-    if (SharpenAdaptiveLine(&row,edge_view,sharp_view,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetBlurProgress(image,AdaptiveSharpenImageTag,progress,&status);
-      }
-  }
-  sharp_image->type=image->type;
-  sharp_view=DestroyCacheView(sharp_view);
-  edge_view=DestroyCacheView(edge_view);
-  image_view=DestroyCacheView(image_view);
-  edge_image=DestroyImage(edge_image);
-  for (w=0; w < (ssize_t) width; w+=2)
-    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
-  kernel=(double **) RelinquishAlignedMemory(kernel);
-  return(ReleaseFailedImage(sharp_image,status));
+  adaptive.image=image;
+  adaptive.sharp_image=sharp_image;
+  adaptive.edge_image=edge_image;
+  adaptive.kernel=kernel;
+  adaptive.width=width;
+  adaptive.exception=exception;
+  return(SharpenAdaptiveRows(&adaptive));
 }
 
 /*
