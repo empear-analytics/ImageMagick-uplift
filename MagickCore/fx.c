@@ -3748,6 +3748,24 @@ static MagickBooleanType TranslateAssignedExpression (
   return(MagickTrue);
 }
 
+static MagickBooleanType SetAssignmentTarget (FxInfo * pfx,
+  OperatorE op, int UserSymNdx0, MagickBooleanType * broke)
+{
+  (*broke)=MagickFalse;
+  if (op == oAssign) {
+    if (!AddAssignmentCopyTo (pfx, UserSymNdx0)) return MagickFalse;
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  } else if (SetInPlaceOperatorTarget (pfx, op, UserSymNdx0, broke) ==
+      MagickFalse) {
+    return MagickFalse;
+  } else if ((*broke) != MagickFalse) {
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -3923,15 +3941,9 @@ static MagickBooleanType TranslateExpression (
     }
     pfx->usedOprStack--;
     (void) AddElement (pfx, (fxFltType) 0, (int) op);
-    if (op == oAssign) {
-      if (!AddAssignmentCopyTo (pfx, UserSymNdx0)) return MagickFalse;
-      break;
-    } else if (SetInPlaceOperatorTarget (pfx, op, UserSymNdx0, &broke) ==
-        MagickFalse) {
+    if (SetAssignmentTarget (pfx, op, UserSymNdx0, &broke) == MagickFalse)
       return MagickFalse;
-    } else if (broke != MagickFalse) {
-      break;
-    }
+    if (broke != MagickFalse) break;
   }
 
   if (ternary.addr_query != NULL_ADDRESS) *needPopAll = MagickTrue;
