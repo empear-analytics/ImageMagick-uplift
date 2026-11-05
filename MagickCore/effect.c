@@ -1988,6 +1988,115 @@ static MagickBooleanType RunLocalContrastPasses(
   return(status);
 }
 
+typedef struct _LocalContrastFilter
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view,
+    *contrast_view;
+
+  float
+    *scanline;
+
+  ssize_t
+    scanLineSize,
+    width;
+
+  double
+    strength;
+
+  Image
+    *contrast_image;
+
+  ExceptionInfo
+    *exception;
+
+  MemoryInfo
+    *scanline_info;
+} LocalContrastFilter;
+
+static Image *FilterLocalContrast(const LocalContrastFilter *filter)
+{
+  const Image
+    *const image = filter->image;
+
+  CacheView
+    *image_view = filter->image_view,
+    *contrast_view = filter->contrast_view;
+
+  float
+    *const scanline = filter->scanline;
+
+  const ssize_t
+    scanLineSize = filter->scanLineSize,
+    width = filter->width;
+
+  const double
+    strength = filter->strength;
+
+  Image
+    *contrast_image = filter->contrast_image;
+
+  ExceptionInfo
+    *const exception = filter->exception;
+
+  MemoryInfo
+    *scanline_info = filter->scanline_info;
+
+  double
+    totalWeight;
+
+  float
+    *interImage;
+
+  LocalContrastPasses
+    passes;
+
+  MagickBooleanType
+    status;
+
+  MemoryInfo
+    *interImage_info;
+
+  /*
+    Create intermediate buffer.
+  */
+  interImage_info=AcquireVirtualMemory(image->rows*(image->columns+(size_t)
+    (2*width)),sizeof(*interImage));
+  if (interImage_info == (MemoryInfo *) NULL)
+    {
+      scanline_info=RelinquishVirtualMemory(scanline_info);
+      contrast_view=DestroyCacheView(contrast_view);
+      image_view=DestroyCacheView(image_view);
+      contrast_image=DestroyImage(contrast_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  interImage=(float *) GetVirtualMemoryBlob(interImage_info);
+  totalWeight=(float) ((width+1)*(width+1));
+  /*
+    Vertical pass.
+  */
+  passes.image=image;
+  passes.image_view=image_view;
+  passes.contrast_view=contrast_view;
+  passes.interImage=interImage;
+  passes.scanline=scanline;
+  passes.scanLineSize=scanLineSize;
+  passes.width=width;
+  passes.totalWeight=totalWeight;
+  passes.strength=strength;
+  passes.contrast_image=contrast_image;
+  passes.exception=exception;
+  status=RunLocalContrastPasses(&passes);
+  scanline_info=RelinquishVirtualMemory(scanline_info);
+  interImage_info=RelinquishVirtualMemory(interImage_info);
+  contrast_view=DestroyCacheView(contrast_view);
+  image_view=DestroyCacheView(image_view);
+  return(ReleaseFailedImage(contrast_image,status));
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -1997,25 +2106,17 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
     *image_view,
     *contrast_view;
 
-  double
-    totalWeight;
-
   float
-    *interImage,
     *scanline;
 
   Image
     *contrast_image;
 
-  LocalContrastPasses
-    passes;
-
-  MagickBooleanType
-    status;
+  LocalContrastFilter
+    filter;
 
   MemoryInfo
-    *scanline_info,
-    *interImage_info;
+    *scanline_info;
 
   ssize_t
     scanLineSize,
@@ -2052,41 +2153,17 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
   scanline=(float *) GetVirtualMemoryBlob(scanline_info);
-  /*
-    Create intermediate buffer.
-  */
-  interImage_info=AcquireVirtualMemory(image->rows*(image->columns+(size_t)
-    (2*width)),sizeof(*interImage));
-  if (interImage_info == (MemoryInfo *) NULL)
-    {
-      scanline_info=RelinquishVirtualMemory(scanline_info);
-      contrast_view=DestroyCacheView(contrast_view);
-      image_view=DestroyCacheView(image_view);
-      contrast_image=DestroyImage(contrast_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  interImage=(float *) GetVirtualMemoryBlob(interImage_info);
-  totalWeight=(float) ((width+1)*(width+1));
-  /*
-    Vertical pass.
-  */
-  passes.image=image;
-  passes.image_view=image_view;
-  passes.contrast_view=contrast_view;
-  passes.interImage=interImage;
-  passes.scanline=scanline;
-  passes.scanLineSize=scanLineSize;
-  passes.width=width;
-  passes.totalWeight=totalWeight;
-  passes.strength=strength;
-  passes.contrast_image=contrast_image;
-  passes.exception=exception;
-  status=RunLocalContrastPasses(&passes);
-  scanline_info=RelinquishVirtualMemory(scanline_info);
-  interImage_info=RelinquishVirtualMemory(interImage_info);
-  contrast_view=DestroyCacheView(contrast_view);
-  image_view=DestroyCacheView(image_view);
-  return(ReleaseFailedImage(contrast_image,status));
+  filter.image=image;
+  filter.image_view=image_view;
+  filter.contrast_view=contrast_view;
+  filter.scanline=scanline;
+  filter.scanLineSize=scanLineSize;
+  filter.width=width;
+  filter.strength=strength;
+  filter.contrast_image=contrast_image;
+  filter.exception=exception;
+  filter.scanline_info=scanline_info;
+  return(FilterLocalContrast(&filter));
 }
 
 
