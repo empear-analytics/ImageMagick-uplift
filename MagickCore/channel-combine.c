@@ -275,6 +275,31 @@ static void SetCombineGrayChannels(Image *combine_image,
     SetPixelMetaChannels(combine_image,number_channels-2,exception);
 }
 
+static void SetCombineChannels(Image *combine_image,
+  const size_t number_channels,ExceptionInfo *exception)
+{
+  switch (combine_image->colorspace)
+  {
+    case UndefinedColorspace:
+    case sRGBColorspace:
+    {
+      SetCombineRGBChannels(combine_image,number_channels,exception);
+      break;
+    }
+    case LinearGRAYColorspace:
+    case GRAYColorspace:
+    {
+      SetCombineGrayChannels(combine_image,number_channels,exception);
+      break;
+    }
+    default:
+    {
+      SetCombineCMYKChannels(combine_image,number_channels,exception);
+      break;
+    }
+  }
+}
+
 MagickExport Image *CombineImages(const Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -317,26 +342,7 @@ MagickExport Image *CombineImages(const Image *image,
     }
   SetCombineImageColorspace(image,combine_image,colorspace,exception);
   number_channels=GetImageListLength(image);
-  switch (combine_image->colorspace)
-  {
-    case UndefinedColorspace:
-    case sRGBColorspace:
-    {
-      SetCombineRGBChannels(combine_image,number_channels,exception);
-      break;
-    }
-    case LinearGRAYColorspace:
-    case GRAYColorspace:
-    {
-      SetCombineGrayChannels(combine_image,number_channels,exception);
-      break;
-    }
-    default:
-    {
-      SetCombineCMYKChannels(combine_image,number_channels,exception);
-      break;
-    }
-  }
+  SetCombineChannels(combine_image,number_channels,exception);
   /*
     Combine images.
   */
