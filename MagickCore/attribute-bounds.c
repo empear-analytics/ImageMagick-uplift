@@ -325,6 +325,9 @@ typedef struct _EdgeTrimScan
 
   ExceptionInfo
     *exception;
+
+  double
+    background_census;
 } EdgeTrimScan;
 
 static double GetLeftEdgeCensus(const EdgeTrimScan *scan,
@@ -411,6 +414,31 @@ static void TrimBottomEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
   (*edge).bottom=GetBottomEdgeCensus(scan,vertex,bounds);
 }
 
+static void TrimLowestEdge(const EdgeTrimScan *scan,CensusInfo *vertex,
+  RectangleInfo *bounds,CensusInfo *edge)
+{
+  if (fabs((*edge).left-scan->background_census) < MagickEpsilon)
+    {
+      TrimLeftEdge(scan,vertex,bounds,edge);
+      return;
+    }
+  if (fabs((*edge).right-scan->background_census) < MagickEpsilon)
+    {
+      TrimRightEdge(scan,vertex,bounds,edge);
+      return;
+    }
+  if (fabs((*edge).top-scan->background_census) < MagickEpsilon)
+    {
+      TrimTopEdge(scan,vertex,bounds,edge);
+      return;
+    }
+  if (fabs((*edge).bottom-scan->background_census) < MagickEpsilon)
+    {
+      TrimBottomEdge(scan,vertex,bounds,edge);
+      return;
+    }
+}
+
 static RectangleInfo GetEdgeBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -459,26 +487,8 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
   {
     if ((bounds.width == 0) || (bounds.height == 0))
       break;
-    if (fabs(edge.left-background_census) < MagickEpsilon)
-      {
-        TrimLeftEdge(&scan,&vertex,&bounds,&edge);
-        continue;
-      }
-    if (fabs(edge.right-background_census) < MagickEpsilon)
-      {
-        TrimRightEdge(&scan,&vertex,&bounds,&edge);
-        continue;
-      }
-    if (fabs(edge.top-background_census) < MagickEpsilon)
-      {
-        TrimTopEdge(&scan,&vertex,&bounds,&edge);
-        continue;
-      }
-    if (fabs(edge.bottom-background_census) < MagickEpsilon)
-      {
-        TrimBottomEdge(&scan,&vertex,&bounds,&edge);
-        continue;
-      }
+    scan.background_census=background_census;
+    TrimLowestEdge(&scan,&vertex,&bounds,&edge);
   }
   edge_view=DestroyCacheView(edge_view);
   edge_image=DestroyImage(edge_image);
