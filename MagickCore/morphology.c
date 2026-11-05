@@ -4440,6 +4440,121 @@ static void SelectCloseIntensityPrimitive(
   }
 }
 
+typedef struct _MorphologyStages
+{
+  const Image
+    *image;
+
+  KernelInfo
+    *rflt_kernel;
+
+  double
+    bias;
+
+  MagickBooleanType
+    verbose;
+
+  size_t
+    method_loop,
+    kernel_number,
+    kernel_limit;
+
+  char
+    *v_info;
+
+  ExceptionInfo
+    *exception;
+} MorphologyStages;
+
+typedef struct _MorphologyIterationTargets
+{
+  size_t
+    *kernel_changed;
+
+  ssize_t
+    *changed;
+
+  Image
+    **work_image;
+
+  size_t
+    *count,
+    *method_changed;
+
+  Image
+    **curr_image;
+} MorphologyIterationTargets;
+
+static MagickBooleanType IterateMorphologyKernel(
+  const MorphologyStages *stages,const MorphologyMethod primitive,
+  KernelInfo *this_kernel,const MorphologyIterationTargets *targets)
+{
+  size_t
+    *const kernel_changed = targets->kernel_changed;
+
+  ssize_t
+    *const changed = targets->changed;
+
+  Image
+    **const work_image = targets->work_image;
+
+  size_t
+    *const count = targets->count,
+    *const method_changed = targets->method_changed;
+
+  Image
+    **const curr_image = targets->curr_image;
+
+  size_t
+    kernel_loop;
+
+  kernel_loop = 0;
+  (*kernel_changed) = 0;
+  (*changed) = 1;
+  while ( kernel_loop < stages->kernel_limit && (*changed) > 0 ) {
+    const MorphologyPass pass = { primitive, this_kernel, stages->bias };
+
+    kernel_loop++;     /* the iteration of this kernel */
+
+    /* Create a clone as the destination image, if not yet defined */
+    if (AcquireWorkImage(stages->image,work_image,stages->exception) == MagickFalse)
+      return(MagickFalse);
+
+    /* APPLY THE MORPHOLOGICAL PRIMITIVE (curr -> work) */
+    (*count)++;
+    (*changed) = MorphologyPrimitive((*curr_image), (*work_image), &pass,
+                 stages->exception);
+    if (stages->verbose != MagickFalse) {
+      MorphologyPassReport
+        report;
+
+      report.primitive=primitive;
+      report.this_kernel=this_kernel;
+      report.rflt_kernel=stages->rflt_kernel;
+      report.method_loop=stages->method_loop;
+      report.kernel_number=stages->kernel_number;
+      report.kernel_loop=kernel_loop;
+      report.count=(*count);
+      report.changed=(*changed);
+      ReportMorphologyPass(stages->v_info,&report);
+    }
+    if ( (*changed) < 0 )
+      return(MagickFalse);
+    (*kernel_changed) = (size_t) ((ssize_t) (*kernel_changed)+(*changed));
+    (*method_changed) = (size_t) ((ssize_t) (*method_changed)+(*changed));
+
+    /* prepare next loop */
+    { Image *tmp = (*work_image);   /* swap images for iteration */
+      (*work_image) = (*curr_image);
+      (*curr_image) = tmp;
+    }
+    if ( (*work_image) == stages->image )
+      (*work_image) = (Image *) NULL; /* replace input 'image' */
+
+  } /* End Loop 4: Iterate the kernel with primitive */
+  return(MagickTrue);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4476,7 +4591,6 @@ MagickPrivate Image *MorphologyApply(const Image *image,
     kernel_number,  /* Loop 2: the kernel number being applied */
     stage_loop,     /* Loop 3: primitive loop for compound morphology */
     stage_limit,    /*         how many primitives are in this compound */
-    kernel_loop,    /* Loop 4: iterate the kernel over image */
     kernel_limit,   /*         number of times to iterate kernel */
     count,          /* total count of primitive steps applied */
     kernel_changed, /* total count of changed using iterated kernel */
@@ -4487,6 +4601,10 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
   char
     v_info[MagickPathExtent];
+
+  const MorphologyIterationTargets
+    iteration_targets = { &kernel_changed, &changed, &work_image, &count,
+      &method_changed, &curr_image };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -4615,6 +4733,18 @@ MagickPrivate Image *MorphologyApply(const Image *image,
       MorphologyKernelCompose
         kernel_compose;
 
+      MorphologyStages
+        stages;
+
+      stages.image=image;
+      stages.rflt_kernel=rflt_kernel;
+      stages.bias=bias;
+      stages.verbose=verbose;
+      stages.method_loop=method_loop;
+      stages.kernel_number=kernel_number;
+      stages.kernel_limit=kernel_limit;
+      stages.v_info=v_info;
+      stages.exception=exception;
 
       /* Loop 3: Compound Morphology Staging - Select Primitive to apply */
       stage_loop = 0;          /* the compound morphology stage number */
@@ -4659,50 +4789,9 @@ MagickPrivate Image *MorphologyApply(const Image *image,
         }
 
         /* Loop 4: Iterate the kernel with primitive */
-        kernel_loop = 0;
-        kernel_changed = 0;
-        changed = 1;
-        while ( kernel_loop < kernel_limit && changed > 0 ) {
-          const MorphologyPass pass = { primitive, this_kernel, bias };
-
-          kernel_loop++;     /* the iteration of this kernel */
-
-          /* Create a clone as the destination image, if not yet defined */
-          if (AcquireWorkImage(image,&work_image,exception) == MagickFalse)
-            goto error_cleanup;
-
-          /* APPLY THE MORPHOLOGICAL PRIMITIVE (curr -> work) */
-          count++;
-          changed = MorphologyPrimitive(curr_image, work_image, &pass,
-                       exception);
-          if (verbose != MagickFalse) {
-            MorphologyPassReport
-              report;
-
-            report.primitive=primitive;
-            report.this_kernel=this_kernel;
-            report.rflt_kernel=rflt_kernel;
-            report.method_loop=method_loop;
-            report.kernel_number=kernel_number;
-            report.kernel_loop=kernel_loop;
-            report.count=count;
-            report.changed=changed;
-            ReportMorphologyPass(v_info,&report);
-          }
-          if ( changed < 0 )
-            goto error_cleanup;
-          kernel_changed = (size_t) ((ssize_t) kernel_changed+changed);
-          method_changed = (size_t) ((ssize_t) method_changed+changed);
-
-          /* prepare next loop */
-          { Image *tmp = work_image;   /* swap images for iteration */
-            work_image = curr_image;
-            curr_image = tmp;
-          }
-          if ( work_image == image )
-            work_image = (Image *) NULL; /* replace input 'image' */
-
-        } /* End Loop 4: Iterate the kernel with primitive */
+        if (IterateMorphologyKernel(&stages,primitive,this_kernel,
+            &iteration_targets) == MagickFalse)
+          goto error_cleanup;
 
         if (verbose != MagickFalse && kernel_changed != (size_t)changed)
           (void) FormatLocaleFile(stderr, "   Total %.17g",(double) kernel_changed);
