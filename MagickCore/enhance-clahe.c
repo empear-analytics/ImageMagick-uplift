@@ -819,6 +819,15 @@ static void InitializeCLAHEPixels(const CLAHEPixelSource *pixel_source,
   image_view=DestroyCacheView(image_view);
 }
 
+static MagickBooleanType RestoreCLAHEColorspace(Image *image,
+  const ColorspaceType colorspace,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  if (TransformImageColorspace(image,colorspace,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   const size_t height,const size_t number_bins,const double clip_limit,
   ExceptionInfo *exception)
@@ -904,7 +913,5 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   StoreCLAHEPixels(&pixel_load,&status,&progress);
   image_view=DestroyCacheView(image_view);
   pixel_cache=RelinquishVirtualMemory(pixel_cache);
-  if (TransformImageColorspace(image,colorspace,exception) == MagickFalse)
-    status=MagickFalse;
-  return(status);
+  return(RestoreCLAHEColorspace(image,colorspace,status,exception));
 }
