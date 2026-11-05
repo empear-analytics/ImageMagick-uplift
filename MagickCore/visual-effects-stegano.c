@@ -655,6 +655,13 @@ static MagickBooleanType CloneStereoImage(const Image *left_image,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsStereoSizeMismatch(const Image *left_image,
+  const Image *right_image)
+{
+  return(((left_image->columns != right_image->columns) ||
+    (left_image->rows != right_image->rows)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   const Image *right_image,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
@@ -681,8 +688,7 @@ MagickExport Image *StereoAnaglyphImage(const Image *left_image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       left_image->filename);
   image=left_image;
-  if ((left_image->columns != right_image->columns) ||
-      (left_image->rows != right_image->rows))
+  if (IsStereoSizeMismatch(left_image,right_image) != MagickFalse)
     ThrowImageException(ImageError,"LeftAndRightImageSizesDiffer");
   /*
     Initialize stereo image attributes.
