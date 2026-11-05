@@ -795,11 +795,11 @@ static MagickBooleanType SeparateImageRow(const SeparateRow *row,
   return(MagickTrue);
 }
 
+#define SeparateImageTag  "Separate/Image"
+
 MagickExport Image *SeparateImage(const Image *image,
   const ChannelType channel_type,ExceptionInfo *exception)
 {
-#define SeparateImageTag  "Separate/Image"
-
   CacheView
     *image_view,
     *separate_view;
