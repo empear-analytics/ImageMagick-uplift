@@ -350,6 +350,17 @@ static MagickBooleanType SetThresholdStorageClass(Image *threshold_image,
   return(MagickTrue);
 }
 
+static void SetThresholdProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *AdaptiveThresholdImage(const Image *image,
   const size_t width,const size_t height,const double bias,
   ExceptionInfo *exception)
@@ -436,17 +447,11 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,AdaptiveThresholdImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetThresholdProgress(image,AdaptiveThresholdImageTag,progress,&status);
       }
   }
   threshold_image->type=image->type;
