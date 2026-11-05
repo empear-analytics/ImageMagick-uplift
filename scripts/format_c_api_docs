@@ -50,6 +50,7 @@ if ( ! GetOptions(
 	 'effect-preview.c',
 	 'effect-blur.c',
 	 'enhance.c',
+	 'enhance-clahe.c',
 	 'enhance-tone.c',
 	 'exception.c',
 	 'fx.c',
