@@ -3035,15 +3035,129 @@ static MagickBooleanType SyncComponentView(CacheView *component_view,
   return(status);
 }
 
+typedef struct _CCLabelInputs
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  MatrixInfo
+    *equivalences;
+
+  CCObjectInfo
+    *object;
+
+  Image
+    *component_image;
+
+  ExceptionInfo
+    *exception;
+} CCLabelInputs;
+
+typedef struct _CCLabelCounts
+{
+  ssize_t
+    *n;
+
+  MagickBooleanType
+    *status;
+
+  MagickOffsetType
+    *progress;
+} CCLabelCounts;
+
+static void LabelConnectedComponents(const CCLabelInputs *label_inputs,
+  const CCLabelCounts *label_counts)
+{
+  const Image
+    *const image = label_inputs->image;
+
+  CacheView
+    *const image_view = label_inputs->image_view;
+
+  MatrixInfo
+    *const equivalences = label_inputs->equivalences;
+
+  CCObjectInfo
+    *const object = label_inputs->object;
+
+  Image
+    *const component_image = label_inputs->component_image;
+
+  ExceptionInfo
+    *const exception = label_inputs->exception;
+
+  ssize_t
+    *const n = label_counts->n;
+
+  MagickBooleanType
+    *const status = label_counts->status;
+
+  MagickOffsetType
+    *const progress = label_counts->progress;
+
+  CacheView
+    *component_view;
+
+  ssize_t
+    y;
+
+  (*n)=0;
+  component_view=AcquireAuthenticCacheView(component_image,exception);
+  for (y=0; y < (ssize_t) component_image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    Quantum
+      *magick_restrict q;
+
+    const CCLabelTargets
+      label_targets = { status, n, &p, &q };
+
+    CCLabelRow
+      label_row;
+
+    if ((*status) == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+    q=QueueCacheViewAuthenticPixels(component_view,0,y,component_image->columns,
+      1,exception);
+    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+      {
+        (*status)=MagickFalse;
+        continue;
+      }
+    label_row.image=image;
+    label_row.equivalences=equivalences;
+    label_row.object=object;
+    label_row.component_image=component_image;
+    label_row.y=y;
+    LabelObjectRow(&label_row,label_targets);
+    if ((*n) > (ssize_t) MaxColormapSize)
+      break;
+    (*status)=SyncComponentView(component_view,(*status),exception);
+    UpdateComponentsProgress(image,progress,status);
+  }
+  component_view=DestroyCacheView(component_view);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
   CacheView
-    *component_view,
     *image_view;
 
   CCEquivalenceInputs
     equivalence_inputs;
+
+  CCLabelCounts
+    label_counts;
+
+  CCLabelInputs
+    label_inputs;
 
   CCLabeledObjects
     labeled_objects;
@@ -3091,8 +3205,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     background_id,
     connect4[2][2] = { { -1,  0 }, {  0, -1 } },
     connect8[4][2] = { { -1, -1 }, { -1,  0 }, { -1,  1 }, {  0, -1 } },
-    n,
-    y;
+    n;
 
   /*
     Initialize connected components image attributes.
@@ -3157,44 +3270,16 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   /*
     Label connected components.
   */
-  n=0;
-  component_view=AcquireAuthenticCacheView(component_image,exception);
-  for (y=0; y < (ssize_t) component_image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    const CCLabelTargets
-      label_targets = { &status, &n, &p, &q };
-
-    CCLabelRow
-      label_row;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(component_view,0,y,component_image->columns,
-      1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    label_row.image=image;
-    label_row.equivalences=equivalences;
-    label_row.object=object;
-    label_row.component_image=component_image;
-    label_row.y=y;
-    LabelObjectRow(&label_row,label_targets);
-    if (n > (ssize_t) MaxColormapSize)
-      break;
-    status=SyncComponentView(component_view,status,exception);
-    UpdateComponentsProgress(image,&progress,&status);
-  }
-  component_view=DestroyCacheView(component_view);
+  label_inputs.image=image;
+  label_inputs.image_view=image_view;
+  label_inputs.equivalences=equivalences;
+  label_inputs.object=object;
+  label_inputs.component_image=component_image;
+  label_inputs.exception=exception;
+  label_counts.n=(&n);
+  label_counts.status=(&status);
+  label_counts.progress=(&progress);
+  LabelConnectedComponents(&label_inputs,&label_counts);
   image_view=DestroyCacheView(image_view);
   equivalences=DestroyMatrixInfo(equivalences);
   if (n > (ssize_t) MaxColormapSize)
