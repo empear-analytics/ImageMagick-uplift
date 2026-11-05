@@ -3597,6 +3597,43 @@ static MagickBooleanType PrintDistortVerbose(
   max.y = MagickMax(max.y,p.y); \
 }
 
+static void AffineBestFitBounds(const double *coeff,const Image *image,
+  PointInfo *caller_min,PointInfo *caller_max)
+{
+  double
+    inverse[6];
+
+  PointInfo
+    d,
+    max = (*caller_max),
+    min = (*caller_min),
+    s;
+
+  InvertAffineCoefficients(coeff, inverse);
+  s.x = (double) image->page.x;
+  s.y = (double) image->page.y;
+  d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
+  d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
+  InitalBounds(d);
+  s.x = (double) image->page.x+image->columns;
+  s.y = (double) image->page.y;
+  d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
+  d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
+  ExpandBounds(d);
+  s.x = (double) image->page.x;
+  s.y = (double) image->page.y+image->rows;
+  d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
+  d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
+  ExpandBounds(d);
+  s.x = (double) image->page.x+image->columns;
+  s.y = (double) image->page.y+image->rows;
+  d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
+  d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
+  ExpandBounds(d);
+  (*caller_min)=min;
+  (*caller_max)=max;
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3687,28 +3724,8 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
     {
       case AffineDistortion:
       case RigidAffineDistortion:
-      { double inverse[6];
-        InvertAffineCoefficients(coeff, inverse);
-        s.x = (double) image->page.x;
-        s.y = (double) image->page.y;
-        d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
-        d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
-        InitalBounds(d);
-        s.x = (double) image->page.x+image->columns;
-        s.y = (double) image->page.y;
-        d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
-        d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
-        ExpandBounds(d);
-        s.x = (double) image->page.x;
-        s.y = (double) image->page.y+image->rows;
-        d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
-        d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
-        ExpandBounds(d);
-        s.x = (double) image->page.x+image->columns;
-        s.y = (double) image->page.y+image->rows;
-        d.x = inverse[0]*s.x+inverse[1]*s.y+inverse[2];
-        d.y = inverse[3]*s.x+inverse[4]*s.y+inverse[5];
-        ExpandBounds(d);
+      {
+        AffineBestFitBounds(coeff,image,&min,&max);
         break;
       }
       case PerspectiveDistortion:
