@@ -2719,6 +2719,26 @@ static void GetBlendIterations(const Image *image,double *iterations,
     }
 }
 
+static void GetMathematicsArguments(const Image *image,
+  GeometryInfo *geometry_info,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  MagickStatusType
+    flags;
+
+  SetGeometryInfo(geometry_info);
+  artifact=GetImageArtifact(image,"compose:args");
+  if (artifact != (char *) NULL)
+    {
+      flags=ParseGeometry(artifact,geometry_info);
+      if (flags == NoValue)
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "InvalidGeometry","`%s'",artifact);
+    }
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3267,15 +3287,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         be changed to some 'general comma list' parser, (with a minimum
         number of values)
       */
-      SetGeometryInfo(&geometry_info);
-      artifact=GetImageArtifact(image,"compose:args");
-      if (artifact != (char *) NULL)
-        {
-          flags=ParseGeometry(artifact,&geometry_info);
-          if (flags == NoValue)
-            (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidGeometry","`%s'",artifact);
-        }
+      GetMathematicsArguments(image,&geometry_info,exception);
       break;
     }
     case ModulateCompositeOp:
