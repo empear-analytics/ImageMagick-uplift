@@ -3006,6 +3006,21 @@ the block's depth.
    block that leaves it ends `Lp`. It contains no `return`, no `goto`, and no `continue`
    that leaves it; a `break` or `continue` of a loop nested inside the block stays as it
    is.
+   Form for a parallel loop body (2026-11-05): the block may instead lie inside the body of
+   a `#pragma omp parallel for` loop and inside a loop `Lp` that one iteration runs to its
+   end (a column loop inside a row loop), so each `break;` that ends `Lp` ends nothing of
+   the parallel loop; the words "outside every OpenMP region" do not apply to it, and the
+   rest of this step holds, `#pragma omp` lines included. The only variable declared
+   outside the loop body that the block writes is the shared `status` (named in
+   `shared(...)` or in no data-sharing clause, never in `private`, `firstprivate`,
+   `lastprivate` or `reduction`; Recipe PS step 2), which it may read, test and assign in
+   any way; every other variable of the body it writes is declared inside the block, or
+   is a pointer the block only writes through (a row pointer `q` passed by value, whose
+   target is the iteration's own row). `status` goes by pointer, `MagickBooleanType
+   *status`, every use written `(*status)` and `&status` passed on written `status`
+   (Recipe PS step 4), and it counts as one of step 4's four parameters. The caller
+   writes `if (Helper(...,&status) == MagickFalse) break;`, or `else if (...) break;`
+   where the block was an `else` body.
 2. The block writes at most one variable `v` of the caller that the caller reads after
    it, a plain local whose address the caller takes only as the `v` argument of helpers
    of this recipe (Recipe V step 2). A temporary it writes before reading, and the caller
@@ -3145,6 +3160,16 @@ static MagickBooleanType FillFloodplaneRun(const FloodfillRow *row,ssize_t *x)
   of them, so `S` reads the values it read before. When `S` writes `Lp`'s counter
   (`i--;`, so that the increment repeats the same `i`), the counter goes to the helper
   by value and only the caller writes it.
+- In the parallel-loop-body form of step 1, `*status` is the very variable the caller
+  used, read and written at the same program points, in the same order, with the same
+  values, nothing deferred or copied (Recipe PS's argument); the helper is called from
+  inside the iteration, on the same thread, and holds no pragma. The `break;` that
+  becomes `return(MagickFalse);` ended `Lp`, a loop the iteration runs wholly inside
+  itself, so neither it nor the caller's `break;` leaves the parallel loop, which an
+  OpenMP region forbids. A block that tests `status` on one path only (an `else` body
+  that assigns and tests it) stays that way: the test sits in the helper, on the path
+  that ran it before, and the other path's code is not touched, so `status` is read at
+  the same points as inline.
 - Under step 8 the variables stay the caller's own locals, read and written directly
   everywhere else; only their addresses travel, fixed before the call and dead after
   it, bound once to `*const` locals, so each `*v` is the object `v` named, in the same
@@ -3169,7 +3194,14 @@ whose depth check (nesting 5, the file's deepest site) raises a channel's depth 
 retries the pixel through `i--; continue;` of the channel loop. Step 8 (2026-10-30,
 task W09): `vision.c`'s `ConnectedComponentsImage`, whose label pass (nesting 4) labels
 each pixel, writing `status`, the object count `n` and the row cursors `p` and `q`, and
-ends the column loop through `break;` when the count reaches `MaxColormapSize`.
+ends the column loop through `break;` when the count reaches `MaxColormapSize`. Parallel-loop-body form of step 1 (2026-11-05, task W14,
+`visual-effects.c`'s `SwirlImage` and `ImplodeImage`): the column loop's `else` body
+interpolates the pixel into `status` and ends the column loop through `break;` when
+`status` is `MagickFalse`, at nesting depth 4 inside the row loop's body (Deep, Nested
+Complexity and Bumpy Road Ahead); a column loop as a PS helper keeps two bumps, and PS
+refuses a block that holds the `break;`. A probe of the `else` body as an LB helper
+through a `status` pointer: `SwirlImage` leaves Deep, Nested Complexity, 4.23 to 4.25.
+Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -6482,3 +6514,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | EI | Chain Exiting Guards into an Else-If: an `else` block that is only a run of `if` statements, each but the last leaving the flow when it fires, becomes an `else if` chain with the conditions and bodies copied unchanged; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `fx.c`'s `GetFunction` (campaign A, W13): the argument loop's `else` block (a throw with `return MagickFalse`, a `break`, a pad test) is a bump that CN does not reach (statements, not one nested `if`) and no extraction recipe takes (a `break` and a `return` in one block). A probe of the whole chain: that bump gone, the loop's switch moved, `GetFunction` leaves Bumpy Road Ahead, fx.c 3.37 to 3.52 | owner |
 | 2026-11-05 | NEW | SW | Split a Returning Selection into Chained Functions: a run of adjacent groups of a `switch` whose every group ends in `return(R);` (followed by a tail ending the function) moves, with the tail, to a new function of the same return type whose `switch` ends `default: break;`; the caller keeps the other groups and `default:` and returns the call | `distort.c`'s `GenerateCoefficients` (campaign A, W13): the dispatch `switch` of seventeen case helpers (cc 126 of the function); SD refuses `return`, SR wants one constant, E step 7 moves the whole `switch` (a Complex Method). A probe of the whole chain: the function leaves Bumpy Road Ahead, Complex Method and Large Method, 3.55 to 4.25 | owner |
 | 2026-11-05 | NEW | CB | Extract Critical Block Body: the body of a `#pragma omp critical` block moves into a `static void` helper that its call replaces, the pragma and braces staying in the caller; written variables by pointer, read ones by value or pointer to `const`, at most four parameters; checked by reading | `compare.c`'s eleven `Get*Similarity` merges (a probe, one helper call per critical body: 2.97 to 3.15) and `feature.c`'s `CannyEdgeImage` | owner |
+| 2026-11-05 | AMEND | LB | Step 1 (parallel-loop-body form): a block in the body of a parallel loop and inside a loop the iteration runs to its end (a column loop in a row loop) may take its `break;` as `return(MagickFalse);`, with the shared `status` (the only outer variable it writes) by pointer as in Recipe PS step 4 and no pragma in the block; the caller writes `if (Helper(...,&status) == MagickFalse) break;` | `visual-effects.c`'s `SwirlImage` and `ImplodeImage` (campaign A, W14): the column loop's `else` body, which assigns and tests `status` and breaks, at nesting depth 4; a probe of the `else` body as a helper: Deep, Nested Complexity leaves | mandate (2026-10-24) |
