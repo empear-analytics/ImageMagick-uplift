@@ -2838,6 +2838,57 @@ static void LinearGrayPixelsTosRGB(Image *image,Quantum *magick_restrict q)
   }
 }
 
+static MagickBooleanType GenericTosRGB(Image *image,const IlluminantType illuminant,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  ColorspaceRowInfo
+    finish;
+
+  const char
+    *value;
+
+  double
+    white_luminance;
+
+  /*
+    Transform image from source colorspace to sRGB.
+  */
+  white_luminance=10000.0;
+  value=GetImageProperty(image,"white-luminance",exception);
+  if (value != (const char *) NULL)
+    white_luminance=StringToDouble(value,(char **) NULL);
+  if (SyncImageToDirectClass(image,exception) == MagickFalse)
+    return(MagickFalse);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    const ColorspaceRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    GenericPixelsTosRGB(image,white_luminance,illuminant,q);
+    SyncColorspaceRow(image_view,exception,&status);
+  }
+  finish.image=image;
+  finish.image_view=image_view;
+  finish.exception=exception;
+  return(FinishColorspace(&finish,sRGBColorspace,status));
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2993,48 +3044,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
     case YIQColorspace:
     case YPbPrColorspace:
     case YUVColorspace:
-    {
-      ColorspaceRowInfo
-        finish;
-
-      const char
-        *value;
-
-      double
-        white_luminance;
-
-      /*
-        Transform image from source colorspace to sRGB.
-      */
-      white_luminance=10000.0;
-      value=GetImageProperty(image,"white-luminance",exception);
-      if (value != (const char *) NULL)
-        white_luminance=StringToDouble(value,(char **) NULL);
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        GenericPixelsTosRGB(image,white_luminance,illuminant,q);
-        SyncColorspaceRow(image_view,exception,&status);
-      }
-      finish.image=image;
-      finish.image_view=image_view;
-      finish.exception=exception;
-      return(FinishColorspace(&finish,sRGBColorspace,status));
-    }
+      return(GenericTosRGB(image,illuminant,status,exception));
     case LogColorspace:
       return(LogTosRGB(image,status,exception));
     case RGBColorspace:
