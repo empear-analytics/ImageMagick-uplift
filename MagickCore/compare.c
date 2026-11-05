@@ -3516,6 +3516,29 @@ static Image *SIMDivideByMagnitude(Image *image,Image *magnitude_image,
   return(result_image);
 }
 
+static void ClearRowNaNs(const Image *image,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      if (IsNaN((double) q[i]) != 0)
+        q[i]=(Quantum) 0;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType SIMFilterImageNaNs(Image *image,
   ExceptionInfo *exception)
 {
@@ -3541,9 +3564,6 @@ static MagickBooleanType SIMFilterImageNaNs(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -3552,22 +3572,7 @@ static MagickBooleanType SIMFilterImageNaNs(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if (IsNaN((double) q[i]) != 0)
-          q[i]=(Quantum) 0;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ClearRowNaNs(image,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
