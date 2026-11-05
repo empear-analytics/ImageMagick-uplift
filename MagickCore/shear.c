@@ -409,6 +409,92 @@ typedef enum
   RIGHT
 } ShearDirection;
 
+typedef struct _XShearSpanInfo
+{
+  Image
+    *image;
+
+  PixelInfo
+    background;
+
+  size_t
+    width;
+
+  ssize_t
+    x_offset;
+} XShearSpanInfo;
+
+static void TransferXShearSpan(const XShearSpanInfo *span_info,
+  const ShearDirection direction,const double displacement,
+  Quantum *magick_restrict p)
+{
+  Image
+    *image = span_info->image;
+
+  const PixelInfo
+    background = span_info->background;
+
+  const size_t
+    width = span_info->width;
+
+  const ssize_t
+    x_offset = span_info->x_offset;
+
+  double
+    area;
+
+  PixelInfo
+    pixel,
+    source,
+    destination;
+
+  ShearSpan
+    span;
+
+  ssize_t
+    step;
+
+  step=CastDoubleToSsizeT(floor((double) displacement));
+  area=(double) (displacement-step);
+  step++;
+  pixel=background;
+  GetPixelInfo(image,&source);
+  GetPixelInfo(image,&destination);
+  switch (direction)
+  {
+    case LEFT:
+    {
+      /*
+        Transfer pixels left-to-right.
+      */
+      span.image=image;
+      span.background=background;
+      span.area=area;
+      span.length=width;
+      span.extent=image->columns;
+      span.offset=x_offset;
+      span.step=step;
+      TransferPixelsForward(p,pixel,destination,&span);
+      break;
+    }
+    case RIGHT:
+    {
+      /*
+        Transfer pixels right-to-left.
+      */
+      span.image=image;
+      span.background=background;
+      span.area=area;
+      span.length=width;
+      span.extent=image->columns;
+      span.offset=x_offset;
+      span.step=step;
+      TransferPixelsBackward(p,pixel,destination,&span);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XShearImage(Image *image,const double degrees,
   const ShearRegion *region,ExceptionInfo *exception)
 {
@@ -455,13 +541,7 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
   for (y=0; y < (ssize_t) height; y++)
   {
     double
-      area,
       displacement;
-
-    PixelInfo
-      pixel,
-      source,
-      destination;
 
     Quantum
       *magick_restrict p;
@@ -469,11 +549,8 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
     ShearDirection
       direction;
 
-    ShearSpan
-      span;
-
-    ssize_t
-      step;
+    XShearSpanInfo
+      span_info;
 
     if (status == MagickFalse)
       continue;
@@ -495,45 +572,11 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
         displacement*=(-1.0);
         direction=LEFT;
       }
-    step=CastDoubleToSsizeT(floor((double) displacement));
-    area=(double) (displacement-step);
-    step++;
-    pixel=background;
-    GetPixelInfo(image,&source);
-    GetPixelInfo(image,&destination);
-    switch (direction)
-    {
-      case LEFT:
-      {
-        /*
-          Transfer pixels left-to-right.
-        */
-        span.image=image;
-        span.background=background;
-        span.area=area;
-        span.length=width;
-        span.extent=image->columns;
-        span.offset=x_offset;
-        span.step=step;
-        TransferPixelsForward(p,pixel,destination,&span);
-        break;
-      }
-      case RIGHT:
-      {
-        /*
-          Transfer pixels right-to-left.
-        */
-        span.image=image;
-        span.background=background;
-        span.area=area;
-        span.length=width;
-        span.extent=image->columns;
-        span.offset=x_offset;
-        span.step=step;
-        TransferPixelsBackward(p,pixel,destination,&span);
-        break;
-      }
-    }
+    span_info.image=image;
+    span_info.background=background;
+    span_info.width=width;
+    span_info.x_offset=x_offset;
+    TransferXShearSpan(&span_info,direction,displacement,p);
     SyncShearView(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
