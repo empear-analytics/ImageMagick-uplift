@@ -1334,16 +1334,10 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) gaussian_image->rows; y++)
   {
-    KuwaharaInfo
-      kuwahara;
+    const KuwaharaInfo
+      kuwahara = { gaussian_image, kuwahara_image, image_view, kuwahara_view,
+        exception, width, y };
 
-    kuwahara.gaussian_image=gaussian_image;
-    kuwahara.kuwahara_image=kuwahara_image;
-    kuwahara.image_view=image_view;
-    kuwahara.kuwahara_view=kuwahara_view;
-    kuwahara.exception=exception;
-    kuwahara.width=width;
-    kuwahara.y=y;
     if (KuwaharaHeadRow(&status,&kuwahara) == MagickFalse)
       continue;
     if (SyncCacheViewAuthenticPixels(kuwahara_view,exception) == MagickFalse)
