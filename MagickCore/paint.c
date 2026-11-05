@@ -403,6 +403,37 @@ static MagickBooleanType TileFloodplaneView(const FloodfillTileView *view)
   return(status);
 }
 
+typedef struct _FloodfillAdvance
+{
+  MagickBooleanType
+    *skip;
+
+  ssize_t
+    *start,
+    *x;
+} FloodfillAdvance;
+
+static MagickBooleanType AdvanceFloodfillRun(const FloodfillRow *row,
+  const ssize_t x2,const FloodfillAdvance *advance)
+{
+  MagickBooleanType
+    *const skip = advance->skip;
+
+  ssize_t
+    *const start = advance->start,
+    *const x = advance->x;
+
+  (*skip)=MagickFalse;
+  (*x)++;
+  if ((*x) <= x2)
+    {
+      if (SkipFloodplaneRun(row,x2,x) == MagickFalse)
+        return(MagickFalse);
+    }
+  (*start)=(*x);
+  return(MagickTrue);
+}
+
 static void TileFloodplaneLine(const FloodfillTileView *view,
   MagickBooleanType *status)
 {
@@ -518,6 +549,9 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     ssize_t
       x;
 
+    const FloodfillAdvance
+      advance = { &skip, &start, &x };
+
     /*
       Pop segment off stack.
     */
@@ -557,14 +591,8 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
           if (x > (x2+1))
             PushSegmentStack(y,x2+1,x-1,-offset);
         }
-      skip=MagickFalse;
-      x++;
-      if (x <= x2)
-        {
-          if (SkipFloodplaneRun(&row,x2,&x) == MagickFalse)
-            break;
-        }
-      start=x;
+      if (AdvanceFloodfillRun(&row,x2,&advance) == MagickFalse)
+        break;
     } while (x <= x2);
   }
   status=MagickTrue;
