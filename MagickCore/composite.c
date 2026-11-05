@@ -2695,6 +2695,30 @@ static void SetDistortCenter(const DisplaceSetup *displace,PointInfo *center)
     }
 }
 
+static void GetBlendIterations(const Image *image,double *iterations,
+  double *residual_threshold,size_t *tick)
+{
+  const char
+    *artifact;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  artifact=GetImageArtifact(image,"compose:args");
+  if (artifact != (char *) NULL)
+    {
+      flags=ParseGeometry(artifact,&geometry_info);
+      (*iterations)=geometry_info.rho;
+      if ((flags & SigmaValue) != 0)
+        (*residual_threshold)=geometry_info.sigma;
+      if ((flags & XiValue) != 0)
+        (*tick)=(size_t) geometry_info.xi;
+    }
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3212,16 +3236,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       size_t
         tick = 100;
 
-      artifact=GetImageArtifact(image,"compose:args");
-      if (artifact != (char *) NULL)
-        {
-          flags=ParseGeometry(artifact,&geometry_info);
-          iterations=geometry_info.rho;
-          if ((flags & SigmaValue) != 0)
-            residual_threshold=geometry_info.sigma;
-          if ((flags & XiValue) != 0)
-            tick=(size_t) geometry_info.xi;
-        }
+      GetBlendIterations(image,&iterations,&residual_threshold,&tick);
       status=SaliencyBlendImage(image,composite,x_offset,y_offset,iterations,
         residual_threshold,tick,exception);
       source_image=DestroyImage(source_image);
@@ -3236,16 +3251,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       size_t
         tick = 100;
 
-      artifact=GetImageArtifact(image,"compose:args");
-      if (artifact != (char *) NULL)
-        {
-          flags=ParseGeometry(artifact,&geometry_info);
-          iterations=geometry_info.rho;
-          if ((flags & SigmaValue) != 0)
-            residual_threshold=geometry_info.sigma;
-          if ((flags & XiValue) != 0)
-            tick=(size_t) geometry_info.xi;
-        }
+      GetBlendIterations(image,&iterations,&residual_threshold,&tick);
       status=SeamlessBlendImage(image,composite,x_offset,y_offset,iterations,
         residual_threshold,tick,exception);
       source_image=DestroyImage(source_image);
