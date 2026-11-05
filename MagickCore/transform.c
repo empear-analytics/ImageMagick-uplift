@@ -273,6 +273,16 @@ typedef struct _ChopRowImages
 
   Image
     *chop_image;
+
+  CacheView
+    *image_view,
+    *chop_view;
+
+  RectangleInfo
+    extent;
+
+  ExceptionInfo
+    *exception;
 } ChopRowImages;
 
 static void ChopPixelRow(const ChopRowImages *images,
@@ -296,6 +306,31 @@ static void ChopPixelRow(const ChopRowImages *images,
       }
     p+=(ptrdiff_t) GetPixelChannels(image);
   }
+}
+
+static MagickBooleanType ChopImageRow(const ChopRowImages *images,
+  const ssize_t source_y,const ssize_t target_y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  p=GetCacheViewVirtualPixels(images->image_view,0,source_y,
+    images->image->columns,1,images->exception);
+  q=QueueCacheViewAuthenticPixels(images->chop_view,0,target_y,
+    images->chop_image->columns,1,images->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ChopPixelRow(images,images->extent,p,q);
+  if (SyncCacheViewAuthenticPixels(images->chop_view,images->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
 }
 
 static RectangleInfo ClampChopExtent(const Image *image,
@@ -377,30 +412,13 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
 #endif
   for (y=0; y < (ssize_t) extent.y; y++)
   {
-    ChopRowImages
-      images;
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
+    const ChopRowImages
+      images = { image,chop_image,image_view,chop_view,extent,exception };
 
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(chop_view,0,y,chop_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    images.image=image;
-    images.chop_image=chop_image;
-    ChopPixelRow(&images,extent,p,q);
-    if (SyncCacheViewAuthenticPixels(chop_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (ChopImageRow(&images,y,y,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -419,31 +437,14 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
 #endif
   for (y=0; y < (ssize_t) (image->rows-((size_t) extent.y+extent.height)); y++)
   {
-    ChopRowImages
-      images;
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
+    const ChopRowImages
+      images = { image,chop_image,image_view,chop_view,extent,exception };
 
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,extent.y+(ssize_t) extent.height+y,
-      image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(chop_view,0,extent.y+y,chop_image->columns,
-      1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    images.image=image;
-    images.chop_image=chop_image;
-    ChopPixelRow(&images,extent,p,q);
-    if (SyncCacheViewAuthenticPixels(chop_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (ChopImageRow(&images,extent.y+(ssize_t) extent.height+y,extent.y+y,
+          &status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
