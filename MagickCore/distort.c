@@ -1449,6 +1449,26 @@ static double *PolynomialCoefficients(double *coeff,
   return(coeff);
 }
 
+static void SetArcCoefficients(double *coeff,const Image *image,
+  const double *arguments,const size_t number_arguments)
+{
+  coeff[0] = -MagickPI2;   /* -90, place at top! */
+  if ( number_arguments >= 1 )
+    coeff[1] = DegreesToRadians(arguments[0]);
+  else
+    coeff[1] = MagickPI2;   /* zero arguments - center is at top */
+  if ( number_arguments >= 2 )
+    coeff[0] += DegreesToRadians(arguments[1]);
+  coeff[0] /= Magick2PI;  /* normalize radians */
+  coeff[0] -= MagickRound(coeff[0]);
+  coeff[0] *= Magick2PI;  /* de-normalize back to radians */
+  coeff[3] = (double)image->rows-1;
+  coeff[2] = (double)image->columns/coeff[1] + coeff[3]/2.0;
+  if ( number_arguments >= 3 )
+    SetArcOuterRadius(coeff,number_arguments,arguments);
+  coeff[4] = ((double)image->columns-1.0)/2.0;
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1690,21 +1710,7 @@ static double *GenerateCoefficients(const Image *image,
             CommandOptionToMnemonic(MagickDistortOptions, *method) );
         return((double *) NULL);
       }
-      coeff[0] = -MagickPI2;   /* -90, place at top! */
-      if ( number_arguments >= 1 )
-        coeff[1] = DegreesToRadians(arguments[0]);
-      else
-        coeff[1] = MagickPI2;   /* zero arguments - center is at top */
-      if ( number_arguments >= 2 )
-        coeff[0] += DegreesToRadians(arguments[1]);
-      coeff[0] /= Magick2PI;  /* normalize radians */
-      coeff[0] -= MagickRound(coeff[0]);
-      coeff[0] *= Magick2PI;  /* de-normalize back to radians */
-      coeff[3] = (double)image->rows-1;
-      coeff[2] = (double)image->columns/coeff[1] + coeff[3]/2.0;
-      if ( number_arguments >= 3 )
-        SetArcOuterRadius(coeff,number_arguments,arguments);
-      coeff[4] = ((double)image->columns-1.0)/2.0;
+      SetArcCoefficients(coeff,image,arguments,number_arguments);
 
       return(coeff);
     }
