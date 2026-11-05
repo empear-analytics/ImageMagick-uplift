@@ -804,10 +804,26 @@ MagickExport MagickBooleanType GetImageAlphaChannel(const Image *image)
 */
 #define GetChannelBit(mask,bit)  (((size_t) (mask) >> (size_t) (bit)) & 0x01)
 
-static void SeparatePixelChannel(const Image *image,
-  const Image *separate_image,const ChannelType channel_type,
+typedef struct _SeparatePixels
+{
+  const Image
+    *image,
+    *separate_image;
+
+  ChannelType
+    channel_type;
+} SeparatePixels;
+
+static void SeparatePixelChannel(const SeparatePixels *pixels,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
+  const ChannelType
+    channel_type = pixels->channel_type;
+
+  const Image
+    *const image = pixels->image,
+    *const separate_image = pixels->separate_image;
+
   ssize_t
     i;
 
@@ -850,6 +866,9 @@ static MagickBooleanType SeparateImageRow(const SeparateRow *row,
   Quantum
     *magick_restrict q;
 
+  SeparatePixels
+    pixels;
+
   ssize_t
     x;
 
@@ -864,10 +883,13 @@ static MagickBooleanType SeparateImageRow(const SeparateRow *row,
       (*status)=MagickFalse;
       return(MagickFalse);
     }
+  pixels.image=row->image;
+  pixels.separate_image=row->separate_image;
+  pixels.channel_type=row->channel_type;
   for (x=0; x < (ssize_t) row->image->columns; x++)
   {
     SetPixelChannel(row->separate_image,GrayPixelChannel,(Quantum) 0,q);
-    SeparatePixelChannel(row->image,row->separate_image,row->channel_type,p,q);
+    SeparatePixelChannel(&pixels,p,q);
     p+=(ptrdiff_t) GetPixelChannels(row->image);
     q+=(ptrdiff_t) GetPixelChannels(row->separate_image);
   }
