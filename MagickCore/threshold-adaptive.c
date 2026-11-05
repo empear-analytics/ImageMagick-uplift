@@ -447,6 +447,60 @@ static MagickBooleanType ThresholdRows(const AdaptiveThresholdRows *rows,
 
 #define AdaptiveThresholdImageTag  "AdaptiveThreshold/Image"
 
+static MagickBooleanType ThresholdImageRows(
+  const AdaptiveThresholdRows *thresholds,MagickOffsetType progress,
+  MagickBooleanType status)
+{
+  CacheView
+    *const image_view = thresholds->image_view,
+    *const threshold_view = thresholds->threshold_view;
+
+  const Image
+    *const image = thresholds->image;
+
+  Image
+    *const threshold_image = thresholds->threshold_image;
+
+  const size_t
+    width = thresholds->width,
+    height = thresholds->height;
+
+  const MagickSizeType
+    number_pixels = thresholds->number_pixels;
+
+  const double
+    bias = thresholds->bias;
+
+  ExceptionInfo
+    *const exception = thresholds->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,threshold_image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const AdaptiveThresholdRows
+      rows = { image_view, threshold_view, image, threshold_image, width,
+        height, number_pixels, bias, exception };
+
+    if (ThresholdRows(&rows,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetThresholdProgress(image,AdaptiveThresholdImageTag,progress,&status);
+      }
+  }
+  return(status);
+}
+
 MagickExport Image *AdaptiveThresholdImage(const Image *image,
   const size_t width,const size_t height,const double bias,
   ExceptionInfo *exception)
@@ -464,11 +518,11 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
   MagickOffsetType
     progress;
 
+  AdaptiveThresholdRows
+    rows;
+
   MagickSizeType
     number_pixels;
-
-  ssize_t
-    y;
 
   /*
     Initialize threshold image attributes.
@@ -494,27 +548,16 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
   number_pixels=(MagickSizeType) width*height;
   image_view=AcquireVirtualCacheView(image,exception);
   threshold_view=AcquireAuthenticCacheView(threshold_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,threshold_image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const AdaptiveThresholdRows
-      rows = { image_view, threshold_view, image, threshold_image, width,
-        height, number_pixels, bias, exception };
-
-    if (ThresholdRows(&rows,y,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetThresholdProgress(image,AdaptiveThresholdImageTag,progress,&status);
-      }
-  }
+  rows.image_view=image_view;
+  rows.threshold_view=threshold_view;
+  rows.image=image;
+  rows.threshold_image=threshold_image;
+  rows.width=width;
+  rows.height=height;
+  rows.number_pixels=number_pixels;
+  rows.bias=bias;
+  rows.exception=exception;
+  status=ThresholdImageRows(&rows,progress,status);
   threshold_image->type=image->type;
   threshold_view=DestroyCacheView(threshold_view);
   image_view=DestroyCacheView(image_view);
