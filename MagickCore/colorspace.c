@@ -1256,6 +1256,68 @@ static void GetLogProperties(const Image *image,ExceptionInfo *exception,
     (*reference_white)=StringToDouble(value,(char **) NULL);
 }
 
+typedef struct _sRGBTransformTables
+{
+  Image
+    *image;
+
+  TransformPacket
+    *x_map,
+    *y_map,
+    *z_map;
+
+  PrimaryInfo
+    primary_info;
+
+  ExceptionInfo
+    *exception;
+} sRGBTransformTables;
+
+static void sRGBTransformColormap(const sRGBTransformTables *tables)
+{
+  const PrimaryInfo
+    primary_info = tables->primary_info;
+
+  ExceptionInfo
+    *const exception = tables->exception;
+
+  Image
+    *const image = tables->image;
+
+  TransformPacket
+    *const x_map = tables->x_map,
+    *const y_map = tables->y_map,
+    *const z_map = tables->z_map;
+
+  ssize_t
+    i;
+
+  unsigned int
+    blue,
+    green,
+    red;
+
+  /*
+    Convert PseudoClass image.
+  */
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    PixelInfo
+      pixel;
+
+    red=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].red));
+    green=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].green));
+    blue=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].blue));
+    pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x+primary_info.x;
+    pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y+primary_info.y;
+    pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z+primary_info.z;
+    image->colormap[i].red=(double) ScaleMapToQuantum(pixel.red);
+    image->colormap[i].green=(double) ScaleMapToQuantum(pixel.green);
+    image->colormap[i].blue=(double) ScaleMapToQuantum(pixel.blue);
+  }
+  (void) SyncImage(image,exception);
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1287,6 +1349,9 @@ static MagickBooleanType sRGBTransformImage(Image *image,
     *x_map,
     *y_map,
     *z_map;
+
+  sRGBTransformTables
+    tables;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1585,6 +1650,12 @@ static MagickBooleanType sRGBTransformImage(Image *image,
   /*
     Convert from sRGB.
   */
+  tables.image=image;
+  tables.x_map=x_map;
+  tables.y_map=y_map;
+  tables.z_map=z_map;
+  tables.primary_info=primary_info;
+  tables.exception=exception;
   switch (image->storage_class)
   {
     case DirectClass:
@@ -1653,30 +1724,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
     }
     case PseudoClass:
     {
-      unsigned int
-        blue,
-        green,
-        red;
-
-      /*
-        Convert PseudoClass image.
-      */
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        PixelInfo
-          pixel;
-
-        red=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].red));
-        green=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].green));
-        blue=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].blue));
-        pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x+primary_info.x;
-        pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y+primary_info.y;
-        pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z+primary_info.z;
-        image->colormap[i].red=(double) ScaleMapToQuantum(pixel.red);
-        image->colormap[i].green=(double) ScaleMapToQuantum(pixel.green);
-        image->colormap[i].blue=(double) ScaleMapToQuantum(pixel.blue);
-      }
-      (void) SyncImage(image,exception);
+      sRGBTransformColormap(&tables);
       break;
     }
   }
