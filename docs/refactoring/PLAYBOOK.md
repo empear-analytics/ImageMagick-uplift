@@ -3613,6 +3613,12 @@ function).
 5. Where the `default` group stood, write the group `default:` alone, whose body is a
    compound block holding `if (Helper(...) == MagickFalse)` `return(R);` with the
    original `R`, then `break;`.
+   Form for a link of a chain (2026-11-05): in a function whose `switch` is followed by
+   `return(MagickTrue);` and whose moved groups return `MagickFalse` (step 4's function,
+   step 7's chain), the group may instead be `default:` followed by
+   `return(Helper(...));`, with the same arguments. The helper returns only `MagickTrue`
+   or `MagickFalse`, so this is the value the `if` form returns on both paths, and the
+   function has one test fewer.
 6. The kept groups stay where they were, unchanged. Check by reading that every label
    of the original `switch` is in exactly one of the two, `default` in the new one, and
    every argument fills the parameter it names.
@@ -3713,6 +3719,13 @@ static MagickBooleanType ExportMapQuantumOPR(const char *map,const ssize_t i,
 - A plain local the moved groups write (`quantum_map=...RelinquishMagickMemory(...)`)
   is written only on paths that return: the caller's copy keeps the old value, which
   nothing reads on the way out (W step 3).
+- The `return(Helper(...));` form of step 5: the `if` form returns `MagickFalse` when the
+  helper does and otherwise `break;`s into `return(MagickTrue);`; the helper's result is
+  `MagickTrue` or `MagickFalse` and nothing else, so returning it gives `MagickFalse` for
+  `MagickFalse` and `MagickTrue` for `MagickTrue`, the same value after the same
+  statements. Each `case` label counts once in cyclomatic complexity, so a chain link
+  that keeps six labels and a `default:` stays at 8 with the form and reaches 9
+  without it.
 - `default` must move, for the reason SD gives; no group may fall through, kept groups
   included, since after the split a kept group falling through would run into whatever
   now follows it.
@@ -7238,3 +7251,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | LB | Step 1: the body of a Recipe PS step 7 helper (the parallel loop's whole body, called once per iteration with the shared `status`'s address) counts as the parallel loop body for the parallel-loop-body form; a block in it passes `status` on and may take the helper's own `const Name *name` unchanged (Recipe N step 2's pass-through). *Careful* gives the argument. Still eight steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): `RotateTileRow270`'s tile loop body ends the tile loop through `break;` on a failed fetch; left in place it is reported as *Code Duplication* with the 90-degree helper (7.58 in a probe); as an LB helper the chain reaches 10.00 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | HC | Step 3: a callee of a construct's statement that may take another lock (the pixel cache's `file_semaphore`, taken by `SyncCacheViewAuthenticPixels` on a disk cache) is allowed, since the construct moves whole and unchanged and the thread takes the same locks in the same order and nesting; a function entering a critical of the same name, or `omp_set_lock` on a lock the caller holds, stays refused. *Careful* gives the argument. Still six steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree critical governs the row sync, whose `WritePixelCachePixels` locks `file_semaphore` for disk and distributed caches; step 3 as written refused every such callee | mandate (2026-10-24) |
 | 2026-11-05 | NEW | PD | Name a Parameter-or-Default Selection: the whole right-hand side `(n >= k) ? values[k-1] : d` of an assignment, at three or more sites of one file, becomes a call of one `static inline` function taking `n`, `values`, `k` and `d`; oracle evidence (the object code is not byte-identical) | `statistic-function.c`'s three case helpers (campaign A, W14 lane d): twelve parameter defaults held *Overall Code Complexity*; a probe 9.09 to 9.68 | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | SR | Step 5: in a function whose `switch` is followed by `return(MagickTrue);` and whose moved groups return `MagickFalse` (a link of step 7's chain), the `default:` group may be `return(Helper(...));` instead of the `if`/`return`/`break;` group; same value on both paths. *Careful* gives the argument. Still seven steps | `channel.c`'s `ChannelFxImage` (campaign A, W14 lane d): the destination-channel `switch` (nine labels, a throwing `default:`) moved by Recipe V step 7 is cc 14; its chain by the `if` form leaves the head link at cc 9 (six labels, `default:`, the `if`), a *Complex Method* the gate refuses; the `return` form makes it 8 | mandate (2026-10-24) |
