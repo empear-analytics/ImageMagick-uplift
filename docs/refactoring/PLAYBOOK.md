@@ -2711,7 +2711,7 @@ Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 **Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
 Method* or *Large Method*, and the block that would fix it meets Recipe V (steps 1 to 6)
-in every respect but one: it writes two, three or four variables of the caller that the
+in every respect but one: it writes two, three or four variables (five or six under step 2's `const` form) of the caller that the
 caller reads after it, and with each as a pointer (Recipe O) the new function would take
 five or more arguments (*Excess Number of Function Arguments*, which the pre-commit gate
 refuses on a new function). The typical case is a parser step that, on success, rewrites
@@ -2736,11 +2736,11 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    exit stands for `return(c);`: each becomes `return(MagickFalse);` and the caller
    writes `return;` (step 7). Recipe V step 7's cleanup form is not this recipe,
    except as step 8 admits it.
-2. List the variables of the caller the block writes: two to four, each a plain local of
+2. List the variables of the caller the block writes: two to four (up to six when the caller declares the targets struct `const`, once, with the addresses as its initialiser, Recipe Q step 8's form, and passes it to every helper that writes any of them, each binding only the members its block writes, as Recipe LB step 8 and Recipe Z step 7 do), each a plain local of
    the caller or a by-value parameter of it (`FunctionE fe`), none a global, a `static`
    or an array, and none whose address `&v` the caller takes anywhere (check by
    `grep`), except to fill a member of another helper's targets struct under this
-   recipe, Recipe LB step 8 or Recipe Q step 8, filled directly before that helper's
+   recipe, Recipe LB step 8, Recipe Z step 7 or Recipe Q step 8, filled directly before that helper's
    call or declared `const` with the addresses as its initialiser (Recipe Q step 8's
    `const` form), and read by nothing but that call (Recipe LB step 2's "helpers of
    this recipe"), or as an argument of calls that keep no copy
@@ -2962,8 +2962,9 @@ static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
   the second block, so calling it is calling the function the step would have made, a
   copy the file then does not carry; the second caller fills its own targets struct
   with the addresses of its own locals, which step 2 checks for that caller.
-- More than four written variables, two labels, two different constants, or a written
-  variable whose address the caller takes elsewhere: skip the block.
+- Under step 2's `const` form the argument is Recipe LB step 8's: the caller's variables stay its own locals; each struct holds their addresses only, fixed at its declaration and read by nothing but the calls that take it, and a helper binds each member once to a `*const` local, so each `*v` is the object `v` named. A variable whose address fills members of two such structs (`expChLimit` in `fx.c`'s opening and qualifier structs) has two pointers to it, of which only the called helper's is in use while it runs, and no helper holds two members naming one object.
+- More than four written variables (six under the `const` form), two labels, two different
+  constants, or a written variable whose address the caller takes elsewhere: skip the block.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), and steps 1, 2, 6 and 7 checked by reading.
@@ -2979,7 +2980,7 @@ during task W09, at the owner's request of 2026-10-30. Step 8's plain cleanup ru
 (2026-10-30, task W09): `layer.c`'s `OptimizeLayerFrames`, whose duplicate-frame trial
 (nesting 4) writes `dup_image`, `dup_bounds` and `cleared` and, when the clone fails,
 releases `bounds` and `disposals`, destroys `prev_image` and returns
-`(Image *) NULL`.
+`(Image *) NULL`. Step 2's `const` form for five or six variables (2026-11-05, W13): `fx.c`'s `GetFunction`, whose qualifier block writes `coordQual`, `fe`, `funStr`, `chQual`, `expChLimit` and `iaQual` and returns `MagickFalse`, and whose opening chain writes five (`pushOp`, `strLimit`, `chLimit`, `expChLimit`, `nArgs`); step 2 stopped at four, and the bump each rests on stays while they are in the caller. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -6115,3 +6116,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-04 | AMEND | PC | Step 2: body variables that the head writes and the tail reads (at most two) go by pointer, every use `(*v)`, and a shared variable the head only reads goes by pointer to `const`; step 4 places these pointers between the struct and `status`. Still five steps | `statistic-measure.c`'s `GetImageRange` (campaign A, W13): the head fetches the row, copies the shared `range_info` into the body's `channel_range`, and accumulates into it; the `omp critical` tail then merges it, which PC step 2 refused. A probe: 9.68 to 10.00, no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | Z | Step 1 and new step 7: a selection that sets five or six of the caller's locals passes their addresses in one `const` struct (Recipe Q step 8's form), after the input struct, so the helper takes two parameters; step 1's four-variable limit holds for the separate-pointer form | `fx.c`'s `ExecuteRPN` (campaign A, W13): the `number_args` `switch` pops into `regA` to `regE`, five written locals, one more than step 1; with the nested push test (CN) and the address check (E) it holds two of the function's last three bumps. A probe: ExecuteRPN leaves Bumpy Road Ahead, 3.33 to 3.35, no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | NEW | RV | Extract Block Returning Whether It Returned: a block of a value-returning function that returns different expressions on its paths and otherwise falls through moves to a `static MagickBooleanType` function that stores each `R` through a `MagickBooleanType *result` and returns `MagickTrue` when it returned (`MagickFalse` when it fell through); the caller writes `if (Helper(...,&returned) != MagickFalse) return(returned);` | `fx.c`'s `GetOperand` (campaign A, W13): the leading-operand block, with its number and property tries, and the function block return `MagickTrue`, `MagickFalse` or a call's value and fall through; V refuses two return values, E step 7 needs a return on every path. A probe with V on the constant block: GetOperand leaves Bumpy Road Ahead, 3.35 to 3.37, no finding on any helper | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | I | Step 2: the block may write up to six variables when the caller declares the targets struct `const`, once, with the addresses as its initialiser, and passes it to every helper that writes any of them (Recipe LB step 8's and Recipe Z step 7's form); a struct of Z step 7 counts for the address exception. *Careful* gives the argument. Still eight steps | `fx.c`'s `GetFunction` (campaign A, W13): the opening chain writes five locals and the qualifier block six, both returning `MagickFalse`; I stopped at four, Z has no `return`, and the two blocks hold bumps the loop cannot be left alone with. A probe of the whole chain (these two blocks and the steps around them): `GetFunction` leaves Bumpy Road Ahead, fx.c 3.37 to 3.52 | mandate (2026-10-24) |
