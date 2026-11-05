@@ -5193,21 +5193,21 @@ static double GetSimilarityMetric(const Image *image,
   return(similarity);
 }
 
+typedef struct
+{
+  double
+    similarity;
+
+  ssize_t
+    x,
+    y;
+} SimilarityInfo;
+
 MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
 #define SimilarityImageTag  "Similarity/Image"
-
-  typedef struct
-  {
-    double
-      similarity;
-
-    ssize_t
-      x,
-      y;
-  } SimilarityInfo;
 
   CacheView
     *similarity_view;
