@@ -37,6 +37,7 @@ if ( ! GetOptions(
 	 'color.c',
 	 'color-equivalent.c',
 	 'colorspace.c',
+	 'colorspace-convert.c',
 	 'compare.c',
 	 'composite.c',
 	 'constitute.c',
