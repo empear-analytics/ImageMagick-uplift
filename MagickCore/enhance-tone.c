@@ -1046,6 +1046,47 @@ static void FormStretchHistogram(Image *image,double *histogram,
   image_view=DestroyCacheView(image_view);
 }
 
+typedef struct _StretchLevels
+{
+  Image
+    *image;
+
+  double
+    *histogram,
+    black_point,
+    white_point;
+} StretchLevels;
+
+static void FindStretchLevels(const StretchLevels *levels,Quantum *black,
+  Quantum *white)
+{
+  Image
+    *const image = levels->image;
+
+  double
+    *const histogram = levels->histogram;
+
+  const double
+    black_point = levels->black_point,
+    white_point = levels->white_point;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    ssize_t
+      j;
+
+    black[i]=(Quantum) 0;
+    white[i]=(Quantum) ScaleQuantumToMap(QuantumRange);
+    j=FindStretchBlackLevel(image,histogram,i,black_point);
+    black[i]=(Quantum) j;
+    j=FindStretchWhiteLevel(image,histogram,i,white_point);
+    white[i]=(Quantum) j;
+  }
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -1068,8 +1109,8 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     *stretch_map,
     *white;
 
-  ssize_t
-    i;
+  StretchLevels
+    levels;
 
   ssize_t
     y;
@@ -1101,18 +1142,11 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   /*
     Find the histogram boundaries by locating the black/white levels.
   */
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    ssize_t
-      j;
-
-    black[i]=(Quantum) 0;
-    white[i]=(Quantum) ScaleQuantumToMap(QuantumRange);
-    j=FindStretchBlackLevel(image,histogram,i,black_point);
-    black[i]=(Quantum) j;
-    j=FindStretchWhiteLevel(image,histogram,i,white_point);
-    white[i]=(Quantum) j;
-  }
+  levels.image=image;
+  levels.histogram=histogram;
+  levels.black_point=black_point;
+  levels.white_point=white_point;
+  FindStretchLevels(&levels,black,white);
   histogram=(double *) RelinquishMagickMemory(histogram);
   /*
     Stretch the histogram to create the stretched image mapping.
