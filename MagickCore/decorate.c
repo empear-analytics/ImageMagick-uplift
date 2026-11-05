@@ -953,18 +953,24 @@ static MagickBooleanType DrawFrameSides(const FrameSideLine *sides)
   return(status);
 }
 
-MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
-  const CompositeOperator compose,ExceptionInfo *exception)
+static Image *DrawFrameBorders(const FrameComposite *frame_composite,
+  Image *frame_image)
 {
   CacheView
     *image_view,
     *frame_view;
 
-  Image
-    *frame_image;
+  const Image
+    *const image = frame_composite->image;
 
-  FrameComposite
-    frame_composite;
+  const FrameInfo
+    *const frame_info = frame_composite->frame_info;
+
+  const size_t
+    bevel_width = frame_composite->bevel_width;
+
+  ExceptionInfo
+    *const exception = frame_composite->exception;
 
   FrameSideLine
     sides;
@@ -980,36 +986,8 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     trough;
 
   size_t
-    bevel_width,
     height;
 
-  ssize_t
-    x_offset,
-    y_offset;
-
-  /*
-    Check frame geometry.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(frame_info != (FrameInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((frame_info->outer_bevel < 0) || (frame_info->inner_bevel < 0))
-    ThrowImageException(OptionError,"FrameIsLessThanImageSize");
-  bevel_width=(size_t) (frame_info->outer_bevel+frame_info->inner_bevel);
-  x_offset=(ssize_t) frame_info->width-frame_info->x-(ssize_t) bevel_width;
-  y_offset=(ssize_t) frame_info->height-frame_info->y-(ssize_t) bevel_width;
-  if ((x_offset < (ssize_t) image->columns) ||
-      (y_offset < (ssize_t) image->rows))
-    ThrowImageException(OptionError,"FrameIsLessThanImageSize");
-  /*
-    Initialize framed image attributes.
-  */
-  if (AcquireFrameImage(image,frame_info,&frame_image,exception) ==
-      MagickFalse)
-    return((Image *) NULL);
-  SetFrameImageAttributes(frame_image,image,exception);
   /*
     Initialize 3D effects color.
   */
@@ -1057,11 +1035,53 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     }
   frame_view=DestroyCacheView(frame_view);
   image_view=DestroyCacheView(image_view);
+  return(CompositeFrameImage(frame_composite,status,frame_image));
+}
+
+MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
+  const CompositeOperator compose,ExceptionInfo *exception)
+{
+  FrameComposite
+    frame_composite;
+
+  Image
+    *frame_image;
+
+  size_t
+    bevel_width;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  /*
+    Check frame geometry.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(frame_info != (FrameInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if ((frame_info->outer_bevel < 0) || (frame_info->inner_bevel < 0))
+    ThrowImageException(OptionError,"FrameIsLessThanImageSize");
+  bevel_width=(size_t) (frame_info->outer_bevel+frame_info->inner_bevel);
+  x_offset=(ssize_t) frame_info->width-frame_info->x-(ssize_t) bevel_width;
+  y_offset=(ssize_t) frame_info->height-frame_info->y-(ssize_t) bevel_width;
+  if ((x_offset < (ssize_t) image->columns) ||
+      (y_offset < (ssize_t) image->rows))
+    ThrowImageException(OptionError,"FrameIsLessThanImageSize");
+  /*
+    Initialize framed image attributes.
+  */
+  if (AcquireFrameImage(image,frame_info,&frame_image,exception) ==
+      MagickFalse)
+    return((Image *) NULL);
+  SetFrameImageAttributes(frame_image,image,exception);
   frame_composite.image=image;
   frame_composite.frame_info=frame_info;
   frame_composite.compose=compose;
   frame_composite.bevel_width=bevel_width;
   frame_composite.exception=exception;
-  return(CompositeFrameImage(&frame_composite,status,frame_image));
+  return(DrawFrameBorders(&frame_composite,frame_image));
 }
 
