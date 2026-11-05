@@ -5436,6 +5436,140 @@ campaign A's files.
 
 ---
 
+## Recipe HC - Extract Block Holding a Named Critical Region
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method* on a function with a parallel loop, and the block that would fix
+it is a statement of the loop body (usually the column loop of a row loop) that holds a
+whole named `#pragma omp critical (name)` construct: a double-checked insert into a shared
+table, `if (table[i] < 0)` outside the lock and the same test again inside it.
+
+**Not covered by:** Recipe E, O, K and PS (the OpenMP rule of Recipe O step 1 and PS step 1:
+the block contains no `#pragma omp` line); Recipe CB (it moves only the braced body of the
+critical region and leaves the pragma in the caller; a critical that governs an unbraced
+`if` is outside its step 1, and moving that body would leave the column loop, and the
+nesting, where they were); Recipe N step 1 and Z step 1 (whole parallel loops in a block
+outside every region, not a block inside one).
+
+**How:**
+
+1. The block is one statement of a `#pragma omp parallel for` loop body (a loop, an `if`,
+   or a braced block). It holds one or more whole critical constructs: the `#if
+   defined(MAGICKCORE_OPENMP_SUPPORT)` line, a `#pragma omp critical (name)` line with a
+   name, the `#endif` and the statement the pragma governs, braced or not. It holds no
+   other `#pragma` line, no `return` or `goto`, and no `break` or `continue` that leaves
+   it.
+2. Outside the critical constructs the block meets Recipe O step 1's rule for a block in a
+   parallel loop body: every variable it writes is declared inside the body or inside the
+   block, so each thread has its own, and it assigns no variable declared outside the
+   body, `status` included. Writes through a pointer or array the block already used (the
+   thread's row pointer `q`, a shared table indexed inside the critical region) stay
+   writes through the same pointer. Inside the critical constructs the block may write
+   shared memory through such pointers and members (`table[i]=...`, `image->colors++`),
+   as before; it assigns no variable of the caller.
+3. Inside the critical constructs nothing takes a lock or calls a function that could (no
+   `omp_set_lock`, no `LockSemaphoreInfo`, no function that enters a critical of the same
+   name), as Recipe CB step 1 says. Check each callee by reading.
+4. A body variable the block writes and that nothing after it in the body reads (the row
+   pointer `q`, advanced along the row) goes by value, Recipe E step 4; a body variable
+   only the block uses (the column counter `x`) is declared in the new function and its
+   declaration leaves the body.
+5. Cut the block into a new `static void` function directly above the caller. Pass each
+   variable it reads by value and each pointer it writes through as it was; at most four
+   parameters (Recipe N's struct otherwise). The block's text, the `#if`, the pragma with
+   its name and the `#endif` included, is unchanged apart from its indentation.
+6. Where the block stood, write the call. The new function is called from that parallel
+   loop body alone; check by reading that no other caller exists and that every argument
+   fills the parameter it names.
+
+**Before:**
+
+```c
+        for (x=0; x < (ssize_t) image->columns; x++)
+        {
+          size_t
+            intensity;
+
+          intensity=ScaleQuantumToMap(GetPixelRed(image,q));
+          if (colormap_index[intensity] < 0)
+            {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+              #pragma omp critical (MagickCore_SetGrayscaleImage)
+#endif
+              if (colormap_index[intensity] < 0)
+                {
+                  colormap_index[intensity]=(ssize_t) image->colors;
+                  ...
+                  image->colors++;
+               }
+            }
+          SetPixelIndex(image,(Quantum) colormap_index[intensity],q);
+          q+=(ptrdiff_t) GetPixelChannels(image);
+        }
+```
+
+**After:**
+
+```c
+static void IndexGrayscaleRow(Image *image,ssize_t *colormap_index,
+  Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ...
+    if (colormap_index[intensity] < 0)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp critical (MagickCore_SetGrayscaleImage)
+#endif
+        if (colormap_index[intensity] < 0)
+          {
+            ...
+          }
+      }
+    ...
+  }
+}
+...
+        IndexGrayscaleRow(image,colormap_index,q);
+```
+
+**Careful:**
+
+- The critical construct moves with its name into a function that runs only inside the
+  parallel region. OpenMP binds such an orphaned construct to the innermost enclosing
+  parallel region at run time, and a named critical excludes every thread executing any
+  critical construct of that name, wherever it stands in the program text. So the thread
+  waits for and holds the same lock, around the same statements, at the same point of the
+  same iteration, as before; the name is not edited, so the region still excludes nothing
+  it did not exclude and nothing it did.
+- Outside the construct the helper runs on the thread's own variables (its copy of `q`,
+  its own `x` and `intensity`) and reads the shared memory the block read, at the same
+  points: an unlocked read such as the first `if (colormap_index[intensity] < 0)` of a
+  double-checked insert stays unlocked and where it was. Nothing is copied before the
+  lock and written back after it.
+- With OpenMP off the pragma is not compiled, and the helper is a plain function holding
+  the same statements.
+- The oracle builds without OpenMP and cannot see a race or a lock: steps 1 to 3 are
+  checked by reading.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function, the
+moved callees unchanged), and steps 1 to 3 checked by reading.
+
+**Provenance:** 2026-11-05, task W14 (campaign A, Claude Code, Claude Opus 5.5, under the
+mandate of 2026-10-24), from `quantize.c`'s `SetGrayscaleImage`: its colormap-building
+parallel loop scans each row in a column loop whose `if` holds a named critical governing
+an unbraced `if`, the function's Deep, Nested Complexity (5) and one of its four bumps; the
+plateau rows of W11 to W13 recorded that no recipe moves it (CB step 1 refuses the unbraced
+`if`). A probe of the column loop as a helper, after the split that freed the function
+budget: 6.11 to 6.57, the function leaving Deep, Nested Complexity, no finding on the
+helper.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -6869,3 +7003,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | Z | Step 1: a block outside every OpenMP region may hold whole parallel loops under Recipe N step 1's conditions (amended the same day): each loop moved whole and unchanged, what the region writes or a clause names a parameter or local of the new function, never a member. *Careful* refers to N's argument. Still seven steps | `colorspace.c`'s `sRGBTransformImage` (campaign A, W14): Recipe SD on its table set-up `switch (colorspace)` (the Rec709YCbCr, YCC and identity groups, two of them whole parallel loops) writes `primary_info` and reads four inputs, so SD step 3 takes Z's form, whose step 1 refused the loops. A probe of the step and the E step that follows it: 5.87 to 5.93 to 6.01, no new finding | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | N | Step 8: the statements of one loop body are sibling blocks too (each moved under N, I or Y), the struct may be filled before the loop when nothing in it writes a member's variable, and a later block that holds the siblings' calls (the loop around them) takes the same `const Name *name`, the typedef gaining the members it reads, read as `name->member`, its inner calls passing `name` for `&name`; *Careful* gives the argument | `morphology.c`'s `MorphologyApply` (campaign A, W14): its kernel-iteration loop (Recipe I), the two verbose reports around it (N) and the stage loop that holds them (I) read the same nine to twelve inputs; one struct per helper would take the stage-loop helper past *Large Method* (77 lines in a probe). A probe of the chain with one shared `MorphologyStages`: MorphologyApply leaves Brain Method and Deep, Nested Complexity, 2.71 to 3.04, no finding on a helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | NS | Step 1: the selection may be the whole right-hand side of an assignment statement (`sign=c ? 1 : -1;`), no parentheses needed since nothing can regroup it, may be a single site when the step takes the function out of *Complex Method*, and may select between signed integer literals. *Careful* is unchanged: the argument is evaluated once, the function returns the same constant under the same test, the call replaces the right-hand side as a whole, and `tools/obj_identical.sh` must print `IDENTICAL` | `enhance.c`'s `ContrastImage` (campaign A, W14 lane d): `sign=sharpen != MagickFalse ? 1 : -1;` is one decision of its cc 9; NS step 1 asked for a parenthesised selection that recurs. A probe: ContrastImage leaves Complex Method, enhance.c 6.49 to 6.65 | mandate (2026-10-24) |
+| 2026-11-05 | NEW | HC | Extract Block Holding a Named Critical Region: a statement of a parallel loop body (a column loop) that holds whole named `#pragma omp critical (name)` constructs moves, constructs included and unchanged, into a `static void` helper called from that body alone; outside the constructs the block writes only body variables (Recipe O step 1's rule), inside them shared memory through the same pointers; no lock taken; checked by reading | `quantize.c`'s `SetGrayscaleImage` (campaign A, W14): the column loop of its colormap-building parallel loop holds a double-checked insert whose critical governs an unbraced `if` (outside CB step 1), the function's Deep, Nested Complexity (5); a probe 6.11 to 6.57 with no finding on the helper | mandate (2026-10-24) |

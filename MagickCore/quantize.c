@@ -364,50 +364,6 @@ static void
   PruneToCubeDepth(QCubeInfo *,const QNodeInfo *),
   ReduceImageColors(const Image *,QCubeInfo *);
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   A c q u i r e Q u a n t i z e I n f o                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  AcquireQuantizeInfo() allocates the QuantizeInfo structure.
-%
-%  The format of the AcquireQuantizeInfo method is:
-%
-%      QuantizeInfo *AcquireQuantizeInfo(const ImageInfo *image_info)
-%
-%  A description of each parameter follows:
-%
-%    o image_info: the image info.
-%
-*/
-MagickExport QuantizeInfo *AcquireQuantizeInfo(const ImageInfo *image_info)
-{
-  QuantizeInfo
-    *quantize_info;
-
-  quantize_info=(QuantizeInfo *) AcquireCriticalMemory(sizeof(*quantize_info));
-  GetQuantizeInfo(quantize_info);
-  if (image_info != (ImageInfo *) NULL)
-    {
-      const char
-        *option;
-
-      quantize_info->dither_method=image_info->dither == MagickFalse ?
-        NoDitherMethod : RiemersmaDitherMethod;
-      option=GetImageOption(image_info,"dither");
-      if (option != (const char *) NULL)
-        quantize_info->dither_method=(DitherMethod) ParseCommandOption(
-          MagickDitherOptions,MagickFalse,option);
-      quantize_info->measure_error=image_info->verbose;
-    }
-  return(quantize_info);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -693,6 +649,33 @@ static MagickBooleanType AcquireAssignImageColormap(Image *image,
   return(MagickTrue);
 }
 
+typedef struct _QuantizeRowInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} QuantizeRowInfo;
+
+static MagickBooleanType FetchQuantizeRow(const QuantizeRowInfo *row,
+  const ssize_t y,Quantum **q,MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*q)=GetCacheViewAuthenticPixels(row->image_view,0,y,row->image->columns,1,
+    row->exception);
+  if ((*q) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -732,15 +715,11 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
         Quantum
           *magick_restrict q;
 
-        if (status == MagickFalse)
+        const QuantizeRowInfo
+          row = { image,image_view,exception };
+
+        if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
         AssignImageRowColors(image,cube_info,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
@@ -1372,48 +1351,6 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   return(y < (ssize_t) image->rows ? MagickFalse : MagickTrue);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   C l o n e Q u a n t i z e I n f o                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  CloneQuantizeInfo() makes a duplicate of the given quantize info structure,
-%  or if quantize info is NULL, a new one.
-%
-%  The format of the CloneQuantizeInfo method is:
-%
-%      QuantizeInfo *CloneQuantizeInfo(const QuantizeInfo *quantize_info)
-%
-%  A description of each parameter follows:
-%
-%    o clone_info: Method CloneQuantizeInfo returns a duplicate of the given
-%      quantize info, or if image info is NULL a new one.
-%
-%    o quantize_info: a structure of type info.
-%
-*/
-MagickExport QuantizeInfo *CloneQuantizeInfo(const QuantizeInfo *quantize_info)
-{
-  QuantizeInfo
-    *clone_info;
-
-  clone_info=(QuantizeInfo *) AcquireCriticalMemory(sizeof(*clone_info));
-  GetQuantizeInfo(clone_info);
-  if (quantize_info == (QuantizeInfo *) NULL)
-    return(clone_info);
-  clone_info->number_colors=quantize_info->number_colors;
-  clone_info->tree_depth=quantize_info->tree_depth;
-  clone_info->dither_method=quantize_info->dither_method;
-  clone_info->colorspace=quantize_info->colorspace;
-  clone_info->measure_error=quantize_info->measure_error;
-  return(clone_info);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1764,39 +1701,6 @@ static void DestroyQCubeInfo(QCubeInfo *cube_info)
   cube_info=(QCubeInfo *) RelinquishMagickMemory(cube_info);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   D e s t r o y Q u a n t i z e I n f o                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  DestroyQuantizeInfo() deallocates memory associated with an QuantizeInfo
-%  structure.
-%
-%  The format of the DestroyQuantizeInfo method is:
-%
-%      QuantizeInfo *DestroyQuantizeInfo(QuantizeInfo *quantize_info)
-%
-%  A description of each parameter follows:
-%
-%    o quantize_info: Specifies a pointer to an QuantizeInfo structure.
-%
-*/
-MagickExport QuantizeInfo *DestroyQuantizeInfo(QuantizeInfo *quantize_info)
-{
-  assert(quantize_info != (QuantizeInfo *) NULL);
-  assert(quantize_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  quantize_info->signature=(~MagickCoreSignature);
-  quantize_info=(QuantizeInfo *) RelinquishMagickMemory(quantize_info);
-  return(quantize_info);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2745,222 +2649,7 @@ static QNodeInfo *GetQNodeInfo(QCubeInfo *cube_info,const size_t id,
   return(node_info);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%  G e t I m a g e Q u a n t i z e E r r o r                                  %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetImageQuantizeError() measures the difference between the original
-%  and quantized images.  This difference is the total quantization error.
-%  The error is computed by summing over all pixels in an image the distance
-%  squared in RGB space between each reference pixel value and its quantized
-%  value.  These values are computed:
-%
-%    o mean_error_per_pixel:  This value is the mean error for any single
-%      pixel in the image.
-%
-%    o normalized_mean_square_error:  This value is the normalized mean
-%      quantization error for any single pixel in the image.  This distance
-%      measure is normalized to a range between 0 and 1.  It is independent
-%      of the range of red, green, and blue values in the image.
-%
-%    o normalized_maximum_square_error:  This value is the normalized
-%      maximum quantization error for any single pixel in the image.  This
-%      distance measure is normalized to a range between 0 and 1.  It is
-%      independent of the range of red, green, and blue values in your image.
-%
-%  The format of the GetImageQuantizeError method is:
-%
-%      MagickBooleanType GetImageQuantizeError(Image *image,
-%        ExceptionInfo *exception)
-%
-%  A description of each parameter follows.
-%
-%    o image: the image.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-static inline double UpdateMaximumError(const double distance,
-  double maximum_error)
-{
-  if (distance > maximum_error)
-    maximum_error=distance;
-  return(maximum_error);
-}
-
-typedef struct _QuantizeErrorRow
-{
-  Image
-    *image;
-} QuantizeErrorRow;
-
-typedef struct _QuantizeErrorTargets
-{
-  double
-    *alpha,
-    *beta,
-    *mean_error_per_pixel,
-    *mean_error,
-    *maximum_error;
-
-  const Quantum
-    *magick_restrict *p;
-} QuantizeErrorTargets;
-
-static void AccumulateQuantizeErrorRow(const QuantizeErrorRow *errors,
-  const QuantizeErrorTargets *targets)
-{
-  Image
-    *const image = errors->image;
-
-  double
-    *const alpha = targets->alpha,
-    *const beta = targets->beta,
-    *const mean_error_per_pixel = targets->mean_error_per_pixel,
-    *const mean_error = targets->mean_error,
-    *const maximum_error = targets->maximum_error;
-
-  const Quantum
-    *magick_restrict *const p = targets->p;
-
-  double
-    distance;
-
-  ssize_t
-    index,
-    x;
-
-  for (x=0; x < (ssize_t) image->columns; x++)
-  {
-    index=(ssize_t) GetPixelIndex(image,*p);
-    if (image->alpha_trait != UndefinedPixelTrait)
-      {
-        *alpha=(double) (QuantumScale*(double) GetPixelAlpha(image,*p));
-        *beta=(double) (QuantumScale*image->colormap[index].alpha);
-      }
-    distance=fabs((double) ((*alpha)*(double) GetPixelRed(image,*p)-(*beta)*
-      image->colormap[index].red));
-    *mean_error_per_pixel+=distance;
-    *mean_error+=distance*distance;
-    *maximum_error=UpdateMaximumError(distance,*maximum_error);
-    distance=fabs((double) ((*alpha)*(double) GetPixelGreen(image,*p)-(*beta)*
-      image->colormap[index].green));
-    *mean_error_per_pixel+=distance;
-    *mean_error+=distance*distance;
-    *maximum_error=UpdateMaximumError(distance,*maximum_error);
-    distance=fabs((double) ((*alpha)*(double) GetPixelBlue(image,*p)-(*beta)*
-      image->colormap[index].blue));
-    *mean_error_per_pixel+=distance;
-    *mean_error+=distance*distance;
-    *maximum_error=UpdateMaximumError(distance,*maximum_error);
-    *p+=(ptrdiff_t) GetPixelChannels(image);
-  }
-}
-
-MagickExport MagickBooleanType GetImageQuantizeError(Image *image,
-  ExceptionInfo *exception)
-{
-  CacheView
-    *image_view;
-
-  double
-    alpha,
-    area,
-    beta,
-    maximum_error,
-    mean_error,
-    mean_error_per_pixel;
-
-  ssize_t
-    y;
-
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  image->total_colors=GetNumberColors(image,(FILE *) NULL,exception);
-  (void) memset(&image->error,0,sizeof(image->error));
-  if (image->storage_class == DirectClass)
-    return(MagickTrue);
-  alpha=1.0;
-  beta=1.0;
-  area=3.0*image->columns*image->rows;
-  maximum_error=0.0;
-  mean_error_per_pixel=0.0;
-  mean_error=0.0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    QuantizeErrorRow
-      errors;
-
-    QuantizeErrorTargets
-      targets;
-
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    errors.image=image;
-    targets.alpha=(&alpha);
-    targets.beta=(&beta);
-    targets.mean_error_per_pixel=(&mean_error_per_pixel);
-    targets.mean_error=(&mean_error);
-    targets.maximum_error=(&maximum_error);
-    targets.p=(&p);
-    AccumulateQuantizeErrorRow(&errors,&targets);
-  }
-  image_view=DestroyCacheView(image_view);
-  image->error.mean_error_per_pixel=(double) mean_error_per_pixel/area;
-  image->error.normalized_mean_error=(double) QuantumScale*QuantumScale*
-    mean_error/area;
-  image->error.normalized_maximum_error=(double) QuantumScale*maximum_error;
-  return(MagickTrue);
-}
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t Q u a n t i z e I n f o                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetQuantizeInfo() initializes the QuantizeInfo structure.
-%
-%  The format of the GetQuantizeInfo method is:
-%
-%      void GetQuantizeInfo(QuantizeInfo *quantize_info)
-%
-%  A description of each parameter follows:
-%
-%    o quantize_info: Specifies a pointer to a QuantizeInfo structure.
-%
-*/
-MagickExport void GetQuantizeInfo(QuantizeInfo *quantize_info)
-{
-  assert(quantize_info != (QuantizeInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  (void) memset(quantize_info,0,sizeof(*quantize_info));
-  quantize_info->number_colors=256;
-  quantize_info->dither_method=RiemersmaDitherMethod;
-  quantize_info->colorspace=UndefinedColorspace;
-  quantize_info->measure_error=MagickFalse;
-  quantize_info->signature=MagickCoreSignature;
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3446,6 +3135,143 @@ static MagickBooleanType FinishKmeansImage(Image *image,
   return(SyncImage(image,exception));
 }
 
+typedef struct _KmeansPass
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  KmeansInfo
+    **kmeans_pixels;
+
+  ExceptionInfo
+    *exception;
+} KmeansPass;
+
+static MagickBooleanType AssignKmeansPixels(const KmeansPass *kmeans,
+  MagickBooleanType status)
+{
+  Image
+    *const image = kmeans->image;
+
+  CacheView
+    *const image_view = kmeans->image_view;
+
+  KmeansInfo
+    **const kmeans_pixels = kmeans->kmeans_pixels;
+
+  ExceptionInfo
+    *const exception = kmeans->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(dynamic) shared(status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    Quantum
+      *magick_restrict q;
+
+    const QuantizeRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    AssignKmeansRow(image,kmeans_pixels,id,q);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      status=MagickFalse;
+  }
+  return(status);
+}
+
+typedef struct _KmeansRefinement
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  KmeansInfo
+    **kmeans_pixels;
+
+  size_t
+    number_threads,
+    max_iterations;
+
+  double
+    tolerance;
+
+  ExceptionInfo
+    *exception;
+} KmeansRefinement;
+
+static MagickBooleanType RefineKmeansClusters(const KmeansRefinement *refine,
+  double previous_tolerance,MagickBooleanType status)
+{
+  Image
+    *const image = refine->image;
+
+  CacheView
+    *const image_view = refine->image_view;
+
+  KmeansInfo
+    **const kmeans_pixels = refine->kmeans_pixels;
+
+  const size_t
+    number_threads = refine->number_threads,
+    max_iterations = refine->max_iterations;
+
+  const double
+    tolerance = refine->tolerance;
+
+  ExceptionInfo
+    *const exception = refine->exception;
+
+  ssize_t
+    n;
+
+  for (n=0; n < (ssize_t) max_iterations; n++)
+  {
+    double
+      distortion;
+
+    KmeansPass
+      kmeans;
+
+    ClearKmeansPixels(image,kmeans_pixels,number_threads);
+    kmeans.image=image;
+    kmeans.image_view=image_view;
+    kmeans.kmeans_pixels=kmeans_pixels;
+    kmeans.exception=exception;
+    status=AssignKmeansPixels(&kmeans,status);
+    if (status == MagickFalse)
+      break;
+    /*
+      Reduce sums to [0] entry.
+    */
+    ReduceKmeansPixels(image,kmeans_pixels,number_threads);
+    /*
+      Calculate the new means (centroids) of the pixels in the new clusters.
+    */
+    distortion=UpdateKmeansCentroids(image,kmeans_pixels);
+    LogKmeansDistortion(image,n,distortion,previous_tolerance);
+    if (fabs(distortion-previous_tolerance) <= tolerance)
+      break;
+    previous_tolerance=distortion;
+    ReportKmeansProgress(image,n,max_iterations,&status);
+  }
+  return(status);
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -3462,15 +3288,15 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
   KmeansInfo
     **kmeans_pixels;
 
+  KmeansRefinement
+    refine;
+
   MagickBooleanType
     verbose,
     status;
 
   size_t
     number_threads;
-
-  ssize_t
-    n;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -3511,55 +3337,14 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
   verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
   number_threads=(size_t) GetMagickResourceLimit(ThreadResource);
   image_view=AcquireAuthenticCacheView(image,exception);
-  for (n=0; n < (ssize_t) max_iterations; n++)
-  {
-    double
-      distortion;
-
-    ssize_t
-      y;
-
-    ClearKmeansPixels(image,kmeans_pixels,number_threads);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp parallel for schedule(dynamic) shared(status) \
-      magick_number_threads(image,image,image->rows,1)
-#endif
-    for (y=0; y < (ssize_t) image->rows; y++)
-    {
-      const int
-        id = GetOpenMPThreadId();
-
-      Quantum
-        *magick_restrict q;
-
-      if (status == MagickFalse)
-        continue;
-      q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-      if (q == (Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      AssignKmeansRow(image,kmeans_pixels,id,q);
-      if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-        status=MagickFalse;
-    }
-    if (status == MagickFalse)
-      break;
-    /*
-      Reduce sums to [0] entry.
-    */
-    ReduceKmeansPixels(image,kmeans_pixels,number_threads);
-    /*
-      Calculate the new means (centroids) of the pixels in the new clusters.
-    */
-    distortion=UpdateKmeansCentroids(image,kmeans_pixels);
-    LogKmeansDistortion(image,n,distortion,previous_tolerance);
-    if (fabs(distortion-previous_tolerance) <= tolerance)
-      break;
-    previous_tolerance=distortion;
-    ReportKmeansProgress(image,n,max_iterations,&status);
-  }
+  refine.image=image;
+  refine.image_view=image_view;
+  refine.kmeans_pixels=kmeans_pixels;
+  refine.number_threads=number_threads;
+  refine.max_iterations=max_iterations;
+  refine.tolerance=tolerance;
+  refine.exception=exception;
+  status=RefineKmeansClusters(&refine,previous_tolerance,status);
   image_view=DestroyCacheView(image_view);
   ReleaseKmeansClusters(image,verbose,kmeans_pixels,exception);
   return(FinishKmeansImage(image,max_iterations,status,exception));
@@ -4526,6 +4311,100 @@ static void RemapGrayscaleRow(Image *image,const ssize_t *colormap_index,
   }
 }
 
+static void IndexGrayscaleRow(Image *image,ssize_t *colormap_index,
+  Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    size_t
+      intensity;
+
+    intensity=ScaleQuantumToMap(GetPixelRed(image,q));
+    if (colormap_index[intensity] < 0)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp critical (MagickCore_SetGrayscaleImage)
+#endif
+        if (colormap_index[intensity] < 0)
+          {
+            colormap_index[intensity]=(ssize_t) image->colors;
+            image->colormap[image->colors].red=(double)
+              GetPixelRed(image,q);
+            image->colormap[image->colors].green=(double)
+              GetPixelGreen(image,q);
+            image->colormap[image->colors].blue=(double)
+              GetPixelBlue(image,q);
+            image->colors++;
+         }
+      }
+    SetPixelIndex(image,(Quantum) colormap_index[intensity],q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void BuildGrayscaleColormap(Image *image,ssize_t *colormap_index,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    y;
+
+  image->colors=0;
+  status=MagickTrue;
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    const QuantizeRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    IndexGrayscaleRow(image,colormap_index,q);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      status=MagickFalse;
+  }
+  image_view=DestroyCacheView(image_view);
+}
+
+static MagickBooleanType AcquireGrayscaleColormap(Image *image,
+  ssize_t *colormap_index,const size_t extent,ExceptionInfo *exception)
+{
+  if (image->storage_class != PseudoClass)
+    {
+      (void) memset(colormap_index,(-1),extent*sizeof(*colormap_index));
+      if (AcquireImageColormap(image,MaxColormapSize,exception) == MagickFalse)
+        {
+          colormap_index=(ssize_t *) RelinquishMagickMemory(colormap_index);
+          ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+            image->filename);
+        }
+      BuildGrayscaleColormap(image,colormap_index,exception);
+    }
+  return(MagickTrue);
+}
+
+static void SyncQuantizeRow(CacheView *image_view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType SetGrayscaleImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -4556,70 +4435,9 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
   if (colormap_index == (ssize_t *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
-  if (image->storage_class != PseudoClass)
-    {
-      (void) memset(colormap_index,(-1),extent*sizeof(*colormap_index));
-      if (AcquireImageColormap(image,MaxColormapSize,exception) == MagickFalse)
-        {
-          colormap_index=(ssize_t *) RelinquishMagickMemory(colormap_index);
-          ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-            image->filename);
-        }
-      image->colors=0;
-      status=MagickTrue;
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,1)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        Quantum
-          *magick_restrict q;
-
-        ssize_t
-          x;
-
-        if (status == MagickFalse)
-          continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          size_t
-            intensity;
-
-          intensity=ScaleQuantumToMap(GetPixelRed(image,q));
-          if (colormap_index[intensity] < 0)
-            {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-              #pragma omp critical (MagickCore_SetGrayscaleImage)
-#endif
-              if (colormap_index[intensity] < 0)
-                {
-                  colormap_index[intensity]=(ssize_t) image->colors;
-                  image->colormap[image->colors].red=(double)
-                    GetPixelRed(image,q);
-                  image->colormap[image->colors].green=(double)
-                    GetPixelGreen(image,q);
-                  image->colormap[image->colors].blue=(double)
-                    GetPixelBlue(image,q);
-                  image->colors++;
-               }
-            }
-          SetPixelIndex(image,(Quantum) colormap_index[intensity],q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-          status=MagickFalse;
-      }
-      image_view=DestroyCacheView(image_view);
-    }
+  if (AcquireGrayscaleColormap(image,colormap_index,extent,exception) ==
+      MagickFalse)
+    return(MagickFalse);
   (void) memset(colormap_index,0,extent*sizeof(*colormap_index));
   SortGrayscaleColormap(image);
   colormap=(PixelInfo *) AcquireQuantumMemory(image->colors,sizeof(*colormap));
@@ -4644,17 +4462,13 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const QuantizeRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchQuantizeRow(&row,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     RemapGrayscaleRow(image,colormap_index,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncQuantizeRow(image_view,exception,&status);
   }
   image_view=DestroyCacheView(image_view);
   colormap_index=(ssize_t *) RelinquishMagickMemory(colormap_index);
