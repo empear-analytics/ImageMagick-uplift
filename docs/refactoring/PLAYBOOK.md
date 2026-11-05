@@ -5958,6 +5958,139 @@ leaves the category, fx.c 3.37 to 3.52. Added by Claude Code (Claude Sonnet 5.5)
 
 ---
 
+## Recipe SW - Split a Returning Selection into Chained Functions
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead*, and
+much of the complexity is a `switch` of a value-returning function whose every group ends
+in `return(R);` and which is followed by statements that end the function, as
+`distort.c`'s `GenerateCoefficients` does: seventeen labels, each `return(<case helper>(...));`,
+then `perror(...); return((double *) NULL);`. Moved whole (Recipe E step 7), the switch
+keeps every label and the new function is itself a *Complex Method*.
+
+**Not covered by:** Recipe SD, whose step 1 refuses a `return` in a group and whose new
+function is `void`; Recipe SR, whose groups all return one constant and whose new function
+returns `MagickBooleanType`; Recipe E step 7, which moves the whole `switch` and its tail;
+Recipe W and RV, which move a block, not a run of labels.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region, with no `#pragma` line in it or in
+   what follows. In the same block, directly after it, come statements `T` that end the
+   function with `return(R_T);` on every path, with no other exit. Every group of the
+   `switch` ends in `return(R);` (`R` any expression), except a `default:` group that is
+   `break;` alone (or no `default:` group). No group falls through; none holds a
+   `continue`, `goto` or `break` of its own. `e` is a variable or an expression of
+   variables with no call, assignment or increment (`*method`); groups may write what `e`
+   reads (`*method=AffineDistortion;`) only on a path that returns at once, so `e` is
+   never evaluated after such a write.
+2. Choose a run of adjacent groups, labels and bodies, none of them `default:`. A
+   never-compiled `#if 0` branch between them moves with them (*Preprocessor branches*).
+3. Cut the run into a new `static` function of the caller's return type directly above
+   the caller, whose body is `switch (e) { <the run> default: break; }` followed by `T`
+   unchanged. Its parameters are what the run and `T` read, as Recipe N steps 2 to 4 give
+   them (at most four; an input struct shared with the other helpers of the function). A
+   call in the run that passed `&name` of the struct passes `name`.
+4. In the caller the kept groups and the `default:` group stand as they were; `T` is
+   replaced by `return(Helper(...));`. A `switch` that had no `default:` gets `default:
+   break;` in the caller as well, so that no compiler warns about unhandled enumerators.
+5. Check by reading that every label of the original is in exactly one of the two
+   `switch`es, that each moved group is byte for byte the original, and that the call's
+   arguments fill the parameters they name.
+6. Applied again to the new function (a run of its groups moved to a further helper
+   directly above it, its own `T` becoming the call), the steps form a chain, one commit
+   each.
+
+**Before:**
+
+```c
+  switch (*method)
+  {
+    case AffineDistortion:
+      return(AffineCoefficients(coeff,method,&context));
+    ...
+    case PolarDistortion:
+    case DePolarDistortion:
+      return(PolarCoefficients(coeff,method,&context));
+    case Cylinder2PlaneDistortion:
+    case Plane2CylinderDistortion:
+      return(CylinderCoefficients(coeff,method,&context));
+    case BarrelDistortion:
+    case BarrelInverseDistortion:
+      return(BarrelCoefficients(coeff,method,&context));
+    case ShepardsDistortion:
+      return(ShepardsCoefficients(coeff,method,&context));
+    default:
+      break;
+  }
+  /* you should never reach this point */
+  perror("no method handler"); /* just fail assertion */
+  return((double *) NULL);
+```
+
+**After:**
+
+```c
+static double *GenerateRadialCoefficients(double *coeff,DistortMethod *method,
+  const CoefficientContext *context)
+{
+  switch (*method)
+  {
+    case PolarDistortion:
+    case DePolarDistortion:
+      return(PolarCoefficients(coeff,method,context));
+    case Cylinder2PlaneDistortion:
+    case Plane2CylinderDistortion:
+      return(CylinderCoefficients(coeff,method,context));
+    case BarrelDistortion:
+    case BarrelInverseDistortion:
+      return(BarrelCoefficients(coeff,method,context));
+    default:
+      break;
+  }
+  /* you should never reach this point */
+  perror("no method handler"); /* just fail assertion */
+  return((double *) NULL);
+}
+...
+    case ShepardsDistortion:
+      return(ShepardsCoefficients(coeff,method,&context));
+    default:
+      break;
+  }
+  return(GenerateRadialCoefficients(coeff,method,&context));
+```
+
+**Careful:**
+
+- A value of `e` that matches a kept label selects the same group as before and returns
+  what it returned. One that matches a moved label (or none) used to select that group,
+  or `default:`, whose `break;` led into `T`; now it selects the caller's `default:`,
+  breaks, and `T` is the call. The helper evaluates the same `e`: nothing ran between
+  the caller's `break;` and the call, and `e` has no side effect (step 1), so it selects
+  the group the original would have, which returns `R` after the same statements. A value
+  that matched nothing reaches the helper's `default: break;` and its `T`, the original's
+  tail, with the same effects.
+- A group that writes what `e` reads (`*method=...`) does so on a path that returns at
+  once; the caller never re-evaluates `e` after such a write, and the helper is entered
+  only on paths on which no group ran.
+- `perror(...)` in `T` runs once, in the helper that holds it, after the same
+  `switch` evaluations and with nothing run in between that the original did not run.
+- Each helper's switch has `default: break;` so that `-Wswitch` stays quiet; it costs
+  one label of its cyclomatic complexity, and the run must be sized for it (cc 9 or more
+  counts one per label, `default` and a dead `#if 0` label included).
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new function,
+nothing else moved), and steps 1 and 5 checked by reading.
+
+**Provenance:** 2026-11-05, from `distort.c`'s `GenerateCoefficients` (campaign A, W13):
+the dispatch `switch` of its seventeen case helpers. A probe of the whole chain (two SW
+steps and the head moved by Recipe E step 7, with the thirty other steps of the function):
+the function leaves Bumpy Road Ahead, Complex Method and Large Method together,
+distort.c 3.55 to 4.25. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -6210,3 +6343,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | RV | Extract Block Returning Whether It Returned: a block of a value-returning function that returns different expressions on its paths and otherwise falls through moves to a `static MagickBooleanType` function that stores each `R` through a `MagickBooleanType *result` and returns `MagickTrue` when it returned (`MagickFalse` when it fell through); the caller writes `if (Helper(...,&returned) != MagickFalse) return(returned);` | `fx.c`'s `GetOperand` (campaign A, W13): the leading-operand block, with its number and property tries, and the function block return `MagickTrue`, `MagickFalse` or a call's value and fall through; V refuses two return values, E step 7 needs a return on every path. A probe with V on the constant block: GetOperand leaves Bumpy Road Ahead, 3.35 to 3.37, no finding on any helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | I | Step 2: the block may write up to six variables when the caller declares the targets struct `const`, once, with the addresses as its initialiser, and passes it to every helper that writes any of them (Recipe LB step 8's and Recipe Z step 7's form); a struct of Z step 7 counts for the address exception. *Careful* gives the argument. Still eight steps | `fx.c`'s `GetFunction` (campaign A, W13): the opening chain writes five locals and the qualifier block six, both returning `MagickFalse`; I stopped at four, Z has no `return`, and the two blocks hold bumps the loop cannot be left alone with. A probe of the whole chain (these two blocks and the steps around them): `GetFunction` leaves Bumpy Road Ahead, fx.c 3.37 to 3.52 | mandate (2026-10-24) |
 | 2026-11-05 | NEW | EI | Chain Exiting Guards into an Else-If: an `else` block that is only a run of `if` statements, each but the last leaving the flow when it fires, becomes an `else if` chain with the conditions and bodies copied unchanged; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `fx.c`'s `GetFunction` (campaign A, W13): the argument loop's `else` block (a throw with `return MagickFalse`, a `break`, a pad test) is a bump that CN does not reach (statements, not one nested `if`) and no extraction recipe takes (a `break` and a `return` in one block). A probe of the whole chain: that bump gone, the loop's switch moved, `GetFunction` leaves Bumpy Road Ahead, fx.c 3.37 to 3.52 | mandate (2026-10-24) |
+| 2026-11-05 | NEW | SW | Split a Returning Selection into Chained Functions: a run of adjacent groups of a `switch` whose every group ends in `return(R);` (followed by a tail ending the function) moves, with the tail, to a new function of the same return type whose `switch` ends `default: break;`; the caller keeps the other groups and `default:` and returns the call | `distort.c`'s `GenerateCoefficients` (campaign A, W13): the dispatch `switch` of seventeen case helpers (cc 126 of the function); SD refuses `return`, SR wants one constant, E step 7 moves the whole `switch` (a Complex Method). A probe of the whole chain: the function leaves Bumpy Road Ahead, Complex Method and Large Method, 3.55 to 4.25 | mandate (2026-10-24) |
