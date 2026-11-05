@@ -1056,11 +1056,20 @@ MagickExport ThresholdMap *GetThresholdMap(const char *map_id,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetThresholdMapId(ThresholdMap *map,XMLTreeInfo *threshold)
+{
+  const char
+    *attribute;
+
+  attribute=GetXMLTreeAttribute(threshold,"map");
+  if (attribute != (char *) NULL)
+    map->map_id=ConstantString(attribute);
+}
+
 static ThresholdMap *AcquireThresholdMap(XMLTreeInfo *threshold,
   XMLTreeInfo *description)
 {
   const char
-    *attribute,
     *content;
 
   ThresholdMap
@@ -1070,9 +1079,7 @@ static ThresholdMap *AcquireThresholdMap(XMLTreeInfo *threshold,
   map->map_id=(char *) NULL;
   map->description=(char *) NULL;
   map->levels=(ssize_t *) NULL;
-  attribute=GetXMLTreeAttribute(threshold,"map");
-  if (attribute != (char *) NULL)
-    map->map_id=ConstantString(attribute);
+  SetThresholdMapId(map,threshold);
   content=GetXMLTreeContent(description);
   if (content != (char *) NULL)
     map->description=ConstantString(content);
