@@ -690,6 +690,43 @@ static ssize_t CountResampleHits(const ResampleFilter *resample_filter,
   return(hit);
 }
 
+static MagickBooleanType TryResampleShortcut(const ResampleLimitPoint *area,
+  PixelInfo *pixel,MagickBooleanType status,MagickBooleanType *result)
+{
+  ssize_t
+    hit;
+
+  hit = CountResampleHits(area->resample_filter,area->u0,area->v0);
+  if ( hit ) {
+    /* The area being resampled is simply a solid color
+     * just return a single lookup color.
+     *
+     * Should this return the users requested interpolated color?
+     */
+    status=InterpolatePixelInfo(area->resample_filter->image,
+      area->resample_filter->view,IntegerInterpolatePixel,area->u0,area->v0,
+      pixel,area->resample_filter->exception);
+    (*result)=status;
+    return(MagickTrue);
+  }
+
+  /*
+    When Scaling limits reached, return an 'averaged' result.
+  */
+  if ( area->resample_filter->limit_reached ) {
+    ResampleLimitPoint
+      point;
+
+    point.resample_filter=area->resample_filter;
+    point.u0=area->u0;
+    point.v0=area->v0;
+    point.exception=area->exception;
+    (*result)=ResampleLimitedPixel(&point,pixel,status);
+    return(MagickTrue);
+  }
+  return(MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -729,7 +766,11 @@ MagickExport MagickBooleanType ResamplePixelColor(
   PixelInfo *pixel,ExceptionInfo *exception)
 {
   MagickBooleanType
+    returned,
     status;
+
+  ResampleLimitPoint
+    area;
 
   ssize_t u,v, v1, v2, uw, hit;
   double u1;
@@ -761,31 +802,12 @@ MagickExport MagickBooleanType ResamplePixelColor(
     However it probably should be expanded to image bounds plus the filters
     scaled support size.
   */
-  hit = CountResampleHits(resample_filter,u0,v0);
-  if ( hit ) {
-    /* The area being resampled is simply a solid color
-     * just return a single lookup color.
-     *
-     * Should this return the users requested interpolated color?
-     */
-    status=InterpolatePixelInfo(resample_filter->image,resample_filter->view,
-      IntegerInterpolatePixel,u0,v0,pixel,resample_filter->exception);
-    return(status);
-  }
-
-  /*
-    When Scaling limits reached, return an 'averaged' result.
-  */
-  if ( resample_filter->limit_reached ) {
-    ResampleLimitPoint
-      point;
-
-    point.resample_filter=resample_filter;
-    point.u0=u0;
-    point.v0=v0;
-    point.exception=exception;
-    return(ResampleLimitedPixel(&point,pixel,status));
-  }
+  area.resample_filter=resample_filter;
+  area.u0=u0;
+  area.v0=v0;
+  area.exception=exception;
+  if (TryResampleShortcut(&area,pixel,status,&returned) != MagickFalse)
+    return(returned);
 
   /*
     Initialize weighted average data collection
