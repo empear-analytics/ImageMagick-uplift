@@ -1397,7 +1397,16 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
 **How:**
 
 1. The block meets Recipe E steps 1 and 3 to 7, and the OpenMP rule above. It contains
-   no `#pragma omp` line.
+   no `#pragma omp` line, with one exception: a block that lies outside every OpenMP
+   region may hold whole parallel loops, as Recipe O step 1 lets a block outside every
+   region do. Each such loop moves whole and unchanged: the `#if
+   defined(MAGICKCORE_OPENMP_SUPPORT)` line, the pragma with its clauses, the `#endif`
+   and the loop statement the pragma governs all lie inside the block. Every variable
+   the region writes (`status`, `progress`, the loop counter) is a parameter or a local
+   of the new function, never a member (Recipe E steps 3 and 4: a by-value input, the
+   returned value, or a temporary the function declares), and every variable a clause
+   names (`shared(status)`) is a parameter or local of the new function by the same
+   name.
 2. List the variables the block only reads. Choose a group of them that are scalars or
    pointers, none written anywhere in the block, so the new function keeps at most four
    parameters: the struct and what the block writes through (a pixel buffer, say).
@@ -1531,6 +1540,17 @@ static void ThresholdWaveletLevel(float *pixels,
 
 **Careful:**
 
+- Under step 1's whole parallel loops, the `const` locals of step 4 are declared at the
+  top of the new function, before the region, as the caller's variables were declared
+  before it: the region's default data-sharing makes them shared, as it made the
+  caller's, and the region only reads them (step 2: nothing in the block writes a
+  member's variable), so each thread reads the value the caller's variable held. A
+  written variable stays out of the struct, so `shared(status)` and `#pragma omp atomic`
+  `progress++` name the new function's own parameter, one object shared by the threads
+  of the region as the caller's local was, and its value leaves the function the way
+  Recipe E steps 3 and 4 say. The pragma and its clauses are not edited and do not
+  move relative to the loop they govern; nothing moves into, out of or across the
+  region. The oracle builds without OpenMP, so this is checked by reading.
 - The members are read in the caller, directly before the call, from variables the block
   does not write: each holds the value the block would have read at its first use, and
   the `const` locals hold it for the whole block, as the block's own reads of an
@@ -2563,7 +2583,10 @@ through a jump or a `return`.
 **How:**
 
 1. The block meets Recipe O steps 1 to 3: it lies outside every OpenMP region (or in a
-   parallel loop body under O step 1's condition) with no `#pragma` line; every variable
+   parallel loop body under O step 1's condition) with no `#pragma` line, except whole
+   parallel loops in a block outside every region, under Recipe N step 1's conditions
+   (each moved whole and unchanged; what the region writes or a clause names is a
+   parameter or local of the new function, never a member); every variable
    it writes is a plain local of the caller whose address is not taken elsewhere, at
    most four of them (five or six in step 7's form); it contains no `return`, `goto`,
    or `continue` or `break` that leaves it.
@@ -2670,6 +2693,11 @@ static void ConvertColorThresholdRange(const ColorThresholdRange *range,
 
 **Careful:**
 
+- Under step 1's whole parallel loops, the argument is Recipe N's *Careful* item for
+  them: the `const` locals bound from the members are declared before the region, so
+  the region shares and only reads them, as it did the caller's variables; a written
+  variable is never a member, and a write `(*v)` inside the region lands in the
+  caller's object, as the region's write to `v` did. Checked by reading.
 - The two parts keep the arguments of the recipes they come from. Every write of the
   block stays a write through the pointer and nothing more, so a field a path leaves
   alone keeps the caller's value, and reads go through the pointer too (Recipe O). The
@@ -6817,3 +6845,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | BR | Step 7: a block holding the call of an earlier helper of this recipe (with `&broke`) and the test of `broke` after it passes the new function's own `broke` on: `&broke` becomes `broke`, other uses `(*broke)` (Recipe O step 5); *Careful* gives the argument | `fx.c`'s `TranslateExpression` (campaign A, W14): the assignment-target chain of the operator-stack loop, after step 6 and Recipe EI, still holds the loop's bump in its first branch, and its `broke` would clash with the helper's parameter. A probe (this step, then Recipe W on the loop): the function leaves Bumpy Road Ahead, fx.c 3.59 to 3.62 | mandate (2026-10-24) |
 | 2026-11-05 | NEW | MB | Extract Block Through Copies of Macro-Bound Locals: a block that writes struct locals of the caller only through function-like macros whose bodies name them (so Recipe O's `(*v)` would edit the macro text) moves to a `static void` function taking a pointer `T *caller_v` per such local, which declares a local of the same name and type initialised `(*caller_v)` (copy in), keeps the block's text and the macro uses unchanged, and ends `(*caller_v)=v;` (copy out); every member set before the block, no exit, no other name or address of `v` in the block, at most four parameters | `distort.c`'s `DistortImage` (campaign A, W14): the best-fit Affine/RigidAffine, Perspective and Arc groups write the block's `min` and `max` only through `InitalBounds` and `ExpandBounds`; O, Z and I would rewrite the macro body, E step 4 skips two outputs; W11 to W13 recorded "no legal home". A probe of the three steps after the macros' Recipe H step: 4.76 to 4.96, no new finding | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | LB | Step 1 (parallel-loop-body form): a block in the body of a parallel loop and inside a loop the iteration runs to its end (a column loop in a row loop) may take its `break;` as `return(MagickFalse);`, with the shared `status` (the only outer variable it writes) by pointer as in Recipe PS step 4 and no pragma in the block; the caller writes `if (Helper(...,&status) == MagickFalse) break;` | `visual-effects.c`'s `SwirlImage` and `ImplodeImage` (campaign A, W14): the column loop's `else` body, which assigns and tests `status` and breaks, at nesting depth 4; a probe of the `else` body as a helper: Deep, Nested Complexity leaves | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | N | Step 1: a block that lies outside every OpenMP region may hold whole parallel loops (the `#if`, the pragma with its clauses, the `#endif` and the loop, all inside the block and unchanged), as Recipe O step 1 already admits for its blocks; every variable the region writes or a clause names is a parameter or local of the new function, never a member. *Careful* gives the data-sharing argument. Still eight steps | `colorspace.c`'s `TransformsRGBImage` (campaign A, W14): the DirectClass row loop of the table conversion (`shared(status)`, an `omp atomic` progress tail) reads the image, three maps and the exception, already in the `TransformsRGBTables` local its PseudoClass sibling takes (Recipe N step 8); with the parameters Recipe E would give it takes eight. A probe of the chain (the table set-up split by SD and E, this loop, the tail by E step 7): 5.33 to 5.75, no new finding. The same form was already used, without the text admitting it, by `sRGBToGeneric` (9845ba7e4) | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | Z | Step 1: a block outside every OpenMP region may hold whole parallel loops under Recipe N step 1's conditions (amended the same day): each loop moved whole and unchanged, what the region writes or a clause names a parameter or local of the new function, never a member. *Careful* refers to N's argument. Still seven steps | `colorspace.c`'s `sRGBTransformImage` (campaign A, W14): Recipe SD on its table set-up `switch (colorspace)` (the Rec709YCbCr, YCC and identity groups, two of them whole parallel loops) writes `primary_info` and reads four inputs, so SD step 3 takes Z's form, whose step 1 refused the loops. A probe of the step and the E step that follows it: 5.87 to 5.93 to 6.01, no new finding | mandate (2026-10-24) |
