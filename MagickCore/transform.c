@@ -803,6 +803,16 @@ static Image *CropOutsideCanvas(const Image *image,
   return(CropOutsideImage(image,bounding_box,exception));
 }
 
+static RectangleInfo AdjustCropPage(const Image *image,
+  const RectangleInfo *geometry,const RectangleInfo bounding_box,
+  RectangleInfo page)
+{
+  ClipCropOffset(&page.x,&page.width,bounding_box.x);
+  ClipCropOffset(&page.y,&page.height,bounding_box.y);
+  page=ClampCropExtent(image,geometry,page);
+  return(page);
+}
+
 static MagickBooleanType CropImageLine(const TransformLine *line,
   const RectangleInfo *page,const ssize_t y,MagickBooleanType *status)
 {
@@ -869,9 +879,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   page=GetCropPage(geometry,bounding_box);
   if (IsCropOutsideImage(image,bounding_box,page) != MagickFalse)
     return(CropOutsideCanvas(image,geometry,bounding_box,exception));
-  ClipCropOffset(&page.x,&page.width,bounding_box.x);
-  ClipCropOffset(&page.y,&page.height,bounding_box.y);
-  page=ClampCropExtent(image,geometry,page);
+  page=AdjustCropPage(image,geometry,bounding_box,page);
   bounding_box.x+=page.x;
   bounding_box.y+=page.y;
   if (CheckCropExtent(image,page,exception) == MagickFalse)
