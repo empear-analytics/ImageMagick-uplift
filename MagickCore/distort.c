@@ -808,6 +808,52 @@ static double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
   return(coeff);
 }
 
+static double *AffineProjectionCoefficients(double *coeff,
+  DistortMethod *method,const CoefficientContext *context)
+{
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
+  size_t
+    i;
+
+  /*
+    Arguments: Affine Matrix (forward mapping)
+    Arguments  sx, rx, ry, sy, tx, ty
+    Where      u = sx*x + ry*y + tx
+               v = rx*x + sy*y + ty
+
+    Returns coefficients (in there inverse form) ordered as...
+         sx ry tx  rx sy ty
+
+    AffineProjection Distortion Notes...
+       + Will only work with a 2 number_values for Image Distortion
+       + Can not be used for generating a sparse gradient (interpolation)
+  */
+  double inverse[8];
+  if (number_arguments != 6) {
+    coeff = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "InvalidArgument","%s : 'Needs 6 coeff values'",
+          CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    return((double *) NULL);
+  }
+  /* FUTURE: trap test for sx*sy-rx*ry == 0 (determinant = 0, no inverse) */
+  for(i=0; i<6UL; i++ )
+    inverse[i] = arguments[i];
+  AffineArgsToCoefficients(inverse); /* map into coefficients */
+  InvertAffineCoefficients(inverse, coeff); /* invert */
+  *method = AffineDistortion;
+
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -970,37 +1016,7 @@ static double *GenerateCoefficients(const Image *image,
     case RigidAffineDistortion:
       return(RigidAffineCoefficients(coeff,method,&context));
     case AffineProjectionDistortion:
-    {
-      /*
-        Arguments: Affine Matrix (forward mapping)
-        Arguments  sx, rx, ry, sy, tx, ty
-        Where      u = sx*x + ry*y + tx
-                   v = rx*x + sy*y + ty
-
-        Returns coefficients (in there inverse form) ordered as...
-             sx ry tx  rx sy ty
-
-        AffineProjection Distortion Notes...
-           + Will only work with a 2 number_values for Image Distortion
-           + Can not be used for generating a sparse gradient (interpolation)
-      */
-      double inverse[8];
-      if (number_arguments != 6) {
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument","%s : 'Needs 6 coeff values'",
-              CommandOptionToMnemonic(MagickDistortOptions, *method) );
-        return((double *) NULL);
-      }
-      /* FUTURE: trap test for sx*sy-rx*ry == 0 (determinant = 0, no inverse) */
-      for(i=0; i<6UL; i++ )
-        inverse[i] = arguments[i];
-      AffineArgsToCoefficients(inverse); /* map into coefficients */
-      InvertAffineCoefficients(inverse, coeff); /* invert */
-      *method = AffineDistortion;
-
-      return(coeff);
-    }
+      return(AffineProjectionCoefficients(coeff,method,&context));
     case ScaleRotateTranslateDistortion:
     {
       /* Scale, Rotate and Translate Distortion
