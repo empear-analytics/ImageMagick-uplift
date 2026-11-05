@@ -3517,6 +3517,21 @@ static MagickBooleanType SwirlPixel(const WarpInfo *warp,
   return(MagickTrue);
 }
 
+static PointInfo GetSwirlScale(const Image *canvas_image)
+{
+  PointInfo
+    scale;
+
+  scale.x=1.0;
+  scale.y=1.0;
+  if (canvas_image->columns > canvas_image->rows)
+    scale.y=(double) canvas_image->columns/(double) canvas_image->rows;
+  else
+    if (canvas_image->columns < canvas_image->rows)
+      scale.x=(double) canvas_image->rows/(double) canvas_image->columns;
+  return(scale);
+}
+
 MagickExport Image *SwirlImage(const Image *image,double degrees,
   const PixelInterpolateMethod method,ExceptionInfo *exception)
 {
@@ -3579,13 +3594,7 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
   center.x=(double) canvas_image->columns/2.0;
   center.y=(double) canvas_image->rows/2.0;
   radius=MagickMax(center.x,center.y);
-  scale.x=1.0;
-  scale.y=1.0;
-  if (canvas_image->columns > canvas_image->rows)
-    scale.y=(double) canvas_image->columns/(double) canvas_image->rows;
-  else
-    if (canvas_image->columns < canvas_image->rows)
-      scale.x=(double) canvas_image->rows/(double) canvas_image->columns;
+  scale=GetSwirlScale(canvas_image);
   degrees=(double) DegreesToRadians(degrees);
   /*
     Swirl image.
