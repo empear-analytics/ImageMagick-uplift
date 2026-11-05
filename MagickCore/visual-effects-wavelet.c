@@ -433,6 +433,9 @@ static MagickBooleanType ReportWaveletProgress(const Image *image,
 
 typedef struct _WaveletDenoise
 {
+  size_t
+    number_levels;
+
   MagickSizeType
     number_pixels;
 
@@ -444,7 +447,8 @@ typedef struct _WaveletDenoise
     *noise_levels;
 
   float
-    *pixels;
+    *pixels,
+    *kernel;
 } WaveletDenoise;
 
 static void ThresholdWaveletCoefficients(const WaveletDenoise *denoise,
@@ -463,6 +467,70 @@ static void ThresholdWaveletCoefficients(const WaveletDenoise *denoise,
   wavelet.magnitude=magnitude;
   wavelet.softness=denoise->softness;
   ThresholdWaveletLevel(denoise->pixels,&wavelet);
+}
+
+static size_t DecomposeWaveletLevels(const WaveletDenoise *denoise,
+  const Image *image,size_t low_pass)
+{
+  size_t
+    high_pass = 0;
+
+  ssize_t
+    level,
+    y;
+
+  high_pass=0;
+  for (level=0; level < (ssize_t) denoise->number_levels; level++)
+  {
+    ssize_t
+      x;
+
+    low_pass=(size_t) (denoise->number_pixels*((level & 0x01)+1));
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+    #pragma omp parallel for schedule(static,1) \
+      magick_number_threads(image,image,image->rows,1)
+#endif
+    for (y=0; y < (ssize_t) image->rows; y++)
+    {
+      const int
+        id = GetOpenMPThreadId();
+
+      float
+        *magick_restrict p,
+        *magick_restrict q;
+
+      p=denoise->kernel+id*(ssize_t) image->columns;
+      q=denoise->pixels+y*(ssize_t) image->columns;
+      HatTransform(q+high_pass,1,image->columns,((size_t) 1UL << level),p);
+      q+=(ptrdiff_t) low_pass;
+      CopyWaveletRow(image,p,q);
+    }
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+    #pragma omp parallel for schedule(static,1) \
+      magick_number_threads(image,image,image->columns,1)
+#endif
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      const int
+        id = GetOpenMPThreadId();
+
+      float
+        *magick_restrict p,
+        *magick_restrict q;
+
+      p=denoise->kernel+id*(ssize_t) image->rows;
+      q=denoise->pixels+x+low_pass;
+      HatTransform(q,image->columns,image->rows,((size_t) 1UL << level),p);
+      CopyWaveletColumn(image,p,q);
+    }
+    /*
+      To threshold, each coefficient is compared to a threshold value and
+      attenuated / shrunk by some factor.
+    */
+    ThresholdWaveletCoefficients(denoise,level,high_pass,low_pass);
+    high_pass=low_pass;
+  }
+  return(low_pass);
 }
 
 MagickExport Image *WaveletDenoiseImage(const Image *image,
@@ -552,12 +620,7 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
   for (channel=0; channel < (ssize_t) GetPixelChannels(image); channel++)
   {
     size_t
-      high_pass = 0,
       low_pass = 0;
-
-    ssize_t
-      level,
-      y;
 
     PixelChannel
       pixel_channel;
@@ -567,6 +630,9 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
 
     WaveletChannel
       wavelet_channel;
+
+    WaveletDenoise
+      denoise;
 
     WaveletReconstruct
       wavelet_reconstruct;
@@ -592,65 +658,14 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
       filters are referred to as detail kernel. The detail kernel
       have high values in the noisy parts of the signal.
     */
-    high_pass=0;
-    for (level=0; level < (ssize_t) number_levels; level++)
-    {
-      ssize_t
-        x;
-
-      WaveletDenoise
-        denoise;
-
-      low_pass=(size_t) (number_pixels*((level & 0x01)+1));
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static,1) \
-        magick_number_threads(image,image,image->rows,1)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const int
-          id = GetOpenMPThreadId();
-
-        float
-          *magick_restrict p,
-          *magick_restrict q;
-
-        p=kernel+id*(ssize_t) image->columns;
-        q=pixels+y*(ssize_t) image->columns;
-        HatTransform(q+high_pass,1,image->columns,((size_t) 1UL << level),p);
-        q+=(ptrdiff_t) low_pass;
-        CopyWaveletRow(image,p,q);
-      }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static,1) \
-        magick_number_threads(image,image,image->columns,1)
-#endif
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        const int
-          id = GetOpenMPThreadId();
-
-        float
-          *magick_restrict p,
-          *magick_restrict q;
-
-        p=kernel+id*(ssize_t) image->rows;
-        q=pixels+x+low_pass;
-        HatTransform(q,image->columns,image->rows,((size_t) 1UL << level),p);
-        CopyWaveletColumn(image,p,q);
-      }
-      /*
-        To threshold, each coefficient is compared to a threshold value and
-        attenuated / shrunk by some factor.
-      */
-      denoise.number_pixels=number_pixels;
-      denoise.threshold=threshold;
-      denoise.softness=softness;
-      denoise.noise_levels=noise_levels;
-      denoise.pixels=pixels;
-      ThresholdWaveletCoefficients(&denoise,level,high_pass,low_pass);
-      high_pass=low_pass;
-    }
+    denoise.number_levels=number_levels;
+    denoise.number_pixels=number_pixels;
+    denoise.threshold=threshold;
+    denoise.softness=softness;
+    denoise.noise_levels=noise_levels;
+    denoise.pixels=pixels;
+    denoise.kernel=kernel;
+    low_pass=DecomposeWaveletLevels(&denoise,image,low_pass);
     /*
       Reconstruct image from the thresholded wavelet kernel.
     */
