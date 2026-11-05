@@ -826,12 +826,12 @@ static MagickBooleanType SharpenAdaptiveLine(const AdaptiveBlurRow *row,
   return(MagickTrue);
 }
 
-MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
-  const double sigma,ExceptionInfo *exception)
-{
 #define AdaptiveSharpenImageTag  "Convolve/Image"
 #define MagickSigma  (fabs(sigma) < MagickEpsilon ? MagickEpsilon : sigma)
 
+MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
+  const double sigma,ExceptionInfo *exception)
+{
   CacheView
     *sharp_view,
     *edge_view,
