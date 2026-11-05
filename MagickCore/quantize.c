@@ -4373,6 +4373,40 @@ static void RemapGrayscaleRow(Image *image,const ssize_t *colormap_index,
   }
 }
 
+static void IndexGrayscaleRow(Image *image,ssize_t *colormap_index,
+  Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    size_t
+      intensity;
+
+    intensity=ScaleQuantumToMap(GetPixelRed(image,q));
+    if (colormap_index[intensity] < 0)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp critical (MagickCore_SetGrayscaleImage)
+#endif
+        if (colormap_index[intensity] < 0)
+          {
+            colormap_index[intensity]=(ssize_t) image->colors;
+            image->colormap[image->colors].red=(double)
+              GetPixelRed(image,q);
+            image->colormap[image->colors].green=(double)
+              GetPixelGreen(image,q);
+            image->colormap[image->colors].blue=(double)
+              GetPixelBlue(image,q);
+            image->colors++;
+         }
+      }
+    SetPixelIndex(image,(Quantum) colormap_index[intensity],q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType SetGrayscaleImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -4424,9 +4458,6 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
         q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
@@ -4436,32 +4467,7 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
             status=MagickFalse;
             continue;
           }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          size_t
-            intensity;
-
-          intensity=ScaleQuantumToMap(GetPixelRed(image,q));
-          if (colormap_index[intensity] < 0)
-            {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-              #pragma omp critical (MagickCore_SetGrayscaleImage)
-#endif
-              if (colormap_index[intensity] < 0)
-                {
-                  colormap_index[intensity]=(ssize_t) image->colors;
-                  image->colormap[image->colors].red=(double)
-                    GetPixelRed(image,q);
-                  image->colormap[image->colors].green=(double)
-                    GetPixelGreen(image,q);
-                  image->colormap[image->colors].blue=(double)
-                    GetPixelBlue(image,q);
-                  image->colors++;
-               }
-            }
-          SetPixelIndex(image,(Quantum) colormap_index[intensity],q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        IndexGrayscaleRow(image,colormap_index,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
       }
