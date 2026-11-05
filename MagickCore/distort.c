@@ -1154,6 +1154,45 @@ static double *PerspectiveCoefficients(double *coeff,
   return(coeff);
 }
 
+static double *PerspectiveProjectionCoefficients(double *coeff,
+  DistortMethod *method,const CoefficientContext *context)
+{
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
+  /*
+    Arguments: Perspective Coefficients (forward mapping)
+  */
+  if (number_arguments != 8) {
+    coeff = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "InvalidArgument", "%s : 'Needs 8 coefficient values'",
+          CommandOptionToMnemonic(MagickDistortOptions, *method));
+    return((double *) NULL);
+  }
+  /* FUTURE: trap test  c0*c4-c3*c1 == 0  (determinate = 0, no inverse) */
+  InvertPerspectiveCoefficients(arguments, coeff);
+  /*
+    Calculate 9'th coefficient! The ground-sky determination.
+    What is sign of the 'ground' in r() denominator affine function?
+    Just use any valid image coordinate in destination for determination.
+    For a forward mapped perspective the images 0,0 coord will map to
+    c2,c5 in the distorted image, so set the sign of denominator of that.
+  */
+  coeff[8] = coeff[6]*arguments[2]
+                       + coeff[7]*arguments[5] + 1.0;
+  coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
+  *method = PerspectiveDistortion;
+
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1322,33 +1361,7 @@ static double *GenerateCoefficients(const Image *image,
     case PerspectiveDistortion:
       return(PerspectiveCoefficients(coeff,method,&context));
     case PerspectiveProjectionDistortion:
-    {
-      /*
-        Arguments: Perspective Coefficients (forward mapping)
-      */
-      if (number_arguments != 8) {
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument", "%s : 'Needs 8 coefficient values'",
-              CommandOptionToMnemonic(MagickDistortOptions, *method));
-        return((double *) NULL);
-      }
-      /* FUTURE: trap test  c0*c4-c3*c1 == 0  (determinate = 0, no inverse) */
-      InvertPerspectiveCoefficients(arguments, coeff);
-      /*
-        Calculate 9'th coefficient! The ground-sky determination.
-        What is sign of the 'ground' in r() denominator affine function?
-        Just use any valid image coordinate in destination for determination.
-        For a forward mapped perspective the images 0,0 coord will map to
-        c2,c5 in the distorted image, so set the sign of denominator of that.
-      */
-      coeff[8] = coeff[6]*arguments[2]
-                           + coeff[7]*arguments[5] + 1.0;
-      coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
-      *method = PerspectiveDistortion;
-
-      return(coeff);
-    }
+      return(PerspectiveProjectionCoefficients(coeff,method,&context));
     case BilinearForwardDistortion:
     case BilinearReverseDistortion:
     {
