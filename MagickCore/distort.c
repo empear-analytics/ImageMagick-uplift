@@ -3746,6 +3746,42 @@ static Image *DistortResizeFromArguments(const Image *image,
   return(distort_image);
 }
 
+typedef struct _DistortScaleTargets
+{
+  double
+    *output_scaling;
+
+  RectangleInfo
+    *geometry;
+} DistortScaleTargets;
+
+static MagickBooleanType ScaleDistortGeometry(const Image *image,
+  const DistortScaleTargets *targets)
+{
+  double
+    *const output_scaling = targets->output_scaling;
+
+  RectangleInfo
+    *const geometry = targets->geometry;
+
+  { const char *artifact;
+    artifact=GetImageArtifact(image,"distort:scale");
+    (*output_scaling) = 1.0;
+    if (artifact != (const char *) NULL) {
+      (*output_scaling) = fabs(StringToDouble(artifact,(char **) NULL));
+      (*geometry).width=CastDoubleToSizeT((*output_scaling)*(*geometry).width+0.5);
+      (*geometry).height=CastDoubleToSizeT((*output_scaling)*(*geometry).height+0.5);
+      (*geometry).x=(ssize_t) ((*output_scaling)*(*geometry).x+0.5);
+      (*geometry).y=(ssize_t) ((*output_scaling)*(*geometry).y+0.5);
+      if ( (*output_scaling) < 0.1 ) {
+        return(MagickFalse);
+      }
+      (*output_scaling) = 1/(*output_scaling);
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3770,6 +3806,9 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
 
   DistortVerboseInput
     verbose_input;
+
+  DistortScaleTargets
+    scale_targets;
 
   const CoefficientInput input = { number_arguments, arguments, 0 };
 
@@ -3944,24 +3983,15 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
     by the factor given allowing for super-sampling of the distorted image
     space.  Any scaling factors must naturally be halved as a result.
   */
-  { const char *artifact;
-    artifact=GetImageArtifact(image,"distort:scale");
-    output_scaling = 1.0;
-    if (artifact != (const char *) NULL) {
-      output_scaling = fabs(StringToDouble(artifact,(char **) NULL));
-      geometry.width=CastDoubleToSizeT(output_scaling*geometry.width+0.5);
-      geometry.height=CastDoubleToSizeT(output_scaling*geometry.height+0.5);
-      geometry.x=(ssize_t) (output_scaling*geometry.x+0.5);
-      geometry.y=(ssize_t) (output_scaling*geometry.y+0.5);
-      if ( output_scaling < 0.1 ) {
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-                "InvalidArgument","%s", "-set option:distort:scale" );
-        return((Image *) NULL);
-      }
-      output_scaling = 1/output_scaling;
+  scale_targets.output_scaling=(&output_scaling);
+  scale_targets.geometry=(&geometry);
+  if (ScaleDistortGeometry(image,&scale_targets) == MagickFalse)
+    {
+      coeff = (double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+              "InvalidArgument","%s", "-set option:distort:scale" );
+      return((Image *) NULL);
     }
-  }
 
   /*
     Initialize the distort image attributes.
