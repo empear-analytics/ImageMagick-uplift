@@ -1631,14 +1631,61 @@ static MagickBooleanType sRGBTransformRow(const sRGBTransformRowInfo *info,
   return(MagickTrue);
 }
 
-static MagickBooleanType sRGBTransformImage(Image *image,
-  const ColorspaceType colorspace,ExceptionInfo *exception)
+static MagickBooleanType sRGBTransformPixels(
+  const sRGBTransformTables *tables,MagickBooleanType status,
+  MagickOffsetType progress)
 {
 #define sRGBTransformImageTag  "RGBTransform/Image"
+
+  const PrimaryInfo
+    primary_info = tables->primary_info;
+
+  ExceptionInfo
+    *const exception = tables->exception;
+
+  Image
+    *const image = tables->image;
+
+  TransformPacket
+    *const x_map = tables->x_map,
+    *const y_map = tables->y_map,
+    *const z_map = tables->z_map;
 
   CacheView
     *image_view;
 
+  ssize_t
+    y;
+
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const sRGBTransformRowInfo
+      info = { image,image_view,exception,x_map,y_map,z_map,
+        primary_info };
+
+    if (sRGBTransformRow(&info,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetColorspaceProgress(image,sRGBTransformImageTag,progress,&status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+static MagickBooleanType sRGBTransformImage(Image *image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
   const char
     *artifact;
 
@@ -1655,8 +1702,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
     primary_info;
 
   ssize_t
-    i,
-    y;
+    i;
 
   TransformPacket
     *x_map,
@@ -1899,29 +1945,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
       /*
         Convert DirectClass image.
       */
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const sRGBTransformRowInfo
-          info = { image,image_view,exception,x_map,y_map,z_map,
-            primary_info };
-
-        if (sRGBTransformRow(&info,y,&status) == MagickFalse)
-          continue;
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp atomic
-#endif
-            progress++;
-            SetColorspaceProgress(image,sRGBTransformImageTag,progress,&status);
-          }
-      }
-      image_view=DestroyCacheView(image_view);
+      status=sRGBTransformPixels(&tables,status,progress);
       break;
     }
     case PseudoClass:
