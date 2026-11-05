@@ -92,6 +92,12 @@ static double FinishTotalInkDensity(CacheView *image_view,
   return(total_ink_density);
 }
 
+static void UpdateInkDensity(const double density,double *total_ink_density)
+{
+  if (density > (*total_ink_density))
+    (*total_ink_density)=density;
+}
+
 MagickExport double GetImageTotalInkDensity(Image *image,
   ExceptionInfo *exception)
 {
@@ -150,8 +156,7 @@ MagickExport double GetImageTotalInkDensity(Image *image,
         #pragma omp critical (MagickCore_GetImageTotalInkDensity)
 #endif
         {
-          if (density > total_ink_density)
-            total_ink_density=density;
+          UpdateInkDensity(density,&total_ink_density);
         }
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
