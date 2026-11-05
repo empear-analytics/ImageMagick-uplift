@@ -3379,6 +3379,14 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    4), where the group moved had `&tile` and `&v`. N step 8's condition holds: nothing on
    any path from the fill to the call writes a variable a member copies; a kept group
    that writes one and leaves the `switch` before any call does not count.
+   When the groups one step moves write five or six variables of the caller, those the
+   `default` group's call writes through included, the helper takes Recipe Z step 7's
+   `const Targets *targets` after `tile`, in place of one pointer per variable: the
+   caller declares that struct `const`, once, at the top of its body, with the addresses
+   as its initialiser, and its `default:` group calls `Helper(&tile,&targets);`; the
+   helper binds each member once (`T *const v = targets->v;`), writes `(*v)` as Z step 4
+   says, and passes `&(*v)` on to the earlier step's helper. Each variable meets Recipe
+   O step 2.
 
 **Before:**
 
@@ -3538,6 +3546,11 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   pass the same `tile` and the same addresses (`&(*v)` is `v`) down to the helper whose
   `switch` holds the group, so each written variable is the caller's own, written at
   the points it was.
+- Under step 8's `targets` form the argument is Recipe Z step 7's: only the addresses
+  travel, fixed at the declaration and bound once to `*const` locals, so each `(*v)` is
+  the caller's own variable, written at the points it was; they are the addresses of
+  distinct locals, so no two members alias, and a call that took one of them elsewhere
+  and kept no copy (`GetQuantizeInfo(&quantize_info)`) gives it no second name.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), a case for each moved label where one exists, and steps 1 and 5
@@ -3566,7 +3579,12 @@ which step 1 refused. Seven chained functions of three to six groups each, takin
 `PreviewTile` and `preview_image`, `gamma` and, in the last, `degrees`: 4.51 to 4.56, 4.62, 4.69,
 4.79, 4.85, 4.90 and 5.00 in probes (each step raising the score, no finding on a new
 function). Added by Claude Code (Claude
-Sonnet 5.5) during task W12, under the mandate of 2026-10-24.
+Sonnet 5.5) during task W12, under the mandate of 2026-10-24. Step 8's `targets` form
+(2026-11-05, task W14 lane b): `effect-preview.c`'s `PreviewImage` after its split, whose
+Roll, Grayscale and Quantize groups with `default` write `preview_image`, `degrees`,
+`gamma`, `colors` and `quantize_info`, one more than four parameters hold; a probe: 8.42
+to 8.58, no finding on the helper. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
 
 ---
 
@@ -7386,3 +7404,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | HC | Step 3: a callee of a construct's statement that may take another lock (the pixel cache's `file_semaphore`, taken by `SyncCacheViewAuthenticPixels` on a disk cache) is allowed, since the construct moves whole and unchanged and the thread takes the same locks in the same order and nesting; a function entering a critical of the same name, or `omp_set_lock` on a lock the caller holds, stays refused. *Careful* gives the argument. Still six steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree critical governs the row sync, whose `WritePixelCachePixels` locks `file_semaphore` for disk and distributed caches; step 3 as written refused every such callee | mandate (2026-10-24) |
 | 2026-11-05 | NEW | PD | Name a Parameter-or-Default Selection: the whole right-hand side `(n >= k) ? values[k-1] : d` of an assignment, at three or more sites of one file, becomes a call of one `static inline` function taking `n`, `values`, `k` and `d`; oracle evidence (the object code is not byte-identical) | `statistic-function.c`'s three case helpers (campaign A, W14 lane d): twelve parameter defaults held *Overall Code Complexity*; a probe 9.09 to 9.68 | mandate (2026-10-24) |
 | 2026-11-05 | NEW | RP | Extract Progress Loop Returning the Progress: a sequential pass whose progress block holds an orphaned `#pragma omp atomic` `progress++` (moving whole and unchanged, Recipe N step 1) and which may clear `status` moves into a `static` function that returns `progress` (declared there, or by value) and takes `status` by pointer (`(*status)`, PS step 4's text); other writes are Recipe E step 4 temporaries; at most four parameters. *Careful* gives the binding and return arguments | `segment.c`'s `Classify` (campaign A, W14 lane a): after H, I and N its sequential counting pass, writing `progress` and `status` that the parallel pass reads, held the last *Complex Method* (cc 9) and *Large Method* (90 lines); E, N, O, K and Q refuse it (second written variable, or `(*progress)++` under the atomic). A probe: 6.67 to 7.01, no finding on the helper | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | SD | Step 8: when the groups one step moves write five or six variables of the caller (those the `default` group's call writes through included), the helper takes Recipe Z step 7's `const Targets *targets` after `tile`; the caller declares it `const` once with the addresses as its initialiser and calls `Helper(&tile,&targets);`, the helper binds each member once and passes `&(*v)` on. *Careful* gives the argument. Still eight steps | `effect-preview.c`'s `PreviewImage` (campaign A, W14 lane b): the Roll, Grayscale and Quantize groups with `default` write five variables; a probe 8.42 to 8.58, no finding on the helper | mandate (2026-10-24) |
