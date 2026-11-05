@@ -3287,6 +3287,83 @@ static Image *MergeAndReportComponents(const CCFinishInputs *finish_inputs,
   return(ReportConnectedComponents(&report_inputs,metrics,status));
 }
 
+typedef struct _CCSelectionInputs
+{
+  const Image
+    *image;
+
+  CCObjectInfo
+    *object;
+
+  Image
+    *component_image;
+} CCSelectionInputs;
+
+typedef struct _CCSelectionTargets
+{
+  ssize_t
+    *background_id;
+
+  double
+    *min_threshold,
+    *max_threshold;
+
+  ssize_t
+    *n;
+} CCSelectionTargets;
+
+static void PrepareObjectSelection(const CCSelectionInputs *selection_inputs,
+  const CCSelectionTargets *selection_targets)
+{
+  const Image
+    *const image = selection_inputs->image;
+
+  CCObjectInfo
+    *const object = selection_inputs->object;
+
+  Image
+    *const component_image = selection_inputs->component_image;
+
+  ssize_t
+    *const background_id = selection_targets->background_id;
+
+  double
+    *const min_threshold = selection_targets->min_threshold,
+    *const max_threshold = selection_targets->max_threshold;
+
+  ssize_t
+    *const n = selection_targets->n;
+
+  CCLabeledObjects
+    labeled_objects;
+
+  const char
+    *artifact;
+
+  labeled_objects.image=image;
+  labeled_objects.object=object;
+  labeled_objects.component_image=component_image;
+  labeled_objects.n=(*n);
+  NormalizeLabeledObjects(&labeled_objects,background_id,min_threshold,
+    max_threshold);
+  (*n)=(-1);
+  artifact=GetImageArtifact(image,"connected-components:background-id");
+  if (artifact != (const char *) NULL)
+    (*background_id)=(ssize_t) StringToLong(artifact);
+  artifact=GetImageArtifact(image,"connected-components:area-threshold");
+  if (artifact != (const char *) NULL)
+    {
+      CCThresholdRange range;
+
+      /*
+        Merge any object not within the min and max area threshold.
+      */
+      range=GetThresholdRange(artifact,min_threshold,max_threshold,
+        (*background_id));
+      AreaThreshold(component_image,object,range);
+    }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -3305,8 +3382,11 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   CCLabelInputs
     label_inputs;
 
-  CCLabeledObjects
-    labeled_objects;
+  CCSelectionInputs
+    selection_inputs;
+
+  CCSelectionTargets
+    selection_targets;
 
   CCMetricInputs
     inputs;
@@ -3426,28 +3506,14 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       component_image=DestroyImage(component_image);
       ThrowImageException(ResourceLimitError,"TooManyObjects");
     }
-  labeled_objects.image=image;
-  labeled_objects.object=object;
-  labeled_objects.component_image=component_image;
-  labeled_objects.n=n;
-  NormalizeLabeledObjects(&labeled_objects,&background_id,&min_threshold,
-    &max_threshold);
-  n=(-1);
-  artifact=GetImageArtifact(image,"connected-components:background-id");
-  if (artifact != (const char *) NULL)
-    background_id=(ssize_t) StringToLong(artifact);
-  artifact=GetImageArtifact(image,"connected-components:area-threshold");
-  if (artifact != (const char *) NULL)
-    {
-      CCThresholdRange range;
-
-      /*
-        Merge any object not within the min and max area threshold.
-      */
-      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
-        background_id);
-      AreaThreshold(component_image,object,range);
-    }
+  selection_inputs.image=image;
+  selection_inputs.object=object;
+  selection_inputs.component_image=component_image;
+  selection_targets.background_id=(&background_id);
+  selection_targets.min_threshold=(&min_threshold);
+  selection_targets.max_threshold=(&max_threshold);
+  selection_targets.n=(&n);
+  PrepareObjectSelection(&selection_inputs,&selection_targets);
   KeepSelectedObjects(image,component_image,object,exception);
   artifact=GetImageArtifact(image,"connected-components:keep-top");
   /*
