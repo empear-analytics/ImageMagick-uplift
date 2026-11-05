@@ -1059,6 +1059,101 @@ static void AddPerspectiveTerms(double **matrix,double *vectors[1],
   }
 }
 
+static double *PerspectiveCoefficients(double *coeff,
+  const DistortMethod *method,const CoefficientContext *context)
+{
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments,
+    cp_size = context->cp_size,
+    cp_x = context->cp_x,
+    cp_y = context->cp_y;
+
+  /*
+     Perspective Distortion (a ratio of affine distortions)
+
+            p(x,y)    c0*x + c1*y + c2
+        u = ------ = ------------------
+            r(x,y)    c6*x + c7*y + 1
+
+            q(x,y)    c3*x + c4*y + c5
+        v = ------ = ------------------
+            r(x,y)    c6*x + c7*y + 1
+
+       c8 = Sign of 'r', or the denominator affine, for the actual image.
+            This determines what part of the distorted image is 'ground'
+            side of the horizon, the other part is 'sky' or invalid.
+            Valid values are  +1.0  or  -1.0  only.
+
+     Input Arguments are sets of control points...
+     For Distort Images    u,v, x,y  ...
+     For Sparse Gradients  x,y, r,g,b  ...
+
+     Perspective Distortion Notes...
+       + Can be thought of as ratio of  3 affine transformations
+       + Not separable: r() or c6 and c7 are used by both equations
+       + All 8 coefficients must be determined simultaneously
+       + Will only work with a 2 number_valuesal Image Distortion
+       + Can not be used for generating a sparse gradient (interpolation)
+       + It is not linear, but is simple to generate an inverse
+       + All lines within an image remain lines.
+       + but distances between points may vary.
+  */
+  double
+    **matrix,
+    *vectors[1];
+
+  MagickBooleanType
+    status;
+
+  if ( number_arguments%cp_size != 0 ||
+       number_arguments < cp_size*4 ) {
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "InvalidArgument", "%s : 'require at least %.17g CPs'",
+          CommandOptionToMnemonic(MagickDistortOptions, *method), 4.0);
+    coeff=(double *) RelinquishMagickMemory(coeff);
+    return((double *) NULL);
+  }
+  /* fake 1x8 vectors matrix directly using the coefficients array */
+  vectors[0] = &(coeff[0]);
+  /* 8x8 least-squares matrix (zeroed) */
+  matrix = AcquireMagickMatrix(8UL,8UL);
+  if (matrix == (double **) NULL) {
+    coeff=(double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),
+              ResourceLimitError,"MemoryAllocationFailed",
+              "%s", "DistortCoefficients");
+    return((double *) NULL);
+  }
+  AddPerspectiveTerms(matrix,vectors,context);
+  /* Solve for LeastSquares Coefficients */
+  status=GaussJordanElimination(matrix,vectors,8UL,1UL);
+  matrix = RelinquishMagickMatrix(matrix, 8UL);
+  if ( status == MagickFalse ) {
+    coeff = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument","%s : 'Unsolvable Matrix'",
+        CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    return((double *) NULL);
+  }
+  /*
+    Calculate 9'th coefficient! The ground-sky determination.
+    What is sign of the 'ground' in r() denominator affine function?
+    Just use any valid image coordinate (first control point) in
+    destination for determination of what part of view is 'ground'.
+  */
+  coeff[8] = coeff[6]*arguments[cp_x]
+                  + coeff[7]*arguments[cp_y] + 1.0;
+  coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
+
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1225,85 +1320,7 @@ static double *GenerateCoefficients(const Image *image,
     case ScaleRotateTranslateDistortion:
       return(ScaleRotateTranslateCoefficients(coeff,method,&context));
     case PerspectiveDistortion:
-    { /*
-         Perspective Distortion (a ratio of affine distortions)
-
-                p(x,y)    c0*x + c1*y + c2
-            u = ------ = ------------------
-                r(x,y)    c6*x + c7*y + 1
-
-                q(x,y)    c3*x + c4*y + c5
-            v = ------ = ------------------
-                r(x,y)    c6*x + c7*y + 1
-
-           c8 = Sign of 'r', or the denominator affine, for the actual image.
-                This determines what part of the distorted image is 'ground'
-                side of the horizon, the other part is 'sky' or invalid.
-                Valid values are  +1.0  or  -1.0  only.
-
-         Input Arguments are sets of control points...
-         For Distort Images    u,v, x,y  ...
-         For Sparse Gradients  x,y, r,g,b  ...
-
-         Perspective Distortion Notes...
-           + Can be thought of as ratio of  3 affine transformations
-           + Not separable: r() or c6 and c7 are used by both equations
-           + All 8 coefficients must be determined simultaneously
-           + Will only work with a 2 number_valuesal Image Distortion
-           + Can not be used for generating a sparse gradient (interpolation)
-           + It is not linear, but is simple to generate an inverse
-           + All lines within an image remain lines.
-           + but distances between points may vary.
-      */
-      double
-        **matrix,
-        *vectors[1];
-
-      MagickBooleanType
-        status;
-
-      if ( number_arguments%cp_size != 0 ||
-           number_arguments < cp_size*4 ) {
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument", "%s : 'require at least %.17g CPs'",
-              CommandOptionToMnemonic(MagickDistortOptions, *method), 4.0);
-        coeff=(double *) RelinquishMagickMemory(coeff);
-        return((double *) NULL);
-      }
-      /* fake 1x8 vectors matrix directly using the coefficients array */
-      vectors[0] = &(coeff[0]);
-      /* 8x8 least-squares matrix (zeroed) */
-      matrix = AcquireMagickMatrix(8UL,8UL);
-      if (matrix == (double **) NULL) {
-        coeff=(double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),
-                  ResourceLimitError,"MemoryAllocationFailed",
-                  "%s", "DistortCoefficients");
-        return((double *) NULL);
-      }
-      AddPerspectiveTerms(matrix,vectors,&context);
-      /* Solve for LeastSquares Coefficients */
-      status=GaussJordanElimination(matrix,vectors,8UL,1UL);
-      matrix = RelinquishMagickMatrix(matrix, 8UL);
-      if ( status == MagickFalse ) {
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "InvalidArgument","%s : 'Unsolvable Matrix'",
-            CommandOptionToMnemonic(MagickDistortOptions, *method) );
-        return((double *) NULL);
-      }
-      /*
-        Calculate 9'th coefficient! The ground-sky determination.
-        What is sign of the 'ground' in r() denominator affine function?
-        Just use any valid image coordinate (first control point) in
-        destination for determination of what part of view is 'ground'.
-      */
-      coeff[8] = coeff[6]*arguments[cp_x]
-                      + coeff[7]*arguments[cp_y] + 1.0;
-      coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
-
-      return(coeff);
-    }
+      return(PerspectiveCoefficients(coeff,method,&context));
     case PerspectiveProjectionDistortion:
     {
       /*
