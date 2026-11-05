@@ -2789,6 +2789,24 @@ static MagickBooleanType GetUnaryPrefixOperand (FxInfo * pfx, OperatorE op,
   return MagickTrue;
 }
 
+static MagickBooleanType NotAConstantOperand (FxInfo * pfx)
+{
+  ConstantE ce;
+  for (ce = (ConstantE)0; ce < cNull; ce=(ConstantE) (ce+1)) {
+    const char * ceStr = Constants[ce].str;
+    if (LocaleCompare (ceStr, pfx->token)==0) {
+      break;
+    }
+  }
+
+  if (ce != cNull) {
+    (void) AddElement (pfx, Constants[ce].val, oNull);
+    pfx->pex += pfx->lenToken;
+    return MagickFalse;
+  }
+  return MagickTrue;
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, const OperandSymbols * operand)
 {
@@ -2859,21 +2877,8 @@ static MagickBooleanType GetOperand (
   if (pfx->lenToken > 0) {
     /* Try a constant
     */
-    {
-      ConstantE ce;
-      for (ce = (ConstantE)0; ce < cNull; ce=(ConstantE) (ce+1)) {
-        const char * ceStr = Constants[ce].str;
-        if (LocaleCompare (ceStr, pfx->token)==0) {
-          break;
-        }
-      }
-
-      if (ce != cNull) {
-        (void) AddElement (pfx, Constants[ce].val, oNull);
-        pfx->pex += pfx->lenToken;
-        return MagickTrue;
-      }
-    }
+    if (NotAConstantOperand (pfx) == MagickFalse)
+      return MagickTrue;
 
     /* Try a function
     */
