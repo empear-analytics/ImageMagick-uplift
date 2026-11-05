@@ -225,3 +225,10 @@ MagickFalse) continue;` guard (with the guard in the helper the row helpers clon
 
 **Noticed upstream, not changed.** `ChopImage`'s first loop lists only `shared(status)`; `progress` is
 shared by default.
+
+### 06:25: decorate.c reaches 10.0
+
+`FrameImage`: E twice (`DrawFrameSides` 9.43 -> 9.50, `DrawFrameBorders` by E step 7 -> 10.00), 137 cases,
+0 diverged, reusing the existing `FrameSideLine` and `FrameComposite` structs; no Recipe FI or other new
+recipe was needed. Six W13 files are now at 10.0 (resize-scale, threshold-auto, shear-deskew,
+statistic-measure, prepress, decorate), plus resize-sample from W12.
