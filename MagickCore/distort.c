@@ -3782,6 +3782,17 @@ static MagickBooleanType ScaleDistortGeometry(const Image *image,
   return(MagickTrue);
 }
 
+static void SetDistortProgress(MagickBooleanType *status,const Image *image,
+  const char *tag,const MagickOffsetType progress)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -4255,16 +4266,11 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         status=MagickFalse;
       if (image->progress_monitor != (MagickProgressMonitor) NULL)
         {
-          MagickBooleanType
-            proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
           #pragma omp atomic
 #endif
           progress++;
-          proceed=SetImageProgress(image,DistortImageTag,progress,image->rows);
-          if (proceed == MagickFalse)
-            status=MagickFalse;
+          SetDistortProgress(&status,image,DistortImageTag,progress);
         }
     }
     distort_view=DestroyCacheView(distort_view);
