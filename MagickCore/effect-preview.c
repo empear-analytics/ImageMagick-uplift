@@ -950,6 +950,27 @@ static void ApplyDespeckleSegmentPreview(const PreviewSelection *selection,
   }
 }
 
+static Image *MontagePreviewTiles(const Image *image,ImageInfo *preview_info,
+  Image *images,ExceptionInfo *exception)
+{
+  Image
+    *montage_image;
+
+  MontageInfo
+    *montage_info;
+
+  montage_info=CloneMontageInfo(preview_info,(MontageInfo *) NULL);
+  (void) CopyMagickString(montage_info->filename,image->filename,
+    MagickPathExtent);
+  montage_info->shadow=MagickTrue;
+  (void) CloneString(&montage_info->tile,"3x3");
+  (void) CloneString(&montage_info->geometry,DefaultPreviewGeometry);
+  (void) CloneString(&montage_info->frame,DefaultTileFrame);
+  montage_image=MontageImages(images,montage_info,exception);
+  montage_info=DestroyMontageInfo(montage_info);
+  return(montage_image);
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -976,9 +997,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
 
   MagickBooleanType
     proceed;
-
-  MontageInfo
-    *montage_info;
 
   QuantizeInfo
     quantize_info;
@@ -1078,15 +1096,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   /*
     Create the montage.
   */
-  montage_info=CloneMontageInfo(preview_info,(MontageInfo *) NULL);
-  (void) CopyMagickString(montage_info->filename,image->filename,
-    MagickPathExtent);
-  montage_info->shadow=MagickTrue;
-  (void) CloneString(&montage_info->tile,"3x3");
-  (void) CloneString(&montage_info->geometry,DefaultPreviewGeometry);
-  (void) CloneString(&montage_info->frame,DefaultTileFrame);
-  montage_image=MontageImages(images,montage_info,exception);
-  montage_info=DestroyMontageInfo(montage_info);
+  montage_image=MontagePreviewTiles(image,preview_info,images,exception);
   images=DestroyImageList(images);
   if (montage_image == (Image *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
