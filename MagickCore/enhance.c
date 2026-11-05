@@ -1220,6 +1220,11 @@ static MagickBooleanType ContrastImageHead(const ContrastHead *head,
   return(MagickTrue);
 }
 
+static inline int ContrastSign(const MagickBooleanType sharpen)
+{
+  return(sharpen != MagickFalse ? 1 : -1);
+}
+
 MagickExport MagickBooleanType ContrastImage(Image *image,
   const MagickBooleanType sharpen,ExceptionInfo *exception)
 {
@@ -1248,7 +1253,7 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
 #endif
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  sign=sharpen != MagickFalse ? 1 : -1;
+  sign=ContrastSign(sharpen);
   /*
     Contrast enhance colormap.
   */
@@ -1451,6 +1456,16 @@ static MagickBooleanType EnhanceImageHead(const EnhanceHead *head,
   return(MagickTrue);
 }
 
+static Image *FinishEnhanceImage(CacheView *enhance_view,CacheView *image_view,
+  Image *enhance_image,const MagickBooleanType status)
+{
+  enhance_view=DestroyCacheView(enhance_view);
+  image_view=DestroyCacheView(image_view);
+  if (status == MagickFalse)
+    enhance_image=DestroyImage(enhance_image);
+  return(enhance_image);
+}
+
 MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -1519,11 +1534,7 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
         SetEnhanceProgress(image,EnhanceImageTag,progress,&status);
       }
   }
-  enhance_view=DestroyCacheView(enhance_view);
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    enhance_image=DestroyImage(enhance_image);
-  return(enhance_image);
+  return(FinishEnhanceImage(enhance_view,image_view,enhance_image,status));
 }
 
 
@@ -2130,6 +2141,28 @@ static void ModulateImageColormap(const ModulateRow *modulate_row)
   }
 }
 
+typedef struct _ModulateHead
+{
+  ModulateRow
+    modulate_row;
+
+  EnhanceLine
+    line;
+} ModulateHead;
+
+static MagickBooleanType ModulateImageHead(const ModulateHead *head,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if (GetEnhanceRow(&head->line,y,&q,status) == MagickFalse)
+    return(MagickFalse);
+  ModulateImageRow(&head->modulate_row,q);
+  SyncEnhanceRow(&head->line,status);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   ExceptionInfo *exception)
 {
@@ -2174,15 +2207,10 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   GetModulateColorspace(image,&colorspace,&illuminant);
   if (image->storage_class == PseudoClass)
     {
-      ModulateRow
-        modulate_row;
+      const ModulateRow
+        modulate_row = { image, colorspace, percent_hue, percent_saturation,
+          percent_brightness, illuminant };
 
-      modulate_row.image=image;
-      modulate_row.colorspace=colorspace;
-      modulate_row.percent_hue=percent_hue;
-      modulate_row.percent_saturation=percent_saturation;
-      modulate_row.percent_brightness=percent_brightness;
-      modulate_row.illuminant=illuminant;
       ModulateImageColormap(&modulate_row);
     }
   /*
@@ -2202,25 +2230,12 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ModulateRow
-      modulate_row;
+    const ModulateHead
+      head = { { image, colorspace, percent_hue, percent_saturation,
+        percent_brightness, illuminant }, { image,image_view,exception } };
 
-    Quantum
-      *magick_restrict q;
-
-    const EnhanceLine
-      line = { image,image_view,exception };
-
-    if (GetEnhanceRow(&line,y,&q,&status) == MagickFalse)
+    if (ModulateImageHead(&head,y,&status) == MagickFalse)
       continue;
-    modulate_row.image=image;
-    modulate_row.colorspace=colorspace;
-    modulate_row.percent_hue=percent_hue;
-    modulate_row.percent_saturation=percent_saturation;
-    modulate_row.percent_brightness=percent_brightness;
-    modulate_row.illuminant=illuminant;
-    ModulateImageRow(&modulate_row,q);
-    SyncEnhanceRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2404,6 +2419,23 @@ static inline double InverseScaledSigmoidal(const double a,const double b,
   InverseScaledSigmoidal(contrast,QuantumScale*midpoint,QuantumScale* \
   ((double) x))) )
 
+static void InverseSigmoidalColormapEntry(Image *image,const ssize_t i,
+  const double contrast,const double midpoint)
+{
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].red=(MagickRealType) InverseScaledSig(
+      image->colormap[i].red);
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].green=(MagickRealType) InverseScaledSig(
+      image->colormap[i].green);
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].blue=(MagickRealType) InverseScaledSig(
+      image->colormap[i].blue);
+  if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].alpha=(MagickRealType) InverseScaledSig(
+      image->colormap[i].alpha);
+}
+
 static void SigmoidalContrastColormap(Image *image,
   const MagickBooleanType sharpen,const double contrast,const double midpoint)
 {
@@ -2428,20 +2460,7 @@ static void SigmoidalContrastColormap(Image *image,
     }
   else
     for (i=0; i < (ssize_t) image->colors; i++)
-    {
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].red=(MagickRealType) InverseScaledSig(
-          image->colormap[i].red);
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].green=(MagickRealType) InverseScaledSig(
-          image->colormap[i].green);
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].blue=(MagickRealType) InverseScaledSig(
-          image->colormap[i].blue);
-      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].alpha=(MagickRealType) InverseScaledSig(
-          image->colormap[i].alpha);
-    }
+      InverseSigmoidalColormapEntry(image,i,contrast,midpoint);
 }
 
 static void SigmoidalContrastImageRow(const Image *image,
@@ -2648,6 +2667,88 @@ static MagickStatusType LevelWhiteBalanceVibrance(Image *image,
   return(status);
 }
 
+static void SumWhiteBalanceChroma(const EnhanceLine *line,
+  MagickStatusType *status,double *a_mean,double *b_mean)
+{
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) line->image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    if ((*status) == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(line->image_view,0,y,line->image->columns,1,
+      line->exception);
+    if (p == (Quantum *) NULL)
+      {
+        (*status)=MagickFalse;
+        continue;
+      }
+    AccumulateChromaMeans(line->image,p,a_mean,b_mean);
+  }
+}
+
+static MagickBooleanType FinishWhiteBalance(Image *image,
+  MagickStatusType status,ExceptionInfo *exception)
+{
+  status=LevelWhiteBalanceVibrance(image,status,exception);
+  status&=(MagickStatusType) TransformImageColorspace(image,sRGBColorspace,
+    exception);
+  return(status != 0 ? MagickTrue : MagickFalse);
+}
+
+typedef struct _WhiteBalanceHead
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  double
+    a_mean,
+    b_mean;
+} WhiteBalanceHead;
+
+static MagickBooleanType ShiftWhiteBalanceHead(const WhiteBalanceHead *head,
+  const ssize_t y,MagickStatusType *status)
+{
+  const Image
+    *const image = head->image;
+
+  CacheView
+    *const image_view = head->image_view;
+
+  const double
+    a_mean = head->a_mean,
+    b_mean = head->b_mean;
+
+  ExceptionInfo
+    *const exception = head->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ShiftChromaRow(image,a_mean,b_mean,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2659,6 +2760,9 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   double
     a_mean,
     b_mean;
+
+  EnhanceLine
+    line;
 
   MagickOffsetType
     progress;
@@ -2682,21 +2786,10 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   a_mean=0.0;
   b_mean=0.0;
   image_view=AcquireAuthenticCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    AccumulateChromaMeans(image,p,&a_mean,&b_mean);
-  }
+  line.image=image;
+  line.image_view=image_view;
+  line.exception=exception;
+  SumWhiteBalanceChroma(&line,&status,&a_mean,&b_mean);
   a_mean/=((double) image->columns*image->rows);
   b_mean/=((double) image->columns*image->rows);
   progress=0;
@@ -2706,20 +2799,16 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    WhiteBalanceHead
+      head;
 
-    if (status == MagickFalse)
+    head.image=image;
+    head.image_view=image_view;
+    head.exception=exception;
+    head.a_mean=a_mean;
+    head.b_mean=b_mean;
+    if (ShiftWhiteBalanceHead(&head,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    ShiftChromaRow(image,a_mean,b_mean,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -2736,8 +2825,5 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
       }
   }
   image_view=DestroyCacheView(image_view);
-  status=LevelWhiteBalanceVibrance(image,status,exception);
-  status&=(MagickStatusType) TransformImageColorspace(image,sRGBColorspace,
-    exception);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return(FinishWhiteBalance(image,status,exception));
 }

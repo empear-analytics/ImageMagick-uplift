@@ -727,6 +727,13 @@ static void DespeckleChannel(const DespeckleChannelPass *despeckle,
   (*status)=ReportDespeckleProgress(image,i,(*status));
 }
 
+static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    image=DestroyImage(image);
+  return(image);
+}
+
 MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -829,9 +836,7 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
   buffer_info=RelinquishVirtualMemory(buffer_info);
   pixel_info=RelinquishVirtualMemory(pixel_info);
   despeckle_image->type=image->type;
-  if (status == MagickFalse)
-    despeckle_image=DestroyImage(despeckle_image);
-  return(despeckle_image);
+  return(ReleaseFailedImage(despeckle_image,status));
 }
 
 /*
@@ -1329,16 +1334,10 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) gaussian_image->rows; y++)
   {
-    KuwaharaInfo
-      kuwahara;
+    const KuwaharaInfo
+      kuwahara = { gaussian_image, kuwahara_image, image_view, kuwahara_view,
+        exception, width, y };
 
-    kuwahara.gaussian_image=gaussian_image;
-    kuwahara.kuwahara_image=kuwahara_image;
-    kuwahara.image_view=image_view;
-    kuwahara.kuwahara_view=kuwahara_view;
-    kuwahara.exception=exception;
-    kuwahara.width=width;
-    kuwahara.y=y;
     if (KuwaharaHeadRow(&status,&kuwahara) == MagickFalse)
       continue;
     if (SyncCacheViewAuthenticPixels(kuwahara_view,exception) == MagickFalse)
@@ -1355,9 +1354,7 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   kuwahara_view=DestroyCacheView(kuwahara_view);
   image_view=DestroyCacheView(image_view);
   gaussian_image=DestroyImage(gaussian_image);
-  if (status == MagickFalse)
-    kuwahara_image=DestroyImage(kuwahara_image);
-  return(kuwahara_image);
+  return(ReleaseFailedImage(kuwahara_image,status));
 }
 
 /*
@@ -1903,17 +1900,10 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
 #endif
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      LocalContrastColumnPass
-        pass;
+      const LocalContrastColumnPass
+        pass = { image, image_view, interImage, scanline, scanLineSize, width,
+          totalWeight, exception };
 
-      pass.image=image;
-      pass.image_view=image_view;
-      pass.interImage=interImage;
-      pass.scanline=scanline;
-      pass.scanLineSize=scanLineSize;
-      pass.width=width;
-      pass.totalWeight=totalWeight;
-      pass.exception=exception;
       RunLocalContrastColumn(&status,&pass,x);
     }
   }
@@ -1930,20 +1920,11 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
 #endif
     for (y=0; y < (ssize_t) image->rows; y++)
     {
-      LocalContrastRowPass
-        pass;
+      const LocalContrastRowPass
+        pass = { image, image_view, contrast_view, interImage, scanline,
+          scanLineSize, width, totalWeight, strength, contrast_image,
+          exception };
 
-      pass.image=image;
-      pass.image_view=image_view;
-      pass.contrast_view=contrast_view;
-      pass.interImage=interImage;
-      pass.scanline=scanline;
-      pass.scanLineSize=scanLineSize;
-      pass.width=width;
-      pass.totalWeight=totalWeight;
-      pass.strength=strength;
-      pass.contrast_image=contrast_image;
-      pass.exception=exception;
       RunLocalContrastRow(&status,&pass,y);
     }
   }
@@ -1951,9 +1932,7 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   interImage_info=RelinquishVirtualMemory(interImage_info);
   contrast_view=DestroyCacheView(contrast_view);
   image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    contrast_image=DestroyImage(contrast_image);
-  return(contrast_image);
+  return(ReleaseFailedImage(contrast_image,status));
 }
 
 
@@ -3216,9 +3195,7 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   shade_view=DestroyCacheView(shade_view);
   image_view=DestroyCacheView(image_view);
   linear_image=DestroyImage(linear_image);
-  if (status == MagickFalse)
-    shade_image=DestroyImage(shade_image);
-  return(shade_image);
+  return(ReleaseFailedImage(shade_image,status));
 }
 
 
@@ -3417,17 +3394,10 @@ MagickExport Image *SpreadImage(const Image *image,
     const int
       id = GetOpenMPThreadId();
 
-    SpreadInfo
-      spread;
+    const SpreadInfo
+      spread = { image, spread_image, image_view, spread_view, exception,
+        method, width, y };
 
-    spread.image=image;
-    spread.spread_image=spread_image;
-    spread.image_view=image_view;
-    spread.spread_view=spread_view;
-    spread.exception=exception;
-    spread.method=method;
-    spread.width=width;
-    spread.y=y;
     if (SpreadHeadRow(&status,&spread,random_info[id]) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -3442,9 +3412,7 @@ MagickExport Image *SpreadImage(const Image *image,
   spread_view=DestroyCacheView(spread_view);
   image_view=DestroyCacheView(image_view);
   random_info=DestroyRandomInfoTLS(random_info);
-  if (status == MagickFalse)
-    spread_image=DestroyImage(spread_image);
-  return(spread_image);
+  return(ReleaseFailedImage(spread_image,status));
 }
 
 /*
@@ -3676,7 +3644,5 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
   unsharp_image->type=image->type;
   unsharp_view=DestroyCacheView(unsharp_view);
   image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    unsharp_image=DestroyImage(unsharp_image);
-  return(unsharp_image);
+  return(ReleaseFailedImage(unsharp_image,status));
 }
