@@ -2583,7 +2583,10 @@ through a jump or a `return`.
 **How:**
 
 1. The block meets Recipe O steps 1 to 3: it lies outside every OpenMP region (or in a
-   parallel loop body under O step 1's condition) with no `#pragma` line; every variable
+   parallel loop body under O step 1's condition) with no `#pragma` line, except whole
+   parallel loops in a block outside every region, under Recipe N step 1's conditions
+   (each moved whole and unchanged; what the region writes or a clause names is a
+   parameter or local of the new function, never a member); every variable
    it writes is a plain local of the caller whose address is not taken elsewhere, at
    most four of them (five or six in step 7's form); it contains no `return`, `goto`,
    or `continue` or `break` that leaves it.
@@ -2690,6 +2693,11 @@ static void ConvertColorThresholdRange(const ColorThresholdRange *range,
 
 **Careful:**
 
+- Under step 1's whole parallel loops, the argument is Recipe N's *Careful* item for
+  them: the `const` locals bound from the members are declared before the region, so
+  the region shares and only reads them, as it did the caller's variables; a written
+  variable is never a member, and a write `(*v)` inside the region lands in the
+  caller's object, as the region's write to `v` did. Checked by reading.
 - The two parts keep the arguments of the recipes they come from. Every write of the
   block stays a write through the pointer and nothing more, so a field a path leaves
   alone keeps the caller's value, and reads go through the pointer too (Recipe O). The
@@ -6647,3 +6655,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | CB | Extract Critical Block Body: the body of a `#pragma omp critical` block moves into a `static void` helper that its call replaces, the pragma and braces staying in the caller; written variables by pointer, read ones by value or pointer to `const`, at most four parameters; checked by reading | `compare.c`'s eleven `Get*Similarity` merges (a probe, one helper call per critical body: 2.97 to 3.15) and `feature.c`'s `CannyEdgeImage` | owner |
 | 2026-11-05 | NEW | MB | Extract Block Through Copies of Macro-Bound Locals: a block that writes struct locals of the caller only through function-like macros whose bodies name them (so Recipe O's `(*v)` would edit the macro text) moves to a `static void` function taking a pointer `T *caller_v` per such local, which declares a local of the same name and type initialised `(*caller_v)` (copy in), keeps the block's text and the macro uses unchanged, and ends `(*caller_v)=v;` (copy out); every member set before the block, no exit, no other name or address of `v` in the block, at most four parameters | `distort.c`'s `DistortImage` (campaign A, W14): the best-fit Affine/RigidAffine, Perspective and Arc groups write the block's `min` and `max` only through `InitalBounds` and `ExpandBounds`; O, Z and I would rewrite the macro body, E step 4 skips two outputs; W11 to W13 recorded "no legal home". A probe of the three steps after the macros' Recipe H step: 4.76 to 4.96, no new finding | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | N | Step 1: a block that lies outside every OpenMP region may hold whole parallel loops (the `#if`, the pragma with its clauses, the `#endif` and the loop, all inside the block and unchanged), as Recipe O step 1 already admits for its blocks; every variable the region writes or a clause names is a parameter or local of the new function, never a member. *Careful* gives the data-sharing argument. Still eight steps | `colorspace.c`'s `TransformsRGBImage` (campaign A, W14): the DirectClass row loop of the table conversion (`shared(status)`, an `omp atomic` progress tail) reads the image, three maps and the exception, already in the `TransformsRGBTables` local its PseudoClass sibling takes (Recipe N step 8); with the parameters Recipe E would give it takes eight. A probe of the chain (the table set-up split by SD and E, this loop, the tail by E step 7): 5.33 to 5.75, no new finding. The same form was already used, without the text admitting it, by `sRGBToGeneric` (9845ba7e4) | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | Z | Step 1: a block outside every OpenMP region may hold whole parallel loops under Recipe N step 1's conditions (amended the same day): each loop moved whole and unchanged, what the region writes or a clause names a parameter or local of the new function, never a member. *Careful* refers to N's argument. Still seven steps | `colorspace.c`'s `sRGBTransformImage` (campaign A, W14): Recipe SD on its table set-up `switch (colorspace)` (the Rec709YCbCr, YCC and identity groups, two of them whole parallel loops) writes `primary_info` and reads four inputs, so SD step 3 takes Z's form, whose step 1 refused the loops. A probe of the step and the E step that follows it: 5.87 to 5.93 to 6.01, no new finding | mandate (2026-10-24) |
