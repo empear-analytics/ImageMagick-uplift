@@ -302,6 +302,18 @@ static void SetCombineChannels(Image *combine_image,
 
 #define CombineImageTag  "Combine/Image"
 
+static void SetCombineProgress(const Image *image,const Image *combine_image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,CombineImageTag,progress,
+    combine_image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *CombineImages(const Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -380,17 +392,11 @@ MagickExport Image *CombineImages(const Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,CombineImageTag,progress,
-          combine_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetCombineProgress(image,combine_image,progress,&status);
       }
   }
   combine_view=DestroyCacheView(combine_view);
