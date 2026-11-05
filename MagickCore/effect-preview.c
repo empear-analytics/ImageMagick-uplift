@@ -476,6 +476,25 @@ static void ApplyDullSolarizeEdgePreview(const PreviewTile *tile,
   }
 }
 
+static void WriteJpegQualityPreview(ImageInfo *preview_info,
+  Image **preview_image,ExceptionInfo *exception)
+{
+  char
+    filename[MagickPathExtent];
+
+  int
+    file;
+
+  file=AcquireUniqueFileResource(filename);
+  if (file != -1)
+    file=close_utf8(file)-1;
+  (void) FormatLocaleString((*preview_image)->filename,MagickPathExtent,
+    "jpeg:%s",filename);
+  (*preview_image)=WriteAndReadQualityPreview(preview_info,(*preview_image),
+    exception);
+  (void) RelinquishUniqueFileResource((*preview_image)->filename);
+}
+
 static void ApplyRaiseJpegPreview(const PreviewTile *tile,Image **preview_image,
   double *gamma)
 {
@@ -523,26 +542,13 @@ static void ApplyRaiseJpegPreview(const PreviewTile *tile,Image **preview_image,
     }
     case JPEGPreview:
     {
-      char
-        filename[MagickPathExtent];
-
-      int
-        file;
-
       (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
       if ((*preview_image) == (Image *) NULL)
         break;
       preview_info->quality=(size_t) percentage;
       (void) FormatLocaleString(factor,MagickPathExtent,"%.17g",(double)
         preview_info->quality);
-      file=AcquireUniqueFileResource(filename);
-      if (file != -1)
-        file=close_utf8(file)-1;
-      (void) FormatLocaleString((*preview_image)->filename,MagickPathExtent,
-        "jpeg:%s",filename);
-      (*preview_image)=WriteAndReadQualityPreview(preview_info,(*preview_image),
-        exception);
-      (void) RelinquishUniqueFileResource((*preview_image)->filename);
+      WriteJpegQualityPreview(preview_info,preview_image,exception);
       FormatQualityLabel(label,factor,(*preview_image),thumbnail);
       break;
     }
