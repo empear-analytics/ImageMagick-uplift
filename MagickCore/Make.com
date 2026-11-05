@@ -97,6 +97,7 @@ $call Make morphology.c
 $call Make opencl.c
 $call Make option.c
 $call Make paint.c
+$call Make paint-floodfill.c
 $call Make pixel.c
 $call Make pixel-import.c
 $call Make pixel-export.c

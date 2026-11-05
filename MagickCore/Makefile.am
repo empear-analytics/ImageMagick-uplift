@@ -236,6 +236,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/option.h \
   MagickCore/option-private.h \
   MagickCore/paint.c \
+  MagickCore/paint-floodfill.c \
   MagickCore/paint.h \
   MagickCore/pixel.c \
   MagickCore/pixel-import.c \
