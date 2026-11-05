@@ -5764,6 +5764,107 @@ object code. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-
 
 ---
 
+## Recipe RV - Extract Block Returning Whether It Returned
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method*, and
+the block that would fix it is one of a run of "try" blocks of a value-returning function:
+each tests something and leaves the function through `return(R);` with different
+expressions `R` (`return MagickTrue;`, `return MagickFalse;`, `return (Get...(pfx,...));`),
+and otherwise falls through to the next try, as `GetOperand`'s leading-operand, number and
+function blocks do.
+
+**Not covered by:** Recipe V step 6 and Recipe W, whose every `return` in the block returns
+the same constant (V: "a block returning a variable, or two different values, is not this
+recipe"); Recipe E step 7, whose block must end the function with a `return` on every path;
+Recipe LB (a `break;`, not a `return`).
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. It contains
+   no `goto`, and no `break` or `continue` that leaves it; every `return` in it is
+   `return(R);` or `return R;`, `R` an expression of the caller's return type
+   `MagickBooleanType`, and on at least one path the block ends without returning.
+2. Each `R` is evaluated where the `return` stood, in the new function, from what the
+   block reads and writes (its own locals, values passed in, writes through pointers the
+   caller also holds); the block writes no plain local of the caller, except locals
+   nothing after the block reads (Recipe E step 4), which the new function declares.
+3. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. Each `return(R);` becomes `(*result)=R;` followed by `return(MagickTrue);`
+   (in braces when it stood as the body of an `if`), and the function ends with
+   `return(MagickFalse);`. Nothing else in the text changes.
+4. Pass what the block reads by value (pointers included), a pointer it writes through as
+   it was, or the one `const` struct that holds it (Recipe B), and last `MagickBooleanType
+   *result`: at most four parameters.
+5. The caller declares `MagickBooleanType returned;` once among its declarations. Where
+   the block stood it writes `if (Helper(...,&returned) != MagickFalse) return(returned);`
+   and checks every argument against its parameter by reading. When a compiler warns that
+   `returned` may be used uninitialised, the declaration gets `=MagickFalse` instead of
+   a new statement.
+
+**Before:**
+
+```c
+    {
+      char * tailptr;
+      ssize_t lenOptArt;
+      fxFltType val = strtold (pfx->pex, &tailptr);
+      if (pfx->pex != tailptr) {
+        ...
+        return MagickTrue;
+      }
+      val = (fxFltType) 0;
+      lenOptArt = GetProperty (pfx, &val, NULL);
+      if (lenOptArt < 0) return MagickFalse;
+      ...
+    }
+```
+
+**After:**
+
+```c
+static MagickBooleanType TryLeadingOperand (FxInfo * pfx,
+  const OperandSymbols * operand, MagickBooleanType * result)
+{
+  ...
+      if (lenOptArt < 0) {
+        (*result)=MagickFalse;
+        return MagickTrue;
+      }
+  ...
+  return MagickFalse;
+}
+...
+  if (TryLeadingOperand (pfx, operand, &returned) != MagickFalse)
+    return returned;
+```
+
+**Careful:**
+
+- Every path of the block either reached a `return(R);` or fell off its end. After, the
+  first stores the same `R`, computed at the same point after the same statements, and
+  returns `MagickTrue`, and the caller returns that value at once; the second returns
+  `MagickFalse` and the caller goes on with the next statement. Nothing runs between
+  the helper's return and the caller's.
+- `returned` is written only on the paths that return `MagickTrue`, and the caller reads
+  it only then; it is never read otherwise, so its value on the fall-through path does
+  not matter.
+- The helper's result is the *did it return* flag, the opposite sense of Recipe V's
+  *did it fall through*; the name says so (`Try...`), where V's helpers are `NotA...`.
+- A block with one return value is Recipe V, not this recipe; a block with a nested
+  `if` that returns is fine, its `return`s are rewritten one for one.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new function,
+nothing else moved), and steps 1 and 2 checked by reading.
+
+**Provenance:** 2026-11-05, from `fx.c`'s `GetOperand` (campaign A, W13): its leading-operand
+block (`(`, unary prefix, `#`, a number or a property) and its function block return
+`MagickTrue`, `MagickFalse` or the result of a call, and fall through, the "returns several
+different values or falls through" plateau W09 recorded. A probe of both and the constant
+block (Recipe V): GetOperand leaves Bumpy Road Ahead, 3.35 to 3.37, no finding on a helper.
+Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -6011,3 +6112,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-04 | AMEND | LB | Step 8: up to six written variables share the one struct when the caller declares it `const`, once, with the addresses as its initialiser (Recipe Q step 8's form) and passes it to every helper that writes any of them; the helpers take it as one parameter | `resize-scale.c`'s `ScaleImage` (campaign A, W13): the row loop's body and its Y-direction block write `n`, `status`, `number_rows`, `span`, `scale` and `next_row`, the six addresses `AccumulateScaleRows` already takes in `targets`; step 8 stopped at four. A probe of the Y-direction block (the rest of the body as it stood): 8.46 to 8.53; with the single-row fetch, the sync and the progress test as helpers 8.62, and the body itself as a helper over them 8.78 | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | PC | Step 2: body variables that the head writes and the tail reads (at most two) go by pointer, every use `(*v)`, and a shared variable the head only reads goes by pointer to `const`; step 4 places these pointers between the struct and `status`. Still five steps | `statistic-measure.c`'s `GetImageRange` (campaign A, W13): the head fetches the row, copies the shared `range_info` into the body's `channel_range`, and accumulates into it; the `omp critical` tail then merges it, which PC step 2 refused. A probe: 9.68 to 10.00, no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | Z | Step 1 and new step 7: a selection that sets five or six of the caller's locals passes their addresses in one `const` struct (Recipe Q step 8's form), after the input struct, so the helper takes two parameters; step 1's four-variable limit holds for the separate-pointer form | `fx.c`'s `ExecuteRPN` (campaign A, W13): the `number_args` `switch` pops into `regA` to `regE`, five written locals, one more than step 1; with the nested push test (CN) and the address check (E) it holds two of the function's last three bumps. A probe: ExecuteRPN leaves Bumpy Road Ahead, 3.33 to 3.35, no finding on the helper | mandate (2026-10-24) |
+| 2026-11-05 | NEW | RV | Extract Block Returning Whether It Returned: a block of a value-returning function that returns different expressions on its paths and otherwise falls through moves to a `static MagickBooleanType` function that stores each `R` through a `MagickBooleanType *result` and returns `MagickTrue` when it returned (`MagickFalse` when it fell through); the caller writes `if (Helper(...,&returned) != MagickFalse) return(returned);` | `fx.c`'s `GetOperand` (campaign A, W13): the leading-operand block, with its number and property tries, and the function block return `MagickTrue`, `MagickFalse` or a call's value and fall through; V refuses two return values, E step 7 needs a return on every path. A probe with V on the constant block: GetOperand leaves Bumpy Road Ahead, 3.35 to 3.37, no finding on any helper | mandate (2026-10-24) |
