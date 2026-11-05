@@ -2646,20 +2646,18 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
     int FndOne = 0;
     if (TranslateStatementList (pfx, strLimit, &chLimit)) {
       FndOne = 1;
-    } else {
-      if (!*pfx->pex) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "For function", "'%s' expected ')' at '%s'",
-          funStr, SetShortExp(pfx));
-        return MagickFalse;
-      }
+    } else if (!*pfx->pex) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "For function", "'%s' expected ')' at '%s'",
+        funStr, SetShortExp(pfx));
+      return MagickFalse;
+    } else if (!chLimit) {
       /* Maybe don't break because other expressions may be not empty. */
-      if (!chLimit) break;
-      if (IsPadFunction(fe) != MagickFalse) {
-        (void) AddElement (pfx, (fxFltType) 0, oNull);
-        FndOne = 1;
-      }
+      break;
+    } else if (IsPadFunction(fe) != MagickFalse) {
+      (void) AddElement (pfx, (fxFltType) 0, oNull);
+      FndOne = 1;
     }
 
     if (strchr (strLimit, chLimit)==NULL) {
