@@ -366,12 +366,23 @@ static void ApplyThresholdEvaluateOperator(const Quantum pixel,
   }
 }
 
-static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
-  const MagickEvaluateOperator op,const double value,double *result)
+static double EvaluateRightShift(const Quantum pixel,const double value)
 {
+  double
+    result;
+
   ssize_t
     i;
 
+  result=(double) pixel;
+  for (i=0; i < (ssize_t) value; i++)
+    result/=2.0;
+  return(result);
+}
+
+static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
   switch (op)
   {
     default:
@@ -391,9 +402,7 @@ static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
     }
     case RightShiftEvaluateOperator:
     {
-      (*result)=(double) pixel;
-      for (i=0; i < (ssize_t) value; i++)
-        (*result)/=2.0;
+      (*result)=EvaluateRightShift(pixel,value);
       break;
     }
     case XorEvaluateOperator:
