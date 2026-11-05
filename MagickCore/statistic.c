@@ -1518,6 +1518,64 @@ static void EvaluateRowPixels(const Image *image,RandomInfo *random_info,
   }
 }
 
+typedef struct _EvaluateImageRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  int
+    id;
+
+  EvaluateOperation
+    operation;
+
+  ExceptionInfo
+    *exception;
+} EvaluateImageRow;
+
+static MagickBooleanType EvaluateImageLine(const EvaluateImageRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = row->image;
+
+  CacheView
+    *const image_view = row->image_view;
+
+  RandomInfo
+    **magick_restrict const random_info = row->random_info;
+
+  const int
+    id = row->id;
+
+  const EvaluateOperation
+    operation = row->operation;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  EvaluateRowPixels(image,random_info[id],operation,q);
+  SyncEvaluateView(image_view,exception,status);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType EvaluateImage(Image *image,
   const MagickEvaluateOperator op,const double value,ExceptionInfo *exception)
 {
@@ -1568,19 +1626,11 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
     const EvaluateOperation
       operation = { op, value, clamp };
 
-    Quantum
-      *magick_restrict q;
+    const EvaluateImageRow
+      row = { image, image_view, random_info, id, operation, exception };
 
-    if (status == MagickFalse)
+    if (EvaluateImageLine(&row,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    EvaluateRowPixels(image,random_info[id],operation,q);
-    SyncEvaluateView(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
