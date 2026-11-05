@@ -929,9 +929,7 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
       }
   }
   image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    colorize_image=DestroyImage(colorize_image);
-  return(colorize_image);
+  return(ReleaseFailedImage(colorize_image,status));
 }
 
 /*
