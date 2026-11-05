@@ -2955,6 +2955,81 @@ static void InitializeYCCOrIdentityMaps(const Image *image,
   }
 }
 
+static void InitializeRec601OrRec709Maps(const Image *image,
+  TransformPacket *x_map,
+  TransformPacket *y_map,TransformPacket *z_map)
+{
+  ssize_t
+    i;
+
+  switch (image->colorspace)
+  {
+    case Rec601YCbCrColorspace:
+    {
+      /*
+        Initialize YCbCr tables:
+
+          R = Y            +1.402000*Cr
+          G = Y-0.344136*Cb-0.714136*Cr
+          B = Y+1.772000*Cb
+
+        Cb and Cr, normally -0.5 through 0.5, must be normalized to the range 0
+        through QuantumRange.
+      */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static)
+#endif
+      for (i=0; i <= (ssize_t) MaxMap; i++)
+      {
+        x_map[i].x=0.99999999999914679361*(double) i;
+        y_map[i].x=0.5*(-1.2188941887145875e-06)*(2.00*(double) i-MaxMap);
+        z_map[i].x=0.5*1.4019995886561440468*(2.00*(double) i-MaxMap);
+        x_map[i].y=0.99999975910502514331*(double) i;
+        y_map[i].y=0.5*(-0.34413567816504303521)*(2.00*(double) i-MaxMap);
+        z_map[i].y=0.5*(-0.71413649331646789076)*(2.00*(double) i-MaxMap);
+        x_map[i].z=1.00000124040004623180*(double) i;
+        y_map[i].z=0.5*1.77200006607230409200*(2.00*(double) i-MaxMap);
+        z_map[i].z=0.5*2.1453384174593273e-06*(2.00*(double) i-MaxMap);
+      }
+      break;
+    }
+    case Rec709YCbCrColorspace:
+    {
+      /*
+        Initialize YCbCr tables:
+
+          R = Y            +1.574800*Cr
+          G = Y-0.187324*Cb-0.468124*Cr
+          B = Y+1.855600*Cb
+
+        Cb and Cr, normally -0.5 through 0.5, must be normalized to the range 0
+        through QuantumRange.
+      */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static)
+#endif
+      for (i=0; i <= (ssize_t) MaxMap; i++)
+      {
+        x_map[i].x=(MagickRealType) (1.0*i);
+        y_map[i].x=(MagickRealType) (0.5*0.000000*(2.0*i-MaxMap));
+        z_map[i].x=(MagickRealType) (0.5*1.574800*(2.0*i-MaxMap));
+        x_map[i].y=(MagickRealType) (1.0*i);
+        y_map[i].y=(MagickRealType) (0.5*(-0.187324)*(2.0*i-MaxMap));
+        z_map[i].y=(MagickRealType) (0.5*(-0.468124)*(2.0*i-MaxMap));
+        x_map[i].z=(MagickRealType) (1.0*i);
+        y_map[i].z=(MagickRealType) (0.5*1.855600*(2.0*i-MaxMap));
+        z_map[i].z=(MagickRealType) (0.5*0.000000*(2.0*i-MaxMap));
+      }
+      break;
+    }
+    default:
+    {
+      InitializeYCCOrIdentityMaps(image,x_map,y_map,z_map);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -3218,67 +3293,9 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       }
       break;
     }
-    case Rec601YCbCrColorspace:
-    {
-      /*
-        Initialize YCbCr tables:
-
-          R = Y            +1.402000*Cr
-          G = Y-0.344136*Cb-0.714136*Cr
-          B = Y+1.772000*Cb
-
-        Cb and Cr, normally -0.5 through 0.5, must be normalized to the range 0
-        through QuantumRange.
-      */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=0.99999999999914679361*(double) i;
-        y_map[i].x=0.5*(-1.2188941887145875e-06)*(2.00*(double) i-MaxMap);
-        z_map[i].x=0.5*1.4019995886561440468*(2.00*(double) i-MaxMap);
-        x_map[i].y=0.99999975910502514331*(double) i;
-        y_map[i].y=0.5*(-0.34413567816504303521)*(2.00*(double) i-MaxMap);
-        z_map[i].y=0.5*(-0.71413649331646789076)*(2.00*(double) i-MaxMap);
-        x_map[i].z=1.00000124040004623180*(double) i;
-        y_map[i].z=0.5*1.77200006607230409200*(2.00*(double) i-MaxMap);
-        z_map[i].z=0.5*2.1453384174593273e-06*(2.00*(double) i-MaxMap);
-      }
-      break;
-    }
-    case Rec709YCbCrColorspace:
-    {
-      /*
-        Initialize YCbCr tables:
-
-          R = Y            +1.574800*Cr
-          G = Y-0.187324*Cb-0.468124*Cr
-          B = Y+1.855600*Cb
-
-        Cb and Cr, normally -0.5 through 0.5, must be normalized to the range 0
-        through QuantumRange.
-      */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static)
-#endif
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=(MagickRealType) (1.0*i);
-        y_map[i].x=(MagickRealType) (0.5*0.000000*(2.0*i-MaxMap));
-        z_map[i].x=(MagickRealType) (0.5*1.574800*(2.0*i-MaxMap));
-        x_map[i].y=(MagickRealType) (1.0*i);
-        y_map[i].y=(MagickRealType) (0.5*(-0.187324)*(2.0*i-MaxMap));
-        z_map[i].y=(MagickRealType) (0.5*(-0.468124)*(2.0*i-MaxMap));
-        x_map[i].z=(MagickRealType) (1.0*i);
-        y_map[i].z=(MagickRealType) (0.5*1.855600*(2.0*i-MaxMap));
-        z_map[i].z=(MagickRealType) (0.5*0.000000*(2.0*i-MaxMap));
-      }
-      break;
-    }
     default:
     {
-      InitializeYCCOrIdentityMaps(image,x_map,y_map,z_map);
+      InitializeRec601OrRec709Maps(image,x_map,y_map,z_map);
       break;
     }
   }
