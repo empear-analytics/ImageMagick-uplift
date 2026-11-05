@@ -145,3 +145,15 @@ messages:** in 63a152baa and e43e56658 "cc 9 -> 8" was inferred from the Complex
 read from a tool (read: "leaves Complex Method"); 91302c0fe moves a whole parallel loop under N step 1's form
 but carries the trailer `Recipe: E`. Upstream, not changed: `WriteHoughFile` ignores `WriteHoughLines`' status;
 `SetCannyEdgeGray` destroys only its local copy of `edge_image` on failure.
+
+## Lane d, fifth batch: three more files at 10.0 (Sonnet, 23 commits)
+
+`decorate-raise.c` 8.87 -> **10.0**, `channel-combine.c` 9.34 -> **10.0**, `quantize-posterize.c` 9.47 -> **10.0**,
+`threshold-adaptive.c` 9.13 -> 9.68 and `statistic-image.c` 9.09 -> 9.68 (both held only by a public 5-argument
+signature). **Temporary drops:** fifteen commits (the first five of `decorate-raise.c`, `threshold-adaptive.c`
+and `channel-combine.c`) lowered their file's score as early steps of a plan that ends higher, and were
+committed with `--no-verify` under the owner's ruling of 2026-10-29 ("You can accept a temporary drop. We
+focus on the long term goal of CH 10"); every plan ended at or above its starting score. **Correction:**
+`decorate-raise.c` messages 1-5 say the plan ends with FI; it ended with PC (FI is illegal there). Upstream, not
+changed: `CombineImageRow` leaks its per-channel view on the `p == NULL` continue; `PosterizeImage` overwrites
+its row loop's `status` with `QuantizePosterizeImage`'s result.
