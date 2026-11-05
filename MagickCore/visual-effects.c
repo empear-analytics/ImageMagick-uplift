@@ -3733,12 +3733,12 @@ static MagickBooleanType CloneWaveCanvas(const Image *image,
   return(MagickTrue);
 }
 
+#define WaveImageTag  "Wave/Image"
+
 MagickExport Image *WaveImage(const Image *image,const double amplitude,
   const double wave_length,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
 {
-#define WaveImageTag  "Wave/Image"
-
   CacheView
     *canvas_image_view,
     *wave_view;
