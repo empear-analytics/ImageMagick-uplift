@@ -278,3 +278,12 @@ New file `colorspace-generic-rgb.c` (9.68): **add it to the Windows build config
 a draft of one SD step (67 cases diverged; `&input` passed where step 8 passes `input`), fixed before the commit.
 Upstream, not changed: `MorphImages` passes an uninitialised `status` to `MorphSingleImage`, which only writes it;
 `MorphSequenceFrames` leaks the morph list when `SetImageStorageClass` fails.
+
+## Lane c, ninth batch: channel-alpha.c 8.96 -> 10.0 (Opus, 5 commits + 1 playbook)
+
+New recipe under the mandate, not yet ruled on: **Recipe ST** (9d344362e, Split a Selection at its Default,
+Copying the Return Tail): the `default:` group of a `switch` moves with the groups next to it, as a run in source
+order, into a `static` function of the caller's return type whose body is the switch over those groups followed by
+a copy of the function's final `return(R_T);`; the caller's `default:` becomes `return(Helper(...));`. **Review:**
+672d2040f is labelled Recipe N step 1 although the moved tail reads only three inputs and needs no input struct.
+`threshold.c` and `resample.c` unchanged (no legal split or step).
