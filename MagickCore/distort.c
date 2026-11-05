@@ -3272,6 +3272,31 @@ static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
     (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
 }
 
+static void PrintBilinearReverseFX(const double *coeff,const char *image_gen,
+  const char *lookup)
+{
+#if 0
+        (void) FormatLocaleFile(stderr, "Polynomial Projection Distort:\n");
+        (void) FormatLocaleFile(stderr, "  -distort PolynomialProjection \\\n");
+        (void) FormatLocaleFile(stderr, "      '1.5, %lf, %lf, %lf, %lf,\n",
+            coeff[3], coeff[0], coeff[1], coeff[2]);
+        (void) FormatLocaleFile(stderr, "            %lf, %lf, %lf, %lf'\n",
+            coeff[7], coeff[4], coeff[5], coeff[6]);
+#endif
+  (void) FormatLocaleFile(stderr,
+    "BilinearReverse Distort, FX Equivalent:\n");
+  (void) FormatLocaleFile(stderr,"%s", image_gen);
+  (void) FormatLocaleFile(stderr,
+    "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
+  (void) FormatLocaleFile(stderr,
+    "       xx=%+lf*ii %+lf*jj %+lf*ii*jj %+lf;\n",coeff[0],coeff[1],
+    coeff[2], coeff[3]);
+  (void) FormatLocaleFile(stderr,
+     "       yy=%+lf*ii %+lf*jj %+lf*ii*jj %+lf;\n",coeff[4],coeff[5],
+     coeff[6], coeff[7]);
+  (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3599,26 +3624,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       }
       case BilinearReverseDistortion:
       {
-#if 0
-        (void) FormatLocaleFile(stderr, "Polynomial Projection Distort:\n");
-        (void) FormatLocaleFile(stderr, "  -distort PolynomialProjection \\\n");
-        (void) FormatLocaleFile(stderr, "      '1.5, %lf, %lf, %lf, %lf,\n",
-            coeff[3], coeff[0], coeff[1], coeff[2]);
-        (void) FormatLocaleFile(stderr, "            %lf, %lf, %lf, %lf'\n",
-            coeff[7], coeff[4], coeff[5], coeff[6]);
-#endif
-        (void) FormatLocaleFile(stderr,
-          "BilinearReverse Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
-        (void) FormatLocaleFile(stderr,
-          "       xx=%+lf*ii %+lf*jj %+lf*ii*jj %+lf;\n",coeff[0],coeff[1],
-          coeff[2], coeff[3]);
-        (void) FormatLocaleFile(stderr,
-           "       yy=%+lf*ii %+lf*jj %+lf*ii*jj %+lf;\n",coeff[4],coeff[5],
-           coeff[6], coeff[7]);
-        (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+        PrintBilinearReverseFX(coeff,image_gen,lookup);
         break;
       }
       case PolynomialDistortion:
