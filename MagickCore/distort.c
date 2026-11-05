@@ -3727,6 +3727,25 @@ static void ArcBestFitBounds(double *coeff,const Image *image,
   (*caller_max)=max;
 }
 
+static Image *DistortResizeFromArguments(const Image *image,
+  const size_t number_arguments,const double *arguments,
+  ExceptionInfo *exception)
+{
+  Image
+    *distort_image;
+
+  if ( number_arguments != 2 )
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+                "InvalidArgument","%s : '%s'","Resize",
+                "Invalid number of args: 2 only");
+      return((Image *) NULL);
+    }
+  distort_image=DistortResizeImage(image,CastDoubleToSizeT(arguments[0]),
+    CastDoubleToSizeT(arguments[1]),exception);
+  return(distort_image);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3764,18 +3783,8 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
     Handle Special Compound Distortions
   */
   if ( method == ResizeDistortion )
-    {
-      if ( number_arguments != 2 )
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-                    "InvalidArgument","%s : '%s'","Resize",
-                    "Invalid number of args: 2 only");
-          return((Image *) NULL);
-        }
-      distort_image=DistortResizeImage(image,CastDoubleToSizeT(arguments[0]),
-        CastDoubleToSizeT(arguments[1]),exception);
-      return(distort_image);
-    }
+    return(DistortResizeFromArguments(image,number_arguments,arguments,
+      exception));
 
   /*
     Convert input arguments (usually as control points for reverse mapping)
