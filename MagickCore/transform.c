@@ -369,11 +369,11 @@ static Image *FinishChopImage(const Image *image,Image *chop_image,
   return(chop_image);
 }
 
+#define ChopImageTag  "Chop/Image"
+
 MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ExceptionInfo *exception)
 {
-#define ChopImageTag  "Chop/Image"
-
   CacheView
     *chop_view,
     *image_view;
