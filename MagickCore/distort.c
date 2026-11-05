@@ -729,6 +729,85 @@ static void AddRigidAffineTerms(double **matrix,double *vectors[1],
   }
 }
 
+static double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
+  const CoefficientContext *context)
+{
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments,
+    cp_size = context->cp_size;
+
+  double
+    inverse[6],
+    **matrix,
+    *vectors[1];
+
+  MagickBooleanType
+    status;
+
+  /*
+    Rigid affine (also known as a Euclidean transform), restricts affine
+    coefficients to 4 (S, R, Tx, Ty) with Sy=Sx and Ry = -Rx so that one has
+    only scale, rotation and translation. No skew.
+  */
+  if (((number_arguments % cp_size) != 0) || (number_arguments < cp_size))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument", "%s : 'require at least %.17g CPs'",
+        CommandOptionToMnemonic(MagickDistortOptions,*method),2.0);
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      return((double *) NULL);
+    }
+  /*
+    Rigid affine requires a 4x4 least-squares matrix (zeroed).
+  */
+  matrix=AcquireMagickMatrix(4UL,4UL);
+  if (matrix == (double **) NULL)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","%s",
+        CommandOptionToMnemonic(MagickDistortOptions,*method));
+      return((double *) NULL);
+    }
+  /*
+    Add control points for least squares solving.
+  */
+  vectors[0]=(&(coeff[0]));
+  AddRigidAffineTerms(matrix,vectors,arguments,number_arguments);
+  /*
+    Solve for least-squares coefficients.
+  */
+  status=GaussJordanElimination(matrix,vectors,4UL,1UL);
+  matrix=RelinquishMagickMatrix(matrix,4UL);
+  if (status == MagickFalse)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument","%s : 'Unsolvable Matrix'",
+        CommandOptionToMnemonic(MagickDistortOptions,*method));
+      return((double *) NULL);
+    }
+  /*
+    Convert (S, R, Tx, Ty) to an affine projection.
+  */
+  inverse[0]=coeff[0];
+  inverse[1]=coeff[1];
+  inverse[2]=(-coeff[1]);
+  inverse[3]=coeff[0];
+  inverse[4]=coeff[2];
+  inverse[5]=coeff[3];
+  AffineArgsToCoefficients(inverse);
+  InvertAffineCoefficients(inverse,coeff);
+  *method=AffineDistortion;
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -889,72 +968,7 @@ static double *GenerateCoefficients(const Image *image,
     case AffineDistortion:
       return(AffineCoefficients(coeff,method,&context));
     case RigidAffineDistortion:
-    {
-      double
-        inverse[6],
-        **matrix,
-        *vectors[1];
-
-      MagickBooleanType
-        status;
-
-      /*
-        Rigid affine (also known as a Euclidean transform), restricts affine
-        coefficients to 4 (S, R, Tx, Ty) with Sy=Sx and Ry = -Rx so that one has
-        only scale, rotation and translation. No skew.
-      */
-      if (((number_arguments % cp_size) != 0) || (number_arguments < cp_size))
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "InvalidArgument", "%s : 'require at least %.17g CPs'",
-            CommandOptionToMnemonic(MagickDistortOptions,*method),2.0);
-          coeff=(double *) RelinquishMagickMemory(coeff);
-          return((double *) NULL);
-        }
-      /*
-        Rigid affine requires a 4x4 least-squares matrix (zeroed).
-      */
-      matrix=AcquireMagickMatrix(4UL,4UL);
-      if (matrix == (double **) NULL)
-        {
-          coeff=(double *) RelinquishMagickMemory(coeff);
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","%s",
-            CommandOptionToMnemonic(MagickDistortOptions,*method));
-          return((double *) NULL);
-        }
-      /*
-        Add control points for least squares solving.
-      */
-      vectors[0]=(&(coeff[0]));
-      AddRigidAffineTerms(matrix,vectors,arguments,number_arguments);
-      /*
-        Solve for least-squares coefficients.
-      */
-      status=GaussJordanElimination(matrix,vectors,4UL,1UL);
-      matrix=RelinquishMagickMatrix(matrix,4UL);
-      if (status == MagickFalse)
-        {
-          coeff=(double *) RelinquishMagickMemory(coeff);
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "InvalidArgument","%s : 'Unsolvable Matrix'",
-            CommandOptionToMnemonic(MagickDistortOptions,*method));
-          return((double *) NULL);
-        }
-      /*
-        Convert (S, R, Tx, Ty) to an affine projection.
-      */
-      inverse[0]=coeff[0];
-      inverse[1]=coeff[1];
-      inverse[2]=(-coeff[1]);
-      inverse[3]=coeff[0];
-      inverse[4]=coeff[2];
-      inverse[5]=coeff[3];
-      AffineArgsToCoefficients(inverse);
-      InvertAffineCoefficients(inverse,coeff);
-      *method=AffineDistortion;
-      return(coeff);
-    }
+      return(RigidAffineCoefficients(coeff,method,&context));
     case AffineProjectionDistortion:
     {
       /*
