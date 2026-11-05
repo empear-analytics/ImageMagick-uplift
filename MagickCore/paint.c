@@ -403,6 +403,56 @@ static MagickBooleanType TileFloodplaneView(const FloodfillTileView *view)
   return(status);
 }
 
+typedef struct _FloodfillAdvance
+{
+  MagickBooleanType
+    *skip;
+
+  ssize_t
+    *start,
+    *x;
+} FloodfillAdvance;
+
+static MagickBooleanType AdvanceFloodfillRun(const FloodfillRow *row,
+  const ssize_t x2,const FloodfillAdvance *advance)
+{
+  MagickBooleanType
+    *const skip = advance->skip;
+
+  ssize_t
+    *const start = advance->start,
+    *const x = advance->x;
+
+  (*skip)=MagickFalse;
+  (*x)++;
+  if ((*x) <= x2)
+    {
+      if (SkipFloodplaneRun(row,x2,x) == MagickFalse)
+        return(MagickFalse);
+    }
+  (*start)=(*x);
+  return(MagickTrue);
+}
+
+static void TileFloodplaneLine(const FloodfillTileView *view,
+  MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return;
+  if (TileFloodplaneView(view) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static MagickBooleanType CheckFloodfillOffsets(const Image *image,
+  const ssize_t x_offset,const ssize_t y_offset)
+{
+  if ((x_offset < 0) || (x_offset >= (ssize_t) image->columns))
+    return(MagickFalse);
+  if ((y_offset < 0) || (y_offset >= (ssize_t) image->rows))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
   const ssize_t y_offset,const MagickBooleanType invert,
@@ -471,9 +521,7 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   assert(draw_info->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse) 
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((x_offset < 0) || (x_offset >= (ssize_t) image->columns))
-    return(MagickFalse);
-  if ((y_offset < 0) || (y_offset >= (ssize_t) image->rows))
+  if (CheckFloodfillOffsets(image,x_offset,y_offset) == MagickFalse)
     return(MagickFalse);
   if (PrepareFloodfillImage(image,draw_info,exception) == MagickFalse)
     return(MagickFalse);
@@ -508,6 +556,9 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
 
     ssize_t
       x;
+
+    const FloodfillAdvance
+      advance = { &skip, &start, &x };
 
     /*
       Pop segment off stack.
@@ -548,14 +599,8 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
           if (x > (x2+1))
             PushSegmentStack(y,x2+1,x-1,-offset);
         }
-      skip=MagickFalse;
-      x++;
-      if (x <= x2)
-        {
-          if (SkipFloodplaneRun(&row,x2,&x) == MagickFalse)
-            break;
-        }
-      start=x;
+      if (AdvanceFloodfillRun(&row,x2,&advance) == MagickFalse)
+        break;
     } while (x <= x2);
   }
   status=MagickTrue;
@@ -565,23 +610,14 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    FloodfillTileView
-      view;
+    const FloodfillTileView
+      view = { image, floodplane_image, floodplane_view, image_view,
+        draw_info, y, exception };
 
     /*
       Tile fill color onto floodplane.
     */
-    if (status == MagickFalse)
-      continue;
-    view.image=image;
-    view.floodplane_image=floodplane_image;
-    view.floodplane_view=floodplane_view;
-    view.image_view=image_view;
-    view.draw_info=draw_info;
-    view.y=y;
-    view.exception=exception;
-    if (TileFloodplaneView(&view) == MagickFalse)
-      status=MagickFalse;
+    TileFloodplaneLine(&view,&status);
   }
   floodplane_view=DestroyCacheView(floodplane_view);
   image_view=DestroyCacheView(image_view);
