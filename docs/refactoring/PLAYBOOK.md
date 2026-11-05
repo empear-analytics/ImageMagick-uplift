@@ -7097,6 +7097,164 @@ Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe ST - Split a Selection at its Default, Copying the Return Tail
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method*, and much of the
+complexity is a `switch` of a value-returning function whose groups leave it in two ways:
+through `return(R);` (with different expressions `R`) and through `break;` to the
+statement after the `switch`, a single `return(R_T);` that ends the function; and whose
+`default:` group does work of its own, as `channel-alpha.c`'s `SetImageAlphaChannel`
+does: its Activate, Associate, Background, Disassociate and Off groups return `status` or
+the result of a row helper on some paths and break to the tail on others, and its
+`default:` group calls the copy-and-extract helper chain and breaks.
+
+**Not covered by:** Recipe SD, whose step 1 refuses a `return` in a group and whose new
+function is `void`; Recipe SR, whose returns all give one `R` meeting W step 2 and whose
+moved groups write plain locals only on returning paths (here `status` is written and then
+read by the tail); Recipe SW, whose every group must end in `return(R);` and whose
+`default:` group, `break;` alone or absent, stays in the caller (a kept `default:` that
+does work would receive the moved labels' values first); Recipe RV, whose block may hold no
+`break` that leaves it, and a run of groups is not one block; Recipe E step 7 on the whole
+`switch` and tail, whose new function keeps every label and is itself a *Complex Method*.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region; `e` is a variable, or an
+   expression of variables with no call, assignment or increment, that no statement
+   inside the `switch` writes. Directly after the `switch`, in the same block, stands
+   one statement `return(R_T);` that ends the function (Recipe E step 7, in a commit of
+   its own, can make a longer tail one call). No group of the `switch` falls through
+   into another.
+2. Choose the groups that move: the group carrying `default:` and groups adjacent to it,
+   a run in their source order. No moved group holds a `#pragma` line, a `continue` or
+   a `goto`; each ends with `return(R);` or with `break;` of this `switch`, and may hold
+   further such `return(R);` or `break;` statements inside selections. A `break` of a
+   loop or `switch` nested in a group is that construct's own and stays.
+3. The plain locals of the caller that the moved groups write are read after the
+   `switch` by nothing but `R_T`; they go by value, like everything the groups and
+   `R_T` read, as Recipe N steps 2 to 4 give the parameters (at most four, or an input
+   struct). Writes through pointers the groups already use stay as they are.
+4. Cut the moved groups, labels and bodies, in their order, into a new `static`
+   function of the caller's return type directly above the caller, whose body is
+   `switch (e) { <the groups> }` with the same text of `e`, followed by a copy of
+   `return(R_T);`. Nothing else in the text changes.
+5. Where the `default:` group stood, write the group `default:` alone, whose body is
+   `return(Helper(...));`. The kept groups and the caller's `return(R_T);` stay as they
+   were. Check by reading that every label of the original is in exactly one of the two
+   `switch`es, `default` in the new one, that each moved group is byte for byte the
+   original, and that every argument fills the parameter it names.
+6. Applied again to the caller, the run may hold the call group of step 5, which then
+   moves as the new function's `default:` group: a chain of functions, each a step and a
+   commit of its own, each ending with the same `return(R_T);`.
+
+**Before:**
+
+```c
+  status=MagickTrue;
+  switch (alpha_type)
+  {
+    case ActivateAlphaChannel:
+    {
+      if ((image->alpha_trait & BlendPixelTrait) != 0)
+        return(status);
+      image->alpha_trait=BlendPixelTrait;
+      break;
+    }
+    ...
+    case BackgroundAlphaChannel:
+    {
+      ...
+      status=SetImageStorageClass(image,DirectClass,exception);
+      if (status == MagickFalse)
+        break;
+      return(SetTransparentRowsToBackground(image,status,exception));
+    }
+    default:
+    {
+      SetCopyExtractAlpha(image,alpha_type,&status,exception);
+      break;
+    }
+    case DisassociateAlphaChannel:
+    ...
+  }
+  return(SyncAlphaChannelCache(image,status,exception));
+```
+
+**After:**
+
+```c
+static MagickBooleanType SetBackgroundAlpha(Image *image,
+  const AlphaChannelOption alpha_type,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  switch (alpha_type)
+  {
+    case BackgroundAlphaChannel:
+    {
+      ...
+      status=SetImageStorageClass(image,DirectClass,exception);
+      if (status == MagickFalse)
+        break;
+      return(SetTransparentRowsToBackground(image,status,exception));
+    }
+    default:
+    {
+      SetCopyExtractAlpha(image,alpha_type,&status,exception);
+      break;
+    }
+  }
+  return(SyncAlphaChannelCache(image,status,exception));
+}
+...
+    default:
+      return(SetBackgroundAlpha(image,alpha_type,status,exception));
+    case DisassociateAlphaChannel:
+    ...
+  }
+  return(SyncAlphaChannelCache(image,status,exception));
+```
+
+**Careful:**
+
+- Why the behaviour is the same, value by value. A value of `e` that matches a kept
+  label selects the same group as before, unchanged; its `break;` reaches the caller's
+  `return(R_T);`, which stays. One that matches a moved label (or none) selected its
+  group, or `default:`, before; now it selects the caller's `default:`, whose first act
+  is the call. Nothing between the two evaluations writes what `e` reads, and `e` has no
+  side effect, so the new `switch` selects the same group, which runs the same
+  statements on the same values.
+- A path that ended in `return(R);` computes `R` in the new function after the same
+  statements and returns it; the caller returns it at once. A path that ended in
+  `break;` ends the new `switch`, and the copy of `return(R_T);` runs: it reads the new
+  function's copies of the variables, which hold what the caller's would have held at
+  its `return(R_T);` (the group wrote them where it wrote them before, and nothing ran
+  in between); the caller returns that value at once.
+- The caller's own copies of the variables the groups write are left unwritten, and the
+  caller reads nothing after the call. `R_T` runs once on every path, in one function
+  or the other; only its text stands twice, which is why step 1 wants it to be one
+  statement (a copied block of several would be reported as *Code Duplication*).
+- `default` must move, as SD argues: left in the caller, it would receive the values of
+  the moved labels. Both `switch`es have a `default`, so `-Wswitch` warns about neither,
+  and the new function ends in a `return`, so no compiler warns that control reaches
+  its end.
+- The new function counts one per label towards its cyclomatic complexity; size the
+  run so that it is not a *Complex Method* (step 6 chains the rest).
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function and
+`+1` for the function `R_T` calls, its copy; nothing else moved), a case for each moved
+label where one exists, and steps 1 to 3 and 5 checked by reading.
+
+**Provenance:** 2026-11-05, from `channel-alpha.c`'s `SetImageAlphaChannel` (campaign A,
+W14 lane c): cc 16 and 81 lines, every group but `default:` mixing `break;` to the tail
+with `return(...)`, the plateau W13 and W14 lane d recorded (SD, SR, SW, RV and BR refuse
+it). A probe of the chain (Recipe E step 7 on the three-statement tail as
+`SyncAlphaChannelCache`, then this recipe on the Background and `default:` groups, then on
+the Activate and Associate groups with the call group): 8.96 to 8.98, 9.07 and 9.38, the
+function leaving *Complex Method* and *Large Method*, no finding on a new function. Added
+by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -7387,3 +7545,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | HC | Step 3: a callee of a construct's statement that may take another lock (the pixel cache's `file_semaphore`, taken by `SyncCacheViewAuthenticPixels` on a disk cache) is allowed, since the construct moves whole and unchanged and the thread takes the same locks in the same order and nesting; a function entering a critical of the same name, or `omp_set_lock` on a lock the caller holds, stays refused. *Careful* gives the argument. Still six steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree critical governs the row sync, whose `WritePixelCachePixels` locks `file_semaphore` for disk and distributed caches; step 3 as written refused every such callee | mandate (2026-10-24) |
 | 2026-11-05 | NEW | PD | Name a Parameter-or-Default Selection: the whole right-hand side `(n >= k) ? values[k-1] : d` of an assignment, at three or more sites of one file, becomes a call of one `static inline` function taking `n`, `values`, `k` and `d`; oracle evidence (the object code is not byte-identical) | `statistic-function.c`'s three case helpers (campaign A, W14 lane d): twelve parameter defaults held *Overall Code Complexity*; a probe 9.09 to 9.68 | mandate (2026-10-24) |
 | 2026-11-05 | NEW | RP | Extract Progress Loop Returning the Progress: a sequential pass whose progress block holds an orphaned `#pragma omp atomic` `progress++` (moving whole and unchanged, Recipe N step 1) and which may clear `status` moves into a `static` function that returns `progress` (declared there, or by value) and takes `status` by pointer (`(*status)`, PS step 4's text); other writes are Recipe E step 4 temporaries; at most four parameters. *Careful* gives the binding and return arguments | `segment.c`'s `Classify` (campaign A, W14 lane a): after H, I and N its sequential counting pass, writing `progress` and `status` that the parallel pass reads, held the last *Complex Method* (cc 9) and *Large Method* (90 lines); E, N, O, K and Q refuse it (second written variable, or `(*progress)++` under the atomic). A probe: 6.67 to 7.01, no finding on the helper | mandate (2026-10-24) |
+| 2026-11-05 | NEW | ST | Split a Selection at its Default, Copying the Return Tail: the `default:` group of a `switch` and groups adjacent to it, which leave through `return(R);` (any `R`) or through `break;` to a single `return(R_T);` that ends the function, move to a `static` function of the caller's return type whose body is the moved groups' `switch` followed by a copy of `return(R_T);`; the caller's `default:` becomes `return(Helper(...));` and keeps its own `return(R_T);` for the kept groups. Variables the groups write go by value (only `R_T` read them after the `switch`). *Careful* gives the argument | `channel-alpha.c`'s `SetImageAlphaChannel` (campaign A, W14 lane c): cc 16, 81 lines, groups mixing `break;` to the tail with `return(...)`, refused by SD, SR, SW, RV and BR. A probe of the chain (E step 7 on the tail, then two steps of this recipe): 8.96 to 8.98, 9.07 and 9.38, no finding on a new function | mandate (2026-10-24) |
