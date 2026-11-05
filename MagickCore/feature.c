@@ -670,6 +670,13 @@ static void ComputeCannyGradientRow(MagickBooleanType *status,
   SetCannyGradientRow(edge_image,canny_cache,p,y);
 }
 
+static void SyncFeatureView(CacheView *view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void SetFeatureProgress(const Image *image,const char *tag,
   const MagickOffsetType progress,MagickBooleanType *status)
 {
@@ -848,8 +855,7 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
       *q=(Quantum) 0;
       q+=(ptrdiff_t) GetPixelChannels(edge_image);
     }
-    if (SyncCacheViewAuthenticPixels(edge_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncFeatureView(edge_view,exception,&status);
   }
   edge_view=DestroyCacheView(edge_view);
   /*
