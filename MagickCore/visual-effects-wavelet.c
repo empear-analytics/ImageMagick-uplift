@@ -110,6 +110,17 @@
 #include "MagickCore/visual-effects.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _WaveletLine
+{
+  size_t
+    stride,
+    extent,
+    scale;
+} WaveletLine;
+
+/*
   Define declarations.
 */
 #define AddNoiseImageTag  "AddNoise/Image"
@@ -150,8 +161,13 @@
 */
 
 static inline void HatTransform(const float *magick_restrict pixels,
-  const size_t stride,const size_t extent,const size_t scale,float *kernel)
+  const WaveletLine *line,float *kernel)
 {
+  const size_t
+    stride = line->stride,
+    extent = line->extent,
+    scale = line->scale;
+
   const float
     *magick_restrict p,
     *magick_restrict q,
@@ -514,9 +530,15 @@ static size_t DecomposeWaveletLevels(const WaveletDenoise *denoise,
         *magick_restrict p,
         *magick_restrict q;
 
+      WaveletLine
+        line;
+
       p=denoise->kernel+id*(ssize_t) image->columns;
       q=denoise->pixels+y*(ssize_t) image->columns;
-      HatTransform(q+high_pass,1,image->columns,((size_t) 1UL << level),p);
+      line.stride=1;
+      line.extent=image->columns;
+      line.scale=((size_t) 1UL << level);
+      HatTransform(q+high_pass,&line,p);
       q+=(ptrdiff_t) low_pass;
       CopyWaveletRow(image,p,q);
     }
@@ -533,9 +555,15 @@ static size_t DecomposeWaveletLevels(const WaveletDenoise *denoise,
         *magick_restrict p,
         *magick_restrict q;
 
+      WaveletLine
+        line;
+
       p=denoise->kernel+id*(ssize_t) image->rows;
       q=denoise->pixels+x+low_pass;
-      HatTransform(q,image->columns,image->rows,((size_t) 1UL << level),p);
+      line.stride=image->columns;
+      line.extent=image->rows;
+      line.scale=((size_t) 1UL << level);
+      HatTransform(q,&line,p);
       CopyWaveletColumn(image,p,q);
     }
     /*
