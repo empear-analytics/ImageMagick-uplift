@@ -1623,6 +1623,74 @@ static double *PolarCoefficients(double *coeff,const DistortMethod *method,
   return(coeff);
 }
 
+static double *CylinderCoefficients(double *coeff,const DistortMethod *method,
+  const CoefficientContext *context)
+{
+  const Image
+    *const image = context->image;
+
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
+  /* 3D Cylinder to/from a Tangential Plane
+
+     Projection between a cylinder and flat plain from a point on the
+     center line of the cylinder.
+
+     The two surfaces coincide in 3D space at the given centers of
+     distortion (perpendicular to projection point) on both images.
+
+     Args:  FOV_arc_width
+     Coefficients: FOV(radians), Radius, center_x,y, dest_center_x,y
+
+     FOV (Field Of View) the angular field of view of the distortion,
+     across the width of the image, in degrees.  The centers are the
+     points of least distortion in the input and resulting images.
+
+     These centers are however determined later.
+
+     Coeff 0 is the FOV angle of view of image width in radians
+     Coeff 1 is calculated radius of cylinder.
+     Coeff 2,3  center of distortion of input image
+     Coefficients 4,5 Center of Distortion of dest (determined later)
+  */
+  if (number_arguments < 1) {
+    coeff=(double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument", "%s : 'Needs at least 1 argument'",
+        CommandOptionToMnemonic(MagickDistortOptions,*method));
+    return((double *) NULL);
+  }
+  if ( arguments[0] < MagickEpsilon || arguments[0] > 160.0 ) {
+    coeff=(double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument", "%s : Invalid FOV Angle",
+        CommandOptionToMnemonic(MagickDistortOptions,*method));
+    return((double *) NULL);
+  }
+  coeff[0] = DegreesToRadians(arguments[0]);
+  if ( *method == Cylinder2PlaneDistortion )
+    /* image is curved around cylinder, so FOV angle (in radians)
+     * scales directly to image X coordinate, according to its radius.
+     */
+    coeff[1] = (double) image->columns/coeff[0];
+  else
+    /* radius is distance away from an image with this angular FOV */
+    coeff[1] = (double) image->columns / ( 2 * tan(coeff[0]/2) );
+
+  coeff[2] = (double)(image->columns)/2.0+image->page.x;
+  coeff[3] = (double)(image->rows)/2.0+image->page.y;
+  coeff[4] = coeff[2];
+  coeff[5] = coeff[3]; /* assuming image size is the same */
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1821,59 +1889,7 @@ static double *GenerateCoefficients(const Image *image,
       return(PolarCoefficients(coeff,method,&context));
     case Cylinder2PlaneDistortion:
     case Plane2CylinderDistortion:
-    {
-      /* 3D Cylinder to/from a Tangential Plane
-
-         Projection between a cylinder and flat plain from a point on the
-         center line of the cylinder.
-
-         The two surfaces coincide in 3D space at the given centers of
-         distortion (perpendicular to projection point) on both images.
-
-         Args:  FOV_arc_width
-         Coefficients: FOV(radians), Radius, center_x,y, dest_center_x,y
-
-         FOV (Field Of View) the angular field of view of the distortion,
-         across the width of the image, in degrees.  The centers are the
-         points of least distortion in the input and resulting images.
-
-         These centers are however determined later.
-
-         Coeff 0 is the FOV angle of view of image width in radians
-         Coeff 1 is calculated radius of cylinder.
-         Coeff 2,3  center of distortion of input image
-         Coefficients 4,5 Center of Distortion of dest (determined later)
-      */
-      if (number_arguments < 1) {
-        coeff=(double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "InvalidArgument", "%s : 'Needs at least 1 argument'",
-            CommandOptionToMnemonic(MagickDistortOptions,*method));
-        return((double *) NULL);
-      }
-      if ( arguments[0] < MagickEpsilon || arguments[0] > 160.0 ) {
-        coeff=(double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "InvalidArgument", "%s : Invalid FOV Angle",
-            CommandOptionToMnemonic(MagickDistortOptions,*method));
-        return((double *) NULL);
-      }
-      coeff[0] = DegreesToRadians(arguments[0]);
-      if ( *method == Cylinder2PlaneDistortion )
-        /* image is curved around cylinder, so FOV angle (in radians)
-         * scales directly to image X coordinate, according to its radius.
-         */
-        coeff[1] = (double) image->columns/coeff[0];
-      else
-        /* radius is distance away from an image with this angular FOV */
-        coeff[1] = (double) image->columns / ( 2 * tan(coeff[0]/2) );
-
-      coeff[2] = (double)(image->columns)/2.0+image->page.x;
-      coeff[3] = (double)(image->rows)/2.0+image->page.y;
-      coeff[4] = coeff[2];
-      coeff[5] = coeff[3]; /* assuming image size is the same */
-      return(coeff);
-    }
+      return(CylinderCoefficients(coeff,method,&context));
     case BarrelDistortion:
     case BarrelInverseDistortion:
     {
