@@ -629,6 +629,82 @@ static void AddAffineTerms(double *coeff,double **matrix,double **vectors,
   }
 }
 
+static double *AffineCoefficients(double *coeff,const DistortMethod *method,
+  const CoefficientContext *context)
+{
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments,
+    number_values = context->number_values,
+    cp_size = context->cp_size,
+    cp_values = context->cp_values;
+
+  /* Affine Distortion
+       v =  c0*x + c1*y + c2
+     for each 'value' given
+
+     Input Arguments are sets of control points...
+     For Distort Images    u,v, x,y  ...
+     For Sparse Gradients  x,y, r,g,b  ...
+  */
+  double
+    **matrix,
+    **vectors;
+
+  MagickBooleanType
+    status;
+
+  if ( number_arguments%cp_size != 0 ||
+       number_arguments < cp_size ) {
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+           "InvalidArgument", "%s : 'require at least %.17g CPs'",
+           "Affine", 1.0);
+    coeff=(double *) RelinquishMagickMemory(coeff);
+    return((double *) NULL);
+  }
+  /* handle special cases of not enough arguments */
+  if ( number_arguments == cp_size ) {
+    /* Only 1 CP Set Given */
+    SetAffineSingleCoefficients(coeff,arguments,cp_values,number_values);
+    return(coeff);
+  }
+  /* 2 or more points (usually 3) given.
+     Solve a least squares simultaneous equation for coefficients.
+  */
+  /* create matrix, and a fake vectors matrix */
+  matrix=AcquireMagickMatrix(3UL,3UL);
+  vectors=(double **) AcquireQuantumMemory(number_values,
+    sizeof(*vectors));
+  if (matrix == (double **) NULL || vectors == (double **) NULL)
+  {
+    matrix  = RelinquishMagickMatrix(matrix, 3UL);
+    vectors = (double **) RelinquishMagickMemory(vectors);
+    coeff   = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),
+            ResourceLimitError,"MemoryAllocationFailed",
+            "%s", "DistortCoefficients");
+    return((double *) NULL);
+  }
+  AddAffineTerms(coeff,matrix,vectors,context);
+  /* Solve for LeastSquares Coefficients */
+  status=GaussJordanElimination(matrix,vectors,3UL,number_values);
+  matrix = RelinquishMagickMatrix(matrix, 3UL);
+  vectors = (double **) RelinquishMagickMemory(vectors);
+  if ( status == MagickFalse ) {
+    coeff = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument","%s : 'Unsolvable Matrix'",
+        CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    return((double *) NULL);
+  }
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -787,67 +863,7 @@ static double *GenerateCoefficients(const Image *image,
   switch (*method)
   {
     case AffineDistortion:
-    {
-      /* Affine Distortion
-           v =  c0*x + c1*y + c2
-         for each 'value' given
-
-         Input Arguments are sets of control points...
-         For Distort Images    u,v, x,y  ...
-         For Sparse Gradients  x,y, r,g,b  ...
-      */
-      double
-        **matrix,
-        **vectors;
-
-      MagickBooleanType
-        status;
-
-      if ( number_arguments%cp_size != 0 ||
-           number_arguments < cp_size ) {
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-               "InvalidArgument", "%s : 'require at least %.17g CPs'",
-               "Affine", 1.0);
-        coeff=(double *) RelinquishMagickMemory(coeff);
-        return((double *) NULL);
-      }
-      /* handle special cases of not enough arguments */
-      if ( number_arguments == cp_size ) {
-        /* Only 1 CP Set Given */
-        SetAffineSingleCoefficients(coeff,arguments,cp_values,number_values);
-        return(coeff);
-      }
-      /* 2 or more points (usually 3) given.
-         Solve a least squares simultaneous equation for coefficients.
-      */
-      /* create matrix, and a fake vectors matrix */
-      matrix=AcquireMagickMatrix(3UL,3UL);
-      vectors=(double **) AcquireQuantumMemory(number_values,
-        sizeof(*vectors));
-      if (matrix == (double **) NULL || vectors == (double **) NULL)
-      {
-        matrix  = RelinquishMagickMatrix(matrix, 3UL);
-        vectors = (double **) RelinquishMagickMemory(vectors);
-        coeff   = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),
-                ResourceLimitError,"MemoryAllocationFailed",
-                "%s", "DistortCoefficients");
-        return((double *) NULL);
-      }
-      AddAffineTerms(coeff,matrix,vectors,&context);
-      /* Solve for LeastSquares Coefficients */
-      status=GaussJordanElimination(matrix,vectors,3UL,number_values);
-      matrix = RelinquishMagickMatrix(matrix, 3UL);
-      vectors = (double **) RelinquishMagickMemory(vectors);
-      if ( status == MagickFalse ) {
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "InvalidArgument","%s : 'Unsolvable Matrix'",
-            CommandOptionToMnemonic(MagickDistortOptions, *method) );
-        return((double *) NULL);
-      }
-      return(coeff);
-    }
+      return(AffineCoefficients(coeff,method,&context));
     case RigidAffineDistortion:
     {
       double
