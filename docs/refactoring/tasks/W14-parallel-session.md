@@ -69,3 +69,11 @@ script. Whole catalogue on the merged tree: 15,900 cases, 0 diverged.
 Saturated; see its plateau row. The lane found clean shared levers (sync helper, trait predicate, head and
 mask predicate) that are flat alone; one would need a Recipe P amendment for operands declared only for the
 test.
+
+## Lane d, second batch: enhance.c 5.83 -> 7.13, effect.c 6.17 -> 6.75 (Sonnet, 15 commits)
+
+Amendment under the mandate, not yet ruled on: **Recipe NS step 1** (26fb3d849) lets the expression be the
+whole right-hand side of an assignment (`sign=c ? 1 : -1;`) at a single site when the step takes its
+function out of *Complex Method*, with signed integer literals as `k1` and `k2`. FI steps proven IDENTICAL by
+`obj_identical.sh`. A first verification loop in the lane lost its function name in the WSL quoting and
+started two empty-name casemap re-indexes; stopped, scripts used afterwards.
