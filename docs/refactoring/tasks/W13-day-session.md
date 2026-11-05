@@ -251,3 +251,13 @@ whole catalogue 15,900 cases 0 diverged. One commit is parked on the local branc
 (`GetImageTargets`, Recipe W with a returned value that is not a constant, 9.57 -> 9.60): **owner
 ruling** on whether W step 2 allows it. Noticed upstream, not changed: the trim loop spins forever if no
 edge census equals the minimum (unreachable in practice).
+
+### 2026-11-05, after the night: recipes and amendments approved
+
+The owner said "you can add the recipes and the amendments": Recipes PC, FI, RV, EI, SW and CB and the
+amendments to PS (steps 2, 7, 8, wording), SD, OC, PC (steps 2 and 4), LB (steps 4 and 8), Z (step 7)
+and I (step 2) are now decided by `owner` in the Catalogue changes table, not by the
+mandate. Not covered by that approval and still open: the `#if M` branch (`layer.c`), pure label-run
+helpers (`composite.c`), PC step 1 with the guard outside the helper (`transform.c`), PS on
+per-iteration array elements (`attribute.c`), Recipe W with a non-constant returned value
+(`attribute-bounds.c`), and the PS/PC use on the unreached `TransparentPaintImageChroma` (`paint.c`).
