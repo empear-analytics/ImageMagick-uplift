@@ -333,6 +333,20 @@ static MagickBooleanType TraceCannyRow(const CannyTrace *trace,
   return(MagickTrue);
 }
 
+static MagickBooleanType TraceCannyRows(const CannyTrace *trace,
+  ExceptionInfo *exception,const CannyTraceTargets *targets)
+{
+  ssize_t
+    v;
+
+  for (v=(-1); v <= 1; v++)
+  {
+    if (TraceCannyRow(trace,exception,v,targets) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
   const ssize_t y,ExceptionInfo *exception)
 {
@@ -355,18 +369,12 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
     return(MagickFalse);
   for (i=1; i != 0; )
   {
-    ssize_t
-      v;
-
     i--;
     status=GetMatrixElement(canny_cache,i,0,&edge);
     if (status == MagickFalse)
       return(MagickFalse);
-    for (v=(-1); v <= 1; v++)
-    {
-      if (TraceCannyRow(trace,exception,v,&targets) == MagickFalse)
-        return(MagickFalse);
-    }
+    if (TraceCannyRows(trace,exception,&targets) == MagickFalse)
+      return(MagickFalse);
   }
   return(MagickTrue);
 }
