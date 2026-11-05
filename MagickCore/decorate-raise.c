@@ -276,6 +276,38 @@ static MagickBooleanType GetRaiseRow(const RaiseRows *rows,const ssize_t y,
   return(MagickTrue);
 }
 
+static MagickBooleanType DrawRaiseTopRows(const RaiseRows *rows,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = rows->image;
+
+  CacheView
+    *const image_view = rows->image_view;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  const Quantum
+    foreground = rows->foreground,
+    background = rows->background;
+
+  Quantum
+    *magick_restrict q;
+
+  RaiseTop
+    raise_top;
+
+  if (GetRaiseRow(rows,y,&q,status) == MagickFalse)
+    return(MagickFalse);
+  raise_top.image=image;
+  raise_top.foreground=foreground;
+  raise_top.background=background;
+  DrawRaiseTopRow(&raise_top,y,q);
+  SyncRaiseRow(image_view,exception,status);
+  return(MagickTrue);
+}
+
 static MagickBooleanType DrawRaiseBottomRows(const RaiseRows *rows,
   const ssize_t y,MagickBooleanType *status)
 {
@@ -483,19 +515,8 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
       rows = { image, image_view, exception, raise_info, foreground,
         background };
 
-    Quantum
-      *magick_restrict q;
-
-    RaiseTop
-      raise_top;
-
-    if (GetRaiseRow(&rows,y,&q,&status) == MagickFalse)
+    if (DrawRaiseTopRows(&rows,y,&status) == MagickFalse)
       continue;
-    raise_top.image=image;
-    raise_top.foreground=foreground;
-    raise_top.background=background;
-    DrawRaiseTopRow(&raise_top,y,q);
-    SyncRaiseRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
