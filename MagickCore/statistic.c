@@ -1296,6 +1296,91 @@ static PixelChannels *ClearEvaluatePixels(const Image *image,
   return(evaluate_pixel);
 }
 
+static MagickBooleanType EvaluateOtherImages(const EvaluateImagesLoop *loop,
+  RandomInfo **magick_restrict random_info,MagickBooleanType status,
+  MagickOffsetType progress)
+{
+  Image
+    *const image = loop->image;
+
+  const Image
+    *const images = loop->images;
+
+  const size_t
+    number_images = loop->number_images;
+
+  CacheView
+    **const image_view = loop->image_view,
+    *const evaluate_view = loop->evaluate_view;
+
+  PixelChannels
+    **magick_restrict const evaluate_pixels = loop->evaluate_pixels;
+
+  const MagickEvaluateOperator
+    op = loop->op;
+
+  ExceptionInfo
+    *const exception = loop->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  unsigned long
+    key;
+#endif
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  key=GetRandomSecretKey(random_info[0]);
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,images,image->rows,key == ~0UL)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    const Quantum
+      **p;
+
+    EvaluateImagesRows
+      rows;
+
+    PixelChannels
+      *evaluate_pixel;
+
+    Quantum
+      *magick_restrict q;
+
+    const EvaluateRowHead
+      head = { images, image, image_view, evaluate_view, number_images, y,
+        exception };
+
+    if (FetchEvaluateRows(&head,&p,&q,&status) == MagickFalse)
+      continue;
+    evaluate_pixel=ClearEvaluatePixels(image,evaluate_pixels,id);
+    rows.image=image;
+    rows.images=images;
+    rows.number_images=number_images;
+    rows.random_info=random_info;
+    rows.id=id;
+    rows.op=op;
+    AccumulateEvaluateRows(&rows,p,evaluate_pixel);
+    NormalizeEvaluatePixels(image,op,number_images,evaluate_pixel);
+    SetEvaluatePixels(image,evaluate_pixel,q);
+    FinishEvaluateRows(p,evaluate_view,exception,&status);
+    if (images->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetEvaluateProgress(images,image,progress,&status);
+      }
+  }
+  return(status);
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -1323,14 +1408,6 @@ MagickExport Image *EvaluateImages(const Image *images,
 
   size_t
     number_images;
-
-  ssize_t
-    y;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  unsigned long
-    key;
-#endif
 
   const EvaluateCanvasTargets
     targets = { &image, &number_images, &evaluate_pixels };
@@ -1373,56 +1450,7 @@ MagickExport Image *EvaluateImages(const Image *images,
   if (op == MedianEvaluateOperator)
     status=EvaluateMedianImages(&loop,status,progress);
   else
-    {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      key=GetRandomSecretKey(random_info[0]);
-      #pragma omp parallel for schedule(static) shared(progress,status) \
-        magick_number_threads(image,images,image->rows,key == ~0UL)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const int
-          id = GetOpenMPThreadId();
-
-        const Quantum
-          **p;
-
-        EvaluateImagesRows
-          rows;
-
-        PixelChannels
-          *evaluate_pixel;
-
-        Quantum
-          *magick_restrict q;
-
-        const EvaluateRowHead
-          head = { images, image, image_view, evaluate_view, number_images, y,
-            exception };
-
-        if (FetchEvaluateRows(&head,&p,&q,&status) == MagickFalse)
-          continue;
-        evaluate_pixel=ClearEvaluatePixels(image,evaluate_pixels,id);
-        rows.image=image;
-        rows.images=images;
-        rows.number_images=number_images;
-        rows.random_info=random_info;
-        rows.id=id;
-        rows.op=op;
-        AccumulateEvaluateRows(&rows,p,evaluate_pixel);
-        NormalizeEvaluatePixels(image,op,number_images,evaluate_pixel);
-        SetEvaluatePixels(image,evaluate_pixel,q);
-        FinishEvaluateRows(p,evaluate_view,exception,&status);
-        if (images->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp atomic
-#endif
-            progress++;
-            SetEvaluateProgress(images,image,progress,&status);
-          }
-      }
-    }
+    status=EvaluateOtherImages(&loop,random_info,status,progress);
   DestroyEvaluateViews(number_images,image_view);
   image_view=(CacheView **) RelinquishMagickMemory(image_view);
   evaluate_view=DestroyCacheView(evaluate_view);
