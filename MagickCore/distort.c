@@ -3464,6 +3464,39 @@ static void PrintDistortFX(const DistortVerboseFX *fx)
   }
 }
 
+typedef struct _VerboseDestination
+{
+  MagickBooleanType
+    bestfit,
+    viewport_given;
+
+  RectangleInfo
+    geometry;
+} VerboseDestination;
+
+static void SetVerboseDestination(const VerboseDestination *destination,
+  char (*image_gen)[MagickPathExtent],const char **lookup)
+{
+  const MagickBooleanType
+    bestfit = destination->bestfit,
+    viewport_given = destination->viewport_given;
+
+  const RectangleInfo
+    geometry = destination->geometry;
+
+  if ( bestfit || viewport_given ) {
+    (void) FormatLocaleString((*image_gen),MagickPathExtent,
+      "  -size %.17gx%.17g -page %+.20g%+.20g xc: +insert \\\n",
+      (double) geometry.width,(double) geometry.height,(double) geometry.x,
+      (double) geometry.y);
+    (*lookup)="v.p{xx-v.page.x-0.5,yy-v.page.y-0.5}";
+  }
+  else {
+    (*image_gen)[0] = '\0';             /* no destination to generate */
+    (*lookup) = "p{xx-page.x-0.5,yy-page.y-0.5}"; /* simplify lookup */
+  }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3755,18 +3788,14 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
     DistortVerboseFX
       fx;
 
+    VerboseDestination
+      destination;
+
     /* Set destination image size and virtual offset */
-    if ( bestfit || viewport_given ) {
-      (void) FormatLocaleString(image_gen,MagickPathExtent,
-        "  -size %.17gx%.17g -page %+.20g%+.20g xc: +insert \\\n",
-        (double) geometry.width,(double) geometry.height,(double) geometry.x,
-        (double) geometry.y);
-      lookup="v.p{xx-v.page.x-0.5,yy-v.page.y-0.5}";
-    }
-    else {
-      image_gen[0] = '\0';             /* no destination to generate */
-      lookup = "p{xx-page.x-0.5,yy-page.y-0.5}"; /* simplify lookup */
-    }
+    destination.bestfit=bestfit;
+    destination.viewport_given=viewport_given;
+    destination.geometry=geometry;
+    SetVerboseDestination(&destination,&image_gen,&lookup);
 
     fx.method=method;
     fx.image=image;
