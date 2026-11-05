@@ -802,6 +802,41 @@ static void SetShapeRemoveAlpha(Image *image,const AlphaChannelOption alpha_type
   }
 }
 
+static void SetOffSetAlpha(Image *image,const AlphaChannelOption alpha_type,
+  MagickBooleanType *status,ExceptionInfo *exception)
+{
+  switch (alpha_type)
+  {
+    case OffIfOpaqueAlphaChannel:
+    {
+      /*
+        Remove opaque alpha channel.
+      */
+      if ((image->alpha_trait & BlendPixelTrait) == 0)
+        break;
+      (*status)=RemoveOpaqueAlpha(image,(*status),exception);
+      break;
+    }
+    case SetAlphaChannel:
+    {
+      (*status)=SetMissingAlphaOpaque(image,(*status),exception);
+      break;
+    }
+    case TransparentAlphaChannel:
+    {
+      (*status)=SetImageAlpha(image,TransparentAlpha,exception);
+      break;
+    }
+    case UndefinedAlphaChannel:
+      break;
+    default:
+    {
+      SetShapeRemoveAlpha(image,alpha_type,status,exception);
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -909,14 +944,9 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
       image->alpha_trait=UndefinedPixelTrait;
       break;
     }
-    case OffIfOpaqueAlphaChannel:
+    default:
     {
-      /*
-        Remove opaque alpha channel.
-      */
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        break;
-      status=RemoveOpaqueAlpha(image,status,exception);
+      SetOffSetAlpha(image,alpha_type,&status,exception);
       break;
     }
     case OnAlphaChannel:
@@ -929,23 +959,6 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
       status=SetImageAlpha(image,OpaqueAlpha,exception);
       break;
     }
-    default:
-    {
-      SetShapeRemoveAlpha(image,alpha_type,&status,exception);
-      break;
-    }
-    case SetAlphaChannel:
-    {
-      status=SetMissingAlphaOpaque(image,status,exception);
-      break;
-    }
-    case TransparentAlphaChannel:
-    {
-      status=SetImageAlpha(image,TransparentAlpha,exception);
-      break;
-    }
-    case UndefinedAlphaChannel:
-      break;
   }
   if (status == MagickFalse)
     return(status);
