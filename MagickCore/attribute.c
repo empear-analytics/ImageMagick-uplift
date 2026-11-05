@@ -233,6 +233,58 @@ static const char *GetEdgeBackgroundArtifact(const Image *image)
   return(artifact);
 }
 
+static double CountRowNonBackground(const Image *edge_image,
+  const Quantum *p,const PixelInfo *background)
+{
+  double
+    count;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  count=0.0;
+  for (x=0; x < (ssize_t) edge_image->columns; x++)
+  {
+    GetPixelInfoPixel(edge_image,p,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,background) == MagickFalse)
+      count++;
+    p+=(ptrdiff_t) GetPixelChannels(edge_image);
+  }
+  return(count);
+}
+
+static double CountEdgeNonBackground(const Image *edge_image,
+  const PixelInfo *background,ExceptionInfo *exception)
+{
+  CacheView
+    *edge_view;
+
+  double
+    count;
+
+  ssize_t
+    y;
+
+  count=0.0;
+  edge_view=AcquireVirtualCacheView(edge_image,exception);
+  for (y=0; y < (ssize_t) edge_image->rows; y++)
+  {
+    const Quantum
+      *p;
+
+    p=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,
+      exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    count+=CountRowNonBackground(edge_image,p,background);
+  }
+  edge_view=DestroyCacheView(edge_view);
+  return(count);
+}
+
 static PixelInfo GetEdgeBackgroundColor(const Image *image,
   const CacheView *image_view,ExceptionInfo *exception)
 {
@@ -259,9 +311,6 @@ static PixelInfo GetEdgeBackgroundColor(const Image *image,
 #endif
   for (i=0; i < 4; i++)
   {
-    CacheView
-      *edge_view;
-
     GravityType
       gravity;
 
@@ -271,17 +320,11 @@ static PixelInfo GetEdgeBackgroundColor(const Image *image,
     ImageEdge
       edge;
 
-    PixelInfo
-      pixel;
-
     RectangleInfo
       edge_geometry;
 
     const Quantum
       *p;
-
-    ssize_t
-      y;
 
     census[i]=0.0;
     (void) memset(&edge_geometry,0,sizeof(edge_geometry));
@@ -298,25 +341,7 @@ static PixelInfo GetEdgeBackgroundColor(const Image *image,
     edge_image=CropImage(image,&edge_geometry,exception);
     if (edge_image == (Image *) NULL)
       continue;
-    edge_view=AcquireVirtualCacheView(edge_image,exception);
-    for (y=0; y < (ssize_t) edge_image->rows; y++)
-    {
-      ssize_t
-        x;
-
-      p=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,
-        exception);
-      if (p == (const Quantum *) NULL)
-        break;
-      for (x=0; x < (ssize_t) edge_image->columns; x++)
-      {
-        GetPixelInfoPixel(edge_image,p,&pixel);
-        if (IsFuzzyEquivalencePixelInfo(&pixel,background+i) == MagickFalse)
-          census[i]++;
-        p+=(ptrdiff_t) GetPixelChannels(edge_image);
-      }
-    }
-    edge_view=DestroyCacheView(edge_view);
+    census[i]=CountEdgeNonBackground(edge_image,background+i,exception);
     edge_image=DestroyImage(edge_image);
   }
   return(GetDominantEdgeBackground(census,background,edge_background));
