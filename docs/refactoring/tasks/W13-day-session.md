@@ -128,3 +128,24 @@ are mostly flat plan steps (rule 2) for +0.01 in all; `colorspace.c` 6dc7b78b8 i
 and its `threshold_trigger` test can never fire; `CompositeOverImage` and the main loop of
 `CompositeImage` have dead `canvas_pixel`/`source_pixel` initialisations and `CompositeOverImage`
 sets `status` and `progress` twice; `HoughLineImage` reports progress under `CannyEdgeImageTag`.
+
+### 02:00 to 03:30: whole-function chains
+
+The shared-helper lever is spent on most files; what still moves a red file is making a giant
+function leave Bumpy Road, Complex Method and Large Method completely, with a chain of finding-free
+helpers planned and measured on a scratch copy first.
+
+| File | Score | Commits |
+| --- | --- | ---: |
+| `fx.c` (`GetFunction`) | 3.37 -> 3.52 | 17 (incl. 2 playbook) |
+| `distort.c` (`GenerateCoefficients`) | 3.55 -> **4.25** | 31 (incl. 1 playbook) |
+
+**New playbook text, not ruled on:** Recipe SW (Split a Returning Selection into Chained Functions;
+6f1cac76c), Recipe EI (Chain Exiting Guards into an Else-If; d76680685: CodeScene counts `else { if }`
+as a bump and `else if` as none, so EI changes what the metric sees, not the code; obj_identical
+IDENTICAL), Recipe I step 2 amendment (dc05428f1: up to six writes via a const struct of addresses).
+The distort.c chain is flat through its first 15 code commits and rests on rule 2's plan clause; the
+eight `#if 0` blocks moved verbatim with their cases (compared by script).
+
+**Noticed upstream, not changed.** The count switch in `GenerateCoefficients` has a stray `break;`
+after the `#if 0 case QuadrilateralDistortion`, and `QuadrilateralDistortion` reports 19 coefficients.
