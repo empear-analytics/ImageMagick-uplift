@@ -420,9 +420,29 @@ static Image *ExtractChopImageBelow(const ChopRowImages *chop,
   return(FinishChopImage(image,chop_image,image_view,status));
 }
 
-MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
-  ExceptionInfo *exception)
+typedef struct _ChopImageInputs
 {
+  const Image
+    *image;
+
+  RectangleInfo
+    extent;
+
+  ExceptionInfo
+    *exception;
+} ChopImageInputs;
+
+static Image *ExtractChopImage(Image *chop_image,const ChopImageInputs *inputs)
+{
+  const Image
+    *const image = inputs->image;
+
+  const RectangleInfo
+    extent = inputs->extent;
+
+  ExceptionInfo
+    *const exception = inputs->exception;
+
   CacheView
     *chop_view,
     *image_view;
@@ -430,44 +450,15 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ChopRowImages
     chop;
 
-  Image
-    *chop_image;
-
   MagickBooleanType
     status;
 
   MagickOffsetType
     progress;
 
-  RectangleInfo
-    extent;
-
   ssize_t
     y;
 
-  /*
-    Check chop geometry.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  assert(chop_info != (RectangleInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (IsChopOutsideImage(image,chop_info) != MagickFalse)
-    ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
-  extent=(*chop_info);
-  extent=ClampChopExtent(image,extent);
-  if (IsChopExtentTooLarge(image,extent) != MagickFalse)
-    ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
-  chop_image=CloneImage(image,image->columns-extent.width,image->rows-
-    extent.height,MagickTrue,exception);
-  if (chop_image == (Image *) NULL)
-    return((Image *) NULL);
-  /*
-    Extract chop image.
-  */
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
@@ -504,6 +495,47 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   chop.extent=extent;
   chop.exception=exception;
   return(ExtractChopImageBelow(&chop,progress,status));
+}
+
+MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
+  ExceptionInfo *exception)
+{
+  ChopImageInputs
+    inputs;
+
+  Image
+    *chop_image;
+
+  RectangleInfo
+    extent;
+
+  /*
+    Check chop geometry.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  assert(chop_info != (RectangleInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (IsChopOutsideImage(image,chop_info) != MagickFalse)
+    ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
+  extent=(*chop_info);
+  extent=ClampChopExtent(image,extent);
+  if (IsChopExtentTooLarge(image,extent) != MagickFalse)
+    ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
+  chop_image=CloneImage(image,image->columns-extent.width,image->rows-
+    extent.height,MagickTrue,exception);
+  if (chop_image == (Image *) NULL)
+    return((Image *) NULL);
+  /*
+    Extract chop image.
+  */
+  inputs.image=image;
+  inputs.extent=extent;
+  inputs.exception=exception;
+  return(ExtractChopImage(chop_image,&inputs));
 }
 
 /*
