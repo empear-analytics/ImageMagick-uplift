@@ -324,6 +324,13 @@ static MagickBooleanType CloneEffectImage(const Image *image,
   return(MagickTrue);
 }
 
+static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    image=DestroyImage(image);
+  return(image);
+}
+
 MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
   const double attenuate,ExceptionInfo *exception)
 {
@@ -397,9 +404,7 @@ MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
   noise_view=DestroyCacheView(noise_view);
   image_view=DestroyCacheView(image_view);
   random_info=DestroyRandomInfoTLS(random_info);
-  if (status == MagickFalse)
-    noise_image=DestroyImage(noise_image);
-  return(noise_image);
+  return(ReleaseFailedImage(noise_image,status));
 }
 
 /*
