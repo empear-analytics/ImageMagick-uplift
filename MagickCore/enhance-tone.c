@@ -1814,6 +1814,52 @@ static void GetGammaLumaIntensity(const GrayscaleSample *sample,
   }
 }
 
+static void GetLuminanceIntensity(const GrayscaleSample *sample,
+  MagickRealType *intensity)
+{
+  const Image
+    *const image = sample->image;
+
+  const PixelIntensityMethod
+    method = sample->method;
+
+  MagickRealType
+    blue = sample->blue,
+    green = sample->green,
+    red = sample->red;
+
+  switch (method)
+  {
+    case Rec601LuminancePixelIntensityMethod:
+    {
+      if (image->colorspace == sRGBColorspace)
+        {
+          red=DecodePixelGamma(red);
+          green=DecodePixelGamma(green);
+          blue=DecodePixelGamma(blue);
+        }
+      (*intensity)=0.298839*red+0.586811*green+0.114350*blue;
+      break;
+    }
+    default:
+    {
+      GetGammaLumaIntensity(sample,intensity);
+      break;
+    }
+    case Rec709LuminancePixelIntensityMethod:
+    {
+      if (image->colorspace == sRGBColorspace)
+        {
+          red=DecodePixelGamma(red);
+          green=DecodePixelGamma(green);
+          blue=DecodePixelGamma(blue);
+        }
+      (*intensity)=0.212656*red+0.715158*green+0.072186*blue;
+      break;
+    }
+  }
+}
+
 static MagickRealType GetGrayscaleIntensity(const Image *image,
   const PixelIntensityMethod method,const Quantum *q)
 {
@@ -1859,31 +1905,9 @@ static MagickRealType GetGrayscaleIntensity(const Image *image,
         blue*blue)/3.0);
       break;
     }
-    case Rec601LuminancePixelIntensityMethod:
-    {
-      if (image->colorspace == sRGBColorspace)
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
     default:
     {
-      GetGammaLumaIntensity(&sample,&intensity);
-      break;
-    }
-    case Rec709LuminancePixelIntensityMethod:
-    {
-      if (image->colorspace == sRGBColorspace)
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
+      GetLuminanceIntensity(&sample,&intensity);
       break;
     }
     case RMSPixelIntensityMethod:
