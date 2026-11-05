@@ -5398,6 +5398,19 @@ static MagickBooleanType ApplyFxToRow (const FxRowInputs * row,
   return(MagickTrue);
 }
 
+static void DumpUserSymbolValues (FxInfo * pfx)
+{
+  int t, i;
+  char UserSym[MagickPathExtent];
+  fprintf (stderr, "User symbols (%i):\n", pfx->usedUserSymbols);
+  for (t=0; t < (int) GetMagickResourceLimit(ThreadResource); t++) {
+    for (i = 0; i < (int) pfx->usedUserSymbols; i++) {
+      fprintf (stderr, "th=%i us=%i '%s': %.*Lg\n",
+               t, i, NameOfUserSym (pfx, i, UserSym), pfx->precision, pfx->fxrts[t].UserSymVals[i]);
+    }
+  }
+}
+
 /* Following is substitute for FxImage().
 */
 MagickExport Image *FxImage(const Image *image,const char *expression,
@@ -5488,17 +5501,8 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
 
   /* Before destroying the user symbol values, dump them to stderr.
   */
-  if (pfx->DebugOpt && pfx->usedUserSymbols) {
-    int t, i;
-    char UserSym[MagickPathExtent];
-    fprintf (stderr, "User symbols (%i):\n", pfx->usedUserSymbols);
-    for (t=0; t < (int) GetMagickResourceLimit(ThreadResource); t++) {
-      for (i = 0; i < (int) pfx->usedUserSymbols; i++) {
-        fprintf (stderr, "th=%i us=%i '%s': %.*Lg\n",
-                 t, i, NameOfUserSym (pfx, i, UserSym), pfx->precision, pfx->fxrts[t].UserSymVals[i]);
-      }
-    }
-  }
+  if (pfx->DebugOpt && pfx->usedUserSymbols)
+    DumpUserSymbolValues (pfx);
 
   if ((status == MagickFalse) || (pfx->exception->severity >= ErrorException))
     fx_image=DestroyImage(fx_image);
