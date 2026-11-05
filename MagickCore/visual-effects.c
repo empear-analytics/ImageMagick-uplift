@@ -1876,12 +1876,11 @@ static MagickBooleanType MorphSequenceFrames(const Image *next,
   return(MagickTrue);
 }
 
-MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
-  ExceptionInfo *exception)
+static MagickBooleanType MorphImageSequence(const Image *image,
+  const size_t number_frames,Image **morph_images,ExceptionInfo *exception)
 {
   Image
-    *morph_image,
-    *morph_images;
+    *morph_image;
 
   MagickBooleanType
     status;
@@ -1894,6 +1893,53 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
 
   ssize_t
     n;
+
+  status=MagickTrue;
+  scene=0;
+  next=image;
+  for ( ; GetNextImageInList(next) != (Image *) NULL; next=GetNextImageInList(next))
+  {
+    MorphSequenceTargets
+      targets;
+
+    targets.morph_images=morph_images;
+    targets.status=(&status);
+    targets.n=(&n);
+    if (MorphSequenceFrames(next,number_frames,exception,&targets) ==
+        MagickFalse)
+      return(MagickFalse);
+    if (n < (ssize_t) number_frames)
+      break;
+    /*
+      Clone last frame in sequence.
+    */
+    morph_image=CloneImage(GetNextImageInList(next),0,0,MagickTrue,exception);
+    if (morph_image == (Image *) NULL)
+      {
+        (*morph_images)=DestroyImageList((*morph_images));
+        return(MagickFalse);
+      }
+    AppendImageToList(morph_images,morph_image);
+    (*morph_images)=GetLastImageInList((*morph_images));
+    status=ReportMorphProgress(image,scene,status);
+    scene++;
+  }
+  if (GetNextImageInList(next) != (Image *) NULL)
+    {
+      (*morph_images)=DestroyImageList((*morph_images));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
+  ExceptionInfo *exception)
+{
+  Image
+    *morph_images;
+
+  MagickBooleanType
+    status;
 
   /*
     Clone first frame in sequence.
@@ -1917,41 +1963,9 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
   /*
     Morph image sequence.
   */
-  status=MagickTrue;
-  scene=0;
-  next=image;
-  for ( ; GetNextImageInList(next) != (Image *) NULL; next=GetNextImageInList(next))
-  {
-    MorphSequenceTargets
-      targets;
-
-    targets.morph_images=(&morph_images);
-    targets.status=(&status);
-    targets.n=(&n);
-    if (MorphSequenceFrames(next,number_frames,exception,&targets) ==
-        MagickFalse)
-      return((Image *) NULL);
-    if (n < (ssize_t) number_frames)
-      break;
-    /*
-      Clone last frame in sequence.
-    */
-    morph_image=CloneImage(GetNextImageInList(next),0,0,MagickTrue,exception);
-    if (morph_image == (Image *) NULL)
-      {
-        morph_images=DestroyImageList(morph_images);
-        return((Image *) NULL);
-      }
-    AppendImageToList(&morph_images,morph_image);
-    morph_images=GetLastImageInList(morph_images);
-    status=ReportMorphProgress(image,scene,status);
-    scene++;
-  }
-  if (GetNextImageInList(next) != (Image *) NULL)
-    {
-      morph_images=DestroyImageList(morph_images);
-      return((Image *) NULL);
-    }
+  if (MorphImageSequence(image,number_frames,&morph_images,exception) ==
+      MagickFalse)
+    return((Image *) NULL);
   return(GetFirstImageInList(morph_images));
 }
 
