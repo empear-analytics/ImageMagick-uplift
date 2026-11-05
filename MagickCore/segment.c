@@ -1466,6 +1466,17 @@ static Cluster *FindLargestBackground(Cluster *background)
   return(background);
 }
 
+static void FindDynamicExtrema(ssize_t **histogram,
+  const double smooth_threshold,short **extrema)
+{
+  (void) OptimalTau(histogram[Red],Tau,0.2f,DeltaTau,
+    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Red]);
+  (void) OptimalTau(histogram[Green],Tau,0.2f,DeltaTau,
+    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Green]);
+  (void) OptimalTau(histogram[Blue],Tau,0.2f,DeltaTau,
+    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Blue]);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1521,12 +1532,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     Initialize histogram.
   */
   InitializeHistogram(image,histogram,exception);
-  (void) OptimalTau(histogram[Red],Tau,0.2f,DeltaTau,
-    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Red]);
-  (void) OptimalTau(histogram[Green],Tau,0.2f,DeltaTau,
-    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Green]);
-  (void) OptimalTau(histogram[Blue],Tau,0.2f,DeltaTau,
-    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Blue]);
+  FindDynamicExtrema(histogram,smooth_threshold,extrema);
   /*
     Form clusters.
   */
