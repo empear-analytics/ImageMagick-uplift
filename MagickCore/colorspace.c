@@ -3401,6 +3401,47 @@ static MagickBooleanType TransformsRGBByTables(Image *image,
   return(MagickTrue);
 }
 
+static void TransformLinearRGBRowTosRGB(const ColorspaceRowInfo *info,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = info->image;
+
+  CacheView
+    *const image_view = info->image_view;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  const ColorspaceRowInfo
+    row = { image,image_view,exception };
+
+  if (FetchColorspaceRow(&row,y,&q,status) == MagickFalse)
+    return;
+  for (x=(ssize_t) image->columns; x != 0; x--)
+  {
+    double
+      blue,
+      green,
+      red;
+
+    red=EncodePixelGamma((MagickRealType) GetPixelRed(image,q));
+    green=EncodePixelGamma((MagickRealType) GetPixelGreen(image,q));
+    blue=EncodePixelGamma((MagickRealType) GetPixelBlue(image,q));
+    SetPixelRed(image,ClampToQuantum(red),q);
+    SetPixelGreen(image,ClampToQuantum(green),q);
+    SetPixelBlue(image,ClampToQuantum(blue),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  SyncColorspaceRow(image_view,exception,status);
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -3566,33 +3607,10 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
         const ColorspaceRowInfo
-          row = { image,image_view,exception };
+          info = { image,image_view,exception };
 
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=(ssize_t) image->columns; x != 0; x--)
-        {
-          double
-            blue,
-            green,
-            red;
-
-          red=EncodePixelGamma((MagickRealType) GetPixelRed(image,q));
-          green=EncodePixelGamma((MagickRealType) GetPixelGreen(image,q));
-          blue=EncodePixelGamma((MagickRealType) GetPixelBlue(image,q));
-          SetPixelRed(image,ClampToQuantum(red),q);
-          SetPixelGreen(image,ClampToQuantum(green),q);
-          SetPixelBlue(image,ClampToQuantum(blue),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
+        TransformLinearRGBRowTosRGB(&info,y,&status);
       }
       finish.image=image;
       finish.image_view=image_view;
