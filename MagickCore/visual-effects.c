@@ -1226,9 +1226,7 @@ MagickExport Image *ColorMatrixImage(const Image *image,
   }
   color_view=DestroyCacheView(color_view);
   image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    color_image=DestroyImage(color_image);
-  return(color_image);
+  return(ReleaseFailedImage(color_image,status));
 }
 
 /*
