@@ -230,6 +230,13 @@ static void SetTransformProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
+static inline MagickBooleanType IsPixelRowMissing(const Quantum *p,
+  const Quantum *q)
+{
+  return(((p == (const Quantum *) NULL) || (q == (Quantum *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static void CopyPixelChannelsTo(const Image *image,const Image *destination,
   const Quantum *p,Quantum *q)
 {
@@ -2276,7 +2283,7 @@ MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
       image->columns,1,exception);
     q=QueueCacheViewAuthenticPixels(transpose_view,(ssize_t) image->rows-y-1,
       0,1,transpose_image->rows,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsPixelRowMissing(p,q) != MagickFalse)
       {
         status=MagickFalse;
         continue;
