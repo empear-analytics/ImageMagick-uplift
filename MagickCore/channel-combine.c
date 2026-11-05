@@ -257,6 +257,15 @@ static Image *FinishCombineImage(Image *combine_image,
   return(combine_image);
 }
 
+static void SetCombineRGBChannels(Image *combine_image,
+  const size_t number_channels,ExceptionInfo *exception)
+{
+  if (number_channels > 3)
+    combine_image->alpha_trait=BlendPixelTrait;
+  if (number_channels > 4)
+    SetPixelMetaChannels(combine_image,number_channels-4,exception);
+}
+
 MagickExport Image *CombineImages(const Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -304,10 +313,7 @@ MagickExport Image *CombineImages(const Image *image,
     case UndefinedColorspace:
     case sRGBColorspace:
     {
-      if (number_channels > 3)
-        combine_image->alpha_trait=BlendPixelTrait;
-      if (number_channels > 4)
-        SetPixelMetaChannels(combine_image,number_channels-4,exception);
+      SetCombineRGBChannels(combine_image,number_channels,exception);
       break;
     }
     case LinearGRAYColorspace:
