@@ -610,6 +610,14 @@ static MagickBooleanType DenoiseWaveletChannels(
   return(status);
 }
 
+static size_t CountWaveletLevels(const Image *image,size_t number_levels)
+{
+  while ((number_levels > 0) &&
+         (((size_t) 1 << (number_levels-1)) >= MagickMin(image->columns,image->rows)))
+    number_levels--;
+  return(number_levels);
+}
+
 MagickExport Image *WaveletDenoiseImage(const Image *image,
   const double threshold,const double softness,ExceptionInfo *exception)
 {
@@ -653,9 +661,7 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   number_pixels=(MagickSizeType) image->columns*image->rows;
-  while ((number_levels > 0) &&
-         (((size_t) 1 << (number_levels-1)) >= MagickMin(image->columns,image->rows)))
-    number_levels--;
+  number_levels=CountWaveletLevels(image,number_levels);
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
   if (number_levels >= 5)
     {
