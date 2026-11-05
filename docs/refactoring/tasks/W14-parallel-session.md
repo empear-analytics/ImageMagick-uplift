@@ -350,3 +350,12 @@ pixel (median 0.183 s against 0.156 s, 9 runs each); the three control links alo
 chain (`w14-fx-annealed`, 5.93) has the same call-chain structure, so it would cost at least as much. **Owner
 decision:** accept a slower `-fx` for the score, or leave `ExecuteRPN` whole. Note: `DestroyFxInfoOnFailure` now
 has one shared call for four failure returns (call guard -3), stated in 36b1ea6da.
+
+## 2026-11-05, end of session: playbook text approved
+
+The owner said "Your changes to the playbook recipes are fine": every Catalogue changes row from W13 and W14 that
+was decided under the mandate (Recipes BR, MB, HC, RP, PD, ST, CB, SW, RV, EI, FI and the amendments to LB, N, Z,
+NS, TW, PS, PC, HC, S, V, SW, SD, SR, B, I, P) is now decided by `owner`. Not covered, because their text is not in
+this branch: the parked Recipe S `--copy-static` amendment (`w14-tone-splits`) and the Recipe P amendment on
+`w14-fx-annealed`. The other open questions in this report (the 111th function, `#if defined` pairs, per-iteration
+slots, label-run helpers, the parked chains) are separate decisions.
