@@ -3788,14 +3788,8 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  tint_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (tint_image == (Image *) NULL)
+  if (CloneEffectImage(image,&tint_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(tint_image,DirectClass,exception) == MagickFalse)
-    {
-      tint_image=DestroyImage(tint_image);
-      return((Image *) NULL);
-    }
   if ((IsGrayColorspace(image->colorspace) != MagickFalse) &&
       (IsPixelInfoGray(tint) == MagickFalse))
     (void) SetImageColorspace(tint_image,sRGBColorspace,exception);
