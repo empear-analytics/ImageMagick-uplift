@@ -3766,6 +3766,28 @@ static MagickBooleanType SetAssignmentTarget (FxInfo * pfx,
   return(MagickTrue);
 }
 
+static MagickBooleanType FlushOperatorStack (FxInfo * pfx,
+  MagickBooleanType Assign, MagickBooleanType Update, int UserSymNdx0)
+{
+  MagickBooleanType broke = MagickFalse;
+
+  while (pfx->usedOprStack) {
+    OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
+    if (IsOpenGroupOperator(op) != MagickFalse) {
+      break;
+    }
+    if (IsMisplacedAssignment(op,Assign,Update) != MagickFalse) {
+      break;
+    }
+    pfx->usedOprStack--;
+    (void) AddElement (pfx, (fxFltType) 0, (int) op);
+    if (SetAssignmentTarget (pfx, op, UserSymNdx0, &broke) == MagickFalse)
+      return(MagickFalse);
+    if (broke != MagickFalse) break;
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -3931,20 +3953,8 @@ static MagickBooleanType TranslateExpression (
     *chLimit = *pfx->pex;
     pfx->pex++;
   }
-  while (pfx->usedOprStack) {
-    OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
-    if (IsOpenGroupOperator(op) != MagickFalse) {
-      break;
-    }
-    if (IsMisplacedAssignment(op,Assign,Update) != MagickFalse) {
-      break;
-    }
-    pfx->usedOprStack--;
-    (void) AddElement (pfx, (fxFltType) 0, (int) op);
-    if (SetAssignmentTarget (pfx, op, UserSymNdx0, &broke) == MagickFalse)
-      return MagickFalse;
-    if (broke != MagickFalse) break;
-  }
+  if (FlushOperatorStack (pfx, Assign, Update, UserSymNdx0) == MagickFalse)
+    return MagickFalse;
 
   if (ternary.addr_query != NULL_ADDRESS) *needPopAll = MagickTrue;
 
