@@ -149,3 +149,23 @@ eight `#if 0` blocks moved verbatim with their cases (compared by script).
 
 **Noticed upstream, not changed.** The count switch in `GenerateCoefficients` has a stray `break;`
 after the `#if 0 case QuadrilateralDistortion`, and `QuadrilateralDistortion` reports 19 coefficients.
+
+### 03:30 to 05:00
+
+| File | Score | Commits |
+| --- | --- | ---: |
+| `colorspace.c` | 3.52 -> **4.63** | 9 |
+| `compare.c` | 2.54 -> 2.97 | 8 |
+| `morphology.c` | 2.71 | 0 |
+
+**For the owner.** (1) `colorspace.c` dfb4a6e95 hoists the 236-line `YCCMap` table to file scope (Recipe F),
+3.52 to 3.77; the agent thinks most of that gain is the file getting shorter and the object-identity
+tools need `otool`, so the disassembly was compared instead (code identical, `.rodata` layout differs).
+Revert that one commit if F is not to count there. (2) The oracle build has no OpenMP: the pragma
+handling in `colorspace.c` was checked by reading, and no case was confirmed to reach the PseudoClass
+blocks. (3) `compare.c`'s first six `SimilarityImage` commits are flat plan steps (rule 2); `SIMFilterImageNaNs`
+is unreached.
+
+**Noticed upstream, not changed.** The `shared(status)` clause of the TransformsRGB Pseudo loop names a
+variable the loop never uses; `SimilarityImage`'s `threshold_trigger` guard is dead and its `progress++`
+is non-atomic.
