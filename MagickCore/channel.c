@@ -276,6 +276,21 @@ static MagickBooleanType RegisterDestinationChannel(
   return(MagickTrue);
 }
 
+static MagickBooleanType ParseDestinationChannel(Image *destination_image,
+  const char *token,ssize_t *i,ExceptionInfo *exception)
+{
+  (*i)=ParsePixelChannelOption(token);
+  if (LocaleCompare(token,"alpha") == 0)
+    destination_image->alpha_trait=BlendPixelTrait;
+  if ((*i) < 0)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionError,"UnrecognizedChannelType","`%s'",token);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -431,18 +446,12 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
         if (channel_op == AssignChannelOp)
           pixel=StringToDoubleInterval(token,(double) QuantumRange+1.0);
         else
-          {
-            i=ParsePixelChannelOption(token);
-            if (LocaleCompare(token,"alpha") == 0)
-              destination_image->alpha_trait=BlendPixelTrait;
-            if (i < 0)
-              {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  OptionError,"UnrecognizedChannelType","`%s'",token);
-                destination_image=DestroyImageList(destination_image);
-                return(destination_image);
-              }
-          }
+          if (ParseDestinationChannel(destination_image,token,&i,
+                exception) == MagickFalse)
+            {
+              destination_image=DestroyImageList(destination_image);
+              return(destination_image);
+            }
         destination_channel=(PixelChannel) i;
         if (image->colorspace != UndefinedColorspace)
           if (RegisterDestinationChannel(destination_image,destination_channel,
