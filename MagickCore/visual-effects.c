@@ -3735,20 +3735,46 @@ static MagickBooleanType CloneWaveCanvas(const Image *image,
 
 #define WaveImageTag  "Wave/Image"
 
-MagickExport Image *WaveImage(const Image *image,const double amplitude,
-  const double wave_length,const PixelInterpolateMethod method,
-  ExceptionInfo *exception)
+typedef struct _WaveRender
 {
-  CacheView
-    *canvas_image_view,
-    *wave_view;
-
-  float
-    *sine_map;
+  const Image
+    *image;
 
   Image
     *canvas_image,
     *wave_image;
+
+  float
+    *sine_map;
+
+  PixelInterpolateMethod
+    method;
+
+  ExceptionInfo
+    *exception;
+} WaveRender;
+
+static Image *RenderWaveImage(const WaveRender *render)
+{
+  const Image
+    *const image = render->image;
+
+  Image
+    *const canvas_image = render->canvas_image,
+    *const wave_image = render->wave_image;
+
+  float
+    *const sine_map = render->sine_map;
+
+  const PixelInterpolateMethod
+    method = render->method;
+
+  ExceptionInfo
+    *const exception = render->exception;
+
+  CacheView
+    *canvas_image_view,
+    *wave_view;
 
   MagickBooleanType
     status;
@@ -3758,6 +3784,51 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
 
   ssize_t
     y;
+
+  status=MagickTrue;
+  progress=0;
+  canvas_image_view=AcquireVirtualCacheView(canvas_image,exception);
+  wave_view=AcquireAuthenticCacheView(wave_image,exception);
+  (void) SetCacheViewVirtualPixelMethod(canvas_image_view,
+    BackgroundVirtualPixelMethod);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(canvas_image,wave_image,wave_image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) wave_image->rows; y++)
+  {
+    const WaveRow
+      wave_row = { canvas_image, wave_image, canvas_image_view, wave_view,
+        sine_map, method, exception };
+
+    if (WaveImageRow(&wave_row,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetEffectProgress(canvas_image,WaveImageTag,progress,&status);
+      }
+  }
+  DestroyWaveResources(wave_view,canvas_image_view,canvas_image,sine_map);
+  return(ReleaseFailedImage(wave_image,status));
+}
+
+MagickExport Image *WaveImage(const Image *image,const double amplitude,
+  const double wave_length,const PixelInterpolateMethod method,
+  ExceptionInfo *exception)
+{
+  float
+    *sine_map;
+
+  Image
+    *canvas_image,
+    *wave_image;
+
+  WaveRender
+    render;
 
   /*
     Initialize wave image attributes.
@@ -3798,34 +3869,12 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
   /*
     Wave image.
   */
-  status=MagickTrue;
-  progress=0;
-  canvas_image_view=AcquireVirtualCacheView(canvas_image,exception);
-  wave_view=AcquireAuthenticCacheView(wave_image,exception);
-  (void) SetCacheViewVirtualPixelMethod(canvas_image_view,
-    BackgroundVirtualPixelMethod);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(canvas_image,wave_image,wave_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) wave_image->rows; y++)
-  {
-    const WaveRow
-      wave_row = { canvas_image, wave_image, canvas_image_view, wave_view,
-        sine_map, method, exception };
-
-    if (WaveImageRow(&wave_row,y,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetEffectProgress(canvas_image,WaveImageTag,progress,&status);
-      }
-  }
-  DestroyWaveResources(wave_view,canvas_image_view,canvas_image,sine_map);
-  return(ReleaseFailedImage(wave_image,status));
+  render.image=image;
+  render.canvas_image=canvas_image;
+  render.wave_image=wave_image;
+  render.sine_map=sine_map;
+  render.method=method;
+  render.exception=exception;
+  return(RenderWaveImage(&render));
 }
 
