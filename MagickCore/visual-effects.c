@@ -1499,9 +1499,7 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
   interpolate_view=DestroyCacheView(interpolate_view);
   canvas_view=DestroyCacheView(canvas_view);
   canvas_image=DestroyImage(canvas_image);
-  if (status == MagickFalse)
-    implode_image=DestroyImage(implode_image);
-  return(implode_image);
+  return(ReleaseFailedImage(implode_image,status));
 }
 
 /*
