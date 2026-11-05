@@ -871,6 +871,73 @@ static MagickBooleanType FormClassifyClusters(short **extrema,
   return(MagickTrue);
 }
 
+typedef struct _ClassifyPixelsInputs
+{
+  ExceptionInfo
+    *exception;
+
+  Cluster
+    *head;
+
+  double
+    *squares;
+
+  double
+    weighting_exponent;
+} ClassifyPixelsInputs;
+
+static void ClassifyImagePixels(Image *image,const ClassifyPixelsInputs *inputs,
+  MagickOffsetType progress,MagickStatusType status)
+{
+  ExceptionInfo
+    *const exception = inputs->exception;
+
+  Cluster
+    *const head = inputs->head;
+
+  double
+    *const squares = inputs->squares;
+
+  const double
+    weighting_exponent = inputs->weighting_exponent;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ClassifyLine
+      line;
+
+    line.image=image;
+    line.image_view=image_view;
+    line.exception=exception;
+    line.inputs.head=head;
+    line.inputs.squares=squares;
+    line.inputs.weighting_exponent=weighting_exponent;
+    if (ClassifyImageLine(&line,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ReportClassifyProgress(image,SegmentImageTag,progress,&status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  status&=(MagickStatusType) SyncImage(image,exception);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -883,6 +950,9 @@ static MagickBooleanType Classify(Image *image,short **extrema,
 
   CacheView
     *image_view;
+
+  ClassifyPixelsInputs
+    pixels_inputs;
 
   Cluster
     *cluster,
@@ -982,35 +1052,11 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   /*
     Do course grain classes.
   */
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    ClassifyLine
-      line;
-
-    line.image=image;
-    line.image_view=image_view;
-    line.exception=exception;
-    line.inputs.head=head;
-    line.inputs.squares=squares;
-    line.inputs.weighting_exponent=weighting_exponent;
-    if (ClassifyImageLine(&line,y,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        ReportClassifyProgress(image,SegmentImageTag,progress,&status);
-      }
-  }
-  image_view=DestroyCacheView(image_view);
-  status&=(MagickStatusType) SyncImage(image,exception);
+  pixels_inputs.exception=exception;
+  pixels_inputs.head=head;
+  pixels_inputs.squares=squares;
+  pixels_inputs.weighting_exponent=weighting_exponent;
+  ClassifyImagePixels(image,&pixels_inputs,progress,status);
   /*
     Relinquish resources.
   */
