@@ -369,17 +369,86 @@ static Image *FinishChopImage(const Image *image,Image *chop_image,
   return(chop_image);
 }
 
-MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
-  ExceptionInfo *exception)
-{
 #define ChopImageTag  "Chop/Image"
+
+static Image *ExtractChopImageBelow(const ChopRowImages *chop,
+  MagickOffsetType progress,MagickBooleanType status)
+{
+  const Image
+    *const image = chop->image;
+
+  Image
+    *const chop_image = chop->chop_image;
+
+  CacheView
+    *const image_view = chop->image_view,
+    *chop_view = chop->chop_view;
+
+  const RectangleInfo
+    extent = chop->extent;
+
+  ExceptionInfo
+    *const exception = chop->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,chop_image,image->rows-((size_t) extent.y+extent.height),2)
+#endif
+  for (y=0; y < (ssize_t) (image->rows-((size_t) extent.y+extent.height)); y++)
+  {
+    const ChopRowImages
+      images = { image,chop_image,image_view,chop_view,extent,exception };
+
+    if (status == MagickFalse)
+      continue;
+    if (ChopImageRow(&images,extent.y+(ssize_t) extent.height+y,extent.y+y,
+          &status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetTransformProgress(image,ChopImageTag,progress,&status);
+      }
+  }
+  chop_view=DestroyCacheView(chop_view);
+  return(FinishChopImage(image,chop_image,image_view,status));
+}
+
+typedef struct _ChopImageInputs
+{
+  const Image
+    *image;
+
+  RectangleInfo
+    extent;
+
+  ExceptionInfo
+    *exception;
+} ChopImageInputs;
+
+static Image *ExtractChopImage(Image *chop_image,const ChopImageInputs *inputs)
+{
+  const Image
+    *const image = inputs->image;
+
+  const RectangleInfo
+    extent = inputs->extent;
+
+  ExceptionInfo
+    *const exception = inputs->exception;
 
   CacheView
     *chop_view,
     *image_view;
 
-  Image
-    *chop_image;
+  ChopRowImages
+    chop;
 
   MagickBooleanType
     status;
@@ -387,35 +456,9 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   MagickOffsetType
     progress;
 
-  RectangleInfo
-    extent;
-
   ssize_t
     y;
 
-  /*
-    Check chop geometry.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  assert(chop_info != (RectangleInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (IsChopOutsideImage(image,chop_info) != MagickFalse)
-    ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
-  extent=(*chop_info);
-  extent=ClampChopExtent(image,extent);
-  if (IsChopExtentTooLarge(image,extent) != MagickFalse)
-    ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
-  chop_image=CloneImage(image,image->columns-extent.width,image->rows-
-    extent.height,MagickTrue,exception);
-  if (chop_image == (Image *) NULL)
-    return((Image *) NULL);
-  /*
-    Extract chop image.
-  */
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
@@ -445,31 +488,54 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   /*
     Extract chop image.
   */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,chop_image,image->rows-((size_t) extent.y+extent.height),2)
-#endif
-  for (y=0; y < (ssize_t) (image->rows-((size_t) extent.y+extent.height)); y++)
-  {
-    const ChopRowImages
-      images = { image,chop_image,image_view,chop_view,extent,exception };
+  chop.image=image;
+  chop.chop_image=chop_image;
+  chop.image_view=image_view;
+  chop.chop_view=chop_view;
+  chop.extent=extent;
+  chop.exception=exception;
+  return(ExtractChopImageBelow(&chop,progress,status));
+}
 
-    if (status == MagickFalse)
-      continue;
-    if (ChopImageRow(&images,extent.y+(ssize_t) extent.height+y,extent.y+y,
-          &status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetTransformProgress(image,ChopImageTag,progress,&status);
-      }
-  }
-  chop_view=DestroyCacheView(chop_view);
-  return(FinishChopImage(image,chop_image,image_view,status));
+MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
+  ExceptionInfo *exception)
+{
+  ChopImageInputs
+    inputs;
+
+  Image
+    *chop_image;
+
+  RectangleInfo
+    extent;
+
+  /*
+    Check chop geometry.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  assert(chop_info != (RectangleInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (IsChopOutsideImage(image,chop_info) != MagickFalse)
+    ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
+  extent=(*chop_info);
+  extent=ClampChopExtent(image,extent);
+  if (IsChopExtentTooLarge(image,extent) != MagickFalse)
+    ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
+  chop_image=CloneImage(image,image->columns-extent.width,image->rows-
+    extent.height,MagickTrue,exception);
+  if (chop_image == (Image *) NULL)
+    return((Image *) NULL);
+  /*
+    Extract chop image.
+  */
+  inputs.image=image;
+  inputs.extent=extent;
+  inputs.exception=exception;
+  return(ExtractChopImage(chop_image,&inputs));
 }
 
 /*
@@ -1981,17 +2047,98 @@ static void SyncTransformView(CacheView *view,ExceptionInfo *exception,
     (*status)=MagickFalse;
 }
 
-MagickExport Image *SpliceImage(const Image *image,
-  const RectangleInfo *geometry,ExceptionInfo *exception)
+static MagickBooleanType IsSpliceRowPending(Image *splice_image,
+  const ssize_t y,const MagickBooleanType *status)
 {
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  if (IsSpliceRowOutside(splice_image,y) != MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 #define SpliceImageTag  "Splice/Image"
+
+static Image *SpliceImageBelow(const SpliceRow *splice,
+  MagickOffsetType progress,MagickBooleanType status)
+{
+  const Image
+    *const image = splice->image;
+
+  Image
+    *const splice_image = splice->splice_image;
+
+  CacheView
+    *const image_view = splice->image_view,
+    *const splice_view = splice->splice_view;
+
+  const RectangleInfo
+    splice_geometry = splice->splice_geometry;
+
+  ExceptionInfo
+    *const exception = splice->exception;
+
+  const ssize_t
+    columns = splice->columns;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,splice_image,splice_image->rows,2)
+#endif
+  for (y=splice_geometry.y+(ssize_t) splice_geometry.height; y < (ssize_t) splice_image->rows; y++)
+  {
+    const SpliceRow
+      row = { image,splice_image,image_view,splice_view,splice_geometry,
+        exception,columns };
+
+    if (IsSpliceRowPending(splice_image,y,&status) == MagickFalse)
+      continue;
+    if (SpliceImageRow(&row,y-(ssize_t) splice_geometry.height,y,&status) ==
+        MagickFalse)
+      continue;
+    SyncTransformView(splice_view,exception,&status);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetSpliceProgress(&row,SpliceImageTag,progress,&status);
+      }
+  }
+  return(FinishSpliceImage(splice_image,splice_view,image_view,status));
+}
+
+typedef struct _SpliceImageInputs
+{
+  const Image
+    *image;
+
+  RectangleInfo
+    splice_geometry;
+
+  ExceptionInfo
+    *exception;
+} SpliceImageInputs;
+
+static Image *SpliceImageRows(Image *splice_image,
+  const SpliceImageInputs *inputs)
+{
+  const Image
+    *const image = inputs->image;
+
+  const RectangleInfo
+    splice_geometry = inputs->splice_geometry;
+
+  ExceptionInfo
+    *const exception = inputs->exception;
 
   CacheView
     *image_view,
     *splice_view;
-
-  Image
-    *splice_image;
 
   MagickBooleanType
     status;
@@ -1999,37 +2146,13 @@ MagickExport Image *SpliceImage(const Image *image,
   MagickOffsetType
     progress;
 
-  RectangleInfo
-    splice_geometry;
+  SpliceRow
+    splice;
 
   ssize_t
     columns,
     y;
 
-  /*
-    Allocate splice image.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  assert(geometry != (const RectangleInfo *) NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  splice_geometry=(*geometry);
-  splice_image=CloneImage(image,image->columns+splice_geometry.width,
-    image->rows+splice_geometry.height,MagickTrue,exception);
-  if (splice_image == (Image *) NULL)
-    return((Image *) NULL);
-  if (PrepareSpliceImage(splice_image,exception) == MagickFalse)
-    return((Image *) NULL);
-  /*
-    Respect image geometry.
-  */
-  splice_geometry=ApplySpliceGravity(image,splice_geometry);
-  /*
-    Splice image.
-  */
   status=MagickTrue;
   progress=0;
   columns=MagickMin(splice_geometry.x,(ssize_t) splice_image->columns);
@@ -2059,34 +2182,56 @@ MagickExport Image *SpliceImage(const Image *image,
         SetSpliceProgress(&row,SpliceImageTag,progress,&status);
       }
   }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,splice_image,splice_image->rows,2)
-#endif
-  for (y=splice_geometry.y+(ssize_t) splice_geometry.height; y < (ssize_t) splice_image->rows; y++)
-  {
-    const SpliceRow
-      row = { image,splice_image,image_view,splice_view,splice_geometry,
-        exception,columns };
+  splice.image=image;
+  splice.splice_image=splice_image;
+  splice.image_view=image_view;
+  splice.splice_view=splice_view;
+  splice.splice_geometry=splice_geometry;
+  splice.exception=exception;
+  splice.columns=columns;
+  return(SpliceImageBelow(&splice,progress,status));
+}
 
-    if (status == MagickFalse)
-      continue;
-    if (IsSpliceRowOutside(splice_image,y) != MagickFalse)
-      continue;
-    if (SpliceImageRow(&row,y-(ssize_t) splice_geometry.height,y,&status) ==
-        MagickFalse)
-      continue;
-    SyncTransformView(splice_view,exception,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetSpliceProgress(&row,SpliceImageTag,progress,&status);
-      }
-  }
-  return(FinishSpliceImage(splice_image,splice_view,image_view,status));
+MagickExport Image *SpliceImage(const Image *image,
+  const RectangleInfo *geometry,ExceptionInfo *exception)
+{
+  Image
+    *splice_image;
+
+  RectangleInfo
+    splice_geometry;
+
+  SpliceImageInputs
+    inputs;
+
+  /*
+    Allocate splice image.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  assert(geometry != (const RectangleInfo *) NULL);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  splice_geometry=(*geometry);
+  splice_image=CloneImage(image,image->columns+splice_geometry.width,
+    image->rows+splice_geometry.height,MagickTrue,exception);
+  if (splice_image == (Image *) NULL)
+    return((Image *) NULL);
+  if (PrepareSpliceImage(splice_image,exception) == MagickFalse)
+    return((Image *) NULL);
+  /*
+    Respect image geometry.
+  */
+  splice_geometry=ApplySpliceGravity(image,splice_geometry);
+  /*
+    Splice image.
+  */
+  inputs.image=image;
+  inputs.splice_geometry=splice_geometry;
+  inputs.exception=exception;
+  return(SpliceImageRows(splice_image,&inputs));
 }
 
 /*
