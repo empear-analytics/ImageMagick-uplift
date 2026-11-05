@@ -979,17 +979,10 @@ static MagickBooleanType DisassociateAlphaImage(Image *image,
   return(status);
 }
 
-MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
-  const AlphaChannelOption alpha_type,ExceptionInfo *exception)
+static MagickBooleanType SetDisassociateAlpha(Image *image,
+  const AlphaChannelOption alpha_type,MagickBooleanType status,
+  ExceptionInfo *exception)
 {
-  MagickBooleanType
-    status;
-
-  assert(image != (Image *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  assert(image->signature == MagickCoreSignature);
-  status=MagickTrue;
   switch (alpha_type)
   {
     default:
@@ -1004,6 +997,25 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
         break;
       return(DisassociateAlphaImage(image,status,exception));
     }
+  }
+  return(SyncAlphaChannelCache(image,status,exception));
+}
+
+MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
+  const AlphaChannelOption alpha_type,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  assert(image != (Image *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  assert(image->signature == MagickCoreSignature);
+  status=MagickTrue;
+  switch (alpha_type)
+  {
+    default:
+      return(SetDisassociateAlpha(image,alpha_type,status,exception));
     case OffAlphaChannel:
     {
       if ((image->alpha_trait & BlendPixelTrait) == 0)
