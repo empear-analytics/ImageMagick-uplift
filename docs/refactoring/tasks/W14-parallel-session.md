@@ -245,3 +245,12 @@ New file `paint-floodfill.c` (8.33): **add it to the Windows build configuration
 closing brace of a multi-line macro inside the function; and the include-comment lookup crashed on a one-space
 "Include declarations." line. Campaign B should pick it up. Upstream, not changed: `RangeThresholdValue` ends in
 `if (pixel > high_black) return 0; else return 0;`; the first `status=MagickTrue;` in `FloodfillPaintImage` is dead.
+
+## Lane a, fifth batch: segment.c 6.46 -> 7.02, transform.c 6.62 -> 7.39 (Opus, 13 commits)
+
+New recipe under the mandate, not yet ruled on: **Recipe RP** (d066388ac, Extract Progress Loop Returning the
+Progress): a sequential pass in no parallel region, whose only pragmas are orphaned `omp atomic` constructs on
+`progress` moved whole, becomes a function returning `progress`; `status` goes by pointer; the caller writes
+`progress=Helper(...,&status,...);`. **Review:** the two tail N steps in `transform.c` (bde214f54..58bcb2cd9) take
+the file's existing `ChopRowImages` and `SpliceRow` typedefs as their input structs (same members, types and
+order) rather than adding duplicates; a reading of N step 3. `quantize.c` unchanged (no legal split left).
