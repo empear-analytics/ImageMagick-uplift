@@ -788,9 +788,21 @@ static MagickBooleanType TranslateExpression
 
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe);
 
+typedef struct _OperandSymbols
+{
+  MagickBooleanType
+    *UserSymbol,
+    *NewUserSymbol;
+
+  int
+    *UserSymNdx;
+
+  MagickBooleanType
+    *needPopAll;
+} OperandSymbols;
+
 static MagickBooleanType GetOperand (
-  FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
-  MagickBooleanType * needPopAll);
+  FxInfo * pfx, const OperandSymbols * operand);
 
 static inline MagickBooleanType IsHslOrIntensityChannel(const PixelChannel pc)
 {
@@ -2724,19 +2736,6 @@ static MagickBooleanType NotAUserSymbolOperand (FxInfo * pfx,
   return(MagickTrue);
 }
 
-typedef struct _OperandSymbols
-{
-  MagickBooleanType
-    *UserSymbol,
-    *NewUserSymbol;
-
-  int
-    *UserSymNdx;
-
-  MagickBooleanType
-    *needPopAll;
-} OperandSymbols;
-
 static MagickBooleanType GetUnaryPrefixOperand (FxInfo * pfx, OperatorE op,
   const OperandSymbols * symbols)
 {
@@ -2746,9 +2745,6 @@ static MagickBooleanType GetUnaryPrefixOperand (FxInfo * pfx, OperatorE op,
 
   int
     *const UserSymNdx = symbols->UserSymNdx;
-
-  MagickBooleanType
-    *const needPopAll = symbols->needPopAll;
 
   MagickBooleanType operand_ok;
   if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
@@ -2763,7 +2759,7 @@ static MagickBooleanType GetUnaryPrefixOperand (FxInfo * pfx, OperatorE op,
     return MagickFalse;
   }
   pfx->teDepth++;
-  operand_ok=GetOperand (pfx, UserSymbol, NewUserSymbol, UserSymNdx, needPopAll);
+  operand_ok=GetOperand (pfx, symbols);
   pfx->teDepth--;
   if (!operand_ok) {
     (void) ThrowMagickException (
@@ -2794,9 +2790,17 @@ static MagickBooleanType GetUnaryPrefixOperand (FxInfo * pfx, OperatorE op,
 }
 
 static MagickBooleanType GetOperand (
-  FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
-  MagickBooleanType * needPopAll)
+  FxInfo * pfx, const OperandSymbols * operand)
 {
+  MagickBooleanType
+    *const UserSymbol = operand->UserSymbol,
+    *const NewUserSymbol = operand->NewUserSymbol;
+
+  int
+    *const UserSymNdx = operand->UserSymNdx;
+
+  MagickBooleanType
+    *const needPopAll = operand->needPopAll;
 
   *NewUserSymbol = *UserSymbol = MagickFalse;
   *UserSymNdx = NULL_ADDRESS;
@@ -3281,6 +3285,10 @@ static MagickBooleanType TranslateExpression (
 
   int StartEleNdx;
 
+  const OperandSymbols
+    operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll },
+    operand1 = { &UserSymbol, &NewUserSymbol, &UserSymNdx1, needPopAll };
+
   TernaryT ternary;
   ternary.addr_query = NULL_ADDRESS;
   ternary.addr_colon = NULL_ADDRESS;
@@ -3314,7 +3322,7 @@ static MagickBooleanType TranslateExpression (
     return MagickFalse;
   }
 
-  if (!GetOperand (pfx, &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll)) return MagickFalse;
+  if (!GetOperand (pfx, &operand0)) return MagickFalse;
   SkipSpaces (pfx);
 
   /* Loop through Operator, Operand, Operator, Operand, ...
@@ -3391,7 +3399,7 @@ static MagickBooleanType TranslateExpression (
       return MagickFalse;
     }
 
-    if (!GetOperand (pfx, &UserSymbol, &NewUserSymbol, &UserSymNdx1, needPopAll)) {
+    if (!GetOperand (pfx, &operand1)) {
       (void) ThrowMagickException (
         pfx->exception, GetMagickModule(), OptionError,
         "Expected operand at", "'%s'",
