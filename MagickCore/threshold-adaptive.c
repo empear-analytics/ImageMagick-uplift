@@ -445,12 +445,12 @@ static MagickBooleanType ThresholdRows(const AdaptiveThresholdRows *rows,
   return(MagickTrue);
 }
 
+#define AdaptiveThresholdImageTag  "AdaptiveThreshold/Image"
+
 MagickExport Image *AdaptiveThresholdImage(const Image *image,
   const size_t width,const size_t height,const double bias,
   ExceptionInfo *exception)
 {
-#define AdaptiveThresholdImageTag  "AdaptiveThreshold/Image"
-
   CacheView
     *image_view,
     *threshold_view;
