@@ -1640,21 +1640,68 @@ static OffsetInfo FillBilateralSpatial(const size_t width,
   return(mid);
 }
 
-MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
-  const size_t height,const double intensity_sigma,const double spatial_sigma,
-  ExceptionInfo *exception)
+typedef struct _BilateralBlur
 {
-  CacheView
-    *blur_view,
-    *image_view;
-
-  double
-    intensity_gaussian[2*(MaxIntensity+1)],
-    *spatial_gaussian,
-    **weights;
+  const Image
+    *image;
 
   Image
     *blur_image;
+
+  OffsetInfo
+    mid;
+
+  size_t
+    width,
+    height;
+
+  double
+    *intensity_gaussian,
+    *spatial_gaussian,
+    **weights,
+    intensity_sigma,
+    spatial_sigma;
+
+  size_t
+    number_threads;
+
+  ExceptionInfo
+    *exception;
+} BilateralBlur;
+
+static Image *BlurBilateralRows(const BilateralBlur *bilateral)
+{
+  const Image
+    *const image = bilateral->image;
+
+  Image
+    *const blur_image = bilateral->blur_image;
+
+  const OffsetInfo
+    mid = bilateral->mid;
+
+  const size_t
+    width = bilateral->width,
+    height = bilateral->height;
+
+  double
+    *const intensity_gaussian = bilateral->intensity_gaussian,
+    *const spatial_gaussian = bilateral->spatial_gaussian,
+    **weights = bilateral->weights;
+
+  const double
+    intensity_sigma = bilateral->intensity_sigma,
+    spatial_sigma = bilateral->spatial_sigma;
+
+  const size_t
+    number_threads = bilateral->number_threads;
+
+  ExceptionInfo
+    *const exception = bilateral->exception;
+
+  CacheView
+    *blur_view,
+    *image_view;
 
   MagickBooleanType
     status;
@@ -1662,37 +1709,9 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   MagickOffsetType
     progress;
 
-  OffsetInfo
-    mid;
-
-  size_t
-    number_threads;
-
   ssize_t
     y;
 
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (CloneDirectImage(image,&blur_image,exception) == MagickFalse)
-    return((Image *) NULL);
-  number_threads=(size_t) GetMagickResourceLimit(ThreadResource);
-  weights=AcquireBilateralTLS(number_threads,MagickMax(width,1),
-    MagickMax(height,1));
-  if (weights == (double **) NULL)
-    {
-      blur_image=DestroyImage(blur_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  FillBilateralIntensity(intensity_gaussian,intensity_sigma);
-  spatial_gaussian=weights[number_threads];
-  mid=FillBilateralSpatial(width,height,spatial_gaussian,spatial_sigma);
-  /*
-    Bilateral blur image.
-  */
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
@@ -1727,6 +1746,64 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   image_view=DestroyCacheView(image_view);
   weights=DestroyBilateralTLS(number_threads,weights);
   return(ReleaseFailedImage(blur_image,status));
+}
+
+MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
+  const size_t height,const double intensity_sigma,const double spatial_sigma,
+  ExceptionInfo *exception)
+{
+  BilateralBlur
+    bilateral;
+
+  double
+    intensity_gaussian[2*(MaxIntensity+1)],
+    *spatial_gaussian,
+    **weights;
+
+  Image
+    *blur_image;
+
+  OffsetInfo
+    mid;
+
+  size_t
+    number_threads;
+
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (CloneDirectImage(image,&blur_image,exception) == MagickFalse)
+    return((Image *) NULL);
+  number_threads=(size_t) GetMagickResourceLimit(ThreadResource);
+  weights=AcquireBilateralTLS(number_threads,MagickMax(width,1),
+    MagickMax(height,1));
+  if (weights == (double **) NULL)
+    {
+      blur_image=DestroyImage(blur_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  FillBilateralIntensity(intensity_gaussian,intensity_sigma);
+  spatial_gaussian=weights[number_threads];
+  mid=FillBilateralSpatial(width,height,spatial_gaussian,spatial_sigma);
+  /*
+    Bilateral blur image.
+  */
+  bilateral.image=image;
+  bilateral.blur_image=blur_image;
+  bilateral.mid=mid;
+  bilateral.width=width;
+  bilateral.height=height;
+  bilateral.intensity_gaussian=intensity_gaussian;
+  bilateral.spatial_gaussian=spatial_gaussian;
+  bilateral.weights=weights;
+  bilateral.intensity_sigma=intensity_sigma;
+  bilateral.spatial_sigma=spatial_sigma;
+  bilateral.number_threads=number_threads;
+  bilateral.exception=exception;
+  return(BlurBilateralRows(&bilateral));
 }
 
 /*
