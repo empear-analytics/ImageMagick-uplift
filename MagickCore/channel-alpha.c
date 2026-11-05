@@ -920,23 +920,10 @@ static MagickBooleanType SetBackgroundAlpha(Image *image,
   return(SyncAlphaChannelCache(image,status,exception));
 }
 
-MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
-  const AlphaChannelOption alpha_type,ExceptionInfo *exception)
+static MagickBooleanType SetActivateAssociateAlpha(Image *image,
+  const AlphaChannelOption alpha_type,MagickBooleanType status,
+  ExceptionInfo *exception)
 {
-  CacheView
-    *image_view;
-
-  MagickBooleanType
-    status;
-
-  ssize_t
-    y;
-
-  assert(image != (Image *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  assert(image->signature == MagickCoreSignature);
-  status=MagickTrue;
   switch (alpha_type)
   {
     case ActivateAlphaChannel:
@@ -958,6 +945,31 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
     }
     default:
       return(SetBackgroundAlpha(image,alpha_type,status,exception));
+  }
+  return(SyncAlphaChannelCache(image,status,exception));
+}
+
+MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
+  const AlphaChannelOption alpha_type,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    y;
+
+  assert(image != (Image *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  assert(image->signature == MagickCoreSignature);
+  status=MagickTrue;
+  switch (alpha_type)
+  {
+    default:
+      return(SetActivateAssociateAlpha(image,alpha_type,status,exception));
     case DisassociateAlphaChannel:
     {
       /*
