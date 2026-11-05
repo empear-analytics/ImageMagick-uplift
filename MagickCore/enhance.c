@@ -101,6 +101,19 @@ typedef struct _ModulateInfo
   IlluminantType
     illuminant;
 } ModulateInfo;
+
+typedef struct _SigmoidalContrastRow
+{
+  const Image
+    *image;
+
+  MagickBooleanType
+    sharpen;
+
+  double
+    contrast,
+    midpoint;
+} SigmoidalContrastRow;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1745,10 +1758,19 @@ static void SigmoidalContrastColormap(Image *image,
       InverseSigmoidalColormapEntry(image,i,contrast,midpoint);
 }
 
-static void SigmoidalContrastImageRow(const Image *image,
-  const MagickBooleanType sharpen,const double contrast,const double midpoint,
+static void SigmoidalContrastImageRow(const SigmoidalContrastRow *row,
   Quantum *q)
 {
+  const Image
+    *const image = row->image;
+
+  const MagickBooleanType
+    sharpen = row->sharpen;
+
+  const double
+    contrast = row->contrast,
+    midpoint = row->midpoint;
+
   ssize_t
     x;
 
@@ -1826,9 +1848,12 @@ MagickExport MagickBooleanType SigmoidalContrastImage(Image *image,
     const EnhanceLine
       line = { image,image_view,exception };
 
+    const SigmoidalContrastRow
+      row = { image, sharpen, contrast, midpoint };
+
     if (GetEnhanceRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    SigmoidalContrastImageRow(image,sharpen,contrast,midpoint,q);
+    SigmoidalContrastImageRow(&row,q);
     SyncEnhanceRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
