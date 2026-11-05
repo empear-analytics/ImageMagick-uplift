@@ -1047,11 +1047,7 @@ MagickExport Image *ExcerptImage(const Image *image,
       }
   }
   excerpt_view=DestroyCacheView(excerpt_view);
-  image_view=DestroyCacheView(image_view);
-  excerpt_image->type=image->type;
-  if (status == MagickFalse)
-    excerpt_image=DestroyImage(excerpt_image);
-  return(excerpt_image);
+  return(FinishChopImage(image,excerpt_image,image_view,status));
 }
 
 /*
