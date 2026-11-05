@@ -261,3 +261,13 @@ Two splits: `effect-preview.c` (8.40) and `enhance-clahe.c` (8.71); **add both t
 configuration.** Tool fix in its own commit (df35436d9): `tools/split_source.py` strips comments before building
 the call graph (the word "Contrast" in a comment counted as a call of the static `Contrast`). Upstream, not
 changed: `effect-blur.c` defines `MagickSigma` twice, identically.
+
+## Lane b, sixth batch: compare.c and morphology.c cannot be split for a real gain (Opus, 1 tool commit)
+
+Tool fix in its own commit (1596ecbce, `tools/split_source.py`): a column-0 brace inside a function no longer
+ends it (the end is where the brace depth returns to zero, ignoring braces in `#else`/`#elif` branches), and
+anonymous `typedef struct`s between moved functions are accepted. Across every MagickCore file the function
+boundaries found are unchanged except `SimilarityImage`, which the old tool cut short at a column-0 `{` block
+inside its HDRI/FFTW `#if`; dry runs the old tool accepted produce byte-identical files. Campaign B should pick
+it up. The agent rejected the one split that would lift `compare.c` to 8.92, because it moves the whole problem
+into a new file that scores 2.97.
