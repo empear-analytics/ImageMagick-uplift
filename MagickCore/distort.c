@@ -4772,6 +4772,111 @@ static MagickBooleanType CloneSparseColorImage(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _SparseColorRender
+{
+  const Image
+    *image;
+
+  SparseColorMethod
+    sparse_method;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  size_t
+    number_colors;
+
+  double
+    *coeff;
+} SparseColorRender;
+
+static Image *RenderSparseColorImage(const SparseColorRender *render,
+  Image *sparse_image,ExceptionInfo *exception)
+{
+  /* ----- MAIN CODE ----- */
+  const Image
+    *const image = render->image;
+
+  const SparseColorMethod
+    sparse_method = render->sparse_method;
+
+  const size_t
+    number_arguments = render->number_arguments;
+
+  const double
+    *const arguments = render->arguments;
+
+  const size_t
+    number_colors = render->number_colors;
+
+  double
+    *const coeff = render->coeff;
+
+  CacheView
+    *sparse_view;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    j;
+
+  status=MagickTrue;
+  progress=0;
+  sparse_view=AcquireAuthenticCacheView(sparse_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,sparse_image,sparse_image->rows,1)
+#endif
+  for (j=0; j < (ssize_t) sparse_image->rows; j++)
+  {
+    PixelInfo
+      pixel;    /* pixel to assign to distorted image */
+
+    Quantum
+      *magick_restrict q;
+
+    SparseColorRowInput
+      row;
+
+    q=GetCacheViewAuthenticPixels(sparse_view,0,j,sparse_image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    GetPixelInfo(sparse_image,&pixel);
+    row.sparse_method=sparse_method;
+    row.image=image;
+    row.sparse_image=sparse_image;
+    row.number_arguments=number_arguments;
+    row.arguments=arguments;
+    row.number_colors=number_colors;
+    row.coeff=coeff;
+    SparseColorRow(&row,j,q,pixel);
+    SyncDistortRow(&status,sparse_view,exception);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetDistortProgress(&status,image,SparseColorTag,progress);
+      }
+  }
+  sparse_view=DestroyCacheView(sparse_view);
+  if (status == MagickFalse)
+    sparse_image=DestroyImage(sparse_image);
+  return(sparse_image);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -4787,6 +4892,9 @@ MagickExport Image *SparseColorImage(const Image *image,
 
   SparseColorMethod
     sparse_method;
+
+  SparseColorRender
+    render;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -4838,67 +4946,13 @@ MagickExport Image *SparseColorImage(const Image *image,
 
   if (CloneSparseColorImage(image,&sparse_image,exception) == MagickFalse)
     return((Image *) NULL);
-  { /* ----- MAIN CODE ----- */
-    CacheView
-      *sparse_view;
-
-    MagickBooleanType
-      status;
-
-    MagickOffsetType
-      progress;
-
-    ssize_t
-      j;
-
-    status=MagickTrue;
-    progress=0;
-    sparse_view=AcquireAuthenticCacheView(sparse_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp parallel for schedule(static) shared(progress,status) \
-      magick_number_threads(image,sparse_image,sparse_image->rows,1)
-#endif
-    for (j=0; j < (ssize_t) sparse_image->rows; j++)
-    {
-      PixelInfo
-        pixel;    /* pixel to assign to distorted image */
-
-      Quantum
-        *magick_restrict q;
-
-      SparseColorRowInput
-        row;
-
-      q=GetCacheViewAuthenticPixels(sparse_view,0,j,sparse_image->columns,1,
-        exception);
-      if (q == (Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      GetPixelInfo(sparse_image,&pixel);
-      row.sparse_method=sparse_method;
-      row.image=image;
-      row.sparse_image=sparse_image;
-      row.number_arguments=number_arguments;
-      row.arguments=arguments;
-      row.number_colors=number_colors;
-      row.coeff=coeff;
-      SparseColorRow(&row,j,q,pixel);
-      SyncDistortRow(&status,sparse_view,exception);
-      if (image->progress_monitor != (MagickProgressMonitor) NULL)
-        {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-          #pragma omp atomic
-#endif
-          progress++;
-          SetDistortProgress(&status,image,SparseColorTag,progress);
-        }
-    }
-    sparse_view=DestroyCacheView(sparse_view);
-    if (status == MagickFalse)
-      sparse_image=DestroyImage(sparse_image);
-  }
+  render.image=image;
+  render.sparse_method=sparse_method;
+  render.number_arguments=number_arguments;
+  render.arguments=arguments;
+  render.number_colors=number_colors;
+  render.coeff=coeff;
+  sparse_image=RenderSparseColorImage(&render,sparse_image,exception);
   coeff = (double *) RelinquishMagickMemory(coeff);
   return(sparse_image);
 }
