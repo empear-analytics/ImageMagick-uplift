@@ -1908,20 +1908,23 @@ static MagickBooleanType AcquiresRGBTransformMaps(Image *image,
   return(MagickTrue);
 }
 
-static MagickBooleanType sRGBTransformImage(Image *image,
-  const ColorspaceType colorspace,ExceptionInfo *exception)
+typedef struct _sRGBTableInput
 {
-  const char
-    *artifact;
-
-  IlluminantType
-    illuminant = D65Illuminant;
-
-  MagickBooleanType
-    status;
+  ColorspaceType
+    colorspace;
 
   MagickOffsetType
     progress;
+} sRGBTableInput;
+
+static MagickBooleanType sRGBTransformByTables(const sRGBTableInput *table,
+  Image *image,MagickBooleanType status,ExceptionInfo *exception)
+{
+  const ColorspaceType
+    colorspace = table->colorspace;
+
+  const MagickOffsetType
+    progress = table->progress;
 
   PrimaryInfo
     primary_info;
@@ -1936,6 +1939,70 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 
   TransformMapTargets
     targets;
+
+  /*
+    Allocate the tables.
+  */
+  targets.x_map=(&x_map);
+  targets.y_map=(&y_map);
+  targets.z_map=(&z_map);
+  if (AcquiresRGBTransformMaps(image,exception,&targets) == MagickFalse)
+    return(MagickFalse);
+  primary_info=InitializesRGBTransformMaps(colorspace,x_map,y_map,z_map);
+  /*
+    Convert from sRGB.
+  */
+  tables.image=image;
+  tables.x_map=x_map;
+  tables.y_map=y_map;
+  tables.z_map=z_map;
+  tables.primary_info=primary_info;
+  tables.exception=exception;
+  switch (image->storage_class)
+  {
+    case DirectClass:
+    default:
+    {
+      /*
+        Convert DirectClass image.
+      */
+      status=sRGBTransformPixels(&tables,status,progress);
+      break;
+    }
+    case PseudoClass:
+    {
+      sRGBTransformColormap(&tables);
+      break;
+    }
+  }
+  /*
+    Relinquish resources.
+  */
+  z_map=(TransformPacket *) RelinquishMagickMemory(z_map);
+  y_map=(TransformPacket *) RelinquishMagickMemory(y_map);
+  x_map=(TransformPacket *) RelinquishMagickMemory(x_map);
+  if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
+    return(MagickFalse);
+  return(status);
+}
+
+static MagickBooleanType sRGBTransformImage(Image *image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  sRGBTableInput
+    table;
+
+  IlluminantType
+    illuminant = D65Illuminant;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1999,50 +2066,9 @@ static MagickBooleanType sRGBTransformImage(Image *image,
     default:
       break;
   }
-  /*
-    Allocate the tables.
-  */
-  targets.x_map=(&x_map);
-  targets.y_map=(&y_map);
-  targets.z_map=(&z_map);
-  if (AcquiresRGBTransformMaps(image,exception,&targets) == MagickFalse)
-    return(MagickFalse);
-  primary_info=InitializesRGBTransformMaps(colorspace,x_map,y_map,z_map);
-  /*
-    Convert from sRGB.
-  */
-  tables.image=image;
-  tables.x_map=x_map;
-  tables.y_map=y_map;
-  tables.z_map=z_map;
-  tables.primary_info=primary_info;
-  tables.exception=exception;
-  switch (image->storage_class)
-  {
-    case DirectClass:
-    default:
-    {
-      /*
-        Convert DirectClass image.
-      */
-      status=sRGBTransformPixels(&tables,status,progress);
-      break;
-    }
-    case PseudoClass:
-    {
-      sRGBTransformColormap(&tables);
-      break;
-    }
-  }
-  /*
-    Relinquish resources.
-  */
-  z_map=(TransformPacket *) RelinquishMagickMemory(z_map);
-  y_map=(TransformPacket *) RelinquishMagickMemory(y_map);
-  x_map=(TransformPacket *) RelinquishMagickMemory(x_map);
-  if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
-    return(MagickFalse);
-  return(status);
+  table.colorspace=colorspace;
+  table.progress=progress;
+  return(sRGBTransformByTables(&table,image,status,exception));
 }
 
 /*
