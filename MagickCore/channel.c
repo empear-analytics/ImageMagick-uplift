@@ -740,6 +740,61 @@ static void SeparatePixelChannel(const Image *image,
   }
 }
 
+typedef struct _SeparateRow
+{
+  const Image
+    *image;
+
+  Image
+    *separate_image;
+
+  CacheView
+    *image_view,
+    *separate_view;
+
+  ChannelType
+    channel_type;
+
+  ExceptionInfo
+    *exception;
+} SeparateRow;
+
+static MagickBooleanType SeparateImageRow(const SeparateRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(row->image_view,0,y,row->image->columns,1,
+    row->exception);
+  q=QueueCacheViewAuthenticPixels(row->separate_view,0,y,
+    row->separate_image->columns,1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) row->image->columns; x++)
+  {
+    SetPixelChannel(row->separate_image,GrayPixelChannel,(Quantum) 0,q);
+    SeparatePixelChannel(row->image,row->separate_image,row->channel_type,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(row->image);
+    q+=(ptrdiff_t) GetPixelChannels(row->separate_image);
+  }
+  if (SyncCacheViewAuthenticPixels(row->separate_view,row->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *SeparateImage(const Image *image,
   const ChannelType channel_type,ExceptionInfo *exception)
 {
@@ -794,34 +849,12 @@ MagickExport Image *SeparateImage(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    const SeparateRow
+      row = { image, separate_image, image_view, separate_view, channel_type,
+        exception };
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    if (SeparateImageRow(&row,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(separate_view,0,y,separate_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SetPixelChannel(separate_image,GrayPixelChannel,(Quantum) 0,q);
-      SeparatePixelChannel(image,separate_image,channel_type,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(separate_image);
-    }
-    if (SyncCacheViewAuthenticPixels(separate_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
