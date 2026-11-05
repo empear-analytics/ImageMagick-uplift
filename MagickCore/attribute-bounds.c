@@ -614,6 +614,19 @@ static RectangleInfo FinishBoundingBox(const Image *image,
   return(bounds);
 }
 
+static void MergeBoundingBox(const RectangleInfo bounding_box,
+  RectangleInfo *bounds)
+{
+  if (bounding_box.x < (*bounds).x)
+    (*bounds).x=bounding_box.x;
+  if (bounding_box.y < (*bounds).y)
+    (*bounds).y=bounding_box.y;
+  if (bounding_box.width > (*bounds).width)
+    (*bounds).width=bounding_box.width;
+  if (bounding_box.height > (*bounds).height)
+    (*bounds).height=bounding_box.height;
+}
+
 MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -695,14 +708,7 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
 #  pragma omp critical (MagickCore_GetImageBoundingBox)
 #endif
     {
-      if (bounding_box.x < bounds.x)
-        bounds.x=bounding_box.x;
-      if (bounding_box.y < bounds.y)
-        bounds.y=bounding_box.y;
-      if (bounding_box.width > bounds.width)
-        bounds.width=bounding_box.width;
-      if (bounding_box.height > bounds.height)
-        bounds.height=bounding_box.height;
+      MergeBoundingBox(bounding_box,&bounds);
     }
   }
   image_view=DestroyCacheView(image_view);
