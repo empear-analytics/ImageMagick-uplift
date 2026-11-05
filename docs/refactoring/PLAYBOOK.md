@@ -1470,6 +1470,15 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    from the fill to a call writes a member's variable (Recipe B step 5's condition):
    checked by reading every path, the paths through blocks that stay in the caller
    included.
+   The statements of one loop body are siblings in the same sense (a report before a
+   nested loop, the nested loop, a report after it, each moved under this recipe or
+   Recipe I or Y in its own commit), and the struct may be filled before the loop when
+   nothing in it writes a member's variable. A later block that holds the calls of
+   earlier siblings (the loop around them, moved by this recipe or Recipe I or Y) takes
+   the same `const Name *name` in place of a struct of its own: the typedef gains the
+   members its own text reads (each filled with the others, from the variable of its
+   name), the block reads them as `name->member`, and each inner call passes `name`
+   where it passed `&name`.
 
 **Before:**
 
@@ -1602,6 +1611,12 @@ static void ThresholdWaveletLevel(float *pixels,
   member's variable itself (a coordinate it computes before reading it) declares its own
   variable (Recipe E step 4) and does not read that member, and once moved it no longer
   writes the caller's variable.
+- A block that holds the siblings' calls and takes the same `name` reads, at its own
+  uses, the members filled from the variables it read, and nothing between the fill and
+  those uses writes them (step 8's condition, now for the block as well), so each
+  `name->member` gives the value the block's own read gave. The inner calls receive the
+  very struct they received before, through the same pointer value, so they read what
+  they read.
 - Two helpers that unpack the same members into `const` locals (the Manhattan and
   Voronoi nearest-point searches of `SparseColorImage`), or that test the same five
   channel traits, are reported as *Code Duplication*; the member form removes the
@@ -6640,3 +6655,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | CB | Extract Critical Block Body: the body of a `#pragma omp critical` block moves into a `static void` helper that its call replaces, the pragma and braces staying in the caller; written variables by pointer, read ones by value or pointer to `const`, at most four parameters; checked by reading | `compare.c`'s eleven `Get*Similarity` merges (a probe, one helper call per critical body: 2.97 to 3.15) and `feature.c`'s `CannyEdgeImage` | owner |
 | 2026-11-05 | NEW | BR | Extract Block Leaving Through a Loop Break or a Return: a block in a loop that leaves through `break;` of the loop on some paths and `return(R);` (one `R`, Recipe W step 2) on others moves to a `static MagickBooleanType` function taking `MagickBooleanType *broke` last, which it clears first; each `return(R);` becomes `return(MagickFalse);`, each `break;` `(*broke)=MagickTrue; return(MagickTrue);`; the caller writes `if (Helper(...,&broke) == MagickFalse) return(R);` and `if (broke != MagickFalse) break;` | `fx.c`'s `TranslateExpression` (campaign A, W14): the ternary colon, the missing-operand test and the in-place operator target each leave the operator loop through `break;` and the function through `return MagickFalse;`, which LB, W, V, Y, I and RV each refuse (the W13 plateau). A probe of the chain (CN, this recipe on the three blocks, EI): bumps 8 to 4, fx.c 3.52 to 3.59, no finding on any new function | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | BR | Step 7: a block holding the call of an earlier helper of this recipe (with `&broke`) and the test of `broke` after it passes the new function's own `broke` on: `&broke` becomes `broke`, other uses `(*broke)` (Recipe O step 5); *Careful* gives the argument | `fx.c`'s `TranslateExpression` (campaign A, W14): the assignment-target chain of the operator-stack loop, after step 6 and Recipe EI, still holds the loop's bump in its first branch, and its `broke` would clash with the helper's parameter. A probe (this step, then Recipe W on the loop): the function leaves Bumpy Road Ahead, fx.c 3.59 to 3.62 | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | N | Step 8: the statements of one loop body are sibling blocks too (each moved under N, I or Y), the struct may be filled before the loop when nothing in it writes a member's variable, and a later block that holds the siblings' calls (the loop around them) takes the same `const Name *name`, the typedef gaining the members it reads, read as `name->member`, its inner calls passing `name` for `&name`; *Careful* gives the argument | `morphology.c`'s `MorphologyApply` (campaign A, W14): its kernel-iteration loop (Recipe I), the two verbose reports around it (N) and the stage loop that holds them (I) read the same nine to twelve inputs; one struct per helper would take the stage-loop helper past *Large Method* (77 lines in a probe). A probe of the chain with one shared `MorphologyStages`: MorphologyApply leaves Brain Method and Deep, Nested Complexity, 2.71 to 3.04, no finding on a helper | mandate (2026-10-24) |
