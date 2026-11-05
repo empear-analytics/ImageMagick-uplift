@@ -1984,6 +1984,28 @@ static MagickBooleanType CountCoefficients(const DistortMethod *method,
   return(MagickTrue);
 }
 
+static double *GenerateRadialCoefficients(double *coeff,DistortMethod *method,
+  const CoefficientContext *context)
+{
+  switch (*method)
+  {
+    case PolarDistortion:
+    case DePolarDistortion:
+      return(PolarCoefficients(coeff,method,context));
+    case Cylinder2PlaneDistortion:
+    case Plane2CylinderDistortion:
+      return(CylinderCoefficients(coeff,method,context));
+    case BarrelDistortion:
+    case BarrelInverseDistortion:
+      return(BarrelCoefficients(coeff,method,context));
+    default:
+      break;
+  }
+  /* you should never reach this point */
+  perror("no method handler"); /* just fail assertion */
+  return((double *) NULL);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -2105,23 +2127,12 @@ static double *GenerateCoefficients(const Image *image,
       return(PolynomialCoefficients(coeff,method,&context));
     case ArcDistortion:
       return(ArcCoefficients(coeff,method,&context));
-    case PolarDistortion:
-    case DePolarDistortion:
-      return(PolarCoefficients(coeff,method,&context));
-    case Cylinder2PlaneDistortion:
-    case Plane2CylinderDistortion:
-      return(CylinderCoefficients(coeff,method,&context));
-    case BarrelDistortion:
-    case BarrelInverseDistortion:
-      return(BarrelCoefficients(coeff,method,&context));
     case ShepardsDistortion:
       return(ShepardsCoefficients(coeff,method,&context));
     default:
       break;
   }
-  /* you should never reach this point */
-  perror("no method handler"); /* just fail assertion */
-  return((double *) NULL);
+  return(GenerateRadialCoefficients(coeff,method,&context));
 }
 
 /*
