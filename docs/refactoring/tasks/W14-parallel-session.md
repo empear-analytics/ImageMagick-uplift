@@ -55,3 +55,17 @@ Rejected: a coefficient-table helper for the OHTA/Rec601/Rec709 loops (more than
 Recipe D; and on x87 builds a literal may keep long-double precision where an array element does not).
 Upstream, not changed: the table path of `TransformsRGBImage` returns `MagickTrue` and ignores its row
 loop's `status`.
+
+## Lane a, second file: morphology.c 2.71 -> 3.04 (Opus, 9 commits)
+
+`MorphologyApply` leaves Brain Method and Deep Nesting through an SD chain on its stage switch, Recipe I on
+two loops, N on two verbose reports and SV on the difference prints. Amendment under the mandate, not yet
+ruled on: **Recipe N step 8** (ae16b9045) treats the statements of one loop body as siblings and lets a later
+block that holds earlier siblings' calls share their `const Name *`. Six `#if 0` blocks checked unchanged by
+script. Whole catalogue on the merged tree: 15,900 cases, 0 diverged.
+
+## Lane b, second file: compare.c stays 2.97 (Opus, no commits)
+
+Saturated; see its plateau row. The lane found clean shared levers (sync helper, trait predicate, head and
+mask predicate) that are flat alone; one would need a Recipe P amendment for operands declared only for the
+test.
