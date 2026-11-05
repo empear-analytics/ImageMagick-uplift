@@ -5330,6 +5330,59 @@ static void SetSimilarityChannel(const SimilarityPixel *pixel,
   }
 }
 
+typedef struct _SimilarityChannels
+{
+  const Image
+    *image;
+
+  Image
+    *similarity_image;
+
+  MetricType
+    metric;
+
+  double
+    similarity;
+} SimilarityChannels;
+
+static void SetSimilarityChannels(const SimilarityChannels *channels,
+  Quantum *magick_restrict q)
+{
+  const Image
+    *const image = channels->image;
+
+  Image
+    *const similarity_image = channels->similarity_image;
+
+  const MetricType
+    metric = channels->metric;
+
+  const double
+    similarity = channels->similarity;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait similarity_traits = GetPixelChannelTraits(similarity_image,
+      channel);
+    SimilarityPixel
+      pixel;
+
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((similarity_traits & UpdatePixelTrait) == 0))
+      continue;
+    pixel.similarity_image=similarity_image;
+    pixel.channel=channel;
+    pixel.metric=metric;
+    pixel.similarity=similarity;
+    SetSimilarityChannel(&pixel,q);
+  }
+}
+
 MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
@@ -5479,8 +5532,8 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
       SimilarityCandidate
         tile;
 
-      ssize_t
-        i;
+      SimilarityChannels
+        channels;
 
       similarity=GetSimilarityMetric((Image *) image,reconstruct,metric,x,y,
         exception);
@@ -5496,24 +5549,11 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
           break;
         }
       }
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait similarity_traits = GetPixelChannelTraits(similarity_image,
-          channel);
-        SimilarityPixel
-          pixel;
-
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((similarity_traits & UpdatePixelTrait) == 0))
-          continue;
-        pixel.similarity_image=similarity_image;
-        pixel.channel=channel;
-        pixel.metric=metric;
-        pixel.similarity=similarity;
-        SetSimilarityChannel(&pixel,q);
-      }
+      channels.image=image;
+      channels.similarity_image=similarity_image;
+      channels.metric=metric;
+      channels.similarity=similarity;
+      SetSimilarityChannels(&channels,q);
       q+=(ptrdiff_t) GetPixelChannels(similarity_image);
     }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
