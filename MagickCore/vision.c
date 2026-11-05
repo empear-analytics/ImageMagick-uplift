@@ -3190,6 +3190,103 @@ static void InitializeEquivalences(const Image *image,
     (void) SetMatrixElement(equivalences,n,0,&n);
 }
 
+typedef struct _CCFinishInputs
+{
+  const Image
+    *image;
+
+  Image
+    *component_image;
+
+  CCObjectInfo
+    *object,
+    **objects;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    background_id,
+    n;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+} CCFinishInputs;
+
+static Image *MergeAndReportComponents(const CCFinishInputs *finish_inputs,
+  const char **metrics)
+{
+  const Image
+    *const image = finish_inputs->image;
+
+  Image
+    *component_image = finish_inputs->component_image;
+
+  CCObjectInfo
+    *object = finish_inputs->object,
+    **const objects = finish_inputs->objects;
+
+  const size_t
+    connectivity = finish_inputs->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = finish_inputs->connect4,
+    (*const connect8)[2] = finish_inputs->connect8;
+
+  const ssize_t
+    background_id = finish_inputs->background_id,
+    n = finish_inputs->n;
+
+  MagickBooleanType
+    status = finish_inputs->status;
+
+  ExceptionInfo
+    *const exception = finish_inputs->exception;
+
+  CCMergeInputs
+    merge_inputs;
+
+  CCReportInputs
+    report_inputs;
+
+  size_t
+    *neighbors;
+
+  /*
+    Merge any object not within the min and max area threshold.
+  */
+  neighbors=(size_t *) AcquireQuantumMemory(component_image->colors+1,
+    sizeof(*neighbors));
+  if (neighbors == (size_t *) NULL)
+    {
+      object=(CCObjectInfo *) RelinquishMagickMemory(object);
+      component_image=DestroyImage(component_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  merge_inputs.component_image=component_image;
+  merge_inputs.object=object;
+  merge_inputs.neighbors=neighbors;
+  merge_inputs.connectivity=connectivity;
+  merge_inputs.connect4=connect4;
+  merge_inputs.connect8=connect8;
+  merge_inputs.background_id=background_id;
+  merge_inputs.exception=exception;
+  status=MergeSelectedObjects(&merge_inputs,status);
+  neighbors=(size_t *) RelinquishMagickMemory(neighbors);
+  report_inputs.image=image;
+  report_inputs.component_image=component_image;
+  report_inputs.object=object;
+  report_inputs.objects=objects;
+  report_inputs.n=n;
+  report_inputs.exception=exception;
+  return(ReportConnectedComponents(&report_inputs,metrics,status));
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -3198,6 +3295,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
 
   CCEquivalenceInputs
     equivalence_inputs;
+
+  CCFinishInputs
+    finish_inputs;
 
   CCLabelCounts
     label_counts;
@@ -3208,14 +3308,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   CCLabeledObjects
     labeled_objects;
 
-  CCMergeInputs
-    merge_inputs;
-
   CCMetricInputs
     inputs;
-
-  CCReportInputs
-    report_inputs;
 
   CCMetricTargets
     targets;
@@ -3244,7 +3338,6 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     *equivalences;
 
   size_t
-    *neighbors,
     size;
 
   ssize_t
@@ -3388,34 +3481,18 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   targets.n=(&n);
   targets.metrics=(&metrics);
   ApplyAxisThresholds(&inputs,&targets);
-  /*
-    Merge any object not within the min and max area threshold.
-  */
-  neighbors=(size_t *) AcquireQuantumMemory(component_image->colors+1,
-    sizeof(*neighbors));
-  if (neighbors == (size_t *) NULL)
-    {
-      object=(CCObjectInfo *) RelinquishMagickMemory(object);
-      component_image=DestroyImage(component_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  merge_inputs.component_image=component_image;
-  merge_inputs.object=object;
-  merge_inputs.neighbors=neighbors;
-  merge_inputs.connectivity=connectivity;
-  merge_inputs.connect4=connect4;
-  merge_inputs.connect8=connect8;
-  merge_inputs.background_id=background_id;
-  merge_inputs.exception=exception;
-  status=MergeSelectedObjects(&merge_inputs,status);
-  neighbors=(size_t *) RelinquishMagickMemory(neighbors);
-  report_inputs.image=image;
-  report_inputs.component_image=component_image;
-  report_inputs.object=object;
-  report_inputs.objects=objects;
-  report_inputs.n=n;
-  report_inputs.exception=exception;
-  return(ReportConnectedComponents(&report_inputs,metrics,status));
+  finish_inputs.image=image;
+  finish_inputs.component_image=component_image;
+  finish_inputs.object=object;
+  finish_inputs.objects=objects;
+  finish_inputs.connectivity=connectivity;
+  finish_inputs.connect4=connect4;
+  finish_inputs.connect8=connect8;
+  finish_inputs.background_id=background_id;
+  finish_inputs.n=n;
+  finish_inputs.status=status;
+  finish_inputs.exception=exception;
+  return(MergeAndReportComponents(&finish_inputs,metrics));
 }
 
 /*
