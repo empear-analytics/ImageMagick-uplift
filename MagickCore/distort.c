@@ -1884,6 +1884,30 @@ static void CountProjectionCoefficients(const DistortMethod *method,
   }
 }
 
+static void CountFixedCoefficients(const DistortMethod *method,
+  size_t *number_coefficients)
+{
+  switch (*method) {
+    case ShepardsDistortion:
+      *number_coefficients=1;  /* The power factor to use */
+      break;
+    case ArcDistortion:
+      *number_coefficients=5;
+      break;
+    case ScaleRotateTranslateDistortion:
+    case AffineProjectionDistortion:
+    case Plane2CylinderDistortion:
+    case Cylinder2PlaneDistortion:
+      *number_coefficients=6;
+      break;
+    default:
+    {
+      CountProjectionCoefficients(method,&(*number_coefficients));
+      break;
+    }
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1971,21 +1995,9 @@ static double *GenerateCoefficients(const Image *image,
       number_coefficients=19; /* BilinearForward + BilinearReverse */
 #endif
       break;
-    case ShepardsDistortion:
-      number_coefficients=1;  /* The power factor to use */
-      break;
-    case ArcDistortion:
-      number_coefficients=5;
-      break;
-    case ScaleRotateTranslateDistortion:
-    case AffineProjectionDistortion:
-    case Plane2CylinderDistortion:
-    case Cylinder2PlaneDistortion:
-      number_coefficients=6;
-      break;
     default:
     {
-      CountProjectionCoefficients(method,&number_coefficients);
+      CountFixedCoefficients(method,&number_coefficients);
       break;
     }
   }
