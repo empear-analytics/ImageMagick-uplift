@@ -3363,6 +3363,68 @@ static void PrintLensDistortFX(const DistortVerboseFX *fx)
   }
 }
 
+static void PrintRadialDistortFX(const DistortVerboseFX *fx)
+{
+  const DistortMethod
+    method = fx->method;
+
+  double
+    *const coeff = fx->coeff;
+
+  char
+    *const image_gen = fx->image_gen;
+
+  const char
+    *const lookup = fx->lookup;
+
+  ssize_t
+    i;
+
+  switch (method)
+  {
+    case ArcDistortion:
+    {
+      PrintArcFX(coeff,image_gen);
+      break;
+    }
+    case PolarDistortion:
+    {
+      (void) FormatLocaleFile(stderr,"Polar Distort, Internal Coefficients\n");
+      for (i=0; i < 8; i++)
+        (void) FormatLocaleFile(stderr,"  c%.17g = %+lf\n",(double) i,
+          coeff[i]);
+      (void) FormatLocaleFile(stderr,"Polar Distort, FX Equivalent:\n");
+      (void) FormatLocaleFile(stderr,"%s", image_gen);
+      (void) FormatLocaleFile(stderr,
+        "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",-coeff[2],-coeff[3]);
+      (void) FormatLocaleFile(stderr,"       xx=(atan2(ii,jj)%+lf)/(2*pi);\n",
+        -(coeff[4]+coeff[5])/2 );
+      (void) FormatLocaleFile(stderr,"       xx=xx-round(xx);\n");
+      (void) FormatLocaleFile(stderr,"       xx=xx*2*pi*%lf + v.w/2;\n",
+        coeff[6] );
+      (void) FormatLocaleFile(stderr,"       yy=(hypot(ii,jj)%+lf)*%lf;\n",
+        -coeff[1],coeff[7] );
+      (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
+      break;
+    }
+    case DePolarDistortion:
+    {
+      PrintDePolarFX(coeff,image_gen);
+      break;
+    }
+    case Cylinder2PlaneDistortion:
+    {
+      PrintCylinder2PlaneFX(coeff,image_gen,lookup);
+      break;
+    }
+    default:
+    {
+      PrintLensDistortFX(fx);
+      break;
+    }
+  }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3649,8 +3711,6 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
 
   /* Verbose output */
   if (IsStringTrue(GetImageArtifact(image,"verbose")) != MagickFalse) {
-    ssize_t
-       i;
     char image_gen[MagickPathExtent];
     const char *lookup;
     DistortVerboseFX
@@ -3705,44 +3765,9 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         PrintPolynomialFX(coeff,image_gen,lookup);
         break;
       }
-      case ArcDistortion:
-      {
-        PrintArcFX(coeff,image_gen);
-        break;
-      }
-      case PolarDistortion:
-      {
-        (void) FormatLocaleFile(stderr,"Polar Distort, Internal Coefficients\n");
-        for (i=0; i < 8; i++)
-          (void) FormatLocaleFile(stderr,"  c%.17g = %+lf\n",(double) i,
-            coeff[i]);
-        (void) FormatLocaleFile(stderr,"Polar Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",-coeff[2],-coeff[3]);
-        (void) FormatLocaleFile(stderr,"       xx=(atan2(ii,jj)%+lf)/(2*pi);\n",
-          -(coeff[4]+coeff[5])/2 );
-        (void) FormatLocaleFile(stderr,"       xx=xx-round(xx);\n");
-        (void) FormatLocaleFile(stderr,"       xx=xx*2*pi*%lf + v.w/2;\n",
-          coeff[6] );
-        (void) FormatLocaleFile(stderr,"       yy=(hypot(ii,jj)%+lf)*%lf;\n",
-          -coeff[1],coeff[7] );
-        (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
-        break;
-      }
-      case DePolarDistortion:
-      {
-        PrintDePolarFX(coeff,image_gen);
-        break;
-      }
-      case Cylinder2PlaneDistortion:
-      {
-        PrintCylinder2PlaneFX(coeff,image_gen,lookup);
-        break;
-      }
       default:
       {
-        PrintLensDistortFX(&fx);
+        PrintRadialDistortFX(&fx);
         break;
       }
     }
