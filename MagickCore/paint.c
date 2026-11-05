@@ -288,6 +288,14 @@ static void ParseGradientVector(GradientInfo *gradient,const Image *image)
       &gradient->gradient_vector.x2,&gradient->gradient_vector.y2);
 }
 
+static void SetGradientDefaultVector(GradientInfo *gradient,const Image *image,
+  const GradientType type)
+{
+  if (IsGradientDefaultDirection(image) != MagickFalse)
+    if ((type == LinearGradient) && (gradient->gradient_vector.y2 != 0.0))
+      gradient->gradient_vector.x2=0.0;
+}
+
 static void SetGradientVector(GradientInfo *gradient,const Image *image,
   const GradientType type)
 {
@@ -303,9 +311,7 @@ static void SetGradientVector(GradientInfo *gradient,const Image *image,
   if (artifact != (const char *) NULL)
     gradient->angle=StringToDouble(artifact,(char **) NULL);
   ParseGradientVector(gradient,image);
-  if (IsGradientDefaultDirection(image) != MagickFalse)
-    if ((type == LinearGradient) && (gradient->gradient_vector.y2 != 0.0))
-      gradient->gradient_vector.x2=0.0;
+  SetGradientDefaultVector(gradient,image,type);
 }
 
 static void SetGradientBoundingBox(GradientInfo *gradient,const Image *image)
