@@ -921,11 +921,58 @@ static void GetMontageTileCounts(const MontageInfo *montage_info,
     GetMontageGeometry(montage_info->tile,number_images,&targets);
 }
 
+typedef struct _MontageGravityInfo
+{
+  Image
+    *tile_image;
+
+  size_t
+    width,
+    height;
+
+  const MontageInfo
+    *montage_info;
+
+  Image
+    *image;
+
+  size_t
+    border_width;
+
+  ExceptionInfo
+    *exception;
+} MontageGravityInfo;
+
+static void GravitateMontageTile(const MontageGravityInfo *gravity,
+  MagickStatusType *flags,ssize_t *x,ssize_t *y)
+{
+  char
+    tile_geometry[MagickPathExtent];
+
+  RectangleInfo
+    geometry;
+
+  /*
+    Gravitate as specified by the tile gravity.
+  */
+  gravity->tile_image->columns=gravity->width;
+  gravity->tile_image->rows=gravity->height;
+  gravity->tile_image->gravity=gravity->montage_info->gravity;
+  if (gravity->image->gravity != UndefinedGravity)
+    gravity->tile_image->gravity=gravity->image->gravity;
+  (void) FormatLocaleString(tile_geometry,MagickPathExtent,
+    "%.17gx%.17g+0+0",(double) gravity->image->columns,(double)
+    gravity->image->rows);
+  (*flags)=ParseGravityGeometry(gravity->tile_image,tile_geometry,&geometry,
+    gravity->exception);
+  (*x)=geometry.x+(ssize_t) gravity->border_width;
+  (*y)=geometry.y+(ssize_t) gravity->border_width;
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
   char
-    tile_geometry[MagickPathExtent],
     *title;
 
   DrawInfo
@@ -1172,6 +1219,9 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     status=MagickTrue;
     for (tile=0; tile < MagickMin((ssize_t) tiles_per_page,(ssize_t) number_images); tile++)
     {
+      MontageGravityInfo
+        gravity_info;
+
       /*
         Copy this tile to the composite.
       */
@@ -1187,19 +1237,14 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
       if (border_width != 0)
         image=AddTileBorder(image,montage_info,border_width,width,height,
           exception);
-      /*
-        Gravitate as specified by the tile gravity.
-      */
-      tile_image->columns=width;
-      tile_image->rows=height;
-      tile_image->gravity=montage_info->gravity;
-      if (image->gravity != UndefinedGravity)
-        tile_image->gravity=image->gravity;
-      (void) FormatLocaleString(tile_geometry,MagickPathExtent,
-        "%.17gx%.17g+0+0",(double) image->columns,(double) image->rows);
-      flags=ParseGravityGeometry(tile_image,tile_geometry,&geometry,exception);
-      x=geometry.x+(ssize_t) border_width;
-      y=geometry.y+(ssize_t) border_width;
+      gravity_info.tile_image=tile_image;
+      gravity_info.width=width;
+      gravity_info.height=height;
+      gravity_info.montage_info=montage_info;
+      gravity_info.image=image;
+      gravity_info.border_width=border_width;
+      gravity_info.exception=exception;
+      GravitateMontageTile(&gravity_info,&flags,&x,&y);
       if ((montage_info->frame != (char *) NULL) && (bevel_width > 0))
         {
           image=AddTileFrame(image,frame_info,width,height,metrics,exception);
