@@ -1616,6 +1616,13 @@ static MagickBooleanType ThrowClusterAllocationFailed(const Image *image,
   return(MagickFalse);
 }
 
+static Cluster *AppendCluster(Cluster *cluster)
+{
+  cluster->next=(Cluster *) AcquireQuantumMemory(1,sizeof(*cluster->next));
+  cluster=cluster->next;
+  return(cluster);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1687,9 +1694,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
         */
         if (head != (Cluster *) NULL)
           {
-            cluster->next=(Cluster *) AcquireQuantumMemory(1,
-              sizeof(*cluster->next));
-            cluster=cluster->next;
+            cluster=AppendCluster(cluster);
           }
         else
           {
