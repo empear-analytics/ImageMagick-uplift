@@ -3180,6 +3180,16 @@ static void LabelConnectedComponents(const CCLabelInputs *label_inputs,
   component_view=DestroyCacheView(component_view);
 }
 
+static void InitializeEquivalences(const Image *image,
+  MatrixInfo *equivalences)
+{
+  ssize_t
+    n;
+
+  for (n=0; n < (ssize_t) (image->columns*image->rows); n++)
+    (void) SetMatrixElement(equivalences,n,0,&n);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -3278,8 +3288,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       component_image=DestroyImage(component_image);
       return((Image *) NULL);
     }
-  for (n=0; n < (ssize_t) (image->columns*image->rows); n++)
-    (void) SetMatrixElement(equivalences,n,0,&n);
+  InitializeEquivalences(image,equivalences);
   object=(CCObjectInfo *) AcquireQuantumMemory(MaxColormapSize,sizeof(*object));
   if (object == (CCObjectInfo *) NULL)
     {
