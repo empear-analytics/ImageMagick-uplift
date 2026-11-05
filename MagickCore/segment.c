@@ -826,6 +826,51 @@ static MagickBooleanType ClassifyImageLine(const ClassifyLine *line,
   ThrowBinaryException(severity,tag,label); \
 }
 
+typedef struct _ClassifyClusterTargets
+{
+  ExtentPacket
+    *red;
+
+  Cluster
+    **cluster,
+    **head;
+
+  ExtentPacket
+    *green,
+    *blue;
+} ClassifyClusterTargets;
+
+static MagickBooleanType FormClassifyClusters(short **extrema,
+  const ClassifyClusterTargets *targets)
+{
+  ExtentPacket
+    *const red = targets->red;
+
+  Cluster
+    **const cluster = targets->cluster,
+    **const head = targets->head;
+
+  ExtentPacket
+    *const green = targets->green,
+    *const blue = targets->blue;
+
+  while (DefineRegion(extrema[Red],red) != 0)
+  {
+    GreenClusterTargets
+      green_targets;
+
+    green_targets.cluster=(cluster);
+    green_targets.head=(head);
+    green_targets.green=(green);
+    green_targets.blue=(blue);
+    if (FormGreenClusters(extrema,*red,&green_targets) == MagickFalse)
+      return(MagickFalse);
+  }
+  if (AcquireDefaultCluster(*red,*green,*blue,head) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -853,6 +898,9 @@ static MagickBooleanType Classify(Image *image,short **extrema,
     green,
     red;
 
+  const ClassifyClusterTargets
+    cluster_targets = { &red, &cluster, &head, &green, &blue };
+
   MagickOffsetType
     progress;
 
@@ -878,20 +926,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   (void) memset(&red,0,sizeof(red));
   (void) memset(&green,0,sizeof(green));
   (void) memset(&blue,0,sizeof(blue));
-  while (DefineRegion(extrema[Red],&red) != 0)
-  {
-    GreenClusterTargets
-      green_targets;
-
-    green_targets.cluster=(&cluster);
-    green_targets.head=(&head);
-    green_targets.green=(&green);
-    green_targets.blue=(&blue);
-    if (FormGreenClusters(extrema,red,&green_targets) == MagickFalse)
-      ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-  }
-  if (AcquireDefaultCluster(red,green,blue,&head) == MagickFalse)
+  if (FormClassifyClusters(extrema,&cluster_targets) == MagickFalse)
     ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
   /*
