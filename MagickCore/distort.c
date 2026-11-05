@@ -5071,16 +5071,11 @@ MagickExport Image *SparseColorImage(const Image *image,
         status=MagickFalse;
       if (image->progress_monitor != (MagickProgressMonitor) NULL)
         {
-          MagickBooleanType
-            proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
           #pragma omp atomic
 #endif
           progress++;
-          proceed=SetImageProgress(image,SparseColorTag,progress,image->rows);
-          if (proceed == MagickFalse)
-            status=MagickFalse;
+          SetDistortProgress(&status,image,SparseColorTag,progress);
         }
     }
     sparse_view=DestroyCacheView(sparse_view);
