@@ -431,6 +431,40 @@ static MagickBooleanType ReportWaveletProgress(const Image *image,
   return(status);
 }
 
+typedef struct _WaveletDenoise
+{
+  MagickSizeType
+    number_pixels;
+
+  double
+    threshold,
+    softness;
+
+  const float
+    *noise_levels;
+
+  float
+    *pixels;
+} WaveletDenoise;
+
+static void ThresholdWaveletCoefficients(const WaveletDenoise *denoise,
+  const ssize_t level,const size_t high_pass,const size_t low_pass)
+{
+  double
+    magnitude;
+
+  WaveletThreshold
+    wavelet;
+
+  magnitude=denoise->threshold*(double) denoise->noise_levels[level];
+  wavelet.high_pass=high_pass;
+  wavelet.low_pass=low_pass;
+  wavelet.number_pixels=denoise->number_pixels;
+  wavelet.magnitude=magnitude;
+  wavelet.softness=denoise->softness;
+  ThresholdWaveletLevel(denoise->pixels,&wavelet);
+}
+
 MagickExport Image *WaveletDenoiseImage(const Image *image,
   const double threshold,const double softness,ExceptionInfo *exception)
 {
@@ -561,14 +595,11 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
     high_pass=0;
     for (level=0; level < (ssize_t) number_levels; level++)
     {
-      double
-        magnitude;
-
       ssize_t
         x;
 
-      WaveletThreshold
-        wavelet;
+      WaveletDenoise
+        denoise;
 
       low_pass=(size_t) (number_pixels*((level & 0x01)+1));
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -612,13 +643,12 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
         To threshold, each coefficient is compared to a threshold value and
         attenuated / shrunk by some factor.
       */
-      magnitude=threshold*(double) noise_levels[level];
-      wavelet.high_pass=high_pass;
-      wavelet.low_pass=low_pass;
-      wavelet.number_pixels=number_pixels;
-      wavelet.magnitude=magnitude;
-      wavelet.softness=softness;
-      ThresholdWaveletLevel(pixels,&wavelet);
+      denoise.number_pixels=number_pixels;
+      denoise.threshold=threshold;
+      denoise.softness=softness;
+      denoise.noise_levels=noise_levels;
+      denoise.pixels=pixels;
+      ThresholdWaveletCoefficients(&denoise,level,high_pass,low_pass);
       high_pass=low_pass;
     }
     /*
