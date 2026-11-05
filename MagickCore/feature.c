@@ -213,9 +213,34 @@ static MagickBooleanType SeedCannyTrace(const CannyTrace *trace,
   return(MagickTrue);
 }
 
-static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
-  const ssize_t y,ExceptionInfo *exception)
+typedef struct _CannyNeighbor
 {
+  const CannyTrace
+    *trace;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    u,
+    v;
+} CannyNeighbor;
+
+typedef struct _CannyTraceTargets
+{
+  CannyInfo
+    *edge;
+
+  ssize_t
+    *i;
+} CannyTraceTargets;
+
+static MagickBooleanType TraceCannyNeighbor(const CannyNeighbor *neighbor,
+  const CannyTraceTargets *targets)
+{
+  const CannyTrace
+    *const trace = neighbor->trace;
+
   Image
     *edge_image = trace->edge_image;
 
@@ -228,8 +253,20 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
   const double
     lower_threshold = trace->lower_threshold;
 
+  ExceptionInfo
+    *const exception = neighbor->exception;
+
+  const ssize_t
+    u = neighbor->u,
+    v = neighbor->v;
+
   CannyInfo
-    edge,
+    *const edge = targets->edge;
+
+  ssize_t
+    *const i = targets->i;
+
+  CannyInfo
     pixel;
 
   MagickBooleanType
@@ -238,8 +275,50 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
   Quantum
     *q;
 
+  q=GetCacheViewAuthenticPixels(edge_view,(*edge).x+u,(*edge).y+v,1,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    return(MagickFalse);
+  status=GetMatrixElement(canny_cache,(*edge).x+u,(*edge).y+v,&pixel);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  if (IsUntracedEdgePixel(edge_image,q,pixel,lower_threshold) !=
+      MagickFalse)
+    {
+      *q=QuantumRange;
+      status=SyncCacheViewAuthenticPixels(edge_view,exception);
+      if (status == MagickFalse)
+        return(MagickFalse);
+      (*edge).x+=u;
+      (*edge).y+=v;
+      status=SetMatrixElement(canny_cache,(*i),0,edge);
+      if (status == MagickFalse)
+        return(MagickFalse);
+      (*i)++;
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
+  const ssize_t y,ExceptionInfo *exception)
+{
+  Image
+    *edge_image = trace->edge_image;
+
+  MatrixInfo
+    *canny_cache = trace->canny_cache;
+
+  CannyInfo
+    edge;
+
+  MagickBooleanType
+    status;
+
   ssize_t
     i;
+
+  const CannyTraceTargets
+    targets = { &edge, &i };
 
   if (SeedCannyTrace(trace,x,y,exception) == MagickFalse)
     return(MagickFalse);
@@ -259,6 +338,9 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
 
       for (u=(-1); u <= 1; u++)
       {
+        CannyNeighbor
+          neighbor;
+
         if ((u == 0) && (v == 0))
           continue;
         if (IsAuthenticPixel(edge_image,edge.x+u,edge.y+v) == MagickFalse)
@@ -266,27 +348,12 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
         /*
           Not an edge if gradient value is below the lower threshold.
         */
-        q=GetCacheViewAuthenticPixels(edge_view,edge.x+u,edge.y+v,1,1,
-          exception);
-        if (q == (Quantum *) NULL)
+        neighbor.trace=trace;
+        neighbor.exception=exception;
+        neighbor.u=u;
+        neighbor.v=v;
+        if (TraceCannyNeighbor(&neighbor,&targets) == MagickFalse)
           return(MagickFalse);
-        status=GetMatrixElement(canny_cache,edge.x+u,edge.y+v,&pixel);
-        if (status == MagickFalse)
-          return(MagickFalse);
-        if (IsUntracedEdgePixel(edge_image,q,pixel,lower_threshold) !=
-            MagickFalse)
-          {
-            *q=QuantumRange;
-            status=SyncCacheViewAuthenticPixels(edge_view,exception);
-            if (status == MagickFalse)
-              return(MagickFalse);
-            edge.x+=u;
-            edge.y+=v;
-            status=SetMatrixElement(canny_cache,i,0,&edge);
-            if (status == MagickFalse)
-              return(MagickFalse);
-            i++;
-          }
       }
     }
   }
