@@ -2818,6 +2818,26 @@ static void GenericPixelsTosRGB(Image *image,const double white_luminance,
   }
 }
 
+static void LinearGrayPixelsTosRGB(Image *image,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MagickRealType
+      gray;
+
+    gray=0.212656*EncodePixelGamma(GetPixelRed(image,q))+0.715158*
+      EncodePixelGamma(GetPixelGreen(image,q))+0.072186*
+      EncodePixelGamma(GetPixelBlue(image,q));
+    SetPixelRed(image,ClampToQuantum(gray),q);
+    SetPixelGreen(image,ClampToQuantum(gray),q);
+    SetPixelBlue(image,ClampToQuantum(gray),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2880,9 +2900,6 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        ssize_t
-          x;
-
         Quantum
           *magick_restrict q;
 
@@ -2891,19 +2908,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 
         if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
           continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          MagickRealType
-            gray;
-
-          gray=0.212656*EncodePixelGamma(GetPixelRed(image,q))+0.715158*
-            EncodePixelGamma(GetPixelGreen(image,q))+0.072186*
-            EncodePixelGamma(GetPixelBlue(image,q));
-          SetPixelRed(image,ClampToQuantum(gray),q);
-          SetPixelGreen(image,ClampToQuantum(gray),q);
-          SetPixelBlue(image,ClampToQuantum(gray),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        LinearGrayPixelsTosRGB(image,q);
         SyncColorspaceRow(image_view,exception,&status);
       }
       finish.image=image;
