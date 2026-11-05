@@ -1073,6 +1073,71 @@ static Image *PlaceMontageTile(const MontageTilePlacement *placement,
   return(image);
 }
 
+typedef struct _MontagePageInfo
+{
+  Image
+    *montage;
+
+  size_t
+    tiles_per_page,
+    number_images;
+
+  Image
+    **image_list;
+
+  size_t
+    extent;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    *texture;
+
+  const MontageInfo
+    *montage_info;
+
+  const ImageInfo
+    *image_info;
+
+  DrawInfo
+    *draw_info;
+
+  RectangleInfo
+    extract_info;
+
+  char
+    *title;
+} MontagePageInfo;
+
+static void DecorateMontagePage(const MontagePageInfo *page)
+{
+  MagickProgressMonitor
+    progress_monitor;
+
+  ssize_t
+    tile;
+
+  *page->montage->directory='\0';
+  tile=0;
+  while (tile < MagickMin((ssize_t) page->tiles_per_page,(ssize_t)
+         page->number_images))
+  {
+    AppendMontageDirectoryEntry(page->montage,page->image_list[tile]->filename,
+      page->extent,page->exception);
+    tile++;
+  }
+  progress_monitor=SetImageProgressMonitor(page->montage,(MagickProgressMonitor)
+    NULL,page->montage->client_data);
+  if (page->texture != (Image *) NULL)
+    (void) TextureImage(page->montage,page->texture,page->exception);
+  if (page->montage_info->title != (char *) NULL)
+    AnnotateMontageTitle(page->image_info,page->draw_info,page->image_list,
+      page->montage,page->extract_info,page->title,page->exception);
+  (void) SetImageProgressMonitor(page->montage,progress_monitor,
+    page->montage->client_data);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1251,6 +1316,9 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     MontageBoundsInfo
       bounds_info;
 
+    MontagePageInfo
+      page_info;
+
     /*
       Determine bounding box.
     */
@@ -1294,23 +1362,19 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
       ((metrics.ascent-metrics.descent+4)*number_lines+
       (montage_info->shadow != MagickFalse ? 4 : 0))),(double) x_offset,
       (double) y_offset);
-    *montage->directory='\0';
-    tile=0;
-    while (tile < MagickMin((ssize_t) tiles_per_page,(ssize_t) number_images))
-    {
-      AppendMontageDirectoryEntry(montage,image_list[tile]->filename,extent,
-        exception);
-      tile++;
-    }
-    progress_monitor=SetImageProgressMonitor(montage,(MagickProgressMonitor)
-      NULL,montage->client_data);
-    if (texture != (Image *) NULL)
-      (void) TextureImage(montage,texture,exception);
-    if (montage_info->title != (char *) NULL)
-      AnnotateMontageTitle(image_info,draw_info,image_list,montage,
-        extract_info,title,exception);
-    (void) SetImageProgressMonitor(montage,progress_monitor,
-      montage->client_data);
+    page_info.montage=montage;
+    page_info.tiles_per_page=tiles_per_page;
+    page_info.number_images=number_images;
+    page_info.image_list=image_list;
+    page_info.extent=extent;
+    page_info.exception=exception;
+    page_info.texture=texture;
+    page_info.montage_info=montage_info;
+    page_info.image_info=image_info;
+    page_info.draw_info=draw_info;
+    page_info.extract_info=extract_info;
+    page_info.title=title;
+    DecorateMontagePage(&page_info);
     /*
       Copy tile to the composite.
     */
