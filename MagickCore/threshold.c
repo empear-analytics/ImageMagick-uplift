@@ -1638,6 +1638,32 @@ static const char *SkipThresholdMapSeparators(const char *threshold_map)
   return(p);
 }
 
+typedef struct _OrderedDitherMap
+{
+  ThresholdMap
+    *map;
+
+  const char
+    *threshold_map;
+} OrderedDitherMap;
+
+static MagickBooleanType PrepareOrderedDither(const OrderedDitherMap *input,
+  double *levels,Image *image,ExceptionInfo *exception)
+{
+  ThresholdMap
+    *const map = input->map;
+
+  const char
+    *const threshold_map = input->threshold_map;
+
+  if (CheckOrderedDitherMap(map,threshold_map,exception) == MagickFalse)
+    return(MagickFalse);
+  GetDitherLevels(threshold_map,levels);
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   const char *threshold_map,ExceptionInfo *exception)
 {
@@ -1664,6 +1690,9 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   ThresholdMap
     *map;
 
+  OrderedDitherMap
+    input;
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
@@ -1675,10 +1704,9 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   p=SkipThresholdMapSeparators(threshold_map);
   threshold_map=p;
   map=GetNamedThresholdMap(threshold_map,p,exception);
-  if (CheckOrderedDitherMap(map,threshold_map,exception) == MagickFalse)
-    return(MagickFalse);
-  GetDitherLevels(threshold_map,levels);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  input.map=map;
+  input.threshold_map=threshold_map;
+  if (PrepareOrderedDither(&input,levels,image,exception) == MagickFalse)
     return(MagickFalse);
   status=MagickTrue;
   progress=0;
