@@ -2584,6 +2584,93 @@ static MagickBooleanType MergeObject(const CCMergeObject *merge_object,
   return(status);
 }
 
+typedef struct _CCMergeInputs
+{
+  Image
+    *component_image;
+
+  CCObjectInfo
+    *object;
+
+  size_t
+    *neighbors;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    background_id;
+
+  ExceptionInfo
+    *exception;
+} CCMergeInputs;
+
+static MagickBooleanType MergeSelectedObjects(
+  const CCMergeInputs *merge_inputs,MagickBooleanType status)
+{
+  Image
+    *const component_image = merge_inputs->component_image;
+
+  CCObjectInfo
+    *const object = merge_inputs->object;
+
+  size_t
+    *const neighbors = merge_inputs->neighbors;
+
+  const size_t
+    connectivity = merge_inputs->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = merge_inputs->connect4,
+    (*const connect8)[2] = merge_inputs->connect8;
+
+  const ssize_t
+    background_id = merge_inputs->background_id;
+
+  ExceptionInfo
+    *const exception = merge_inputs->exception;
+
+  CacheView
+    *component_view,
+    *object_view;
+
+  ssize_t
+    i;
+
+  component_view=AcquireAuthenticCacheView(component_image,exception);
+  object_view=AcquireVirtualCacheView(component_image,exception);
+  (void) SetCacheViewVirtualPixelMethod(object_view,TileVirtualPixelMethod);
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+  {
+    CCMergeObject
+      merge_object;
+
+    if (status == MagickFalse)
+      continue;
+    if ((object[i].merge == MagickFalse) || (i == background_id))
+      continue;  /* keep object */
+    /*
+      Merge this object.
+    */
+    merge_object.component_view=component_view;
+    merge_object.component_image=component_image;
+    merge_object.object_view=object_view;
+    merge_object.object=object;
+    merge_object.neighbors=neighbors;
+    merge_object.connectivity=connectivity;
+    merge_object.connect4=connect4;
+    merge_object.connect8=connect8;
+    merge_object.i=i;
+    merge_object.exception=exception;
+    status=MergeObject(&merge_object,status);
+  }
+  object_view=DestroyCacheView(object_view);
+  component_view=DestroyCacheView(component_view);
+  return(status);
+}
+
 #define ConnectedComponentsImageTag  "ConnectedComponents/Image"
 
 static void UpdateComponentsProgress(const Image *image,
@@ -2827,14 +2914,16 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
 {
   CacheView
     *component_view,
-    *image_view,
-    *object_view;
+    *image_view;
 
   CCEquivalenceInputs
     equivalence_inputs;
 
   CCLabeledObjects
     labeled_objects;
+
+  CCMergeInputs
+    merge_inputs;
 
   CCMetricInputs
     inputs;
@@ -2873,7 +2962,6 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     background_id,
     connect4[2][2] = { { -1,  0 }, {  0, -1 } },
     connect8[4][2] = { { -1, -1 }, { -1,  0 }, { -1,  1 }, {  0, -1 } },
-    i,
     n,
     y;
 
@@ -3096,35 +3184,15 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       component_image=DestroyImage(component_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  component_view=AcquireAuthenticCacheView(component_image,exception);
-  object_view=AcquireVirtualCacheView(component_image,exception);
-  (void) SetCacheViewVirtualPixelMethod(object_view,TileVirtualPixelMethod);
-  for (i=0; i < (ssize_t) component_image->colors; i++)
-  {
-    CCMergeObject
-      merge_object;
-
-    if (status == MagickFalse)
-      continue;
-    if ((object[i].merge == MagickFalse) || (i == background_id))
-      continue;  /* keep object */
-    /*
-      Merge this object.
-    */
-    merge_object.component_view=component_view;
-    merge_object.component_image=component_image;
-    merge_object.object_view=object_view;
-    merge_object.object=object;
-    merge_object.neighbors=neighbors;
-    merge_object.connectivity=connectivity;
-    merge_object.connect4=connect4;
-    merge_object.connect8=connect8;
-    merge_object.i=i;
-    merge_object.exception=exception;
-    status=MergeObject(&merge_object,status);
-  }
-  object_view=DestroyCacheView(object_view);
-  component_view=DestroyCacheView(component_view);
+  merge_inputs.component_image=component_image;
+  merge_inputs.object=object;
+  merge_inputs.neighbors=neighbors;
+  merge_inputs.connectivity=connectivity;
+  merge_inputs.connect4=connect4;
+  merge_inputs.connect8=connect8;
+  merge_inputs.background_id=background_id;
+  merge_inputs.exception=exception;
+  status=MergeSelectedObjects(&merge_inputs,status);
   neighbors=(size_t *) RelinquishMagickMemory(neighbors);
   artifact=GetImageArtifact(image,"connected-components:mean-color");
   if (IsStringTrue(artifact) != MagickFalse)
