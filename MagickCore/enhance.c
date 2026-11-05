@@ -2648,6 +2648,30 @@ static MagickStatusType LevelWhiteBalanceVibrance(Image *image,
   return(status);
 }
 
+static void SumWhiteBalanceChroma(const EnhanceLine *line,
+  MagickStatusType *status,double *a_mean,double *b_mean)
+{
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) line->image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    if ((*status) == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(line->image_view,0,y,line->image->columns,1,
+      line->exception);
+    if (p == (Quantum *) NULL)
+      {
+        (*status)=MagickFalse;
+        continue;
+      }
+    AccumulateChromaMeans(line->image,p,a_mean,b_mean);
+  }
+}
+
 MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2659,6 +2683,9 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   double
     a_mean,
     b_mean;
+
+  EnhanceLine
+    line;
 
   MagickOffsetType
     progress;
@@ -2682,21 +2709,10 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   a_mean=0.0;
   b_mean=0.0;
   image_view=AcquireAuthenticCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    AccumulateChromaMeans(image,p,&a_mean,&b_mean);
-  }
+  line.image=image;
+  line.image_view=image_view;
+  line.exception=exception;
+  SumWhiteBalanceChroma(&line,&status,&a_mean,&b_mean);
   a_mean/=((double) image->columns*image->rows);
   b_mean/=((double) image->columns*image->rows);
   progress=0;
