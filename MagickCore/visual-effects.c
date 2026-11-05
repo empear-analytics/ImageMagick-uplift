@@ -1398,6 +1398,14 @@ static MagickBooleanType CloneWarpImage(Image *canvas_image,
   return(MagickTrue);
 }
 
+static void SetImplodeCanvasAlpha(Image *canvas_image,
+  ExceptionInfo *exception)
+{
+  if ((canvas_image->alpha_trait == UndefinedPixelTrait) &&
+      (canvas_image->background_color.alpha != (double) OpaqueAlpha))
+    (void) SetImageAlphaChannel(canvas_image,OpaqueAlphaChannel,exception);
+}
+
 static void GetImplodeGeometry(const Image *canvas_image,PointInfo *scale,
   PointInfo *center,double *radius)
 {
@@ -1460,9 +1468,7 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
   canvas_image=CloneImage(image,0,0,MagickTrue,exception);
   if (canvas_image == (Image *) NULL)
     return((Image *) NULL);
-  if ((canvas_image->alpha_trait == UndefinedPixelTrait) &&
-      (canvas_image->background_color.alpha != (double) OpaqueAlpha))
-    (void) SetImageAlphaChannel(canvas_image,OpaqueAlphaChannel,exception);
+  SetImplodeCanvasAlpha(canvas_image,exception);
   if (CloneWarpImage(canvas_image,&implode_image,exception) == MagickFalse)
     return((Image *) NULL);
   /*
