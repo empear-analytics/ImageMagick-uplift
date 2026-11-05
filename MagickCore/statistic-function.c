@@ -117,6 +117,21 @@ typedef struct _FunctionArguments
     *parameters;
 } FunctionArguments;
 
+typedef struct _FunctionRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  const FunctionArguments
+    *arguments;
+
+  ExceptionInfo
+    *exception;
+} FunctionRow;
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -312,6 +327,35 @@ static void ApplyFunctionToRow(const Image *image,
   }
 }
 
+static MagickBooleanType ApplyFunctionToLine(const FunctionRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  CacheView
+    *const image_view = row->image_view;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  Image
+    *const image = row->image;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ApplyFunctionToRow(image,row->arguments,exception,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 static void ReportFunctionProgress(const Image *image,
   const MagickOffsetType progress,MagickBooleanType *status)
 {
@@ -366,20 +410,11 @@ MagickExport MagickBooleanType FunctionImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const FunctionRow
+      row = { image, image_view, &arguments, exception };
 
-    if (status == MagickFalse)
+    if (ApplyFunctionToLine(&row,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    ApplyFunctionToRow(image,&arguments,exception,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
