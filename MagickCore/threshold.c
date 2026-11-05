@@ -1339,6 +1339,13 @@ static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void PrintThresholdMapHeader(FILE *file)
+{
+  (void) FormatLocaleFile(file,"%-16s %-12s %s\n","Map","Alias","Description");
+  (void) FormatLocaleFile(file,
+    "----------------------------------------------------\n");
+}
+
 MagickBooleanType ListThresholdMapFile(FILE *file,const char *xml,
   const char *filename,ExceptionInfo *exception)
 {
@@ -1359,9 +1366,7 @@ MagickBooleanType ListThresholdMapFile(FILE *file,const char *xml,
   thresholds=NewXMLTree(xml,exception);
   if ( thresholds == (XMLTreeInfo *) NULL )
     return(MagickFalse);
-  (void) FormatLocaleFile(file,"%-16s %-12s %s\n","Map","Alias","Description");
-  (void) FormatLocaleFile(file,
-    "----------------------------------------------------\n");
+  PrintThresholdMapHeader(file);
   threshold=GetXMLTreeChild(thresholds,"threshold");
   for ( ; threshold != (XMLTreeInfo *) NULL;
           threshold=GetNextXMLTreeTag(threshold))
