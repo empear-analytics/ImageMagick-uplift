@@ -1183,6 +1183,29 @@ static MagickBooleanType ReadThresholdLevels(ThresholdMap *map,
   return(MagickTrue);
 }
 
+static MagickBooleanType ReadThresholdLevelsDivisor(ThresholdMap *map,
+  XMLTreeInfo *levels,const char *map_id,ExceptionInfo *exception)
+{
+  const char
+    *attribute;
+
+  attribute=GetXMLTreeAttribute(levels,"divisor");
+  if (attribute == (char *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlMissingAttribute", "<levels divisor>, map \"%s\"",map_id);
+      return(MagickFalse);
+    }
+  map->divisor=(ssize_t) StringToLong(attribute);
+  if (map->divisor < 2)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlInvalidAttribute", "<levels divisor>, map \"%s\"",map_id);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ReadThresholdLevelsSize(ThresholdMap *map,
   XMLTreeInfo *levels,const char *map_id,ExceptionInfo *exception)
 {
@@ -1217,20 +1240,8 @@ static MagickBooleanType ReadThresholdLevelsSize(ThresholdMap *map,
         "XmlInvalidAttribute", "<levels height>, map \"%s\"",map_id);
       return(MagickFalse);
     }
-  attribute=GetXMLTreeAttribute(levels,"divisor");
-  if (attribute == (char *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlMissingAttribute", "<levels divisor>, map \"%s\"",map_id);
-      return(MagickFalse);
-    }
-  map->divisor=(ssize_t) StringToLong(attribute);
-  if (map->divisor < 2)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlInvalidAttribute", "<levels divisor>, map \"%s\"",map_id);
-      return(MagickFalse);
-    }
+  if (ReadThresholdLevelsDivisor(map,levels,map_id,exception) == MagickFalse)
+    return(MagickFalse);
   return(MagickTrue);
 }
 
