@@ -2413,6 +2413,57 @@ static MagickBooleanType QualifyFunction (FxInfo * pfx,
   return MagickTrue;
 }
 
+typedef struct _FunctionOpening
+{
+  OperatorE
+    *pushOp;
+
+  const char
+    **strLimit;
+
+  char
+    *chLimit,
+    *expChLimit;
+
+  int
+    *nArgs;
+} FunctionOpening;
+
+static void OpenPixelFunction (FxInfo * pfx, const FunctionOpening *opening)
+{
+  OperatorE
+    *const pushOp = opening->pushOp;
+
+  const char
+    **const strLimit = opening->strLimit;
+
+  char
+    *const chLimit = opening->chLimit,
+    *const expChLimit = opening->expChLimit;
+
+  int
+    *const nArgs = opening->nArgs;
+
+    char p = PeekChar (pfx);
+    if (p=='{') {
+      (void) ExpectChar (pfx, '{');
+      *pushOp = oOpenBrace;
+      *strLimit = ",}";
+      *chLimit = '}';
+      *expChLimit = '}';
+    } else if (p=='[') {
+      (void) ExpectChar (pfx, '[');
+      *pushOp = oOpenBracket;
+      *strLimit = ",]";
+      *chLimit = ']';
+      *expChLimit = ']';
+    } else {
+      *nArgs = 0;
+      *chLimit = ']';
+      *expChLimit = ']';
+    }
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2438,27 +2489,13 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   const FunctionQualifiers qualifiers = { &coordQual, &fe, &funStr, &chQual,
     &expChLimit, &iaQual };
 
+  const FunctionOpening opening = { &pushOp, &strLimit, &chLimit, &expChLimit,
+    &nArgs };
+
   pfx->pex += pfx->lenToken;
 
   if (fe == fP) {
-    char p = PeekChar (pfx);
-    if (p=='{') {
-      (void) ExpectChar (pfx, '{');
-      pushOp = oOpenBrace;
-      strLimit = ",}";
-      chLimit = '}';
-      expChLimit = '}';
-    } else if (p=='[') {
-      (void) ExpectChar (pfx, '[');
-      pushOp = oOpenBracket;
-      strLimit = ",]";
-      chLimit = ']';
-      expChLimit = ']';
-    } else {
-      nArgs = 0;
-      chLimit = ']';
-      expChLimit = ']';
-    }
+    OpenPixelFunction (pfx, &opening);
   } else if (fe == fU) {
     char p = PeekChar (pfx);
     if (p=='[') {
