@@ -708,6 +708,35 @@ static MagickBooleanType ShapeAlphaRows(Image *image,
   return(status);
 }
 
+static MagickBooleanType RemoveAlphaRows(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    RemoveAlphaRowInfo
+      info;
+
+    info.image_view=image_view;
+    info.image=image;
+    info.exception=exception;
+    RemoveAlphaRow(&status,&info,y);
+  }
+  image_view=DestroyCacheView(image_view);
+  image->alpha_trait=image->background_color.alpha_trait;
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -858,23 +887,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
       status=SetImageStorageClass(image,DirectClass,exception);
       if (status == MagickFalse)
         break;
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        RemoveAlphaRowInfo
-          info;
-
-        info.image_view=image_view;
-        info.image=image;
-        info.exception=exception;
-        RemoveAlphaRow(&status,&info,y);
-      }
-      image_view=DestroyCacheView(image_view);
-      image->alpha_trait=image->background_color.alpha_trait;
+      status=RemoveAlphaRows(image,status,exception);
       break;
     }
     case SetAlphaChannel:
