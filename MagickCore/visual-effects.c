@@ -2159,6 +2159,41 @@ static void SepiaTonePixel(const Image *image,const Image *sepia_image,
   SetPixelAlpha(sepia_image,GetPixelAlpha(image,p),q);
 }
 
+typedef struct _SepiaToneRow
+{
+  const Image
+    *image;
+
+  Image
+    *sepia_image;
+
+  double
+    threshold;
+} SepiaToneRow;
+
+static void SepiaToneImageRow(const SepiaToneRow *sepia_row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = sepia_row->image;
+
+  Image
+    *const sepia_image = sepia_row->sepia_image;
+
+  const double
+    threshold = sepia_row->threshold;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    SepiaTonePixel(image,sepia_image,threshold,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(sepia_image);
+  }
+}
+
 MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -2207,11 +2242,11 @@ MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
+
+    SepiaToneRow
+      sepia_row;
 
     if (status == MagickFalse)
       continue;
@@ -2223,12 +2258,10 @@ MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SepiaTonePixel(image,sepia_image,threshold,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(sepia_image);
-    }
+    sepia_row.image=image;
+    sepia_row.sepia_image=sepia_image;
+    sepia_row.threshold=threshold;
+    SepiaToneImageRow(&sepia_row,p,q);
     SyncEffectRow(sepia_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
