@@ -840,6 +840,16 @@ static MagickBooleanType FetchColorspaceRow(const ColorspaceRowInfo *row,
   return(MagickTrue);
 }
 
+static MagickBooleanType FinishColorspace(const ColorspaceRowInfo *finish,
+  const ColorspaceType colorspace,const MagickBooleanType status)
+{
+  (void) DestroyCacheView(finish->image_view);
+  if (SetImageColorspace(finish->image,colorspace,finish->exception) ==
+      MagickFalse)
+    return(MagickFalse);
+  return(status);
+}
+
 static void SetColorspaceProgress(const Image *image,const char *tag,
   const MagickOffsetType progress,MagickBooleanType *status)
 {
@@ -908,6 +918,297 @@ static void TransformLinearGrayRowFromsRGB(MagickBooleanType *status,
     (*status)=MagickFalse;
 }
 
+static void SetCMYKImageType(Image *image)
+{
+  image->type=image->alpha_trait == UndefinedPixelTrait ?
+    ColorSeparationType : ColorSeparationAlphaType;
+}
+
+static MagickBooleanType sRGBToCMYK(Image *image,const ColorspaceType colorspace,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  PixelInfo
+    zero;
+
+  /*
+    Convert RGB to CMYK colorspace.
+  */
+  if (SyncImageToDirectClass(image,exception) == MagickFalse)
+    return(MagickFalse);
+  if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
+    return(MagickFalse);
+  GetPixelInfo(image,&zero);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    PixelInfo
+      pixel;
+
+    Quantum
+      *magick_restrict q;
+
+    ssize_t
+      x;
+
+    const ColorspaceRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    pixel=zero;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      GetPixelInfoPixel(image,q,&pixel);
+      ConvertRGBToCMYK(&pixel);
+      SetPixelViaPixelInfo(image,&pixel,q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    SyncColorspaceRow(image_view,exception,&status);
+  }
+  image_view=DestroyCacheView(image_view);
+  SetCMYKImageType(image);
+  if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
+    return(MagickFalse);
+  return(status);
+}
+
+static MagickBooleanType sRGBToLinearGray(Image *image,const ColorspaceType colorspace,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  /*
+    Transform image from sRGB to GRAY.
+  */
+  if (SyncImageToDirectClass(image,exception) == MagickFalse)
+    return(MagickFalse);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ColorspaceRowInfo
+      row;
+
+    row.image=image;
+    row.image_view=image_view;
+    row.exception=exception;
+    TransformLinearGrayRowFromsRGB(&status,&row,y);
+  }
+  image_view=DestroyCacheView(image_view);
+  if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
+    return(MagickFalse);
+  image->type=GrayscaleType;
+  return(status);
+}
+
+static MagickBooleanType sRGBToGray(Image *image,const ColorspaceType colorspace,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  /*
+    Transform image from sRGB to GRAY.
+  */
+  if (SyncImageToDirectClass(image,exception) == MagickFalse)
+    return(MagickFalse);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ssize_t
+      x;
+
+    Quantum
+      *magick_restrict q;
+
+    const ColorspaceRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      MagickRealType
+        gray;
+
+      gray=0.212656*(double) GetPixelRed(image,q)+0.715158*(double)
+        GetPixelGreen(image,q)+0.072186*(double) GetPixelBlue(image,q);
+      SetPixelGray(image,ClampToQuantum(gray),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    SyncColorspaceRow(image_view,exception,&status);
+  }
+  image_view=DestroyCacheView(image_view);
+  if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
+    return(MagickFalse);
+  image->type=GrayscaleType;
+  return(status);
+}
+
+typedef struct _sRGBGenericInput
+{
+  ColorspaceType
+    colorspace;
+
+  IlluminantType
+    illuminant;
+} sRGBGenericInput;
+
+static MagickBooleanType sRGBToGeneric(const sRGBGenericInput *input,
+  Image *image,MagickBooleanType status,ExceptionInfo *exception)
+{
+  const ColorspaceType
+    colorspace = input->colorspace;
+
+  const IlluminantType
+    illuminant = input->illuminant;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  ColorspaceRowInfo
+    finish;
+
+  const char
+    *value;
+
+  double
+    white_luminance = 10000.0;
+
+  /*
+    Transform image from sRGB to target colorspace.
+  */
+  value=GetImageProperty(image,"white-luminance",exception);
+  if (value != (const char *) NULL)
+    white_luminance=StringToDouble(value,(char **) NULL);
+  if (SyncImageToDirectClass(image,exception) == MagickFalse)
+    return(MagickFalse);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ssize_t
+      x;
+
+    Quantum
+      *magick_restrict q;
+
+    const ColorspaceRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      double
+        X,
+        Y,
+        Z;
+
+      ConvertRGBToGeneric(colorspace,(double) GetPixelRed(image,q),
+        (double) GetPixelGreen(image,q),(double) GetPixelBlue(image,q),
+        white_luminance,illuminant,&X,&Y,&Z);
+      SetPixelRed(image,ClampToQuantum((double) QuantumRange*X),q);
+      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*Y),q);
+      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*Z),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    SyncColorspaceRow(image_view,exception,&status);
+  }
+  finish.image=image;
+  finish.image_view=image_view;
+  finish.exception=exception;
+  return(FinishColorspace(&finish,colorspace,status));
+}
+
+static MagickBooleanType sRGBToLinearRGB(Image *image,const ColorspaceType colorspace,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  ColorspaceRowInfo
+    finish;
+
+  /*
+    Transform image from sRGB to linear RGB.
+  */
+  if (SyncImageToDirectClass(image,exception) == MagickFalse)
+    return(MagickFalse);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ssize_t
+      x;
+
+    Quantum
+      *magick_restrict q;
+
+    const ColorspaceRowInfo
+      row = { image,image_view,exception };
+
+    if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
+      continue;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      double
+        blue,
+        green,
+        red;
+
+      red=DecodePixelGamma((MagickRealType) GetPixelRed(image,q));
+      green=DecodePixelGamma((MagickRealType) GetPixelGreen(image,q));
+      blue=DecodePixelGamma((MagickRealType) GetPixelBlue(image,q));
+      SetPixelRed(image,ClampToQuantum(red),q);
+      SetPixelGreen(image,ClampToQuantum(green),q);
+      SetPixelBlue(image,ClampToQuantum(blue),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    SyncColorspaceRow(image_view,exception,&status);
+  }
+  finish.image=image;
+  finish.image_view=image_view;
+  finish.exception=exception;
+  return(FinishColorspace(&finish,colorspace,status));
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -953,127 +1254,11 @@ static MagickBooleanType sRGBTransformImage(Image *image,
   switch (colorspace)
   {
     case CMYKColorspace:
-    {
-      PixelInfo
-        zero;
-
-      /*
-        Convert RGB to CMYK colorspace.
-      */
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
-        return(MagickFalse);
-      GetPixelInfo(image,&zero);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        PixelInfo
-          pixel;
-
-        Quantum
-          *magick_restrict q;
-
-        ssize_t
-          x;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        pixel=zero;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          GetPixelInfoPixel(image,q,&pixel);
-          ConvertRGBToCMYK(&pixel);
-          SetPixelViaPixelInfo(image,&pixel,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
-      }
-      image_view=DestroyCacheView(image_view);
-      image->type=image->alpha_trait == UndefinedPixelTrait ?
-        ColorSeparationType : ColorSeparationAlphaType;
-      if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
-        return(MagickFalse);
-      return(status);
-    }
+      return(sRGBToCMYK(image,colorspace,status,exception));
     case LinearGRAYColorspace:
-    {
-      /*
-        Transform image from sRGB to GRAY.
-      */
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        ColorspaceRowInfo
-          row;
-
-        row.image=image;
-        row.image_view=image_view;
-        row.exception=exception;
-        TransformLinearGrayRowFromsRGB(&status,&row,y);
-      }
-      image_view=DestroyCacheView(image_view);
-      if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
-        return(MagickFalse);
-      image->type=GrayscaleType;
-      return(status);
-    }
+      return(sRGBToLinearGray(image,colorspace,status,exception));
     case GRAYColorspace:
-    {
-      /*
-        Transform image from sRGB to GRAY.
-      */
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          MagickRealType
-            gray;
-
-          gray=0.212656*(double) GetPixelRed(image,q)+0.715158*(double)
-            GetPixelGreen(image,q)+0.072186*(double) GetPixelBlue(image,q);
-          SetPixelGray(image,ClampToQuantum(gray),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
-      }
-      image_view=DestroyCacheView(image_view);
-      if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
-        return(MagickFalse);
-      image->type=GrayscaleType;
-      return(status);
-    }
+      return(sRGBToGray(image,colorspace,status,exception));
     case CMYColorspace:
     case Adobe98Colorspace:
     case CAT02LMSColorspace:
@@ -1103,59 +1288,12 @@ static MagickBooleanType sRGBTransformImage(Image *image,
     case YPbPrColorspace:
     case YUVColorspace:
     {
-      const char
-        *value;
+      sRGBGenericInput
+        input;
 
-      double
-        white_luminance = 10000.0;
-
-      /*
-        Transform image from sRGB to target colorspace.
-      */
-      value=GetImageProperty(image,"white-luminance",exception);
-      if (value != (const char *) NULL)
-        white_luminance=StringToDouble(value,(char **) NULL);
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          double
-            X,
-            Y,
-            Z;
-
-          ConvertRGBToGeneric(colorspace,(double) GetPixelRed(image,q),
-            (double) GetPixelGreen(image,q),(double) GetPixelBlue(image,q),
-            white_luminance,illuminant,&X,&Y,&Z);
-          SetPixelRed(image,ClampToQuantum((double) QuantumRange*X),q);
-          SetPixelGreen(image,ClampToQuantum((double) QuantumRange*Y),q);
-          SetPixelBlue(image,ClampToQuantum((double) QuantumRange*Z),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
-      }
-      image_view=DestroyCacheView(image_view);
-      if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
-        return(MagickFalse);
-      return(status);
+      input.colorspace=colorspace;
+      input.illuminant=illuminant;
+      return(sRGBToGeneric(&input,image,status,exception));
     }
     case LogColorspace:
     {
@@ -1259,52 +1397,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
     }
     case RGBColorspace:
     case scRGBColorspace:
-    {
-      /*
-        Transform image from sRGB to linear RGB.
-      */
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        const ColorspaceRowInfo
-          row = { image,image_view,exception };
-
-        if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
-          continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          double
-            blue,
-            green,
-            red;
-
-          red=DecodePixelGamma((MagickRealType) GetPixelRed(image,q));
-          green=DecodePixelGamma((MagickRealType) GetPixelGreen(image,q));
-          blue=DecodePixelGamma((MagickRealType) GetPixelBlue(image,q));
-          SetPixelRed(image,ClampToQuantum(red),q);
-          SetPixelGreen(image,ClampToQuantum(green),q);
-          SetPixelBlue(image,ClampToQuantum(blue),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        SyncColorspaceRow(image_view,exception,&status);
-      }
-      image_view=DestroyCacheView(image_view);
-      if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
-        return(MagickFalse);
-      return(status);
-    }
+      return(sRGBToLinearRGB(image,colorspace,status,exception));
     default:
       break;
   }
