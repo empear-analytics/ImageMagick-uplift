@@ -675,6 +675,15 @@ static inline MagickBooleanType IsWaveletBufferMissing(
     MagickTrue : MagickFalse);
 }
 
+static void DestroyWaveletResources(CacheView *image_view,
+  CacheView *noise_view,float *kernel,MemoryInfo *pixels_info)
+{
+  noise_view=DestroyCacheView(noise_view);
+  image_view=DestroyCacheView(image_view);
+  kernel=(float *) RelinquishMagickMemory(kernel);
+  pixels_info=RelinquishVirtualMemory(pixels_info);
+}
+
 MagickExport Image *WaveletDenoiseImage(const Image *image,
   const double threshold,const double softness,ExceptionInfo *exception)
 {
@@ -761,10 +770,7 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
   denoise.noise_view=noise_view;
   denoise.exception=exception;
   status=DenoiseWaveletChannels(&denoise,status);
-  noise_view=DestroyCacheView(noise_view);
-  image_view=DestroyCacheView(image_view);
-  kernel=(float *) RelinquishMagickMemory(kernel);
-  pixels_info=RelinquishVirtualMemory(pixels_info);
+  DestroyWaveletResources(image_view,noise_view,kernel,pixels_info);
   if (status == MagickFalse)
     noise_image=DestroyImage(noise_image);
   return(noise_image);
