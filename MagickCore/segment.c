@@ -185,6 +185,15 @@ typedef struct _ClassifySettings
   MagickBooleanType
     verbose;
 } ClassifySettings;
+
+typedef struct _ZeroCrossingInputs
+{
+  double
+    max_tau,
+    min_tau,
+    delta_tau,
+    smooth_threshold;
+} ZeroCrossingInputs;
 
 /*
   Constant declarations.
@@ -200,8 +209,7 @@ static const int
   Method prototypes.
 */
 static double
-  OptimalTau(const ssize_t *,const double,const double,const double,
-    const double,short *);
+  OptimalTau(const ssize_t *,const ZeroCrossingInputs *,short *);
 
 static ssize_t
   DefineRegion(const short *,ExtentPacket *);
@@ -1469,12 +1477,13 @@ static Cluster *FindLargestBackground(Cluster *background)
 static void FindDynamicExtrema(ssize_t **histogram,
   const double smooth_threshold,short **extrema)
 {
-  (void) OptimalTau(histogram[Red],Tau,0.2f,DeltaTau,
-    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Red]);
-  (void) OptimalTau(histogram[Green],Tau,0.2f,DeltaTau,
-    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Green]);
-  (void) OptimalTau(histogram[Blue],Tau,0.2f,DeltaTau,
-    (smooth_threshold == 0.0 ? 1.0 : smooth_threshold),extrema[Blue]);
+  const ZeroCrossingInputs
+    tau_inputs = { Tau, 0.2f, DeltaTau,
+      (smooth_threshold == 0.0 ? 1.0 : smooth_threshold) };
+
+  (void) OptimalTau(histogram[Red],&tau_inputs,extrema[Red]);
+  (void) OptimalTau(histogram[Green],&tau_inputs,extrema[Green]);
+  (void) OptimalTau(histogram[Blue],&tau_inputs,extrema[Blue]);
 }
 
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
@@ -2175,15 +2184,6 @@ static void SetActiveNodeExtrema(const ActiveNodeInputs *inputs,
   }
 }
 
-typedef struct _ZeroCrossingInputs
-{
-  double
-    max_tau,
-    min_tau,
-    delta_tau,
-    smooth_threshold;
-} ZeroCrossingInputs;
-
 static size_t InitializeZeroCrossings(const ssize_t *histogram,
   const ZeroCrossingInputs *crossing_inputs,ZeroCrossing *zero_crossing)
 {
@@ -2235,10 +2235,15 @@ static size_t InitializeZeroCrossings(const ssize_t *histogram,
   return(number_crossings);
 }
 
-static double OptimalTau(const ssize_t *histogram,const double max_tau,
-  const double min_tau,const double delta_tau,const double smooth_threshold,
-  short *extrema)
+static double OptimalTau(const ssize_t *histogram,
+  const ZeroCrossingInputs *tau_inputs,short *extrema)
 {
+  const double
+    max_tau = tau_inputs->max_tau,
+    min_tau = tau_inputs->min_tau,
+    delta_tau = tau_inputs->delta_tau,
+    smooth_threshold = tau_inputs->smooth_threshold;
+
   double
     average_tau;
 
@@ -2485,6 +2490,10 @@ MagickExport MagickBooleanType SegmentImage(Image *image,
   const ClassifySettings settings = { cluster_threshold, WeightingExponent,
     verbose };
 
+  const ZeroCrossingInputs
+    tau_inputs = { Tau, 0.2, DeltaTau,
+      smooth_threshold == 0.0 ? 1.0 : smooth_threshold };
+
   ColorspaceType
     previous_colorspace;
 
@@ -2516,12 +2525,9 @@ MagickExport MagickBooleanType SegmentImage(Image *image,
   previous_colorspace=image->colorspace;
   (void) TransformImageColorspace(image,colorspace,exception);
   InitializeHistogram(image,histogram,exception);
-  (void) OptimalTau(histogram[Red],Tau,0.2,DeltaTau,smooth_threshold == 0.0 ?
-    1.0 : smooth_threshold,extrema[Red]);
-  (void) OptimalTau(histogram[Green],Tau,0.2,DeltaTau,smooth_threshold == 0.0 ?
-    1.0 : smooth_threshold,extrema[Green]);
-  (void) OptimalTau(histogram[Blue],Tau,0.2,DeltaTau,smooth_threshold == 0.0 ?
-    1.0 : smooth_threshold,extrema[Blue]);
+  (void) OptimalTau(histogram[Red],&tau_inputs,extrema[Red]);
+  (void) OptimalTau(histogram[Green],&tau_inputs,extrema[Green]);
+  (void) OptimalTau(histogram[Blue],&tau_inputs,extrema[Blue]);
   /*
     Classify using the fuzzy c-Means technique.
   */
