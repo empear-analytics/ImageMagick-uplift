@@ -977,6 +977,20 @@ static Image *SharpenAdaptiveRows(const AdaptiveSharpen *adaptive)
   return(ReleaseFailedImage(sharp_image,status));
 }
 
+static ssize_t AcquireAdaptiveSharpenKernelRun(double **kernel,
+  const size_t width,const double sigma)
+{
+  ssize_t
+    w;
+
+  for (w=0; w < (ssize_t) width; w+=2)
+  {
+    if (AcquireAdaptiveSharpenKernel(kernel,width,w,sigma) == MagickFalse)
+      break;
+  }
+  return(w);
+}
+
 MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1043,11 +1057,7 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
   (void) memset(kernel,0,(size_t) width*sizeof(*kernel));
-  for (w=0; w < (ssize_t) width; w+=2)
-  {
-    if (AcquireAdaptiveSharpenKernel(kernel,width,w,sigma) == MagickFalse)
-      break;
-  }
+  w=AcquireAdaptiveSharpenKernelRun(kernel,width,sigma);
   if (w < (ssize_t) width)
     {
       RelinquishAdaptiveKernels(kernel,w);
