@@ -5203,6 +5203,46 @@ typedef struct
     y;
 } SimilarityInfo;
 
+typedef struct _SimilarityCandidate
+{
+  MetricType
+    metric;
+
+  double
+    similarity;
+
+  ssize_t
+    x,
+    y;
+} SimilarityCandidate;
+
+static void SelectLowerSimilarity(const SimilarityCandidate *tile,
+  SimilarityInfo *channel_info)
+{
+  const MetricType
+    metric = tile->metric;
+
+  const double
+    similarity = tile->similarity;
+
+  const ssize_t
+    x = tile->x,
+    y = tile->y;
+
+  switch (metric)
+  {
+    default:
+    {
+      if (similarity >= (*channel_info).similarity)
+        break;
+      (*channel_info).similarity=similarity;
+      (*channel_info).x=x;
+      (*channel_info).y=y;
+      break;
+    }
+  }
+}
+
 MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
@@ -5349,11 +5389,18 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
       }
     for (x=0; x < (ssize_t) similarity_image->columns; x++)
     {
+      SimilarityCandidate
+        tile;
+
       ssize_t
         i;
 
       similarity=GetSimilarityMetric((Image *) image,reconstruct,metric,x,y,
         exception);
+      tile.metric=metric;
+      tile.similarity=similarity;
+      tile.x=x;
+      tile.y=y;
       switch (metric)
       {
         case DotProductCorrelationErrorMetric:
@@ -5371,11 +5418,7 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
         }
         default:
         {
-          if (similarity >= channel_info.similarity)
-            break;
-          channel_info.similarity=similarity;
-          channel_info.x=x;
-          channel_info.y=y;
+          SelectLowerSimilarity(&tile,&channel_info);
           break;
         }
       }
