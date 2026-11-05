@@ -351,6 +351,15 @@ static void ApplyGammaHueSaturationPreview(const PreviewTile *tile,
   }
 }
 
+static void ThresholdPreviewTile(Image *thumbnail,const double percentage,
+  char *label,ExceptionInfo *exception)
+{
+  (void) BilevelImage(thumbnail,(double) (percentage*((double)
+    QuantumRange+1.0))/100.0,exception);
+  (void) FormatLocaleString(label,MagickPathExtent,"threshold %g",
+    (double) (percentage*((double) QuantumRange+1.0))/100.0);
+}
+
 static void ApplyBrightnessSpiffThresholdPreview(const PreviewTile *tile,
   Image **preview_image,double *gamma)
 {
@@ -399,10 +408,7 @@ static void ApplyBrightnessSpiffThresholdPreview(const PreviewTile *tile,
       (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
       if ((*preview_image) == (Image *) NULL)
         break;
-      (void) BilevelImage(thumbnail,(double) (percentage*((double)
-        QuantumRange+1.0))/100.0,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"threshold %g",
-        (double) (percentage*((double) QuantumRange+1.0))/100.0);
+      ThresholdPreviewTile(thumbnail,percentage,label,exception);
       break;
     }
     default:
