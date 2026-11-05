@@ -3561,6 +3561,103 @@ static void ResetObjectsResult(CCObjectInfo **objects)
     *objects=(CCObjectInfo *) NULL;
 }
 
+typedef struct _CCLabeledInputs
+{
+  const Image
+    *image;
+
+  Image
+    *component_image;
+
+  CCObjectInfo
+    *object,
+    **objects;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    n;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+} CCLabeledInputs;
+
+static Image *SelectLabeledComponents(const CCLabeledInputs *labeled)
+{
+  const Image
+    *const image = labeled->image;
+
+  Image
+    *component_image = labeled->component_image;
+
+  CCObjectInfo
+    *object = labeled->object,
+    **const objects = labeled->objects;
+
+  const size_t
+    connectivity = labeled->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = labeled->connect4,
+    (*const connect8)[2] = labeled->connect8,
+    background_id,
+    n = labeled->n;
+
+  const MagickBooleanType
+    status = labeled->status;
+
+  ExceptionInfo
+    *const exception = labeled->exception;
+
+  CCSelectionInputs
+    selection_inputs;
+
+  CCSelectionTargets
+    selection_targets;
+
+  CCThresholdInputs
+    selection;
+
+  double
+    max_threshold,
+    min_threshold;
+
+  if (n > (ssize_t) MaxColormapSize)
+    {
+      object=(CCObjectInfo *) RelinquishMagickMemory(object);
+      component_image=DestroyImage(component_image);
+      ThrowImageException(ResourceLimitError,"TooManyObjects");
+    }
+  selection_inputs.image=image;
+  selection_inputs.object=object;
+  selection_inputs.component_image=component_image;
+  selection_targets.background_id=(&background_id);
+  selection_targets.min_threshold=(&min_threshold);
+  selection_targets.max_threshold=(&max_threshold);
+  selection_targets.n=(&n);
+  PrepareObjectSelection(&selection_inputs,&selection_targets);
+  selection.image=image;
+  selection.component_image=component_image;
+  selection.object=object;
+  selection.objects=objects;
+  selection.connectivity=connectivity;
+  selection.connect4=connect4;
+  selection.connect8=connect8;
+  selection.background_id=background_id;
+  selection.min_threshold=min_threshold;
+  selection.max_threshold=max_threshold;
+  selection.n=n;
+  selection.status=status;
+  selection.exception=exception;
+  return(SelectConnectedComponents(&selection));
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -3576,21 +3673,11 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   CCLabelInputs
     label_inputs;
 
-  CCSelectionInputs
-    selection_inputs;
-
-  CCSelectionTargets
-    selection_targets;
-
-  CCThresholdInputs
-    selection;
+  CCLabeledInputs
+    labeled;
 
   CCObjectInfo
     *object;
-
-  double
-    max_threshold,
-    min_threshold;
 
   Image
     *component_image;
@@ -3608,7 +3695,6 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     size;
 
   ssize_t
-    background_id,
     connect4[2][2] = { { -1,  0 }, {  0, -1 } },
     connect8[4][2] = { { -1, -1 }, { -1,  0 }, { -1,  1 }, {  0, -1 } },
     n;
@@ -3686,34 +3772,17 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   LabelConnectedComponents(&label_inputs,&label_counts);
   image_view=DestroyCacheView(image_view);
   equivalences=DestroyMatrixInfo(equivalences);
-  if (n > (ssize_t) MaxColormapSize)
-    {
-      object=(CCObjectInfo *) RelinquishMagickMemory(object);
-      component_image=DestroyImage(component_image);
-      ThrowImageException(ResourceLimitError,"TooManyObjects");
-    }
-  selection_inputs.image=image;
-  selection_inputs.object=object;
-  selection_inputs.component_image=component_image;
-  selection_targets.background_id=(&background_id);
-  selection_targets.min_threshold=(&min_threshold);
-  selection_targets.max_threshold=(&max_threshold);
-  selection_targets.n=(&n);
-  PrepareObjectSelection(&selection_inputs,&selection_targets);
-  selection.image=image;
-  selection.component_image=component_image;
-  selection.object=object;
-  selection.objects=objects;
-  selection.connectivity=connectivity;
-  selection.connect4=connect4;
-  selection.connect8=connect8;
-  selection.background_id=background_id;
-  selection.min_threshold=min_threshold;
-  selection.max_threshold=max_threshold;
-  selection.n=n;
-  selection.status=status;
-  selection.exception=exception;
-  return(SelectConnectedComponents(&selection));
+  labeled.image=image;
+  labeled.component_image=component_image;
+  labeled.object=object;
+  labeled.objects=objects;
+  labeled.connectivity=connectivity;
+  labeled.connect4=connect4;
+  labeled.connect8=connect8;
+  labeled.n=n;
+  labeled.status=status;
+  labeled.exception=exception;
+  return(SelectLabeledComponents(&labeled));
 }
 
 /*
