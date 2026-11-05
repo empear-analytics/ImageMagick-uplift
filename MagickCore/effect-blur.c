@@ -994,6 +994,9 @@ static ssize_t AcquireAdaptiveSharpenKernelRun(double **kernel,
 MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
+  AdaptiveEdge
+    edge;
+
   AdaptiveSharpen
     adaptive;
 
@@ -1002,8 +1005,7 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
 
   Image
     *sharp_image,
-    *edge_image,
-    *gaussian_image;
+    *edge_image;
 
   size_t
     width;
@@ -1030,20 +1032,14 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   /*
     Edge detect the image brightness channel, level, sharp, and level again.
   */
-  edge_image=EdgeImage(image,radius,exception);
-  if (edge_image == (Image *) NULL)
+  edge.image=image;
+  edge.radius=radius;
+  edge.sigma=sigma;
+  if (PrepareAdaptiveEdge(&edge,&edge_image,exception) == MagickFalse)
     {
       sharp_image=DestroyImage(sharp_image);
       return((Image *) NULL);
     }
-  (void) AutoLevelImage(edge_image,exception);
-  gaussian_image=BlurImage(edge_image,radius,sigma,exception);
-  if (gaussian_image != (Image *) NULL)
-    {
-      edge_image=DestroyImage(edge_image);
-      edge_image=gaussian_image;
-    }
-  (void) AutoLevelImage(edge_image,exception);
   /*
     Create a set of kernels from maximum (radius,sigma) to minimum.
   */
