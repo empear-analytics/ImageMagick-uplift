@@ -3130,6 +3130,15 @@ static PointInfo GetSwirlScale(const Image *canvas_image)
   return(scale);
 }
 
+static void GetSwirlGeometry(const Image *canvas_image,PointInfo *center,
+  double *radius,PointInfo *scale)
+{
+  (*center).x=(double) canvas_image->columns/2.0;
+  (*center).y=(double) canvas_image->rows/2.0;
+  *radius=MagickMax((*center).x,(*center).y);
+  *scale=GetSwirlScale(canvas_image);
+}
+
 MagickExport Image *SwirlImage(const Image *image,double degrees,
   const PixelInterpolateMethod method,ExceptionInfo *exception)
 {
@@ -3179,10 +3188,7 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
   /*
     Compute scaling factor.
   */
-  center.x=(double) canvas_image->columns/2.0;
-  center.y=(double) canvas_image->rows/2.0;
-  radius=MagickMax(center.x,center.y);
-  scale=GetSwirlScale(canvas_image);
+  GetSwirlGeometry(canvas_image,&center,&radius,&scale);
   degrees=(double) DegreesToRadians(degrees);
   /*
     Swirl image.
