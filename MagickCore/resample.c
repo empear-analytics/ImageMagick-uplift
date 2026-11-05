@@ -1689,8 +1689,7 @@ MagickExport void SetResampleFilter(ResampleFilter *resample_filter,
 %    o method: the interpolation method.
 %
 */
-MagickExport MagickBooleanType SetResampleFilterInterpolateMethod(
-  ResampleFilter *resample_filter,const PixelInterpolateMethod method)
+static void CheckResampleFilter(const ResampleFilter *resample_filter)
 {
   assert(resample_filter != (ResampleFilter *) NULL);
   assert(resample_filter->signature == MagickCoreSignature);
@@ -1698,6 +1697,12 @@ MagickExport MagickBooleanType SetResampleFilterInterpolateMethod(
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       resample_filter->image->filename);
+}
+
+MagickExport MagickBooleanType SetResampleFilterInterpolateMethod(
+  ResampleFilter *resample_filter,const PixelInterpolateMethod method)
+{
+  CheckResampleFilter(resample_filter);
   resample_filter->interpolate=method;
   return(MagickTrue);
 }
@@ -1731,12 +1736,7 @@ MagickExport MagickBooleanType SetResampleFilterInterpolateMethod(
 MagickExport MagickBooleanType SetResampleFilterVirtualPixelMethod(
   ResampleFilter *resample_filter,const VirtualPixelMethod method)
 {
-  assert(resample_filter != (ResampleFilter *) NULL);
-  assert(resample_filter->signature == MagickCoreSignature);
-  assert(resample_filter->image != (Image *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      resample_filter->image->filename);
+  CheckResampleFilter(resample_filter);
   resample_filter->virtual_pixel=method;
   if (method != UndefinedVirtualPixelMethod)
     (void) SetCacheViewVirtualPixelMethod(resample_filter->view,method);
