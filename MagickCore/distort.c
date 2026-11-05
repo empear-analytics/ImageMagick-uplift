@@ -1193,6 +1193,46 @@ static double *PerspectiveProjectionCoefficients(double *coeff,
   return(coeff);
 }
 
+static MagickBooleanType SolveBilinearCoefficients(double *coeff,
+  double **matrix,double **vectors,const CoefficientContext *context)
+{
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    number_arguments = context->number_arguments,
+    number_values = context->number_values,
+    cp_size = context->cp_size,
+    cp_x = context->cp_x,
+    cp_y = context->cp_y,
+    cp_values = context->cp_values;
+
+  double
+    terms[4];
+
+  size_t
+    i;
+
+  MagickBooleanType
+    status;
+
+  /* fake a number_values x4 vectors matrix from coefficients array */
+  for (i=0; i < number_values; i++)
+    vectors[i] = &(coeff[i*4]);
+  /* Add given control point pairs for least squares solving */
+  for (i=0; i < number_arguments; i+=cp_size) {
+    terms[0] = arguments[i+cp_x];   /*  x  */
+    terms[1] = arguments[i+cp_y];   /*  y  */
+    terms[2] = terms[0]*terms[1];   /* x*y */
+    terms[3] = 1;                   /*  1  */
+    LeastSquaresAddTerms(matrix,vectors,terms,
+         &(arguments[i+cp_values]),4UL,number_values);
+  }
+  /* Solve for LeastSquares Coefficients */
+  status=GaussJordanElimination(matrix,vectors,4UL,number_values);
+  return(status);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1380,8 +1420,7 @@ static double *GenerateCoefficients(const Image *image,
       */
       double
         **matrix,
-        **vectors,
-        terms[4];
+        **vectors;
 
       MagickBooleanType
         status;
@@ -1408,20 +1447,7 @@ static double *GenerateCoefficients(const Image *image,
                 "%s", "DistortCoefficients");
         return((double *) NULL);
       }
-      /* fake a number_values x4 vectors matrix from coefficients array */
-      for (i=0; i < number_values; i++)
-        vectors[i] = &(coeff[i*4]);
-      /* Add given control point pairs for least squares solving */
-      for (i=0; i < number_arguments; i+=cp_size) {
-        terms[0] = arguments[i+cp_x];   /*  x  */
-        terms[1] = arguments[i+cp_y];   /*  y  */
-        terms[2] = terms[0]*terms[1];   /* x*y */
-        terms[3] = 1;                   /*  1  */
-        LeastSquaresAddTerms(matrix,vectors,terms,
-             &(arguments[i+cp_values]),4UL,number_values);
-      }
-      /* Solve for LeastSquares Coefficients */
-      status=GaussJordanElimination(matrix,vectors,4UL,number_values);
+      status=SolveBilinearCoefficients(coeff,matrix,vectors,&context);
       matrix  = RelinquishMagickMatrix(matrix, 4UL);
       vectors = (double **) RelinquishMagickMemory(vectors);
       if ( status == MagickFalse ) {
