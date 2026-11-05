@@ -4186,16 +4186,10 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
 #endif
   for (y=0; y < (ssize_t) wave_image->rows; y++)
   {
-    WaveRow
-      wave_row;
+    const WaveRow
+      wave_row = { canvas_image, wave_image, canvas_image_view, wave_view,
+        sine_map, method, exception };
 
-    wave_row.canvas_image=canvas_image;
-    wave_row.wave_image=wave_image;
-    wave_row.canvas_image_view=canvas_image_view;
-    wave_row.wave_view=wave_view;
-    wave_row.sine_map=sine_map;
-    wave_row.method=method;
-    wave_row.exception=exception;
     if (WaveImageRow(&wave_row,y,&status) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
