@@ -186,11 +186,18 @@ static void ClearPixelChannelsRow(PixelChannels **pixels,const ssize_t i,
   }
 }
 
-static PixelChannels **AcquirePixelTLS(const Image *images)
+static size_t GetWidestEvaluateColumns(const Image *images,size_t columns)
 {
   const Image
     *next;
 
+  for (next=images; next != (Image *) NULL; next=next->next)
+    columns=MagickMax(next->columns,columns);
+  return(columns);
+}
+
+static PixelChannels **AcquirePixelTLS(const Image *images)
+{
   PixelChannels
     **pixels;
 
@@ -208,9 +215,8 @@ static PixelChannels **AcquirePixelTLS(const Image *images)
   if (pixels == (PixelChannels **) NULL)
     return((PixelChannels **) NULL);
   (void) memset(pixels,0,rows*sizeof(*pixels));
-  columns=MagickMax(number_images,MaxPixelChannels);
-  for (next=images; next != (Image *) NULL; next=next->next)
-    columns=MagickMax(next->columns,columns);
+  columns=GetWidestEvaluateColumns(images,MagickMax(number_images,
+    MaxPixelChannels));
   for (i=0; i < (ssize_t) rows; i++)
   {
     pixels[i]=(PixelChannels *) AcquireQuantumMemory(columns,sizeof(**pixels));
