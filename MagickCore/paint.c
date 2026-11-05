@@ -443,6 +443,16 @@ static void TileFloodplaneLine(const FloodfillTileView *view,
     (*status)=MagickFalse;
 }
 
+static MagickBooleanType CheckFloodfillOffsets(const Image *image,
+  const ssize_t x_offset,const ssize_t y_offset)
+{
+  if ((x_offset < 0) || (x_offset >= (ssize_t) image->columns))
+    return(MagickFalse);
+  if ((y_offset < 0) || (y_offset >= (ssize_t) image->rows))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
   const ssize_t y_offset,const MagickBooleanType invert,
@@ -511,9 +521,7 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   assert(draw_info->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse) 
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((x_offset < 0) || (x_offset >= (ssize_t) image->columns))
-    return(MagickFalse);
-  if ((y_offset < 0) || (y_offset >= (ssize_t) image->rows))
+  if (CheckFloodfillOffsets(image,x_offset,y_offset) == MagickFalse)
     return(MagickFalse);
   if (PrepareFloodfillImage(image,draw_info,exception) == MagickFalse)
     return(MagickFalse);
