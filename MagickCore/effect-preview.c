@@ -971,6 +971,18 @@ static Image *MontagePreviewTiles(const Image *image,ImageInfo *preview_info,
   return(montage_image);
 }
 
+static MagickBooleanType AcquirePreviewThumbnail(const Image *image,
+  const RectangleInfo geometry,ExceptionInfo *exception,Image **thumbnail)
+{
+  (*thumbnail)=ThumbnailImage(image,geometry.width,geometry.height,exception);
+  if ((*thumbnail) == (Image *) NULL)
+    return(MagickFalse);
+  (void) SetImageProgressMonitor((*thumbnail),(MagickProgressMonitor) NULL,
+    (void *) NULL);
+  (void) SetImageProperty((*thumbnail),"label",DefaultTileLabel,exception);
+  return(MagickTrue);
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -1041,12 +1053,9 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     PreviewTile
       tile;
 
-    thumbnail=ThumbnailImage(image,geometry.width,geometry.height,exception);
-    if (thumbnail == (Image *) NULL)
+    if (AcquirePreviewThumbnail(image,geometry,exception,&thumbnail) ==
+        MagickFalse)
       break;
-    (void) SetImageProgressMonitor(thumbnail,(MagickProgressMonitor) NULL,
-      (void *) NULL);
-    (void) SetImageProperty(thumbnail,"label",DefaultTileLabel,exception);
     if (i == (NumberTiles/2))
       {
         (void) QueryColorCompliance("#dfdfdf",AllCompliance,
