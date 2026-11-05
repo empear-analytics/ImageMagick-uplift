@@ -3613,6 +3613,16 @@ static void SetWaveCanvasAlpha(Image *canvas_image,ExceptionInfo *exception)
     (void) SetImageAlpha(canvas_image,OpaqueAlpha,exception);
 }
 
+static MagickBooleanType CloneWaveCanvas(const Image *image,
+  Image **canvas_image,ExceptionInfo *exception)
+{
+  *canvas_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (*canvas_image == (Image *) NULL)
+    return(MagickFalse);
+  SetWaveCanvasAlpha(*canvas_image,exception);
+  return(MagickTrue);
+}
+
 MagickExport Image *WaveImage(const Image *image,const double amplitude,
   const double wave_length,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -3648,10 +3658,8 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  canvas_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (canvas_image == (Image *) NULL)
+  if (CloneWaveCanvas(image,&canvas_image,exception) == MagickFalse)
     return((Image *) NULL);
-  SetWaveCanvasAlpha(canvas_image,exception);
   wave_image=CloneImage(canvas_image,canvas_image->columns,(size_t)
     (canvas_image->rows+2.0*fabs(amplitude)),MagickTrue,exception);
   if (wave_image == (Image *) NULL)
