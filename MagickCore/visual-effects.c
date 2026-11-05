@@ -3127,10 +3127,7 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
         SetEffectProgress(canvas_image,SwirlImageTag,progress,&status);
       }
   }
-  swirl_view=DestroyCacheView(swirl_view);
-  interpolate_view=DestroyCacheView(interpolate_view);
-  canvas_view=DestroyCacheView(canvas_view);
-  canvas_image=DestroyImage(canvas_image);
+  DestroyWarpResources(swirl_view,interpolate_view,canvas_view,canvas_image);
   return(ReleaseFailedImage(swirl_image,status));
 }
 
