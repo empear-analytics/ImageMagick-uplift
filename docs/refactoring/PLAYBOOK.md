@@ -5048,6 +5048,12 @@ functions only.
    pointers, the thread's scratch pointer) move with it, and a call such as
    `GetOpenMPThreadId()` is made in the helper, by the same thread. A `continue` of a
    loop nested in the body is that loop's own and does not change.
+   The loop may instead be a sequential loop nested in the parallel loop's iteration (a
+   tile's row loop inside the tile loop), when its whole body is the block: each
+   `continue;` of that loop becomes `return;`, its counter goes by value, and its body
+   becomes the call. The variables of the parallel body that the block reads come in by
+   value or in step 6's struct, declared in the parallel body and filled before that
+   loop when nothing in the loop writes a member's variable (Recipe N steps 7 and 8).
 8. A block that also writes two to four variables declared in the loop body that the
    body reads after the block (accumulators the block adds to, which step 3 refuses):
    pass their addresses in one `const` struct, Recipe Q step 8's form. A `typedef
@@ -5126,6 +5132,11 @@ static void InterpolateResizeRow(...,MagickBooleanType *status,...)
   (a body that does is not this form). `status` is reached through its address as in
   step 4, so the flag the threads share is read and written at the same points. The
   helper is called from inside the iteration, never across the region's boundary.
+- Under step 7's nested loop the helper is that loop's body: it runs where the body ran,
+  on the same thread inside the same iteration of the parallel loop, and each `return;`
+  leaves it where the `continue;` left the body, so the nested loop goes on with its
+  increment and condition at the same point. The struct's members were read from
+  variables nothing in the loop writes, so each call reads the values the body read.
 - Step 8's variables are declared in the loop body, so each thread's struct points at that
   thread's own copies: the helper adds to the same variables the caller used, in the same
   order, and the caller reads them after the call as it read them after the block. No
@@ -5162,6 +5173,14 @@ by the one second scalar (probes +0.31 and 9.47 to 10.00). Added by Claude Code
 the body's `M00`, `M11`, `M20`, `M02` and read and write `status`); a probe of the three
 loops 5.91 to 6.49, all three leaving Bumpy Road and Complex Method, no finding on the
 helper. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+Step 7's nested loop (2026-11-05, W14 lane c): `shear-rotate.c`'s `IntegralRotateImage`,
+whose 90-degree tile loop (`shared(status)`) runs, per tile, a row loop whose body opens
+with `if (status == MagickFalse) continue;` and continues after a failed
+`QueueCacheViewAuthenticPixels`; step 7 took only the parallel loop's own body, and E's
+OpenMP rule refuses the `status` writes. A probe of the whole chain (this form, PC and
+HC on the 270-degree tiles, PS step 7 on the three parallel bodies, SD, N and E):
+7.63 to 10.00, no finding left. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
 
 ---
 
@@ -7008,3 +7027,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | N | Step 8: the statements of one loop body are sibling blocks too (each moved under N, I or Y), the struct may be filled before the loop when nothing in it writes a member's variable, and a later block that holds the siblings' calls (the loop around them) takes the same `const Name *name`, the typedef gaining the members it reads, read as `name->member`, its inner calls passing `name` for `&name`; *Careful* gives the argument | `morphology.c`'s `MorphologyApply` (campaign A, W14): its kernel-iteration loop (Recipe I), the two verbose reports around it (N) and the stage loop that holds them (I) read the same nine to twelve inputs; one struct per helper would take the stage-loop helper past *Large Method* (77 lines in a probe). A probe of the chain with one shared `MorphologyStages`: MorphologyApply leaves Brain Method and Deep, Nested Complexity, 2.71 to 3.04, no finding on a helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | NS | Step 1: the selection may be the whole right-hand side of an assignment statement (`sign=c ? 1 : -1;`), no parentheses needed since nothing can regroup it, may be a single site when the step takes the function out of *Complex Method*, and may select between signed integer literals. *Careful* is unchanged: the argument is evaluated once, the function returns the same constant under the same test, the call replaces the right-hand side as a whole, and `tools/obj_identical.sh` must print `IDENTICAL` | `enhance.c`'s `ContrastImage` (campaign A, W14 lane d): `sign=sharpen != MagickFalse ? 1 : -1;` is one decision of its cc 9; NS step 1 asked for a parenthesised selection that recurs. A probe: ContrastImage leaves Complex Method, enhance.c 6.49 to 6.65 | mandate (2026-10-24) |
 | 2026-11-05 | NEW | HC | Extract Block Holding a Named Critical Region: a statement of a parallel loop body (a column loop) that holds whole named `#pragma omp critical (name)` constructs moves, constructs included and unchanged, into a `static void` helper called from that body alone; outside the constructs the block writes only body variables (Recipe O step 1's rule), inside them shared memory through the same pointers; no lock taken; checked by reading | `quantize.c`'s `SetGrayscaleImage` (campaign A, W14): the column loop of its colormap-building parallel loop holds a double-checked insert whose critical governs an unbraced `if` (outside CB step 1), the function's Deep, Nested Complexity (5); a probe 6.11 to 6.57 with no finding on the helper | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | PS | Step 7: the loop whose whole body moves may also be a sequential loop nested in the parallel loop's iteration (a tile's row loop inside the tile loop); its `continue;` statements become `return;`, its counter goes by value, and the struct of step 6 is declared in the parallel body and may be filled before that loop (Recipe N steps 7 and 8). *Careful* gives the argument. Still eight steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 90-degree tile row loop's body tests `status`, continues after a failed queue and syncs, at depth 5 of the function; step 7 as written took only the parallel loop's own body. A probe of the whole chain: 7.63 to 10.00, no finding left | mandate (2026-10-24) |
