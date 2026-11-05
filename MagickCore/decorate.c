@@ -917,6 +917,42 @@ static MagickBooleanType AcquireFrameImage(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType DrawFrameSides(const FrameSideLine *sides)
+{
+  const Image
+    *const image = sides->image;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,sides->frame_image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    if (DrawFrameSideLine(sides,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        FrameImageProgress(image,progress,&status);
+      }
+  }
+  return(status);
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -930,11 +966,11 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   FrameComposite
     frame_composite;
 
+  FrameSideLine
+    sides;
+
   MagickBooleanType
     status;
-
-  MagickOffsetType
-    progress;
 
   PixelInfo
     accentuate,
@@ -949,7 +985,6 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
 
   ssize_t
     x_offset,
-    y,
     y_offset;
 
   /*
@@ -983,8 +1018,6 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   highlight=LightenFrameColor(matte,HighlightModulate);
   shadow=DarkenFrameColor(matte,ShadowModulate);
   trough=DarkenFrameColor(matte,TroughModulate);
-  status=MagickTrue;
-  progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
   frame_view=AcquireAuthenticCacheView(frame_image,exception);
   height=(size_t) (frame_info->outer_bevel+(frame_info->y-(ssize_t)
@@ -1000,27 +1033,16 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   /*
     Draw sides of ornamental border.
   */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,frame_image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const FrameSideLine
-      line = { frame_view, frame_image, image, frame_info, highlight, matte,
-        shadow, bevel_width, exception };
-
-    if (DrawFrameSideLine(&line,y,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        FrameImageProgress(image,progress,&status);
-      }
-  }
+  sides.frame_view=frame_view;
+  sides.frame_image=frame_image;
+  sides.image=image;
+  sides.frame_info=frame_info;
+  sides.highlight=highlight;
+  sides.matte=matte;
+  sides.shadow=shadow;
+  sides.bevel_width=bevel_width;
+  sides.exception=exception;
+  status=DrawFrameSides(&sides);
   height=(size_t) (frame_info->inner_bevel+(ssize_t) frame_info->height-
     frame_info->y-(ssize_t) image->rows-(ssize_t) bevel_width+
     frame_info->outer_bevel);
