@@ -734,14 +734,102 @@ static Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
   return(image);
 }
 
-MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
+typedef struct _DespeckleReduction
 {
+  const Image
+    *image;
+
+  Image
+    *despeckle_image;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    length;
+
+  const ssize_t
+    *X,
+    *Y;
+
+  MemoryInfo
+    *pixel_info,
+    *buffer_info;
+} DespeckleReduction;
+
+static Image *ReduceSpeckle(const DespeckleReduction *reduction)
+{
+  const Image
+    *const image = reduction->image;
+
+  Image
+    *const despeckle_image = reduction->despeckle_image;
+
+  ExceptionInfo
+    *const exception = reduction->exception;
+
+  const size_t
+    length = reduction->length;
+
+  const ssize_t
+    *const X = reduction->X,
+    *const Y = reduction->Y;
+
+  MemoryInfo
+    *pixel_info = reduction->pixel_info,
+    *buffer_info = reduction->buffer_info;
+
   CacheView
     *despeckle_view,
     *image_view;
 
   DespeckleChannelPass
     despeckle;
+
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict buffer,
+    *magick_restrict pixels;
+
+  ssize_t
+    i;
+
+  pixels=(Quantum *) GetVirtualMemoryBlob(pixel_info);
+  buffer=(Quantum *) GetVirtualMemoryBlob(buffer_info);
+  /*
+    Reduce speckle in the image.
+  */
+  status=MagickTrue;
+  image_view=AcquireVirtualCacheView(image,exception);
+  despeckle_view=AcquireAuthenticCacheView(despeckle_image,exception);
+  despeckle.image=image;
+  despeckle.despeckle_image=despeckle_image;
+  despeckle.image_view=image_view;
+  despeckle.despeckle_view=despeckle_view;
+  despeckle.exception=exception;
+  despeckle.buffer=buffer;
+  despeckle.pixels=pixels;
+  despeckle.length=length;
+  despeckle.X=X;
+  despeckle.Y=Y;
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    DespeckleChannel(&despeckle,i,&status);
+  }
+  despeckle_view=DestroyCacheView(despeckle_view);
+  image_view=DestroyCacheView(image_view);
+  buffer_info=RelinquishVirtualMemory(buffer_info);
+  pixel_info=RelinquishVirtualMemory(pixel_info);
+  despeckle_image->type=image->type;
+  return(ReleaseFailedImage(despeckle_image,status));
+}
+
+MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
+{
+  DespeckleReduction
+    reduction;
 
   Image
     *despeckle_image;
@@ -759,9 +847,6 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 
   size_t
     length;
-
-  ssize_t
-    i;
 
   static const ssize_t
     X[4] = {0, 1, 1,-1},
@@ -809,34 +894,15 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
       despeckle_image=DestroyImage(despeckle_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  pixels=(Quantum *) GetVirtualMemoryBlob(pixel_info);
-  buffer=(Quantum *) GetVirtualMemoryBlob(buffer_info);
-  /*
-    Reduce speckle in the image.
-  */
-  status=MagickTrue;
-  image_view=AcquireVirtualCacheView(image,exception);
-  despeckle_view=AcquireAuthenticCacheView(despeckle_image,exception);
-  despeckle.image=image;
-  despeckle.despeckle_image=despeckle_image;
-  despeckle.image_view=image_view;
-  despeckle.despeckle_view=despeckle_view;
-  despeckle.exception=exception;
-  despeckle.buffer=buffer;
-  despeckle.pixels=pixels;
-  despeckle.length=length;
-  despeckle.X=X;
-  despeckle.Y=Y;
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    DespeckleChannel(&despeckle,i,&status);
-  }
-  despeckle_view=DestroyCacheView(despeckle_view);
-  image_view=DestroyCacheView(image_view);
-  buffer_info=RelinquishVirtualMemory(buffer_info);
-  pixel_info=RelinquishVirtualMemory(pixel_info);
-  despeckle_image->type=image->type;
-  return(ReleaseFailedImage(despeckle_image,status));
+  reduction.image=image;
+  reduction.despeckle_image=despeckle_image;
+  reduction.exception=exception;
+  reduction.length=length;
+  reduction.X=X;
+  reduction.Y=Y;
+  reduction.pixel_info=pixel_info;
+  reduction.buffer_info=buffer_info;
+  return(ReduceSpeckle(&reduction));
 }
 
 /*
