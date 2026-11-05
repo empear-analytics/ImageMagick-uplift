@@ -719,8 +719,7 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
         break;
       }
     }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncShearView(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
