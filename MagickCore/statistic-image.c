@@ -843,6 +843,16 @@ static void DestroyStatisticResources(CacheView *statistic_view,
   pixel_list=DestroyPixelListTLS(pixel_list);
 }
 
+static PixelList **AcquireStatisticPixelList(const size_t width,
+  const size_t height)
+{
+  PixelList
+    **magick_restrict pixel_list;
+
+  pixel_list=AcquirePixelListTLS(MagickMax(width,1),MagickMax(height,1));
+  return(pixel_list);
+}
+
 MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   const size_t width,const size_t height,ExceptionInfo *exception)
 {
@@ -877,7 +887,7 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   assert(exception->signature == MagickCoreSignature);
   if (AcquireStatisticImage(image,&statistic_image,exception) == MagickFalse)
     return((Image *) NULL);
-  pixel_list=AcquirePixelListTLS(MagickMax(width,1),MagickMax(height,1));
+  pixel_list=AcquireStatisticPixelList(width,height);
   if (pixel_list == (PixelList **) NULL)
     {
       statistic_image=DestroyImage(statistic_image);
