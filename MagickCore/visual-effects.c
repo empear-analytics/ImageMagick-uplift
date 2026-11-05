@@ -3145,6 +3145,98 @@ static void SetSwirlImageAlpha(Image *swirl_image,ExceptionInfo *exception)
     (void) SetImageAlphaChannel(swirl_image,OnAlphaChannel,exception);
 }
 
+typedef struct _SwirlRowInput
+{
+  EffectRows
+    rows;
+
+  WarpInfo
+    warp;
+
+  Image
+    *canvas_image,
+    *swirl_image;
+
+  CacheView
+    *swirl_view;
+
+  ExceptionInfo
+    *exception;
+
+  PointInfo
+    center,
+    scale;
+
+  double
+    radius;
+
+  ssize_t
+    y;
+} SwirlRowInput;
+
+static MagickBooleanType SwirlImageRow(const SwirlRowInput *input,
+  MagickBooleanType *status)
+{
+  const EffectRows
+    rows = input->rows;
+
+  const WarpInfo
+    warp = input->warp;
+
+  Image
+    *const canvas_image = input->canvas_image,
+    *const swirl_image = input->swirl_image;
+
+  CacheView
+    *const swirl_view = input->swirl_view;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  const PointInfo
+    center = input->center,
+    scale = input->scale;
+
+  const double
+    radius = input->radius;
+
+  const ssize_t
+    y = input->y;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  WarpSite
+    site;
+
+  if (GetEffectRows(&rows,&p,&q,status) == MagickFalse)
+    return(MagickFalse);
+  site.delta.y=scale.y*(double) (y-center.y);
+  for (x=0; x < (ssize_t) canvas_image->columns; x++)
+  {
+    /*
+      Determine if the pixel is within an ellipse.
+    */
+    site.delta.x=scale.x*(double) (x-center.x);
+    site.distance=site.delta.x*site.delta.x+site.delta.y*site.delta.y;
+    if (site.distance >= (radius*radius))
+      CopyPixelChannels(canvas_image,swirl_image,p,q);
+    else
+      if (SwirlPixel(&warp,&site,q,status) == MagickFalse)
+        break;
+    p+=(ptrdiff_t) GetPixelChannels(canvas_image);
+    q+=(ptrdiff_t) GetPixelChannels(swirl_image);
+  }
+  SyncEffectRow(swirl_view,exception,status);
+  return(MagickTrue);
+}
+
 MagickExport Image *SwirlImage(const Image *image,double degrees,
   const PixelInterpolateMethod method,ExceptionInfo *exception)
 {
@@ -3216,37 +3308,12 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
       warp = { image,canvas_image,swirl_image,interpolate_view,exception,
         method,center,scale,degrees,radius,y };
 
-    const Quantum
-      *magick_restrict p;
+    const SwirlRowInput
+      input = { rows, warp, canvas_image, swirl_image, swirl_view, exception,
+        center, scale, radius, y };
 
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    WarpSite
-      site;
-
-    if (GetEffectRows(&rows,&p,&q,&status) == MagickFalse)
+    if (SwirlImageRow(&input,&status) == MagickFalse)
       continue;
-    site.delta.y=scale.y*(double) (y-center.y);
-    for (x=0; x < (ssize_t) canvas_image->columns; x++)
-    {
-      /*
-        Determine if the pixel is within an ellipse.
-      */
-      site.delta.x=scale.x*(double) (x-center.x);
-      site.distance=site.delta.x*site.delta.x+site.delta.y*site.delta.y;
-      if (site.distance >= (radius*radius))
-        CopyPixelChannels(canvas_image,swirl_image,p,q);
-      else
-        if (SwirlPixel(&warp,&site,q,&status) == MagickFalse)
-          break;
-      p+=(ptrdiff_t) GetPixelChannels(canvas_image);
-      q+=(ptrdiff_t) GetPixelChannels(swirl_image);
-    }
-    SyncEffectRow(swirl_view,exception,&status);
     if (canvas_image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
