@@ -237,3 +237,11 @@ written): Recipe Z step 7 for four written variables plus an input struct. Upstr
 reads `image->filename` with `image` NULL, a NULL dereference; the tile loop's progress monitor is never restored;
 `tiles_per_page` is assigned twice in a row; `resample.c`'s `#if DEBUG_NO_PIXEL_HIT` branch returns `status`
 unassigned.
+
+## Lane d, eighth batch: paint.c 7.24 -> 8.74 with a split (Sonnet, 2 commits + 1 tool fix)
+
+New file `paint-floodfill.c` (8.33): **add it to the Windows build configuration.** Tool fix in its own commit
+(e40c9238a, `tools/split_source.py`): a function's end was taken as the first column-0 `}`, which is also the
+closing brace of a multi-line macro inside the function; and the include-comment lookup crashed on a one-space
+"Include declarations." line. Campaign B should pick it up. Upstream, not changed: `RangeThresholdValue` ends in
+`if (pixel > high_black) return 0; else return 0;`; the first `status=MagickTrue;` in `FloodfillPaintImage` is dead.
