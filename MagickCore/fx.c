@@ -6072,6 +6072,22 @@ static void SetFxProgress (const Image *image, const char *tag,
 
 /* Following is substitute for FxImage().
 */
+static Image *FinishFxImage (FxInfo * pfx, MagickBooleanType status,
+  Image *fx_image)
+{
+  /* Before destroying the user symbol values, dump them to stderr.
+  */
+  if (pfx->DebugOpt && pfx->usedUserSymbols)
+    DumpUserSymbolValues (pfx);
+
+  if ((status == MagickFalse) || (pfx->exception->severity >= ErrorException))
+    fx_image=DestroyImage(fx_image);
+
+  pfx=DestroyFxInfo(pfx);
+
+  return(fx_image);
+}
+
 MagickExport Image *FxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -6153,15 +6169,5 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
   fx_view = DestroyCacheView (fx_view);
   image_view = DestroyCacheView (image_view);
 
-  /* Before destroying the user symbol values, dump them to stderr.
-  */
-  if (pfx->DebugOpt && pfx->usedUserSymbols)
-    DumpUserSymbolValues (pfx);
-
-  if ((status == MagickFalse) || (pfx->exception->severity >= ErrorException))
-    fx_image=DestroyImage(fx_image);
-
-  pfx=DestroyFxInfo(pfx);
-
-  return(fx_image);
+  return(FinishFxImage (pfx, status, fx_image));
 }
