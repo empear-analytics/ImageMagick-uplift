@@ -1691,6 +1691,29 @@ static double *CylinderCoefficients(double *coeff,const DistortMethod *method,
   return(coeff);
 }
 
+static void SetBarrelCenter(double *coeff,const Image *image,
+  const double *arguments,const size_t number_arguments)
+{
+  /* X,Y Center of Distortion (image coordinates) */
+  if ( number_arguments == 5 )  {
+    coeff[8] = arguments[3];
+    coeff[9] = arguments[4];
+  }
+  else if ( number_arguments == 6 ) {
+    coeff[8] = arguments[4];
+    coeff[9] = arguments[5];
+  }
+  else if ( number_arguments == 10 ) {
+    coeff[8] = arguments[8];
+    coeff[9] = arguments[9];
+  }
+  else {
+    /* center of the image provided (image coordinates) */
+    coeff[8] = (double)image->columns/2.0 + image->page.x;
+    coeff[9] = (double)image->rows/2.0    + image->page.y;
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1948,24 +1971,7 @@ static double *GenerateCoefficients(const Image *image,
         coeff[6] = coeff[2];
         coeff[7] = coeff[3];
       }
-      /* X,Y Center of Distortion (image coordinates) */
-      if ( number_arguments == 5 )  {
-        coeff[8] = arguments[3];
-        coeff[9] = arguments[4];
-      }
-      else if ( number_arguments == 6 ) {
-        coeff[8] = arguments[4];
-        coeff[9] = arguments[5];
-      }
-      else if ( number_arguments == 10 ) {
-        coeff[8] = arguments[8];
-        coeff[9] = arguments[9];
-      }
-      else {
-        /* center of the image provided (image coordinates) */
-        coeff[8] = (double)image->columns/2.0 + image->page.x;
-        coeff[9] = (double)image->rows/2.0    + image->page.y;
-      }
+      SetBarrelCenter(coeff,image,arguments,number_arguments);
       return(coeff);
     }
     case ShepardsDistortion:
