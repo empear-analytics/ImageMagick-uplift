@@ -1172,12 +1172,128 @@ static void FinishEvaluateRows(const Quantum **p,CacheView *evaluate_view,
   SyncEvaluateView(evaluate_view,exception,status);
 }
 
+typedef struct _EvaluateImagesLoop
+{
+  Image
+    *image;
+
+  const Image
+    *images;
+
+  size_t
+    number_images;
+
+  CacheView
+    **image_view,
+    *evaluate_view;
+
+  PixelChannels
+    **magick_restrict evaluate_pixels;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  MagickEvaluateOperator
+    op;
+
+  ExceptionInfo
+    *exception;
+} EvaluateImagesLoop;
+
+static MagickBooleanType EvaluateMedianImages(const EvaluateImagesLoop *loop,
+  MagickBooleanType status,MagickOffsetType progress)
+{
+  Image
+    *const image = loop->image;
+
+  const Image
+    *const images = loop->images;
+
+  const size_t
+    number_images = loop->number_images;
+
+  CacheView
+    **const image_view = loop->image_view,
+    *const evaluate_view = loop->evaluate_view;
+
+  PixelChannels
+    **magick_restrict const evaluate_pixels = loop->evaluate_pixels;
+
+  RandomInfo
+    **magick_restrict const random_info = loop->random_info;
+
+  const MagickEvaluateOperator
+    op = loop->op;
+
+  ExceptionInfo
+    *const exception = loop->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  unsigned long
+    key;
+#endif
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  key=GetRandomSecretKey(random_info[0]);
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,images,image->rows,key == ~0UL)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    const Quantum
+      **p;
+
+    EvaluateMedian
+      median;
+
+    PixelChannels
+      *evaluate_pixel;
+
+    Quantum
+      *magick_restrict q;
+
+    const EvaluateRowHead
+      head = { images, image, image_view, evaluate_view, number_images, y,
+        exception };
+
+    if (FetchEvaluateRows(&head,&p,&q,&status) == MagickFalse)
+      continue;
+    evaluate_pixel=evaluate_pixels[id];
+    median.image=image;
+    median.images=images;
+    median.number_images=number_images;
+    median.random_info=random_info;
+    median.id=id;
+    median.op=op;
+    EvaluateMedianRow(&median,p,evaluate_pixel,q);
+    FinishEvaluateRows(p,evaluate_view,exception,&status);
+    if (images->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetEvaluateProgress(images,image,progress,&status);
+      }
+  }
+  return(status);
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
   CacheView
     *evaluate_view,
     **image_view;
+
+  EvaluateImagesLoop
+    loop;
 
   Image
     *image;
@@ -1234,55 +1350,17 @@ MagickExport Image *EvaluateImages(const Image *images,
   progress=0;
   random_info=AcquireRandomInfoTLS();
   evaluate_view=AcquireAuthenticCacheView(image,exception);
+  loop.image=image;
+  loop.images=images;
+  loop.number_images=number_images;
+  loop.image_view=image_view;
+  loop.evaluate_view=evaluate_view;
+  loop.evaluate_pixels=evaluate_pixels;
+  loop.random_info=random_info;
+  loop.op=op;
+  loop.exception=exception;
   if (op == MedianEvaluateOperator)
-    {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      key=GetRandomSecretKey(random_info[0]);
-      #pragma omp parallel for schedule(static) shared(progress,status) \
-        magick_number_threads(image,images,image->rows,key == ~0UL)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const int
-          id = GetOpenMPThreadId();
-
-        const Quantum
-          **p;
-
-        EvaluateMedian
-          median;
-
-        PixelChannels
-          *evaluate_pixel;
-
-        Quantum
-          *magick_restrict q;
-
-        const EvaluateRowHead
-          head = { images, image, image_view, evaluate_view, number_images, y,
-            exception };
-
-        if (FetchEvaluateRows(&head,&p,&q,&status) == MagickFalse)
-          continue;
-        evaluate_pixel=evaluate_pixels[id];
-        median.image=image;
-        median.images=images;
-        median.number_images=number_images;
-        median.random_info=random_info;
-        median.id=id;
-        median.op=op;
-        EvaluateMedianRow(&median,p,evaluate_pixel,q);
-        FinishEvaluateRows(p,evaluate_view,exception,&status);
-        if (images->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp atomic
-#endif
-            progress++;
-            SetEvaluateProgress(images,image,progress,&status);
-          }
-      }
-    }
+    status=EvaluateMedianImages(&loop,status,progress);
   else
     {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
