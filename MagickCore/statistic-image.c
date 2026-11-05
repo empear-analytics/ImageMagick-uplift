@@ -835,6 +835,14 @@ static ssize_t GetStatisticCenter(const Image *image,const size_t width,
   return(center);
 }
 
+static void DestroyStatisticResources(CacheView *statistic_view,
+  CacheView *image_view,PixelList **magick_restrict pixel_list)
+{
+  statistic_view=DestroyCacheView(statistic_view);
+  image_view=DestroyCacheView(image_view);
+  pixel_list=DestroyPixelListTLS(pixel_list);
+}
+
 MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   const size_t width,const size_t height,ExceptionInfo *exception)
 {
@@ -907,9 +915,7 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
         StatisticImageProgress(image,progress,&status);
       }
   }
-  statistic_view=DestroyCacheView(statistic_view);
-  image_view=DestroyCacheView(image_view);
-  pixel_list=DestroyPixelListTLS(pixel_list);
+  DestroyStatisticResources(statistic_view,image_view,pixel_list);
   statistic_image=FinishStatisticImage(statistic_image,status);
   return(statistic_image);
 }
