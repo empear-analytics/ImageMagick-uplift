@@ -5866,6 +5866,98 @@ Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe EI - Chain Exiting Guards into an Else-If
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*), and a
+bump is an `else` block whose whole body is a run of `if` statements, each but the last
+leaving the enclosing flow when it fires (`return`, `break`, `continue`, `goto`), as the
+argument loop of `fx.c`'s `GetFunction` does: `if (TranslateStatementList(...)) { ... }
+else { if (!*pfx->pex) { throw; return MagickFalse; } if (!chLimit) break; if
+(IsPadFunction(fe) != MagickFalse) { ... } }`.
+
+**Not covered by:** Recipe CN, whose bump is an `if` holding one `if` and nothing else (no
+`else`); Recipe G, which inverts an outermost condition into an early exit; Recipes E, O,
+W, LB and RV, which move the block into a new function, where the nesting stays (a helper
+of nested `if`s is itself bumpy) and where a `break` and a `return` in one block fit none
+of them.
+
+**How:**
+
+1. Find `if (C) S else { if (A1) X1 if (A2) X2 ... if (An) Xn }`: the `else` body, in
+   braces or not, holds only the `if` statements, no declaration and no other
+   statement, and none of them has an `else`. Every `Xi` but `Xn` ends in `return`,
+   `break`, `continue` or `goto` on every path (a compound statement whose last
+   statement is one), so when `Ai` holds nothing after `Xi` runs in this block.
+2. Write the run as an `else if` chain: `else if (A1) X1 else if (A2) X2 ... else if
+   (An) Xn`, each `Ai` and `Xi` copied character for character, re-indented one level
+   less; the braces of the `else` go. A comment that stood before `if (Ai)` goes inside
+   the braces of `Xi` as its first line (`Xi` gets braces when it had none).
+3. Every such `else` block of one function may go in one commit (one recipe, one
+   function).
+4. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
+   the step (the compiler laid the code out differently, and the argument below does not
+   hold for it).
+
+**Before:**
+
+```c
+    if (TranslateStatementList (pfx, strLimit, &chLimit)) {
+      FndOne = 1;
+    } else {
+      if (!*pfx->pex) {
+        (void) ThrowMagickException (...);
+        return MagickFalse;
+      }
+      /* Maybe don't break because other expressions may be not empty. */
+      if (!chLimit) break;
+      if (IsPadFunction(fe) != MagickFalse) {
+        (void) AddElement (pfx, (fxFltType) 0, oNull);
+        FndOne = 1;
+      }
+    }
+```
+
+**After:**
+
+```c
+    if (TranslateStatementList (pfx, strLimit, &chLimit)) {
+      FndOne = 1;
+    } else if (!*pfx->pex) {
+      (void) ThrowMagickException (...);
+      return MagickFalse;
+    } else if (!chLimit) {
+      /* Maybe don't break because other expressions may be not empty. */
+      break;
+    } else if (IsPadFunction(fe) != MagickFalse) {
+      (void) AddElement (pfx, (fxFltType) 0, oNull);
+      FndOne = 1;
+    }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. In the block each `if (Ai)` is reached only when every
+  earlier `Aj` was false, because an earlier `Xj` that ran left the flow. In the chain
+  `else if (Ai)` is evaluated exactly then, and only then, in the same order, and `Xi`
+  runs exactly when `Ai` holds; with no `else` anywhere, nothing runs when all are false.
+  The last `if`'s body need not leave: nothing follows it in the block.
+- An `Xi` that can fall through (a path without an exit) would let the block go on to
+  `A(i+1)`, which the chain skips: step 1 refuses it.
+- The conditions are evaluated the same number of times in the same order, so a side
+  effect in one (`TranslateStatementList` stays in the leading `if`) is unchanged.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`, and `refactor_guard.py` literal and call counts unchanged.
+
+**Provenance:** 2026-11-05, from `fx.c`'s `GetFunction` (campaign A, W13): the argument
+loop's `else` block is one of the loop's bumps, and its `return MagickFalse` and its
+`break` fit no extraction recipe together. A probe of the whole chain: the chain removes the bump, with
+the loop's switch as a helper the loop leaves Bumpy Road Ahead and `GetFunction`
+leaves the category, fx.c 3.37 to 3.52. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -6117,3 +6209,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | Z | Step 1 and new step 7: a selection that sets five or six of the caller's locals passes their addresses in one `const` struct (Recipe Q step 8's form), after the input struct, so the helper takes two parameters; step 1's four-variable limit holds for the separate-pointer form | `fx.c`'s `ExecuteRPN` (campaign A, W13): the `number_args` `switch` pops into `regA` to `regE`, five written locals, one more than step 1; with the nested push test (CN) and the address check (E) it holds two of the function's last three bumps. A probe: ExecuteRPN leaves Bumpy Road Ahead, 3.33 to 3.35, no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | NEW | RV | Extract Block Returning Whether It Returned: a block of a value-returning function that returns different expressions on its paths and otherwise falls through moves to a `static MagickBooleanType` function that stores each `R` through a `MagickBooleanType *result` and returns `MagickTrue` when it returned (`MagickFalse` when it fell through); the caller writes `if (Helper(...,&returned) != MagickFalse) return(returned);` | `fx.c`'s `GetOperand` (campaign A, W13): the leading-operand block, with its number and property tries, and the function block return `MagickTrue`, `MagickFalse` or a call's value and fall through; V refuses two return values, E step 7 needs a return on every path. A probe with V on the constant block: GetOperand leaves Bumpy Road Ahead, 3.35 to 3.37, no finding on any helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | I | Step 2: the block may write up to six variables when the caller declares the targets struct `const`, once, with the addresses as its initialiser, and passes it to every helper that writes any of them (Recipe LB step 8's and Recipe Z step 7's form); a struct of Z step 7 counts for the address exception. *Careful* gives the argument. Still eight steps | `fx.c`'s `GetFunction` (campaign A, W13): the opening chain writes five locals and the qualifier block six, both returning `MagickFalse`; I stopped at four, Z has no `return`, and the two blocks hold bumps the loop cannot be left alone with. A probe of the whole chain (these two blocks and the steps around them): `GetFunction` leaves Bumpy Road Ahead, fx.c 3.37 to 3.52 | mandate (2026-10-24) |
+| 2026-11-05 | NEW | EI | Chain Exiting Guards into an Else-If: an `else` block that is only a run of `if` statements, each but the last leaving the flow when it fires, becomes an `else if` chain with the conditions and bodies copied unchanged; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `fx.c`'s `GetFunction` (campaign A, W13): the argument loop's `else` block (a throw with `return MagickFalse`, a `break`, a pad test) is a bump that CN does not reach (statements, not one nested `if`) and no extraction recipe takes (a `break` and a `return` in one block). A probe of the whole chain: that bump gone, the loop's switch moved, `GetFunction` leaves Bumpy Road Ahead, fx.c 3.37 to 3.52 | mandate (2026-10-24) |
