@@ -888,6 +888,16 @@ static void ApplyRollQuantizePreview(const PreviewTile *tile,
   }
 }
 
+static void SegmentPreviewTile(double *threshold,Image **preview_image,
+  char *label,ExceptionInfo *exception)
+{
+  (*threshold)+=0.4;
+  (void) SegmentImage((*preview_image),sRGBColorspace,MagickFalse,
+    (*threshold),(*threshold),exception);
+  (void) FormatLocaleString(label,MagickPathExtent,"segment %gx%g",
+    (*threshold),(*threshold));
+}
+
 typedef struct _PreviewSelection
 {
   PreviewType
@@ -952,11 +962,7 @@ static void ApplyDespeckleSegmentPreview(const PreviewSelection *selection,
       (*preview_image)=CloneImage((*thumbnail),0,0,MagickTrue,exception);
       if ((*preview_image) == (Image *) NULL)
         break;
-      (*threshold)+=0.4;
-      (void) SegmentImage((*preview_image),sRGBColorspace,MagickFalse,
-        (*threshold),(*threshold),exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"segment %gx%g",
-        (*threshold),(*threshold));
+      SegmentPreviewTile(threshold,preview_image,label,exception);
       break;
     }
   }
