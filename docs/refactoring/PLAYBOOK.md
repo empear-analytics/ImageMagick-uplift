@@ -5208,6 +5208,12 @@ caller must know whether the tail runs). Recipe LB (a `break;`, not a `continue;
    that stays. It contains no `#pragma omp` line, no `return`, `goto` or `break` that
    leaves it, and every `continue;` in it continues the parallel loop (those of a loop
    nested in it stay). The tail follows it directly and is unchanged.
+   The loop may instead be a sequential loop nested in the parallel loop's iteration (a
+   tile's row loop), the block the head of that loop's body and the tail the rest of
+   it, which stays because it holds a `#pragma omp critical` construct: every `continue;`
+   of the head continues that loop, and step 5's `continue;` is that loop's own. Step
+   4's struct is then declared in the parallel body and may be filled before that loop
+   when nothing in the loop writes a member's variable (Recipe N steps 7 and 8).
 2. Written variables: Recipe PS step 2 (`status` and at most two shared scalars, each by
    pointer). Every other variable of the body that the head writes is declared in the
    head, or is not read by the tail (a row pointer `q`), and is declared in the new
@@ -5300,6 +5306,11 @@ static MagickBooleanType OpaquePaintLine(const OpaquePaintRow *row,
   after the head. Nothing is copied and no address leaves the iteration. A shared
   variable the head reads through a pointer to `const` is read at the point the head
   read it, as before.
+- Under step 1's nested loop the first point holds for that loop: a `continue;` of the
+  head and the caller's `continue;` both go on with the nested loop's next iteration and
+  skip the same tail, which stays in the caller with its critical construct, its name
+  and its statement unchanged; the head ran outside the lock before and runs outside it
+  now.
 - The oracle runs single-threaded and cannot see a race: steps 1 and 2 are checked by
   reading.
 
@@ -5314,7 +5325,12 @@ block; the plateau table recorded that no T, U or LB form moves the head. A prob
 Code (Claude Sonnet 5.5) under the mandate of 2026-10-24. Step 2's body variables the
 tail reads (2026-11-04, W13): `statistic-measure.c`'s `GetImageRange`, whose head fills
 the row's `channel_range`, which the `omp critical` tail merges; a probe 9.68 to 10.00.
-Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24. Step 1's
+nested loop (2026-11-05, W14 lane c): `shear-rotate.c`'s `IntegralRotateImage`, whose
+270-degree tile row loop ends in a sync under `critical (MagickCore_IntegralRotateImage)`
+after a head that continues on `status` and on a failed queue; PS refuses the pragma
+and step 1 took only the parallel loop's own body. A probe of the whole chain: 7.63 to
+10.00. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -7028,3 +7044,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | NS | Step 1: the selection may be the whole right-hand side of an assignment statement (`sign=c ? 1 : -1;`), no parentheses needed since nothing can regroup it, may be a single site when the step takes the function out of *Complex Method*, and may select between signed integer literals. *Careful* is unchanged: the argument is evaluated once, the function returns the same constant under the same test, the call replaces the right-hand side as a whole, and `tools/obj_identical.sh` must print `IDENTICAL` | `enhance.c`'s `ContrastImage` (campaign A, W14 lane d): `sign=sharpen != MagickFalse ? 1 : -1;` is one decision of its cc 9; NS step 1 asked for a parenthesised selection that recurs. A probe: ContrastImage leaves Complex Method, enhance.c 6.49 to 6.65 | mandate (2026-10-24) |
 | 2026-11-05 | NEW | HC | Extract Block Holding a Named Critical Region: a statement of a parallel loop body (a column loop) that holds whole named `#pragma omp critical (name)` constructs moves, constructs included and unchanged, into a `static void` helper called from that body alone; outside the constructs the block writes only body variables (Recipe O step 1's rule), inside them shared memory through the same pointers; no lock taken; checked by reading | `quantize.c`'s `SetGrayscaleImage` (campaign A, W14): the column loop of its colormap-building parallel loop holds a double-checked insert whose critical governs an unbraced `if` (outside CB step 1), the function's Deep, Nested Complexity (5); a probe 6.11 to 6.57 with no finding on the helper | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | PS | Step 7: the loop whose whole body moves may also be a sequential loop nested in the parallel loop's iteration (a tile's row loop inside the tile loop); its `continue;` statements become `return;`, its counter goes by value, and the struct of step 6 is declared in the parallel body and may be filled before that loop (Recipe N steps 7 and 8). *Careful* gives the argument. Still eight steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 90-degree tile row loop's body tests `status`, continues after a failed queue and syncs, at depth 5 of the function; step 7 as written took only the parallel loop's own body. A probe of the whole chain: 7.63 to 10.00, no finding left | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | PC | Step 1: the loop may also be a sequential loop nested in the parallel loop's iteration (a tile's row loop), the head the start of that loop's body and the tail the rest of it, kept because it holds a `#pragma omp critical` construct; the head's and the caller's `continue;` are that loop's own; the struct is declared in the parallel body and may be filled before the loop (Recipe N steps 7 and 8). Still five steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree tile row loop's body tests `status`, queues a row, copies it and syncs under a named critical; PS refuses the pragma and PC step 1 took only the parallel loop's own body. A probe of the whole chain: 7.63 to 10.00 | mandate (2026-10-24) |
