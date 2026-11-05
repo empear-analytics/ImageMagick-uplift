@@ -523,6 +523,17 @@ static MagickBooleanType PosterizeThroughMap(
   return(status);
 }
 
+static void SetPosterizeProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   const DitherMethod dither_method,ExceptionInfo *exception)
 {
@@ -602,17 +613,11 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
             #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,PosterizeImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetPosterizeProgress(image,PosterizeImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
