@@ -351,6 +351,19 @@ static void AdvanceDestinationChannel(const ChannelFx channel_op,
 
 #define ChannelFxImageTag  "ChannelFx/Image"
 
+static MagickBooleanType SetChannelFxProgress(const Image *source_image,
+  const char *p,const char *expression)
+{
+  MagickBooleanType
+    status;
+
+  status=SetImageProgress(source_image,ChannelFxImageTag,p-expression,
+    strlen(expression));
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -523,9 +536,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
         channels++;
       }
     AdvanceDestinationChannel(channel_op,&channel_mask,&destination_channel);
-    status=SetImageProgress(source_image,ChannelFxImageTag,p-expression,
-      strlen(expression));
-    if (status == MagickFalse)
+    if (SetChannelFxProgress(source_image,p,expression) == MagickFalse)
       break;
   }
   if (destination_image == (Image *) NULL)
