@@ -2759,6 +2759,27 @@ static void GetModulateArguments(const Image *image,
     }
 }
 
+static void GetThresholdArguments(const Image *image,
+  GeometryInfo *geometry_info,MagickRealType *amount,MagickRealType *threshold)
+{
+  const char
+    *artifact;
+
+  MagickStatusType
+    flags;
+
+  artifact=GetImageArtifact(image,"compose:args");
+  if (artifact != (char *) NULL)
+    {
+      flags=ParseGeometry(artifact,geometry_info);
+      (*amount)=(*geometry_info).rho;
+      (*threshold)=(*geometry_info).sigma;
+      if ((flags & SigmaValue) == 0)
+        (*threshold)=0.05f;
+    }
+  (*threshold)*=(double) QuantumRange;
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3323,16 +3344,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       /*
         Determine the amount and threshold.
       */
-      artifact=GetImageArtifact(image,"compose:args");
-      if (artifact != (char *) NULL)
-        {
-          flags=ParseGeometry(artifact,&geometry_info);
-          amount=geometry_info.rho;
-          threshold=geometry_info.sigma;
-          if ((flags & SigmaValue) == 0)
-            threshold=0.05f;
-        }
-      threshold*=(double) QuantumRange;
+      GetThresholdArguments(image,&geometry_info,&amount,&threshold);
       break;
     }
     default:
