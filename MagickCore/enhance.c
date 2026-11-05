@@ -2672,6 +2672,55 @@ static void SumWhiteBalanceChroma(const EnhanceLine *line,
   }
 }
 
+typedef struct _WhiteBalanceHead
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  double
+    a_mean,
+    b_mean;
+} WhiteBalanceHead;
+
+static MagickBooleanType ShiftWhiteBalanceHead(const WhiteBalanceHead *head,
+  const ssize_t y,MagickStatusType *status)
+{
+  const Image
+    *const image = head->image;
+
+  CacheView
+    *const image_view = head->image_view;
+
+  const double
+    a_mean = head->a_mean,
+    b_mean = head->b_mean;
+
+  ExceptionInfo
+    *const exception = head->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ShiftChromaRow(image,a_mean,b_mean,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2722,20 +2771,16 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    WhiteBalanceHead
+      head;
 
-    if (status == MagickFalse)
+    head.image=image;
+    head.image_view=image_view;
+    head.exception=exception;
+    head.a_mean=a_mean;
+    head.b_mean=b_mean;
+    if (ShiftWhiteBalanceHead(&head,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    ShiftChromaRow(image,a_mean,b_mean,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
