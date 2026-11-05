@@ -670,6 +670,17 @@ static void ComputeCannyGradientRow(MagickBooleanType *status,
   SetCannyGradientRow(edge_image,canny_cache,p,y);
 }
 
+static void SetFeatureProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType BlurCannyImage(const Image *image,
   KernelInfo *kernel_info,Image **edge_image,ExceptionInfo *exception)
 {
@@ -1903,16 +1914,11 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,MeanShiftImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetFeatureProgress(image,MeanShiftImageTag,progress,&status);
       }
   }
   mean_view=DestroyCacheView(mean_view);
