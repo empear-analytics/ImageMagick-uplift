@@ -2729,6 +2729,32 @@ static void ApplyAxisThresholds(const CCMetricInputs *inputs,
     }
 }
 
+static void RemoveSelectedObjects(const Image *image,
+  const Image *component_image,CCObjectInfo *object,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"connected-components:remove-colors");
+  if (artifact != (const char *) NULL)
+    {
+      /*
+        Remove selected objects based on color, keep others.
+      */
+      RemoveObjectsByColor(component_image,object,artifact,exception);
+    }
+  artifact=GetImageArtifact(image,"connected-components:remove-ids");
+  if (artifact == (const char *) NULL)
+    artifact=GetImageArtifact(image,"connected-components:remove");
+  if (artifact != (const char *) NULL)
+    {
+      /*
+        Remove selected objects based on id, keep others.
+      */
+      SetObjectMergeByIds(object,component_image->colors,artifact,MagickTrue);
+    }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2977,24 +3003,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       component_image=DestroyImage(component_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  artifact=GetImageArtifact(image,"connected-components:remove-colors");
-  if (artifact != (const char *) NULL)
-    {
-      /*
-        Remove selected objects based on color, keep others.
-      */
-      RemoveObjectsByColor(component_image,object,artifact,exception);
-    }
-  artifact=GetImageArtifact(image,"connected-components:remove-ids");
-  if (artifact == (const char *) NULL)
-    artifact=GetImageArtifact(image,"connected-components:remove");
-  if (artifact != (const char *) NULL)
-    {
-      /*
-        Remove selected objects based on id, keep others.
-      */
-      SetObjectMergeByIds(object,component_image->colors,artifact,MagickTrue);
-    }
+  RemoveSelectedObjects(image,component_image,object,exception);
   inputs.image=image;
   inputs.component_image=component_image;
   inputs.object=object;
