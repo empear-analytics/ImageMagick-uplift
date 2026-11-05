@@ -794,6 +794,41 @@ static ssize_t FindDifferingPixel(const DifferingPixelScan *scan,
   return(i);
 }
 
+typedef struct _DifferingLineScan
+{
+  const Image
+    *alpha_image,
+    *beta_image;
+
+  DifferingPixelScan
+    scan;
+
+  ExceptionInfo
+    *exception;
+} DifferingLineScan;
+
+static MagickBooleanType ContinueColumnScan(const DifferingLineScan *line,
+  const ssize_t x)
+{
+  const Quantum
+    *p,
+    *q;
+
+  ssize_t
+    y;
+
+  p=GetVirtualPixels(line->alpha_image,x,0,1,line->alpha_image->rows,
+    line->exception);
+  q=GetVirtualPixels(line->beta_image,x,0,1,line->beta_image->rows,
+    line->exception);
+  if (IsEitherRowMissing(p,q) != MagickFalse)
+    return(MagickFalse);
+  y=FindDifferingPixel(&line->scan,p,q,(ssize_t) line->alpha_image->rows);
+  if (y < (ssize_t) line->alpha_image->rows)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static ssize_t FindFirstDifferingColumn(const Image *alpha_image,
   const Image *beta_image,const DifferingPixelScan scan,
   ExceptionInfo *exception)
@@ -833,6 +868,9 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   const DifferingPixelScan
     scan = { method, alpha_image, beta_image, (&alpha_pixel), (&beta_pixel) };
 
+  const DifferingLineScan
+    line = { alpha_image, beta_image, scan, exception };
+
   RectangleInfo
     bounds;
 
@@ -862,15 +900,8 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
     }
   bounds.x=x;
   for (x=(ssize_t) alpha_image->columns-1; x >= 0; x--)
-  {
-    p=GetVirtualPixels(alpha_image,x,0,1,alpha_image->rows,exception);
-    q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
-    if (IsEitherRowMissing(p,q) != MagickFalse)
+    if (ContinueColumnScan(&line,x) == MagickFalse)
       break;
-    y=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->rows);
-    if (y < (ssize_t) alpha_image->rows)
-      break;
-  }
   bounds.width=(size_t) (x-bounds.x+1);
   for (y=0; y < (ssize_t) alpha_image->rows; y++)
   {
