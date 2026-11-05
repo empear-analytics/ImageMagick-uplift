@@ -2194,6 +2194,24 @@ static void SepiaToneImageRow(const SepiaToneRow *sepia_row,
   }
 }
 
+static MagickBooleanType GetSepiaRows(const EffectRows *rows,
+  const Quantum *magick_restrict *p,Quantum *magick_restrict *q,
+  MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*p)=GetCacheViewVirtualPixels(rows->image_view,0,rows->y,
+    rows->image->columns,1,rows->exception);
+  (*q)=GetCacheViewAuthenticPixels(rows->effect_view,0,rows->y,
+    rows->effect_image->columns,1,rows->exception);
+  if (((*p) == (const Quantum *) NULL) || ((*q) == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -2239,6 +2257,9 @@ MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    const EffectRows
+      rows = { image,sepia_image,image_view,sepia_view,exception,y };
+
     const Quantum
       *magick_restrict p;
 
@@ -2248,16 +2269,8 @@ MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
     SepiaToneRow
       sepia_row;
 
-    if (status == MagickFalse)
+    if (GetSepiaRows(&rows,&p,&q,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(sepia_view,0,y,sepia_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
     sepia_row.image=image;
     sepia_row.sepia_image=sepia_image;
     sepia_row.threshold=threshold;
