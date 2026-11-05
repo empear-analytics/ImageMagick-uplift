@@ -4423,6 +4423,23 @@ static void SelectErodeOrDilatePrimitive(
   }
 }
 
+static void SelectCloseIntensityPrimitive(
+  const MorphologyStageSelection *selection,KernelInfo **this_kernel,
+  MorphologyMethod *primitive)
+{
+  switch( selection->method ) {
+    case CloseIntensityMorphology:
+      (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
+      (*primitive) = DilateIntensityMorphology;
+      if ( selection->stage_loop == 2 )
+        (*primitive) = ErodeIntensityMorphology;
+      break;
+    default:
+      SelectErodeOrDilatePrimitive(selection,&(*this_kernel),&(*primitive));
+      break;
+  }
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4614,12 +4631,6 @@ MagickPrivate Image *MorphologyApply(const Image *image,
         selection.rflt_kernel=rflt_kernel;
         selection.stage_loop=stage_loop;
         switch( method ) {
-          case CloseIntensityMorphology:
-            this_kernel = rflt_kernel; /* use the reflected kernel */
-            primitive = DilateIntensityMorphology;
-            if ( stage_loop == 2 )
-              primitive = ErodeIntensityMorphology;
-            break;
           case EdgeMorphology:        /* dilate and erode difference */
             primitive = DilateMorphology;
             if ( stage_loop == 2 ) {
@@ -4629,7 +4640,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
             }
             break;
           default:
-            SelectErodeOrDilatePrimitive(&selection,&this_kernel,&primitive);
+            SelectCloseIntensityPrimitive(&selection,&this_kernel,&primitive);
             break;
         }
         assert( this_kernel != (KernelInfo *) NULL );
