@@ -314,6 +314,62 @@ static void SetCombineProgress(const Image *image,const Image *combine_image,
     (*status)=MagickFalse;
 }
 
+typedef struct _CombineRows
+{
+  const Image
+    *image;
+
+  Image
+    *combine_image;
+
+  CacheView
+    *combine_view;
+
+  ExceptionInfo
+    *exception;
+} CombineRows;
+
+static MagickBooleanType CombineImageRows(const CombineRows *rows,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const image = rows->image;
+
+  Image
+    *const combine_image = rows->combine_image;
+
+  CacheView
+    *const combine_view = rows->combine_view;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  CombineImageRowInfo
+    image_row;
+
+  Quantum
+    *pixels;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  pixels=GetCacheViewAuthenticPixels(combine_view,0,y,combine_image->columns,
+    1,exception);
+  if (pixels == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  image_row.image=image;
+  image_row.combine_image=combine_image;
+  image_row.pixels=pixels;
+  image_row.y=y;
+  image_row.exception=exception;
+  CombineImageRow(&image_row);
+  if (SyncCacheViewAuthenticPixels(combine_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *CombineImages(const Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -367,29 +423,11 @@ MagickExport Image *CombineImages(const Image *image,
 #endif
   for (y=0; y < (ssize_t) combine_image->rows; y++)
   {
-    CombineImageRowInfo
-      image_row;
+    const CombineRows
+      rows = { image, combine_image, combine_view, exception };
 
-    Quantum
-      *pixels;
-
-    if (status == MagickFalse)
+    if (CombineImageRows(&rows,y,&status) == MagickFalse)
       continue;
-    pixels=GetCacheViewAuthenticPixels(combine_view,0,y,combine_image->columns,
-      1,exception);
-    if (pixels == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    image_row.image=image;
-    image_row.combine_image=combine_image;
-    image_row.pixels=pixels;
-    image_row.y=y;
-    image_row.exception=exception;
-    CombineImageRow(&image_row);
-    if (SyncCacheViewAuthenticPixels(combine_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
