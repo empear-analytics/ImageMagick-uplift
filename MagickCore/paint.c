@@ -713,6 +713,12 @@ typedef struct _OilPaintRows
     *exception;
 } OilPaintRows;
 
+static ssize_t GetOilPaintCenter(const Image *linear_image,const size_t width)
+{
+  return((ssize_t) (GetPixelChannels(linear_image)*(linear_image->columns+
+    width)*(width/2L)+GetPixelChannels(linear_image)*(width/2L)));
+}
+
 static MagickBooleanType OilPaintImageRows(const OilPaintRows *rows)
 {
   CacheView
@@ -747,8 +753,7 @@ static MagickBooleanType OilPaintImageRows(const OilPaintRows *rows)
   */
   status=MagickTrue;
   progress=0;
-  center=(ssize_t) (GetPixelChannels(linear_image)*(linear_image->columns+
-    width)*(width/2L)+GetPixelChannels(linear_image)*(width/2L));
+  center=GetOilPaintCenter(linear_image,width);
   image_view=AcquireVirtualCacheView(linear_image,exception);
   paint_view=AcquireAuthenticCacheView(paint_image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
