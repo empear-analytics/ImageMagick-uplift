@@ -2464,6 +2464,48 @@ static void OpenPixelFunction (FxInfo * pfx, const FunctionOpening *opening)
     }
 }
 
+static MagickBooleanType OpenFunction (FxInfo * pfx, FunctionE fe,
+  const FunctionOpening *opening)
+{
+  OperatorE
+    *const pushOp = opening->pushOp;
+
+  const char
+    **const strLimit = opening->strLimit;
+
+  char
+    *const chLimit = opening->chLimit,
+    *const expChLimit = opening->expChLimit;
+
+  int
+    *const nArgs = opening->nArgs;
+
+  if (fe == fP) {
+    OpenPixelFunction (pfx, opening);
+  } else if (fe == fU) {
+    char p = PeekChar (pfx);
+    if (p=='[') {
+      (void) ExpectChar (pfx, '[');
+      *pushOp = oOpenBracket;
+      *strLimit = ",]";
+      *chLimit = ']';
+      *expChLimit = ']';
+    } else {
+      *nArgs = 0;
+      *chLimit = ']';
+      *expChLimit = ']';
+    }
+  } else if (fe == fV || fe == fS) {
+      *nArgs = 0;
+      *pushOp = oOpenBracket;
+      *chLimit = ']';
+      *expChLimit = ']';
+  } else {
+    if (!ExpectChar (pfx, '(')) return MagickFalse;
+  }
+  return MagickTrue;
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2494,29 +2536,8 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
   pfx->pex += pfx->lenToken;
 
-  if (fe == fP) {
-    OpenPixelFunction (pfx, &opening);
-  } else if (fe == fU) {
-    char p = PeekChar (pfx);
-    if (p=='[') {
-      (void) ExpectChar (pfx, '[');
-      pushOp = oOpenBracket;
-      strLimit = ",]";
-      chLimit = ']';
-      expChLimit = ']';
-    } else {
-      nArgs = 0;
-      chLimit = ']';
-      expChLimit = ']';
-    }
-  } else if (fe == fV || fe == fS) {
-      nArgs = 0;
-      pushOp = oOpenBracket;
-      chLimit = ']';
-      expChLimit = ']';
-  } else {
-    if (!ExpectChar (pfx, '(')) return MagickFalse;
-  }
+  if (OpenFunction (pfx, fe, &opening) == MagickFalse)
+    return MagickFalse;
   if (!PushOperatorStack (pfx, (int) pushOp)) return MagickFalse;
 
   pExpStart = pfx->pex;
