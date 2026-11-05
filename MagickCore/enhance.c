@@ -1395,12 +1395,88 @@ static MagickBooleanType ModulateImageHead(const ModulateHead *head,
 
 #define ModulateImageTag  "Modulate/Image"
 
-MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
-  ExceptionInfo *exception)
+typedef struct _ModulateImageInput
 {
+  Image
+    *image;
+
+  ColorspaceType
+    colorspace;
+
+  double
+    percent_hue,
+    percent_saturation,
+    percent_brightness;
+
+  IlluminantType
+    illuminant;
+
+  ExceptionInfo
+    *exception;
+} ModulateImageInput;
+
+static MagickBooleanType ModulateImagePixels(const ModulateImageInput *input)
+{
+  Image
+    *const image = input->image;
+
+  const ColorspaceType
+    colorspace = input->colorspace;
+
+  const double
+    percent_hue = input->percent_hue,
+    percent_saturation = input->percent_saturation,
+    percent_brightness = input->percent_brightness;
+
+  const IlluminantType
+    illuminant = input->illuminant;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
   CacheView
     *image_view;
 
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const ModulateHead
+      head = { { image, colorspace, percent_hue, percent_saturation,
+        percent_brightness, illuminant }, { image,image_view,exception } };
+
+    if (ModulateImageHead(&head,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetEnhanceProgress(image,ModulateImageTag,progress,&status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
+  ExceptionInfo *exception)
+{
   ColorspaceType
     colorspace = UndefinedColorspace;
 
@@ -1412,14 +1488,8 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   IlluminantType
     illuminant = D65Illuminant;
 
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
-  ssize_t
-    y;
+  ModulateImageInput
+    input;
 
   /*
     Initialize modulate table.
@@ -1451,32 +1521,14 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
         percent_saturation,colorspace,exception) != MagickFalse)
     return(MagickTrue);
 #endif
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const ModulateHead
-      head = { { image, colorspace, percent_hue, percent_saturation,
-        percent_brightness, illuminant }, { image,image_view,exception } };
-
-    if (ModulateImageHead(&head,y,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetEnhanceProgress(image,ModulateImageTag,progress,&status);
-      }
-  }
-  image_view=DestroyCacheView(image_view);
-  return(status);
+  input.image=image;
+  input.colorspace=colorspace;
+  input.percent_hue=percent_hue;
+  input.percent_saturation=percent_saturation;
+  input.percent_brightness=percent_brightness;
+  input.illuminant=illuminant;
+  input.exception=exception;
+  return(ModulateImagePixels(&input));
 }
 
 
