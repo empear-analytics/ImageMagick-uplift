@@ -105,3 +105,26 @@ helpers and the transform skeletons.
 `status` and `progress` from its count loop into the classify loop, so a monitor abort in the first
 skips classification; `DestroyOilPaintClones` assigns the result of `DestroyImage(paint_image)` to
 `linear_image`.
+
+### Later in the night (2026-11-05, 00:00 to 03:00)
+
+| File | Score | Commits |
+| --- | --- | ---: |
+| `colorspace.c` | 3.27 -> 3.52 | 2 |
+| `composite.c` | 3.01 -> 3.02 | 6 |
+| `fx.c` | 3.31 -> 3.37 | 11 + 2 playbook |
+| `feature.c` | 6.51 -> 7.39 | 7 |
+| `vision.c` | 6.98 -> 7.15 | 2 |
+| `compare.c`, `morphology.c` | 2.54, 2.71 | 0 |
+
+**More playbook text under the mandate, not yet ruled on:** Recipe RV (Extract Block Returning
+Whether It Returned; 14cc1d7c6) and Recipe Z step 7 (423fef3a8), both from the fx.c pass. Also
+review: feature.c applies OC's tail form to the three post-atomic lines of two sequential loops
+(`HoughLineImage`, the Canny hysteresis loop) because PS is parallel-only; `composite.c`'s steps
+are mostly flat plan steps (rule 2) for +0.01 in all; `colorspace.c` 6dc7b78b8 is a rule 1 set
+(first function alone flat).
+
+**Noticed upstream, not changed.** `SimilarityImage` increments `progress++` outside `omp atomic`
+and its `threshold_trigger` test can never fire; `CompositeOverImage` and the main loop of
+`CompositeImage` have dead `canvas_pixel`/`source_pixel` initialisations and `CompositeOverImage`
+sets `status` and `progress` twice; `HoughLineImage` reports progress under `CannyEdgeImageTag`.
