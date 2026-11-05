@@ -1908,6 +1908,53 @@ static void CountFixedCoefficients(const DistortMethod *method,
   }
 }
 
+typedef struct _CoefficientCountTargets
+{
+  size_t
+    *number_coefficients,
+    *cp_x,
+    *cp_y,
+    *cp_values;
+} CoefficientCountTargets;
+
+static void CountBilinearCoefficients(const DistortMethod *method,
+  const CoefficientContext *context,const CoefficientCountTargets *targets)
+{
+  const size_t
+    number_values = context->number_values;
+
+  size_t
+    *const number_coefficients = targets->number_coefficients,
+    *const cp_x = targets->cp_x,
+    *const cp_y = targets->cp_y,
+    *const cp_values = targets->cp_values;
+
+  switch (*method) {
+    case BilinearReverseDistortion:
+      *number_coefficients=4*number_values;
+      break;
+    /*
+      The rest are constants as they are only used for image distorts
+    */
+    case BilinearForwardDistortion:
+      *number_coefficients=10; /* 2*4 coeff plus 2 constants */
+      *cp_x = 0;        /* Reverse src/dest coords for forward mapping */
+      *cp_y = 1;
+      *cp_values = 2;
+      break;
+#if 0
+    case QuadrilateralDistortion:
+      number_coefficients=19; /* BilinearForward + BilinearReverse */
+#endif
+      break;
+    default:
+    {
+      CountFixedCoefficients(method,&(*number_coefficients));
+      break;
+    }
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1935,6 +1982,9 @@ static double *GenerateCoefficients(const Image *image,
 
   CoefficientContext
     context;
+
+  const CoefficientCountTargets
+    targets = { &number_coefficients,&cp_x,&cp_y,&cp_values };
 
   if ( number_values == 0 ) {
     /* Image distortion using control points (or other distortion)
@@ -1978,26 +2028,9 @@ static double *GenerateCoefficients(const Image *image,
           MagickFalse)
         return((double *) NULL);
       break;
-    case BilinearReverseDistortion:
-      number_coefficients=4*number_values;
-      break;
-    /*
-      The rest are constants as they are only used for image distorts
-    */
-    case BilinearForwardDistortion:
-      number_coefficients=10; /* 2*4 coeff plus 2 constants */
-      cp_x = 0;        /* Reverse src/dest coords for forward mapping */
-      cp_y = 1;
-      cp_values = 2;
-      break;
-#if 0
-    case QuadrilateralDistortion:
-      number_coefficients=19; /* BilinearForward + BilinearReverse */
-#endif
-      break;
     default:
     {
-      CountFixedCoefficients(method,&number_coefficients);
+      CountBilinearCoefficients(method,&context,&targets);
       break;
     }
   }
