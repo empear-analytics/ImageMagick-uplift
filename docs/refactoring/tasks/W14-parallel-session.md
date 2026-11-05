@@ -185,3 +185,13 @@ block alone; here the measured chain goes 7.64 -> 7.38 -> ... -> 7.65, so check 
 **Correction:** 9cd200adc says "271 to 198 lines"; the measured value before that step is 270. Upstream, not
 changed: `YShearImage` reports progress against `image->rows` over a width loop; X/YShear skip sync and progress on
 rows with zero displacement.
+
+## Lane d, sixth batch: attribute.c and attribute-bounds.c to 10.0 (Sonnet, 10 commits)
+
+New recipe under the mandate, not yet ruled on: **Recipe PD** (d028778f4, Name a Parameter-or-Default Selection):
+three or more sites of `(n >= k) ? values[k-1] : d` in a file become calls of one `static inline` helper with the
+same ternary; checked by script and by the oracle (the object code differs in branch order). **Review:** be5af5089
+(`attribute-bounds.c`) and 2ed22bd52 (`resize.c`) move a function's tail that holds a whole parallel loop under
+Recipe E step 7; the text that admits a block carrying whole parallel loops is Recipe N and Z step 1 (amended this
+morning), not E: check whether E should be amended to match or these should be relabelled N. The two
+`--no-verify` messages in `statistic-function.c` say "of 6" steps; the plan took 5 and its measured end, 9.68, held.
