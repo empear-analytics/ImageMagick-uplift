@@ -6497,7 +6497,7 @@ Recipe W and RV, which move a block, not a run of labels.
 **How:**
 
 1. The `switch (e)` lies outside every OpenMP region, with no `#pragma` line in it or in
-   what follows. In the same block, directly after it, come statements `T` that end the
+   what follows, except whole parallel loops inside the run's groups (step 2). In the same block, directly after it, come statements `T` that end the
    function with `return(R_T);` on every path, with no other exit. Every group of the
    `switch` ends in `return(R);` (`R` any expression), except a `default:` group that is
    `break;` alone (or no `default:` group). No group falls through; none holds a
@@ -6507,13 +6507,26 @@ Recipe W and RV, which move a block, not a run of labels.
    never evaluated after such a write.
 2. Choose a run of adjacent groups, labels and bodies, none of them `default:`. A
    never-compiled `#if 0` branch between them moves with them (*Preprocessor branches*).
+   A group of the run may hold whole parallel loops under Recipe N step 1's conditions
+   (as amended 2026-11-05): each loop moves whole and unchanged, the `#if
+   defined(MAGICKCORE_OPENMP_SUPPORT)` line, the pragma with its clauses, the `#endif`
+   and the loop statement; every variable the region writes or a clause names
+   (`shared(status)`) is a parameter or local of the new function by the same name,
+   never a member. The kept groups and `T` hold no `#pragma` line.
 3. Cut the run into a new `static` function of the caller's return type directly above
    the caller, whose body is `switch (e) { <the run> default: break; }` followed by `T`
    unchanged. Its parameters are what the run and `T` read, as Recipe N steps 2 to 4 give
    them (at most four; an input struct shared with the other helpers of the function). A
    call in the run that passed `&name` of the struct passes `name`.
+   When `T` begins with the fill of a Recipe N input struct (`name.m=v;` for every
+   member, in declaration order, followed directly by `T`'s last statement, which passes
+   `&name`), that struct is the shared one: the fill stays in the caller (step 4), the new
+   function takes `const Name *name`, binds as `const` locals of their own names and types
+   the members the run and `T` read as plain variables (N step 4), so the run's text is
+   unchanged, and its `T` is that last statement alone, passing `name` for `&name`.
 4. In the caller the kept groups and the `default:` group stand as they were; `T` is
-   replaced by `return(Helper(...));`. A `switch` that had no `default:` gets `default:
+   replaced by `return(Helper(...));` (after the struct fill of step 3, which stays,
+   when `T` began with one; the call then passes `&name`). A `switch` that had no `default:` gets `default:
    break;` in the caller as well, so that no compiler warns about unhandled enumerators.
 5. Check by reading that every label of the original is in exactly one of the two
    `switch`es, that each moved group is byte for byte the original, and that the call's
@@ -6597,6 +6610,16 @@ static double *GenerateRadialCoefficients(double *coeff,DistortMethod *method,
   only on paths on which no group ran.
 - `perror(...)` in `T` runs once, in the helper that holds it, after the same
   `switch` evaluations and with nothing run in between that the original did not run.
+- A parallel loop moved inside a group (step 2) runs in the new function as it ran in
+  the caller: the region, its clauses and its body are the same text, the variables it
+  writes or names are the new function's own by the same names (a by-value `status`
+  shared by the region, as in a Recipe N helper), and the group's `return(R);` returns
+  the value the caller would have returned, which the caller returns at once.
+- A struct fill left in the caller (step 3) runs where it ran before: after the
+  caller's `switch`, on the paths on which no kept group returned, with the same values.
+  The new function's `const` locals take the members' values, which are the values the
+  caller's variables held, since nothing runs between the fill and the call; its `T`
+  passes the same struct, unchanged, that the original passed.
 - Each helper's switch has `default: break;` so that `-Wswitch` stays quiet; it costs
   one label of its cyclomatic complexity, and the run must be sized for it (cc 9 or more
   counts one per label, `default` and a dead `#if 0` label included).
@@ -7591,3 +7614,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | SR | Step 5: in a function whose `switch` is followed by `return(MagickTrue);` and whose moved groups return `MagickFalse` (a link of step 7's chain), the `default:` group may be `return(Helper(...));` instead of the `if`/`return`/`break;` group; same value on both paths. *Careful* gives the argument. Still seven steps | `channel.c`'s `ChannelFxImage` (campaign A, W14 lane d): the destination-channel `switch` (nine labels, a throwing `default:`) moved by Recipe V step 7 is cc 14; its chain by the `if` form leaves the head link at cc 9 (six labels, `default:`, the `if`), a *Complex Method* the gate refuses; the `return` form makes it 8 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | B | Step 5: calls in a loop of a function with no OpenMP region of its own may take a struct filled once directly before the loop, when nothing from the fill to the loop's end writes what an initialiser reads (the form Recipe OC step 6 and Recipe LB step 4 already use for their structs). *Careful* gives the argument. Still eight steps | `channel.c`'s `SeparatePixelChannel` (5 arguments, called once per pixel by `SeparateImageRow`): B refuses the per-call fill of member accesses in a hot loop; with `ChannelImage` the last two *Excess Number of Function Arguments* of the file, a probe 7.81 to 8.06 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | SD | Step 8: when the groups one step moves write five or six variables of the caller (those the `default` group's call writes through included), the helper takes Recipe Z step 7's `const Targets *targets` after `tile`; the caller declares it `const` once with the addresses as its initialiser and calls `Helper(&tile,&targets);`, the helper binds each member once and passes `&(*v)` on. *Careful* gives the argument. Still eight steps | `effect-preview.c`'s `PreviewImage` (campaign A, W14 lane b): the Roll, Grayscale and Quantize groups with `default` write five variables; a probe 8.42 to 8.58, no finding on the helper | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | SW | Step 2: a group of the run may hold whole parallel loops under Recipe N step 1's conditions (each loop moved whole and unchanged with its `#if`, pragma and `#endif`; what the region writes or a clause names is a parameter or local of the new function by the same name, never a member); step 1 admits them. Step 3: a `T` that begins with the fill of a Recipe N input struct whose call ends `T` shares that struct: the fill stays in the caller before the new call (step 4), the new function binds the members the run reads as `const` locals, so the run's text is unchanged, and its `T` is the last call alone, passing `name`. *Careful* gives both arguments. Still six steps | `colorspace.c`'s `TransformsRGBImage` (campaign A, W14 lane c): its linear RGB group holds the row loop's `#pragma omp parallel for`, as a helper of its own it clones `LinearGrayTosRGB` (6.56 in a probe); `sRGBTransformImage`'s tail fills `sRGBTableInput` from `colorspace` and `progress` before `sRGBTransformByTables`, so a helper with `T` would take five parameters. A probe of the chain (this recipe on the Log and linear RGB groups of `TransformsRGBImage`, then on the Log/linear RGB and CMYK/gray runs of `sRGBTransformImage`): 7.14 to 7.23, 7.29 and 7.35, both functions leaving *Large Method*, no finding on a new function | mandate (2026-10-24) |
