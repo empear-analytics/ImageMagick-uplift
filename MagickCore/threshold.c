@@ -1531,6 +1531,16 @@ static void FillDitherLevels(const char *token,double *levels)
     levels[i]=StringToDouble(token,(char **) NULL);
 }
 
+static const char *ParseDitherLevel(const char *p,char *token,double *levels,
+  const ssize_t i)
+{
+  (void) GetNextToken(p,&p,MagickPathExtent,token);
+  if (*token == ',')
+    (void) GetNextToken(p,&p,MagickPathExtent,token);
+  levels[i]=StringToDouble(token,(char **) NULL);
+  return(p);
+}
+
 static void ParseDitherLevels(const char *p,double *levels)
 {
   char
@@ -1542,12 +1552,7 @@ static void ParseDitherLevels(const char *p,double *levels)
   (void) GetNextToken(p,&p,MagickPathExtent,token);
   FillDitherLevels(token,levels);
   for (i=0; (*p != '\0') && (i < MaxPixelChannels); i++)
-  {
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-    levels[i]=StringToDouble(token,(char **) NULL);
-  }
+    p=ParseDitherLevel(p,token,levels,i);
 }
 
 static void DecrementDitherLevels(double *levels)
