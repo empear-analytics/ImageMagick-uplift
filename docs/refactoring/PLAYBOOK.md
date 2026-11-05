@@ -6952,6 +6952,151 @@ the mandate of 2026-10-24.
 
 ---
 
+## Recipe RP - Extract Progress Loop Returning the Progress
+
+**Use when:** CodeScene reports *Large Method*, *Complex Method* or *Bumpy Road Ahead*,
+and the block that would fix it is a sequential pass over the image (a row loop that no
+`omp parallel` pragma governs, with the statements that set it up and tear it down)
+whose progress block holds an orphaned `#pragma omp atomic` `progress++` and reports
+through a call that may clear the caller's `status`
+(`ReportClassifyProgress(image,SegmentImageTag,progress,&status);`), while the caller
+reads both `progress` and `status` after the block: a later pass continues the count
+and tests the status.
+
+**Not covered by:** Recipe E, whose step 4 refuses a second written variable and whose
+block holds no pragma; Recipe N, whose step 1 admits the orphaned atomic but whose
+block, like E's, writes one variable of the caller, and which needs five inputs;
+Recipes O, K and Q, which take every written variable by pointer, so `progress++`
+under the atomic would become `(*progress)++`, an edit of the statement the construct
+governs, and whose step 1 refuses any `#pragma` line; Recipes T, J, AS and PS, whose
+block lies inside a parallel loop body and whose `progress` stays in the caller.
+
+**How:**
+
+1. The block lies in no parallel region of the function and contains no `#pragma omp`
+   line except orphaned `#pragma omp atomic` constructs (Recipe N step 1's last form),
+   each moving whole and unchanged (the `#if` line, the pragma, the `#endif` and the
+   statement it governs), each updating `progress`. No `return`, `goto`, `continue` or
+   `break` leaves the block.
+2. `progress` is a plain local of the caller (Recipe O step 2: not a parameter, a
+   global or a `static`, its address taken nowhere) that the caller reads after the
+   block. The new function returns it. When the block writes it before reading it on
+   every path (`progress=0;` first), the new function declares it as the caller did,
+   without an initialiser; otherwise it is a by-value parameter of the same name and
+   type. Either way the atomic's statement names the new function's own variable by
+   the same name, as Recipe N step 1 requires.
+3. The block may also write `status`, a plain local of the caller in the same sense,
+   by plain assignment or through `&status` passed to a callee that stores no copy of
+   the pointer (checked by reading the callee), and may read it. It goes by pointer
+   to its exact type (`MagickStatusType *status`), written `(*status)` at every use
+   and `status` where the block passed `&status`, Recipe PS step 4's text change.
+4. Every other variable the block writes is a temporary under Recipe E step 4 (written
+   before it is read on every path through the block, and not read after it: a cache
+   view, the loop counter, a count the caller sets again before reading it): the new
+   function declares it with the declaration it had, and the declaration leaves the
+   caller when nothing else there uses it. Every variable the block only reads is a
+   by-value parameter of its exact type. At most four parameters in all, the `status`
+   pointer included; otherwise skip the block.
+5. Cut the block into a new `static` function returning `progress`'s exact type,
+   directly above the caller (below a macro run Recipe H hoisted that it uses, H step
+   5), ending with `return(progress);`. Nothing else in the text changes.
+6. Where the block stood write `progress=Helper(...);`, passing `&status` for the
+   pointer, and check every argument against its parameter by reading.
+
+**Before:**
+
+```c
+  status=MagickTrue;
+  count=0;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const ClassifyCountInputs
+      inputs = { image, image_view, head, exception };
+
+    if (CountClassifyRow(&inputs,y,&count) == MagickFalse)
+      break;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ReportClassifyProgress(image,SegmentImageTag,progress,&status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+```
+
+**After:**
+
+```c
+static MagickOffsetType CountClassifyPixels(Image *image,Cluster *head,
+  MagickStatusType *status,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    count,
+    y;
+
+  count=0;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ...
+        progress++;
+        ReportClassifyProgress(image,SegmentImageTag,progress,status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  return(progress);
+}
+...
+  status=MagickTrue;
+  progress=CountClassifyPixels(image,head,&status,exception);
+```
+
+**Careful:**
+
+- The orphaned atomic binds at run time to the innermost parallel region enclosing the
+  thread that executes it, or to none, whichever function it is written in (Recipe N's
+  *Careful*). The new function runs at the point where the block stood, on the same
+  thread, so the construct binds as before; its statement is unchanged and updates the
+  new function's `progress`, which no other thread can reach unless the caller's could:
+  the block lies in no region of the caller, so the caller's local was the executing
+  thread's own.
+- `progress` leaves through the return value: on return the caller's variable gets the
+  value the block's last write left, at the point where the block ended, and nothing
+  reads it in between. A by-value `progress` (step 2) carries in the value the block
+  read first.
+- While the new function runs, `status` is the caller's object reached through one
+  pointer; every write lands in it at the same point, and every read sees what the
+  block would have seen. The callee that received `&status` receives the same address.
+- A count or cache view the caller sets again before reading it (step 4) is not
+  returned: its last value was never read after the block.
+- The oracle builds without OpenMP and cannot see the binding; check steps 1 and 2 by
+  reading.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new
+function).
+
+**Provenance:** 2026-11-05, from `segment.c`'s `Classify` (campaign A, W14 lane a): after
+Recipes H, I and N had moved its cluster forming and its parallel pass out, the
+sequential counting pass held the function's last *Complex Method* (cc 9) and *Large
+Method* (90 lines); it writes `progress` and `status`, which the parallel pass reads, and
+holds the orphaned atomic. A probe of the pass as `CountClassifyPixels`: 6.67 to 7.01,
+`Classify` leaving both findings, no finding on the helper. Added by Claude Code (Claude
+Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -7237,3 +7382,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | LB | Step 1: the body of a Recipe PS step 7 helper (the parallel loop's whole body, called once per iteration with the shared `status`'s address) counts as the parallel loop body for the parallel-loop-body form; a block in it passes `status` on and may take the helper's own `const Name *name` unchanged (Recipe N step 2's pass-through). *Careful* gives the argument. Still eight steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): `RotateTileRow270`'s tile loop body ends the tile loop through `break;` on a failed fetch; left in place it is reported as *Code Duplication* with the 90-degree helper (7.58 in a probe); as an LB helper the chain reaches 10.00 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | HC | Step 3: a callee of a construct's statement that may take another lock (the pixel cache's `file_semaphore`, taken by `SyncCacheViewAuthenticPixels` on a disk cache) is allowed, since the construct moves whole and unchanged and the thread takes the same locks in the same order and nesting; a function entering a critical of the same name, or `omp_set_lock` on a lock the caller holds, stays refused. *Careful* gives the argument. Still six steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree critical governs the row sync, whose `WritePixelCachePixels` locks `file_semaphore` for disk and distributed caches; step 3 as written refused every such callee | mandate (2026-10-24) |
 | 2026-11-05 | NEW | PD | Name a Parameter-or-Default Selection: the whole right-hand side `(n >= k) ? values[k-1] : d` of an assignment, at three or more sites of one file, becomes a call of one `static inline` function taking `n`, `values`, `k` and `d`; oracle evidence (the object code is not byte-identical) | `statistic-function.c`'s three case helpers (campaign A, W14 lane d): twelve parameter defaults held *Overall Code Complexity*; a probe 9.09 to 9.68 | mandate (2026-10-24) |
+| 2026-11-05 | NEW | RP | Extract Progress Loop Returning the Progress: a sequential pass whose progress block holds an orphaned `#pragma omp atomic` `progress++` (moving whole and unchanged, Recipe N step 1) and which may clear `status` moves into a `static` function that returns `progress` (declared there, or by value) and takes `status` by pointer (`(*status)`, PS step 4's text); other writes are Recipe E step 4 temporaries; at most four parameters. *Careful* gives the binding and return arguments | `segment.c`'s `Classify` (campaign A, W14 lane a): after H, I and N its sequential counting pass, writing `progress` and `status` that the parallel pass reads, held the last *Complex Method* (cc 9) and *Large Method* (90 lines); E, N, O, K and Q refuse it (second written variable, or `(*progress)++` under the atomic). A probe: 6.67 to 7.01, no finding on the helper | mandate (2026-10-24) |
