@@ -1779,6 +1779,94 @@ static void SetPolynomialProgress(const Image *images,const Image *image,
     (*status)=MagickFalse;
 }
 
+typedef struct _PolynomialLine
+{
+  Image
+    *image;
+
+  const Image
+    *images;
+
+  CacheView
+    *polynomial_view;
+
+  PixelChannels
+    **magick_restrict polynomial_pixels;
+
+  int
+    id;
+
+  size_t
+    number_images,
+    number_terms;
+
+  const double
+    *terms;
+
+  ExceptionInfo
+    *exception;
+} PolynomialLine;
+
+static MagickBooleanType PolynomialImageLine(const PolynomialLine *line,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = line->image;
+
+  const Image
+    *const images = line->images;
+
+  CacheView
+    *const polynomial_view = line->polynomial_view;
+
+  PixelChannels
+    **magick_restrict const polynomial_pixels = line->polynomial_pixels;
+
+  const int
+    id = line->id;
+
+  const size_t
+    number_images = line->number_images,
+    number_terms = line->number_terms;
+
+  const double
+    *const terms = line->terms;
+
+  ExceptionInfo
+    *const exception = line->exception;
+
+  PixelChannels
+    *polynomial_pixel;
+
+  PolynomialRows
+    rows;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(polynomial_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  polynomial_pixel=polynomial_pixels[id];
+  ClearPolynomialPixels(image,polynomial_pixel);
+  rows.image=image;
+  rows.images=images;
+  rows.number_images=number_images;
+  rows.number_terms=number_terms;
+  rows.terms=terms;
+  rows.y=y;
+  AccumulatePolynomialImages(&rows,polynomial_pixel,exception);
+  SetPolynomialPixels(image,polynomial_pixel,q);
+  SyncEvaluateView(polynomial_view,exception,status);
+  return(MagickTrue);
+}
+
 MagickExport Image *PolynomialImage(const Image *images,
   const size_t number_terms,const double *terms,ExceptionInfo *exception)
 {
@@ -1829,35 +1917,12 @@ MagickExport Image *PolynomialImage(const Image *images,
     const int
       id = GetOpenMPThreadId();
 
-    PixelChannels
-      *polynomial_pixel;
+    const PolynomialLine
+      line = { image, images, polynomial_view, polynomial_pixels, id,
+        number_images, number_terms, terms, exception };
 
-    PolynomialRows
-      rows;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    if (PolynomialImageLine(&line,y,&status) == MagickFalse)
       continue;
-    q=QueueCacheViewAuthenticPixels(polynomial_view,0,y,image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    polynomial_pixel=polynomial_pixels[id];
-    ClearPolynomialPixels(image,polynomial_pixel);
-    rows.image=image;
-    rows.images=images;
-    rows.number_images=number_images;
-    rows.number_terms=number_terms;
-    rows.terms=terms;
-    rows.y=y;
-    AccumulatePolynomialImages(&rows,polynomial_pixel,exception);
-    SetPolynomialPixels(image,polynomial_pixel,q);
-    SyncEvaluateView(polynomial_view,exception,&status);
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
