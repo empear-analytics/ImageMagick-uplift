@@ -983,6 +983,19 @@ static MagickBooleanType AcquirePreviewThumbnail(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType AppendMiddlePreviewTile(const ssize_t i,
+  Image *thumbnail,ExceptionInfo *exception,Image **images)
+{
+  if (i == (NumberTiles/2))
+    {
+      (void) QueryColorCompliance("#dfdfdf",AllCompliance,
+        &thumbnail->matte_color,exception);
+      AppendImageToList(&(*images),thumbnail);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -1056,13 +1069,8 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
     if (AcquirePreviewThumbnail(image,geometry,exception,&thumbnail) ==
         MagickFalse)
       break;
-    if (i == (NumberTiles/2))
-      {
-        (void) QueryColorCompliance("#dfdfdf",AllCompliance,
-          &thumbnail->matte_color,exception);
-        AppendImageToList(&images,thumbnail);
-        continue;
-      }
+    if (AppendMiddlePreviewTile(i,thumbnail,exception,&images) == MagickFalse)
+      continue;
     tile.image=image;
     tile.thumbnail=thumbnail;
     tile.exception=exception;
