@@ -299,12 +299,43 @@ static MagickBooleanType TraceCannyNeighbor(const CannyNeighbor *neighbor,
   return(MagickTrue);
 }
 
-static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
-  const ssize_t y,ExceptionInfo *exception)
+static MagickBooleanType TraceCannyRow(const CannyTrace *trace,
+  ExceptionInfo *exception,const ssize_t v,const CannyTraceTargets *targets)
 {
   Image
     *edge_image = trace->edge_image;
 
+  const CannyInfo
+    *const edge = targets->edge;
+
+  ssize_t
+    u;
+
+  for (u=(-1); u <= 1; u++)
+  {
+    CannyNeighbor
+      neighbor;
+
+    if ((u == 0) && (v == 0))
+      continue;
+    if (IsAuthenticPixel(edge_image,(*edge).x+u,(*edge).y+v) == MagickFalse)
+      continue;
+    /*
+      Not an edge if gradient value is below the lower threshold.
+    */
+    neighbor.trace=trace;
+    neighbor.exception=exception;
+    neighbor.u=u;
+    neighbor.v=v;
+    if (TraceCannyNeighbor(&neighbor,targets) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
+  const ssize_t y,ExceptionInfo *exception)
+{
   MatrixInfo
     *canny_cache = trace->canny_cache;
 
@@ -333,28 +364,8 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
       return(MagickFalse);
     for (v=(-1); v <= 1; v++)
     {
-      ssize_t
-        u;
-
-      for (u=(-1); u <= 1; u++)
-      {
-        CannyNeighbor
-          neighbor;
-
-        if ((u == 0) && (v == 0))
-          continue;
-        if (IsAuthenticPixel(edge_image,edge.x+u,edge.y+v) == MagickFalse)
-          continue;
-        /*
-          Not an edge if gradient value is below the lower threshold.
-        */
-        neighbor.trace=trace;
-        neighbor.exception=exception;
-        neighbor.u=u;
-        neighbor.v=v;
-        if (TraceCannyNeighbor(&neighbor,&targets) == MagickFalse)
-          return(MagickFalse);
-      }
+      if (TraceCannyRow(trace,exception,v,&targets) == MagickFalse)
+        return(MagickFalse);
     }
   }
   return(MagickTrue);
