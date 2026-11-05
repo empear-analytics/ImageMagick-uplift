@@ -4445,6 +4445,9 @@ typedef struct _MorphologyStages
   const Image
     *image;
 
+  MorphologyMethod
+    method;
+
   KernelInfo
     *rflt_kernel;
 
@@ -4563,6 +4566,22 @@ static void ReportStageChanges(const MorphologyStages *stages,
     (void) FormatLocaleFile(stderr, "   Total %.17g",(double) kernel_changed);
   if (stages->verbose != MagickFalse && stage_loop < stages->stage_limit)
     (void) FormatLocaleFile(stderr, "\n"); /* add end-of-line before looping */
+}
+
+static void ReportMorphologyStage(const MorphologyStages *stages,
+  const MorphologyMethod primitive,const size_t stage_loop)
+{
+  if (stages->verbose != MagickFalse) {
+    MorphologyStage
+      stage;
+
+    stage.method=stages->method;
+    stage.primitive=primitive;
+    stage.method_loop=stages->method_loop;
+    stage.stage_loop=stage_loop;
+    stage.stage_limit=stages->stage_limit;
+    FormatMorphologyStage(stages->v_info,&stage);
+  }
 }
 
 MagickPrivate Image *MorphologyApply(const Image *image,
@@ -4747,6 +4766,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
         stages;
 
       stages.image=image;
+      stages.method=method;
       stages.rflt_kernel=rflt_kernel;
       stages.bias=bias;
       stages.verbose=verbose;
@@ -4787,17 +4807,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
         assert( this_kernel != (KernelInfo *) NULL );
 
         /* Extra information for debugging compound operations */
-        if (verbose != MagickFalse) {
-          MorphologyStage
-            stage;
-
-          stage.method=method;
-          stage.primitive=primitive;
-          stage.method_loop=method_loop;
-          stage.stage_loop=stage_loop;
-          stage.stage_limit=stage_limit;
-          FormatMorphologyStage(v_info,&stage);
-        }
+        ReportMorphologyStage(&stages,primitive,stage_loop);
 
         /* Loop 4: Iterate the kernel with primitive */
         if (IterateMorphologyKernel(&stages,primitive,this_kernel,
