@@ -151,6 +151,12 @@ typedef struct _FunctionArguments
 %
 */
 
+static double GetFunctionParameter(const size_t number_parameters,
+  const double *parameters,const size_t index,const double default_value)
+{
+  return((number_parameters >= index) ? parameters[index-1] : default_value);
+}
+
 static double ApplySinusoidFunction(Quantum pixel,
   const size_t number_parameters,const double *parameters)
 {
@@ -164,10 +170,10 @@ static double ApplySinusoidFunction(Quantum pixel,
   /*
     Sinusoid: frequency, phase, amplitude, bias.
   */
-  frequency=(number_parameters >= 1) ? parameters[0] : 1.0;
-  phase=(number_parameters >= 2) ? parameters[1] : 0.0;
-  amplitude=(number_parameters >= 3) ? parameters[2] : 0.5;
-  bias=(number_parameters >= 4) ? parameters[3] : 0.5;
+  frequency=GetFunctionParameter(number_parameters,parameters,1,1.0);
+  phase=GetFunctionParameter(number_parameters,parameters,2,0.0);
+  amplitude=GetFunctionParameter(number_parameters,parameters,3,0.5);
+  bias=GetFunctionParameter(number_parameters,parameters,4,0.5);
   result=(double) QuantumRange*(amplitude*sin((double) (2.0*
     MagickPI*(frequency*QuantumScale*(double) pixel+phase/360.0)))+bias);
   return(result);
@@ -187,10 +193,10 @@ static double ApplyArcsinFunction(Quantum pixel,
     Arcsin (pegged at range limits for invalid results): width, center,
     range, and bias.
   */
-  width=(number_parameters >= 1) ? parameters[0] : 1.0;
-  center=(number_parameters >= 2) ? parameters[1] : 0.5;
-  range=(number_parameters >= 3) ? parameters[2] : 1.0;
-  bias=(number_parameters >= 4) ? parameters[3] : 0.5;
+  width=GetFunctionParameter(number_parameters,parameters,1,1.0);
+  center=GetFunctionParameter(number_parameters,parameters,2,0.5);
+  range=GetFunctionParameter(number_parameters,parameters,3,1.0);
+  bias=GetFunctionParameter(number_parameters,parameters,4,0.5);
   result=2.0*MagickSafeReciprocal(width)*(QuantumScale*(double) pixel-
     center);
   if (result <= -1.0)
@@ -217,10 +223,10 @@ static double ApplyArctanFunction(Quantum pixel,
   /*
     Arctan: slope, center, range, and bias.
   */
-  slope=(number_parameters >= 1) ? parameters[0] : 1.0;
-  center=(number_parameters >= 2) ? parameters[1] : 0.5;
-  range=(number_parameters >= 3) ? parameters[2] : 1.0;
-  bias=(number_parameters >= 4) ? parameters[3] : 0.5;
+  slope=GetFunctionParameter(number_parameters,parameters,1,1.0);
+  center=GetFunctionParameter(number_parameters,parameters,2,0.5);
+  range=GetFunctionParameter(number_parameters,parameters,3,1.0);
+  bias=GetFunctionParameter(number_parameters,parameters,4,0.5);
   result=MagickPI*slope*(QuantumScale*(double) pixel-center);
   result=(double) QuantumRange*(range/MagickPI*atan((double) result)+bias);
   return(result);
