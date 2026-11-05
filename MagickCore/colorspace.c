@@ -2864,12 +2864,56 @@ static MagickBooleanType GrayTosRGB(Image *image,
   return(FinishColorspace(&finish,sRGBColorspace,status));
 }
 
-static MagickBooleanType TransformsRGBImage(Image *image,
-  ExceptionInfo *exception)
+static MagickBooleanType LogOrLinearRGBTosRGB(Image *image,
+  MagickBooleanType status,MagickOffsetType progress,ExceptionInfo *exception)
 {
   CacheView
     *image_view;
 
+  ssize_t
+    y;
+
+  switch (image->colorspace)
+  {
+    case LogColorspace:
+      return(LogTosRGB(image,status,exception));
+    case RGBColorspace:
+    case scRGBColorspace:
+    {
+      ColorspaceRowInfo
+        finish;
+
+      /*
+        Transform linear RGB to sRGB colorspace.
+      */
+      if (SyncImageToDirectClass(image,exception) == MagickFalse)
+        return(MagickFalse);
+      image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+      #pragma omp parallel for schedule(static) shared(status) \
+        magick_number_threads(image,image,image->rows,2)
+#endif
+      for (y=0; y < (ssize_t) image->rows; y++)
+      {
+        const ColorspaceRowInfo
+          info = { image,image_view,exception };
+
+        TransformLinearRGBRowTosRGB(&info,y,&status);
+      }
+      finish.image=image;
+      finish.image_view=image_view;
+      finish.exception=exception;
+      return(FinishColorspace(&finish,sRGBColorspace,status));
+    }
+    default:
+      break;
+  }
+  return(TransformsRGBByTables(image,status,progress,exception));
+}
+
+static MagickBooleanType TransformsRGBImage(Image *image,
+  ExceptionInfo *exception)
+{
   const char
     *artifact;
 
@@ -2881,9 +2925,6 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 
   MagickOffsetType
     progress;
-
-  ssize_t
-    y;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -2929,38 +2970,8 @@ static MagickBooleanType TransformsRGBImage(Image *image,
     case YPbPrColorspace:
     case YUVColorspace:
       return(GenericTosRGB(image,illuminant,status,exception));
-    case LogColorspace:
-      return(LogTosRGB(image,status,exception));
-    case RGBColorspace:
-    case scRGBColorspace:
-    {
-      ColorspaceRowInfo
-        finish;
-
-      /*
-        Transform linear RGB to sRGB colorspace.
-      */
-      if (SyncImageToDirectClass(image,exception) == MagickFalse)
-        return(MagickFalse);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const ColorspaceRowInfo
-          info = { image,image_view,exception };
-
-        TransformLinearRGBRowTosRGB(&info,y,&status);
-      }
-      finish.image=image;
-      finish.image_view=image_view;
-      finish.exception=exception;
-      return(FinishColorspace(&finish,sRGBColorspace,status));
-    }
     default:
       break;
   }
-  return(TransformsRGBByTables(image,status,progress,exception));
+  return(LogOrLinearRGBTosRGB(image,status,progress,exception));
 }
