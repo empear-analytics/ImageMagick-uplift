@@ -321,3 +321,11 @@ Amendment under the mandate, not yet ruled on: **Recipe SW steps 2 and 3** (8393
 may hold whole parallel loops under N step 1's conditions, and when the tail begins with the fill of an N input
 struct, that struct is shared (the fill stays in the caller, the helper takes `const Name *`). The lane declined
 two higher-scoring groupings (7.37, 7.39) as clone-detector dodging. `layer.c` unchanged.
+
+## Lane d, tenth batch: segment.c 7.02 -> 7.09 (Sonnet, 3 guard-verified commits)
+
+Upstream, possibly a bug, not changed: in `GetImageDynamicThreshold`, `extrema[i]` is allocated with
+`sizeof(**histogram)` (8 bytes per entry) where its element type is `short`; `AcquireSegmentHistograms` uses the
+right size. **Option for the owner:** no oracle case reaches `GetImageDynamicThreshold` (no command-line option
+calls it); a driver case through `imdriver` would let Recipes I, V, W and PC reach the function, which a stub puts
+at about 9.
