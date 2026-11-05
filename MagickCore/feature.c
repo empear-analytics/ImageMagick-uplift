@@ -726,6 +726,14 @@ static MagickBooleanType BlurCannyImage(const Image *image,
   return(MagickTrue);
 }
 
+static void UpdateCannyRange(const double intensity,double *min,double *max)
+{
+  if (intensity < (*min))
+    (*min)=intensity;
+  if (intensity > (*max))
+    (*max)=intensity;
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -847,10 +855,7 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
       #pragma omp critical (MagickCore_CannyEdgeImage)
 #endif
       {
-        if (pixel.intensity < min)
-          min=pixel.intensity;
-        if (pixel.intensity > max)
-          max=pixel.intensity;
+        UpdateCannyRange(pixel.intensity,&min,&max);
       }
       *q=(Quantum) 0;
       q+=(ptrdiff_t) GetPixelChannels(edge_image);
