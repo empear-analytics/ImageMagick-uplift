@@ -403,6 +403,12 @@ static void SyncShearView(CacheView *image_view,ExceptionInfo *exception,
     (*status)=MagickFalse;
 }
 
+typedef enum
+{
+  LEFT,
+  RIGHT
+} ShearDirection;
+
 static MagickBooleanType XShearImage(Image *image,const double degrees,
   const ShearRegion *region,ExceptionInfo *exception)
 {
@@ -415,12 +421,6 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
   const ssize_t
     x_offset = region->x_offset,
     y_offset = region->y_offset;
-
-  typedef enum
-  {
-    LEFT,
-    RIGHT
-  } ShearDirection;
 
   CacheView
     *image_view;
