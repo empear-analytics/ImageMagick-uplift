@@ -1979,6 +1979,17 @@ static MagickBooleanType ShiftWhiteBalanceHead(const WhiteBalanceHead *head,
   return(MagickTrue);
 }
 
+static void ReportWhiteBalanceProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickStatusType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2041,17 +2052,12 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,WhiteBalanceImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportWhiteBalanceProgress(image,WhiteBalanceImageTag,progress,
+          &status);
       }
   }
   image_view=DestroyCacheView(image_view);
