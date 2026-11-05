@@ -1310,6 +1310,27 @@ static MagickBooleanType sRGBTransformLogOrLinear(
   return(sRGBTransformByTables(table,image,status,exception));
 }
 
+static MagickBooleanType sRGBTransformCMYKOrGray(
+  const sRGBTableInput *table,Image *image,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  const ColorspaceType
+    colorspace = table->colorspace;
+
+  switch (colorspace)
+  {
+    case CMYKColorspace:
+      return(sRGBToCMYK(image,colorspace,status,exception));
+    case LinearGRAYColorspace:
+      return(sRGBToLinearGray(image,colorspace,status,exception));
+    case GRAYColorspace:
+      return(sRGBToGray(image,colorspace,status,exception));
+    default:
+      break;
+  }
+  return(sRGBTransformLogOrLinear(table,image,status,exception));
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1340,12 +1361,6 @@ static MagickBooleanType sRGBTransformImage(Image *image,
   progress=0;
   switch (colorspace)
   {
-    case CMYKColorspace:
-      return(sRGBToCMYK(image,colorspace,status,exception));
-    case LinearGRAYColorspace:
-      return(sRGBToLinearGray(image,colorspace,status,exception));
-    case GRAYColorspace:
-      return(sRGBToGray(image,colorspace,status,exception));
     case CMYColorspace:
     case Adobe98Colorspace:
     case CAT02LMSColorspace:
@@ -1387,7 +1402,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
   }
   table.colorspace=colorspace;
   table.progress=progress;
-  return(sRGBTransformLogOrLinear(&table,image,status,exception));
+  return(sRGBTransformCMYKOrGray(&table,image,status,exception));
 }
 
 /*
