@@ -525,6 +525,78 @@ static void RotateTileRow90(const RotateTiles *tiles,const ssize_t tile_y,
   UpdateRotateTileProgress(image,tile_height,status,progress);
 }
 
+typedef struct _RotateRowInfo
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  Image
+    *rotate_image;
+
+  CacheView
+    *rotate_view;
+
+  ExceptionInfo
+    *exception;
+} RotateRowInfo;
+
+static void RotateRow180(const RotateRowInfo *row,const ssize_t y,
+  MagickBooleanType *status,MagickOffsetType *progress)
+{
+  const Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  Image
+    *rotate_image = row->rotate_image;
+
+  CacheView
+    *rotate_view = row->rotate_view;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  MagickBooleanType
+    sync;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(rotate_view,0,(ssize_t) image->rows-y-1,
+    image->columns,1,exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  q+=(ptrdiff_t) GetPixelChannels(rotate_image)*image->columns;
+  ReverseRotatedRow(image,rotate_image,p,q);
+  sync=SyncCacheViewAuthenticPixels(rotate_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,RotateImageTag,(*progress)++,
+        image->rows);
+      if (proceed == MagickFalse)
+        (*status)=MagickFalse;
+    }
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -611,40 +683,10 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        const Quantum
-          *magick_restrict p;
+        const RotateRowInfo row = { image, image_view, rotate_image,
+          rotate_view, exception };
 
-        MagickBooleanType
-          sync;
-
-        Quantum
-          *magick_restrict q;
-
-        if (status == MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-        q=QueueCacheViewAuthenticPixels(rotate_view,0,(ssize_t) image->rows-y-1,
-          image->columns,1,exception);
-        if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
-        q+=(ptrdiff_t) GetPixelChannels(rotate_image)*image->columns;
-        ReverseRotatedRow(image,rotate_image,p,q);
-        sync=SyncCacheViewAuthenticPixels(rotate_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            MagickBooleanType
-              proceed;
-
-            proceed=SetImageProgress(image,RotateImageTag,progress++,
-              image->rows);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
-          }
+        RotateRow180(&row,y,&status,&progress);
       }
       (void) SetImageProgress(image,RotateImageTag,(MagickOffsetType)
         image->rows-1,image->rows);
