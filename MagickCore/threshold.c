@@ -1505,6 +1505,15 @@ static inline MagickBooleanType IsThresholdMapNameCharacter(const char *p)
     (*p != '\0')) ? MagickTrue : MagickFalse);
 }
 
+static void FillDitherLevels(const char *token,double *levels)
+{
+  ssize_t
+    i;
+
+  for (i=0; (i < MaxPixelChannels); i++)
+    levels[i]=StringToDouble(token,(char **) NULL);
+}
+
 static void ParseDitherLevels(const char *p,double *levels)
 {
   char
@@ -1514,8 +1523,7 @@ static void ParseDitherLevels(const char *p,double *levels)
     i;
 
   (void) GetNextToken(p,&p,MagickPathExtent,token);
-  for (i=0; (i < MaxPixelChannels); i++)
-    levels[i]=StringToDouble(token,(char **) NULL);
+  FillDitherLevels(token,levels);
   for (i=0; (*p != '\0') && (i < MaxPixelChannels); i++)
   {
     (void) GetNextToken(p,&p,MagickPathExtent,token);
