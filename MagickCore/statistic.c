@@ -1619,11 +1619,11 @@ static void AccumulatePolynomialImages(const PolynomialRows *rows,
   }
 }
 
+#define PolynomialImageTag  "Polynomial/Image"
+
 MagickExport Image *PolynomialImage(const Image *images,
   const size_t number_terms,const double *terms,ExceptionInfo *exception)
 {
-#define PolynomialImageTag  "Polynomial/Image"
-
   CacheView
     *polynomial_view;
 
