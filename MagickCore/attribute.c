@@ -1396,6 +1396,48 @@ static void SetPaletteImageType(const SetImageTypeInput *tile,
   }
 }
 
+static void SetGrayImageType(const SetImageTypeInput *tile,
+  MagickBooleanType *status)
+{
+  Image
+    *const image = tile->image;
+
+  ImageInfo
+    *const image_info = tile->image_info;
+
+  const ImageType
+    type = tile->type;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  switch (type)
+  {
+    case BilevelType:
+    {
+      (*status)=SetImageTypeBilevel(image,image_info,exception);
+      break;
+    }
+    case GrayscaleType:
+    {
+      (*status)=TransformImageToGray(image,(*status),exception);
+      image->alpha_trait=UndefinedPixelTrait;
+      break;
+    }
+    case GrayscaleAlphaType:
+    {
+      (*status)=TransformImageToGray(image,(*status),exception);
+      SetOpaqueAlphaIfMissing(image,exception);
+      break;
+    }
+    default:
+    {
+      SetPaletteImageType(tile,status);
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   ExceptionInfo *exception)
 {
@@ -1420,26 +1462,9 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   tile.exception=exception;
   switch (type)
   {
-    case BilevelType:
-    {
-      status=SetImageTypeBilevel(image,image_info,exception);
-      break;
-    }
-    case GrayscaleType:
-    {
-      status=TransformImageToGray(image,status,exception);
-      image->alpha_trait=UndefinedPixelTrait;
-      break;
-    }
-    case GrayscaleAlphaType:
-    {
-      status=TransformImageToGray(image,status,exception);
-      SetOpaqueAlphaIfMissing(image,exception);
-      break;
-    }
     default:
     {
-      SetPaletteImageType(&tile,&status);
+      SetGrayImageType(&tile,&status);
       break;
     }
     case OptimizeType:
