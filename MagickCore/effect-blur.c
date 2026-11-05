@@ -410,6 +410,22 @@ static MagickBooleanType AcquireAdaptiveBlurKernels(double **kernel,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireAdaptiveBlurKernelSet(double ***kernel,
+  const size_t width,const double sigma)
+{
+  *kernel=(double **) MagickAssumeAligned(AcquireAlignedMemory((size_t) width,
+    sizeof(**kernel)));
+  if (*kernel == (double **) NULL)
+    return(MagickFalse);
+  (void) memset(*kernel,0,(size_t) width*sizeof(**kernel));
+  if (AcquireAdaptiveBlurKernels(*kernel,width,sigma) == MagickFalse)
+    {
+      *kernel=(double **) RelinquishAlignedMemory(*kernel);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 typedef struct _AdaptiveBlurRow
 {
   const Image
@@ -683,18 +699,8 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
     Create a set of kernels from maximum (radius,sigma) to minimum.
   */
   width=GetOptimalKernelWidth2D(radius,sigma);
-  kernel=(double **) MagickAssumeAligned(AcquireAlignedMemory((size_t) width,
-    sizeof(*kernel)));
-  if (kernel == (double **) NULL)
+  if (AcquireAdaptiveBlurKernelSet(&kernel,width,sigma) == MagickFalse)
     {
-      edge_image=DestroyImage(edge_image);
-      blur_image=DestroyImage(blur_image);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  (void) memset(kernel,0,(size_t) width*sizeof(*kernel));
-  if (AcquireAdaptiveBlurKernels(kernel,width,sigma) == MagickFalse)
-    {
-      kernel=(double **) RelinquishAlignedMemory(kernel);
       edge_image=DestroyImage(edge_image);
       blur_image=DestroyImage(blur_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
