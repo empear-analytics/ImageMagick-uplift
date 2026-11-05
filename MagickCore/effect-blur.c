@@ -931,17 +931,10 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) sharp_image->rows; y++)
   {
-    AdaptiveBlurRow
-      row;
+    const AdaptiveBlurRow
+      row = { image, sharp_image, edge_image, image_view, kernel, width, y,
+        exception };
 
-    row.image=image;
-    row.blur_image=sharp_image;
-    row.edge_image=edge_image;
-    row.image_view=image_view;
-    row.kernel=kernel;
-    row.width=width;
-    row.y=y;
-    row.exception=exception;
     if (SharpenAdaptiveLine(&row,edge_view,sharp_view,&status) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
