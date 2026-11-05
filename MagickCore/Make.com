@@ -103,6 +103,7 @@ $call Make property.c
 $call Make PreRvIcccm.c
 $call Make profile.c
 $call Make quantize.c
+$call Make quantize-error.c
 $call Make quantize-info.c
 $call Make quantize-posterize.c
 $call Make quantum.c

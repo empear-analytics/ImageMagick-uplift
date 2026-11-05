@@ -65,6 +65,7 @@ if ( ! GetOptions(
 	 'pixel-wand.c',
 	 'profile.c',
 	 'quantize.c',
+	 'quantize-error.c',
 	 'quantize-info.c',
 	 'quantize-posterize.c',
 	 'registry.c',
