@@ -674,6 +674,16 @@ static void ScaleEvaluateProduct(const Image *image,
   }
 }
 
+static void DivideEvaluatePixel(const Image *image,const size_t number_images,
+  PixelChannels *evaluate_pixel,const ssize_t x)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    evaluate_pixel[x].channel[i]/=(double) number_images;
+}
+
 static void NormalizeEvaluatePixels(const Image *image,
   const MagickEvaluateOperator op,const size_t number_images,
   PixelChannels *evaluate_pixel)
@@ -688,8 +698,7 @@ static void NormalizeEvaluatePixels(const Image *image,
     {
       case MeanEvaluateOperator:
       {
-        for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          evaluate_pixel[x].channel[i]/=(double) number_images;
+        DivideEvaluatePixel(image,number_images,evaluate_pixel,x);
         break;
       }
       case MultiplyEvaluateOperator:
