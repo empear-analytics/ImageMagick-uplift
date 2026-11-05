@@ -351,6 +351,15 @@ static void ApplyGammaHueSaturationPreview(const PreviewTile *tile,
   }
 }
 
+static void ThresholdPreviewTile(Image *thumbnail,const double percentage,
+  char *label,ExceptionInfo *exception)
+{
+  (void) BilevelImage(thumbnail,(double) (percentage*((double)
+    QuantumRange+1.0))/100.0,exception);
+  (void) FormatLocaleString(label,MagickPathExtent,"threshold %g",
+    (double) (percentage*((double) QuantumRange+1.0))/100.0);
+}
+
 static void ApplyBrightnessSpiffThresholdPreview(const PreviewTile *tile,
   Image **preview_image,double *gamma)
 {
@@ -399,10 +408,7 @@ static void ApplyBrightnessSpiffThresholdPreview(const PreviewTile *tile,
       (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
       if ((*preview_image) == (Image *) NULL)
         break;
-      (void) BilevelImage(thumbnail,(double) (percentage*((double)
-        QuantumRange+1.0))/100.0,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"threshold %g",
-        (double) (percentage*((double) QuantumRange+1.0))/100.0);
+      ThresholdPreviewTile(thumbnail,percentage,label,exception);
       break;
     }
     default:
@@ -411,6 +417,15 @@ static void ApplyBrightnessSpiffThresholdPreview(const PreviewTile *tile,
       break;
     }
   }
+}
+
+static void SolarizePreviewTile(Image **preview_image,const double percentage,
+  char *label,ExceptionInfo *exception)
+{
+  (void) SolarizeImage((*preview_image),(double) QuantumRange*percentage/
+    100.0,exception);
+  (void) FormatLocaleString(label,MagickPathExtent,"solarize %g",
+    ((double) QuantumRange*percentage)/100.0);
 }
 
 static void ApplyDullSolarizeEdgePreview(const PreviewTile *tile,
@@ -456,10 +471,7 @@ static void ApplyDullSolarizeEdgePreview(const PreviewTile *tile,
       (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
       if ((*preview_image) == (Image *) NULL)
         break;
-      (void) SolarizeImage((*preview_image),(double) QuantumRange*percentage/
-        100.0,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,"solarize %g",
-        ((double) QuantumRange*percentage)/100.0);
+      SolarizePreviewTile(preview_image,percentage,label,exception);
       break;
     }
     case EdgeDetectPreview:
@@ -474,6 +486,41 @@ static void ApplyDullSolarizeEdgePreview(const PreviewTile *tile,
       break;
     }
   }
+}
+
+static void WriteJpegQualityPreview(ImageInfo *preview_info,
+  Image **preview_image,ExceptionInfo *exception)
+{
+  char
+    filename[MagickPathExtent];
+
+  int
+    file;
+
+  file=AcquireUniqueFileResource(filename);
+  if (file != -1)
+    file=close_utf8(file)-1;
+  (void) FormatLocaleString((*preview_image)->filename,MagickPathExtent,
+    "jpeg:%s",filename);
+  (*preview_image)=WriteAndReadQualityPreview(preview_info,(*preview_image),
+    exception);
+  (void) RelinquishUniqueFileResource((*preview_image)->filename);
+}
+
+static void RaisePreviewTile(const ssize_t i,Image **preview_image,
+  char *label,ExceptionInfo *exception)
+{
+  RectangleInfo
+    raise;
+
+  raise.width=(size_t) (2*i+2);
+  raise.height=(size_t) (2*i+2);
+  raise.x=(i-1)/2;
+  raise.y=(i-1)/2;
+  (void) RaiseImage((*preview_image),&raise,MagickTrue,exception);
+  (void) FormatLocaleString(label,MagickPathExtent,
+    "raise %.17gx%.17g%+.20g%+.20g",(double) raise.width,(double)
+    raise.height,(double) raise.x,(double) raise.y);
 }
 
 static void ApplyRaiseJpegPreview(const PreviewTile *tile,Image **preview_image,
@@ -505,44 +552,21 @@ static void ApplyRaiseJpegPreview(const PreviewTile *tile,Image **preview_image,
   {
     case RaisePreview:
     {
-      RectangleInfo
-        raise;
-
       (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
       if ((*preview_image) == (Image *) NULL)
         break;
-      raise.width=(size_t) (2*i+2);
-      raise.height=(size_t) (2*i+2);
-      raise.x=(i-1)/2;
-      raise.y=(i-1)/2;
-      (void) RaiseImage((*preview_image),&raise,MagickTrue,exception);
-      (void) FormatLocaleString(label,MagickPathExtent,
-        "raise %.17gx%.17g%+.20g%+.20g",(double) raise.width,(double)
-        raise.height,(double) raise.x,(double) raise.y);
+      RaisePreviewTile(i,preview_image,label,exception);
       break;
     }
     case JPEGPreview:
     {
-      char
-        filename[MagickPathExtent];
-
-      int
-        file;
-
       (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
       if ((*preview_image) == (Image *) NULL)
         break;
       preview_info->quality=(size_t) percentage;
       (void) FormatLocaleString(factor,MagickPathExtent,"%.17g",(double)
         preview_info->quality);
-      file=AcquireUniqueFileResource(filename);
-      if (file != -1)
-        file=close_utf8(file)-1;
-      (void) FormatLocaleString((*preview_image)->filename,MagickPathExtent,
-        "jpeg:%s",filename);
-      (*preview_image)=WriteAndReadQualityPreview(preview_info,(*preview_image),
-        exception);
-      (void) RelinquishUniqueFileResource((*preview_image)->filename);
+      WriteJpegQualityPreview(preview_info,preview_image,exception);
       FormatQualityLabel(label,factor,(*preview_image),thumbnail);
       break;
     }
@@ -777,20 +801,392 @@ static void ApplyWavePreview(const PreviewTile *tile,Image **preview_image,
   }
 }
 
-MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
-  ExceptionInfo *exception)
-{
 #define NumberTiles  9
 #define PreviewImageTag  "Preview/Image"
 #define DefaultPreviewGeometry  "204x204+10+10"
+
+typedef struct _PreviewTargets
+{
+  Image
+    **preview_image;
+
+  double
+    *degrees,
+    *gamma;
+
+  size_t
+    *colors;
+
+  QuantizeInfo
+    *quantize_info;
+} PreviewTargets;
+
+static void ApplyRollQuantizePreview(const PreviewTile *tile,
+  const PreviewTargets *targets)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const ssize_t
+    i = tile->i;
+
+  Image
+    **const preview_image = targets->preview_image;
+
+  double
+    *const degrees = targets->degrees,
+    *const gamma = targets->gamma;
+
+  size_t
+    *const colors = targets->colors;
+
+  QuantizeInfo
+    *const quantize_info = targets->quantize_info;
+
+  ssize_t
+    x = 0,
+    y = 0;
+
+  switch (preview)
+  {
+    case RollPreview:
+    {
+      x=((i+1)*(ssize_t) thumbnail->columns)/NumberTiles;
+      y=((i+1)*(ssize_t) thumbnail->rows)/NumberTiles;
+      (*preview_image)=RollImage(thumbnail,x,y,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"roll %+.20gx%+.20g",
+        (double) x,(double) y);
+      break;
+    }
+    default:
+    {
+      ApplyWavePreview(tile,&(*preview_image),&(*degrees),&(*gamma));
+      break;
+    }
+    case GrayscalePreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (*colors)<<=1;
+      (*quantize_info).number_colors=(*colors);
+      (*quantize_info).colorspace=GRAYColorspace;
+      (void) QuantizeImage(&(*quantize_info),(*preview_image),exception);
+      (void) FormatLocaleString(label,MagickPathExtent,
+        "-colorspace gray -colors %.17g",(double) (*colors));
+      break;
+    }
+    case QuantizePreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (*colors)<<=1;
+      (*quantize_info).number_colors=(*colors);
+      (void) QuantizeImage(&(*quantize_info),(*preview_image),exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"colors %.17g",
+        (double) (*colors));
+      break;
+    }
+  }
+}
+
+static void SegmentPreviewTile(double *threshold,Image **preview_image,
+  char *label,ExceptionInfo *exception)
+{
+  (*threshold)+=0.4;
+  (void) SegmentImage((*preview_image),sRGBColorspace,MagickFalse,
+    (*threshold),(*threshold),exception);
+  (void) FormatLocaleString(label,MagickPathExtent,"segment %gx%g",
+    (*threshold),(*threshold));
+}
+
+typedef struct _PreviewSelection
+{
+  PreviewType
+    preview;
+
+  ssize_t
+    i;
+
+  char
+    *label;
+
+  ExceptionInfo
+    *exception;
+
+  PreviewTile
+    tile;
+
+  PreviewTargets
+    targets;
+} PreviewSelection;
+
+static void ApplyDespeckleSegmentPreview(const PreviewSelection *selection,
+  Image **thumbnail,Image **preview_image,double *threshold)
+{
+  const PreviewType
+    preview = selection->preview;
+
+  const ssize_t
+    i = selection->i;
+
+  char
+    *const label = selection->label;
+
+  ExceptionInfo
+    *const exception = selection->exception;
+
+  const PreviewTile
+    tile = selection->tile;
+
+  const PreviewTargets
+    targets = selection->targets;
+
+  switch (preview)
+  {
+    default:
+    {
+      ApplyRollQuantizePreview(&tile,&targets);
+      break;
+    }
+    case DespecklePreview:
+    {
+      (*thumbnail)=DespeckleThumbnail((*thumbnail),i,exception);
+      (*preview_image)=DespeckleImage((*thumbnail),exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) FormatLocaleString(label,MagickPathExtent,"despeckle (%.17g)",
+        (double) i+1);
+      break;
+    }
+    case SegmentPreview:
+    {
+      (*preview_image)=CloneImage((*thumbnail),0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      SegmentPreviewTile(threshold,preview_image,label,exception);
+      break;
+    }
+  }
+}
+
+static Image *MontagePreviewTiles(const Image *image,ImageInfo *preview_info,
+  Image *images,ExceptionInfo *exception)
+{
+  Image
+    *montage_image;
+
+  MontageInfo
+    *montage_info;
+
+  montage_info=CloneMontageInfo(preview_info,(MontageInfo *) NULL);
+  (void) CopyMagickString(montage_info->filename,image->filename,
+    MagickPathExtent);
+  montage_info->shadow=MagickTrue;
+  (void) CloneString(&montage_info->tile,"3x3");
+  (void) CloneString(&montage_info->geometry,DefaultPreviewGeometry);
+  (void) CloneString(&montage_info->frame,DefaultTileFrame);
+  montage_image=MontageImages(images,montage_info,exception);
+  montage_info=DestroyMontageInfo(montage_info);
+  return(montage_image);
+}
+
+static MagickBooleanType AcquirePreviewThumbnail(const Image *image,
+  const RectangleInfo geometry,ExceptionInfo *exception,Image **thumbnail)
+{
+  (*thumbnail)=ThumbnailImage(image,geometry.width,geometry.height,exception);
+  if ((*thumbnail) == (Image *) NULL)
+    return(MagickFalse);
+  (void) SetImageProgressMonitor((*thumbnail),(MagickProgressMonitor) NULL,
+    (void *) NULL);
+  (void) SetImageProperty((*thumbnail),"label",DefaultTileLabel,exception);
+  return(MagickTrue);
+}
+
+static MagickBooleanType AppendMiddlePreviewTile(const ssize_t i,
+  Image *thumbnail,ExceptionInfo *exception,Image **images)
+{
+  if (i == (NumberTiles/2))
+    {
+      (void) QueryColorCompliance("#dfdfdf",AllCompliance,
+        &thumbnail->matte_color,exception);
+      AppendImageToList(&(*images),thumbnail);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static Image *AppendPreviewTile(Image *images,Image *preview_image,
+  char *label,ExceptionInfo *exception)
+{
+  preview_image->alpha_trait=UndefinedPixelTrait;
+  (void) DeleteImageProperty(preview_image,"label");
+  (void) SetImageProperty(preview_image,"label",label,exception);
+  AppendImageToList(&images,preview_image);
+  return(images);
+}
+
+typedef struct _PreviewTileInput
+{
+  const Image
+    *image;
+
+  Image
+    *thumbnail;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *factor,
+    *label;
+
+  ImageInfo
+    *preview_info;
+
+  PreviewType
+    preview;
+
+  ssize_t
+    i;
+
+  PreviewTargets
+    targets;
+} PreviewTileInput;
+
+typedef struct _PreviewTileTargets
+{
+  Image
+    **preview_image;
+
+  double
+    *threshold,
+    *percentage,
+    *radius,
+    *sigma;
+
+  Image
+    **images;
+} PreviewTileTargets;
+
+static MagickBooleanType RenderPreviewTile(const PreviewTileInput *input,
+  const PreviewTileTargets *tile_targets)
+{
+  Image
+    *thumbnail = input->thumbnail;
+
+  Image
+    **const preview_image = tile_targets->preview_image,
+    **const images = tile_targets->images;
+
+  double
+    *const threshold = tile_targets->threshold,
+    *const percentage = tile_targets->percentage,
+    *const radius = tile_targets->radius,
+    *const sigma = tile_targets->sigma;
+
+  MagickBooleanType
+    proceed;
+
+  PreviewSelection
+    selection;
+
+  PreviewTile
+    tile;
+
+  tile.image=input->image;
+  tile.thumbnail=thumbnail;
+  tile.exception=input->exception;
+  tile.factor=input->factor;
+  tile.label=input->label;
+  tile.preview_info=input->preview_info;
+  tile.preview=input->preview;
+  tile.i=input->i;
+  tile.percentage=(*percentage);
+  tile.radius=(*radius);
+  tile.sigma=(*sigma);
+  selection.preview=input->preview;
+  selection.i=input->i;
+  selection.label=input->label;
+  selection.exception=input->exception;
+  selection.tile=tile;
+  selection.targets=input->targets;
+  ApplyDespeckleSegmentPreview(&selection,&thumbnail,&(*preview_image),
+    &(*threshold));
+  thumbnail=DestroyImage(thumbnail);
+  (*percentage)+=12.5;
+  (*radius)+=0.5;
+  (*sigma)+=0.25;
+  if ((*preview_image) == (Image *) NULL)
+    return(MagickFalse);
+  (*images)=AppendPreviewTile((*images),(*preview_image),input->label,
+    input->exception);
+  proceed=SetImageProgress(input->image,PreviewImageTag,(MagickOffsetType)
+    input->i,NumberTiles);
+  if (proceed == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+typedef struct _PreviewSetup
+{
+  const Image
+    *image;
+
+  PreviewType
+    preview;
+
+  ImageInfo
+    *preview_info;
+
+  RectangleInfo
+    geometry;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    colors;
+
+  double
+    degrees,
+    gamma;
+} PreviewSetup;
+
+static Image *AcquirePreviewTiles(const PreviewSetup *setup)
+{
+  const Image
+    *const image = setup->image;
+
+  const PreviewType
+    preview = setup->preview;
+
+  ImageInfo
+    *const preview_info = setup->preview_info;
+
+  const RectangleInfo
+    geometry = setup->geometry;
+
+  ExceptionInfo
+    *const exception = setup->exception;
 
   char
     factor[MagickPathExtent],
     label[MagickPathExtent];
 
   double
-    degrees,
-    gamma,
+    degrees = setup->degrees,
+    gamma = setup->gamma,
     percentage,
     radius,
     sigma,
@@ -798,32 +1194,78 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
 
   Image
     *images,
-    *montage_image,
     *preview_image,
     *thumbnail;
+
+  QuantizeInfo
+    quantize_info;
+
+  size_t
+    colors = setup->colors;
+
+  ssize_t
+    i;
+
+  const PreviewTargets
+    targets = { &preview_image, &degrees, &gamma, &colors, &quantize_info };
+
+  const PreviewTileTargets
+    tile_targets = { &preview_image, &threshold, &percentage, &radius, &sigma,
+      &images };
+
+  images=NewImageList();
+  percentage=12.5;
+  GetQuantizeInfo(&quantize_info);
+  radius=0.0;
+  sigma=1.0;
+  threshold=0.0;
+  for (i=0; i < NumberTiles; i++)
+  {
+    PreviewTileInput
+      input;
+
+    if (AcquirePreviewThumbnail(image,geometry,exception,&thumbnail) ==
+        MagickFalse)
+      break;
+    if (AppendMiddlePreviewTile(i,thumbnail,exception,&images) == MagickFalse)
+      continue;
+    input.image=image;
+    input.thumbnail=thumbnail;
+    input.exception=exception;
+    input.factor=factor;
+    input.label=label;
+    input.preview_info=preview_info;
+    input.preview=preview;
+    input.i=i;
+    input.targets=targets;
+    if (RenderPreviewTile(&input,&tile_targets) == MagickFalse)
+      break;
+  }
+  return(images);
+}
+
+MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
+  ExceptionInfo *exception)
+{
+  double
+    degrees,
+    gamma;
+
+  Image
+    *images,
+    *montage_image;
 
   ImageInfo
     *preview_info;
 
-  MagickBooleanType
-    proceed;
-
-  MontageInfo
-    *montage_info;
-
-  QuantizeInfo
-    quantize_info;
+  PreviewSetup
+    setup;
 
   RectangleInfo
     geometry;
 
   size_t
     colors;
-
-  ssize_t
-    i,
-    x = 0,
-    y = 0;
 
   /*
     Open output image file.
@@ -839,120 +1281,15 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   SetGeometry(image,&geometry);
   (void) ParseMetaGeometry(DefaultPreviewGeometry,&geometry.x,&geometry.y,
     &geometry.width,&geometry.height);
-  images=NewImageList();
-  percentage=12.5;
-  GetQuantizeInfo(&quantize_info);
-  radius=0.0;
-  sigma=1.0;
-  threshold=0.0;
-  for (i=0; i < NumberTiles; i++)
-  {
-    PreviewTile
-      tile;
-
-    thumbnail=ThumbnailImage(image,geometry.width,geometry.height,exception);
-    if (thumbnail == (Image *) NULL)
-      break;
-    (void) SetImageProgressMonitor(thumbnail,(MagickProgressMonitor) NULL,
-      (void *) NULL);
-    (void) SetImageProperty(thumbnail,"label",DefaultTileLabel,exception);
-    if (i == (NumberTiles/2))
-      {
-        (void) QueryColorCompliance("#dfdfdf",AllCompliance,
-          &thumbnail->matte_color,exception);
-        AppendImageToList(&images,thumbnail);
-        continue;
-      }
-    tile.image=image;
-    tile.thumbnail=thumbnail;
-    tile.exception=exception;
-    tile.factor=factor;
-    tile.label=label;
-    tile.preview_info=preview_info;
-    tile.preview=preview;
-    tile.i=i;
-    tile.percentage=percentage;
-    tile.radius=radius;
-    tile.sigma=sigma;
-    switch (preview)
-    {
-      case RollPreview:
-      {
-        x=((i+1)*(ssize_t) thumbnail->columns)/NumberTiles;
-        y=((i+1)*(ssize_t) thumbnail->rows)/NumberTiles;
-        preview_image=RollImage(thumbnail,x,y,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"roll %+.20gx%+.20g",
-          (double) x,(double) y);
-        break;
-      }
-      default:
-      {
-        ApplyWavePreview(&tile,&preview_image,&degrees,&gamma);
-        break;
-      }
-      case GrayscalePreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        colors<<=1;
-        quantize_info.number_colors=colors;
-        quantize_info.colorspace=GRAYColorspace;
-        (void) QuantizeImage(&quantize_info,preview_image,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,
-          "-colorspace gray -colors %.17g",(double) colors);
-        break;
-      }
-      case QuantizePreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        colors<<=1;
-        quantize_info.number_colors=colors;
-        (void) QuantizeImage(&quantize_info,preview_image,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"colors %.17g",
-          (double) colors);
-        break;
-      }
-      case DespecklePreview:
-      {
-        thumbnail=DespeckleThumbnail(thumbnail,i,exception);
-        preview_image=DespeckleImage(thumbnail,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) FormatLocaleString(label,MagickPathExtent,"despeckle (%.17g)",
-          (double) i+1);
-        break;
-      }
-      case SegmentPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        threshold+=0.4;
-        (void) SegmentImage(preview_image,sRGBColorspace,MagickFalse,threshold,
-          threshold,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"segment %gx%g",
-          threshold,threshold);
-        break;
-      }
-    }
-    thumbnail=DestroyImage(thumbnail);
-    percentage+=12.5;
-    radius+=0.5;
-    sigma+=0.25;
-    if (preview_image == (Image *) NULL)
-      break;
-    preview_image->alpha_trait=UndefinedPixelTrait;
-    (void) DeleteImageProperty(preview_image,"label");
-    (void) SetImageProperty(preview_image,"label",label,exception);
-    AppendImageToList(&images,preview_image);
-    proceed=SetImageProgress(image,PreviewImageTag,(MagickOffsetType) i,
-      NumberTiles);
-    if (proceed == MagickFalse)
-      break;
-  }
+  setup.image=image;
+  setup.preview=preview;
+  setup.preview_info=preview_info;
+  setup.geometry=geometry;
+  setup.exception=exception;
+  setup.colors=colors;
+  setup.degrees=degrees;
+  setup.gamma=gamma;
+  images=AcquirePreviewTiles(&setup);
   if (images == (Image *) NULL)
     {
       preview_info=DestroyImageInfo(preview_info);
@@ -961,15 +1298,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   /*
     Create the montage.
   */
-  montage_info=CloneMontageInfo(preview_info,(MontageInfo *) NULL);
-  (void) CopyMagickString(montage_info->filename,image->filename,
-    MagickPathExtent);
-  montage_info->shadow=MagickTrue;
-  (void) CloneString(&montage_info->tile,"3x3");
-  (void) CloneString(&montage_info->geometry,DefaultPreviewGeometry);
-  (void) CloneString(&montage_info->frame,DefaultTileFrame);
-  montage_image=MontageImages(images,montage_info,exception);
-  montage_info=DestroyMontageInfo(montage_info);
+  montage_image=MontagePreviewTiles(image,preview_info,images,exception);
   images=DestroyImageList(images);
   if (montage_image == (Image *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");

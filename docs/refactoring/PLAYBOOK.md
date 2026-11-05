@@ -3390,6 +3390,14 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    4), where the group moved had `&tile` and `&v`. N step 8's condition holds: nothing on
    any path from the fill to the call writes a variable a member copies; a kept group
    that writes one and leaves the `switch` before any call does not count.
+   When the groups one step moves write five or six variables of the caller, those the
+   `default` group's call writes through included, the helper takes Recipe Z step 7's
+   `const Targets *targets` after `tile`, in place of one pointer per variable: the
+   caller declares that struct `const`, once, at the top of its body, with the addresses
+   as its initialiser, and its `default:` group calls `Helper(&tile,&targets);`; the
+   helper binds each member once (`T *const v = targets->v;`), writes `(*v)` as Z step 4
+   says, and passes `&(*v)` on to the earlier step's helper. Each variable meets Recipe
+   O step 2.
 
 **Before:**
 
@@ -3549,6 +3557,11 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   pass the same `tile` and the same addresses (`&(*v)` is `v`) down to the helper whose
   `switch` holds the group, so each written variable is the caller's own, written at
   the points it was.
+- Under step 8's `targets` form the argument is Recipe Z step 7's: only the addresses
+  travel, fixed at the declaration and bound once to `*const` locals, so each `(*v)` is
+  the caller's own variable, written at the points it was; they are the addresses of
+  distinct locals, so no two members alias, and a call that took one of them elsewhere
+  and kept no copy (`GetQuantizeInfo(&quantize_info)`) gives it no second name.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), a case for each moved label where one exists, and steps 1 and 5
@@ -3577,7 +3590,12 @@ which step 1 refused. Seven chained functions of three to six groups each, takin
 `PreviewTile` and `preview_image`, `gamma` and, in the last, `degrees`: 4.51 to 4.56, 4.62, 4.69,
 4.79, 4.85, 4.90 and 5.00 in probes (each step raising the score, no finding on a new
 function). Added by Claude Code (Claude
-Sonnet 5.5) during task W12, under the mandate of 2026-10-24.
+Sonnet 5.5) during task W12, under the mandate of 2026-10-24. Step 8's `targets` form
+(2026-11-05, task W14 lane b): `effect-preview.c`'s `PreviewImage` after its split, whose
+Roll, Grayscale and Quantize groups with `default` write `preview_image`, `degrees`,
+`gamma`, `colors` and `quantize_info`, one more than four parameters hold; a probe: 8.42
+to 8.58, no finding on the helper. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
 
 ---
 
@@ -7572,3 +7590,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | NEW | ST | Split a Selection at its Default, Copying the Return Tail: the `default:` group of a `switch` and groups adjacent to it, which leave through `return(R);` (any `R`) or through `break;` to a single `return(R_T);` that ends the function, move to a `static` function of the caller's return type whose body is the moved groups' `switch` followed by a copy of `return(R_T);`; the caller's `default:` becomes `return(Helper(...));` and keeps its own `return(R_T);` for the kept groups. Variables the groups write go by value (only `R_T` read them after the `switch`). *Careful* gives the argument | `channel-alpha.c`'s `SetImageAlphaChannel` (campaign A, W14 lane c): cc 16, 81 lines, groups mixing `break;` to the tail with `return(...)`, refused by SD, SR, SW, RV and BR. A probe of the chain (E step 7 on the tail, then two steps of this recipe): 8.96 to 8.98, 9.07 and 9.38, no finding on a new function | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | SR | Step 5: in a function whose `switch` is followed by `return(MagickTrue);` and whose moved groups return `MagickFalse` (a link of step 7's chain), the `default:` group may be `return(Helper(...));` instead of the `if`/`return`/`break;` group; same value on both paths. *Careful* gives the argument. Still seven steps | `channel.c`'s `ChannelFxImage` (campaign A, W14 lane d): the destination-channel `switch` (nine labels, a throwing `default:`) moved by Recipe V step 7 is cc 14; its chain by the `if` form leaves the head link at cc 9 (six labels, `default:`, the `if`), a *Complex Method* the gate refuses; the `return` form makes it 8 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | B | Step 5: calls in a loop of a function with no OpenMP region of its own may take a struct filled once directly before the loop, when nothing from the fill to the loop's end writes what an initialiser reads (the form Recipe OC step 6 and Recipe LB step 4 already use for their structs). *Careful* gives the argument. Still eight steps | `channel.c`'s `SeparatePixelChannel` (5 arguments, called once per pixel by `SeparateImageRow`): B refuses the per-call fill of member accesses in a hot loop; with `ChannelImage` the last two *Excess Number of Function Arguments* of the file, a probe 7.81 to 8.06 | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | SD | Step 8: when the groups one step moves write five or six variables of the caller (those the `default` group's call writes through included), the helper takes Recipe Z step 7's `const Targets *targets` after `tile`; the caller declares it `const` once with the addresses as its initialiser and calls `Helper(&tile,&targets);`, the helper binds each member once and passes `&(*v)` on. *Careful* gives the argument. Still eight steps | `effect-preview.c`'s `PreviewImage` (campaign A, W14 lane b): the Roll, Grayscale and Quantize groups with `default` write five variables; a probe 8.42 to 8.58, no finding on the helper | mandate (2026-10-24) |
