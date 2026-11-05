@@ -1955,6 +1955,35 @@ static void CountBilinearCoefficients(const DistortMethod *method,
   }
 }
 
+static MagickBooleanType CountCoefficients(const DistortMethod *method,
+  const CoefficientContext *context,const CoefficientCountTargets *targets)
+{
+  const size_t
+    number_values = context->number_values;
+
+  size_t
+    *const number_coefficients = targets->number_coefficients;
+
+  switch (*method) {
+    case AffineDistortion:
+    case RigidAffineDistortion:
+    /* also BarycentricColorInterpolate: */
+      *number_coefficients=3*number_values;
+      break;
+    case PolynomialDistortion:
+      if (GetPolynomialCoefficientCount(context,&(*number_coefficients)) ==
+          MagickFalse)
+        return(MagickFalse);
+      break;
+    default:
+    {
+      CountBilinearCoefficients(method,context,targets);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -2017,23 +2046,8 @@ static double *GenerateCoefficients(const Image *image,
   context.cp_size=cp_size;
 
   number_coefficients=0;
-  switch (*method) {
-    case AffineDistortion:
-    case RigidAffineDistortion:
-    /* also BarycentricColorInterpolate: */
-      number_coefficients=3*number_values;
-      break;
-    case PolynomialDistortion:
-      if (GetPolynomialCoefficientCount(&context,&number_coefficients) ==
-          MagickFalse)
-        return((double *) NULL);
-      break;
-    default:
-    {
-      CountBilinearCoefficients(method,&context,&targets);
-      break;
-    }
-  }
+  if (CountCoefficients(method,&context,&targets) == MagickFalse)
+    return((double *) NULL);
 
   context.cp_x=cp_x;
   context.cp_y=cp_y;
