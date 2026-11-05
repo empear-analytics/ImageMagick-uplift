@@ -2929,6 +2929,42 @@ static void ApplyAxisThresholds(const CCMetricInputs *inputs,
     }
 }
 
+static void KeepSelectedObjects(const Image *image,
+  const Image *component_image,CCObjectInfo *object,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"connected-components:keep-colors");
+  if (artifact != (const char *) NULL)
+    {
+      CCColorMerge
+        color_merge;
+
+      /*
+        Keep selected objects based on color, merge others.
+      */
+      MergeAllObjects(component_image,object);
+      color_merge.component_image=component_image;
+      color_merge.object=object;
+      color_merge.artifact=artifact;
+      color_merge.merge=MagickFalse;
+      color_merge.exception=exception;
+      MergeObjectsByColor(&color_merge);
+    }
+  artifact=GetImageArtifact(image,"connected-components:keep-ids");
+  if (artifact == (const char *) NULL)
+    artifact=GetImageArtifact(image,"connected-components:keep");
+  if (artifact != (const char *) NULL)
+    {
+      /*
+        Keep selected objects based on id, merge others.
+      */
+      MergeAllObjects(component_image,object);
+      SetObjectMergeByIds(object,component_image->colors,artifact,MagickFalse);
+    }
+}
+
 static void RemoveSelectedObjects(const Image *image,
   const Image *component_image,CCObjectInfo *object,ExceptionInfo *exception)
 {
@@ -3310,34 +3346,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         background_id);
       AreaThreshold(component_image,object,range);
     }
-  artifact=GetImageArtifact(image,"connected-components:keep-colors");
-  if (artifact != (const char *) NULL)
-    {
-      CCColorMerge
-        color_merge;
-
-      /*
-        Keep selected objects based on color, merge others.
-      */
-      MergeAllObjects(component_image,object);
-      color_merge.component_image=component_image;
-      color_merge.object=object;
-      color_merge.artifact=artifact;
-      color_merge.merge=MagickFalse;
-      color_merge.exception=exception;
-      MergeObjectsByColor(&color_merge);
-    }
-  artifact=GetImageArtifact(image,"connected-components:keep-ids");
-  if (artifact == (const char *) NULL)
-    artifact=GetImageArtifact(image,"connected-components:keep");
-  if (artifact != (const char *) NULL)
-    {
-      /*
-        Keep selected objects based on id, merge others.
-      */
-      MergeAllObjects(component_image,object);
-      SetObjectMergeByIds(object,component_image->colors,artifact,MagickFalse);
-    }
+  KeepSelectedObjects(image,component_image,object,exception);
   artifact=GetImageArtifact(image,"connected-components:keep-top");
   /*
     Keep top objects.
