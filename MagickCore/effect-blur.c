@@ -2997,14 +2997,104 @@ static void FillRotationalTables(double *cos_theta,double *sin_theta,
   }
 }
 
-MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
-  ExceptionInfo *exception)
+typedef struct _RotationalBlur
 {
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  PointInfo
+    blur_center;
+
+  double
+    blur_radius,
+    *cos_theta,
+    *sin_theta;
+
+  size_t
+    n;
+
+  ExceptionInfo
+    *exception;
+} RotationalBlur;
+
+static Image *BlurRotationalRows(const RotationalBlur *rotational)
+{
+  const Image
+    *const image = rotational->image;
+
+  Image
+    *const blur_image = rotational->blur_image;
+
+  const PointInfo
+    blur_center = rotational->blur_center;
+
+  const double
+    blur_radius = rotational->blur_radius;
+
+  double
+    *cos_theta = rotational->cos_theta,
+    *sin_theta = rotational->sin_theta;
+
+  const size_t
+    n = rotational->n;
+
+  ExceptionInfo
+    *const exception = rotational->exception;
+
   CacheView
     *blur_view,
     *image_view,
     *radial_view;
 
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  radial_view=AcquireVirtualCacheView(image,exception);
+  blur_view=AcquireAuthenticCacheView(blur_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,blur_image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const RotationalRow
+      row = { image, blur_image, radial_view, blur_center, blur_radius,
+        cos_theta, sin_theta, n, y, exception };
+
+    if (BlurRotationalLine(&row,image_view,blur_view,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetBlurProgress(image,BlurImageTag,progress,&status);
+      }
+  }
+  blur_view=DestroyCacheView(blur_view);
+  radial_view=DestroyCacheView(radial_view);
+  image_view=DestroyCacheView(image_view);
+  cos_theta=(double *) RelinquishMagickMemory(cos_theta);
+  sin_theta=(double *) RelinquishMagickMemory(sin_theta);
+  return(ReleaseFailedImage(blur_image,status));
+}
+
+MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
+  ExceptionInfo *exception)
+{
   double
     blur_radius,
     *cos_theta,
@@ -3014,20 +3104,14 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   Image
     *blur_image;
 
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
   PointInfo
     blur_center;
 
+  RotationalBlur
+    rotational;
+
   size_t
     n;
-
-  ssize_t
-    y;
 
   /*
     Allocate blur image.
@@ -3062,38 +3146,15 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   /*
     Radial blur image.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  radial_view=AcquireVirtualCacheView(image,exception);
-  blur_view=AcquireAuthenticCacheView(blur_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,blur_image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const RotationalRow
-      row = { image, blur_image, radial_view, blur_center, blur_radius,
-        cos_theta, sin_theta, n, y, exception };
-
-    if (BlurRotationalLine(&row,image_view,blur_view,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetBlurProgress(image,BlurImageTag,progress,&status);
-      }
-  }
-  blur_view=DestroyCacheView(blur_view);
-  radial_view=DestroyCacheView(radial_view);
-  image_view=DestroyCacheView(image_view);
-  cos_theta=(double *) RelinquishMagickMemory(cos_theta);
-  sin_theta=(double *) RelinquishMagickMemory(sin_theta);
-  return(ReleaseFailedImage(blur_image,status));
+  rotational.image=image;
+  rotational.blur_image=blur_image;
+  rotational.blur_center=blur_center;
+  rotational.blur_radius=blur_radius;
+  rotational.cos_theta=cos_theta;
+  rotational.sin_theta=sin_theta;
+  rotational.n=n;
+  rotational.exception=exception;
+  return(BlurRotationalRows(&rotational));
 }
 
 /*
