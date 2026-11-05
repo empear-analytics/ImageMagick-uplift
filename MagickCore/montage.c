@@ -258,10 +258,22 @@ static Image *AddTileShadow(Image *image,ExceptionInfo *exception)
   return(image);
 }
 
-static Image *AddTileBorder(Image *image,const MontageInfo *montage_info,
-  const size_t border_width,const size_t width,const size_t height,
-  ExceptionInfo *exception)
+typedef struct _MontageTileExtent
 {
+  size_t
+    border_width,
+    width,
+    height;
+} MontageTileExtent;
+
+static Image *AddTileBorder(Image *image,const MontageInfo *montage_info,
+  const MontageTileExtent *extent,ExceptionInfo *exception)
+{
+  const size_t
+    border_width = extent->border_width,
+    width = extent->width,
+    height = extent->height;
+
   Image
     *border_image;
 
@@ -1030,8 +1042,16 @@ static Image *PlaceMontageTile(const MontageTilePlacement *placement,
     y;
 
   if (placement->border_width != 0)
-    image=AddTileBorder(image,placement->montage_info,placement->border_width,
-      placement->width,placement->height,placement->exception);
+    {
+      MontageTileExtent
+        extent;
+
+      extent.border_width=placement->border_width;
+      extent.width=placement->width;
+      extent.height=placement->height;
+      image=AddTileBorder(image,placement->montage_info,&extent,
+        placement->exception);
+    }
   gravity_info.tile_image=placement->tile_image;
   gravity_info.width=placement->width;
   gravity_info.height=placement->height;
