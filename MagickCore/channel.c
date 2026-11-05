@@ -308,6 +308,30 @@ static MagickBooleanType CheckSourceChannel(const Image *source_image,
   return(MagickTrue);
 }
 
+static void ParseChannelOperator(ChannelFx *channel_op,const char **p,
+  char *token)
+{
+  (*channel_op)=ExtractChannelOp;
+  (void) GetNextToken((*p),p,MagickPathExtent,token);
+  if (*token == '<')
+    {
+      (*channel_op)=ExchangeChannelOp;
+      (void) GetNextToken((*p),p,MagickPathExtent,token);
+    }
+  if (*token == '=')
+    {
+      if ((*channel_op) != ExchangeChannelOp)
+        (*channel_op)=AssignChannelOp;
+      (void) GetNextToken((*p),p,MagickPathExtent,token);
+    }
+  if (*token == '>')
+    {
+      if ((*channel_op) != ExchangeChannelOp)
+        (*channel_op)=TransferChannelOp;
+      (void) GetNextToken((*p),p,MagickPathExtent,token);
+    }
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -430,25 +454,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
         destination_image=DestroyImageList(destination_image);
         return(destination_image);
       }
-    channel_op=ExtractChannelOp;
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (*token == '<')
-      {
-        channel_op=ExchangeChannelOp;
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-      }
-    if (*token == '=')
-      {
-        if (channel_op != ExchangeChannelOp)
-          channel_op=AssignChannelOp;
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-      }
-    if (*token == '>')
-      {
-        if (channel_op != ExchangeChannelOp)
-          channel_op=TransferChannelOp;
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-      }
+    ParseChannelOperator(&channel_op,&p,token);
     switch (channel_op)
     {
       case AssignChannelOp:
