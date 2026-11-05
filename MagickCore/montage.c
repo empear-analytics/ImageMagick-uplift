@@ -306,10 +306,36 @@ static Image *AddTileBorder(Image *image,const MontageInfo *montage_info,
   return(image);
 }
 
-static void AnnotateMontageTitle(const ImageInfo *image_info,
-  const DrawInfo *draw_info,Image **image_list,Image *montage,
-  const RectangleInfo extract_info,const char *title,ExceptionInfo *exception)
+typedef struct _MontageTitleInfo
 {
+  const ImageInfo
+    *image_info;
+
+  const DrawInfo
+    *draw_info;
+
+  RectangleInfo
+    extract_info;
+
+  const char
+    *title;
+} MontageTitleInfo;
+
+static void AnnotateMontageTitle(const MontageTitleInfo *title_info,
+  Image **image_list,Image *montage,ExceptionInfo *exception)
+{
+  const ImageInfo
+    *const image_info = title_info->image_info;
+
+  const DrawInfo
+    *const draw_info = title_info->draw_info;
+
+  const RectangleInfo
+    extract_info = title_info->extract_info;
+
+  const char
+    *const title = title_info->title;
+
   DrawInfo
     *draw_clone_info;
 
@@ -1173,8 +1199,17 @@ static void DecorateMontagePage(const MontagePageInfo *page)
   if (page->texture != (Image *) NULL)
     (void) TextureImage(page->montage,page->texture,page->exception);
   if (page->montage_info->title != (char *) NULL)
-    AnnotateMontageTitle(page->image_info,page->draw_info,page->image_list,
-      page->montage,page->extract_info,page->title,page->exception);
+    {
+      MontageTitleInfo
+        title_info;
+
+      title_info.image_info=page->image_info;
+      title_info.draw_info=page->draw_info;
+      title_info.extract_info=page->extract_info;
+      title_info.title=page->title;
+      AnnotateMontageTitle(&title_info,page->image_list,page->montage,
+        page->exception);
+    }
   (void) SetImageProgressMonitor(page->montage,progress_monitor,
     page->montage->client_data);
 }
