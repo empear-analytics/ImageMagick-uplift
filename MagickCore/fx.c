@@ -2544,6 +2544,18 @@ static MagickBooleanType ExpectNoArgsClose (FxInfo * pfx,
   return MagickTrue;
 }
 
+static void ApplyZeroUFunction (FxInfo * pfx, const ImgAttrE iaQual,
+  FunctionE * fe)
+{
+    if ((*fe) == fU && iaQual == aNull) {
+      ElementT * pel = &pfx->Elements[pfx->usedElements-1];
+      if (pel->type == etConstant && pel->val == 0.0) {
+        pfx->usedElements--;
+        (*fe) = fU0;
+      }
+    }
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2725,13 +2737,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
     pfx->Elements[ndx1].element_index = ndx2 + 1;
     pfx->Elements[ndx2].element_index = ndx3;
   } else {
-    if (fe == fU && iaQual == aNull) {
-      ElementT * pel = &pfx->Elements[pfx->usedElements-1];
-      if (pel->type == etConstant && pel->val == 0.0) {
-        pfx->usedElements--;
-        fe = fU0;
-      }
-    }
+    ApplyZeroUFunction (pfx, iaQual, &fe);
     (void) AddElement (pfx, (fxFltType) 0, (int) fe);
     if (IsPixelAccessFunction(fe) != MagickFalse)
     {
