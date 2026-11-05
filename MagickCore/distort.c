@@ -1818,6 +1818,51 @@ static double *ShepardsCoefficients(double *coeff,const DistortMethod *method,
   return(SetShepardsPower(image,coeff,exception));
 }
 
+static MagickBooleanType GetPolynomialCoefficientCount(const CoefficientContext *context,
+  size_t *number_coefficients)
+{
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments,
+    number_values = context->number_values,
+    cp_size = context->cp_size;
+
+  size_t
+    i;
+
+  /* number of coefficients depend on the given polynomial 'order' */
+  if (number_arguments < 1)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+             "InvalidArgument","%s : '%s'","Polynomial",
+             "Needs at least 1 argument");
+      return(MagickFalse);
+    }
+  i = poly_number_terms(arguments[0]);
+  *number_coefficients = 2 + i*number_values;
+  if (i == 0)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+                 "InvalidArgument","%s : '%s'","Polynomial",
+                 "Invalid order, should be integer 1 to 5, or 1.5");
+      return(MagickFalse);
+    }
+  if ((number_arguments < (1+i*cp_size)) ||
+      (((number_arguments-1) % cp_size) != 0)) 
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+             "InvalidArgument", "%s : 'require at least %.17g CPs'",
+             "Polynomial", (double) i);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1884,31 +1929,9 @@ static double *GenerateCoefficients(const Image *image,
       number_coefficients=3*number_values;
       break;
     case PolynomialDistortion:
-      /* number of coefficients depend on the given polynomial 'order' */
-      if (number_arguments < 1)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-                 "InvalidArgument","%s : '%s'","Polynomial",
-                 "Needs at least 1 argument");
-          return((double *) NULL);
-        }
-      i = poly_number_terms(arguments[0]);
-      number_coefficients = 2 + i*number_values;
-      if (i == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-                     "InvalidArgument","%s : '%s'","Polynomial",
-                     "Invalid order, should be integer 1 to 5, or 1.5");
-          return((double *) NULL);
-        }
-      if ((number_arguments < (1+i*cp_size)) ||
-          (((number_arguments-1) % cp_size) != 0)) 
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-                 "InvalidArgument", "%s : 'require at least %.17g CPs'",
-                 "Polynomial", (double) i);
-          return((double *) NULL);
-        }
+      if (GetPolynomialCoefficientCount(&context,&number_coefficients) ==
+          MagickFalse)
+        return((double *) NULL);
       break;
     case BilinearReverseDistortion:
       number_coefficients=4*number_values;
