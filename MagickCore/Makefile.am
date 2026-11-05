@@ -152,6 +152,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/draw.h \
   MagickCore/draw-private.h \
   MagickCore/effect.c \
+  MagickCore/effect-preview.c \
   MagickCore/effect-blur.c \
   MagickCore/effect.h \
   MagickCore/enhance.c \
