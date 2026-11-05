@@ -2117,6 +2117,73 @@ static MagickBooleanType ResolveDirectionEquivalences(
   return(status);
 }
 
+typedef struct _CCEquivalenceInputs
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  MatrixInfo
+    *equivalences;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2];
+
+  ExceptionInfo
+    *exception;
+} CCEquivalenceInputs;
+
+static MagickBooleanType ResolveEquivalences(
+  const CCEquivalenceInputs *equivalence_inputs,MagickBooleanType status)
+{
+  const Image
+    *const image = equivalence_inputs->image;
+
+  CacheView
+    *const image_view = equivalence_inputs->image_view;
+
+  MatrixInfo
+    *const equivalences = equivalence_inputs->equivalences;
+
+  const size_t
+    connectivity = equivalence_inputs->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = equivalence_inputs->connect4,
+    (*const connect8)[2] = equivalence_inputs->connect8;
+
+  ExceptionInfo
+    *const exception = equivalence_inputs->exception;
+
+  ssize_t
+    n;
+
+  for (n=0; n < (ssize_t) (connectivity > 4 ? 4 : 2); n++)
+  {
+    CCEquivalencePass
+      equivalence_pass;
+
+    if (status == MagickFalse)
+      continue;
+    equivalence_pass.image=image;
+    equivalence_pass.image_view=image_view;
+    equivalence_pass.equivalences=equivalences;
+    equivalence_pass.connectivity=connectivity;
+    equivalence_pass.connect4=connect4;
+    equivalence_pass.connect8=connect8;
+    equivalence_pass.n=n;
+    equivalence_pass.exception=exception;
+    status=ResolveDirectionEquivalences(&equivalence_pass,status);
+  }
+  return(status);
+}
+
 typedef struct _CCObjectCensus
 {
   CacheView
@@ -2763,6 +2830,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     *image_view,
     *object_view;
 
+  CCEquivalenceInputs
+    equivalence_inputs;
+
   CCLabeledObjects
     labeled_objects;
 
@@ -2859,23 +2929,14 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
-  for (n=0; n < (ssize_t) (connectivity > 4 ? 4 : 2); n++)
-  {
-    CCEquivalencePass
-      equivalence_pass;
-
-    if (status == MagickFalse)
-      continue;
-    equivalence_pass.image=image;
-    equivalence_pass.image_view=image_view;
-    equivalence_pass.equivalences=equivalences;
-    equivalence_pass.connectivity=connectivity;
-    equivalence_pass.connect4=connect4;
-    equivalence_pass.connect8=connect8;
-    equivalence_pass.n=n;
-    equivalence_pass.exception=exception;
-    status=ResolveDirectionEquivalences(&equivalence_pass,status);
-  }
+  equivalence_inputs.image=image;
+  equivalence_inputs.image_view=image_view;
+  equivalence_inputs.equivalences=equivalences;
+  equivalence_inputs.connectivity=connectivity;
+  equivalence_inputs.connect4=connect4;
+  equivalence_inputs.connect8=connect8;
+  equivalence_inputs.exception=exception;
+  status=ResolveEquivalences(&equivalence_inputs,status);
   /*
     Label connected components.
   */
