@@ -1393,11 +1393,11 @@ static MagickBooleanType ModulateImageHead(const ModulateHead *head,
   return(MagickTrue);
 }
 
+#define ModulateImageTag  "Modulate/Image"
+
 MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   ExceptionInfo *exception)
 {
-#define ModulateImageTag  "Modulate/Image"
-
   CacheView
     *image_view;
 
