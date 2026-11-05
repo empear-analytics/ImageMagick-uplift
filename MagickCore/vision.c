@@ -3521,6 +3521,12 @@ static Image *SelectConnectedComponents(const CCThresholdInputs *selection)
   return(ApplyObjectThresholds(&threshold_inputs));
 }
 
+static void ResetObjectsResult(CCObjectInfo **objects)
+{
+  if (objects != (CCObjectInfo **) NULL)
+    *objects=(CCObjectInfo *) NULL;
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -3582,8 +3588,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (objects != (CCObjectInfo **) NULL)
-    *objects=(CCObjectInfo *) NULL;
+  ResetObjectsResult(objects);
   component_image=CloneImage(image,0,0,MagickTrue,exception);
   if (component_image == (Image *) NULL)
     return((Image *) NULL);
