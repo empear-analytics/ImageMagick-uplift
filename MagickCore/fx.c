@@ -3622,6 +3622,172 @@ static MagickBooleanType SetInPlaceTarget (FxInfo * pfx, int UserSymNdx0)
   return MagickTrue;
 }
 
+static MagickBooleanType ExpectOperandAfterOperator (FxInfo * pfx,
+  const char * strLimit, MagickBooleanType IncrDecr, MagickBooleanType * broke)
+{
+  (*broke)=MagickFalse;
+  if (IsExpressionEnd(pfx,strLimit) != MagickFalse)
+  {
+    if (IncrDecr) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Expected operand after operator", "at '%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  return(MagickTrue);
+}
+
+typedef struct _ExpressionContext
+{
+  FxInfo
+    *pfx;
+
+  char
+    *chLimit;
+
+  MagickBooleanType
+    *needPopAll;
+} ExpressionContext;
+
+static MagickBooleanType TranslateTernaryElse (
+  const ExpressionContext * context, TernaryT ternary,
+  MagickBooleanType * broke)
+{
+  FxInfo
+    *const pfx = context->pfx;
+
+  char
+    *const chLimit = context->chLimit;
+
+  MagickBooleanType
+    *const needPopAll = context->needPopAll;
+
+  (*broke)=MagickFalse;
+  if (ternary.addr_colon != NULL_ADDRESS) {
+    if (!TranslateExpression (pfx, ",);", chLimit, needPopAll)) return MagickFalse;
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetInPlaceOperatorTarget (FxInfo * pfx,
+  OperatorE op, int UserSymNdx0, MagickBooleanType * broke)
+{
+  (*broke)=MagickFalse;
+  if (OprInPlace ((int) op)) {
+    if (!SetInPlaceTarget (pfx, UserSymNdx0)) return MagickFalse;
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  }
+  return(MagickTrue);
+}
+
+typedef struct _UserSymbolAssignment
+{
+  FxInfo
+    *pfx;
+
+  const char
+    *strLimit;
+
+  char
+    *chLimit;
+
+  MagickBooleanType
+    *needPopAll,
+    UserSymbol,
+    Assign,
+    Update,
+    IncrDecr;
+} UserSymbolAssignment;
+
+static MagickBooleanType TranslateAssignedExpression (
+  const UserSymbolAssignment * assignment, MagickBooleanType * broke)
+{
+  FxInfo
+    *const pfx = assignment->pfx;
+
+  const char
+    *const strLimit = assignment->strLimit;
+
+  char
+    *const chLimit = assignment->chLimit;
+
+  MagickBooleanType
+    *const needPopAll = assignment->needPopAll;
+
+  const MagickBooleanType
+    UserSymbol = assignment->UserSymbol,
+    Assign = assignment->Assign,
+    Update = assignment->Update,
+    IncrDecr = assignment->IncrDecr;
+
+  (*broke)=MagickFalse;
+  if (IsUserSymbolAssignment(UserSymbol,Assign,Update,IncrDecr) != MagickFalse) {
+
+    if (!TranslateExpression (pfx, strLimit, chLimit, needPopAll)) return MagickFalse;
+    if (!*pfx->pex) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+    if (!*strLimit) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+    if (strchr(strLimit,*chLimit)!=NULL) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetAssignmentTarget (FxInfo * pfx,
+  OperatorE op, int UserSymNdx0, MagickBooleanType * broke)
+{
+  (*broke)=MagickFalse;
+  if (op == oAssign) {
+    if (!AddAssignmentCopyTo (pfx, UserSymNdx0)) return MagickFalse;
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  } else if (SetInPlaceOperatorTarget (pfx, op, UserSymNdx0, broke) ==
+      MagickFalse) {
+    return MagickFalse;
+  } else if ((*broke) != MagickFalse) {
+    (*broke)=MagickTrue;
+    return(MagickTrue);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType FlushOperatorStack (FxInfo * pfx,
+  MagickBooleanType Assign, MagickBooleanType Update, int UserSymNdx0)
+{
+  MagickBooleanType broke = MagickFalse;
+
+  while (pfx->usedOprStack) {
+    OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
+    if (IsOpenGroupOperator(op) != MagickFalse) {
+      break;
+    }
+    if (IsMisplacedAssignment(op,Assign,Update) != MagickFalse) {
+      break;
+    }
+    pfx->usedOprStack--;
+    (void) AddElement (pfx, (fxFltType) 0, (int) op);
+    if (SetAssignmentTarget (pfx, op, UserSymNdx0, &broke) == MagickFalse)
+      return(MagickFalse);
+    if (broke != MagickFalse) break;
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -3637,9 +3803,15 @@ static MagickBooleanType TranslateExpression (
 
   int StartEleNdx;
 
+  MagickBooleanType broke = MagickFalse;
+
   const OperandSymbols
     operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll },
     operand1 = { &UserSymbol, &NewUserSymbol, &UserSymNdx1, needPopAll };
+
+  ExpressionContext context;
+
+  UserSymbolAssignment assignment;
 
   TernaryT ternary;
   ternary.addr_query = NULL_ADDRESS;
@@ -3679,6 +3851,9 @@ static MagickBooleanType TranslateExpression (
 
   /* Loop through Operator, Operand, Operator, Operand, ...
   */
+  context.pfx=pfx;
+  context.chLimit=chLimit;
+  context.needPopAll=needPopAll;
   while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
     if (!GetOperator (pfx, &Assign, &Update, &IncrDecr)) return MagickFalse;
     SkipSpaces (pfx);
@@ -3703,13 +3878,17 @@ static MagickBooleanType TranslateExpression (
         pfx->token, SetShortExp(pfx));
       return MagickFalse;
     }
-    if (IsUserSymbolAssignment(UserSymbol,Assign,Update,IncrDecr) != MagickFalse) {
-
-      if (!TranslateExpression (pfx, strLimit, chLimit, needPopAll)) return MagickFalse;
-      if (!*pfx->pex) break;
-      if (!*strLimit) break;
-      if (strchr(strLimit,*chLimit)!=NULL) break;
-    }
+    assignment.pfx=pfx;
+    assignment.strLimit=strLimit;
+    assignment.chLimit=chLimit;
+    assignment.needPopAll=needPopAll;
+    assignment.UserSymbol=UserSymbol;
+    assignment.Assign=Assign;
+    assignment.Update=Update;
+    assignment.IncrDecr=IncrDecr;
+    if (TranslateAssignedExpression (&assignment, &broke) == MagickFalse)
+      return MagickFalse;
+    if (broke != MagickFalse) break;
     if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
         MagickFalse) {
       ElementT * pel;
@@ -3725,23 +3904,16 @@ static MagickBooleanType TranslateExpression (
 
     if (!ProcessTernaryOpr (pfx, &ternary)) return MagickFalse;
 
-    if (ternary.addr_colon != NULL_ADDRESS) {
-      if (!TranslateExpression (pfx, ",);", chLimit, needPopAll)) return MagickFalse;
-      break;
-    }
+    if (TranslateTernaryElse (&context, ternary, &broke) == MagickFalse)
+      return MagickFalse;
+    if (broke != MagickFalse) break;
 
     UserSymbol = NewUserSymbol = MagickFalse;
 
-    if (IsExpressionEnd(pfx,strLimit) != MagickFalse)
-    {
-      if (IncrDecr) break;
-
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Expected operand after operator", "at '%s'",
-        SetShortExp(pfx));
+    if (ExpectOperandAfterOperator (pfx, strLimit, IncrDecr, &broke) ==
+        MagickFalse)
       return MagickFalse;
-    }
+    if (broke != MagickFalse) break;
 
     if (IncrDecr) {
       (void) ThrowMagickException (
@@ -3773,33 +3945,16 @@ static MagickBooleanType TranslateExpression (
     UserSymNdx0 = UserSymNdx1;
   }
 
-  if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
-      MagickFalse) {
-    if (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)) return MagickFalse;
-  }
+  if ((IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
+      MagickFalse) && (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)))
+    return MagickFalse;
 
   if (IsPendingLimitChar(pfx,chLimit,strLimit) != MagickFalse) {
     *chLimit = *pfx->pex;
     pfx->pex++;
   }
-  while (pfx->usedOprStack) {
-    OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
-    if (IsOpenGroupOperator(op) != MagickFalse) {
-      break;
-    }
-    if (IsMisplacedAssignment(op,Assign,Update) != MagickFalse) {
-      break;
-    }
-    pfx->usedOprStack--;
-    (void) AddElement (pfx, (fxFltType) 0, (int) op);
-    if (op == oAssign) {
-      if (!AddAssignmentCopyTo (pfx, UserSymNdx0)) return MagickFalse;
-      break;
-    } else if (OprInPlace ((int) op)) {
-      if (!SetInPlaceTarget (pfx, UserSymNdx0)) return MagickFalse;
-      break;
-    }
-  }
+  if (FlushOperatorStack (pfx, Assign, Update, UserSymNdx0) == MagickFalse)
+    return MagickFalse;
 
   if (ternary.addr_query != NULL_ADDRESS) *needPopAll = MagickTrue;
 
