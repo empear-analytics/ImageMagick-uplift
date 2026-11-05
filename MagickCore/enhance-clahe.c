@@ -219,6 +219,20 @@ static ssize_t GetCLAHEExcess(const double clip_limit,
   return(cumulative_excess);
 }
 
+static void RedistributeCLAHERemainder(const double clip_limit,
+  const size_t number_bins,size_t *histogram,ssize_t cumulative_excess)
+{
+  ssize_t
+    previous_excess;
+
+  do
+  {
+    previous_excess=cumulative_excess;
+    cumulative_excess=RedistributeCLAHEExcess(clip_limit,number_bins,
+      histogram,cumulative_excess);
+  } while ((cumulative_excess != 0) && (cumulative_excess < previous_excess));
+}
+
 static void ClipCLAHEHistogram(const double clip_limit,const size_t number_bins,
   size_t *histogram)
 {
@@ -228,7 +242,6 @@ static void ClipCLAHEHistogram(const double clip_limit,const size_t number_bins,
     cumulative_excess,
     excess,
     i,
-    previous_excess,
     step;
 
   /*
@@ -261,12 +274,8 @@ static void ClipCLAHEHistogram(const double clip_limit,const size_t number_bins,
   /*
     Redistribute remaining excess.
   */
-  do
-  {
-    previous_excess=cumulative_excess;
-    cumulative_excess=RedistributeCLAHEExcess(clip_limit,number_bins,
-      histogram,cumulative_excess);
-  } while ((cumulative_excess != 0) && (cumulative_excess < previous_excess));
+  RedistributeCLAHERemainder(clip_limit,number_bins,histogram,
+    cumulative_excess);
 }
 
 static void GenerateCLAHEHistogram(const RectangleInfo *clahe_info,
