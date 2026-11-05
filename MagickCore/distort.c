@@ -272,63 +272,6 @@ static double poly_basis_dy(ssize_t n, double x, double y)
   */
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%     A f f i n e T r a n s f o r m I m a g e                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  AffineTransformImage() transforms an image as dictated by the affine matrix.
-%  It allocates the memory necessary for the new Image structure and returns
-%  a pointer to the new image.
-%
-%  The format of the AffineTransformImage method is:
-%
-%      Image *AffineTransformImage(const Image *image,
-%        AffineMatrix *affine_matrix,ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image: the image.
-%
-%    o affine_matrix: the affine matrix.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-MagickExport Image *AffineTransformImage(const Image *image,
-  const AffineMatrix *affine_matrix,ExceptionInfo *exception)
-{
-  double
-    distort[6];
-
-  Image
-    *deskew_image;
-
-  /*
-    Affine transform image.
-  */
-  assert(image->signature == MagickCoreSignature);
-  assert(affine_matrix != (AffineMatrix *) NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  distort[0]=affine_matrix->sx;
-  distort[1]=affine_matrix->rx;
-  distort[2]=affine_matrix->ry;
-  distort[3]=affine_matrix->sy;
-  distort[4]=affine_matrix->tx;
-  distort[5]=affine_matrix->ty;
-  deskew_image=DistortImage(image,AffineProjectionDistortion,6,distort,
-    MagickTrue,exception);
-  return(deskew_image);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4120,85 +4063,6 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   return(distort_image);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   R o t a t e I m a g e                                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  RotateImage() creates a new image that is a rotated copy of an existing
-%  one.  Positive angles rotate counter-clockwise (right-hand rule), while
-%  negative angles rotate clockwise.  Rotated images are usually larger than
-%  the originals and have 'empty' triangular corners.  X axis.  Empty
-%  triangles left over from shearing the image are filled with the background
-%  color defined by member 'background_color' of the image.  RotateImage
-%  allocates the memory necessary for the new Image structure and returns a
-%  pointer to the new image.
-%
-%  The format of the RotateImage method is:
-%
-%      Image *RotateImage(const Image *image,const double degrees,
-%        ExceptionInfo *exception)
-%
-%  A description of each parameter follows.
-%
-%    o image: the image.
-%
-%    o degrees: Specifies the number of degrees to rotate the image.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-MagickExport Image *RotateImage(const Image *image,const double degrees,
-  ExceptionInfo *exception)
-{
-  Image
-    *distort_image,
-    *rotate_image;
-
-  double
-    angle;
-
-  PointInfo
-    shear;
-
-  size_t
-    rotations;
-
-  /*
-    Adjust rotation angle.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  angle=fmod(degrees,360.0);
-  while (angle < -45.0)
-    angle+=360.0;
-  for (rotations=0; angle > 45.0; rotations++)
-    angle-=90.0;
-  rotations%=4;
-  shear.x=(-tan((double) DegreesToRadians(angle)/2.0));
-  shear.y=sin((double) DegreesToRadians(angle));
-  if ((fabs(shear.x) < MagickEpsilon) && (fabs(shear.y) < MagickEpsilon))
-    return(IntegralRotateImage(image,rotations,exception));
-  distort_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (distort_image == (Image *) NULL)
-    return((Image *) NULL);
-  (void) SetImageVirtualPixelMethod(distort_image,BackgroundVirtualPixelMethod,
-    exception);
-  rotate_image=DistortImage(distort_image,ScaleRotateTranslateDistortion,1,
-    &degrees,MagickTrue,exception);
-  distort_image=DestroyImage(distort_image);
-  return(rotate_image);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
