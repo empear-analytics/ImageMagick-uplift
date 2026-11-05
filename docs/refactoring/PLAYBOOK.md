@@ -1069,6 +1069,12 @@ merges code, not parameters.
    initialiser has no member access or cast, declare it `const` with the initialiser.
    Otherwise declare it without `const` or initialiser, and fill it at that point,
    `name.member=expr;` for every member in declaration order, with nothing between.
+   Form for a call in a loop (2026-11-05): when the calls stand in the body of a loop of
+   a function that has no OpenMP region of its own (no `#pragma omp` in its body, even
+   if a parallel loop calls it), the struct may be filled once directly before the
+   loop, as Recipe OC step 6 and Recipe LB step 4 fill theirs, when nothing from the
+   fill to the loop's end writes an identifier or a member that an initialiser reads
+   (row pointers advanced along the row are not members). Every other step holds.
 6. A struct declared outside a `#pragma omp` region and read inside it is `const`, and
    none of its members point to data the region writes through the struct. A struct
    the function reaches only through its `const Name *name` parameter, a local of the
@@ -1150,6 +1156,11 @@ static inline void CopyPixels(const MagnifyPixels *magnify,
   value is rounded to it exactly as the argument was.
 - An address member (`(&offset)`) is the value the argument `&offset` had: the same
   address at every call, whatever the earlier calls wrote to `offset` through it.
+- The loop form of step 5 reads each initialiser once, before the loop, instead of at
+  every call; the condition on writes between the fill and the loop's end makes the
+  value the same at every call, and the function has no region, so one thread runs the
+  fill and the calls (the pixel loop of `SeparateImageRow`, whose `row` members nothing
+  in the loop writes).
 - A struct reached through a pointer to `const` (step 6) is read by every thread of the
   region and written by none: the caller filled it before the call and runs nothing
   until the call returns. A thread reading `name->member` in the region reads the value
@@ -7252,3 +7263,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | HC | Step 3: a callee of a construct's statement that may take another lock (the pixel cache's `file_semaphore`, taken by `SyncCacheViewAuthenticPixels` on a disk cache) is allowed, since the construct moves whole and unchanged and the thread takes the same locks in the same order and nesting; a function entering a critical of the same name, or `omp_set_lock` on a lock the caller holds, stays refused. *Careful* gives the argument. Still six steps | `shear-rotate.c`'s `IntegralRotateImage` (campaign A, W14 lane c): the 270-degree critical governs the row sync, whose `WritePixelCachePixels` locks `file_semaphore` for disk and distributed caches; step 3 as written refused every such callee | mandate (2026-10-24) |
 | 2026-11-05 | NEW | PD | Name a Parameter-or-Default Selection: the whole right-hand side `(n >= k) ? values[k-1] : d` of an assignment, at three or more sites of one file, becomes a call of one `static inline` function taking `n`, `values`, `k` and `d`; oracle evidence (the object code is not byte-identical) | `statistic-function.c`'s three case helpers (campaign A, W14 lane d): twelve parameter defaults held *Overall Code Complexity*; a probe 9.09 to 9.68 | mandate (2026-10-24) |
 | 2026-11-05 | AMEND | SR | Step 5: in a function whose `switch` is followed by `return(MagickTrue);` and whose moved groups return `MagickFalse` (a link of step 7's chain), the `default:` group may be `return(Helper(...));` instead of the `if`/`return`/`break;` group; same value on both paths. *Careful* gives the argument. Still seven steps | `channel.c`'s `ChannelFxImage` (campaign A, W14 lane d): the destination-channel `switch` (nine labels, a throwing `default:`) moved by Recipe V step 7 is cc 14; its chain by the `if` form leaves the head link at cc 9 (six labels, `default:`, the `if`), a *Complex Method* the gate refuses; the `return` form makes it 8 | mandate (2026-10-24) |
+| 2026-11-05 | AMEND | B | Step 5: calls in a loop of a function with no OpenMP region of its own may take a struct filled once directly before the loop, when nothing from the fill to the loop's end writes what an initialiser reads (the form Recipe OC step 6 and Recipe LB step 4 already use for their structs). *Careful* gives the argument. Still eight steps | `channel.c`'s `SeparatePixelChannel` (5 arguments, called once per pixel by `SeparateImageRow`): B refuses the per-call fill of member accesses in a hot loop; with `ChannelImage` the last two *Excess Number of Function Arguments* of the file, a probe 7.81 to 8.06 | mandate (2026-10-24) |
