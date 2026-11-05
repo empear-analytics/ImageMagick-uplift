@@ -1713,23 +1713,11 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
     const int
       id = GetOpenMPThreadId();
 
-    BilateralRow
-      row;
+    const BilateralRow
+      row = { image, blur_image, image_view, mid, width, height,
+        intensity_gaussian, spatial_gaussian, weights, intensity_sigma,
+        spatial_sigma, id, y, exception };
 
-    row.image=image;
-    row.blur_image=blur_image;
-    row.image_view=image_view;
-    row.mid=mid;
-    row.width=width;
-    row.height=height;
-    row.intensity_gaussian=intensity_gaussian;
-    row.spatial_gaussian=spatial_gaussian;
-    row.weights=weights;
-    row.intensity_sigma=intensity_sigma;
-    row.spatial_sigma=spatial_sigma;
-    row.id=id;
-    row.y=y;
-    row.exception=exception;
     if (BlurBilateralLine(&row,blur_view,&status) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
