@@ -1419,6 +1419,41 @@ static void BuildEqualizeChannelMap(const EqualizeChannel *equalize,
         (size_t) j+(size_t) i]-black[i]))/(white[i]-black[i])));
 }
 
+typedef struct _EqualizeLevels
+{
+  Image
+    *image;
+
+  double
+    *map;
+} EqualizeLevels;
+
+static void BuildEqualizeMaps(const EqualizeLevels *levels,double *black,
+  double *white,double *equalize_map)
+{
+  Image
+    *const image = levels->image;
+
+  double
+    *const map = levels->map;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    EqualizeChannel
+      equalize;
+
+    black[i]=map[i];
+    white[i]=map[GetPixelChannels(image)*MaxMap+(size_t) i];
+    equalize.image=image;
+    equalize.map=map;
+    equalize.i=i;
+    BuildEqualizeChannelMap(&equalize,black,white,equalize_map);
+  }
+}
+
 static void RelinquishEqualizeMemory(double *map,double *histogram,
   double *equalize_map)
 {
@@ -1445,14 +1480,14 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
     *map,
     white[2*CompositePixelChannel+1];
 
+  EqualizeLevels
+    levels;
+
   MagickBooleanType
     status;
 
   MagickOffsetType
     progress;
-
-  ssize_t
-    i;
 
   ssize_t
     y;
@@ -1491,18 +1526,9 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
     sizeof(*equalize_map));
   (void) memset(black,0,sizeof(*black));
   (void) memset(white,0,sizeof(*white));
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    EqualizeChannel
-      equalize;
-
-    black[i]=map[i];
-    white[i]=map[GetPixelChannels(image)*MaxMap+(size_t) i];
-    equalize.image=image;
-    equalize.map=map;
-    equalize.i=i;
-    BuildEqualizeChannelMap(&equalize,black,white,equalize_map);
-  }
+  levels.image=image;
+  levels.map=map;
+  BuildEqualizeMaps(&levels,black,white,equalize_map);
   histogram=(double *) RelinquishMagickMemory(histogram);
   map=(double *) RelinquishMagickMemory(map);
   /*
