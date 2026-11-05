@@ -91,3 +91,13 @@ that name wherever it stands. **Correction:** commit 401d9e9da says quantize.c w
 lines; the measured count after that commit is 2,664. Upstream, not changed: `SetGrayscaleImage` overwrites
 its colormap loop's `status` with `MagickTrue`; the first, unlocked `colormap_index[intensity] < 0` read is a
 double-checked race.
+
+## Lane b, third batch: statistic.c 6.73 -> 8.81 (Opus, 12 commits); feature-texture.c unchanged
+
+`statistic.c` has no function-level finding left. `feature-texture.c` stays at 5.25. **Owner question, now
+blocking two files** (`feature-texture.c` and `attribute.c`): may a block inside a parallel loop that writes
+only the current iteration's own slot of a shared function-local array or struct (`x.direction[i]`,
+`census[i]`) move into a helper that takes that slot by pointer? Each iteration writes a slot no other
+iteration touches, so the access pattern is unchanged. Upstream, not changed: both `EvaluateImages` loops
+`continue` past a failed row without releasing `p`; in `GetImageFeatures` the Q green term divides by
+`density_y[x].direction[i].red`, the co-occurrence failure path leaks, and `p+=...;;` has a doubled semicolon.
