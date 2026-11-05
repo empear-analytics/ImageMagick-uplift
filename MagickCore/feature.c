@@ -1395,6 +1395,78 @@ static Image *RenderHoughImage(const Image *image,const char *path,
   return(GetFirstImageInList(lines_image));
 }
 
+typedef struct _HoughResult
+{
+  const Image
+    *image;
+
+  MatrixInfo
+    *accumulator;
+
+  size_t
+    accumulator_width,
+    accumulator_height,
+    threshold;
+
+  HoughWindow
+    window;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+} HoughResult;
+
+static Image *RenderHoughVotes(const HoughResult *votes_result)
+{
+  const Image
+    *const image = votes_result->image;
+
+  MatrixInfo
+    *accumulator = votes_result->accumulator;
+
+  const size_t
+    accumulator_width = votes_result->accumulator_width,
+    accumulator_height = votes_result->accumulator_height,
+    threshold = votes_result->threshold;
+
+  const HoughWindow
+    window = votes_result->window;
+
+  const MagickBooleanType
+    status = votes_result->status;
+
+  ExceptionInfo
+    *const exception = votes_result->exception;
+
+  char
+    path[MagickPathExtent];
+
+  HoughOutput
+    output;
+
+  if (status == MagickFalse)
+    {
+      accumulator=DestroyMatrixInfo(accumulator);
+      return((Image *) NULL);
+    }
+  /*
+    Generate line segments from accumulator.
+  */
+  output.image=image;
+  output.accumulator=accumulator;
+  output.accumulator_width=accumulator_width;
+  output.accumulator_height=accumulator_height;
+  output.threshold=threshold;
+  if (WriteHoughFile(&output,window,path) == MagickFalse)
+    {
+      accumulator=DestroyMatrixInfo(accumulator);
+      return((Image *) NULL);
+    }
+  return(RenderHoughImage(image,path,accumulator,exception));
+}
+
 MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   const size_t height,const size_t threshold,ExceptionInfo *exception)
 {
@@ -1403,17 +1475,14 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   CacheView
     *image_view;
 
-  char
-    path[MagickPathExtent];
-
   double
     hough_height;
 
   const HoughWindow
     window = { width, height };
 
-  HoughOutput
-    output;
+  HoughResult
+    votes_result;
 
   MagickBooleanType
     status;
@@ -1495,25 +1564,15 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
       }
   }
   image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    {
-      accumulator=DestroyMatrixInfo(accumulator);
-      return((Image *) NULL);
-    }
-  /*
-    Generate line segments from accumulator.
-  */
-  output.image=image;
-  output.accumulator=accumulator;
-  output.accumulator_width=accumulator_width;
-  output.accumulator_height=accumulator_height;
-  output.threshold=threshold;
-  if (WriteHoughFile(&output,window,path) == MagickFalse)
-    {
-      accumulator=DestroyMatrixInfo(accumulator);
-      return((Image *) NULL);
-    }
-  return(RenderHoughImage(image,path,accumulator,exception));
+  votes_result.image=image;
+  votes_result.accumulator=accumulator;
+  votes_result.accumulator_width=accumulator_width;
+  votes_result.accumulator_height=accumulator_height;
+  votes_result.threshold=threshold;
+  votes_result.window=window;
+  votes_result.status=status;
+  votes_result.exception=exception;
+  return(RenderHoughVotes(&votes_result));
 }
 
 /*
