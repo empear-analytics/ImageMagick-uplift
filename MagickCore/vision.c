@@ -1660,9 +1660,41 @@ static MagickBooleanType ResolveRowEquivalences(
   return(status);
 }
 
-static void RemoveObjectsByColor(const Image *component_image,
-  CCObjectInfo *object,const char *artifact,ExceptionInfo *exception)
+typedef struct _CCColorMerge
 {
+  const Image
+    *component_image;
+
+  CCObjectInfo
+    *object;
+
+  const char
+    *artifact;
+
+  MagickBooleanType
+    merge;
+
+  ExceptionInfo
+    *exception;
+} CCColorMerge;
+
+static void MergeObjectsByColor(const CCColorMerge *color_merge)
+{
+  const Image
+    *const component_image = color_merge->component_image;
+
+  CCObjectInfo
+    *const object = color_merge->object;
+
+  const char
+    *const artifact = color_merge->artifact;
+
+  const MagickBooleanType
+    merge = color_merge->merge;
+
+  ExceptionInfo
+    *const exception = color_merge->exception;
+
   const char
     *p;
 
@@ -1683,11 +1715,25 @@ static void RemoveObjectsByColor(const Image *component_image,
     (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
       MagickPathExtent));
     (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
-    SetObjectMergeByColor(object,component_image->colors,&pixel,MagickTrue);
+    SetObjectMergeByColor(object,component_image->colors,&pixel,merge);
     if (*q == '\0')
       break;
     p=q+1;
   }
+}
+
+static void RemoveObjectsByColor(const Image *component_image,
+  CCObjectInfo *object,const char *artifact,ExceptionInfo *exception)
+{
+  CCColorMerge
+    color_merge;
+
+  color_merge.component_image=component_image;
+  color_merge.object=object;
+  color_merge.artifact=artifact;
+  color_merge.merge=MagickTrue;
+  color_merge.exception=exception;
+  MergeObjectsByColor(&color_merge);
 }
 
 static void AreaThreshold(const Image *component_image,CCObjectInfo *object,
@@ -3175,35 +3221,19 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   artifact=GetImageArtifact(image,"connected-components:keep-colors");
   if (artifact != (const char *) NULL)
     {
-      const char
-        *p;
+      CCColorMerge
+        color_merge;
 
       /*
         Keep selected objects based on color, merge others.
       */
       MergeAllObjects(component_image,object);
-      for (p=artifact;  ; )
-      {
-        char
-          color[MagickPathExtent];
-
-        PixelInfo
-          pixel;
-
-        const char
-          *q;
-
-        for (q=p; *q != '\0'; q++)
-          if (*q == ';')
-            break;
-        (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
-          MagickPathExtent));
-        (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
-        SetObjectMergeByColor(object,component_image->colors,&pixel,MagickFalse);
-        if (*q == '\0')
-          break;
-        p=q+1;
-      }
+      color_merge.component_image=component_image;
+      color_merge.object=object;
+      color_merge.artifact=artifact;
+      color_merge.merge=MagickFalse;
+      color_merge.exception=exception;
+      MergeObjectsByColor(&color_merge);
     }
   artifact=GetImageArtifact(image,"connected-components:keep-ids");
   if (artifact == (const char *) NULL)
