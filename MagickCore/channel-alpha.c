@@ -837,6 +837,53 @@ static void SetOffSetAlpha(Image *image,const AlphaChannelOption alpha_type,
   }
 }
 
+static void SetCopyExtractAlpha(Image *image,const AlphaChannelOption alpha_type,
+  MagickBooleanType *status,ExceptionInfo *exception)
+{
+  switch (alpha_type)
+  {
+    case CopyAlphaChannel:
+    {
+      image->alpha_trait=UpdatePixelTrait;
+      (*status)=CompositeImage(image,image,IntensityCompositeOp,MagickTrue,0,0,
+        exception);
+      break;
+    }
+    case DeactivateAlphaChannel:
+    {
+      (*status)=SetOpaqueAlphaTrait(image,CopyPixelTrait,(*status),exception);
+      break;
+    }
+    case DiscreteAlphaChannel:
+    {
+      (*status)=SetOpaqueAlphaTrait(image,UpdatePixelTrait,(*status),exception);
+      break;
+    }
+    case ExtractAlphaChannel:
+    {
+      (*status)=CompositeImage(image,image,AlphaCompositeOp,MagickTrue,0,0,
+        exception);
+      image->alpha_trait=UndefinedPixelTrait;
+      break;
+    }
+    case OnAlphaChannel:
+    {
+      (*status)=SetOpaqueAlphaTrait(image,BlendPixelTrait,(*status),exception);
+      break;
+    }
+    case OpaqueAlphaChannel:
+    {
+      (*status)=SetImageAlpha(image,OpaqueAlpha,exception);
+      break;
+    }
+    default:
+    {
+      SetOffSetAlpha(image,alpha_type,status,exception);
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -885,16 +932,9 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
         break;
       return(SetTransparentRowsToBackground(image,status,exception));
     }
-    case CopyAlphaChannel:
+    default:
     {
-      image->alpha_trait=UpdatePixelTrait;
-      status=CompositeImage(image,image,IntensityCompositeOp,MagickTrue,0,0,
-        exception);
-      break;
-    }
-    case DeactivateAlphaChannel:
-    {
-      status=SetOpaqueAlphaTrait(image,CopyPixelTrait,status,exception);
+      SetCopyExtractAlpha(image,alpha_type,&status,exception);
       break;
     }
     case DisassociateAlphaChannel:
@@ -925,38 +965,11 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
       image->alpha_trait=UndefinedPixelTrait;
       return(status);
     }
-    case DiscreteAlphaChannel:
-    {
-      status=SetOpaqueAlphaTrait(image,UpdatePixelTrait,status,exception);
-      break;
-    }
-    case ExtractAlphaChannel:
-    {
-      status=CompositeImage(image,image,AlphaCompositeOp,MagickTrue,0,0,
-        exception);
-      image->alpha_trait=UndefinedPixelTrait;
-      break;
-    }
     case OffAlphaChannel:
     {
       if ((image->alpha_trait & BlendPixelTrait) == 0)
         return(status);
       image->alpha_trait=UndefinedPixelTrait;
-      break;
-    }
-    default:
-    {
-      SetOffSetAlpha(image,alpha_type,&status,exception);
-      break;
-    }
-    case OnAlphaChannel:
-    {
-      status=SetOpaqueAlphaTrait(image,BlendPixelTrait,status,exception);
-      break;
-    }
-    case OpaqueAlphaChannel:
-    {
-      status=SetImageAlpha(image,OpaqueAlpha,exception);
       break;
     }
   }
