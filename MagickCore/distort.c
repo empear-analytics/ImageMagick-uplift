@@ -1348,6 +1348,107 @@ static double *BilinearCoefficients(double *coeff,const DistortMethod *method,
   return(coeff);
 }
 
+static double *PolynomialCoefficients(double *coeff,
+  const DistortMethod *method,const CoefficientContext *context)
+{
+  const double
+    *const arguments = context->arguments;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const size_t
+    number_arguments = context->number_arguments,
+    number_values = context->number_values,
+    cp_size = context->cp_size,
+    cp_x = context->cp_x,
+    cp_y = context->cp_y,
+    cp_values = context->cp_values;
+
+  size_t
+    i;
+
+  /* Polynomial Distortion
+
+     First two coefficients are used to hole global polynomial information
+       c0 = Order of the polynomial being created
+       c1 = number_of_terms in one polynomial equation
+
+     Rest of the coefficients map to the equations....
+        v = c0 + c1*x + c2*y + c3*x*y + c4*x^2 + c5*y^2 + c6*x^3 + ...
+     for each 'value' (number_values of them) given.
+     As such total coefficients =  2 + number_terms * number_values
+
+     Input Arguments are sets of control points...
+     For Distort Images    order  [u,v, x,y] ...
+     For Sparse Gradients  order  [x,y, r,g,b] ...
+
+     Polynomial Distortion Notes...
+       + UNDER DEVELOPMENT -- Do not expect this to remain as is.
+       + Currently polynomial is a reversed mapped distortion.
+       + Order 1.5 is fudged to map into a bilinear distortion.
+         though it is not the same order as that distortion.
+  */
+  double
+    **matrix,
+    **vectors,
+    *terms;
+
+  size_t
+    nterms;   /* number of polynomial terms per number_values */
+
+  ssize_t
+    j;
+
+  MagickBooleanType
+    status;
+
+  /* first two coefficients hold polynomial order information */
+  coeff[0] = arguments[0];
+  coeff[1] = (double) poly_number_terms(arguments[0]);
+  nterms = CastDoubleToSizeT(coeff[1]);
+
+  /* create matrix, a fake vectors matrix, and least sqs terms */
+  matrix=AcquireMagickMatrix(nterms,nterms);
+  vectors=(double **) AcquireQuantumMemory(number_values,
+    sizeof(*vectors));
+  terms=(double *) AcquireQuantumMemory(nterms,sizeof(*terms));
+  if (IsMatrixMemoryMissing(matrix,vectors,terms) != MagickFalse)
+  {
+    matrix  = RelinquishMagickMatrix(matrix, nterms);
+    vectors = (double **) RelinquishMagickMemory(vectors);
+    terms   = (double *) RelinquishMagickMemory(terms);
+    coeff   = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),
+            ResourceLimitError,"MemoryAllocationFailed",
+            "%s", "DistortCoefficients");
+    return((double *) NULL);
+  }
+  /* fake a number_values x3 vectors matrix from coefficients array */
+  for (i=0; i < number_values; i++)
+    vectors[i] = &(coeff[2+i*nterms]);
+  /* Add given control point pairs for least squares solving */
+  for (i=1; i < number_arguments; i+=cp_size) { /* NB: start = 1 not 0 */
+    for (j=0; j < (ssize_t) nterms; j++)
+      terms[j] = poly_basis_fn(j,arguments[i+cp_x],arguments[i+cp_y]);
+    LeastSquaresAddTerms(matrix,vectors,terms,
+         &(arguments[i+cp_values]),nterms,number_values);
+  }
+  terms = (double *) RelinquishMagickMemory(terms);
+  /* Solve for LeastSquares Coefficients */
+  status=GaussJordanElimination(matrix,vectors,nterms,number_values);
+  matrix  = RelinquishMagickMatrix(matrix, nterms);
+  vectors = (double **) RelinquishMagickMemory(vectors);
+  if ( status == MagickFalse ) {
+    coeff = (double *) RelinquishMagickMemory(coeff);
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument","%s : 'Unsolvable Matrix'",
+        CommandOptionToMnemonic(MagickDistortOptions, *method) );
+    return((double *) NULL);
+  }
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1538,87 +1639,7 @@ static double *GenerateCoefficients(const Image *image,
 #endif
 
     case PolynomialDistortion:
-    {
-      /* Polynomial Distortion
-
-         First two coefficients are used to hole global polynomial information
-           c0 = Order of the polynomial being created
-           c1 = number_of_terms in one polynomial equation
-
-         Rest of the coefficients map to the equations....
-            v = c0 + c1*x + c2*y + c3*x*y + c4*x^2 + c5*y^2 + c6*x^3 + ...
-         for each 'value' (number_values of them) given.
-         As such total coefficients =  2 + number_terms * number_values
-
-         Input Arguments are sets of control points...
-         For Distort Images    order  [u,v, x,y] ...
-         For Sparse Gradients  order  [x,y, r,g,b] ...
-
-         Polynomial Distortion Notes...
-           + UNDER DEVELOPMENT -- Do not expect this to remain as is.
-           + Currently polynomial is a reversed mapped distortion.
-           + Order 1.5 is fudged to map into a bilinear distortion.
-             though it is not the same order as that distortion.
-      */
-      double
-        **matrix,
-        **vectors,
-        *terms;
-
-      size_t
-        nterms;   /* number of polynomial terms per number_values */
-
-      ssize_t
-        j;
-
-      MagickBooleanType
-        status;
-
-      /* first two coefficients hold polynomial order information */
-      coeff[0] = arguments[0];
-      coeff[1] = (double) poly_number_terms(arguments[0]);
-      nterms = CastDoubleToSizeT(coeff[1]);
-
-      /* create matrix, a fake vectors matrix, and least sqs terms */
-      matrix=AcquireMagickMatrix(nterms,nterms);
-      vectors=(double **) AcquireQuantumMemory(number_values,
-        sizeof(*vectors));
-      terms=(double *) AcquireQuantumMemory(nterms,sizeof(*terms));
-      if (IsMatrixMemoryMissing(matrix,vectors,terms) != MagickFalse)
-      {
-        matrix  = RelinquishMagickMatrix(matrix, nterms);
-        vectors = (double **) RelinquishMagickMemory(vectors);
-        terms   = (double *) RelinquishMagickMemory(terms);
-        coeff   = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),
-                ResourceLimitError,"MemoryAllocationFailed",
-                "%s", "DistortCoefficients");
-        return((double *) NULL);
-      }
-      /* fake a number_values x3 vectors matrix from coefficients array */
-      for (i=0; i < number_values; i++)
-        vectors[i] = &(coeff[2+i*nterms]);
-      /* Add given control point pairs for least squares solving */
-      for (i=1; i < number_arguments; i+=cp_size) { /* NB: start = 1 not 0 */
-        for (j=0; j < (ssize_t) nterms; j++)
-          terms[j] = poly_basis_fn(j,arguments[i+cp_x],arguments[i+cp_y]);
-        LeastSquaresAddTerms(matrix,vectors,terms,
-             &(arguments[i+cp_values]),nterms,number_values);
-      }
-      terms = (double *) RelinquishMagickMemory(terms);
-      /* Solve for LeastSquares Coefficients */
-      status=GaussJordanElimination(matrix,vectors,nterms,number_values);
-      matrix  = RelinquishMagickMatrix(matrix, nterms);
-      vectors = (double **) RelinquishMagickMemory(vectors);
-      if ( status == MagickFalse ) {
-        coeff = (double *) RelinquishMagickMemory(coeff);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "InvalidArgument","%s : 'Unsolvable Matrix'",
-            CommandOptionToMnemonic(MagickDistortOptions, *method) );
-        return((double *) NULL);
-      }
-      return(coeff);
-    }
+      return(PolynomialCoefficients(coeff,method,&context));
     case ArcDistortion:
     {
       /* Arc Distortion
