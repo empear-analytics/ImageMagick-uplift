@@ -1216,15 +1216,10 @@ MagickExport Image *ColorMatrixImage(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ColorMatrixRow
-      color_row;
+    const ColorMatrixRow
+      color_row = { image, color_image, color_matrix, image_view, color_view,
+        exception };
 
-    color_row.image=image;
-    color_row.color_image=color_image;
-    color_row.color_matrix=color_matrix;
-    color_row.image_view=image_view;
-    color_row.color_view=color_view;
-    color_row.exception=exception;
     if (ColorMatrixImageRow(&color_row,ColorMatrix,y,&status) == MagickFalse)
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
