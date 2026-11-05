@@ -893,6 +893,33 @@ static MagickBooleanType SyncAlphaChannelCache(Image *image,
   return(SyncImagePixelCache(image,exception));
 }
 
+static MagickBooleanType SetBackgroundAlpha(Image *image,
+  const AlphaChannelOption alpha_type,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  switch (alpha_type)
+  {
+    case BackgroundAlphaChannel:
+    {
+      /*
+        Set transparent pixels to background color.
+      */
+      if ((image->alpha_trait & BlendPixelTrait) == 0)
+        break;
+      status=SetImageStorageClass(image,DirectClass,exception);
+      if (status == MagickFalse)
+        break;
+      return(SetTransparentRowsToBackground(image,status,exception));
+    }
+    default:
+    {
+      SetCopyExtractAlpha(image,alpha_type,&status,exception);
+      break;
+    }
+  }
+  return(SyncAlphaChannelCache(image,status,exception));
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -929,23 +956,8 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
         break;
       return(AssociateAlphaRows(image,status,exception));
     }
-    case BackgroundAlphaChannel:
-    {
-      /*
-        Set transparent pixels to background color.
-      */
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        break;
-      status=SetImageStorageClass(image,DirectClass,exception);
-      if (status == MagickFalse)
-        break;
-      return(SetTransparentRowsToBackground(image,status,exception));
-    }
     default:
-    {
-      SetCopyExtractAlpha(image,alpha_type,&status,exception);
-      break;
-    }
+      return(SetBackgroundAlpha(image,alpha_type,status,exception));
     case DisassociateAlphaChannel:
     {
       /*
