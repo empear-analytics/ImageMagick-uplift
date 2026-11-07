@@ -170,11 +170,25 @@ static ContributionInfo **DestroyContributionTLS(
   return(contribution);
 }
 
-static ContributionInfo **AcquireContributionTLS(const size_t count)
+static ContributionInfo **AcquireContributionRows(
+  ContributionInfo **contribution,const size_t number_threads,
+  const size_t count)
 {
   ssize_t
     i;
 
+  for (i=0; i < (ssize_t) number_threads; i++)
+  {
+    contribution[i]=(ContributionInfo *) MagickAssumeAligned(
+      AcquireAlignedMemory(count,sizeof(**contribution)));
+    if (contribution[i] == (ContributionInfo *) NULL)
+      return(DestroyContributionTLS(contribution));
+  }
+  return(contribution);
+}
+
+static ContributionInfo **AcquireContributionTLS(const size_t count)
+{
   ContributionInfo
     **contribution;
 
@@ -187,14 +201,7 @@ static ContributionInfo **AcquireContributionTLS(const size_t count)
   if (contribution == (ContributionInfo **) NULL)
     return((ContributionInfo **) NULL);
   (void) memset(contribution,0,number_threads*sizeof(*contribution));
-  for (i=0; i < (ssize_t) number_threads; i++)
-  {
-    contribution[i]=(ContributionInfo *) MagickAssumeAligned(
-      AcquireAlignedMemory(count,sizeof(**contribution)));
-    if (contribution[i] == (ContributionInfo *) NULL)
-      return(DestroyContributionTLS(contribution));
-  }
-  return(contribution);
+  return(AcquireContributionRows(contribution,number_threads,count));
 }
 
 static void NormalizeContributions(ContributionInfo *contribution,
