@@ -3655,6 +3655,13 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ClearVignetteOval(Image *oval_image,ExceptionInfo *exception)
+{
+  (void) QueryColorCompliance("#000000",AllCompliance,
+    &oval_image->background_color,exception);
+  (void) SetImageBackgroundColor(oval_image,exception);
+}
+
 MagickExport Image *VignetteImage(const Image *image,const double radius,
   const double sigma,const ssize_t x,const ssize_t y,ExceptionInfo *exception)
 {
@@ -3692,9 +3699,7 @@ MagickExport Image *VignetteImage(const Image *image,const double radius,
       canvas=DestroyImage(canvas);
       return((Image *) NULL);
     }
-  (void) QueryColorCompliance("#000000",AllCompliance,
-    &oval_image->background_color,exception);
-  (void) SetImageBackgroundColor(oval_image,exception);
+  ClearVignetteOval(oval_image,exception);
   draw_info=CloneDrawInfo((const ImageInfo *) NULL,(const DrawInfo *) NULL);
   (void) QueryColorCompliance("#ffffff",AllCompliance,&draw_info->fill,
     exception);
