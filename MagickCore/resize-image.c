@@ -805,6 +805,30 @@ typedef struct _ResizeFilterPass
     y_factor;
 } ResizeFilterPass;
 
+static Image *CloneFilterImage(const ResizeFilterPass *pass,
+  ExceptionInfo *exception)
+{
+  const Image
+    *const image = pass->image;
+
+  const size_t
+    columns = pass->columns,
+    rows = pass->rows;
+
+  const double
+    x_factor = pass->x_factor,
+    y_factor = pass->y_factor;
+
+  Image
+    *filter_image;
+
+  if (x_factor > y_factor)
+    filter_image=CloneImage(image,columns,image->rows,MagickTrue,exception);
+  else
+    filter_image=CloneImage(image,image->columns,rows,MagickTrue,exception);
+  return(filter_image);
+}
+
 static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
   MagickStatusType *status,Image *resize_image,ExceptionInfo *exception)
 {
@@ -834,10 +858,7 @@ static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
   HorizontalFilterPass
     horizontal;
 
-  if (x_factor > y_factor)
-    filter_image=CloneImage(image,columns,image->rows,MagickTrue,exception);
-  else
-    filter_image=CloneImage(image,image->columns,rows,MagickTrue,exception);
+  filter_image=CloneFilterImage(pass,exception);
   if (filter_image == (Image *) NULL)
     return(MagickFalse);
   /*
