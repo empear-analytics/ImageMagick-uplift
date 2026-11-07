@@ -3052,6 +3052,13 @@ static MagickBooleanType SolarizeImageRow(const SolarizeRow *solarize_row,
   return(MagickTrue);
 }
 
+static MagickBooleanType SolarizePseudoClassImage(Image *image,
+  const double threshold,ExceptionInfo *exception)
+{
+  SolarizeColormap(image,threshold);
+  return(SyncImage(image,exception));
+}
+
 MagickExport MagickBooleanType SolarizeImage(Image *image,
   const double threshold,ExceptionInfo *exception)
 {
@@ -3080,8 +3087,7 @@ MagickExport MagickBooleanType SolarizeImage(Image *image,
       /*
         Solarize colormap.
       */
-      SolarizeColormap(image,threshold);
-      return(SyncImage(image,exception));
+      return(SolarizePseudoClassImage(image,threshold,exception));
     }
   /*
     Solarize image.
