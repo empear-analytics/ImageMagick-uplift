@@ -1518,6 +1518,15 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    members its own text reads (each filled with the others, from the variable of its
    name), the block reads them as `name->member`, and each inner call passes `name`
    where it passed `&name`.
+   The same holds in a parallel loop body when the earlier sibling is a nested loop's
+   whole body moved under Recipe PS step 7, its struct declared `const` with its
+   initialiser among the body's declarations (PS step 6), and the later block is the
+   body's head that Recipe PC moves: the head takes that struct in place of PC step 4's
+   own, the typedef and the initialiser (which stays among the body's declarations)
+   gain the members the head reads, the head binds those it reads as `const` locals of
+   their own names (step 4; PC changes no other text), and its inner call passes `name`
+   where it passed `&name`. The declarations the head's variables need move with them
+   (PS step 8's targets struct, whose initialiser names them).
 
 **Before:**
 
@@ -1702,6 +1711,15 @@ block holds `#pragma omp atomic` `progress++`) is the function's last bump; as a
 Image-returning helper (Recipe E step 7's value form) a probe measured 7.50 to 7.65, the
 function leaving *Bumpy Road Ahead*. Added by Claude Code (Claude Opus 5.5) under the
 mandate of 2026-10-24.
+Step 8's PS sibling and PC head (2026-11-07, W15 lane b): `distort.c`'s `DistortImage`,
+whose parallel row loop body, once its column loop body is a PS step 7 helper, keeps a
+head (pixel fetch, the affine filter scaling, the column loop, the sync) before the
+atomic progress block. Before the column loop body moves, PC's helper is a *Complex*
+and *Large Method* (cc 9, 119 lines; the file falls 6.30 to 6.21); after it, with a
+struct of its own, the helper would bind sixteen locals and fill the row struct again
+from them (about 80 lines by count, *Large*); sharing it, the helper is 52 lines with
+no finding, 6.51 to 6.62. Added by Claude Code (Claude Opus
+5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -7654,3 +7672,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | SW | Step 2: a group of the run may hold whole parallel loops under Recipe N step 1's conditions (each loop moved whole and unchanged with its `#if`, pragma and `#endif`; what the region writes or a clause names is a parameter or local of the new function by the same name, never a member); step 1 admits them. Step 3: a `T` that begins with the fill of a Recipe N input struct whose call ends `T` shares that struct: the fill stays in the caller before the new call (step 4), the new function binds the members the run reads as `const` locals, so the run's text is unchanged, and its `T` is the last call alone, passing `name`. *Careful* gives both arguments. Still six steps | `colorspace.c`'s `TransformsRGBImage` (campaign A, W14 lane c): its linear RGB group holds the row loop's `#pragma omp parallel for`, as a helper of its own it clones `LinearGrayTosRGB` (6.56 in a probe); `sRGBTransformImage`'s tail fills `sRGBTableInput` from `colorspace` and `progress` before `sRGBTransformByTables`, so a helper with `T` would take five parameters. A probe of the chain (this recipe on the Log and linear RGB groups of `TransformsRGBImage`, then on the Log/linear RGB and CMYK/gray runs of `sRGBTransformImage`): 7.14 to 7.23, 7.29 and 7.35, both functions leaving *Large Method*, no finding on a new function | owner |
 | 2026-11-05 | AMEND | I | Step 2: a temporary of the block (written before it is read, not read by the caller after the block) goes as a written variable, a member of the targets struct, instead of a local of the new function, when the local would leave a variable written but never read in the new function or in the caller (`-Wunused-but-set-variable`, an error in the CI jobs): the block's read was the caller's only one, or the caller only passes the variable's address on to a callee that writes it. *Careful* gives the argument (the value carried in is never read, the values left behind are dead in the caller). Still eight steps | `montage.c`'s `MontageImageList` (campaign A, W14 lane a): its thumbnail loop writes `image` (read later by the page loop's `ThrowImageException`) and the temporaries `progress_monitor` (whose tile-loop store nobody reads once the loop's restore leaves) and `flags` (read nowhere; its address goes to `GetMontageTileGeometry`); as locals of the helper both draw the warning, in the caller and in the helper. A probe of the loop and its failure test as Recipe I with the three as targets: 8.62 to 8.72, MontageImageList cc 23 to 19, 248 to 227 lines, no finding on the helper | owner |
 | 2026-11-07 | AMEND | PS | Step 6: the helper may read the input struct as `name->member` at every use (Recipe N step 4's member form, as Q step 4 allows), the text then changing by that prefix too; a member a function-like macro names keeps its `const` local. When every member's value is a plain identifier that nothing in the loop body writes, the struct may be declared `const` with the values as its initialiser among the loop body's declarations (PC step 4's form). Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): its column loop body, fourteen inputs, as a step 7 nested-loop helper with `const` locals would be a *Large Method* (about 87 lines by count); in the member form 60 lines, no finding, 6.30 to 6.51 | mandate (2026-10-24) |
+| 2026-11-07 | AMEND | N | Step 8: the sibling and later-block forms also join a PS step 7 nested-loop helper and the parallel body's head moved by PC: the head takes the PS struct (declared `const` with its initialiser among the body's declarations, which stays), the typedef and initialiser gain the members the head reads, the head binds them as `const` locals (PC keeps its text), and the inner call passes `name`. Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): PC before the column body moves gives a *Complex* and *Large* helper (6.30 to 6.21); after it, with its own struct, about 80 lines; sharing the PS struct, 52 lines and no finding, 6.51 to 6.62 | mandate (2026-10-24) |
