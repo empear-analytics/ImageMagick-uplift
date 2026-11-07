@@ -2446,39 +2446,58 @@ static MagickBooleanType Riemersma(const RiemersmaCurve *curve,
   return(status);
 }
 
+static void SetDitherDiffusion(const Image *image,QCubeInfo *cube_info)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"dither:diffusion-amount");
+  if (artifact != (const char *) NULL)
+    cube_info->diffusion=StringToDoubleInterval(artifact,1.0);
+}
+
+static size_t GetRiemersmaLevel(const Image *image)
+{
+  size_t
+    extent,
+    level;
+
+  extent=MagickMax(image->columns,image->rows);
+  level=(size_t) log2((double) extent);
+  if (((size_t) 1UL << level) < extent)
+    level++;
+  return(level);
+}
+
+static void ResetDitherError(QCubeInfo *cube_info)
+{
+  (void) memset(cube_info->error,0,ErrorQueueLength*sizeof(*cube_info->error));
+  cube_info->x=0;
+  cube_info->y=0;
+}
+
 static MagickBooleanType DitherImage(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
   CacheView
     *image_view;
 
-  const char
-    *artifact;
-
   MagickBooleanType
     status;
 
   size_t
-    extent,
     level;
 
   RiemersmaCurve curve;
 
-  artifact=GetImageArtifact(image,"dither:diffusion-amount");
-  if (artifact != (const char *) NULL)
-    cube_info->diffusion=StringToDoubleInterval(artifact,1.0);
+  SetDitherDiffusion(image,cube_info);
   if (cube_info->quantize_info->dither_method != RiemersmaDitherMethod)
     return(FloydSteinbergDither(image,cube_info,exception));
   /*
     Distribute quantization error along a Hilbert curve.
   */
-  (void) memset(cube_info->error,0,ErrorQueueLength*sizeof(*cube_info->error));
-  cube_info->x=0;
-  cube_info->y=0;
-  extent=MagickMax(image->columns,image->rows);
-  level=(size_t) log2((double) extent);
-  if (((size_t) 1UL << level) < extent)
-    level++;
+  ResetDitherError(cube_info);
+  level=GetRiemersmaLevel(image);
   cube_info->offset=0;
   cube_info->span=(MagickSizeType) image->columns*image->rows;
   image_view=AcquireAuthenticCacheView(image,exception);
@@ -2529,17 +2548,36 @@ static MagickBooleanType DitherImage(Image *image,QCubeInfo *cube_info,
 %    o maximum_colors: maximum colors.
 %
 */
-static QCubeInfo *GetQCubeInfo(const QuantizeInfo *quantize_info,
-  const size_t depth,const size_t maximum_colors)
+static void SetQCubeDepth(QCubeInfo *cube_info,const size_t depth)
+{
+  cube_info->depth=depth;
+  if (cube_info->depth > MaxTreeDepth)
+    cube_info->depth=MaxTreeDepth;
+  if (cube_info->depth < 2)
+    cube_info->depth=2;
+}
+
+static void DistributeQCubeWeights(QCubeInfo *cube_info)
 {
   double
     weight;
 
-  QCubeInfo
-    *cube_info;
-
   ssize_t
     i;
+
+  weight=1.0;
+  for (i=0; i < ErrorQueueLength; i++)
+  {
+    cube_info->weights[i]=MagickSafeReciprocal(weight);
+    weight*=exp(log(1.0/ErrorRelativeWeight)/(ErrorQueueLength-1.0));
+  }
+}
+
+static QCubeInfo *GetQCubeInfo(const QuantizeInfo *quantize_info,
+  const size_t depth,const size_t maximum_colors)
+{
+  QCubeInfo
+    *cube_info;
 
   /*
     Initialize tree to describe color cube_info.
@@ -2548,11 +2586,7 @@ static QCubeInfo *GetQCubeInfo(const QuantizeInfo *quantize_info,
   if (cube_info == (QCubeInfo *) NULL)
     return((QCubeInfo *) NULL);
   (void) memset(cube_info,0,sizeof(*cube_info));
-  cube_info->depth=depth;
-  if (cube_info->depth > MaxTreeDepth)
-    cube_info->depth=MaxTreeDepth;
-  if (cube_info->depth < 2)
-    cube_info->depth=2;
+  SetQCubeDepth(cube_info,depth);
   cube_info->maximum_colors=maximum_colors;
   /*
     Initialize root node.
@@ -2575,12 +2609,7 @@ static QCubeInfo *GetQCubeInfo(const QuantizeInfo *quantize_info,
   /*
     Distribute weights along a curve of exponential decay.
   */
-  weight=1.0;
-  for (i=0; i < ErrorQueueLength; i++)
-  {
-    cube_info->weights[i]=MagickSafeReciprocal(weight);
-    weight*=exp(log(1.0/ErrorRelativeWeight)/(ErrorQueueLength-1.0));
-  }
+  DistributeQCubeWeights(cube_info);
   cube_info->diffusion=1.0;
   return(cube_info);
 }
@@ -3573,6 +3602,48 @@ static size_t GetQuantizeMaximumColors(const QuantizeInfo *quantize_info)
   return(maximum_colors);
 }
 
+static MagickBooleanType ClassifyAndAssignColors(QCubeInfo *cube_info,
+  Image *image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=ClassifyImageColors(cube_info,image,exception);
+  if (status != MagickFalse)
+    {
+      /*
+        Reduce the number of colors in the image.
+      */
+      if (cube_info->colors > cube_info->maximum_colors)
+        ReduceImageColors(image,cube_info);
+      status=AssignImageColors(image,cube_info,exception);
+    }
+  return(status);
+}
+
+static size_t GetImageTreeDepth(const QuantizeInfo *quantize_info,
+  const Image *image,const ImageType type,const size_t maximum_colors)
+{
+  size_t
+    depth;
+
+  depth=quantize_info->tree_depth;
+  if (depth == 0)
+    depth=GetQuantizeTreeDepth(quantize_info,image,type,maximum_colors);
+  return(depth);
+}
+
+static ImageType IdentifyQuantizeGray(Image *image,ExceptionInfo *exception)
+{
+  ImageType
+    type;
+
+  type=IdentifyImageGray(image,exception);
+  if (IsGrayImageType(type) != MagickFalse)
+    (void) SetGrayscaleImage(image,exception);
+  return(type);
+}
+
 MagickExport MagickBooleanType QuantizeImage(const QuantizeInfo *quantize_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -3598,12 +3669,8 @@ MagickExport MagickBooleanType QuantizeImage(const QuantizeInfo *quantize_info,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   maximum_colors=GetQuantizeMaximumColors(quantize_info);
-  type=IdentifyImageGray(image,exception);
-  if (IsGrayImageType(type) != MagickFalse)
-    (void) SetGrayscaleImage(image,exception);
-  depth=quantize_info->tree_depth;
-  if (depth == 0)
-    depth=GetQuantizeTreeDepth(quantize_info,image,type,maximum_colors);
+  type=IdentifyQuantizeGray(image,exception);
+  depth=GetImageTreeDepth(quantize_info,image,type,maximum_colors);
   /*
     Initialize color cube.
   */
@@ -3611,16 +3678,7 @@ MagickExport MagickBooleanType QuantizeImage(const QuantizeInfo *quantize_info,
   if (cube_info == (QCubeInfo *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
-  status=ClassifyImageColors(cube_info,image,exception);
-  if (status != MagickFalse)
-    {
-      /*
-        Reduce the number of colors in the image.
-      */
-      if (cube_info->colors > cube_info->maximum_colors)
-        ReduceImageColors(image,cube_info);
-      status=AssignImageColors(image,cube_info,exception);
-    }
+  status=ClassifyAndAssignColors(cube_info,image,exception);
   DestroyQCubeInfo(cube_info);
   return(status);
 }
@@ -3747,6 +3805,22 @@ static void AssignImageSequenceColors(const QuantizeSequence *sequence,
   }
 }
 
+static size_t GetSequenceTreeDepth(const QuantizeInfo *quantize_info,
+  const size_t maximum_colors)
+{
+  size_t
+    depth;
+
+  depth=quantize_info->tree_depth;
+  if (depth == 0)
+    {
+      depth=GetLog4TreeDepth(maximum_colors);
+      if (quantize_info->dither_method != NoDitherMethod)
+        depth--;
+    }
+  return(depth);
+}
+
 MagickExport MagickBooleanType QuantizeImages(const QuantizeInfo *quantize_info,
   Image *images,ExceptionInfo *exception)
 {
@@ -3782,13 +3856,7 @@ MagickExport MagickBooleanType QuantizeImages(const QuantizeInfo *quantize_info,
     }
   status=MagickFalse;
   maximum_colors=GetQuantizeMaximumColors(quantize_info);
-  depth=quantize_info->tree_depth;
-  if (depth == 0)
-    {
-      depth=GetLog4TreeDepth(maximum_colors);
-      if (quantize_info->dither_method != NoDitherMethod)
-        depth--;
-    }
+  depth=GetSequenceTreeDepth(quantize_info,maximum_colors);
   /*
     Initialize color cube.
   */
@@ -4157,6 +4225,23 @@ MagickExport MagickBooleanType RemapImage(const QuantizeInfo *quantize_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType AssignRemapImagesColors(Image *images,
+  QCubeInfo *cube_info,MagickBooleanType status,ExceptionInfo *exception)
+{
+  Image
+    *image;
+
+  cube_info->quantize_info->number_colors=cube_info->colors;
+  image=images;
+  for ( ; image != (Image *) NULL; image=GetNextImageInList(image))
+  {
+    status=AssignImageColors(image,cube_info,exception);
+    if (status == MagickFalse)
+      break;
+  }
+  return(status);
+}
+
 MagickExport MagickBooleanType RemapImages(const QuantizeInfo *quantize_info,
   Image *images,const Image *remap_image,ExceptionInfo *exception)
 {
@@ -4198,14 +4283,7 @@ MagickExport MagickBooleanType RemapImages(const QuantizeInfo *quantize_info,
       /*
         Classify image colors from the reference image.
       */
-      cube_info->quantize_info->number_colors=cube_info->colors;
-      image=images;
-      for ( ; image != (Image *) NULL; image=GetNextImageInList(image))
-      {
-        status=AssignImageColors(image,cube_info,exception);
-        if (status == MagickFalse)
-          break;
-      }
+      status=AssignRemapImagesColors(images,cube_info,status,exception);
     }
   DestroyQCubeInfo(cube_info);
   return(status);
@@ -4405,6 +4483,25 @@ static void SyncQuantizeRow(CacheView *image_view,ExceptionInfo *exception,
     (*status)=MagickFalse;
 }
 
+static void InstallGrayscaleColormap(Image *image,PixelInfo *colormap,
+  ssize_t *colormap_index)
+{
+  ssize_t
+    j;
+
+  j=CompactGrayscaleColormap(image,colormap,colormap_index);
+  image->colors=(size_t) (j+1);
+  image->colormap=(PixelInfo *) RelinquishMagickMemory(image->colormap);
+  image->colormap=colormap;
+}
+
+static void SetGrayscaleImageType(Image *image,ExceptionInfo *exception)
+{
+  image->type=GrayscaleType;
+  if (SetImageMonochrome(image,exception) != MagickFalse)
+    image->type=BilevelType;
+}
+
 static MagickBooleanType SetGrayscaleImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -4422,7 +4519,6 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
 
   ssize_t
     *colormap_index,
-    j,
     y;
 
   assert(image != (Image *) NULL);
@@ -4447,10 +4543,7 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
-  j=CompactGrayscaleColormap(image,colormap,colormap_index);
-  image->colors=(size_t) (j+1);
-  image->colormap=(PixelInfo *) RelinquishMagickMemory(image->colormap);
-  image->colormap=colormap;
+  InstallGrayscaleColormap(image,colormap,colormap_index);
   status=MagickTrue;
   image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -4472,9 +4565,7 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
   }
   image_view=DestroyCacheView(image_view);
   colormap_index=(ssize_t *) RelinquishMagickMemory(colormap_index);
-  image->type=GrayscaleType;
-  if (SetImageMonochrome(image,exception) != MagickFalse)
-    image->type=BilevelType;
+  SetGrayscaleImageType(image,exception);
   return(status);
 }
 
