@@ -363,6 +363,16 @@ static inline MagickBooleanType IsResampleUnweighted(const ssize_t hit,
     divisor_c <= MagickEpsilon ) ? MagickTrue : MagickFalse);
 }
 
+static void FinishCheckerTileBlend(ResampleFilter *resample_filter,
+  const double divisor_c)
+{
+  /* alpha blend */
+  resample_filter->average_pixel.red /= divisor_c;
+  resample_filter->average_pixel.green /= divisor_c;
+  resample_filter->average_pixel.blue /= divisor_c;
+  resample_filter->average_pixel.alpha /= 2; /* 50% blend */
+}
+
 static void BlendCheckerTileAverage(ResampleFilter *resample_filter)
 {
   double
@@ -393,11 +403,7 @@ static void BlendCheckerTileAverage(ResampleFilter *resample_filter)
           resample_filter->image->background_color.alpha;
   divisor_c += weight;
 
-  /* alpha blend */
-  resample_filter->average_pixel.red /= divisor_c;
-  resample_filter->average_pixel.green /= divisor_c;
-  resample_filter->average_pixel.blue /= divisor_c;
-  resample_filter->average_pixel.alpha /= 2; /* 50% blend */
+  FinishCheckerTileBlend(resample_filter,divisor_c);
 }
 
 static void ResetPixelAccumulator(PixelInfo *pixel)
