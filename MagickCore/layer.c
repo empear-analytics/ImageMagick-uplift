@@ -2053,6 +2053,18 @@ static Image *KeepDisposedImage(const Image *next,Image *dispose_image,
   return(dispose_image);
 }
 
+static void ClearTransparencyCanvas(const Image *next,Image *dispose_image,
+  ExceptionInfo *exception)
+{
+  dispose_image->page=next->page;
+  dispose_image->page.x=0;
+  dispose_image->page.y=0;
+  dispose_image->dispose=NoneDispose;
+  dispose_image->background_color.alpha_trait=BlendPixelTrait;
+  dispose_image->background_color.alpha=(MagickRealType) TransparentAlpha;
+  (void) SetImageBackgroundColor(dispose_image,exception);
+}
+
 MagickExport void OptimizeImageTransparency(const Image *image,
      ExceptionInfo *exception)
 {
@@ -2076,13 +2088,7 @@ MagickExport void OptimizeImageTransparency(const Image *image,
     MagickTrue,exception);
   if (dispose_image == (Image *) NULL)
     return;
-  dispose_image->page=next->page;
-  dispose_image->page.x=0;
-  dispose_image->page.y=0;
-  dispose_image->dispose=NoneDispose;
-  dispose_image->background_color.alpha_trait=BlendPixelTrait;
-  dispose_image->background_color.alpha=(MagickRealType) TransparentAlpha;
-  (void) SetImageBackgroundColor(dispose_image,exception);
+  ClearTransparencyCanvas(next,dispose_image,exception);
 
   while ( next != (Image *) NULL )
   {
