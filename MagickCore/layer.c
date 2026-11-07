@@ -409,6 +409,19 @@ static RectangleInfo GetClippedFrameBounds(const Image *previous,
   return(bounds);
 }
 
+static RectangleInfo GetCoalesceBounds(const Image *next)
+{
+  RectangleInfo
+    bounds;
+
+  bounds=next->page;
+  bounds.width=GetCanvasExtent(bounds.width,next->columns,bounds.x);
+  bounds.height=GetCanvasExtent(bounds.height,next->rows,bounds.y);
+  bounds.x=0;
+  bounds.y=0;
+  return(bounds);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -432,11 +445,7 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   next=GetFirstImageInList(image);
-  bounds=next->page;
-  bounds.width=GetCanvasExtent(bounds.width,next->columns,bounds.x);
-  bounds.height=GetCanvasExtent(bounds.height,next->rows,bounds.y);
-  bounds.x=0;
-  bounds.y=0;
+  bounds=GetCoalesceBounds(next);
   if (AcquireCoalesceCanvas(next,bounds,&coalesce_image,exception) ==
       MagickFalse)
     return((Image *) NULL);
