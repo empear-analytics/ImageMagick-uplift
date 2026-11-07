@@ -1061,6 +1061,12 @@ MagickExport Image *SeparateImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsChannelNotUpdated(const PixelTrait traits)
+{
+  return(((traits == UndefinedPixelTrait) || ((traits & UpdatePixelTrait) == 0)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport Image *SeparateImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -1079,7 +1085,7 @@ MagickExport Image *SeparateImages(const Image *image,ExceptionInfo *exception)
   {
     PixelChannel channel = GetPixelChannelChannel(image,i);
     PixelTrait traits = GetPixelChannelTraits(image,channel);
-    if ((traits == UndefinedPixelTrait) || ((traits & UpdatePixelTrait) == 0))
+    if (IsChannelNotUpdated(traits) != MagickFalse)
       continue;
     separate_image=SeparateImage(image,(ChannelType)
       (MagickLLConstant(1) << channel),exception);
