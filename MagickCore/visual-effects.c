@@ -3670,12 +3670,21 @@ static void SetVignetteColors(DrawInfo *draw_info,ExceptionInfo *exception)
     exception);
 }
 
-MagickExport Image *VignetteImage(const Image *image,const double radius,
-  const double sigma,const ssize_t x,const ssize_t y,ExceptionInfo *exception)
+static void SetVignettePrimitive(const Image *image,const ssize_t x,
+  const ssize_t y,DrawInfo *draw_info)
 {
   char
     ellipse[MagickPathExtent];
 
+  (void) FormatLocaleString(ellipse,MagickPathExtent,"ellipse %g,%g,%g,%g,"
+    "0.0,360.0",image->columns/2.0,image->rows/2.0,image->columns/2.0-x,
+    image->rows/2.0-y);
+  draw_info->primitive=AcquireString(ellipse);
+}
+
+MagickExport Image *VignetteImage(const Image *image,const double radius,
+  const double sigma,const ssize_t x,const ssize_t y,ExceptionInfo *exception)
+{
   DrawInfo
     *draw_info;
 
@@ -3710,10 +3719,7 @@ MagickExport Image *VignetteImage(const Image *image,const double radius,
   ClearVignetteOval(oval_image,exception);
   draw_info=CloneDrawInfo((const ImageInfo *) NULL,(const DrawInfo *) NULL);
   SetVignetteColors(draw_info,exception);
-  (void) FormatLocaleString(ellipse,MagickPathExtent,"ellipse %g,%g,%g,%g,"
-    "0.0,360.0",image->columns/2.0,image->rows/2.0,image->columns/2.0-x,
-    image->rows/2.0-y);
-  draw_info->primitive=AcquireString(ellipse);
+  SetVignettePrimitive(image,x,y,draw_info);
   (void) DrawImage(oval_image,draw_info,exception);
   draw_info=DestroyDrawInfo(draw_info);
   blur_image=BlurImage(oval_image,radius,sigma,exception);
