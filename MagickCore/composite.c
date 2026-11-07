@@ -4334,9 +4334,6 @@ static void CompositeImageRow(const CompositeRowInputs *row,
   GetPixelInfo(source_image,&source_pixel);
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    size_t
-      channels;
-
     if (clip_to_self != MagickFalse)
       {
         if (x < x_offset)
@@ -4366,10 +4363,7 @@ static void CompositeImageRow(const CompositeRowInputs *row,
         continue;
       }
     CompositeImagePixel(row,p,q);
-    p+=(ptrdiff_t) GetPixelChannels(source_image);
-    channels=GetPixelChannels(source_image);
-    if (p >= (pixels+channels*source_image->columns))
-      p=pixels;
+    p=AdvanceOverSourcePixel(source_image,pixels,p);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
