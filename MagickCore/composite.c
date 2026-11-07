@@ -3098,7 +3098,83 @@ typedef struct _CompositeRowInputs
     geometry_info;
 } CompositeRowInputs;
 
-static void SetCompositeCoverage(const CompositeRowInputs *row,
+static void SetCompositeCoverageModulus(const CompositeRowInputs *row,
+  const MagickRealType Sa,const MagickRealType Da,MagickRealType *alpha)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  switch (compose)
+  {
+    case DstOutCompositeOp:
+    {
+      (*alpha)=Da*(1.0-Sa);
+      break;
+    }
+    case XorCompositeOp:
+    {
+      (*alpha)=Sa+Da-2.0*Sa*Da;
+      break;
+    }
+    case ModulusAddCompositeOp:
+    {
+      if ((Sa+Da) <= 1.0)
+        {
+          (*alpha)=(Sa+Da);
+          break;
+        }
+      (*alpha)=((Sa+Da)-1.0);
+      break;
+    }
+    case ModulusSubtractCompositeOp:
+    {
+      if ((Sa-Da) >= 0.0)
+        {
+          (*alpha)=(Sa-Da);
+          break;
+        }
+      (*alpha)=((Sa-Da)+1.0);
+      break;
+    }
+    default:
+    {
+      (*alpha)=1.0;
+      break;
+    }
+  }
+}
+
+static void SetCompositeCoverageProduct(const CompositeRowInputs *row,
+  const MagickRealType Sa,const MagickRealType Da,MagickRealType *alpha)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  switch (compose)
+  {
+    case DstAtopCompositeOp:
+    case DstInCompositeOp:
+    case InCompositeOp:
+    case SrcInCompositeOp:
+    {
+      (*alpha)=Sa*Da;
+      break;
+    }
+    case OutCompositeOp:
+    case SrcOutCompositeOp:
+    {
+      (*alpha)=Sa*(1.0-Da);
+      break;
+    }
+    default:
+    {
+      SetCompositeCoverageModulus(row,Sa,Da,alpha);
+      break;
+    }
+  }
+}
+
+static void SetCompositeCoverageDissolve(const CompositeRowInputs *row,
   const MagickRealType Sa,const MagickRealType Da,MagickRealType *alpha)
 {
   const CompositeOperator
@@ -3107,6 +3183,41 @@ static void SetCompositeCoverage(const CompositeRowInputs *row,
   const MagickRealType
     canvas_dissolve = row->canvas_dissolve,
     source_dissolve = row->source_dissolve;
+
+  switch (compose)
+  {
+    case DissolveCompositeOp:
+    {
+      (*alpha)=source_dissolve*Sa*(-canvas_dissolve*Da)+source_dissolve*Sa+
+        canvas_dissolve*Da;
+      break;
+    }
+    case DstOverCompositeOp:
+    case OverCompositeOp:
+    case SrcOverCompositeOp:
+    {
+      (*alpha)=Sa+Da-Sa*Da;
+      break;
+    }
+    case BlendCompositeOp:
+    case PlusCompositeOp:
+    {
+      (*alpha)=RoundToUnity(source_dissolve*Sa+canvas_dissolve*Da);
+      break;
+    }
+    default:
+    {
+      SetCompositeCoverageProduct(row,Sa,Da,alpha);
+      break;
+    }
+  }
+}
+
+static void SetCompositeCoverage(const CompositeRowInputs *row,
+  const MagickRealType Sa,const MagickRealType Da,MagickRealType *alpha)
+{
+  const CompositeOperator
+    compose = row->compose;
 
   switch (compose)
   {
@@ -3146,72 +3257,9 @@ static void SetCompositeCoverage(const CompositeRowInputs *row,
       (*alpha)=RoundToUnity(Sa+Da-Sa*Da);
       break;
     }
-    case DstAtopCompositeOp:
-    case DstInCompositeOp:
-    case InCompositeOp:
-    case SrcInCompositeOp:
-    {
-      (*alpha)=Sa*Da;
-      break;
-    }
-    case DissolveCompositeOp:
-    {
-      (*alpha)=source_dissolve*Sa*(-canvas_dissolve*Da)+source_dissolve*Sa+
-        canvas_dissolve*Da;
-      break;
-    }
-    case DstOverCompositeOp:
-    case OverCompositeOp:
-    case SrcOverCompositeOp:
-    {
-      (*alpha)=Sa+Da-Sa*Da;
-      break;
-    }
-    case DstOutCompositeOp:
-    {
-      (*alpha)=Da*(1.0-Sa);
-      break;
-    }
-    case OutCompositeOp:
-    case SrcOutCompositeOp:
-    {
-      (*alpha)=Sa*(1.0-Da);
-      break;
-    }
-    case BlendCompositeOp:
-    case PlusCompositeOp:
-    {
-      (*alpha)=RoundToUnity(source_dissolve*Sa+canvas_dissolve*Da);
-      break;
-    }
-    case XorCompositeOp:
-    {
-      (*alpha)=Sa+Da-2.0*Sa*Da;
-      break;
-    }
-    case ModulusAddCompositeOp:
-    {
-      if ((Sa+Da) <= 1.0)
-        {
-          (*alpha)=(Sa+Da);
-          break;
-        }
-      (*alpha)=((Sa+Da)-1.0);
-      break;
-    }
-    case ModulusSubtractCompositeOp:
-    {
-      if ((Sa-Da) >= 0.0)
-        {
-          (*alpha)=(Sa-Da);
-          break;
-        }
-      (*alpha)=((Sa-Da)+1.0);
-      break;
-    }
     default:
     {
-      (*alpha)=1.0;
+      SetCompositeCoverageDissolve(row,Sa,Da,alpha);
       break;
     }
   }
