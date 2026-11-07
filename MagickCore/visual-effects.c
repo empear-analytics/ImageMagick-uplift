@@ -2554,6 +2554,15 @@ static MagickBooleanType ShadowBorderImage(const Image *border_image,
   return(status);
 }
 
+static void PrepareShadowClone(const Image *image,Image *clone_image,
+  ExceptionInfo *exception)
+{
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) SetImageColorspace(clone_image,sRGBColorspace,exception);
+  (void) SetImageVirtualPixelMethod(clone_image,EdgeVirtualPixelMethod,
+    exception);
+}
+
 MagickExport Image *ShadowImage(const Image *image,const double alpha,
   const double sigma,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
@@ -2583,10 +2592,7 @@ MagickExport Image *ShadowImage(const Image *image,const double alpha,
   clone_image=CloneImage(image,0,0,MagickTrue,exception);
   if (clone_image == (Image *) NULL)
     return((Image *) NULL);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) SetImageColorspace(clone_image,sRGBColorspace,exception);
-  (void) SetImageVirtualPixelMethod(clone_image,EdgeVirtualPixelMethod,
-    exception);
+  PrepareShadowClone(image,clone_image,exception);
   border_info.width=CastDoubleToSizeT(2.0*sigma+0.5);
   border_info.height=CastDoubleToSizeT(2.0*sigma+0.5);
   border_info.x=0;
