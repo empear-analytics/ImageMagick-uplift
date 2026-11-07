@@ -2073,6 +2073,26 @@ typedef struct _PolaroidFinish
     angle;
 } PolaroidFinish;
 
+static Image *TiltPolaroidImage(Image *polaroid_image,const double angle,
+  ExceptionInfo *exception)
+{
+  Image
+    *rotate_image,
+    *trim_image;
+
+  rotate_image=RotateImage(polaroid_image,angle,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (rotate_image == (Image *) NULL)
+    return((Image *) NULL);
+  polaroid_image=rotate_image;
+  trim_image=TrimImage(polaroid_image,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (trim_image == (Image *) NULL)
+    return((Image *) NULL);
+  polaroid_image=trim_image;
+  return(polaroid_image);
+}
+
 static Image *FinishPolaroidImage(const PolaroidFinish *polaroid_finish,
   Image *picture_image,ExceptionInfo *exception)
 {
@@ -2092,8 +2112,7 @@ static Image *FinishPolaroidImage(const PolaroidFinish *polaroid_finish,
     *bend_image,
     *flop_image,
     *polaroid_image,
-    *rotate_image,
-    *trim_image;
+    *rotate_image;
 
   rotate_image=RotateImage(picture_image,90.0,exception);
   picture_image=DestroyImage(picture_image);
@@ -2132,17 +2151,7 @@ static Image *FinishPolaroidImage(const PolaroidFinish *polaroid_finish,
   picture_image=DestroyImage(picture_image);
   (void) QueryColorCompliance("none",AllCompliance,
     &polaroid_image->background_color,exception);
-  rotate_image=RotateImage(polaroid_image,angle,exception);
-  polaroid_image=DestroyImage(polaroid_image);
-  if (rotate_image == (Image *) NULL)
-    return((Image *) NULL);
-  polaroid_image=rotate_image;
-  trim_image=TrimImage(polaroid_image,exception);
-  polaroid_image=DestroyImage(polaroid_image);
-  if (trim_image == (Image *) NULL)
-    return((Image *) NULL);
-  polaroid_image=trim_image;
-  return(polaroid_image);
+  return(TiltPolaroidImage(polaroid_image,angle,exception));
 }
 
 static void DestroyPolaroidCaption(Image *caption_image)
