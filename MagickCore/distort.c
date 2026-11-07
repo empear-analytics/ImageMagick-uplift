@@ -4507,6 +4507,119 @@ static MagickBooleanType LayoutDistortImage(const DistortLayoutInput *layout,
   return(MagickTrue);
 }
 
+typedef struct _DistortCreateInput
+{
+  const Image
+    *image;
+
+  DistortMethod
+    method;
+
+  double
+    output_scaling;
+
+  RectangleInfo
+    geometry;
+
+  MagickBooleanType
+    bestfit;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  ExceptionInfo
+    *exception;
+} DistortCreateInput;
+
+static MagickBooleanType CreateDistortImage(const DistortCreateInput *create,
+  double *coeff,Image **distort_image)
+{
+  const Image
+    *const image = create->image;
+
+  const DistortMethod
+    method = create->method;
+
+  const double
+    output_scaling = create->output_scaling;
+
+  const RectangleInfo
+    geometry = create->geometry;
+
+  const MagickBooleanType
+    bestfit = create->bestfit;
+
+  const size_t
+    number_arguments = create->number_arguments;
+
+  const double
+    *const arguments = create->arguments;
+
+  ExceptionInfo
+    *const exception = create->exception;
+
+  PixelInfo
+    invalid;  /* the color to assign when distort result is invalid */
+
+
+  /*
+    Initialize the distort image attributes.
+  */
+  (*distort_image)=CloneImage(image,geometry.width,geometry.height,MagickTrue,
+    exception);
+  if ((*distort_image) == (Image *) NULL)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      return(MagickFalse);
+    }
+  /* if image is ColorMapped - change it to DirectClass */
+  if (SetImageStorageClass((*distort_image),DirectClass,exception) == MagickFalse)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      (*distort_image)=DestroyImage((*distort_image));
+      return(MagickFalse);
+    }
+  if ((IsPixelInfoGray(&(*distort_image)->background_color) == MagickFalse) &&
+      (IsGrayColorspace((*distort_image)->colorspace) != MagickFalse))
+    (void) SetImageColorspace((*distort_image),sRGBColorspace,exception);
+  if ((*distort_image)->background_color.alpha_trait != UndefinedPixelTrait)
+    (*distort_image)->alpha_trait=BlendPixelTrait;
+  (*distort_image)->page.x=geometry.x;
+  (*distort_image)->page.y=geometry.y;
+  ConformPixelInfo((*distort_image),&(*distort_image)->matte_color,&invalid,
+    exception);
+
+  { /* ----- MAIN CODE -----
+       Sample the source image to each pixel in the distort image.
+     */
+    DistortRenderInput
+      render;
+
+    MagickBooleanType
+      status;
+
+    render.image=image;
+    render.distort_image=(*distort_image);
+    render.method=method;
+    render.coeff=coeff;
+    render.output_scaling=output_scaling;
+    render.geometry=geometry;
+    render.bestfit=bestfit;
+    render.number_arguments=number_arguments;
+    render.arguments=arguments;
+    render.invalid=invalid;
+    render.exception=exception;
+    status=RenderDistortImage(&render);
+
+    if (status == MagickFalse)
+      (*distort_image)=DestroyImage((*distort_image));
+  }
+  return(MagickTrue);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -4524,14 +4637,14 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   MagickBooleanType
     viewport_given;
 
-  PixelInfo
-    invalid;  /* the color to assign when distort result is invalid */
-
   DistortLayoutInput
     layout;
 
   DistortLayoutTargets
     layout_targets;
+
+  DistortCreateInput
+    create;
 
   const CoefficientInput input = { number_arguments, arguments, 0 };
 
@@ -4570,58 +4683,16 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   if (LayoutDistortImage(&layout,coeff,&layout_targets) == MagickFalse)
     return((Image *) NULL);
 
-  /*
-    Initialize the distort image attributes.
-  */
-  distort_image=CloneImage(image,geometry.width,geometry.height,MagickTrue,
-    exception);
-  if (distort_image == (Image *) NULL)
-    {
-      coeff=(double *) RelinquishMagickMemory(coeff);
-      return((Image *) NULL);
-    }
-  /* if image is ColorMapped - change it to DirectClass */
-  if (SetImageStorageClass(distort_image,DirectClass,exception) == MagickFalse)
-    {
-      coeff=(double *) RelinquishMagickMemory(coeff);
-      distort_image=DestroyImage(distort_image);
-      return((Image *) NULL);
-    }
-  if ((IsPixelInfoGray(&distort_image->background_color) == MagickFalse) &&
-      (IsGrayColorspace(distort_image->colorspace) != MagickFalse))
-    (void) SetImageColorspace(distort_image,sRGBColorspace,exception);
-  if (distort_image->background_color.alpha_trait != UndefinedPixelTrait)
-    distort_image->alpha_trait=BlendPixelTrait;
-  distort_image->page.x=geometry.x;
-  distort_image->page.y=geometry.y;
-  ConformPixelInfo(distort_image,&distort_image->matte_color,&invalid,
-    exception);
-
-  { /* ----- MAIN CODE -----
-       Sample the source image to each pixel in the distort image.
-     */
-    DistortRenderInput
-      render;
-
-    MagickBooleanType
-      status;
-
-    render.image=image;
-    render.distort_image=distort_image;
-    render.method=method;
-    render.coeff=coeff;
-    render.output_scaling=output_scaling;
-    render.geometry=geometry;
-    render.bestfit=bestfit;
-    render.number_arguments=number_arguments;
-    render.arguments=arguments;
-    render.invalid=invalid;
-    render.exception=exception;
-    status=RenderDistortImage(&render);
-
-    if (status == MagickFalse)
-      distort_image=DestroyImage(distort_image);
-  }
+  create.image=image;
+  create.method=method;
+  create.output_scaling=output_scaling;
+  create.geometry=geometry;
+  create.bestfit=bestfit;
+  create.number_arguments=number_arguments;
+  create.arguments=arguments;
+  create.exception=exception;
+  if (CreateDistortImage(&create,coeff,&distort_image) == MagickFalse)
+    return((Image *) NULL);
 
   /* Arc does not return an offset unless 'bestfit' is in effect
      And the user has not provided an overriding 'viewport'.
