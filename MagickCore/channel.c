@@ -965,6 +965,14 @@ static MagickBooleanType SeparateImageRows(const Image *image,
   return(status);
 }
 
+static void SetSeparateImageAttributes(const Image *image,
+  Image *separate_image,ExceptionInfo *exception)
+{
+  separate_image->alpha_trait=UndefinedPixelTrait;
+  (void) SetImageColorspace(separate_image,GRAYColorspace,exception);
+  separate_image->gamma=image->gamma;
+}
+
 MagickExport Image *SeparateImage(const Image *image,
   const ChannelType channel_type,ExceptionInfo *exception)
 {
@@ -991,9 +999,7 @@ MagickExport Image *SeparateImage(const Image *image,
       separate_image=DestroyImage(separate_image);
       return((Image *) NULL);
     }
-  separate_image->alpha_trait=UndefinedPixelTrait;
-  (void) SetImageColorspace(separate_image,GRAYColorspace,exception);
-  separate_image->gamma=image->gamma;
+  SetSeparateImageAttributes(image,separate_image,exception);
   /*
     Separate image.
   */
