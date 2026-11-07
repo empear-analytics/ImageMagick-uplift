@@ -502,6 +502,17 @@ static Image *ExtractChopImage(Image *chop_image,const ChopImageInputs *inputs)
   return(ExtractChopImageBelow(&chop,progress,status));
 }
 
+static RectangleInfo GetChopExtent(const Image *image,
+  const RectangleInfo *chop_info)
+{
+  RectangleInfo
+    extent;
+
+  extent=(*chop_info);
+  extent=ClampChopExtent(image,extent);
+  return(extent);
+}
+
 MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ExceptionInfo *exception)
 {
@@ -526,8 +537,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (IsChopOutsideImage(image,chop_info) != MagickFalse)
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
-  extent=(*chop_info);
-  extent=ClampChopExtent(image,extent);
+  extent=GetChopExtent(image,chop_info);
   if (IsChopExtentTooLarge(image,extent) != MagickFalse)
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
   chop_image=CloneImage(image,image->columns-extent.width,image->rows-
