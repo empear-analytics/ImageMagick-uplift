@@ -2161,6 +2161,15 @@ static ssize_t GetPolaroidQuantum(const Image *image)
   return(quantum);
 }
 
+static void MountPolaroidPicture(const Image *image,Image *picture_image,
+  const ssize_t quantum,ExceptionInfo *exception)
+{
+  picture_image->background_color=image->border_color;
+  (void) SetImageBackgroundColor(picture_image,exception);
+  (void) CompositeImage(picture_image,image,OverCompositeOp,MagickTrue,quantum,
+    quantum,exception);
+}
+
 MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
   const char *caption,const double angle,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -2214,10 +2223,7 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
       DestroyPolaroidCaption(caption_image);
       return((Image *) NULL);
     }
-  picture_image->background_color=image->border_color;
-  (void) SetImageBackgroundColor(picture_image,exception);
-  (void) CompositeImage(picture_image,image,OverCompositeOp,MagickTrue,quantum,
-    quantum,exception);
+  MountPolaroidPicture(image,picture_image,quantum,exception);
   if (caption_image != (Image *) NULL)
     {
       (void) CompositeImage(picture_image,caption_image,OverCompositeOp,
