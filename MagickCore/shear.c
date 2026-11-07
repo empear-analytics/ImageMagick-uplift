@@ -998,6 +998,16 @@ static MagickBooleanType PrepareIntegralImage(Image **integral_image,
   return(MagickTrue);
 }
 
+static PointInfo GetShearAngles(const double x_shear,const double y_shear)
+{
+  PointInfo
+    shear;
+
+  shear.x=(-tan(DegreesToRadians(fmod(x_shear,360.0))));
+  shear.y=tan(DegreesToRadians(fmod(y_shear,360.0)));
+  return(shear);
+}
+
 MagickExport Image *ShearImage(const Image *image,const double x_shear,
   const double y_shear,ExceptionInfo *exception)
 {
@@ -1027,8 +1037,7 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
   integral_image=CloneImage(image,0,0,MagickTrue,exception);
   if (integral_image == (Image *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  shear.x=(-tan(DegreesToRadians(fmod(x_shear,360.0))));
-  shear.y=tan(DegreesToRadians(fmod(y_shear,360.0)));
+  shear=GetShearAngles(x_shear,y_shear);
   if (IsZeroShear(shear) != MagickFalse)
     return(integral_image);
   if (PrepareIntegralImage(&integral_image,exception) == MagickFalse)
