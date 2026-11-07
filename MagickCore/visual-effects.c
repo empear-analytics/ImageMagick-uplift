@@ -3662,6 +3662,14 @@ static void ClearVignetteOval(Image *oval_image,ExceptionInfo *exception)
   (void) SetImageBackgroundColor(oval_image,exception);
 }
 
+static void SetVignetteColors(DrawInfo *draw_info,ExceptionInfo *exception)
+{
+  (void) QueryColorCompliance("#ffffff",AllCompliance,&draw_info->fill,
+    exception);
+  (void) QueryColorCompliance("#ffffff",AllCompliance,&draw_info->stroke,
+    exception);
+}
+
 MagickExport Image *VignetteImage(const Image *image,const double radius,
   const double sigma,const ssize_t x,const ssize_t y,ExceptionInfo *exception)
 {
@@ -3701,10 +3709,7 @@ MagickExport Image *VignetteImage(const Image *image,const double radius,
     }
   ClearVignetteOval(oval_image,exception);
   draw_info=CloneDrawInfo((const ImageInfo *) NULL,(const DrawInfo *) NULL);
-  (void) QueryColorCompliance("#ffffff",AllCompliance,&draw_info->fill,
-    exception);
-  (void) QueryColorCompliance("#ffffff",AllCompliance,&draw_info->stroke,
-    exception);
+  SetVignetteColors(draw_info,exception);
   (void) FormatLocaleString(ellipse,MagickPathExtent,"ellipse %g,%g,%g,%g,"
     "0.0,360.0",image->columns/2.0,image->rows/2.0,image->columns/2.0-x,
     image->rows/2.0-y);
