@@ -169,8 +169,8 @@ static RectangleInfo GetCropGeometry(const PointInfo min,const PointInfo max)
   return(geometry);
 }
 
-static MagickBooleanType CropToFitImage(Image **image,
-  const CropToFitRegion *region,ExceptionInfo *exception)
+static void GetShearedExtent(const CropToFitRegion *region,Image **image,
+  PointInfo *extent)
 {
   const double
     x_shear = region->x_shear,
@@ -180,18 +180,6 @@ static MagickBooleanType CropToFitImage(Image **image,
 
   const MagickBooleanType
     rotate = region->rotate;
-
-  Image
-    *crop_image;
-
-  PointInfo
-    extent[4],
-    min,
-    max;
-
-  RectangleInfo
-    geometry,
-    page;
 
   ssize_t
     i;
@@ -216,6 +204,24 @@ static MagickBooleanType CropToFitImage(Image **image,
     extent[i].x+=(double) (*image)->columns/2.0;
     extent[i].y+=(double) (*image)->rows/2.0;
   }
+}
+
+static MagickBooleanType CropToFitImage(Image **image,
+  const CropToFitRegion *region,ExceptionInfo *exception)
+{
+  Image
+    *crop_image;
+
+  PointInfo
+    extent[4],
+    min,
+    max;
+
+  RectangleInfo
+    geometry,
+    page;
+
+  GetShearedExtent(region,image,extent);
   GetExtentLimits(extent,&min,&max);
   geometry=GetCropGeometry(min,max);
   page=(*image)->page;
