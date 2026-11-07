@@ -749,6 +749,17 @@ static inline MagickBooleanType IsMitchellResize(const Image *image,
     ((x_factor*y_factor) > 1.0)) ? MagickTrue : MagickFalse);
 }
 
+static FilterType SelectDefaultResizeFilter(const Image *image,
+  const double x_factor,const double y_factor,FilterType filter_type)
+{
+  if ((x_factor == 1.0) && (y_factor == 1.0))
+    filter_type=PointFilter;
+  else
+    if (IsMitchellResize(image,x_factor,y_factor) != MagickFalse)
+      filter_type=MitchellFilter;
+  return(filter_type);
+}
+
 static FilterType SelectResizeFilterType(const Image *image,
   const FilterType filter,const double x_factor,const double y_factor)
 {
@@ -759,11 +770,8 @@ static FilterType SelectResizeFilterType(const Image *image,
   if (filter != UndefinedFilter)
     filter_type=filter;
   else
-    if ((x_factor == 1.0) && (y_factor == 1.0))
-      filter_type=PointFilter;
-    else
-      if (IsMitchellResize(image,x_factor,y_factor) != MagickFalse)
-        filter_type=MitchellFilter;
+    filter_type=SelectDefaultResizeFilter(image,x_factor,y_factor,
+      filter_type);
   return(filter_type);
 }
 
