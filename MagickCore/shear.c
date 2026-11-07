@@ -157,6 +157,18 @@ static void GetExtentLimits(const PointInfo *extent,PointInfo *min,
   }
 }
 
+static RectangleInfo GetCropGeometry(const PointInfo min,const PointInfo max)
+{
+  RectangleInfo
+    geometry;
+
+  geometry.x=CastDoubleToSsizeT(ceil(min.x-0.5));
+  geometry.y=CastDoubleToSsizeT(ceil(min.y-0.5));
+  geometry.width=(size_t) CastDoubleToSsizeT(floor(max.x-min.x+0.5));
+  geometry.height=(size_t) CastDoubleToSsizeT(floor(max.y-min.y+0.5));
+  return(geometry);
+}
+
 static MagickBooleanType CropToFitImage(Image **image,
   const CropToFitRegion *region,ExceptionInfo *exception)
 {
@@ -205,10 +217,7 @@ static MagickBooleanType CropToFitImage(Image **image,
     extent[i].y+=(double) (*image)->rows/2.0;
   }
   GetExtentLimits(extent,&min,&max);
-  geometry.x=CastDoubleToSsizeT(ceil(min.x-0.5));
-  geometry.y=CastDoubleToSsizeT(ceil(min.y-0.5));
-  geometry.width=(size_t) CastDoubleToSsizeT(floor(max.x-min.x+0.5));
-  geometry.height=(size_t) CastDoubleToSsizeT(floor(max.y-min.y+0.5));
+  geometry=GetCropGeometry(min,max);
   page=(*image)->page;
   (void) ParseAbsoluteGeometry("0x0+0+0",&(*image)->page);
   crop_image=CropImage(*image,&geometry,exception);
