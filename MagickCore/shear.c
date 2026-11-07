@@ -536,6 +536,18 @@ typedef struct _XShearRow
     *exception;
 } XShearRow;
 
+static void SelectShearDirection(double *displacement,
+  ShearDirection *direction)
+{
+  if (*displacement > 0.0)
+    *direction=RIGHT;
+  else
+    {
+      *displacement*=(-1.0);
+      *direction=LEFT;
+    }
+}
+
 static MagickBooleanType XShearLine(const XShearRow *row,const ssize_t y,
   MagickBooleanType *status)
 {
@@ -587,13 +599,7 @@ static MagickBooleanType XShearLine(const XShearRow *row,const ssize_t y,
   displacement=degrees*(double) (y-height/2.0);
   if (displacement == 0.0)
     return(MagickFalse);
-  if (displacement > 0.0)
-    direction=RIGHT;
-  else
-    {
-      displacement*=(-1.0);
-      direction=LEFT;
-    }
+  SelectShearDirection(&displacement,&direction);
   span_info.image=image;
   span_info.background=background;
   span_info.width=width;
