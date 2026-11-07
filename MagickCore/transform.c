@@ -1160,6 +1160,20 @@ MagickExport Image *ExcerptImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *CompositeExtentImage(const Image *image,Image *extent_image,
+  const RectangleInfo *geometry,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  DisableCompositeClampUnlessSpecified(extent_image);
+  status=CompositeImage(extent_image,image,image->compose,MagickTrue,
+    -geometry->x,-geometry->y,exception);
+  if (status != MagickFalse)
+    Update8BIMClipPath(extent_image,image->columns,image->rows,geometry);
+  return(extent_image);
+}
+
 MagickExport Image *ExtentImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -1189,12 +1203,7 @@ MagickExport Image *ExtentImage(const Image *image,
       extent_image=DestroyImage(extent_image);
       return((Image *) NULL);
     }
-  DisableCompositeClampUnlessSpecified(extent_image);
-  status=CompositeImage(extent_image,image,image->compose,MagickTrue,
-    -geometry->x,-geometry->y,exception);
-  if (status != MagickFalse)
-    Update8BIMClipPath(extent_image,image->columns,image->rows,geometry);
-  return(extent_image);
+  return(CompositeExtentImage(image,extent_image,geometry,exception));
 }
 
 /*
