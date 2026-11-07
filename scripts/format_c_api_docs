@@ -54,6 +54,7 @@ if ( ! GetOptions(
 	 'enhance.c',
 	 'enhance-clahe.c',
 	 'enhance-tone.c',
+	 'enhance-level-colors.c',
 	 'exception.c',
 	 'fx.c',
 	 'image.c',
