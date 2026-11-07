@@ -914,6 +914,20 @@ static Image *SurroundImageWithBorder(const Image *image,Image *integral_image,
   return(rotate_image);
 }
 
+static void ComputeShearBounds(const Image *image,const PointInfo shear,
+  RectangleInfo *bounds)
+{
+  /*
+    Compute image size.
+  */
+  (*bounds).width=(size_t) ((ssize_t) image->columns+CastDoubleToSsizeT(floor(
+    fabs(shear.x)*image->rows+0.5)));
+  (*bounds).x=CastDoubleToSsizeT(ceil((double) image->columns+((fabs(shear.x)*
+    image->rows)-image->columns)/2.0-0.5));
+  (*bounds).y=CastDoubleToSsizeT(ceil((double) image->rows+((fabs(shear.y)*
+    (*bounds).width)-image->rows)/2.0-0.5));
+}
+
 static Image *ShearIntegralImage(const Image *image,Image *integral_image,
   const PointInfo shear,ExceptionInfo *exception)
 {
@@ -930,15 +944,7 @@ static Image *ShearIntegralImage(const Image *image,Image *integral_image,
     first_pass,
     second_pass;
 
-  /*
-    Compute image size.
-  */
-  bounds.width=(size_t) ((ssize_t) image->columns+CastDoubleToSsizeT(floor(
-    fabs(shear.x)*image->rows+0.5)));
-  bounds.x=CastDoubleToSsizeT(ceil((double) image->columns+((fabs(shear.x)*
-    image->rows)-image->columns)/2.0-0.5));
-  bounds.y=CastDoubleToSsizeT(ceil((double) image->rows+((fabs(shear.y)*
-    bounds.width)-image->rows)/2.0-0.5));
+  ComputeShearBounds(image,shear,&bounds);
   /*
     Surround image with border.
   */
