@@ -1789,6 +1789,15 @@ static RectangleInfo GetShaveGeometry(const Image *image,
   return(geometry);
 }
 
+static void ShaveImagePage(Image *shave_image,
+  const RectangleInfo *shave_info)
+{
+  shave_image->page.width-=2*shave_info->width;
+  shave_image->page.height-=2*shave_info->height;
+  shave_image->page.x-=(ssize_t) shave_info->width;
+  shave_image->page.y-=(ssize_t) shave_info->height;
+}
+
 MagickExport Image *ShaveImage(const Image *image,
   const RectangleInfo *shave_info,ExceptionInfo *exception)
 {
@@ -1809,10 +1818,7 @@ MagickExport Image *ShaveImage(const Image *image,
   shave_image=CropImage(image,&geometry,exception);
   if (shave_image == (Image *) NULL)
     return((Image *) NULL);
-  shave_image->page.width-=2*shave_info->width;
-  shave_image->page.height-=2*shave_info->height;
-  shave_image->page.x-=(ssize_t) shave_info->width;
-  shave_image->page.y-=(ssize_t) shave_info->height;
+  ShaveImagePage(shave_image,shave_info);
   return(shave_image);
 }
 
