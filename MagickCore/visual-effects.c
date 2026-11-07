@@ -2691,6 +2691,21 @@ static void SetRandomPixelChannels(const Image *image,
   }
 }
 
+static Image *ToneSketchDodge(Image *dodge_image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=ClampImage(dodge_image,exception);
+  if (status != MagickFalse)
+    status=NormalizeImage(dodge_image,exception);
+  if (status != MagickFalse)
+    status=NegateImage(dodge_image,MagickFalse,exception);
+  if (status != MagickFalse)
+    status=TransformImage(&dodge_image,(char *) NULL,"50%",exception);
+  return(dodge_image);
+}
+
 static Image *BlendSketchImage(const Image *image,Image *blur_image,
   const double radius,ExceptionInfo *exception)
 {
@@ -2699,20 +2714,11 @@ static Image *BlendSketchImage(const Image *image,Image *blur_image,
     *dodge_image,
     *sketch_image;
 
-  MagickBooleanType
-    status;
-
   dodge_image=EdgeImage(blur_image,radius,exception);
   blur_image=DestroyImage(blur_image);
   if (dodge_image == (Image *) NULL)
     return((Image *) NULL);
-  status=ClampImage(dodge_image,exception);
-  if (status != MagickFalse)
-    status=NormalizeImage(dodge_image,exception);
-  if (status != MagickFalse)
-    status=NegateImage(dodge_image,MagickFalse,exception);
-  if (status != MagickFalse)
-    status=TransformImage(&dodge_image,(char *) NULL,"50%",exception);
+  dodge_image=ToneSketchDodge(dodge_image,exception);
   sketch_image=CloneImage(image,0,0,MagickTrue,exception);
   if (sketch_image == (Image *) NULL)
     {
