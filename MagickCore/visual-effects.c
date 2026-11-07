@@ -2151,6 +2151,16 @@ static void DestroyPolaroidCaption(Image *caption_image)
     caption_image=DestroyImage(caption_image);
 }
 
+static ssize_t GetPolaroidQuantum(const Image *image)
+{
+  ssize_t
+    quantum;
+
+  quantum=(ssize_t) MagickMax(MagickMax((double) image->columns,(double)
+    image->rows)/25.0,10.0);
+  return(quantum);
+}
+
 MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
   const char *caption,const double angle,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -2177,8 +2187,7 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  quantum=(ssize_t) MagickMax(MagickMax((double) image->columns,(double)
-    image->rows)/25.0,10.0);
+  quantum=GetPolaroidQuantum(image);
   height=(size_t) ((ssize_t) image->rows+2*quantum);
   caption_image=(Image *) NULL;
   if (caption != (const char *) NULL)
