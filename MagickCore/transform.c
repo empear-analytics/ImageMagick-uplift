@@ -1679,6 +1679,15 @@ static void SetRollOffset(const Image *image,const ssize_t x_offset,
   (*offset).y=WrapRollOffset((*offset).y,image->rows);
 }
 
+static Image *FinishRollImage(const Image *image,Image *roll_image,
+  const MagickStatusType status)
+{
+  roll_image->type=image->type;
+  if (status == MagickFalse)
+    roll_image=DestroyImage(roll_image);
+  return(roll_image);
+}
+
 MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
   const ssize_t y_offset,ExceptionInfo *exception)
 {
@@ -1750,10 +1759,7 @@ MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
   status&=(MagickStatusType) CopyImageRegion(roll_image,image,&fourth_region,
     exception);
   (void) SetImageProgress(image,RollImageTag,3,3);
-  roll_image->type=image->type;
-  if (status == MagickFalse)
-    roll_image=DestroyImage(roll_image);
-  return(roll_image);
+  return(FinishRollImage(image,roll_image,status));
 }
 
 /*
