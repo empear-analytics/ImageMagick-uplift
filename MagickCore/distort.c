@@ -3665,6 +3665,71 @@ static void MapDistortLensPoint(const DistortPointInput *tile,PointInfo *d,
         }
 }
 
+static void MapDistortCurvedPoint(const DistortPointInput *tile,PointInfo *s,
+  PointInfo *d,double *validity)
+{
+  const DistortMethod
+    method = tile->method;
+
+  double
+    *const coeff = tile->coeff;
+
+  const double
+    output_scaling = tile->output_scaling;
+
+  const DistortMapping
+    mapping = tile->mapping;
+
+  const ssize_t
+    i = tile->i,
+    j = tile->j;
+
+        switch (method)
+        {
+          case PolynomialDistortion:
+          {
+            /* multi-ordered polynomial */
+            (*s)=MapPolynomialPoint(&mapping);
+            break;
+          }
+          case ArcDistortion:
+          {
+            (*s)=MapArcPoint(&mapping);
+            break;
+          }
+          case PolarDistortion:
+          { /* 2D Cartesian to Polar View */
+            (*s)=MapPolarPoint(&mapping);
+            break;
+          }
+          case DePolarDistortion:
+          { /* @D Polar to Cartesian  */
+            /* ignore all destination virtual offsets */
+            (*d).x = ((double)i+0.5)*output_scaling*coeff[6]+coeff[4];
+            (*d).y = ((double)j+0.5)*output_scaling*coeff[7]+coeff[1];
+            (*s).x = (*d).y*sin((*d).x) + coeff[2];
+            (*s).y = (*d).y*cos((*d).x) + coeff[3];
+            /* derivatives are useless - better to use SuperSampling */
+            break;
+          }
+          case Cylinder2PlaneDistortion:
+          { /* 3D Cylinder to Tangential Plane */
+            (*s)=MapCylinder2PlanePoint(&mapping);
+            break;
+          }
+          case Plane2CylinderDistortion:
+          { /* 3D Cylinder to Tangential Plane */
+            MapPlane2CylinderPoint(&mapping,&(*d),&(*validity),&(*s));
+            break;
+          }
+          default:
+          {
+            MapDistortLensPoint(tile,&(*d),&(*s));
+            break;
+          }
+        }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -4058,45 +4123,9 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
             /* UNDER DEVELOPMENT */
             break;
 #endif
-          case PolynomialDistortion:
-          {
-            /* multi-ordered polynomial */
-            s=MapPolynomialPoint(&mapping);
-            break;
-          }
-          case ArcDistortion:
-          {
-            s=MapArcPoint(&mapping);
-            break;
-          }
-          case PolarDistortion:
-          { /* 2D Cartesian to Polar View */
-            s=MapPolarPoint(&mapping);
-            break;
-          }
-          case DePolarDistortion:
-          { /* @D Polar to Cartesian  */
-            /* ignore all destination virtual offsets */
-            d.x = ((double)i+0.5)*output_scaling*coeff[6]+coeff[4];
-            d.y = ((double)j+0.5)*output_scaling*coeff[7]+coeff[1];
-            s.x = d.y*sin(d.x) + coeff[2];
-            s.y = d.y*cos(d.x) + coeff[3];
-            /* derivatives are useless - better to use SuperSampling */
-            break;
-          }
-          case Cylinder2PlaneDistortion:
-          { /* 3D Cylinder to Tangential Plane */
-            s=MapCylinder2PlanePoint(&mapping);
-            break;
-          }
-          case Plane2CylinderDistortion:
-          { /* 3D Cylinder to Tangential Plane */
-            MapPlane2CylinderPoint(&mapping,&d,&validity,&s);
-            break;
-          }
           default:
           {
-            MapDistortLensPoint(&tile,&d,&s);
+            MapDistortCurvedPoint(&tile,&s,&d,&validity);
             break;
           }
         }
