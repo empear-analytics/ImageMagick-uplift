@@ -4266,12 +4266,12 @@ static MagickBooleanType DistortImageLine(const DistortLineInput *line,
   return(MagickTrue);
 }
 
+#define DistortImageTag  "Distort/Image"
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
 {
-#define DistortImageTag  "Distort/Image"
-
   double
     *coeff,
     output_scaling;
