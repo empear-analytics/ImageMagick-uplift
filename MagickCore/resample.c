@@ -205,6 +205,19 @@ struct _ResampleFilter
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void InitializeResampleFilter(ResampleFilter *resample_filter,
+  const Image *image,ExceptionInfo *exception)
+{
+  resample_filter->exception=exception;
+  resample_filter->image=ReferenceImage((Image *) image);
+  resample_filter->view=AcquireVirtualCacheView(resample_filter->image,
+    exception);
+  resample_filter->debug=IsEventLogging();
+  resample_filter->image_area=(ssize_t) (image->columns*image->rows);
+  resample_filter->average_defined=MagickFalse;
+  resample_filter->signature=MagickCoreSignature;
+}
+
 MagickExport ResampleFilter *AcquireResampleFilter(const Image *image,
   ExceptionInfo *exception)
 {
@@ -220,14 +233,7 @@ MagickExport ResampleFilter *AcquireResampleFilter(const Image *image,
   resample_filter=(ResampleFilter *) AcquireCriticalMemory(sizeof(
     *resample_filter));
   (void) memset(resample_filter,0,sizeof(*resample_filter));
-  resample_filter->exception=exception;
-  resample_filter->image=ReferenceImage((Image *) image);
-  resample_filter->view=AcquireVirtualCacheView(resample_filter->image,
-    exception);
-  resample_filter->debug=IsEventLogging();
-  resample_filter->image_area=(ssize_t) (image->columns*image->rows);
-  resample_filter->average_defined=MagickFalse;
-  resample_filter->signature=MagickCoreSignature;
+  InitializeResampleFilter(resample_filter,image,exception);
   SetResampleFilter(resample_filter,image->filter);
   (void) SetResampleFilterInterpolateMethod(resample_filter,image->interpolate);
   (void) SetResampleFilterVirtualPixelMethod(resample_filter,
