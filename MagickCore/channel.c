@@ -142,6 +142,13 @@ typedef struct _ChannelRow
     *exception;
 } ChannelRow;
 
+static inline MagickBooleanType IsChannelRowMissing(const Quantum *p,
+  const Quantum *q)
+{
+  return(((p == (const Quantum *) NULL) || (q == (Quantum *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static void CopyChannelPixels(const ChannelRow *row,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
@@ -187,7 +194,7 @@ static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
     row->exception);
   q=GetCacheViewAuthenticPixels(row->destination_view,0,y,
     row->destination_image->columns,1,row->exception);
-  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+  if (IsChannelRowMissing(p,q) != MagickFalse)
     {
       (*status)=MagickFalse;
       return;
@@ -906,7 +913,7 @@ static MagickBooleanType SeparateImageRow(const SeparateRow *row,
     row->exception);
   q=QueueCacheViewAuthenticPixels(row->separate_view,0,y,
     row->separate_image->columns,1,row->exception);
-  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+  if (IsChannelRowMissing(p,q) != MagickFalse)
     {
       (*status)=MagickFalse;
       return(MagickFalse);
