@@ -4057,6 +4057,9 @@ typedef struct _DistortLineInput
   Image
     *distort_image;
 
+  CacheView
+    *distort_view;
+
   DistortMethod
     method;
 
@@ -4086,7 +4089,8 @@ typedef struct _DistortLineInput
     **resample_filter;
 
   PixelInfo
-    invalid;
+    invalid,
+    zero;
 
   ExceptionInfo
     *exception;
@@ -4175,6 +4179,91 @@ static void DistortImagePixel(const DistortLineInput *line,
           (*status)=ResampleDistortPixel(&distort_input,pixel,(*q));
         }
         (*q)+=(ptrdiff_t) GetPixelChannels(line->distort_image);
+}
+
+static MagickBooleanType DistortImageLine(const DistortLineInput *line,
+  MagickBooleanType *status)
+{
+  Image
+    *const distort_image = line->distort_image;
+
+  CacheView
+    *const distort_view = line->distort_view;
+
+  const DistortMethod
+    method = line->method;
+
+  double
+    *const coeff = line->coeff;
+
+  const double
+    output_scaling = line->output_scaling;
+
+  const ssize_t
+    j = line->j;
+
+  const int
+    id = line->id;
+
+  ResampleFilter
+    **const resample_filter = line->resample_filter;
+
+  const PixelInfo
+    zero = line->zero;
+
+  ExceptionInfo
+    *const exception = line->exception;
+
+      double
+        validity;  /* how mathematically valid is this the mapping */
+
+      PixelInfo
+        pixel;    /* pixel color to assign to distorted image */
+
+      ssize_t
+        i;
+
+      Quantum
+        *magick_restrict q;
+
+      const DistortPixelTargets
+        targets = { &validity, &pixel, &q };
+
+      q=QueueCacheViewAuthenticPixels(distort_view,0,j,distort_image->columns,1,
+        exception);
+      if (q == (Quantum *) NULL)
+        {
+          (*status)=MagickFalse;
+          return(MagickFalse);
+        }
+      pixel=zero;
+
+      /* Define constant scaling vectors for Affine Distortions
+        Other methods are either variable, or use interpolated lookup
+      */
+      switch (method)
+      {
+        case AffineDistortion:
+        case RigidAffineDistortion:
+          ScaleFilter( resample_filter[id],
+            coeff[0], coeff[1],
+            coeff[3], coeff[4] );
+          break;
+        default:
+          break;
+      }
+
+      /* Initialize default pixel validity
+      *    negative:         pixel is invalid  output 'matte_color'
+      *    0.0 to 1.0:       antialiased, mix with resample output
+      *    1.0 or greater:   use resampled output.
+      */
+      validity = 1.0;
+
+      for (i=0; i < (ssize_t) distort_image->columns; i++)
+        DistortImagePixel(line,&targets,i,status);
+      SyncDistortRow(status,distort_view,exception);
+  return(MagickTrue);
 }
 
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
@@ -4348,60 +4437,13 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       const int
         id = GetOpenMPThreadId();
 
-      double
-        validity;  /* how mathematically valid is this the mapping */
-
-      PixelInfo
-        pixel;    /* pixel color to assign to distorted image */
-
-      ssize_t
-        i;
-
-      Quantum
-        *magick_restrict q;
-
       const DistortLineInput
-        line = { image, distort_image, method, coeff, output_scaling, geometry,
-          j, id, bestfit, number_arguments, arguments, resample_filter, invalid,
-          exception };
+        line = { image, distort_image, distort_view, method, coeff,
+          output_scaling, geometry, j, id, bestfit, number_arguments,
+          arguments, resample_filter, invalid, zero, exception };
 
-      const DistortPixelTargets
-        targets = { &validity, &pixel, &q };
-
-      q=QueueCacheViewAuthenticPixels(distort_view,0,j,distort_image->columns,1,
-        exception);
-      if (q == (Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      pixel=zero;
-
-      /* Define constant scaling vectors for Affine Distortions
-        Other methods are either variable, or use interpolated lookup
-      */
-      switch (method)
-      {
-        case AffineDistortion:
-        case RigidAffineDistortion:
-          ScaleFilter( resample_filter[id],
-            coeff[0], coeff[1],
-            coeff[3], coeff[4] );
-          break;
-        default:
-          break;
-      }
-
-      /* Initialize default pixel validity
-      *    negative:         pixel is invalid  output 'matte_color'
-      *    0.0 to 1.0:       antialiased, mix with resample output
-      *    1.0 or greater:   use resampled output.
-      */
-      validity = 1.0;
-
-      for (i=0; i < (ssize_t) distort_image->columns; i++)
-        DistortImagePixel(&line,&targets,i,&status);
-      SyncDistortRow(&status,distort_view,exception);
+      if (DistortImageLine(&line,&status) == MagickFalse)
+        continue;
       if (image->progress_monitor != (MagickProgressMonitor) NULL)
         {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
