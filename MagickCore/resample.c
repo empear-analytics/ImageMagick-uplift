@@ -1250,6 +1250,26 @@ typedef struct _ResampleEllipse
     C;
 } ResampleEllipse;
 
+static void SetResampleEllipseBounds(const ResampleEllipse *ellipse,
+  double *F)
+{
+  ResampleFilter
+    *const resample_filter = ellipse->resample_filter;
+
+  const double
+    A = ellipse->A,
+    B = ellipse->B,
+    C = ellipse->C;
+
+  /* Orthogonal bounds of the ellipse */
+  resample_filter->Ulimit = sqrt(C*(*F)/(A*C-0.25*B*B));
+  resample_filter->Vlimit = sqrt(A*(*F)/(A*C-0.25*B*B));
+
+  /* Horizontally aligned parallelogram fitted to Ellipse */
+  resample_filter->Uwidth = sqrt(*F/A); /* Half of the parallelogram width */
+  resample_filter->slope = -B/(2.0*A); /* Reciprocal slope of the parallelogram */
+}
+
 static MagickBooleanType FitResampleEllipse(const ResampleEllipse *ellipse,
   double *F)
 {
@@ -1273,13 +1293,7 @@ static MagickBooleanType FitResampleEllipse(const ResampleEllipse *ellipse,
   *F *= resample_filter->support;
   *F *= resample_filter->support;
 
-  /* Orthogonal bounds of the ellipse */
-  resample_filter->Ulimit = sqrt(C*(*F)/(A*C-0.25*B*B));
-  resample_filter->Vlimit = sqrt(A*(*F)/(A*C-0.25*B*B));
-
-  /* Horizontally aligned parallelogram fitted to Ellipse */
-  resample_filter->Uwidth = sqrt(*F/A); /* Half of the parallelogram width */
-  resample_filter->slope = -B/(2.0*A); /* Reciprocal slope of the parallelogram */
+  SetResampleEllipseBounds(ellipse,F);
 
   return(MagickTrue);
 }
