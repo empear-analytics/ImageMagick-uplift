@@ -4268,6 +4268,130 @@ static MagickBooleanType DistortImageLine(const DistortLineInput *line,
 
 #define DistortImageTag  "Distort/Image"
 
+typedef struct _DistortRenderInput
+{
+  const Image
+    *image;
+
+  Image
+    *distort_image;
+
+  DistortMethod
+    method;
+
+  double
+    *coeff,
+    output_scaling;
+
+  RectangleInfo
+    geometry;
+
+  MagickBooleanType
+    bestfit;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  PixelInfo
+    invalid;
+
+  ExceptionInfo
+    *exception;
+} DistortRenderInput;
+
+static MagickBooleanType RenderDistortImage(const DistortRenderInput *render)
+{
+  const Image
+    *const image = render->image;
+
+  Image
+    *const distort_image = render->distort_image;
+
+  const DistortMethod
+    method = render->method;
+
+  double
+    *const coeff = render->coeff;
+
+  const double
+    output_scaling = render->output_scaling;
+
+  const RectangleInfo
+    geometry = render->geometry;
+
+  const MagickBooleanType
+    bestfit = render->bestfit;
+
+  const size_t
+    number_arguments = render->number_arguments;
+
+  const double
+    *const arguments = render->arguments;
+
+  const PixelInfo
+    invalid = render->invalid;
+
+  ExceptionInfo
+    *const exception = render->exception;
+
+
+    CacheView
+      *distort_view;
+
+    MagickBooleanType
+      status;
+
+    MagickOffsetType
+      progress;
+
+    PixelInfo
+      zero;
+
+    ResampleFilter
+      **magick_restrict resample_filter;
+
+    ssize_t
+      j;
+
+    status=MagickTrue;
+    progress=0;
+    GetPixelInfo(distort_image,&zero);
+    resample_filter=AcquireResampleFilterTLS(image,UndefinedVirtualPixelMethod,
+      MagickFalse,exception);
+    distort_view=AcquireAuthenticCacheView(distort_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+    #pragma omp parallel for schedule(static) shared(progress,status) \
+      magick_number_threads(image,distort_image,distort_image->rows,1)
+#endif
+    for (j=0; j < (ssize_t) distort_image->rows; j++)
+    {
+      const int
+        id = GetOpenMPThreadId();
+
+      const DistortLineInput
+        line = { image, distort_image, distort_view, method, coeff,
+          output_scaling, geometry, j, id, bestfit, number_arguments,
+          arguments, resample_filter, invalid, zero, exception };
+
+      if (DistortImageLine(&line,&status) == MagickFalse)
+        continue;
+      if (image->progress_monitor != (MagickProgressMonitor) NULL)
+        {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+          #pragma omp atomic
+#endif
+          progress++;
+          SetDistortProgress(&status,image,DistortImageTag,progress);
+        }
+    }
+    distort_view=DestroyCacheView(distort_view);
+    resample_filter=DestroyResampleFilterTLS(resample_filter);
+  return(status);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -4404,57 +4528,24 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   { /* ----- MAIN CODE -----
        Sample the source image to each pixel in the distort image.
      */
-    CacheView
-      *distort_view;
+    DistortRenderInput
+      render;
 
     MagickBooleanType
       status;
 
-    MagickOffsetType
-      progress;
-
-    PixelInfo
-      zero;
-
-    ResampleFilter
-      **magick_restrict resample_filter;
-
-    ssize_t
-      j;
-
-    status=MagickTrue;
-    progress=0;
-    GetPixelInfo(distort_image,&zero);
-    resample_filter=AcquireResampleFilterTLS(image,UndefinedVirtualPixelMethod,
-      MagickFalse,exception);
-    distort_view=AcquireAuthenticCacheView(distort_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp parallel for schedule(static) shared(progress,status) \
-      magick_number_threads(image,distort_image,distort_image->rows,1)
-#endif
-    for (j=0; j < (ssize_t) distort_image->rows; j++)
-    {
-      const int
-        id = GetOpenMPThreadId();
-
-      const DistortLineInput
-        line = { image, distort_image, distort_view, method, coeff,
-          output_scaling, geometry, j, id, bestfit, number_arguments,
-          arguments, resample_filter, invalid, zero, exception };
-
-      if (DistortImageLine(&line,&status) == MagickFalse)
-        continue;
-      if (image->progress_monitor != (MagickProgressMonitor) NULL)
-        {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-          #pragma omp atomic
-#endif
-          progress++;
-          SetDistortProgress(&status,image,DistortImageTag,progress);
-        }
-    }
-    distort_view=DestroyCacheView(distort_view);
-    resample_filter=DestroyResampleFilterTLS(resample_filter);
+    render.image=image;
+    render.distort_image=distort_image;
+    render.method=method;
+    render.coeff=coeff;
+    render.output_scaling=output_scaling;
+    render.geometry=geometry;
+    render.bestfit=bestfit;
+    render.number_arguments=number_arguments;
+    render.arguments=arguments;
+    render.invalid=invalid;
+    render.exception=exception;
+    status=RenderDistortImage(&render);
 
     if (status == MagickFalse)
       distort_image=DestroyImage(distort_image);
