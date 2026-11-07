@@ -3265,8 +3265,25 @@ static void SetCompositeCoverage(const CompositeRowInputs *row,
   }
 }
 
-static void CompositeImagePixel(const CompositeRowInputs *row,
-  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+typedef struct _CompositePixelInputs
+{
+  const Quantum
+    *p;
+
+  MagickRealType
+    alpha,
+    Da,
+    Di,
+    Sa,
+    Si;
+
+  const PixelInfo
+    *canvas_pixel,
+    *source_pixel;
+} CompositePixelInputs;
+
+static void CompositeImageChannels(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,Quantum *magick_restrict q)
 {
   Image
     *const image = row->image,
@@ -3300,22 +3317,31 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
   const GeometryInfo
     geometry_info = row->geometry_info;
 
+  const Quantum
+    *const p = authentic->p;
+
+  const MagickRealType
+    alpha = authentic->alpha,
+    Da = authentic->Da,
+    Di = authentic->Di,
+    Sa = authentic->Sa,
+    Si = authentic->Si;
+
+  const PixelInfo
+    *const canvas_pixel = authentic->canvas_pixel,
+    *const source_pixel = authentic->source_pixel;
+
   double
     gamma = 0.0;
 
   MagickRealType
-    alpha = 0.0,
     blend = 0.0,
     D = 0.0,
-    Da = 0.0,
     Dc = 0.0,
     Dca = 0.0,
-    Di = 0.0,
     S = 0.0,
-    Sa = 0.0,
     Sc = 0.0,
-    Sca = 0.0,
-    Si = 0.0;
+    Sca = 0.0;
 
   MagickRealType
     blue = 0.0,
@@ -3325,47 +3351,9 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
     luma = 0.0,
     red = 0.0;
 
-  PixelInfo
-    canvas_pixel,
-    source_pixel;
-
   ssize_t
     i;
 
-  /*
-    Authentic composite:
-      Sa:  normalized source alpha.
-      Da:  normalized canvas alpha.
-  */
-  Sa=QuantumScale*(double) GetPixelAlpha(source_image,p);
-  Da=QuantumScale*(double) GetPixelAlpha(image,q);
-  SetCompositeCoverage(row,Sa,Da,&alpha);
-  switch (compose)
-  {
-    case ColorizeCompositeOp:
-    case HueCompositeOp:
-    case LuminizeCompositeOp:
-    case ModulateCompositeOp:
-    case RMSECompositeOp:
-    case SaturateCompositeOp:
-    {
-      Si=GetPixelIntensity(source_image,p);
-      GetPixelInfoPixel(source_image,p,&source_pixel);
-      GetPixelInfoPixel(image,q,&canvas_pixel);
-      break;
-    }
-    case BumpmapCompositeOp:
-    case CopyAlphaCompositeOp:
-    case DarkenIntensityCompositeOp:
-    case LightenIntensityCompositeOp:
-    {
-      Si=GetPixelIntensity(source_image,p);
-      Di=GetPixelIntensity(image,q);
-      break;
-    }
-    default:
-      break;
-  }
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
     MagickRealType
@@ -3655,11 +3643,11 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
             pixel=Sc;
             break;
           }
-        ConvertRGBToGeneric(colorspace,(double) canvas_pixel.red,
-          (double) canvas_pixel.green,(double) canvas_pixel.blue,
+        ConvertRGBToGeneric(colorspace,(double) (*canvas_pixel).red,
+          (double) (*canvas_pixel).green,(double) (*canvas_pixel).blue,
           white_luminance,illuminant,&sans,&sans,&luma);
-        ConvertRGBToGeneric(colorspace,(double) source_pixel.red,
-          (double) source_pixel.green,(double) source_pixel.blue,
+        ConvertRGBToGeneric(colorspace,(double) (*source_pixel).red,
+          (double) (*source_pixel).green,(double) (*source_pixel).blue,
           white_luminance,illuminant,&hue,&chroma,&sans);
         ConvertGenericToRGB(colorspace,hue,chroma,luma,
           white_luminance,illuminant,&red,&green,&blue);
@@ -3862,11 +3850,11 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
             pixel=Sc;
             break;
           }
-        ConvertRGBToGeneric(colorspace,(double) canvas_pixel.red,
-          (double) canvas_pixel.green,(double) canvas_pixel.blue,
+        ConvertRGBToGeneric(colorspace,(double) (*canvas_pixel).red,
+          (double) (*canvas_pixel).green,(double) (*canvas_pixel).blue,
           white_luminance,illuminant,&hue,&chroma,&luma);
-        ConvertRGBToGeneric(colorspace,(double) source_pixel.red,
-          (double) source_pixel.green,(double) source_pixel.blue,
+        ConvertRGBToGeneric(colorspace,(double) (*source_pixel).red,
+          (double) (*source_pixel).green,(double) (*source_pixel).blue,
           white_luminance,illuminant,&hue,&sans,&sans);
         ConvertGenericToRGB(colorspace,hue,chroma,luma,
           white_luminance,illuminant,&red,&green,&blue);
@@ -3959,11 +3947,11 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
             pixel=Sc;
             break;
           }
-        ConvertRGBToGeneric(colorspace,(double) canvas_pixel.red,
-          (double) canvas_pixel.green,(double) canvas_pixel.blue,
+        ConvertRGBToGeneric(colorspace,(double) (*canvas_pixel).red,
+          (double) (*canvas_pixel).green,(double) (*canvas_pixel).blue,
           white_luminance,illuminant,&hue,&chroma,&luma);
-        ConvertRGBToGeneric(colorspace,(double) source_pixel.red,
-          (double) source_pixel.green,(double) source_pixel.blue,
+        ConvertRGBToGeneric(colorspace,(double) (*source_pixel).red,
+          (double) (*source_pixel).green,(double) (*source_pixel).blue,
           white_luminance,illuminant,&sans,&sans,&luma);
         ConvertGenericToRGB(colorspace,hue,chroma,luma,
           white_luminance,illuminant,&red,&green,&blue);
@@ -4044,8 +4032,8 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
             pixel=Dc;
             break;
           }
-        ConvertRGBToGeneric(colorspace,(double) canvas_pixel.red,
-          (double) canvas_pixel.green,(double) canvas_pixel.blue,
+        ConvertRGBToGeneric(colorspace,(double) (*canvas_pixel).red,
+          (double) (*canvas_pixel).green,(double) (*canvas_pixel).blue,
           white_luminance,illuminant,&hue,&chroma,&luma);
         luma+=(0.01*percent_luma*offset)/midpoint;
         chroma*=0.01*percent_chroma;
@@ -4211,12 +4199,12 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
             break;
           }
         gray=sqrt(
-          (canvas_pixel.red-source_pixel.red)*
-          (canvas_pixel.red-source_pixel.red)+
-          (canvas_pixel.green-source_pixel.green)*
-          (canvas_pixel.green-source_pixel.green)+
-          (canvas_pixel.blue-source_pixel.blue)*
-          (canvas_pixel.blue-source_pixel.blue)/3.0);
+          ((*canvas_pixel).red-(*source_pixel).red)*
+          ((*canvas_pixel).red-(*source_pixel).red)+
+          ((*canvas_pixel).green-(*source_pixel).green)*
+          ((*canvas_pixel).green-(*source_pixel).green)+
+          ((*canvas_pixel).blue-(*source_pixel).blue)*
+          ((*canvas_pixel).blue-(*source_pixel).blue)/3.0);
         switch (channel)
         {
           case RedPixelChannel: pixel=gray; break;
@@ -4238,11 +4226,11 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
             pixel=Sc;
             break;
           }
-        ConvertRGBToGeneric(colorspace,(double) canvas_pixel.red,
-          (double) canvas_pixel.green,(double) canvas_pixel.blue,
+        ConvertRGBToGeneric(colorspace,(double) (*canvas_pixel).red,
+          (double) (*canvas_pixel).green,(double) (*canvas_pixel).blue,
           white_luminance,illuminant,&hue,&chroma,&luma);
-        ConvertRGBToGeneric(colorspace,(double) source_pixel.red,
-          (double) source_pixel.green,(double) source_pixel.blue,
+        ConvertRGBToGeneric(colorspace,(double) (*source_pixel).red,
+          (double) (*source_pixel).green,(double) (*source_pixel).blue,
           white_luminance,illuminant,&sans,&chroma,&sans);
         ConvertGenericToRGB(colorspace,hue,chroma,luma,
           white_luminance,illuminant,&red,&green,&blue);
@@ -4352,6 +4340,75 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
     }
     q[i]=clamp != MagickFalse ? ClampPixel(pixel) : ClampToQuantum(pixel);
   }
+}
+
+static void CompositeImagePixel(const CompositeRowInputs *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  Image
+    *const image = row->image,
+    *const source_image = row->source_image;
+
+  const CompositeOperator
+    compose = row->compose;
+
+  CompositePixelInputs
+    authentic;
+
+  MagickRealType
+    alpha = 0.0,
+    Da = 0.0,
+    Di = 0.0,
+    Sa = 0.0,
+    Si = 0.0;
+
+  PixelInfo
+    canvas_pixel,
+    source_pixel;
+
+  /*
+    Authentic composite:
+      Sa:  normalized source alpha.
+      Da:  normalized canvas alpha.
+  */
+  Sa=QuantumScale*(double) GetPixelAlpha(source_image,p);
+  Da=QuantumScale*(double) GetPixelAlpha(image,q);
+  SetCompositeCoverage(row,Sa,Da,&alpha);
+  switch (compose)
+  {
+    case ColorizeCompositeOp:
+    case HueCompositeOp:
+    case LuminizeCompositeOp:
+    case ModulateCompositeOp:
+    case RMSECompositeOp:
+    case SaturateCompositeOp:
+    {
+      Si=GetPixelIntensity(source_image,p);
+      GetPixelInfoPixel(source_image,p,&source_pixel);
+      GetPixelInfoPixel(image,q,&canvas_pixel);
+      break;
+    }
+    case BumpmapCompositeOp:
+    case CopyAlphaCompositeOp:
+    case DarkenIntensityCompositeOp:
+    case LightenIntensityCompositeOp:
+    {
+      Si=GetPixelIntensity(source_image,p);
+      Di=GetPixelIntensity(image,q);
+      break;
+    }
+    default:
+      break;
+  }
+  authentic.p=p;
+  authentic.alpha=alpha;
+  authentic.Da=Da;
+  authentic.Di=Di;
+  authentic.Sa=Sa;
+  authentic.Si=Si;
+  authentic.canvas_pixel=(&canvas_pixel);
+  authentic.source_pixel=(&source_pixel);
+  CompositeImageChannels(row,&authentic,q);
 }
 
 static void CompositeImageRow(const CompositeRowInputs *row,
