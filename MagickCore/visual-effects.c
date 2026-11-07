@@ -3059,6 +3059,12 @@ static MagickBooleanType SolarizePseudoClassImage(Image *image,
   return(SyncImage(image,exception));
 }
 
+static void ConformSolarizeColorspace(Image *image,ExceptionInfo *exception)
+{
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) SetImageColorspace(image,sRGBColorspace,exception);
+}
+
 MagickExport MagickBooleanType SolarizeImage(Image *image,
   const double threshold,ExceptionInfo *exception)
 {
@@ -3080,8 +3086,7 @@ MagickExport MagickBooleanType SolarizeImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) SetImageColorspace(image,sRGBColorspace,exception);
+  ConformSolarizeColorspace(image,exception);
   if (image->storage_class == PseudoClass)
     {
       /*
