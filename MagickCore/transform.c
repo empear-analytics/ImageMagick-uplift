@@ -147,6 +147,13 @@ static void OrientTopBottomImage(const Image *image,
   }
 }
 
+static Image *ResetImageOrientation(Image *orient_image)
+{
+  if (orient_image != (Image *) NULL)
+    orient_image->orientation=TopLeftOrientation;
+  return(orient_image);
+}
+
 MagickExport Image *AutoOrientImage(const Image *image,
   const OrientationType orientation,ExceptionInfo *exception)
 {
@@ -186,9 +193,7 @@ MagickExport Image *AutoOrientImage(const Image *image,
       break;
     }
   }
-  if (orient_image != (Image *) NULL)
-    orient_image->orientation=TopLeftOrientation;
-  return(orient_image);
+  return(ResetImageOrientation(orient_image));
 }
 
 /*
