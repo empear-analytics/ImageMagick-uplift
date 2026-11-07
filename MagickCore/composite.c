@@ -3282,6 +3282,184 @@ typedef struct _CompositePixelInputs
     *source_pixel;
 } CompositePixelInputs;
 
+static void CompositeAlphaChannel(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,Quantum *magick_restrict q,
+  MagickRealType *pixel)
+{
+  Image
+    *const image = row->image,
+    *const source_image = row->source_image;
+
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickBooleanType
+    compose_sync = row->compose_sync;
+
+  const Quantum
+    *const p = authentic->p;
+
+  const MagickRealType
+    alpha = authentic->alpha,
+    Da = authentic->Da,
+    Di = authentic->Di,
+    Sa = authentic->Sa,
+    Si = authentic->Si;
+
+  switch (compose)
+  {
+    case AlphaCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*Sa;
+      break;
+    }
+    case AtopCompositeOp:
+    case CopyBlackCompositeOp:
+    case CopyBlueCompositeOp:
+    case CopyCyanCompositeOp:
+    case CopyGreenCompositeOp:
+    case CopyMagentaCompositeOp:
+    case CopyRedCompositeOp:
+    case CopyYellowCompositeOp:
+    case SrcAtopCompositeOp:
+    case DstCompositeOp:
+    case NoCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*Da;
+      break;
+    }
+    case BumpmapCompositeOp:
+    {
+      (*pixel)=Si*Da;
+      break;
+    }
+    case ChangeMaskCompositeOp:
+    {
+      ChangeMaskImages
+        images;
+
+      images.image=image;
+      images.source_image=source_image;
+      (*pixel)=GetChangeMaskAlpha(&images,p,q,Da);
+      break;
+    }
+    case ClearCompositeOp:
+    {
+      (*pixel)=(MagickRealType) TransparentAlpha;
+      break;
+    }
+    case ColorizeCompositeOp:
+    case HueCompositeOp:
+    case LuminizeCompositeOp:
+    case RMSECompositeOp:
+    case SaturateCompositeOp:
+    {
+      (*pixel)=GetHueAlpha(Sa,Da,(*pixel));
+      break;
+    }
+    case CopyAlphaCompositeOp:
+    {
+      (*pixel)=GetCopyAlpha(source_image,Si,Sa);
+      break;
+    }
+    case BlurCompositeOp:
+    case CopyCompositeOp:
+    case DisplaceCompositeOp:
+    case DistortCompositeOp:
+    case DstAtopCompositeOp:
+    case ReplaceCompositeOp:
+    case SrcCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*Sa;
+      break;
+    }
+    case DarkenIntensityCompositeOp:
+    {
+      IntensityAlphaInputs
+        intensity;
+
+      intensity.compose_sync=compose_sync;
+      intensity.Sa=Sa;
+      intensity.Da=Da;
+      intensity.Si=Si;
+      intensity.Di=Di;
+      (*pixel)=GetDarkenIntensityAlpha(&intensity,(*pixel));
+      break;
+    }
+    case DifferenceCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*fabs((double) (Sa-Da));
+      break;
+    }
+    case FreezeCompositeOp:
+    {
+      (*pixel)=GetFreezeAlpha(Sa,Da);
+      break;
+    }
+    case InterpolateCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*(0.5-0.25*cos(MagickPI*Sa)-0.25*
+        cos(MagickPI*Da));
+      break;
+    }
+    case LightenIntensityCompositeOp:
+    {
+      IntensityAlphaInputs
+        intensity;
+
+      intensity.compose_sync=compose_sync;
+      intensity.Sa=Sa;
+      intensity.Da=Da;
+      intensity.Si=Si;
+      intensity.Di=Di;
+      (*pixel)=GetLightenIntensityAlpha(&intensity,(*pixel));
+      break;
+    }
+    case ModulateCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*Da;
+      break;
+    }
+    case MultiplyCompositeOp:
+    {
+      MultiplyAlphaInputs
+        multiply;
+
+      multiply.compose_sync=compose_sync;
+      multiply.alpha=alpha;
+      multiply.Sa=Sa;
+      multiply.Da=Da;
+      (*pixel)=GetMultiplyAlpha(&multiply,(*pixel));
+      break;
+    }
+    case NegateCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*((1.0-Sa-Da));
+      break;
+    }
+    case ReflectCompositeOp:
+    {
+      (*pixel)=GetReflectAlpha(Sa,Da);
+      break;
+    }
+    case StampCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*(Sa+Da*Da-1.0);
+      break;
+    }
+    case StereoCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*(Sa+Da)/2;
+      break;
+    }
+    default:
+    {
+      (*pixel)=(double) QuantumRange*alpha;
+      break;
+    }
+  }
+}
+
 static void CompositeImageChannels(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,Quantum *magick_restrict q)
 {
@@ -3371,158 +3549,7 @@ static void CompositeImageChannels(const CompositeRowInputs *row,
         /*
           Set alpha channel.
         */
-        switch (compose)
-        {
-          case AlphaCompositeOp:
-          {
-            pixel=(double) QuantumRange*Sa;
-            break;
-          }
-          case AtopCompositeOp:
-          case CopyBlackCompositeOp:
-          case CopyBlueCompositeOp:
-          case CopyCyanCompositeOp:
-          case CopyGreenCompositeOp:
-          case CopyMagentaCompositeOp:
-          case CopyRedCompositeOp:
-          case CopyYellowCompositeOp:
-          case SrcAtopCompositeOp:
-          case DstCompositeOp:
-          case NoCompositeOp:
-          {
-            pixel=(double) QuantumRange*Da;
-            break;
-          }
-          case BumpmapCompositeOp:
-          {
-            pixel=Si*Da;
-            break;
-          }
-          case ChangeMaskCompositeOp:
-          {
-            ChangeMaskImages
-              images;
-
-            images.image=image;
-            images.source_image=source_image;
-            pixel=GetChangeMaskAlpha(&images,p,q,Da);
-            break;
-          }
-          case ClearCompositeOp:
-          {
-            pixel=(MagickRealType) TransparentAlpha;
-            break;
-          }
-          case ColorizeCompositeOp:
-          case HueCompositeOp:
-          case LuminizeCompositeOp:
-          case RMSECompositeOp:
-          case SaturateCompositeOp:
-          {
-            pixel=GetHueAlpha(Sa,Da,pixel);
-            break;
-          }
-          case CopyAlphaCompositeOp:
-          {
-            pixel=GetCopyAlpha(source_image,Si,Sa);
-            break;
-          }
-          case BlurCompositeOp:
-          case CopyCompositeOp:
-          case DisplaceCompositeOp:
-          case DistortCompositeOp:
-          case DstAtopCompositeOp:
-          case ReplaceCompositeOp:
-          case SrcCompositeOp:
-          {
-            pixel=(double) QuantumRange*Sa;
-            break;
-          }
-          case DarkenIntensityCompositeOp:
-          {
-            IntensityAlphaInputs
-              intensity;
-
-            intensity.compose_sync=compose_sync;
-            intensity.Sa=Sa;
-            intensity.Da=Da;
-            intensity.Si=Si;
-            intensity.Di=Di;
-            pixel=GetDarkenIntensityAlpha(&intensity,pixel);
-            break;
-          }
-          case DifferenceCompositeOp:
-          {
-            pixel=(double) QuantumRange*fabs((double) (Sa-Da));
-            break;
-          }
-          case FreezeCompositeOp:
-          {
-            pixel=GetFreezeAlpha(Sa,Da);
-            break;
-          }
-          case InterpolateCompositeOp:
-          {
-            pixel=(double) QuantumRange*(0.5-0.25*cos(MagickPI*Sa)-0.25*
-              cos(MagickPI*Da));
-            break;
-          }
-          case LightenIntensityCompositeOp:
-          {
-            IntensityAlphaInputs
-              intensity;
-
-            intensity.compose_sync=compose_sync;
-            intensity.Sa=Sa;
-            intensity.Da=Da;
-            intensity.Si=Si;
-            intensity.Di=Di;
-            pixel=GetLightenIntensityAlpha(&intensity,pixel);
-            break;
-          }
-          case ModulateCompositeOp:
-          {
-            pixel=(double) QuantumRange*Da;
-            break;
-          }
-          case MultiplyCompositeOp:
-          {
-            MultiplyAlphaInputs
-              multiply;
-
-            multiply.compose_sync=compose_sync;
-            multiply.alpha=alpha;
-            multiply.Sa=Sa;
-            multiply.Da=Da;
-            pixel=GetMultiplyAlpha(&multiply,pixel);
-            break;
-          }
-          case NegateCompositeOp:
-          {
-            pixel=(double) QuantumRange*((1.0-Sa-Da));
-            break;
-          }
-          case ReflectCompositeOp:
-          {
-            pixel=GetReflectAlpha(Sa,Da);
-            break;
-          }
-          case StampCompositeOp:
-          {
-            pixel=(double) QuantumRange*(Sa+Da*Da-1.0);
-            break;
-          }
-          case StereoCompositeOp:
-          {
-            pixel=(double) QuantumRange*(Sa+Da)/2;
-            break;
-          }
-          default:
-          {
-            pixel=(double) QuantumRange*alpha;
-            break;
-          }
-        }
+        CompositeAlphaChannel(row,authentic,q,&pixel);
         q[i]=clamp != MagickFalse ? ClampPixel(pixel) :
           ClampToQuantum(pixel);
         continue;
