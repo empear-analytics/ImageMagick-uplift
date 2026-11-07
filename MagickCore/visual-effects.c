@@ -3691,6 +3691,19 @@ static void CompositeVignetteMask(Image *canvas,Image *blur_image,
   blur_image=DestroyImage(blur_image);
 }
 
+static Image *FlattenVignetteImage(const Image *image,Image *canvas,
+  ExceptionInfo *exception)
+{
+  Image
+    *vignette_image;
+
+  vignette_image=MergeImageLayers(canvas,FlattenLayer,exception);
+  canvas=DestroyImage(canvas);
+  if (vignette_image != (Image *) NULL)
+    (void) TransformImageColorspace(vignette_image,image->colorspace,exception);
+  return(vignette_image);
+}
+
 MagickExport Image *VignetteImage(const Image *image,const double radius,
   const double sigma,const ssize_t x,const ssize_t y,ExceptionInfo *exception)
 {
@@ -3700,8 +3713,7 @@ MagickExport Image *VignetteImage(const Image *image,const double radius,
   Image
     *canvas,
     *blur_image,
-    *oval_image,
-    *vignette_image;
+    *oval_image;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -3739,11 +3751,7 @@ MagickExport Image *VignetteImage(const Image *image,const double radius,
       return((Image *) NULL);
     }
   CompositeVignetteMask(canvas,blur_image,exception);
-  vignette_image=MergeImageLayers(canvas,FlattenLayer,exception);
-  canvas=DestroyImage(canvas);
-  if (vignette_image != (Image *) NULL)
-    (void) TransformImageColorspace(vignette_image,image->colorspace,exception);
-  return(vignette_image);
+  return(FlattenVignetteImage(image,canvas,exception));
 }
 
 /*
