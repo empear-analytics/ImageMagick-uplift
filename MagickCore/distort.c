@@ -3961,6 +3961,94 @@ static void SetDistortPolarBestFit(const DistortBestFitTile *tile,
     }
 }
 
+typedef struct _DistortBestFitInput
+{
+  const Image
+    *image;
+
+  DistortMethod
+    method;
+
+  size_t
+    number_arguments;
+
+  double
+    *coeff;
+} DistortBestFitInput;
+
+static void SetDistortBestFit(const DistortBestFitInput *fit,
+  RectangleInfo *geometry,MagickBooleanType *bestfit)
+{
+  const Image
+    *const image = fit->image;
+
+  const DistortMethod
+    method = fit->method;
+
+  const size_t
+    number_arguments = fit->number_arguments;
+
+  double
+    *const coeff = fit->coeff;
+
+  /* Work out the 'best fit', (required for ArcDistortion) */
+  if ( (*bestfit) ) {
+    PointInfo
+      s,min,max;  /* source, dest coords --mapping--> min, max coords */
+
+    MagickBooleanType
+      fix_bounds = MagickTrue;   /* enlarge bounds for VP handling */
+
+    DistortBestFitTile
+      tile;
+
+    const DistortBestFitTargets
+      targets = { &min, &max, &fix_bounds, &(*geometry), &(*bestfit) };
+
+    s.x=s.y=min.x=max.x=min.y=max.y=0.0;   /* keep compiler happy */
+
+    tile.method=method;
+    tile.number_arguments=number_arguments;
+    tile.coeff=coeff;
+    switch (method)
+    {
+      case AffineDistortion:
+      case RigidAffineDistortion:
+      {
+        AffineBestFitBounds(coeff,image,&min,&max);
+        break;
+      }
+      case PerspectiveDistortion:
+      {
+        PerspectiveBestFitBounds(coeff,image,&min,&max);
+        break;
+      }
+      case ArcDistortion:
+      {
+        ArcBestFitBounds(coeff,image,&min,&max);
+        break;
+      }
+      default:
+      {
+        SetDistortPolarBestFit(&tile,&targets);
+        break;
+      }
+    }
+
+    /* Set the output image geometry to calculated 'bestfit'.
+       Yes this tends to 'over do' the file image size, ON PURPOSE!
+       Do not do this for DePolar which needs to be exact for virtual tiling.
+    */
+    if ( fix_bounds ) {
+      (*geometry).x = CastDoubleToSsizeT(floor(min.x-0.5));
+      (*geometry).y = CastDoubleToSsizeT(floor(min.y-0.5));
+      (*geometry).width=CastDoubleToSizeT(ceil(max.x-(*geometry).x+0.5));
+      (*geometry).height=CastDoubleToSizeT(ceil(max.y-(*geometry).y+0.5));
+    }
+
+  }  /* end bestfit destination image calculations */
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3988,6 +4076,9 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
 
   DistortScaleTargets
     scale_targets;
+
+  DistortBestFitInput
+    fit;
 
   const CoefficientInput input = { number_arguments, arguments, 0 };
 
@@ -4030,62 +4121,11 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
     bestfit = MagickTrue;  /* always calculate a 'best fit' viewport */
   }
 
-  /* Work out the 'best fit', (required for ArcDistortion) */
-  if ( bestfit ) {
-    PointInfo
-      s,min,max;  /* source, dest coords --mapping--> min, max coords */
-
-    MagickBooleanType
-      fix_bounds = MagickTrue;   /* enlarge bounds for VP handling */
-
-    DistortBestFitTile
-      tile;
-
-    const DistortBestFitTargets
-      targets = { &min, &max, &fix_bounds, &geometry, &bestfit };
-
-    s.x=s.y=min.x=max.x=min.y=max.y=0.0;   /* keep compiler happy */
-
-    tile.method=method;
-    tile.number_arguments=number_arguments;
-    tile.coeff=coeff;
-    switch (method)
-    {
-      case AffineDistortion:
-      case RigidAffineDistortion:
-      {
-        AffineBestFitBounds(coeff,image,&min,&max);
-        break;
-      }
-      case PerspectiveDistortion:
-      {
-        PerspectiveBestFitBounds(coeff,image,&min,&max);
-        break;
-      }
-      case ArcDistortion:
-      {
-        ArcBestFitBounds(coeff,image,&min,&max);
-        break;
-      }
-      default:
-      {
-        SetDistortPolarBestFit(&tile,&targets);
-        break;
-      }
-    }
-
-    /* Set the output image geometry to calculated 'bestfit'.
-       Yes this tends to 'over do' the file image size, ON PURPOSE!
-       Do not do this for DePolar which needs to be exact for virtual tiling.
-    */
-    if ( fix_bounds ) {
-      geometry.x = CastDoubleToSsizeT(floor(min.x-0.5));
-      geometry.y = CastDoubleToSsizeT(floor(min.y-0.5));
-      geometry.width=CastDoubleToSizeT(ceil(max.x-geometry.x+0.5));
-      geometry.height=CastDoubleToSizeT(ceil(max.y-geometry.y+0.5));
-    }
-
-  }  /* end bestfit destination image calculations */
+  fit.image=image;
+  fit.method=method;
+  fit.number_arguments=number_arguments;
+  fit.coeff=coeff;
+  SetDistortBestFit(&fit,&geometry,&bestfit);
 
   /* The user provided a 'viewport' expert option which may
      overrides some parts of the current output image geometry.
