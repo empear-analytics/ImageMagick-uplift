@@ -576,6 +576,14 @@ static void AdvanceSourceImage(const Image **source_image,const char **p,
   (void) GetNextToken((*p),p,MagickPathExtent,token);
 }
 
+static ChannelType AddChannelMaskOption(ChannelType channel_mask,
+  const char *token)
+{
+  channel_mask=(ChannelType) (channel_mask |
+    (MagickLLConstant(1) << ParseChannelOption(token)));
+  return(channel_mask);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -713,8 +721,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
               destination_image=DestroyImageList(destination_image);
               return(destination_image);
             }
-        channel_mask=(ChannelType) (channel_mask |
-          (MagickLLConstant(1) << ParseChannelOption(token)));
+        channel_mask=AddChannelMaskOption(channel_mask,token);
         (void) GetNextToken(p,&p,MagickPathExtent,token);
         break;
       }
