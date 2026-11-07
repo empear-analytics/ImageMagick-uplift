@@ -2575,6 +2575,13 @@ static RectangleInfo GetShadowBorder(const double sigma)
   return(border_info);
 }
 
+static void ClearShadowBorderColor(Image *clone_image,ExceptionInfo *exception)
+{
+  (void) QueryColorCompliance("none",AllCompliance,&clone_image->border_color,
+    exception);
+  clone_image->alpha_trait=BlendPixelTrait;
+}
+
 MagickExport Image *ShadowImage(const Image *image,const double alpha,
   const double sigma,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
@@ -2606,9 +2613,7 @@ MagickExport Image *ShadowImage(const Image *image,const double alpha,
     return((Image *) NULL);
   PrepareShadowClone(image,clone_image,exception);
   border_info=GetShadowBorder(sigma);
-  (void) QueryColorCompliance("none",AllCompliance,&clone_image->border_color,
-    exception);
-  clone_image->alpha_trait=BlendPixelTrait;
+  ClearShadowBorderColor(clone_image,exception);
   border_image=BorderImage(clone_image,&border_info,OverCompositeOp,exception);
   clone_image=DestroyImage(clone_image);
   if (border_image == (Image *) NULL)
