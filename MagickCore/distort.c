@@ -3801,6 +3801,166 @@ static void MapDistortPoint(const DistortPointInput *tile,PointInfo *s,
         }
 }
 
+static void SetDistortNoBestFit(const DistortMethod method,
+  MagickBooleanType *bestfit,MagickBooleanType *fix_bounds)
+{
+    switch (method)
+    {
+      case ShepardsDistortion:
+      case BilinearForwardDistortion:
+      case BilinearReverseDistortion:
+#if 0
+      case QuadrilateralDistortion:
+#endif
+      case PolynomialDistortion:
+      case BarrelDistortion:
+      case BarrelInverseDistortion:
+      default:
+        /* no calculated bestfit available for these distortions */
+        (*bestfit) = MagickFalse;
+        (*fix_bounds) = MagickFalse;
+        break;
+    }
+}
+
+typedef struct _DistortBestFitTile
+{
+  DistortMethod
+    method;
+
+  size_t
+    number_arguments;
+
+  double
+    *coeff;
+} DistortBestFitTile;
+
+static void SetDistortCylinderBestFit(const DistortBestFitTile *tile,
+  RectangleInfo *geometry,MagickBooleanType *fix_bounds,
+  MagickBooleanType *bestfit)
+{
+  const DistortMethod
+    method = tile->method;
+
+  double
+    *const coeff = tile->coeff;
+
+    switch (method)
+    {
+      case Cylinder2PlaneDistortion:
+      {
+        /* direct calculation so center of distortion is either a pixel
+         * center, or pixel edge. This allows for reversibility of the
+         * distortion */
+        (*geometry).x = (*geometry).y = 0;
+        (*geometry).width = CastDoubleToSizeT(ceil( 2.0*coeff[1]*tan(coeff[0]/2.0) ));
+        (*geometry).height = CastDoubleToSizeT(ceil( 2.0*coeff[3]/cos(coeff[0]/2.0) ));
+        /* correct center of distortion relative to new size */
+        coeff[4] = (double) (*geometry).width/2.0;
+        coeff[5] = (double) (*geometry).height/2.0;
+        (*fix_bounds) = MagickFalse;
+        break;
+      }
+      case Plane2CylinderDistortion:
+      {
+        /* direct calculation center is either pixel center, or pixel edge
+         * so as to allow reversibility of the image distortion */
+        (*geometry).x = (*geometry).y = 0;
+        (*geometry).width = CastDoubleToSizeT(ceil(coeff[0]*coeff[1]));  /* FOV * radius */
+        (*geometry).height = CastDoubleToSizeT(2.0*coeff[3]);              /* input image height */
+        /* correct center of distortion relative to new size */
+        coeff[4] = (double) (*geometry).width/2.0;
+        coeff[5] = (double) (*geometry).height/2.0;
+        (*fix_bounds) = MagickFalse;
+        break;
+      }
+      default:
+      {
+        SetDistortNoBestFit(method,&(*bestfit),&(*fix_bounds));
+        break;
+      }
+    }
+}
+
+typedef struct _DistortBestFitTargets
+{
+  PointInfo
+    *min,
+    *max;
+
+  MagickBooleanType
+    *fix_bounds;
+
+  RectangleInfo
+    *geometry;
+
+  MagickBooleanType
+    *bestfit;
+} DistortBestFitTargets;
+
+static void SetDistortPolarBestFit(const DistortBestFitTile *tile,
+  const DistortBestFitTargets *targets)
+{
+  const DistortMethod
+    method = tile->method;
+
+  const size_t
+    number_arguments = tile->number_arguments;
+
+  double
+    *const coeff = tile->coeff;
+
+  PointInfo
+    *const min = targets->min,
+    *const max = targets->max;
+
+  MagickBooleanType
+    *const fix_bounds = targets->fix_bounds;
+
+  RectangleInfo
+    *const geometry = targets->geometry;
+
+  MagickBooleanType
+    *const bestfit = targets->bestfit;
+
+    switch (method)
+    {
+      case PolarDistortion:
+      {
+        if (number_arguments < 2)
+          coeff[2] = coeff[3] = 0.0;
+        (*min).x = coeff[2]-coeff[0];
+        (*max).x = coeff[2]+coeff[0];
+        (*min).y = coeff[3]-coeff[0];
+        (*max).y = coeff[3]+coeff[0];
+        /* should be about 1.0 if Rmin = 0 */
+        coeff[7]=(double) (*geometry).height/(coeff[0]-coeff[1]);
+        break;
+      }
+      case DePolarDistortion:
+      {
+        /* direct calculation as it needs to tile correctly
+         * for reversibility in a DePolar-Polar cycle */
+        (*fix_bounds) = MagickFalse;
+        (*geometry).x = (*geometry).y = 0;
+        (*geometry).height = CastDoubleToSizeT(ceil(coeff[0]-coeff[1]));
+        (*geometry).width = CastDoubleToSizeT(ceil((coeff[0]-coeff[1])*
+          (coeff[5]-coeff[4])*0.5));
+        /* correct scaling factors relative to new size */
+        coeff[6]=(coeff[5]-coeff[4]) * MagickSafeReciprocal(
+          (double) (*geometry).width); /* changed width */
+        coeff[7]=(coeff[0]-coeff[1]) * MagickSafeReciprocal(
+          (double) (*geometry).height); /* should be about 1.0 */
+        break;
+      }
+      default:
+      {
+        SetDistortCylinderBestFit(tile,&(*geometry),&(*fix_bounds),&(*bestfit));
+        break;
+      }
+    }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3878,8 +4038,17 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
     MagickBooleanType
       fix_bounds = MagickTrue;   /* enlarge bounds for VP handling */
 
+    DistortBestFitTile
+      tile;
+
+    const DistortBestFitTargets
+      targets = { &min, &max, &fix_bounds, &geometry, &bestfit };
+
     s.x=s.y=min.x=max.x=min.y=max.y=0.0;   /* keep compiler happy */
 
+    tile.method=method;
+    tile.number_arguments=number_arguments;
+    tile.coeff=coeff;
     switch (method)
     {
       case AffineDistortion:
@@ -3898,75 +4067,11 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         ArcBestFitBounds(coeff,image,&min,&max);
         break;
       }
-      case PolarDistortion:
-      {
-        if (number_arguments < 2)
-          coeff[2] = coeff[3] = 0.0;
-        min.x = coeff[2]-coeff[0];
-        max.x = coeff[2]+coeff[0];
-        min.y = coeff[3]-coeff[0];
-        max.y = coeff[3]+coeff[0];
-        /* should be about 1.0 if Rmin = 0 */
-        coeff[7]=(double) geometry.height/(coeff[0]-coeff[1]);
-        break;
-      }
-      case DePolarDistortion:
-      {
-        /* direct calculation as it needs to tile correctly
-         * for reversibility in a DePolar-Polar cycle */
-        fix_bounds = MagickFalse;
-        geometry.x = geometry.y = 0;
-        geometry.height = CastDoubleToSizeT(ceil(coeff[0]-coeff[1]));
-        geometry.width = CastDoubleToSizeT(ceil((coeff[0]-coeff[1])*
-          (coeff[5]-coeff[4])*0.5));
-        /* correct scaling factors relative to new size */
-        coeff[6]=(coeff[5]-coeff[4]) * MagickSafeReciprocal(
-          (double) geometry.width); /* changed width */
-        coeff[7]=(coeff[0]-coeff[1]) * MagickSafeReciprocal(
-          (double) geometry.height); /* should be about 1.0 */
-        break;
-      }
-      case Cylinder2PlaneDistortion:
-      {
-        /* direct calculation so center of distortion is either a pixel
-         * center, or pixel edge. This allows for reversibility of the
-         * distortion */
-        geometry.x = geometry.y = 0;
-        geometry.width = CastDoubleToSizeT(ceil( 2.0*coeff[1]*tan(coeff[0]/2.0) ));
-        geometry.height = CastDoubleToSizeT(ceil( 2.0*coeff[3]/cos(coeff[0]/2.0) ));
-        /* correct center of distortion relative to new size */
-        coeff[4] = (double) geometry.width/2.0;
-        coeff[5] = (double) geometry.height/2.0;
-        fix_bounds = MagickFalse;
-        break;
-      }
-      case Plane2CylinderDistortion:
-      {
-        /* direct calculation center is either pixel center, or pixel edge
-         * so as to allow reversibility of the image distortion */
-        geometry.x = geometry.y = 0;
-        geometry.width = CastDoubleToSizeT(ceil(coeff[0]*coeff[1]));  /* FOV * radius */
-        geometry.height = CastDoubleToSizeT(2.0*coeff[3]);              /* input image height */
-        /* correct center of distortion relative to new size */
-        coeff[4] = (double) geometry.width/2.0;
-        coeff[5] = (double) geometry.height/2.0;
-        fix_bounds = MagickFalse;
-        break;
-      }
-      case ShepardsDistortion:
-      case BilinearForwardDistortion:
-      case BilinearReverseDistortion:
-#if 0
-      case QuadrilateralDistortion:
-#endif
-      case PolynomialDistortion:
-      case BarrelDistortion:
-      case BarrelInverseDistortion:
       default:
-        /* no calculated bestfit available for these distortions */
-        bestfit = MagickFalse;
-        fix_bounds = MagickFalse;
+      {
+        SetDistortPolarBestFit(&tile,&targets);
         break;
+      }
     }
 
     /* Set the output image geometry to calculated 'bestfit'.
