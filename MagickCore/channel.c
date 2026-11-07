@@ -857,6 +857,27 @@ typedef struct _SeparateRow
     *exception;
 } SeparateRow;
 
+static void SeparateRowPixels(const SeparateRow *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  SeparatePixels
+    pixels;
+
+  ssize_t
+    x;
+
+  pixels.image=row->image;
+  pixels.separate_image=row->separate_image;
+  pixels.channel_type=row->channel_type;
+  for (x=0; x < (ssize_t) row->image->columns; x++)
+  {
+    SetPixelChannel(row->separate_image,GrayPixelChannel,(Quantum) 0,q);
+    SeparatePixelChannel(&pixels,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(row->image);
+    q+=(ptrdiff_t) GetPixelChannels(row->separate_image);
+  }
+}
+
 static MagickBooleanType SeparateImageRow(const SeparateRow *row,
   const ssize_t y,MagickBooleanType *status)
 {
@@ -865,12 +886,6 @@ static MagickBooleanType SeparateImageRow(const SeparateRow *row,
 
   Quantum
     *magick_restrict q;
-
-  SeparatePixels
-    pixels;
-
-  ssize_t
-    x;
 
   if ((*status) == MagickFalse)
     return(MagickFalse);
@@ -883,16 +898,7 @@ static MagickBooleanType SeparateImageRow(const SeparateRow *row,
       (*status)=MagickFalse;
       return(MagickFalse);
     }
-  pixels.image=row->image;
-  pixels.separate_image=row->separate_image;
-  pixels.channel_type=row->channel_type;
-  for (x=0; x < (ssize_t) row->image->columns; x++)
-  {
-    SetPixelChannel(row->separate_image,GrayPixelChannel,(Quantum) 0,q);
-    SeparatePixelChannel(&pixels,p,q);
-    p+=(ptrdiff_t) GetPixelChannels(row->image);
-    q+=(ptrdiff_t) GetPixelChannels(row->separate_image);
-  }
+  SeparateRowPixels(row,p,q);
   if (SyncCacheViewAuthenticPixels(row->separate_view,row->exception) ==
       MagickFalse)
     (*status)=MagickFalse;
