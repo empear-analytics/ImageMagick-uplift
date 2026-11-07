@@ -2895,11 +2895,20 @@ static RectangleInfo ApplyTrimArtifact(const Image *image,
   return(geometry);
 }
 
-MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
+static Image *CropTrimImage(const Image *image,RectangleInfo geometry,
+  ExceptionInfo *exception)
 {
   Image
     *trim_image;
 
+  trim_image=CropImage(image,&geometry,exception);
+  if (trim_image != (Image *) NULL)
+    SetTrimPage(image,geometry,trim_image);
+  return(trim_image);
+}
+
+MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
+{
   RectangleInfo
     geometry;
 
@@ -2912,8 +2921,5 @@ MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
     return(TrimEmptyImage(image,exception));
   geometry=ApplyTrimArtifact(image,geometry);
   geometry=OffsetTrimByPage(image,geometry);
-  trim_image=CropImage(image,&geometry,exception);
-  if (trim_image != (Image *) NULL)
-    SetTrimPage(image,geometry,trim_image);
-  return(trim_image);
+  return(CropTrimImage(image,geometry,exception));
 }
