@@ -155,17 +155,22 @@ typedef struct _HorizontalFilterPass
     *magick_restrict progress;
 } HorizontalFilterPass;
 
-static ContributionInfo **DestroyContributionTLS(
-  ContributionInfo **contribution)
+static void RelinquishContributionRows(ContributionInfo **contribution)
 {
   ssize_t
     i;
 
-  assert(contribution != (ContributionInfo **) NULL);
   for (i=0; i < (ssize_t) GetMagickResourceLimit(ThreadResource); i++)
     if (contribution[i] != (ContributionInfo *) NULL)
       contribution[i]=(ContributionInfo *) RelinquishAlignedMemory(
         contribution[i]);
+}
+
+static ContributionInfo **DestroyContributionTLS(
+  ContributionInfo **contribution)
+{
+  assert(contribution != (ContributionInfo **) NULL);
+  RelinquishContributionRows(contribution);
   contribution=(ContributionInfo **) RelinquishMagickMemory(contribution);
   return(contribution);
 }
