@@ -370,6 +370,13 @@ static MagickBooleanType DestroyFilterResources(CacheView *image_view,
   return(status);
 }
 
+static inline MagickBooleanType IsFilterRowMissing(const Quantum *p,
+  const Quantum *q)
+{
+  return(((p == (const Quantum *) NULL) || (q == (Quantum *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 typedef struct _HorizontalFilterColumn
 {
   const HorizontalFilterPass
@@ -447,7 +454,7 @@ static MagickBooleanType FilterHorizontalColumn(
     column->image->rows,column->exception);
   q=QueueCacheViewAuthenticPixels(column->resize_view,column->x,0,1,
     column->resize_image->rows,column->exception);
-  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+  if (IsFilterRowMissing(p,q) != MagickFalse)
     {
       (*status)=MagickFalse;
       return(MagickFalse);
@@ -717,7 +724,7 @@ static MagickBooleanType VerticalFilter(
       exception);
     q=QueueCacheViewAuthenticPixels(resize_view,0,y,resize_image->columns,1,
       exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsFilterRowMissing(p,q) != MagickFalse)
       {
         status=MagickFalse;
         continue;
