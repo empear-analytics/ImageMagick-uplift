@@ -2378,6 +2378,19 @@ static MagickBooleanType ResizeTransformImage(Image **image,
   return(MagickTrue);
 }
 
+static Image *SelectTransformImage(Image **image,const char *crop_geometry,
+  ExceptionInfo *exception)
+{
+  Image
+    *transform_image;
+
+  transform_image=(*image);
+  if (crop_geometry != (const char *) NULL)
+    transform_image=CropTransformImage(image,transform_image,crop_geometry,
+      exception);
+  return(transform_image);
+}
+
 MagickPrivate MagickBooleanType TransformImage(Image **image,
   const char *crop_geometry,const char *image_geometry,ExceptionInfo *exception)
 {
@@ -2388,10 +2401,7 @@ MagickPrivate MagickBooleanType TransformImage(Image **image,
   assert((*image)->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",(*image)->filename);
-  transform_image=(*image);
-  if (crop_geometry != (const char *) NULL)
-    transform_image=CropTransformImage(image,transform_image,crop_geometry,
-      exception);
+  transform_image=SelectTransformImage(image,crop_geometry,exception);
   if (transform_image == (Image *) NULL)
     return(MagickFalse);
   /*
