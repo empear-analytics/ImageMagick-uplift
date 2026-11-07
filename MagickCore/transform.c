@@ -2850,6 +2850,14 @@ static RectangleInfo ApplyTrimMinSize(const Image *image,
   return(geometry);
 }
 
+static RectangleInfo OffsetTrimByPage(const Image *image,
+  RectangleInfo geometry)
+{
+  geometry.x+=image->page.x;
+  geometry.y+=image->page.y;
+  return(geometry);
+}
+
 MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
 {
   const char
@@ -2871,8 +2879,7 @@ MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
   artifact=GetImageArtifact(image,"trim:minSize");
   if (artifact != (const char *) NULL)
     geometry=ApplyTrimMinSize(image,artifact,geometry);
-  geometry.x+=image->page.x;
-  geometry.y+=image->page.y;
+  geometry=OffsetTrimByPage(image,geometry);
   trim_image=CropImage(image,&geometry,exception);
   if (trim_image != (Image *) NULL)
     SetTrimPage(image,geometry,trim_image);
