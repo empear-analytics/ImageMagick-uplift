@@ -3592,6 +3592,79 @@ static void SyncDistortRow(MagickBooleanType *status,CacheView *view,
     (*status)=MagickFalse;
 }
 
+typedef struct _DistortPointInput
+{
+  DistortMethod
+    method;
+
+  double
+    *coeff,
+    output_scaling;
+
+  DistortMapping
+    mapping;
+
+  ResampleFilter
+    **resample_filter;
+
+  int
+    id;
+
+  ssize_t
+    i,
+    j;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+} DistortPointInput;
+
+static void MapDistortLensPoint(const DistortPointInput *tile,PointInfo *d,
+  PointInfo *s)
+{
+  const DistortMethod
+    method = tile->method;
+
+  double
+    *const coeff = tile->coeff;
+
+  const DistortMapping
+    mapping = tile->mapping;
+
+  const size_t
+    number_arguments = tile->number_arguments;
+
+  const double
+    *const arguments = tile->arguments;
+
+        switch (method)
+        {
+          case BarrelDistortion:
+          case BarrelInverseDistortion:
+          { /* Lens Barrel Distortion Correction */
+            MapBarrelDistortion(&mapping,&(*d),&(*s));
+            break;
+          }
+          case ShepardsDistortion:
+          { /* Shepards Method, or Inverse Weighted Distance for
+               displacement around the destination image control points
+               The input arguments are the coefficients to the function.
+               This is more of a 'displacement' function rather than an
+               absolute distortion function.
+
+               Note: We can not determine derivatives using shepards method
+               so only a point sample interpolation can be used.
+            */
+            (*s)=ShepardsSourcePoint((*d),number_arguments,arguments,coeff);
+            break;
+          }
+          default:
+            break; /* use the default no-op given above */
+        }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3918,6 +3991,9 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         DistortMapping
           mapping;
 
+        DistortPointInput
+          tile;
+
         /* map pixel coordinate to distortion space coordinate */
         d.x = (double) (geometry.x+i+0.5)*output_scaling;
         d.y = (double) (geometry.y+j+0.5)*output_scaling;
@@ -3930,6 +4006,16 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         mapping.image=image;
         mapping.distort_image=distort_image;
         mapping.method=method;
+        tile.method=method;
+        tile.coeff=coeff;
+        tile.output_scaling=output_scaling;
+        tile.mapping=mapping;
+        tile.resample_filter=resample_filter;
+        tile.id=id;
+        tile.i=i;
+        tile.j=j;
+        tile.number_arguments=number_arguments;
+        tile.arguments=arguments;
         switch (method)
         {
           case AffineDistortion:
@@ -4008,27 +4094,11 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
             MapPlane2CylinderPoint(&mapping,&d,&validity,&s);
             break;
           }
-          case BarrelDistortion:
-          case BarrelInverseDistortion:
-          { /* Lens Barrel Distortion Correction */
-            MapBarrelDistortion(&mapping,&d,&s);
-            break;
-          }
-          case ShepardsDistortion:
-          { /* Shepards Method, or Inverse Weighted Distance for
-               displacement around the destination image control points
-               The input arguments are the coefficients to the function.
-               This is more of a 'displacement' function rather than an
-               absolute distortion function.
-
-               Note: We can not determine derivatives using shepards method
-               so only a point sample interpolation can be used.
-            */
-            s=ShepardsSourcePoint(d,number_arguments,arguments,coeff);
-            break;
-          }
           default:
-            break; /* use the default no-op given above */
+          {
+            MapDistortLensPoint(&tile,&d,&s);
+            break;
+          }
         }
         /* map virtual canvas location back to real image coordinate */
         if ( bestfit && method != ArcDistortion ) {
