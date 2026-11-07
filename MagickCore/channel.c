@@ -161,6 +161,13 @@ static void CopyChannelPixels(const ChannelRow *row,
   }
 }
 
+static inline MagickBooleanType IsChannelPairUndefined(
+  const PixelTrait destination_traits,const PixelTrait source_traits)
+{
+  return(((destination_traits == UndefinedPixelTrait) ||
+    (source_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
   MagickBooleanType *status)
 {
@@ -188,8 +195,7 @@ static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
   destination_traits=GetPixelChannelTraits(row->destination_image,
     row->destination_channel);
   source_traits=GetPixelChannelTraits(row->source_image,row->source_channel);
-  if ((destination_traits == UndefinedPixelTrait) ||
-      (source_traits == UndefinedPixelTrait))
+  if (IsChannelPairUndefined(destination_traits,source_traits) != MagickFalse)
     return;
   CopyChannelPixels(row,p,q);
   if (SyncCacheViewAuthenticPixels(row->destination_view,row->exception) ==
