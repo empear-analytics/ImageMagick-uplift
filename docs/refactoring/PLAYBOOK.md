@@ -1472,6 +1472,15 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    new function binds the members its block reads as step 4 does, and steps 3, 5 and
    6 do not apply (no typedef, no local, no assignment). A member the block does not
    read is not bound; the other parameters are as above, at most four in all.
+   The pass-through form also combines: when the caller binds `const` locals from more
+   than one such parameter (a helper that took two names under this form), the new
+   function may take each name the group draws on, unchanged and in the caller's
+   order; and when the block reads, besides those locals, variables computed in the
+   caller's body that would take it past four parameters, those form one new struct
+   by steps 3, 5 and 6 (declared in the caller, filled directly before the call),
+   which the new function takes after the names (`CompositeImageChannels(row,
+   &authentic,q)` in `composite.c`). It binds what its block reads from each as step
+   4 does; at most four parameters in all.
    A variable the block reads on entry and then writes, and that nothing after the
    block reads (Recipe E step 4's input that goes by value: `InterpolatePixelChannel`'s
    `x_offset`, decremented for the 16-neighbour average before the fetch), may be one
@@ -1634,6 +1643,11 @@ static void ThresholdWaveletLevel(float *pixels,
   of the pointer kind, and a copy of an array of structs is not a value C assigns.
 - Every member is assigned before the call: an unassigned member is read uninitialised,
   and nothing checks it but reading (step 8). Count them against the typedef.
+- Under step 2's combined form each passed-through name keeps the pass-through
+  argument below, and the new struct keeps the argument of steps 3 to 6: its members
+  are copied directly before the call from variables the block does not write. The
+  two never hold the same variable (a bound local is never a member of the new
+  struct), so no value is read through two routes.
 - Under step 2's pass-through form the new function reads, through `name`, the
   members its caller's `const` locals were initialised from. The struct is a local of
   the caller's caller, filled directly before that call and written by nothing while
@@ -1702,6 +1716,13 @@ block holds `#pragma omp atomic` `progress++`) is the function's last bump; as a
 Image-returning helper (Recipe E step 7's value form) a probe measured 7.50 to 7.65, the
 function leaving *Bumpy Road Ahead*. Added by Claude Code (Claude Opus 5.5) under the
 mandate of 2026-10-24.
+Step 2's combined form (2026-11-07, task W15): `composite.c`'s `CompositeImagePixel`, a
+helper taking `CompositeRowInputs *row`, whose channel loop reads sixteen locals bound
+from `row` and eight of its own per-pixel values (`Sa`, `Da`, `alpha`, `Si`, `Di`, `p`
+and the two `PixelInfo` values); the loop's colour `switch` then reads values bound
+from both names plus six per-channel values. Without the form every pixel would refill
+a 24-member struct from the locals just bound. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24.
 
 ---
 
@@ -7638,3 +7659,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-05 | AMEND | SD | Step 8: when the groups one step moves write five or six variables of the caller (those the `default` group's call writes through included), the helper takes Recipe Z step 7's `const Targets *targets` after `tile`; the caller declares it `const` once with the addresses as its initialiser and calls `Helper(&tile,&targets);`, the helper binds each member once and passes `&(*v)` on. *Careful* gives the argument. Still eight steps | `effect-preview.c`'s `PreviewImage` (campaign A, W14 lane b): the Roll, Grayscale and Quantize groups with `default` write five variables; a probe 8.42 to 8.58, no finding on the helper | owner |
 | 2026-11-05 | AMEND | SW | Step 2: a group of the run may hold whole parallel loops under Recipe N step 1's conditions (each loop moved whole and unchanged with its `#if`, pragma and `#endif`; what the region writes or a clause names is a parameter or local of the new function by the same name, never a member); step 1 admits them. Step 3: a `T` that begins with the fill of a Recipe N input struct whose call ends `T` shares that struct: the fill stays in the caller before the new call (step 4), the new function binds the members the run reads as `const` locals, so the run's text is unchanged, and its `T` is the last call alone, passing `name`. *Careful* gives both arguments. Still six steps | `colorspace.c`'s `TransformsRGBImage` (campaign A, W14 lane c): its linear RGB group holds the row loop's `#pragma omp parallel for`, as a helper of its own it clones `LinearGrayTosRGB` (6.56 in a probe); `sRGBTransformImage`'s tail fills `sRGBTableInput` from `colorspace` and `progress` before `sRGBTransformByTables`, so a helper with `T` would take five parameters. A probe of the chain (this recipe on the Log and linear RGB groups of `TransformsRGBImage`, then on the Log/linear RGB and CMYK/gray runs of `sRGBTransformImage`): 7.14 to 7.23, 7.29 and 7.35, both functions leaving *Large Method*, no finding on a new function | owner |
 | 2026-11-05 | AMEND | I | Step 2: a temporary of the block (written before it is read, not read by the caller after the block) goes as a written variable, a member of the targets struct, instead of a local of the new function, when the local would leave a variable written but never read in the new function or in the caller (`-Wunused-but-set-variable`, an error in the CI jobs): the block's read was the caller's only one, or the caller only passes the variable's address on to a callee that writes it. *Careful* gives the argument (the value carried in is never read, the values left behind are dead in the caller). Still eight steps | `montage.c`'s `MontageImageList` (campaign A, W14 lane a): its thumbnail loop writes `image` (read later by the page loop's `ThrowImageException`) and the temporaries `progress_monitor` (whose tile-loop store nobody reads once the loop's restore leaves) and `flags` (read nowhere; its address goes to `GetMontageTileGeometry`); as locals of the helper both draw the warning, in the caller and in the helper. A probe of the loop and its failure test as Recipe I with the three as targets: 8.62 to 8.72, MontageImageList cc 23 to 19, 248 to 227 lines, no finding on the helper | owner |
+| 2026-11-07 | AMEND | N | Step 2's pass-through form combines: the new function may take several names the caller binds `const` locals from (unchanged, in the caller's order) and, for variables computed in the caller's body that would take it past four parameters, one new struct by steps 3, 5 and 6; at most four parameters in all. *Careful* gives the argument | `composite.c`'s `CompositeImagePixel` (campaign A, W15): its channel loop reads 16 locals bound from `row` and 8 per-pixel values; the loop's colour `switch` reads from `row`, the per-pixel struct and 6 per-channel values. The three steps that use the form: 3.44 to 3.46 in a probe | mandate (2026-10-24) |
