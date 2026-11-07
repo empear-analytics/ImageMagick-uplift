@@ -1834,6 +1834,13 @@ static void ShaveImagePage(Image *shave_image,
   shave_image->page.y-=(ssize_t) shave_info->height;
 }
 
+static inline MagickBooleanType IsShaveTooLarge(const Image *image,
+  const RectangleInfo *shave_info)
+{
+  return((((2*shave_info->width) >= image->columns) ||
+    ((2*shave_info->height) >= image->rows)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ShaveImage(const Image *image,
   const RectangleInfo *shave_info,ExceptionInfo *exception)
 {
@@ -1847,8 +1854,7 @@ MagickExport Image *ShaveImage(const Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (((2*shave_info->width) >= image->columns) ||
-      ((2*shave_info->height) >= image->rows))
+  if (IsShaveTooLarge(image,shave_info) != MagickFalse)
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
   geometry=GetShaveGeometry(image,shave_info);
   shave_image=CropImage(image,&geometry,exception);
