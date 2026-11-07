@@ -2616,6 +2616,12 @@ static void FillMotionOffsets(OffsetInfo *offset,const size_t width,
   }
 }
 
+static void RelinquishMotionTables(MagickRealType *kernel,OffsetInfo *offset)
+{
+  kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
+  offset=(OffsetInfo *) RelinquishMagickMemory(offset);
+}
+
 MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -2719,8 +2725,7 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   blur_view=DestroyCacheView(blur_view);
   motion_view=DestroyCacheView(motion_view);
   image_view=DestroyCacheView(image_view);
-  kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
-  offset=(OffsetInfo *) RelinquishMagickMemory(offset);
+  RelinquishMotionTables(kernel,offset);
   return(ReleaseFailedImage(blur_image,status));
 }
 
