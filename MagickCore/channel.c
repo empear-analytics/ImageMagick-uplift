@@ -973,6 +973,15 @@ static void SetSeparateImageAttributes(const Image *image,
   separate_image->gamma=image->gamma;
 }
 
+static Image *FinishSeparateImage(Image *separate_image,
+  const MagickBooleanType status)
+{
+  (void) SetImageChannelMask(separate_image,AllChannels);
+  if (status == MagickFalse)
+    separate_image=DestroyImage(separate_image);
+  return(separate_image);
+}
+
 MagickExport Image *SeparateImage(const Image *image,
   const ChannelType channel_type,ExceptionInfo *exception)
 {
@@ -1004,10 +1013,7 @@ MagickExport Image *SeparateImage(const Image *image,
     Separate image.
   */
   status=SeparateImageRows(image,separate_image,channel_type,exception);
-  (void) SetImageChannelMask(separate_image,AllChannels);
-  if (status == MagickFalse)
-    separate_image=DestroyImage(separate_image);
-  return(separate_image);
+  return(FinishSeparateImage(separate_image,status));
 }
 
 /*
