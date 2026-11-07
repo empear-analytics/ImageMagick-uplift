@@ -4392,6 +4392,121 @@ static MagickBooleanType RenderDistortImage(const DistortRenderInput *render)
   return(status);
 }
 
+typedef struct _DistortLayoutInput
+{
+  const Image
+    *image;
+
+  DistortMethod
+    method;
+
+  size_t
+    number_arguments;
+
+  ExceptionInfo
+    *exception;
+} DistortLayoutInput;
+
+typedef struct _DistortLayoutTargets
+{
+  RectangleInfo
+    *geometry;
+
+  MagickBooleanType
+    *bestfit,
+    *viewport_given;
+
+  double
+    *output_scaling;
+} DistortLayoutTargets;
+
+static MagickBooleanType LayoutDistortImage(const DistortLayoutInput *layout,
+  double *coeff,const DistortLayoutTargets *targets)
+{
+  const Image
+    *const image = layout->image;
+
+  const DistortMethod
+    method = layout->method;
+
+  const size_t
+    number_arguments = layout->number_arguments;
+
+  ExceptionInfo
+    *const exception = layout->exception;
+
+  RectangleInfo
+    *const geometry = targets->geometry;
+
+  MagickBooleanType
+    *const bestfit = targets->bestfit,
+    *const viewport_given = targets->viewport_given;
+
+  double
+    *const output_scaling = targets->output_scaling;
+
+  DistortVerboseInput
+    verbose_input;
+
+  DistortScaleTargets
+    scale_targets;
+
+  DistortBestFitInput
+    fit;
+
+  /*
+    Determine the size and offset for a 'bestfit' destination.
+    Usually the four corners of the source image is enough.
+  */
+
+  /* default output image bounds, when no 'bestfit' is requested */
+  (*geometry).width=image->columns;
+  (*geometry).height=image->rows;
+  (*geometry).x=0;
+  (*geometry).y=0;
+
+  if ( method == ArcDistortion ) {
+    (*bestfit) = MagickTrue;  /* always calculate a 'best fit' viewport */
+  }
+
+  fit.image=image;
+  fit.method=method;
+  fit.number_arguments=number_arguments;
+  fit.coeff=coeff;
+  SetDistortBestFit(&fit,geometry,bestfit);
+
+  /* The user provided a 'viewport' expert option which may
+     overrides some parts of the current output image geometry.
+     This also overrides its default 'bestfit' setting.
+  */
+  GetDistortViewport(image,geometry,viewport_given,exception);
+
+  /* Verbose output */
+  verbose_input.image=image;
+  verbose_input.method=method;
+  verbose_input.coeff=coeff;
+  verbose_input.bestfit=(*bestfit);
+  verbose_input.viewport_given=(*viewport_given);
+  verbose_input.geometry=(*geometry);
+  if (PrintDistortVerbose(&verbose_input,exception) == MagickFalse)
+    return(MagickFalse);
+  /*
+    The user provided a 'scale' expert option will scale the output image size,
+    by the factor given allowing for super-sampling of the distorted image
+    space.  Any scaling factors must naturally be halved as a result.
+  */
+  scale_targets.output_scaling=(output_scaling);
+  scale_targets.geometry=(geometry);
+  if (ScaleDistortGeometry(image,&scale_targets) == MagickFalse)
+    {
+      coeff = (double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+              "InvalidArgument","%s", "-set option:distort:scale" );
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -4412,14 +4527,11 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   PixelInfo
     invalid;  /* the color to assign when distort result is invalid */
 
-  DistortVerboseInput
-    verbose_input;
+  DistortLayoutInput
+    layout;
 
-  DistortScaleTargets
-    scale_targets;
-
-  DistortBestFitInput
-    fit;
+  DistortLayoutTargets
+    layout_targets;
 
   const CoefficientInput input = { number_arguments, arguments, 0 };
 
@@ -4447,56 +4559,16 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   if ( coeff == (double *) NULL )
     return((Image *) NULL);
 
-  /*
-    Determine the size and offset for a 'bestfit' destination.
-    Usually the four corners of the source image is enough.
-  */
-
-  /* default output image bounds, when no 'bestfit' is requested */
-  geometry.width=image->columns;
-  geometry.height=image->rows;
-  geometry.x=0;
-  geometry.y=0;
-
-  if ( method == ArcDistortion ) {
-    bestfit = MagickTrue;  /* always calculate a 'best fit' viewport */
-  }
-
-  fit.image=image;
-  fit.method=method;
-  fit.number_arguments=number_arguments;
-  fit.coeff=coeff;
-  SetDistortBestFit(&fit,&geometry,&bestfit);
-
-  /* The user provided a 'viewport' expert option which may
-     overrides some parts of the current output image geometry.
-     This also overrides its default 'bestfit' setting.
-  */
-  GetDistortViewport(image,&geometry,&viewport_given,exception);
-
-  /* Verbose output */
-  verbose_input.image=image;
-  verbose_input.method=method;
-  verbose_input.coeff=coeff;
-  verbose_input.bestfit=bestfit;
-  verbose_input.viewport_given=viewport_given;
-  verbose_input.geometry=geometry;
-  if (PrintDistortVerbose(&verbose_input,exception) == MagickFalse)
+  layout.image=image;
+  layout.method=method;
+  layout.number_arguments=number_arguments;
+  layout.exception=exception;
+  layout_targets.geometry=(&geometry);
+  layout_targets.bestfit=(&bestfit);
+  layout_targets.viewport_given=(&viewport_given);
+  layout_targets.output_scaling=(&output_scaling);
+  if (LayoutDistortImage(&layout,coeff,&layout_targets) == MagickFalse)
     return((Image *) NULL);
-  /*
-    The user provided a 'scale' expert option will scale the output image size,
-    by the factor given allowing for super-sampling of the distorted image
-    space.  Any scaling factors must naturally be halved as a result.
-  */
-  scale_targets.output_scaling=(&output_scaling);
-  scale_targets.geometry=(&geometry);
-  if (ScaleDistortGeometry(image,&scale_targets) == MagickFalse)
-    {
-      coeff = (double *) RelinquishMagickMemory(coeff);
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument","%s", "-set option:distort:scale" );
-      return((Image *) NULL);
-    }
 
   /*
     Initialize the distort image attributes.
