@@ -157,8 +157,20 @@ static void GetExtentLimits(const PointInfo *extent,PointInfo *min,
   }
 }
 
-static MagickBooleanType CropToFitImage(Image **image,
-  const CropToFitRegion *region,ExceptionInfo *exception)
+static RectangleInfo GetCropGeometry(const PointInfo min,const PointInfo max)
+{
+  RectangleInfo
+    geometry;
+
+  geometry.x=CastDoubleToSsizeT(ceil(min.x-0.5));
+  geometry.y=CastDoubleToSsizeT(ceil(min.y-0.5));
+  geometry.width=(size_t) CastDoubleToSsizeT(floor(max.x-min.x+0.5));
+  geometry.height=(size_t) CastDoubleToSsizeT(floor(max.y-min.y+0.5));
+  return(geometry);
+}
+
+static void GetShearedExtent(const CropToFitRegion *region,Image **image,
+  PointInfo *extent)
 {
   const double
     x_shear = region->x_shear,
@@ -168,18 +180,6 @@ static MagickBooleanType CropToFitImage(Image **image,
 
   const MagickBooleanType
     rotate = region->rotate;
-
-  Image
-    *crop_image;
-
-  PointInfo
-    extent[4],
-    min,
-    max;
-
-  RectangleInfo
-    geometry,
-    page;
 
   ssize_t
     i;
@@ -204,11 +204,26 @@ static MagickBooleanType CropToFitImage(Image **image,
     extent[i].x+=(double) (*image)->columns/2.0;
     extent[i].y+=(double) (*image)->rows/2.0;
   }
+}
+
+static MagickBooleanType CropToFitImage(Image **image,
+  const CropToFitRegion *region,ExceptionInfo *exception)
+{
+  Image
+    *crop_image;
+
+  PointInfo
+    extent[4],
+    min,
+    max;
+
+  RectangleInfo
+    geometry,
+    page;
+
+  GetShearedExtent(region,image,extent);
   GetExtentLimits(extent,&min,&max);
-  geometry.x=CastDoubleToSsizeT(ceil(min.x-0.5));
-  geometry.y=CastDoubleToSsizeT(ceil(min.y-0.5));
-  geometry.width=(size_t) CastDoubleToSsizeT(floor(max.x-min.x+0.5));
-  geometry.height=(size_t) CastDoubleToSsizeT(floor(max.y-min.y+0.5));
+  geometry=GetCropGeometry(min,max);
   page=(*image)->page;
   (void) ParseAbsoluteGeometry("0x0+0+0",&(*image)->page);
   crop_image=CropImage(*image,&geometry,exception);
@@ -521,6 +536,18 @@ typedef struct _XShearRow
     *exception;
 } XShearRow;
 
+static void SelectShearDirection(double *displacement,
+  ShearDirection *direction)
+{
+  if (*displacement > 0.0)
+    *direction=RIGHT;
+  else
+    {
+      *displacement*=(-1.0);
+      *direction=LEFT;
+    }
+}
+
 static MagickBooleanType XShearLine(const XShearRow *row,const ssize_t y,
   MagickBooleanType *status)
 {
@@ -572,13 +599,7 @@ static MagickBooleanType XShearLine(const XShearRow *row,const ssize_t y,
   displacement=degrees*(double) (y-height/2.0);
   if (displacement == 0.0)
     return(MagickFalse);
-  if (displacement > 0.0)
-    direction=RIGHT;
-  else
-    {
-      displacement*=(-1.0);
-      direction=LEFT;
-    }
+  SelectShearDirection(&displacement,&direction);
   span_info.image=image;
   span_info.background=background;
   span_info.width=width;
@@ -899,6 +920,20 @@ static Image *SurroundImageWithBorder(const Image *image,Image *integral_image,
   return(rotate_image);
 }
 
+static void ComputeShearBounds(const Image *image,const PointInfo shear,
+  RectangleInfo *bounds)
+{
+  /*
+    Compute image size.
+  */
+  (*bounds).width=(size_t) ((ssize_t) image->columns+CastDoubleToSsizeT(floor(
+    fabs(shear.x)*image->rows+0.5)));
+  (*bounds).x=CastDoubleToSsizeT(ceil((double) image->columns+((fabs(shear.x)*
+    image->rows)-image->columns)/2.0-0.5));
+  (*bounds).y=CastDoubleToSsizeT(ceil((double) image->rows+((fabs(shear.y)*
+    (*bounds).width)-image->rows)/2.0-0.5));
+}
+
 static Image *ShearIntegralImage(const Image *image,Image *integral_image,
   const PointInfo shear,ExceptionInfo *exception)
 {
@@ -915,15 +950,7 @@ static Image *ShearIntegralImage(const Image *image,Image *integral_image,
     first_pass,
     second_pass;
 
-  /*
-    Compute image size.
-  */
-  bounds.width=(size_t) ((ssize_t) image->columns+CastDoubleToSsizeT(floor(
-    fabs(shear.x)*image->rows+0.5)));
-  bounds.x=CastDoubleToSsizeT(ceil((double) image->columns+((fabs(shear.x)*
-    image->rows)-image->columns)/2.0-0.5));
-  bounds.y=CastDoubleToSsizeT(ceil((double) image->rows+((fabs(shear.y)*
-    bounds.width)-image->rows)/2.0-0.5));
+  ComputeShearBounds(image,shear,&bounds);
   /*
     Surround image with border.
   */
@@ -998,6 +1025,16 @@ static MagickBooleanType PrepareIntegralImage(Image **integral_image,
   return(MagickTrue);
 }
 
+static PointInfo GetShearAngles(const double x_shear,const double y_shear)
+{
+  PointInfo
+    shear;
+
+  shear.x=(-tan(DegreesToRadians(fmod(x_shear,360.0))));
+  shear.y=tan(DegreesToRadians(fmod(y_shear,360.0)));
+  return(shear);
+}
+
 MagickExport Image *ShearImage(const Image *image,const double x_shear,
   const double y_shear,ExceptionInfo *exception)
 {
@@ -1027,8 +1064,7 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
   integral_image=CloneImage(image,0,0,MagickTrue,exception);
   if (integral_image == (Image *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  shear.x=(-tan(DegreesToRadians(fmod(x_shear,360.0))));
-  shear.y=tan(DegreesToRadians(fmod(y_shear,360.0)));
+  shear=GetShearAngles(x_shear,y_shear);
   if (IsZeroShear(shear) != MagickFalse)
     return(integral_image);
   if (PrepareIntegralImage(&integral_image,exception) == MagickFalse)

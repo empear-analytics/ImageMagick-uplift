@@ -147,6 +147,13 @@ static void OrientTopBottomImage(const Image *image,
   }
 }
 
+static Image *ResetImageOrientation(Image *orient_image)
+{
+  if (orient_image != (Image *) NULL)
+    orient_image->orientation=TopLeftOrientation;
+  return(orient_image);
+}
+
 MagickExport Image *AutoOrientImage(const Image *image,
   const OrientationType orientation,ExceptionInfo *exception)
 {
@@ -186,9 +193,7 @@ MagickExport Image *AutoOrientImage(const Image *image,
       break;
     }
   }
-  if (orient_image != (Image *) NULL)
-    orient_image->orientation=TopLeftOrientation;
-  return(orient_image);
+  return(ResetImageOrientation(orient_image));
 }
 
 /*
@@ -497,6 +502,17 @@ static Image *ExtractChopImage(Image *chop_image,const ChopImageInputs *inputs)
   return(ExtractChopImageBelow(&chop,progress,status));
 }
 
+static RectangleInfo GetChopExtent(const Image *image,
+  const RectangleInfo *chop_info)
+{
+  RectangleInfo
+    extent;
+
+  extent=(*chop_info);
+  extent=ClampChopExtent(image,extent);
+  return(extent);
+}
+
 MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ExceptionInfo *exception)
 {
@@ -521,8 +537,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (IsChopOutsideImage(image,chop_info) != MagickFalse)
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
-  extent=(*chop_info);
-  extent=ClampChopExtent(image,extent);
+  extent=GetChopExtent(image,chop_info);
   if (IsChopExtentTooLarge(image,extent) != MagickFalse)
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
   chop_image=CloneImage(image,image->columns-extent.width,image->rows-
@@ -1160,6 +1175,20 @@ MagickExport Image *ExcerptImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *CompositeExtentImage(const Image *image,Image *extent_image,
+  const RectangleInfo *geometry,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  DisableCompositeClampUnlessSpecified(extent_image);
+  status=CompositeImage(extent_image,image,image->compose,MagickTrue,
+    -geometry->x,-geometry->y,exception);
+  if (status != MagickFalse)
+    Update8BIMClipPath(extent_image,image->columns,image->rows,geometry);
+  return(extent_image);
+}
+
 MagickExport Image *ExtentImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -1189,12 +1218,7 @@ MagickExport Image *ExtentImage(const Image *image,
       extent_image=DestroyImage(extent_image);
       return((Image *) NULL);
     }
-  DisableCompositeClampUnlessSpecified(extent_image);
-  status=CompositeImage(extent_image,image,image->compose,MagickTrue,
-    -geometry->x,-geometry->y,exception);
-  if (status != MagickFalse)
-    Update8BIMClipPath(extent_image,image->columns,image->rows,geometry);
-  return(extent_image);
+  return(CompositeExtentImage(image,extent_image,geometry,exception));
 }
 
 /*
@@ -1661,6 +1685,24 @@ static ssize_t WrapRollOffset(ssize_t offset,const size_t extent)
   return(offset);
 }
 
+static void SetRollOffset(const Image *image,const ssize_t x_offset,
+  const ssize_t y_offset,RectangleInfo *offset)
+{
+  (*offset).x=x_offset;
+  (*offset).y=y_offset;
+  (*offset).x=WrapRollOffset((*offset).x,image->columns);
+  (*offset).y=WrapRollOffset((*offset).y,image->rows);
+}
+
+static Image *FinishRollImage(const Image *image,Image *roll_image,
+  const MagickStatusType status)
+{
+  roll_image->type=image->type;
+  if (status == MagickFalse)
+    roll_image=DestroyImage(roll_image);
+  return(roll_image);
+}
+
 MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
   const ssize_t y_offset,ExceptionInfo *exception)
 {
@@ -1693,10 +1735,7 @@ MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
   roll_image=CloneImage(image,0,0,MagickTrue,exception);
   if (roll_image == (Image *) NULL)
     return((Image *) NULL);
-  offset.x=x_offset;
-  offset.y=y_offset;
-  offset.x=WrapRollOffset(offset.x,image->columns);
-  offset.y=WrapRollOffset(offset.y,image->rows);
+  SetRollOffset(image,x_offset,y_offset,&offset);
   /*
     Roll image.
   */
@@ -1735,10 +1774,7 @@ MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
   status&=(MagickStatusType) CopyImageRegion(roll_image,image,&fourth_region,
     exception);
   (void) SetImageProgress(image,RollImageTag,3,3);
-  roll_image->type=image->type;
-  if (status == MagickFalse)
-    roll_image=DestroyImage(roll_image);
-  return(roll_image);
+  return(FinishRollImage(image,roll_image,status));
 }
 
 /*
@@ -1775,6 +1811,36 @@ MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static RectangleInfo GetShaveGeometry(const Image *image,
+  const RectangleInfo *shave_info)
+{
+  RectangleInfo
+    geometry;
+
+  SetGeometry(image,&geometry);
+  geometry.width-=2*shave_info->width;
+  geometry.height-=2*shave_info->height;
+  geometry.x=(ssize_t) shave_info->width+image->page.x;
+  geometry.y=(ssize_t) shave_info->height+image->page.y;
+  return(geometry);
+}
+
+static void ShaveImagePage(Image *shave_image,
+  const RectangleInfo *shave_info)
+{
+  shave_image->page.width-=2*shave_info->width;
+  shave_image->page.height-=2*shave_info->height;
+  shave_image->page.x-=(ssize_t) shave_info->width;
+  shave_image->page.y-=(ssize_t) shave_info->height;
+}
+
+static inline MagickBooleanType IsShaveTooLarge(const Image *image,
+  const RectangleInfo *shave_info)
+{
+  return((((2*shave_info->width) >= image->columns) ||
+    ((2*shave_info->height) >= image->rows)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ShaveImage(const Image *image,
   const RectangleInfo *shave_info,ExceptionInfo *exception)
 {
@@ -1788,21 +1854,13 @@ MagickExport Image *ShaveImage(const Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (((2*shave_info->width) >= image->columns) ||
-      ((2*shave_info->height) >= image->rows))
+  if (IsShaveTooLarge(image,shave_info) != MagickFalse)
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
-  SetGeometry(image,&geometry);
-  geometry.width-=2*shave_info->width;
-  geometry.height-=2*shave_info->height;
-  geometry.x=(ssize_t) shave_info->width+image->page.x;
-  geometry.y=(ssize_t) shave_info->height+image->page.y;
+  geometry=GetShaveGeometry(image,shave_info);
   shave_image=CropImage(image,&geometry,exception);
   if (shave_image == (Image *) NULL)
     return((Image *) NULL);
-  shave_image->page.width-=2*shave_info->width;
-  shave_image->page.height-=2*shave_info->height;
-  shave_image->page.x-=(ssize_t) shave_info->width;
-  shave_image->page.y-=(ssize_t) shave_info->height;
+  ShaveImagePage(shave_image,shave_info);
   return(shave_image);
 }
 
@@ -2302,31 +2360,15 @@ static Image *CropTransformImage(Image **image,Image *transform_image,
   return(transform_image);
 }
 
-MagickPrivate MagickBooleanType TransformImage(Image **image,
-  const char *crop_geometry,const char *image_geometry,ExceptionInfo *exception)
+static MagickBooleanType ResizeTransformImage(Image **image,
+  Image *transform_image,const char *image_geometry,ExceptionInfo *exception)
 {
   Image
-    *resize_image,
-    *transform_image;
+    *resize_image;
 
   RectangleInfo
     geometry;
 
-  assert(image != (Image **) NULL);
-  assert((*image)->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",(*image)->filename);
-  transform_image=(*image);
-  if (crop_geometry != (const char *) NULL)
-    transform_image=CropTransformImage(image,transform_image,crop_geometry,
-      exception);
-  if (transform_image == (Image *) NULL)
-    return(MagickFalse);
-  /*
-    Scale image to a user specified size.
-  */
-  if (image_geometry == (const char *) NULL)
-    return(MagickTrue);
   (void) ParseRegionGeometry(transform_image,image_geometry,&geometry,
     exception);
   if ((transform_image->columns == geometry.width) &&
@@ -2340,6 +2382,40 @@ MagickPrivate MagickBooleanType TransformImage(Image **image,
   transform_image=resize_image;
   *image=transform_image;
   return(MagickTrue);
+}
+
+static Image *SelectTransformImage(Image **image,const char *crop_geometry,
+  ExceptionInfo *exception)
+{
+  Image
+    *transform_image;
+
+  transform_image=(*image);
+  if (crop_geometry != (const char *) NULL)
+    transform_image=CropTransformImage(image,transform_image,crop_geometry,
+      exception);
+  return(transform_image);
+}
+
+MagickPrivate MagickBooleanType TransformImage(Image **image,
+  const char *crop_geometry,const char *image_geometry,ExceptionInfo *exception)
+{
+  Image
+    *transform_image;
+
+  assert(image != (Image **) NULL);
+  assert((*image)->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",(*image)->filename);
+  transform_image=SelectTransformImage(image,crop_geometry,exception);
+  if (transform_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Scale image to a user specified size.
+  */
+  if (image_geometry == (const char *) NULL)
+    return(MagickTrue);
+  return(ResizeTransformImage(image,transform_image,image_geometry,exception));
 }
 
 /*
@@ -2805,14 +2881,40 @@ static RectangleInfo ApplyTrimMinSize(const Image *image,
   return(geometry);
 }
 
-MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
+static RectangleInfo OffsetTrimByPage(const Image *image,
+  RectangleInfo geometry)
+{
+  geometry.x+=image->page.x;
+  geometry.y+=image->page.y;
+  return(geometry);
+}
+
+static RectangleInfo ApplyTrimArtifact(const Image *image,
+  RectangleInfo geometry)
 {
   const char
     *artifact;
 
+  artifact=GetImageArtifact(image,"trim:minSize");
+  if (artifact != (const char *) NULL)
+    geometry=ApplyTrimMinSize(image,artifact,geometry);
+  return(geometry);
+}
+
+static Image *CropTrimImage(const Image *image,RectangleInfo geometry,
+  ExceptionInfo *exception)
+{
   Image
     *trim_image;
 
+  trim_image=CropImage(image,&geometry,exception);
+  if (trim_image != (Image *) NULL)
+    SetTrimPage(image,geometry,trim_image);
+  return(trim_image);
+}
+
+MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
+{
   RectangleInfo
     geometry;
 
@@ -2823,13 +2925,7 @@ MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
   geometry=GetImageBoundingBox(image,exception);
   if ((geometry.width == 0) || (geometry.height == 0))
     return(TrimEmptyImage(image,exception));
-  artifact=GetImageArtifact(image,"trim:minSize");
-  if (artifact != (const char *) NULL)
-    geometry=ApplyTrimMinSize(image,artifact,geometry);
-  geometry.x+=image->page.x;
-  geometry.y+=image->page.y;
-  trim_image=CropImage(image,&geometry,exception);
-  if (trim_image != (Image *) NULL)
-    SetTrimPage(image,geometry,trim_image);
-  return(trim_image);
+  geometry=ApplyTrimArtifact(image,geometry);
+  geometry=OffsetTrimByPage(image,geometry);
+  return(CropTrimImage(image,geometry,exception));
 }

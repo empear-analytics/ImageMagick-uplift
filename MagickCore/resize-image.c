@@ -155,26 +155,45 @@ typedef struct _HorizontalFilterPass
     *magick_restrict progress;
 } HorizontalFilterPass;
 
-static ContributionInfo **DestroyContributionTLS(
-  ContributionInfo **contribution)
+static void RelinquishContributionRows(ContributionInfo **contribution)
 {
   ssize_t
     i;
 
-  assert(contribution != (ContributionInfo **) NULL);
   for (i=0; i < (ssize_t) GetMagickResourceLimit(ThreadResource); i++)
     if (contribution[i] != (ContributionInfo *) NULL)
       contribution[i]=(ContributionInfo *) RelinquishAlignedMemory(
         contribution[i]);
+}
+
+static ContributionInfo **DestroyContributionTLS(
+  ContributionInfo **contribution)
+{
+  assert(contribution != (ContributionInfo **) NULL);
+  RelinquishContributionRows(contribution);
   contribution=(ContributionInfo **) RelinquishMagickMemory(contribution);
+  return(contribution);
+}
+
+static ContributionInfo **AcquireContributionRows(
+  ContributionInfo **contribution,const size_t number_threads,
+  const size_t count)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_threads; i++)
+  {
+    contribution[i]=(ContributionInfo *) MagickAssumeAligned(
+      AcquireAlignedMemory(count,sizeof(**contribution)));
+    if (contribution[i] == (ContributionInfo *) NULL)
+      return(DestroyContributionTLS(contribution));
+  }
   return(contribution);
 }
 
 static ContributionInfo **AcquireContributionTLS(const size_t count)
 {
-  ssize_t
-    i;
-
   ContributionInfo
     **contribution;
 
@@ -187,14 +206,7 @@ static ContributionInfo **AcquireContributionTLS(const size_t count)
   if (contribution == (ContributionInfo **) NULL)
     return((ContributionInfo **) NULL);
   (void) memset(contribution,0,number_threads*sizeof(*contribution));
-  for (i=0; i < (ssize_t) number_threads; i++)
-  {
-    contribution[i]=(ContributionInfo *) MagickAssumeAligned(
-      AcquireAlignedMemory(count,sizeof(**contribution)));
-    if (contribution[i] == (ContributionInfo *) NULL)
-      return(DestroyContributionTLS(contribution));
-  }
-  return(contribution);
+  return(AcquireContributionRows(contribution,number_threads,count));
 }
 
 static void NormalizeContributions(ContributionInfo *contribution,
@@ -358,6 +370,13 @@ static MagickBooleanType DestroyFilterResources(CacheView *image_view,
   return(status);
 }
 
+static inline MagickBooleanType IsFilterRowMissing(const Quantum *p,
+  const Quantum *q)
+{
+  return(((p == (const Quantum *) NULL) || (q == (Quantum *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 typedef struct _HorizontalFilterColumn
 {
   const HorizontalFilterPass
@@ -435,7 +454,7 @@ static MagickBooleanType FilterHorizontalColumn(
     column->image->rows,column->exception);
   q=QueueCacheViewAuthenticPixels(column->resize_view,column->x,0,1,
     column->resize_image->rows,column->exception);
-  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+  if (IsFilterRowMissing(p,q) != MagickFalse)
     {
       (*status)=MagickFalse;
       return(MagickFalse);
@@ -705,7 +724,7 @@ static MagickBooleanType VerticalFilter(
       exception);
     q=QueueCacheViewAuthenticPixels(resize_view,0,y,resize_image->columns,1,
       exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsFilterRowMissing(p,q) != MagickFalse)
       {
         status=MagickFalse;
         continue;
@@ -737,6 +756,17 @@ static inline MagickBooleanType IsMitchellResize(const Image *image,
     ((x_factor*y_factor) > 1.0)) ? MagickTrue : MagickFalse);
 }
 
+static FilterType SelectDefaultResizeFilter(const Image *image,
+  const double x_factor,const double y_factor,FilterType filter_type)
+{
+  if ((x_factor == 1.0) && (y_factor == 1.0))
+    filter_type=PointFilter;
+  else
+    if (IsMitchellResize(image,x_factor,y_factor) != MagickFalse)
+      filter_type=MitchellFilter;
+  return(filter_type);
+}
+
 static FilterType SelectResizeFilterType(const Image *image,
   const FilterType filter,const double x_factor,const double y_factor)
 {
@@ -747,11 +777,8 @@ static FilterType SelectResizeFilterType(const Image *image,
   if (filter != UndefinedFilter)
     filter_type=filter;
   else
-    if ((x_factor == 1.0) && (y_factor == 1.0))
-      filter_type=PointFilter;
-    else
-      if (IsMitchellResize(image,x_factor,y_factor) != MagickFalse)
-        filter_type=MitchellFilter;
+    filter_type=SelectDefaultResizeFilter(image,x_factor,y_factor,
+      filter_type);
   return(filter_type);
 }
 
@@ -793,6 +820,30 @@ typedef struct _ResizeFilterPass
     y_factor;
 } ResizeFilterPass;
 
+static Image *CloneFilterImage(const ResizeFilterPass *pass,
+  ExceptionInfo *exception)
+{
+  const Image
+    *const image = pass->image;
+
+  const size_t
+    columns = pass->columns,
+    rows = pass->rows;
+
+  const double
+    x_factor = pass->x_factor,
+    y_factor = pass->y_factor;
+
+  Image
+    *filter_image;
+
+  if (x_factor > y_factor)
+    filter_image=CloneImage(image,columns,image->rows,MagickTrue,exception);
+  else
+    filter_image=CloneImage(image,image->columns,rows,MagickTrue,exception);
+  return(filter_image);
+}
+
 static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
   MagickStatusType *status,Image *resize_image,ExceptionInfo *exception)
 {
@@ -822,10 +873,7 @@ static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
   HorizontalFilterPass
     horizontal;
 
-  if (x_factor > y_factor)
-    filter_image=CloneImage(image,columns,image->rows,MagickTrue,exception);
-  else
-    filter_image=CloneImage(image,image->columns,rows,MagickTrue,exception);
+  filter_image=CloneFilterImage(pass,exception);
   if (filter_image == (Image *) NULL)
     return(MagickFalse);
   /*

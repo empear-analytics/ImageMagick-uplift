@@ -2941,36 +2941,32 @@ static MagickBooleanType LogOrLinearRGBTosRGB(Image *image,
   return(TransformsRGBByTables(image,status,progress,exception));
 }
 
-static MagickBooleanType TransformsRGBImage(Image *image,
-  ExceptionInfo *exception)
+typedef struct _TransformsRGBInput
 {
-  const char
-    *artifact;
-
   IlluminantType
-    illuminant = D65Illuminant;
+    illuminant;
 
   MagickBooleanType
     status;
 
   MagickOffsetType
     progress;
+} TransformsRGBInput;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  GetIlluminantArtifact(image,&artifact,&illuminant);
-  status=MagickTrue;
-  progress=0;
+static MagickBooleanType GenericOrLogTosRGB(Image *image,
+  const TransformsRGBInput *input,ExceptionInfo *exception)
+{
+  const IlluminantType
+    illuminant = input->illuminant;
+
+  const MagickBooleanType
+    status = input->status;
+
+  const MagickOffsetType
+    progress = input->progress;
+
   switch (image->colorspace)
   {
-    case CMYKColorspace:
-      return(CMYKTosRGB(image,status,exception));
-    case LinearGRAYColorspace:
-      return(LinearGrayTosRGB(image,status,exception));
-    case GRAYColorspace:
-      return(GrayTosRGB(image,status,exception));
     case Adobe98Colorspace:
     case CMYColorspace:
     case CAT02LMSColorspace:
@@ -3004,4 +3000,46 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       break;
   }
   return(LogOrLinearRGBTosRGB(image,status,progress,exception));
+}
+
+static MagickBooleanType TransformsRGBImage(Image *image,
+  ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  IlluminantType
+    illuminant = D65Illuminant;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  TransformsRGBInput
+    input;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  GetIlluminantArtifact(image,&artifact,&illuminant);
+  status=MagickTrue;
+  progress=0;
+  switch (image->colorspace)
+  {
+    case CMYKColorspace:
+      return(CMYKTosRGB(image,status,exception));
+    case LinearGRAYColorspace:
+      return(LinearGrayTosRGB(image,status,exception));
+    case GRAYColorspace:
+      return(GrayTosRGB(image,status,exception));
+    default:
+      break;
+  }
+  input.illuminant=illuminant;
+  input.status=status;
+  input.progress=progress;
+  return(GenericOrLogTosRGB(image,&input,exception));
 }

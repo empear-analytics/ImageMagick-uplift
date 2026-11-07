@@ -171,6 +171,42 @@ static size_t poly_number_terms(double order)
   return(CastDoubleToSizeT(floor((order+1.0)*(order+2.0)/2.0)));
 }
 
+static double PolyBasisFnQuintic(ssize_t n, double x, double y)
+{
+  switch(n) {
+    case 15:  return( x*x*x*x*x );
+    case 16:  return( x*x*x*x*y );
+    case 17:  return( x*x*x*y*y );
+    case 18:  return( x*x*y*y*y );
+    case 19:  return( x*y*y*y*y );
+    case 20:  return( y*y*y*y*y ); /* quintic   order = 5   terms = 21 */
+    default:  break;
+  }
+  return( 0 ); /* should never happen */
+}
+static double PolyBasisFnQuartic(ssize_t n, double x, double y)
+{
+  switch(n) {
+    case 10:  return( x*x*x*x );
+    case 11:  return( x*x*x*y );
+    case 12:  return( x*x*y*y );
+    case 13:  return( x*y*y*y );
+    case 14:  return( y*y*y*y ); /* quartic     order = 4   terms = 15 */
+    default:  break;
+  }
+  return(PolyBasisFnQuintic(n,x,y));
+}
+static double PolyBasisFnCubic(ssize_t n, double x, double y)
+{
+  switch(n) {
+    case  6:  return( x*x*x );
+    case  7:  return( x*x*y );
+    case  8:  return( x*y*y );
+    case  9:  return( y*y*y ); /* cubic         order = 3   terms = 10 */
+    default:  break;
+  }
+  return(PolyBasisFnQuartic(n,x,y));
+}
 static double poly_basis_fn(ssize_t n, double x, double y)
 {
   /* Return the result for this polynomial term */
@@ -181,23 +217,9 @@ static double poly_basis_fn(ssize_t n, double x, double y)
     case  3:  return( x*y ); /* bilinear        order = 1.5 terms = 4 */
     case  4:  return( x*x );
     case  5:  return( y*y ); /* quadratic       order = 2   terms = 6 */
-    case  6:  return( x*x*x );
-    case  7:  return( x*x*y );
-    case  8:  return( x*y*y );
-    case  9:  return( y*y*y ); /* cubic         order = 3   terms = 10 */
-    case 10:  return( x*x*x*x );
-    case 11:  return( x*x*x*y );
-    case 12:  return( x*x*y*y );
-    case 13:  return( x*y*y*y );
-    case 14:  return( y*y*y*y ); /* quartic     order = 4   terms = 15 */
-    case 15:  return( x*x*x*x*x );
-    case 16:  return( x*x*x*x*y );
-    case 17:  return( x*x*x*y*y );
-    case 18:  return( x*x*y*y*y );
-    case 19:  return( x*y*y*y*y );
-    case 20:  return( y*y*y*y*y ); /* quintic   order = 5   terms = 21 */
+    default:  break;
   }
-  return( 0 ); /* should never happen */
+  return(PolyBasisFnCubic(n,x,y));
 }
 static const char *poly_basis_str(ssize_t n)
 {
@@ -3570,85 +3592,424 @@ static void SyncDistortRow(MagickBooleanType *status,CacheView *view,
     (*status)=MagickFalse;
 }
 
-MagickExport Image *DistortImage(const Image *image, DistortMethod method,
-  const size_t number_arguments,const double *arguments,
-  MagickBooleanType bestfit,ExceptionInfo *exception)
+typedef struct _DistortPointInput
 {
-#define DistortImageTag  "Distort/Image"
+  DistortMethod
+    method;
 
   double
     *coeff,
     output_scaling;
 
-  Image
-    *distort_image;
+  DistortMapping
+    mapping;
 
-  RectangleInfo
-    geometry;  /* geometry of the distorted space viewport */
+  ResampleFilter
+    **resample_filter;
+
+  int
+    id;
+
+  ssize_t
+    i,
+    j;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+} DistortPointInput;
+
+static void MapDistortLensPoint(const DistortPointInput *tile,PointInfo *d,
+  PointInfo *s)
+{
+  const DistortMethod
+    method = tile->method;
+
+  double
+    *const coeff = tile->coeff;
+
+  const DistortMapping
+    mapping = tile->mapping;
+
+  const size_t
+    number_arguments = tile->number_arguments;
+
+  const double
+    *const arguments = tile->arguments;
+
+        switch (method)
+        {
+          case BarrelDistortion:
+          case BarrelInverseDistortion:
+          { /* Lens Barrel Distortion Correction */
+            MapBarrelDistortion(&mapping,&(*d),&(*s));
+            break;
+          }
+          case ShepardsDistortion:
+          { /* Shepards Method, or Inverse Weighted Distance for
+               displacement around the destination image control points
+               The input arguments are the coefficients to the function.
+               This is more of a 'displacement' function rather than an
+               absolute distortion function.
+
+               Note: We can not determine derivatives using shepards method
+               so only a point sample interpolation can be used.
+            */
+            (*s)=ShepardsSourcePoint((*d),number_arguments,arguments,coeff);
+            break;
+          }
+          default:
+            break; /* use the default no-op given above */
+        }
+}
+
+static void MapDistortCurvedPoint(const DistortPointInput *tile,PointInfo *s,
+  PointInfo *d,double *validity)
+{
+  const DistortMethod
+    method = tile->method;
+
+  double
+    *const coeff = tile->coeff;
+
+  const double
+    output_scaling = tile->output_scaling;
+
+  const DistortMapping
+    mapping = tile->mapping;
+
+  const ssize_t
+    i = tile->i,
+    j = tile->j;
+
+        switch (method)
+        {
+          case PolynomialDistortion:
+          {
+            /* multi-ordered polynomial */
+            (*s)=MapPolynomialPoint(&mapping);
+            break;
+          }
+          case ArcDistortion:
+          {
+            (*s)=MapArcPoint(&mapping);
+            break;
+          }
+          case PolarDistortion:
+          { /* 2D Cartesian to Polar View */
+            (*s)=MapPolarPoint(&mapping);
+            break;
+          }
+          case DePolarDistortion:
+          { /* @D Polar to Cartesian  */
+            /* ignore all destination virtual offsets */
+            (*d).x = ((double)i+0.5)*output_scaling*coeff[6]+coeff[4];
+            (*d).y = ((double)j+0.5)*output_scaling*coeff[7]+coeff[1];
+            (*s).x = (*d).y*sin((*d).x) + coeff[2];
+            (*s).y = (*d).y*cos((*d).x) + coeff[3];
+            /* derivatives are useless - better to use SuperSampling */
+            break;
+          }
+          case Cylinder2PlaneDistortion:
+          { /* 3D Cylinder to Tangential Plane */
+            (*s)=MapCylinder2PlanePoint(&mapping);
+            break;
+          }
+          case Plane2CylinderDistortion:
+          { /* 3D Cylinder to Tangential Plane */
+            MapPlane2CylinderPoint(&mapping,&(*d),&(*validity),&(*s));
+            break;
+          }
+          default:
+          {
+            MapDistortLensPoint(tile,&(*d),&(*s));
+            break;
+          }
+        }
+}
+
+static void MapDistortPoint(const DistortPointInput *tile,PointInfo *s,
+  double *validity,PointInfo *d)
+{
+  const DistortMethod
+    method = tile->method;
+
+  double
+    *const coeff = tile->coeff;
+
+  const double
+    output_scaling = tile->output_scaling;
+
+  const DistortMapping
+    mapping = tile->mapping;
+
+  ResampleFilter
+    **const resample_filter = tile->resample_filter;
+
+  const int
+    id = tile->id;
+
+        switch (method)
+        {
+          case AffineDistortion:
+          case RigidAffineDistortion:
+          {
+            (*s).x=coeff[0]*(*d).x+coeff[1]*(*d).y+coeff[2];
+            (*s).y=coeff[3]*(*d).x+coeff[4]*(*d).y+coeff[5];
+            /* Affine partial derivatives are constant -- set above */
+            break;
+          }
+          case PerspectiveDistortion:
+          {
+            MapPerspectivePoint(&mapping,&(*validity),&(*s));
+            break;
+          }
+          case BilinearReverseDistortion:
+          {
+            /* Reversed Mapped is just a simple polynomial */
+            (*s).x=coeff[0]*(*d).x+coeff[1]*(*d).y+coeff[2]*(*d).x*(*d).y+coeff[3];
+            (*s).y=coeff[4]*(*d).x+coeff[5]*(*d).y
+                    +coeff[6]*(*d).x*(*d).y+coeff[7];
+            /* Bilinear partial derivatives of scaling vectors */
+            ScaleFilter( resample_filter[id],
+                coeff[0] + coeff[2]*(*d).y,
+                coeff[1] + coeff[2]*(*d).x,
+                coeff[4] + coeff[6]*(*d).y,
+                coeff[5] + coeff[6]*(*d).x );
+            break;
+          }
+          case BilinearForwardDistortion:
+          {
+            /* Forward mapped needs reversed polynomial equations
+             * which unfortunately requires a square root!  */
+            MapBilinearForwardPoint(coeff,&(*d),&(*s),&(*validity));
+            break;
+          }
+#if 0
+          case BilinearDistortion:
+            /* Bilinear mapping of any Quadrilateral to any Quadrilateral */
+            /* UNDER DEVELOPMENT */
+            break;
+#endif
+          default:
+          {
+            MapDistortCurvedPoint(tile,&(*s),&(*d),&(*validity));
+            break;
+          }
+        }
+}
+
+static void SetDistortNoBestFit(const DistortMethod method,
+  MagickBooleanType *bestfit,MagickBooleanType *fix_bounds)
+{
+    switch (method)
+    {
+      case ShepardsDistortion:
+      case BilinearForwardDistortion:
+      case BilinearReverseDistortion:
+#if 0
+      case QuadrilateralDistortion:
+#endif
+      case PolynomialDistortion:
+      case BarrelDistortion:
+      case BarrelInverseDistortion:
+      default:
+        /* no calculated bestfit available for these distortions */
+        (*bestfit) = MagickFalse;
+        (*fix_bounds) = MagickFalse;
+        break;
+    }
+}
+
+typedef struct _DistortBestFitTile
+{
+  DistortMethod
+    method;
+
+  size_t
+    number_arguments;
+
+  double
+    *coeff;
+} DistortBestFitTile;
+
+static void SetDistortCylinderBestFit(const DistortBestFitTile *tile,
+  RectangleInfo *geometry,MagickBooleanType *fix_bounds,
+  MagickBooleanType *bestfit)
+{
+  const DistortMethod
+    method = tile->method;
+
+  double
+    *const coeff = tile->coeff;
+
+    switch (method)
+    {
+      case Cylinder2PlaneDistortion:
+      {
+        /* direct calculation so center of distortion is either a pixel
+         * center, or pixel edge. This allows for reversibility of the
+         * distortion */
+        (*geometry).x = (*geometry).y = 0;
+        (*geometry).width = CastDoubleToSizeT(ceil( 2.0*coeff[1]*tan(coeff[0]/2.0) ));
+        (*geometry).height = CastDoubleToSizeT(ceil( 2.0*coeff[3]/cos(coeff[0]/2.0) ));
+        /* correct center of distortion relative to new size */
+        coeff[4] = (double) (*geometry).width/2.0;
+        coeff[5] = (double) (*geometry).height/2.0;
+        (*fix_bounds) = MagickFalse;
+        break;
+      }
+      case Plane2CylinderDistortion:
+      {
+        /* direct calculation center is either pixel center, or pixel edge
+         * so as to allow reversibility of the image distortion */
+        (*geometry).x = (*geometry).y = 0;
+        (*geometry).width = CastDoubleToSizeT(ceil(coeff[0]*coeff[1]));  /* FOV * radius */
+        (*geometry).height = CastDoubleToSizeT(2.0*coeff[3]);              /* input image height */
+        /* correct center of distortion relative to new size */
+        coeff[4] = (double) (*geometry).width/2.0;
+        coeff[5] = (double) (*geometry).height/2.0;
+        (*fix_bounds) = MagickFalse;
+        break;
+      }
+      default:
+      {
+        SetDistortNoBestFit(method,&(*bestfit),&(*fix_bounds));
+        break;
+      }
+    }
+}
+
+typedef struct _DistortBestFitTargets
+{
+  PointInfo
+    *min,
+    *max;
 
   MagickBooleanType
-    viewport_given;
+    *fix_bounds;
 
-  PixelInfo
-    invalid;  /* the color to assign when distort result is invalid */
+  RectangleInfo
+    *geometry;
 
-  DistortVerboseInput
-    verbose_input;
+  MagickBooleanType
+    *bestfit;
+} DistortBestFitTargets;
 
-  DistortScaleTargets
-    scale_targets;
+static void SetDistortPolarBestFit(const DistortBestFitTile *tile,
+  const DistortBestFitTargets *targets)
+{
+  const DistortMethod
+    method = tile->method;
 
-  const CoefficientInput input = { number_arguments, arguments, 0 };
+  const size_t
+    number_arguments = tile->number_arguments;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  /*
-    Handle Special Compound Distortions
-  */
-  if ( method == ResizeDistortion )
-    return(DistortResizeFromArguments(image,number_arguments,arguments,
-      exception));
+  double
+    *const coeff = tile->coeff;
 
-  /*
-    Convert input arguments (usually as control points for reverse mapping)
-    into mapping coefficients to apply the distortion.
+  PointInfo
+    *const min = targets->min,
+    *const max = targets->max;
 
-    Note that some distortions are mapped to other distortions,
-    and as such do not require specific code after this point.
-  */
-  coeff = GenerateCoefficients(image, &method, &input, exception);
-  if ( coeff == (double *) NULL )
-    return((Image *) NULL);
+  MagickBooleanType
+    *const fix_bounds = targets->fix_bounds;
 
-  /*
-    Determine the size and offset for a 'bestfit' destination.
-    Usually the four corners of the source image is enough.
-  */
+  RectangleInfo
+    *const geometry = targets->geometry;
 
-  /* default output image bounds, when no 'bestfit' is requested */
-  geometry.width=image->columns;
-  geometry.height=image->rows;
-  geometry.x=0;
-  geometry.y=0;
+  MagickBooleanType
+    *const bestfit = targets->bestfit;
 
-  if ( method == ArcDistortion ) {
-    bestfit = MagickTrue;  /* always calculate a 'best fit' viewport */
-  }
+    switch (method)
+    {
+      case PolarDistortion:
+      {
+        if (number_arguments < 2)
+          coeff[2] = coeff[3] = 0.0;
+        (*min).x = coeff[2]-coeff[0];
+        (*max).x = coeff[2]+coeff[0];
+        (*min).y = coeff[3]-coeff[0];
+        (*max).y = coeff[3]+coeff[0];
+        /* should be about 1.0 if Rmin = 0 */
+        coeff[7]=(double) (*geometry).height/(coeff[0]-coeff[1]);
+        break;
+      }
+      case DePolarDistortion:
+      {
+        /* direct calculation as it needs to tile correctly
+         * for reversibility in a DePolar-Polar cycle */
+        (*fix_bounds) = MagickFalse;
+        (*geometry).x = (*geometry).y = 0;
+        (*geometry).height = CastDoubleToSizeT(ceil(coeff[0]-coeff[1]));
+        (*geometry).width = CastDoubleToSizeT(ceil((coeff[0]-coeff[1])*
+          (coeff[5]-coeff[4])*0.5));
+        /* correct scaling factors relative to new size */
+        coeff[6]=(coeff[5]-coeff[4]) * MagickSafeReciprocal(
+          (double) (*geometry).width); /* changed width */
+        coeff[7]=(coeff[0]-coeff[1]) * MagickSafeReciprocal(
+          (double) (*geometry).height); /* should be about 1.0 */
+        break;
+      }
+      default:
+      {
+        SetDistortCylinderBestFit(tile,&(*geometry),&(*fix_bounds),&(*bestfit));
+        break;
+      }
+    }
+}
+
+typedef struct _DistortBestFitInput
+{
+  const Image
+    *image;
+
+  DistortMethod
+    method;
+
+  size_t
+    number_arguments;
+
+  double
+    *coeff;
+} DistortBestFitInput;
+
+static void SetDistortBestFit(const DistortBestFitInput *fit,
+  RectangleInfo *geometry,MagickBooleanType *bestfit)
+{
+  const Image
+    *const image = fit->image;
+
+  const DistortMethod
+    method = fit->method;
+
+  const size_t
+    number_arguments = fit->number_arguments;
+
+  double
+    *const coeff = fit->coeff;
 
   /* Work out the 'best fit', (required for ArcDistortion) */
-  if ( bestfit ) {
+  if ( (*bestfit) ) {
     PointInfo
       s,min,max;  /* source, dest coords --mapping--> min, max coords */
 
     MagickBooleanType
       fix_bounds = MagickTrue;   /* enlarge bounds for VP handling */
 
+    DistortBestFitTile
+      tile;
+
+    const DistortBestFitTargets
+      targets = { &min, &max, &fix_bounds, &(*geometry), &(*bestfit) };
+
     s.x=s.y=min.x=max.x=min.y=max.y=0.0;   /* keep compiler happy */
 
+    tile.method=method;
+    tile.number_arguments=number_arguments;
+    tile.coeff=coeff;
     switch (method)
     {
       case AffineDistortion:
@@ -3667,75 +4028,11 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         ArcBestFitBounds(coeff,image,&min,&max);
         break;
       }
-      case PolarDistortion:
-      {
-        if (number_arguments < 2)
-          coeff[2] = coeff[3] = 0.0;
-        min.x = coeff[2]-coeff[0];
-        max.x = coeff[2]+coeff[0];
-        min.y = coeff[3]-coeff[0];
-        max.y = coeff[3]+coeff[0];
-        /* should be about 1.0 if Rmin = 0 */
-        coeff[7]=(double) geometry.height/(coeff[0]-coeff[1]);
-        break;
-      }
-      case DePolarDistortion:
-      {
-        /* direct calculation as it needs to tile correctly
-         * for reversibility in a DePolar-Polar cycle */
-        fix_bounds = MagickFalse;
-        geometry.x = geometry.y = 0;
-        geometry.height = CastDoubleToSizeT(ceil(coeff[0]-coeff[1]));
-        geometry.width = CastDoubleToSizeT(ceil((coeff[0]-coeff[1])*
-          (coeff[5]-coeff[4])*0.5));
-        /* correct scaling factors relative to new size */
-        coeff[6]=(coeff[5]-coeff[4]) * MagickSafeReciprocal(
-          (double) geometry.width); /* changed width */
-        coeff[7]=(coeff[0]-coeff[1]) * MagickSafeReciprocal(
-          (double) geometry.height); /* should be about 1.0 */
-        break;
-      }
-      case Cylinder2PlaneDistortion:
-      {
-        /* direct calculation so center of distortion is either a pixel
-         * center, or pixel edge. This allows for reversibility of the
-         * distortion */
-        geometry.x = geometry.y = 0;
-        geometry.width = CastDoubleToSizeT(ceil( 2.0*coeff[1]*tan(coeff[0]/2.0) ));
-        geometry.height = CastDoubleToSizeT(ceil( 2.0*coeff[3]/cos(coeff[0]/2.0) ));
-        /* correct center of distortion relative to new size */
-        coeff[4] = (double) geometry.width/2.0;
-        coeff[5] = (double) geometry.height/2.0;
-        fix_bounds = MagickFalse;
-        break;
-      }
-      case Plane2CylinderDistortion:
-      {
-        /* direct calculation center is either pixel center, or pixel edge
-         * so as to allow reversibility of the image distortion */
-        geometry.x = geometry.y = 0;
-        geometry.width = CastDoubleToSizeT(ceil(coeff[0]*coeff[1]));  /* FOV * radius */
-        geometry.height = CastDoubleToSizeT(2.0*coeff[3]);              /* input image height */
-        /* correct center of distortion relative to new size */
-        coeff[4] = (double) geometry.width/2.0;
-        coeff[5] = (double) geometry.height/2.0;
-        fix_bounds = MagickFalse;
-        break;
-      }
-      case ShepardsDistortion:
-      case BilinearForwardDistortion:
-      case BilinearReverseDistortion:
-#if 0
-      case QuadrilateralDistortion:
-#endif
-      case PolynomialDistortion:
-      case BarrelDistortion:
-      case BarrelInverseDistortion:
       default:
-        /* no calculated bestfit available for these distortions */
-        bestfit = MagickFalse;
-        fix_bounds = MagickFalse;
+      {
+        SetDistortPolarBestFit(&tile,&targets);
         break;
+      }
     }
 
     /* Set the output image geometry to calculated 'bestfit'.
@@ -3743,74 +4040,304 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
        Do not do this for DePolar which needs to be exact for virtual tiling.
     */
     if ( fix_bounds ) {
-      geometry.x = CastDoubleToSsizeT(floor(min.x-0.5));
-      geometry.y = CastDoubleToSsizeT(floor(min.y-0.5));
-      geometry.width=CastDoubleToSizeT(ceil(max.x-geometry.x+0.5));
-      geometry.height=CastDoubleToSizeT(ceil(max.y-geometry.y+0.5));
+      (*geometry).x = CastDoubleToSsizeT(floor(min.x-0.5));
+      (*geometry).y = CastDoubleToSsizeT(floor(min.y-0.5));
+      (*geometry).width=CastDoubleToSizeT(ceil(max.x-(*geometry).x+0.5));
+      (*geometry).height=CastDoubleToSizeT(ceil(max.y-(*geometry).y+0.5));
     }
 
   }  /* end bestfit destination image calculations */
+}
 
-  /* The user provided a 'viewport' expert option which may
-     overrides some parts of the current output image geometry.
-     This also overrides its default 'bestfit' setting.
-  */
-  GetDistortViewport(image,&geometry,&viewport_given,exception);
+typedef struct _DistortLineInput
+{
+  const Image
+    *image;
 
-  /* Verbose output */
-  verbose_input.image=image;
-  verbose_input.method=method;
-  verbose_input.coeff=coeff;
-  verbose_input.bestfit=bestfit;
-  verbose_input.viewport_given=viewport_given;
-  verbose_input.geometry=geometry;
-  if (PrintDistortVerbose(&verbose_input,exception) == MagickFalse)
-    return((Image *) NULL);
-  /*
-    The user provided a 'scale' expert option will scale the output image size,
-    by the factor given allowing for super-sampling of the distorted image
-    space.  Any scaling factors must naturally be halved as a result.
-  */
-  scale_targets.output_scaling=(&output_scaling);
-  scale_targets.geometry=(&geometry);
-  if (ScaleDistortGeometry(image,&scale_targets) == MagickFalse)
-    {
-      coeff = (double *) RelinquishMagickMemory(coeff);
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument","%s", "-set option:distort:scale" );
-      return((Image *) NULL);
-    }
+  Image
+    *distort_image;
 
-  /*
-    Initialize the distort image attributes.
-  */
-  distort_image=CloneImage(image,geometry.width,geometry.height,MagickTrue,
-    exception);
-  if (distort_image == (Image *) NULL)
-    {
-      coeff=(double *) RelinquishMagickMemory(coeff);
-      return((Image *) NULL);
-    }
-  /* if image is ColorMapped - change it to DirectClass */
-  if (SetImageStorageClass(distort_image,DirectClass,exception) == MagickFalse)
-    {
-      coeff=(double *) RelinquishMagickMemory(coeff);
-      distort_image=DestroyImage(distort_image);
-      return((Image *) NULL);
-    }
-  if ((IsPixelInfoGray(&distort_image->background_color) == MagickFalse) &&
-      (IsGrayColorspace(distort_image->colorspace) != MagickFalse))
-    (void) SetImageColorspace(distort_image,sRGBColorspace,exception);
-  if (distort_image->background_color.alpha_trait != UndefinedPixelTrait)
-    distort_image->alpha_trait=BlendPixelTrait;
-  distort_image->page.x=geometry.x;
-  distort_image->page.y=geometry.y;
-  ConformPixelInfo(distort_image,&distort_image->matte_color,&invalid,
-    exception);
+  CacheView
+    *distort_view;
 
-  { /* ----- MAIN CODE -----
-       Sample the source image to each pixel in the distort image.
-     */
+  DistortMethod
+    method;
+
+  double
+    *coeff,
+    output_scaling;
+
+  RectangleInfo
+    geometry;
+
+  ssize_t
+    j;
+
+  int
+    id;
+
+  MagickBooleanType
+    bestfit;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  ResampleFilter
+    **resample_filter;
+
+  PixelInfo
+    invalid,
+    zero;
+
+  ExceptionInfo
+    *exception;
+} DistortLineInput;
+
+typedef struct _DistortPixelTargets
+{
+  double
+    *validity;
+
+  PixelInfo
+    *pixel;
+
+  Quantum
+    *magick_restrict *q;
+} DistortPixelTargets;
+
+static void DistortImagePixel(const DistortLineInput *line,
+  const DistortPixelTargets *targets,const ssize_t i,MagickBooleanType *status)
+{
+  double
+    *const validity = targets->validity;
+
+  PixelInfo
+    *const pixel = targets->pixel;
+
+  Quantum
+    *magick_restrict *const q = targets->q;
+
+  PointInfo
+    d,
+    s;  /* transform destination image x,y  to source image x,y */
+
+        DistortMapping
+          mapping;
+
+        DistortPointInput
+          tile;
+
+        /* map pixel coordinate to distortion space coordinate */
+        d.x = (double) (line->geometry.x+i+0.5)*line->output_scaling;
+        d.y = (double) (line->geometry.y+line->j+0.5)*line->output_scaling;
+        s = d;  /* default is a no-op mapping */
+        mapping.d=d;
+        mapping.coeff=line->coeff;
+        mapping.output_scaling=line->output_scaling;
+        mapping.resample_filter=line->resample_filter;
+        mapping.id=line->id;
+        mapping.image=line->image;
+        mapping.distort_image=line->distort_image;
+        mapping.method=line->method;
+        tile.method=line->method;
+        tile.coeff=line->coeff;
+        tile.output_scaling=line->output_scaling;
+        tile.mapping=mapping;
+        tile.resample_filter=line->resample_filter;
+        tile.id=line->id;
+        tile.i=i;
+        tile.j=line->j;
+        tile.number_arguments=line->number_arguments;
+        tile.arguments=line->arguments;
+        MapDistortPoint(&tile,&s,validity,&d);
+        /* map virtual canvas location back to real image coordinate */
+        if ( line->bestfit && line->method != ArcDistortion ) {
+          s.x -= line->image->page.x;
+          s.y -= line->image->page.y;
+        }
+        s.x -= 0.5;
+        s.y -= 0.5;
+
+        if ( (*validity) <= 0.0 ) {
+          /* result of distortion is an invalid pixel - don't resample */
+          SetPixelViaPixelInfo(line->distort_image,&line->invalid,(*q));
+        }
+        else {
+          DistortPixelInput
+            distort_input;
+
+          distort_input.distort_image=line->distort_image;
+          distort_input.resample_filter=line->resample_filter;
+          distort_input.id=line->id;
+          distort_input.s=s;
+          distort_input.validity=(*validity);
+          distort_input.invalid=line->invalid;
+          distort_input.exception=line->exception;
+          (*status)=ResampleDistortPixel(&distort_input,pixel,(*q));
+        }
+        (*q)+=(ptrdiff_t) GetPixelChannels(line->distort_image);
+}
+
+static MagickBooleanType DistortImageLine(const DistortLineInput *line,
+  MagickBooleanType *status)
+{
+  Image
+    *const distort_image = line->distort_image;
+
+  CacheView
+    *const distort_view = line->distort_view;
+
+  const DistortMethod
+    method = line->method;
+
+  double
+    *const coeff = line->coeff;
+
+  const double
+    output_scaling = line->output_scaling;
+
+  const ssize_t
+    j = line->j;
+
+  const int
+    id = line->id;
+
+  ResampleFilter
+    **const resample_filter = line->resample_filter;
+
+  const PixelInfo
+    zero = line->zero;
+
+  ExceptionInfo
+    *const exception = line->exception;
+
+      double
+        validity;  /* how mathematically valid is this the mapping */
+
+      PixelInfo
+        pixel;    /* pixel color to assign to distorted image */
+
+      ssize_t
+        i;
+
+      Quantum
+        *magick_restrict q;
+
+      const DistortPixelTargets
+        targets = { &validity, &pixel, &q };
+
+      q=QueueCacheViewAuthenticPixels(distort_view,0,j,distort_image->columns,1,
+        exception);
+      if (q == (Quantum *) NULL)
+        {
+          (*status)=MagickFalse;
+          return(MagickFalse);
+        }
+      pixel=zero;
+
+      /* Define constant scaling vectors for Affine Distortions
+        Other methods are either variable, or use interpolated lookup
+      */
+      switch (method)
+      {
+        case AffineDistortion:
+        case RigidAffineDistortion:
+          ScaleFilter( resample_filter[id],
+            coeff[0], coeff[1],
+            coeff[3], coeff[4] );
+          break;
+        default:
+          break;
+      }
+
+      /* Initialize default pixel validity
+      *    negative:         pixel is invalid  output 'matte_color'
+      *    0.0 to 1.0:       antialiased, mix with resample output
+      *    1.0 or greater:   use resampled output.
+      */
+      validity = 1.0;
+
+      for (i=0; i < (ssize_t) distort_image->columns; i++)
+        DistortImagePixel(line,&targets,i,status);
+      SyncDistortRow(status,distort_view,exception);
+  return(MagickTrue);
+}
+
+#define DistortImageTag  "Distort/Image"
+
+typedef struct _DistortRenderInput
+{
+  const Image
+    *image;
+
+  Image
+    *distort_image;
+
+  DistortMethod
+    method;
+
+  double
+    *coeff,
+    output_scaling;
+
+  RectangleInfo
+    geometry;
+
+  MagickBooleanType
+    bestfit;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  PixelInfo
+    invalid;
+
+  ExceptionInfo
+    *exception;
+} DistortRenderInput;
+
+static MagickBooleanType RenderDistortImage(const DistortRenderInput *render)
+{
+  const Image
+    *const image = render->image;
+
+  Image
+    *const distort_image = render->distort_image;
+
+  const DistortMethod
+    method = render->method;
+
+  double
+    *const coeff = render->coeff;
+
+  const double
+    output_scaling = render->output_scaling;
+
+  const RectangleInfo
+    geometry = render->geometry;
+
+  const MagickBooleanType
+    bestfit = render->bestfit;
+
+  const size_t
+    number_arguments = render->number_arguments;
+
+  const double
+    *const arguments = render->arguments;
+
+  const PixelInfo
+    invalid = render->invalid;
+
+  ExceptionInfo
+    *const exception = render->exception;
+
+
     CacheView
       *distort_view;
 
@@ -3844,198 +4371,13 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       const int
         id = GetOpenMPThreadId();
 
-      double
-        validity;  /* how mathematically valid is this the mapping */
+      const DistortLineInput
+        line = { image, distort_image, distort_view, method, coeff,
+          output_scaling, geometry, j, id, bestfit, number_arguments,
+          arguments, resample_filter, invalid, zero, exception };
 
-      PixelInfo
-        pixel;    /* pixel color to assign to distorted image */
-
-      PointInfo
-        d,
-        s;  /* transform destination image x,y  to source image x,y */
-
-      ssize_t
-        i;
-
-      Quantum
-        *magick_restrict q;
-
-      q=QueueCacheViewAuthenticPixels(distort_view,0,j,distort_image->columns,1,
-        exception);
-      if (q == (Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      pixel=zero;
-
-      /* Define constant scaling vectors for Affine Distortions
-        Other methods are either variable, or use interpolated lookup
-      */
-      switch (method)
-      {
-        case AffineDistortion:
-        case RigidAffineDistortion:
-          ScaleFilter( resample_filter[id],
-            coeff[0], coeff[1],
-            coeff[3], coeff[4] );
-          break;
-        default:
-          break;
-      }
-
-      /* Initialize default pixel validity
-      *    negative:         pixel is invalid  output 'matte_color'
-      *    0.0 to 1.0:       antialiased, mix with resample output
-      *    1.0 or greater:   use resampled output.
-      */
-      validity = 1.0;
-
-      for (i=0; i < (ssize_t) distort_image->columns; i++)
-      {
-        DistortMapping
-          mapping;
-
-        /* map pixel coordinate to distortion space coordinate */
-        d.x = (double) (geometry.x+i+0.5)*output_scaling;
-        d.y = (double) (geometry.y+j+0.5)*output_scaling;
-        s = d;  /* default is a no-op mapping */
-        mapping.d=d;
-        mapping.coeff=coeff;
-        mapping.output_scaling=output_scaling;
-        mapping.resample_filter=resample_filter;
-        mapping.id=id;
-        mapping.image=image;
-        mapping.distort_image=distort_image;
-        mapping.method=method;
-        switch (method)
-        {
-          case AffineDistortion:
-          case RigidAffineDistortion:
-          {
-            s.x=coeff[0]*d.x+coeff[1]*d.y+coeff[2];
-            s.y=coeff[3]*d.x+coeff[4]*d.y+coeff[5];
-            /* Affine partial derivatives are constant -- set above */
-            break;
-          }
-          case PerspectiveDistortion:
-          {
-            MapPerspectivePoint(&mapping,&validity,&s);
-            break;
-          }
-          case BilinearReverseDistortion:
-          {
-            /* Reversed Mapped is just a simple polynomial */
-            s.x=coeff[0]*d.x+coeff[1]*d.y+coeff[2]*d.x*d.y+coeff[3];
-            s.y=coeff[4]*d.x+coeff[5]*d.y
-                    +coeff[6]*d.x*d.y+coeff[7];
-            /* Bilinear partial derivatives of scaling vectors */
-            ScaleFilter( resample_filter[id],
-                coeff[0] + coeff[2]*d.y,
-                coeff[1] + coeff[2]*d.x,
-                coeff[4] + coeff[6]*d.y,
-                coeff[5] + coeff[6]*d.x );
-            break;
-          }
-          case BilinearForwardDistortion:
-          {
-            /* Forward mapped needs reversed polynomial equations
-             * which unfortunately requires a square root!  */
-            MapBilinearForwardPoint(coeff,&d,&s,&validity);
-            break;
-          }
-#if 0
-          case BilinearDistortion:
-            /* Bilinear mapping of any Quadrilateral to any Quadrilateral */
-            /* UNDER DEVELOPMENT */
-            break;
-#endif
-          case PolynomialDistortion:
-          {
-            /* multi-ordered polynomial */
-            s=MapPolynomialPoint(&mapping);
-            break;
-          }
-          case ArcDistortion:
-          {
-            s=MapArcPoint(&mapping);
-            break;
-          }
-          case PolarDistortion:
-          { /* 2D Cartesian to Polar View */
-            s=MapPolarPoint(&mapping);
-            break;
-          }
-          case DePolarDistortion:
-          { /* @D Polar to Cartesian  */
-            /* ignore all destination virtual offsets */
-            d.x = ((double)i+0.5)*output_scaling*coeff[6]+coeff[4];
-            d.y = ((double)j+0.5)*output_scaling*coeff[7]+coeff[1];
-            s.x = d.y*sin(d.x) + coeff[2];
-            s.y = d.y*cos(d.x) + coeff[3];
-            /* derivatives are useless - better to use SuperSampling */
-            break;
-          }
-          case Cylinder2PlaneDistortion:
-          { /* 3D Cylinder to Tangential Plane */
-            s=MapCylinder2PlanePoint(&mapping);
-            break;
-          }
-          case Plane2CylinderDistortion:
-          { /* 3D Cylinder to Tangential Plane */
-            MapPlane2CylinderPoint(&mapping,&d,&validity,&s);
-            break;
-          }
-          case BarrelDistortion:
-          case BarrelInverseDistortion:
-          { /* Lens Barrel Distortion Correction */
-            MapBarrelDistortion(&mapping,&d,&s);
-            break;
-          }
-          case ShepardsDistortion:
-          { /* Shepards Method, or Inverse Weighted Distance for
-               displacement around the destination image control points
-               The input arguments are the coefficients to the function.
-               This is more of a 'displacement' function rather than an
-               absolute distortion function.
-
-               Note: We can not determine derivatives using shepards method
-               so only a point sample interpolation can be used.
-            */
-            s=ShepardsSourcePoint(d,number_arguments,arguments,coeff);
-            break;
-          }
-          default:
-            break; /* use the default no-op given above */
-        }
-        /* map virtual canvas location back to real image coordinate */
-        if ( bestfit && method != ArcDistortion ) {
-          s.x -= image->page.x;
-          s.y -= image->page.y;
-        }
-        s.x -= 0.5;
-        s.y -= 0.5;
-
-        if ( validity <= 0.0 ) {
-          /* result of distortion is an invalid pixel - don't resample */
-          SetPixelViaPixelInfo(distort_image,&invalid,q);
-        }
-        else {
-          DistortPixelInput
-            distort_input;
-
-          distort_input.distort_image=distort_image;
-          distort_input.resample_filter=resample_filter;
-          distort_input.id=id;
-          distort_input.s=s;
-          distort_input.validity=validity;
-          distort_input.invalid=invalid;
-          distort_input.exception=exception;
-          status=ResampleDistortPixel(&distort_input,&pixel,q);
-        }
-        q+=(ptrdiff_t) GetPixelChannels(distort_image);
-      }
-      SyncDistortRow(&status,distort_view,exception);
+      if (DistortImageLine(&line,&status) == MagickFalse)
+        continue;
       if (image->progress_monitor != (MagickProgressMonitor) NULL)
         {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -4047,10 +4389,310 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
     }
     distort_view=DestroyCacheView(distort_view);
     resample_filter=DestroyResampleFilterTLS(resample_filter);
+  return(status);
+}
+
+typedef struct _DistortLayoutInput
+{
+  const Image
+    *image;
+
+  DistortMethod
+    method;
+
+  size_t
+    number_arguments;
+
+  ExceptionInfo
+    *exception;
+} DistortLayoutInput;
+
+typedef struct _DistortLayoutTargets
+{
+  RectangleInfo
+    *geometry;
+
+  MagickBooleanType
+    *bestfit,
+    *viewport_given;
+
+  double
+    *output_scaling;
+} DistortLayoutTargets;
+
+static MagickBooleanType LayoutDistortImage(const DistortLayoutInput *layout,
+  double *coeff,const DistortLayoutTargets *targets)
+{
+  const Image
+    *const image = layout->image;
+
+  const DistortMethod
+    method = layout->method;
+
+  const size_t
+    number_arguments = layout->number_arguments;
+
+  ExceptionInfo
+    *const exception = layout->exception;
+
+  RectangleInfo
+    *const geometry = targets->geometry;
+
+  MagickBooleanType
+    *const bestfit = targets->bestfit,
+    *const viewport_given = targets->viewport_given;
+
+  double
+    *const output_scaling = targets->output_scaling;
+
+  DistortVerboseInput
+    verbose_input;
+
+  DistortScaleTargets
+    scale_targets;
+
+  DistortBestFitInput
+    fit;
+
+  /*
+    Determine the size and offset for a 'bestfit' destination.
+    Usually the four corners of the source image is enough.
+  */
+
+  /* default output image bounds, when no 'bestfit' is requested */
+  (*geometry).width=image->columns;
+  (*geometry).height=image->rows;
+  (*geometry).x=0;
+  (*geometry).y=0;
+
+  if ( method == ArcDistortion ) {
+    (*bestfit) = MagickTrue;  /* always calculate a 'best fit' viewport */
+  }
+
+  fit.image=image;
+  fit.method=method;
+  fit.number_arguments=number_arguments;
+  fit.coeff=coeff;
+  SetDistortBestFit(&fit,geometry,bestfit);
+
+  /* The user provided a 'viewport' expert option which may
+     overrides some parts of the current output image geometry.
+     This also overrides its default 'bestfit' setting.
+  */
+  GetDistortViewport(image,geometry,viewport_given,exception);
+
+  /* Verbose output */
+  verbose_input.image=image;
+  verbose_input.method=method;
+  verbose_input.coeff=coeff;
+  verbose_input.bestfit=(*bestfit);
+  verbose_input.viewport_given=(*viewport_given);
+  verbose_input.geometry=(*geometry);
+  if (PrintDistortVerbose(&verbose_input,exception) == MagickFalse)
+    return(MagickFalse);
+  /*
+    The user provided a 'scale' expert option will scale the output image size,
+    by the factor given allowing for super-sampling of the distorted image
+    space.  Any scaling factors must naturally be halved as a result.
+  */
+  scale_targets.output_scaling=(output_scaling);
+  scale_targets.geometry=(geometry);
+  if (ScaleDistortGeometry(image,&scale_targets) == MagickFalse)
+    {
+      coeff = (double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+              "InvalidArgument","%s", "-set option:distort:scale" );
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _DistortCreateInput
+{
+  const Image
+    *image;
+
+  DistortMethod
+    method;
+
+  double
+    output_scaling;
+
+  RectangleInfo
+    geometry;
+
+  MagickBooleanType
+    bestfit;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  ExceptionInfo
+    *exception;
+} DistortCreateInput;
+
+static MagickBooleanType CreateDistortImage(const DistortCreateInput *create,
+  double *coeff,Image **distort_image)
+{
+  const Image
+    *const image = create->image;
+
+  const DistortMethod
+    method = create->method;
+
+  const double
+    output_scaling = create->output_scaling;
+
+  const RectangleInfo
+    geometry = create->geometry;
+
+  const MagickBooleanType
+    bestfit = create->bestfit;
+
+  const size_t
+    number_arguments = create->number_arguments;
+
+  const double
+    *const arguments = create->arguments;
+
+  ExceptionInfo
+    *const exception = create->exception;
+
+  PixelInfo
+    invalid;  /* the color to assign when distort result is invalid */
+
+
+  /*
+    Initialize the distort image attributes.
+  */
+  (*distort_image)=CloneImage(image,geometry.width,geometry.height,MagickTrue,
+    exception);
+  if ((*distort_image) == (Image *) NULL)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      return(MagickFalse);
+    }
+  /* if image is ColorMapped - change it to DirectClass */
+  if (SetImageStorageClass((*distort_image),DirectClass,exception) == MagickFalse)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      (*distort_image)=DestroyImage((*distort_image));
+      return(MagickFalse);
+    }
+  if ((IsPixelInfoGray(&(*distort_image)->background_color) == MagickFalse) &&
+      (IsGrayColorspace((*distort_image)->colorspace) != MagickFalse))
+    (void) SetImageColorspace((*distort_image),sRGBColorspace,exception);
+  if ((*distort_image)->background_color.alpha_trait != UndefinedPixelTrait)
+    (*distort_image)->alpha_trait=BlendPixelTrait;
+  (*distort_image)->page.x=geometry.x;
+  (*distort_image)->page.y=geometry.y;
+  ConformPixelInfo((*distort_image),&(*distort_image)->matte_color,&invalid,
+    exception);
+
+  { /* ----- MAIN CODE -----
+       Sample the source image to each pixel in the distort image.
+     */
+    DistortRenderInput
+      render;
+
+    MagickBooleanType
+      status;
+
+    render.image=image;
+    render.distort_image=(*distort_image);
+    render.method=method;
+    render.coeff=coeff;
+    render.output_scaling=output_scaling;
+    render.geometry=geometry;
+    render.bestfit=bestfit;
+    render.number_arguments=number_arguments;
+    render.arguments=arguments;
+    render.invalid=invalid;
+    render.exception=exception;
+    status=RenderDistortImage(&render);
 
     if (status == MagickFalse)
-      distort_image=DestroyImage(distort_image);
+      (*distort_image)=DestroyImage((*distort_image));
   }
+  return(MagickTrue);
+}
+
+MagickExport Image *DistortImage(const Image *image, DistortMethod method,
+  const size_t number_arguments,const double *arguments,
+  MagickBooleanType bestfit,ExceptionInfo *exception)
+{
+  double
+    *coeff,
+    output_scaling;
+
+  Image
+    *distort_image;
+
+  RectangleInfo
+    geometry;  /* geometry of the distorted space viewport */
+
+  MagickBooleanType
+    viewport_given;
+
+  DistortLayoutInput
+    layout;
+
+  DistortLayoutTargets
+    layout_targets;
+
+  DistortCreateInput
+    create;
+
+  const CoefficientInput input = { number_arguments, arguments, 0 };
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  /*
+    Handle Special Compound Distortions
+  */
+  if ( method == ResizeDistortion )
+    return(DistortResizeFromArguments(image,number_arguments,arguments,
+      exception));
+
+  /*
+    Convert input arguments (usually as control points for reverse mapping)
+    into mapping coefficients to apply the distortion.
+
+    Note that some distortions are mapped to other distortions,
+    and as such do not require specific code after this point.
+  */
+  coeff = GenerateCoefficients(image, &method, &input, exception);
+  if ( coeff == (double *) NULL )
+    return((Image *) NULL);
+
+  layout.image=image;
+  layout.method=method;
+  layout.number_arguments=number_arguments;
+  layout.exception=exception;
+  layout_targets.geometry=(&geometry);
+  layout_targets.bestfit=(&bestfit);
+  layout_targets.viewport_given=(&viewport_given);
+  layout_targets.output_scaling=(&output_scaling);
+  if (LayoutDistortImage(&layout,coeff,&layout_targets) == MagickFalse)
+    return((Image *) NULL);
+
+  create.image=image;
+  create.method=method;
+  create.output_scaling=output_scaling;
+  create.geometry=geometry;
+  create.bestfit=bestfit;
+  create.number_arguments=number_arguments;
+  create.arguments=arguments;
+  create.exception=exception;
+  if (CreateDistortImage(&create,coeff,&distort_image) == MagickFalse)
+    return((Image *) NULL);
 
   /* Arc does not return an offset unless 'bestfit' is in effect
      And the user has not provided an overriding 'viewport'.

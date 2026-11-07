@@ -205,6 +205,19 @@ struct _ResampleFilter
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void InitializeResampleFilter(ResampleFilter *resample_filter,
+  const Image *image,ExceptionInfo *exception)
+{
+  resample_filter->exception=exception;
+  resample_filter->image=ReferenceImage((Image *) image);
+  resample_filter->view=AcquireVirtualCacheView(resample_filter->image,
+    exception);
+  resample_filter->debug=IsEventLogging();
+  resample_filter->image_area=(ssize_t) (image->columns*image->rows);
+  resample_filter->average_defined=MagickFalse;
+  resample_filter->signature=MagickCoreSignature;
+}
+
 MagickExport ResampleFilter *AcquireResampleFilter(const Image *image,
   ExceptionInfo *exception)
 {
@@ -220,14 +233,7 @@ MagickExport ResampleFilter *AcquireResampleFilter(const Image *image,
   resample_filter=(ResampleFilter *) AcquireCriticalMemory(sizeof(
     *resample_filter));
   (void) memset(resample_filter,0,sizeof(*resample_filter));
-  resample_filter->exception=exception;
-  resample_filter->image=ReferenceImage((Image *) image);
-  resample_filter->view=AcquireVirtualCacheView(resample_filter->image,
-    exception);
-  resample_filter->debug=IsEventLogging();
-  resample_filter->image_area=(ssize_t) (image->columns*image->rows);
-  resample_filter->average_defined=MagickFalse;
-  resample_filter->signature=MagickCoreSignature;
+  InitializeResampleFilter(resample_filter,image,exception);
   SetResampleFilter(resample_filter,image->filter);
   (void) SetResampleFilterInterpolateMethod(resample_filter,image->interpolate);
   (void) SetResampleFilterVirtualPixelMethod(resample_filter,
@@ -357,6 +363,16 @@ static inline MagickBooleanType IsResampleUnweighted(const ssize_t hit,
     divisor_c <= MagickEpsilon ) ? MagickTrue : MagickFalse);
 }
 
+static void FinishCheckerTileBlend(ResampleFilter *resample_filter,
+  const double divisor_c)
+{
+  /* alpha blend */
+  resample_filter->average_pixel.red /= divisor_c;
+  resample_filter->average_pixel.green /= divisor_c;
+  resample_filter->average_pixel.blue /= divisor_c;
+  resample_filter->average_pixel.alpha /= 2; /* 50% blend */
+}
+
 static void BlendCheckerTileAverage(ResampleFilter *resample_filter)
 {
   double
@@ -387,11 +403,7 @@ static void BlendCheckerTileAverage(ResampleFilter *resample_filter)
           resample_filter->image->background_color.alpha;
   divisor_c += weight;
 
-  /* alpha blend */
-  resample_filter->average_pixel.red /= divisor_c;
-  resample_filter->average_pixel.green /= divisor_c;
-  resample_filter->average_pixel.blue /= divisor_c;
-  resample_filter->average_pixel.alpha /= 2; /* 50% blend */
+  FinishCheckerTileBlend(resample_filter,divisor_c);
 }
 
 static void ResetPixelAccumulator(PixelInfo *pixel)
@@ -448,18 +460,23 @@ static void SetWholeImageAveragePixel(ResampleFilter *resample_filter,
   *pixel=resample_filter->average_pixel;
 }
 
-static void NormalizeResampledPixel(PixelInfo *pixel,double divisor_m,
-  double divisor_c)
+static void NormalizeResampledColor(PixelInfo *pixel,double divisor_c)
 {
-  divisor_m = 1.0/divisor_m;
-  if (pixel->alpha_trait != UndefinedPixelTrait)
-    pixel->alpha = (double) ClampToQuantum(divisor_m*pixel->alpha);
   divisor_c = 1.0/divisor_c;
   pixel->red   = (double) ClampToQuantum(divisor_c*pixel->red);
   pixel->green = (double) ClampToQuantum(divisor_c*pixel->green);
   pixel->blue  = (double) ClampToQuantum(divisor_c*pixel->blue);
   if (pixel->colorspace == CMYKColorspace)
     pixel->black = (double) ClampToQuantum(divisor_c*pixel->black);
+}
+
+static void NormalizeResampledPixel(PixelInfo *pixel,double divisor_m,
+  double divisor_c)
+{
+  divisor_m = 1.0/divisor_m;
+  if (pixel->alpha_trait != UndefinedPixelTrait)
+    pixel->alpha = (double) ClampToQuantum(divisor_m*pixel->alpha);
+  NormalizeResampledColor(pixel,divisor_c);
 }
 
 static void ResampleTiledLimitPixel(ResampleFilter *resample_filter,
@@ -1244,6 +1261,26 @@ typedef struct _ResampleEllipse
     C;
 } ResampleEllipse;
 
+static void SetResampleEllipseBounds(const ResampleEllipse *ellipse,
+  double *F)
+{
+  ResampleFilter
+    *const resample_filter = ellipse->resample_filter;
+
+  const double
+    A = ellipse->A,
+    B = ellipse->B,
+    C = ellipse->C;
+
+  /* Orthogonal bounds of the ellipse */
+  resample_filter->Ulimit = sqrt(C*(*F)/(A*C-0.25*B*B));
+  resample_filter->Vlimit = sqrt(A*(*F)/(A*C-0.25*B*B));
+
+  /* Horizontally aligned parallelogram fitted to Ellipse */
+  resample_filter->Uwidth = sqrt(*F/A); /* Half of the parallelogram width */
+  resample_filter->slope = -B/(2.0*A); /* Reciprocal slope of the parallelogram */
+}
+
 static MagickBooleanType FitResampleEllipse(const ResampleEllipse *ellipse,
   double *F)
 {
@@ -1267,13 +1304,7 @@ static MagickBooleanType FitResampleEllipse(const ResampleEllipse *ellipse,
   *F *= resample_filter->support;
   *F *= resample_filter->support;
 
-  /* Orthogonal bounds of the ellipse */
-  resample_filter->Ulimit = sqrt(C*(*F)/(A*C-0.25*B*B));
-  resample_filter->Vlimit = sqrt(A*(*F)/(A*C-0.25*B*B));
-
-  /* Horizontally aligned parallelogram fitted to Ellipse */
-  resample_filter->Uwidth = sqrt(*F/A); /* Half of the parallelogram width */
-  resample_filter->slope = -B/(2.0*A); /* Reciprocal slope of the parallelogram */
+  SetResampleEllipseBounds(ellipse,F);
 
   return(MagickTrue);
 }

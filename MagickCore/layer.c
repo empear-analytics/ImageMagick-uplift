@@ -409,6 +409,19 @@ static RectangleInfo GetClippedFrameBounds(const Image *previous,
   return(bounds);
 }
 
+static RectangleInfo GetCoalesceBounds(const Image *next)
+{
+  RectangleInfo
+    bounds;
+
+  bounds=next->page;
+  bounds.width=GetCanvasExtent(bounds.width,next->columns,bounds.x);
+  bounds.height=GetCanvasExtent(bounds.height,next->rows,bounds.y);
+  bounds.x=0;
+  bounds.y=0;
+  return(bounds);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -432,11 +445,7 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   next=GetFirstImageInList(image);
-  bounds=next->page;
-  bounds.width=GetCanvasExtent(bounds.width,next->columns,bounds.x);
-  bounds.height=GetCanvasExtent(bounds.height,next->rows,bounds.y);
-  bounds.x=0;
-  bounds.y=0;
+  bounds=GetCoalesceBounds(next);
   if (AcquireCoalesceCanvas(next,bounds,&coalesce_image,exception) ==
       MagickFalse)
     return((Image *) NULL);
@@ -2044,6 +2053,18 @@ static Image *KeepDisposedImage(const Image *next,Image *dispose_image,
   return(dispose_image);
 }
 
+static void ClearTransparencyCanvas(const Image *next,Image *dispose_image,
+  ExceptionInfo *exception)
+{
+  dispose_image->page=next->page;
+  dispose_image->page.x=0;
+  dispose_image->page.y=0;
+  dispose_image->dispose=NoneDispose;
+  dispose_image->background_color.alpha_trait=BlendPixelTrait;
+  dispose_image->background_color.alpha=(MagickRealType) TransparentAlpha;
+  (void) SetImageBackgroundColor(dispose_image,exception);
+}
+
 MagickExport void OptimizeImageTransparency(const Image *image,
      ExceptionInfo *exception)
 {
@@ -2067,13 +2088,7 @@ MagickExport void OptimizeImageTransparency(const Image *image,
     MagickTrue,exception);
   if (dispose_image == (Image *) NULL)
     return;
-  dispose_image->page=next->page;
-  dispose_image->page.x=0;
-  dispose_image->page.y=0;
-  dispose_image->dispose=NoneDispose;
-  dispose_image->background_color.alpha_trait=BlendPixelTrait;
-  dispose_image->background_color.alpha=(MagickRealType) TransparentAlpha;
-  (void) SetImageBackgroundColor(dispose_image,exception);
+  ClearTransparencyCanvas(next,dispose_image,exception);
 
   while ( next != (Image *) NULL )
   {

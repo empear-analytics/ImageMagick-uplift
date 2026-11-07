@@ -160,6 +160,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/enhance.c \
   MagickCore/enhance-clahe.c \
   MagickCore/enhance-tone.c \
+  MagickCore/enhance-level-colors.c \
   MagickCore/enhance.h \
   MagickCore/exception.c \
   MagickCore/exception.h \

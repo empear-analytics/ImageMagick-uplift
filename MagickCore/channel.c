@@ -142,6 +142,13 @@ typedef struct _ChannelRow
     *exception;
 } ChannelRow;
 
+static inline MagickBooleanType IsChannelRowMissing(const Quantum *p,
+  const Quantum *q)
+{
+  return(((p == (const Quantum *) NULL) || (q == (Quantum *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static void CopyChannelPixels(const ChannelRow *row,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
@@ -159,6 +166,13 @@ static void CopyChannelPixels(const ChannelRow *row,
     p+=(ptrdiff_t) GetPixelChannels(row->source_image);
     q+=(ptrdiff_t) GetPixelChannels(row->destination_image);
   }
+}
+
+static inline MagickBooleanType IsChannelPairUndefined(
+  const PixelTrait destination_traits,const PixelTrait source_traits)
+{
+  return(((destination_traits == UndefinedPixelTrait) ||
+    (source_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
 static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
@@ -180,7 +194,7 @@ static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
     row->exception);
   q=GetCacheViewAuthenticPixels(row->destination_view,0,y,
     row->destination_image->columns,1,row->exception);
-  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+  if (IsChannelRowMissing(p,q) != MagickFalse)
     {
       (*status)=MagickFalse;
       return;
@@ -188,8 +202,7 @@ static void ChannelImageRow(const ChannelRow *row,const ssize_t y,
   destination_traits=GetPixelChannelTraits(row->destination_image,
     row->destination_channel);
   source_traits=GetPixelChannelTraits(row->source_image,row->source_channel);
-  if ((destination_traits == UndefinedPixelTrait) ||
-      (source_traits == UndefinedPixelTrait))
+  if (IsChannelPairUndefined(destination_traits,source_traits) != MagickFalse)
     return;
   CopyChannelPixels(row,p,q);
   if (SyncCacheViewAuthenticPixels(row->destination_view,row->exception) ==
@@ -576,6 +589,14 @@ static void AdvanceSourceImage(const Image **source_image,const char **p,
   (void) GetNextToken((*p),p,MagickPathExtent,token);
 }
 
+static ChannelType AddChannelMaskOption(ChannelType channel_mask,
+  const char *token)
+{
+  channel_mask=(ChannelType) (channel_mask |
+    (MagickLLConstant(1) << ParseChannelOption(token)));
+  return(channel_mask);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -713,8 +734,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
               destination_image=DestroyImageList(destination_image);
               return(destination_image);
             }
-        channel_mask=(ChannelType) (channel_mask |
-          (MagickLLConstant(1) << ParseChannelOption(token)));
+        channel_mask=AddChannelMaskOption(channel_mask,token);
         (void) GetNextToken(p,&p,MagickPathExtent,token);
         break;
       }
@@ -857,32 +877,15 @@ typedef struct _SeparateRow
     *exception;
 } SeparateRow;
 
-static MagickBooleanType SeparateImageRow(const SeparateRow *row,
-  const ssize_t y,MagickBooleanType *status)
+static void SeparateRowPixels(const SeparateRow *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
-  const Quantum
-    *magick_restrict p;
-
-  Quantum
-    *magick_restrict q;
-
   SeparatePixels
     pixels;
 
   ssize_t
     x;
 
-  if ((*status) == MagickFalse)
-    return(MagickFalse);
-  p=GetCacheViewVirtualPixels(row->image_view,0,y,row->image->columns,1,
-    row->exception);
-  q=QueueCacheViewAuthenticPixels(row->separate_view,0,y,
-    row->separate_image->columns,1,row->exception);
-  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-    {
-      (*status)=MagickFalse;
-      return(MagickFalse);
-    }
   pixels.image=row->image;
   pixels.separate_image=row->separate_image;
   pixels.channel_type=row->channel_type;
@@ -893,6 +896,29 @@ static MagickBooleanType SeparateImageRow(const SeparateRow *row,
     p+=(ptrdiff_t) GetPixelChannels(row->image);
     q+=(ptrdiff_t) GetPixelChannels(row->separate_image);
   }
+}
+
+static MagickBooleanType SeparateImageRow(const SeparateRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(row->image_view,0,y,row->image->columns,1,
+    row->exception);
+  q=QueueCacheViewAuthenticPixels(row->separate_view,0,y,
+    row->separate_image->columns,1,row->exception);
+  if (IsChannelRowMissing(p,q) != MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  SeparateRowPixels(row,p,q);
   if (SyncCacheViewAuthenticPixels(row->separate_view,row->exception) ==
       MagickFalse)
     (*status)=MagickFalse;
@@ -959,6 +985,23 @@ static MagickBooleanType SeparateImageRows(const Image *image,
   return(status);
 }
 
+static void SetSeparateImageAttributes(const Image *image,
+  Image *separate_image,ExceptionInfo *exception)
+{
+  separate_image->alpha_trait=UndefinedPixelTrait;
+  (void) SetImageColorspace(separate_image,GRAYColorspace,exception);
+  separate_image->gamma=image->gamma;
+}
+
+static Image *FinishSeparateImage(Image *separate_image,
+  const MagickBooleanType status)
+{
+  (void) SetImageChannelMask(separate_image,AllChannels);
+  if (status == MagickFalse)
+    separate_image=DestroyImage(separate_image);
+  return(separate_image);
+}
+
 MagickExport Image *SeparateImage(const Image *image,
   const ChannelType channel_type,ExceptionInfo *exception)
 {
@@ -985,17 +1028,12 @@ MagickExport Image *SeparateImage(const Image *image,
       separate_image=DestroyImage(separate_image);
       return((Image *) NULL);
     }
-  separate_image->alpha_trait=UndefinedPixelTrait;
-  (void) SetImageColorspace(separate_image,GRAYColorspace,exception);
-  separate_image->gamma=image->gamma;
+  SetSeparateImageAttributes(image,separate_image,exception);
   /*
     Separate image.
   */
   status=SeparateImageRows(image,separate_image,channel_type,exception);
-  (void) SetImageChannelMask(separate_image,AllChannels);
-  if (status == MagickFalse)
-    separate_image=DestroyImage(separate_image);
-  return(separate_image);
+  return(FinishSeparateImage(separate_image,status));
 }
 
 /*
@@ -1023,6 +1061,12 @@ MagickExport Image *SeparateImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsChannelNotUpdated(const PixelTrait traits)
+{
+  return(((traits == UndefinedPixelTrait) || ((traits & UpdatePixelTrait) == 0)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport Image *SeparateImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -1041,7 +1085,7 @@ MagickExport Image *SeparateImages(const Image *image,ExceptionInfo *exception)
   {
     PixelChannel channel = GetPixelChannelChannel(image,i);
     PixelTrait traits = GetPixelChannelTraits(image,channel);
-    if ((traits == UndefinedPixelTrait) || ((traits & UpdatePixelTrait) == 0))
+    if (IsChannelNotUpdated(traits) != MagickFalse)
       continue;
     separate_image=SeparateImage(image,(ChannelType)
       (MagickLLConstant(1) << channel),exception);

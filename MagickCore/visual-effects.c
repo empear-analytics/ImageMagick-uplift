@@ -654,6 +654,20 @@ MagickExport Image *BlueShiftImage(const Image *image,const double factor,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType ToneCharcoalImage(const Image *image,
+  Image *charcoal_image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=NormalizeImage(charcoal_image,exception);
+  if (status != MagickFalse)
+    status=NegateImage(charcoal_image,MagickFalse,exception);
+  if (status != MagickFalse)
+    status=GrayscaleImage(charcoal_image,image->intensity,exception);
+  return(status);
+}
+
 MagickExport Image *CharcoalImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -681,11 +695,7 @@ MagickExport Image *CharcoalImage(const Image *image,const double radius,
   edge_image=DestroyImage(edge_image);
   if (charcoal_image == (Image *) NULL)
     return((Image *) NULL);
-  status=NormalizeImage(charcoal_image,exception);
-  if (status != MagickFalse)
-    status=NegateImage(charcoal_image,MagickFalse,exception);
-  if (status != MagickFalse)
-    status=GrayscaleImage(charcoal_image,image->intensity,exception);
+  status=ToneCharcoalImage(image,charcoal_image,exception);
   if (status == MagickFalse)
     charcoal_image=DestroyImage(charcoal_image);
   return(charcoal_image);
@@ -2063,6 +2073,26 @@ typedef struct _PolaroidFinish
     angle;
 } PolaroidFinish;
 
+static Image *TiltPolaroidImage(Image *polaroid_image,const double angle,
+  ExceptionInfo *exception)
+{
+  Image
+    *rotate_image,
+    *trim_image;
+
+  rotate_image=RotateImage(polaroid_image,angle,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (rotate_image == (Image *) NULL)
+    return((Image *) NULL);
+  polaroid_image=rotate_image;
+  trim_image=TrimImage(polaroid_image,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (trim_image == (Image *) NULL)
+    return((Image *) NULL);
+  polaroid_image=trim_image;
+  return(polaroid_image);
+}
+
 static Image *FinishPolaroidImage(const PolaroidFinish *polaroid_finish,
   Image *picture_image,ExceptionInfo *exception)
 {
@@ -2082,8 +2112,7 @@ static Image *FinishPolaroidImage(const PolaroidFinish *polaroid_finish,
     *bend_image,
     *flop_image,
     *polaroid_image,
-    *rotate_image,
-    *trim_image;
+    *rotate_image;
 
   rotate_image=RotateImage(picture_image,90.0,exception);
   picture_image=DestroyImage(picture_image);
@@ -2122,23 +2151,32 @@ static Image *FinishPolaroidImage(const PolaroidFinish *polaroid_finish,
   picture_image=DestroyImage(picture_image);
   (void) QueryColorCompliance("none",AllCompliance,
     &polaroid_image->background_color,exception);
-  rotate_image=RotateImage(polaroid_image,angle,exception);
-  polaroid_image=DestroyImage(polaroid_image);
-  if (rotate_image == (Image *) NULL)
-    return((Image *) NULL);
-  polaroid_image=rotate_image;
-  trim_image=TrimImage(polaroid_image,exception);
-  polaroid_image=DestroyImage(polaroid_image);
-  if (trim_image == (Image *) NULL)
-    return((Image *) NULL);
-  polaroid_image=trim_image;
-  return(polaroid_image);
+  return(TiltPolaroidImage(polaroid_image,angle,exception));
 }
 
 static void DestroyPolaroidCaption(Image *caption_image)
 {
   if (caption_image != (Image *) NULL)
     caption_image=DestroyImage(caption_image);
+}
+
+static ssize_t GetPolaroidQuantum(const Image *image)
+{
+  ssize_t
+    quantum;
+
+  quantum=(ssize_t) MagickMax(MagickMax((double) image->columns,(double)
+    image->rows)/25.0,10.0);
+  return(quantum);
+}
+
+static void MountPolaroidPicture(const Image *image,Image *picture_image,
+  const ssize_t quantum,ExceptionInfo *exception)
+{
+  picture_image->background_color=image->border_color;
+  (void) SetImageBackgroundColor(picture_image,exception);
+  (void) CompositeImage(picture_image,image,OverCompositeOp,MagickTrue,quantum,
+    quantum,exception);
 }
 
 MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
@@ -2167,8 +2205,7 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  quantum=(ssize_t) MagickMax(MagickMax((double) image->columns,(double)
-    image->rows)/25.0,10.0);
+  quantum=GetPolaroidQuantum(image);
   height=(size_t) ((ssize_t) image->rows+2*quantum);
   caption_image=(Image *) NULL;
   if (caption != (const char *) NULL)
@@ -2195,10 +2232,7 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
       DestroyPolaroidCaption(caption_image);
       return((Image *) NULL);
     }
-  picture_image->background_color=image->border_color;
-  (void) SetImageBackgroundColor(picture_image,exception);
-  (void) CompositeImage(picture_image,image,OverCompositeOp,MagickTrue,quantum,
-    quantum,exception);
+  MountPolaroidPicture(image,picture_image,quantum,exception);
   if (caption_image != (Image *) NULL)
     {
       (void) CompositeImage(picture_image,caption_image,OverCompositeOp,
@@ -2529,6 +2563,34 @@ static MagickBooleanType ShadowBorderImage(const Image *border_image,
   return(status);
 }
 
+static void PrepareShadowClone(const Image *image,Image *clone_image,
+  ExceptionInfo *exception)
+{
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) SetImageColorspace(clone_image,sRGBColorspace,exception);
+  (void) SetImageVirtualPixelMethod(clone_image,EdgeVirtualPixelMethod,
+    exception);
+}
+
+static RectangleInfo GetShadowBorder(const double sigma)
+{
+  RectangleInfo
+    border_info;
+
+  border_info.width=CastDoubleToSizeT(2.0*sigma+0.5);
+  border_info.height=CastDoubleToSizeT(2.0*sigma+0.5);
+  border_info.x=0;
+  border_info.y=0;
+  return(border_info);
+}
+
+static void ClearShadowBorderColor(Image *clone_image,ExceptionInfo *exception)
+{
+  (void) QueryColorCompliance("none",AllCompliance,&clone_image->border_color,
+    exception);
+  clone_image->alpha_trait=BlendPixelTrait;
+}
+
 MagickExport Image *ShadowImage(const Image *image,const double alpha,
   const double sigma,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
@@ -2558,17 +2620,9 @@ MagickExport Image *ShadowImage(const Image *image,const double alpha,
   clone_image=CloneImage(image,0,0,MagickTrue,exception);
   if (clone_image == (Image *) NULL)
     return((Image *) NULL);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) SetImageColorspace(clone_image,sRGBColorspace,exception);
-  (void) SetImageVirtualPixelMethod(clone_image,EdgeVirtualPixelMethod,
-    exception);
-  border_info.width=CastDoubleToSizeT(2.0*sigma+0.5);
-  border_info.height=CastDoubleToSizeT(2.0*sigma+0.5);
-  border_info.x=0;
-  border_info.y=0;
-  (void) QueryColorCompliance("none",AllCompliance,&clone_image->border_color,
-    exception);
-  clone_image->alpha_trait=BlendPixelTrait;
+  PrepareShadowClone(image,clone_image,exception);
+  border_info=GetShadowBorder(sigma);
+  ClearShadowBorderColor(clone_image,exception);
   border_image=BorderImage(clone_image,&border_info,OverCompositeOp,exception);
   clone_image=DestroyImage(clone_image);
   if (border_image == (Image *) NULL)
@@ -2646,6 +2700,32 @@ static void SetRandomPixelChannels(const Image *image,
   }
 }
 
+static Image *ToneSketchDodge(Image *dodge_image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=ClampImage(dodge_image,exception);
+  if (status != MagickFalse)
+    status=NormalizeImage(dodge_image,exception);
+  if (status != MagickFalse)
+    status=NegateImage(dodge_image,MagickFalse,exception);
+  if (status != MagickFalse)
+    status=TransformImage(&dodge_image,(char *) NULL,"50%",exception);
+  return(dodge_image);
+}
+
+static void BlendSketchOverlay(Image *sketch_image,Image *blend_image,
+  ExceptionInfo *exception)
+{
+  if (blend_image->alpha_trait != BlendPixelTrait)
+    (void) SetImageAlpha(blend_image,TransparentAlpha,exception);
+  (void) SetImageArtifact(blend_image,"compose:args","20x80");
+  (void) CompositeImage(sketch_image,blend_image,BlendCompositeOp,MagickTrue,
+    0,0,exception);
+  blend_image=DestroyImage(blend_image);
+}
+
 static Image *BlendSketchImage(const Image *image,Image *blur_image,
   const double radius,ExceptionInfo *exception)
 {
@@ -2654,20 +2734,11 @@ static Image *BlendSketchImage(const Image *image,Image *blur_image,
     *dodge_image,
     *sketch_image;
 
-  MagickBooleanType
-    status;
-
   dodge_image=EdgeImage(blur_image,radius,exception);
   blur_image=DestroyImage(blur_image);
   if (dodge_image == (Image *) NULL)
     return((Image *) NULL);
-  status=ClampImage(dodge_image,exception);
-  if (status != MagickFalse)
-    status=NormalizeImage(dodge_image,exception);
-  if (status != MagickFalse)
-    status=NegateImage(dodge_image,MagickFalse,exception);
-  if (status != MagickFalse)
-    status=TransformImage(&dodge_image,(char *) NULL,"50%",exception);
+  dodge_image=ToneSketchDodge(dodge_image,exception);
   sketch_image=CloneImage(image,0,0,MagickTrue,exception);
   if (sketch_image == (Image *) NULL)
     {
@@ -2683,12 +2754,7 @@ static Image *BlendSketchImage(const Image *image,Image *blur_image,
       sketch_image=DestroyImage(sketch_image);
       return((Image *) NULL);
     }
-  if (blend_image->alpha_trait != BlendPixelTrait)
-    (void) SetImageAlpha(blend_image,TransparentAlpha,exception);
-  (void) SetImageArtifact(blend_image,"compose:args","20x80");
-  (void) CompositeImage(sketch_image,blend_image,BlendCompositeOp,MagickTrue,
-    0,0,exception);
-  blend_image=DestroyImage(blend_image);
+  BlendSketchOverlay(sketch_image,blend_image,exception);
   return(sketch_image);
 }
 
@@ -2995,6 +3061,19 @@ static MagickBooleanType SolarizeImageRow(const SolarizeRow *solarize_row,
   return(MagickTrue);
 }
 
+static MagickBooleanType SolarizePseudoClassImage(Image *image,
+  const double threshold,ExceptionInfo *exception)
+{
+  SolarizeColormap(image,threshold);
+  return(SyncImage(image,exception));
+}
+
+static void ConformSolarizeColorspace(Image *image,ExceptionInfo *exception)
+{
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) SetImageColorspace(image,sRGBColorspace,exception);
+}
+
 MagickExport MagickBooleanType SolarizeImage(Image *image,
   const double threshold,ExceptionInfo *exception)
 {
@@ -3016,15 +3095,13 @@ MagickExport MagickBooleanType SolarizeImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) SetImageColorspace(image,sRGBColorspace,exception);
+  ConformSolarizeColorspace(image,exception);
   if (image->storage_class == PseudoClass)
     {
       /*
         Solarize colormap.
       */
-      SolarizeColormap(image,threshold);
-      return(SyncImage(image,exception));
+      return(SolarizePseudoClassImage(image,threshold,exception));
     }
   /*
     Solarize image.
@@ -3598,20 +3675,65 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport Image *VignetteImage(const Image *image,const double radius,
-  const double sigma,const ssize_t x,const ssize_t y,ExceptionInfo *exception)
+static void ClearVignetteOval(Image *oval_image,ExceptionInfo *exception)
+{
+  (void) QueryColorCompliance("#000000",AllCompliance,
+    &oval_image->background_color,exception);
+  (void) SetImageBackgroundColor(oval_image,exception);
+}
+
+static void SetVignetteColors(DrawInfo *draw_info,ExceptionInfo *exception)
+{
+  (void) QueryColorCompliance("#ffffff",AllCompliance,&draw_info->fill,
+    exception);
+  (void) QueryColorCompliance("#ffffff",AllCompliance,&draw_info->stroke,
+    exception);
+}
+
+static void SetVignettePrimitive(const Image *image,const ssize_t x,
+  const ssize_t y,DrawInfo *draw_info)
 {
   char
     ellipse[MagickPathExtent];
 
+  (void) FormatLocaleString(ellipse,MagickPathExtent,"ellipse %g,%g,%g,%g,"
+    "0.0,360.0",image->columns/2.0,image->rows/2.0,image->columns/2.0-x,
+    image->rows/2.0-y);
+  draw_info->primitive=AcquireString(ellipse);
+}
+
+static void CompositeVignetteMask(Image *canvas,Image *blur_image,
+  ExceptionInfo *exception)
+{
+  blur_image->alpha_trait=UndefinedPixelTrait;
+  (void) CompositeImage(canvas,blur_image,IntensityCompositeOp,MagickTrue,
+    0,0,exception);
+  blur_image=DestroyImage(blur_image);
+}
+
+static Image *FlattenVignetteImage(const Image *image,Image *canvas,
+  ExceptionInfo *exception)
+{
+  Image
+    *vignette_image;
+
+  vignette_image=MergeImageLayers(canvas,FlattenLayer,exception);
+  canvas=DestroyImage(canvas);
+  if (vignette_image != (Image *) NULL)
+    (void) TransformImageColorspace(vignette_image,image->colorspace,exception);
+  return(vignette_image);
+}
+
+MagickExport Image *VignetteImage(const Image *image,const double radius,
+  const double sigma,const ssize_t x,const ssize_t y,ExceptionInfo *exception)
+{
   DrawInfo
     *draw_info;
 
   Image
     *canvas,
     *blur_image,
-    *oval_image,
-    *vignette_image;
+    *oval_image;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -3635,18 +3757,10 @@ MagickExport Image *VignetteImage(const Image *image,const double radius,
       canvas=DestroyImage(canvas);
       return((Image *) NULL);
     }
-  (void) QueryColorCompliance("#000000",AllCompliance,
-    &oval_image->background_color,exception);
-  (void) SetImageBackgroundColor(oval_image,exception);
+  ClearVignetteOval(oval_image,exception);
   draw_info=CloneDrawInfo((const ImageInfo *) NULL,(const DrawInfo *) NULL);
-  (void) QueryColorCompliance("#ffffff",AllCompliance,&draw_info->fill,
-    exception);
-  (void) QueryColorCompliance("#ffffff",AllCompliance,&draw_info->stroke,
-    exception);
-  (void) FormatLocaleString(ellipse,MagickPathExtent,"ellipse %g,%g,%g,%g,"
-    "0.0,360.0",image->columns/2.0,image->rows/2.0,image->columns/2.0-x,
-    image->rows/2.0-y);
-  draw_info->primitive=AcquireString(ellipse);
+  SetVignetteColors(draw_info,exception);
+  SetVignettePrimitive(image,x,y,draw_info);
   (void) DrawImage(oval_image,draw_info,exception);
   draw_info=DestroyDrawInfo(draw_info);
   blur_image=BlurImage(oval_image,radius,sigma,exception);
@@ -3656,15 +3770,8 @@ MagickExport Image *VignetteImage(const Image *image,const double radius,
       canvas=DestroyImage(canvas);
       return((Image *) NULL);
     }
-  blur_image->alpha_trait=UndefinedPixelTrait;
-  (void) CompositeImage(canvas,blur_image,IntensityCompositeOp,MagickTrue,
-    0,0,exception);
-  blur_image=DestroyImage(blur_image);
-  vignette_image=MergeImageLayers(canvas,FlattenLayer,exception);
-  canvas=DestroyImage(canvas);
-  if (vignette_image != (Image *) NULL)
-    (void) TransformImageColorspace(vignette_image,image->colorspace,exception);
-  return(vignette_image);
+  CompositeVignetteMask(canvas,blur_image,exception);
+  return(FlattenVignetteImage(image,canvas,exception));
 }
 
 /*
