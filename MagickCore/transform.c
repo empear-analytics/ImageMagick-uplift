@@ -1775,6 +1775,20 @@ MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static RectangleInfo GetShaveGeometry(const Image *image,
+  const RectangleInfo *shave_info)
+{
+  RectangleInfo
+    geometry;
+
+  SetGeometry(image,&geometry);
+  geometry.width-=2*shave_info->width;
+  geometry.height-=2*shave_info->height;
+  geometry.x=(ssize_t) shave_info->width+image->page.x;
+  geometry.y=(ssize_t) shave_info->height+image->page.y;
+  return(geometry);
+}
+
 MagickExport Image *ShaveImage(const Image *image,
   const RectangleInfo *shave_info,ExceptionInfo *exception)
 {
@@ -1791,11 +1805,7 @@ MagickExport Image *ShaveImage(const Image *image,
   if (((2*shave_info->width) >= image->columns) ||
       ((2*shave_info->height) >= image->rows))
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
-  SetGeometry(image,&geometry);
-  geometry.width-=2*shave_info->width;
-  geometry.height-=2*shave_info->height;
-  geometry.x=(ssize_t) shave_info->width+image->page.x;
-  geometry.y=(ssize_t) shave_info->height+image->page.y;
+  geometry=GetShaveGeometry(image,shave_info);
   shave_image=CropImage(image,&geometry,exception);
   if (shave_image == (Image *) NULL)
     return((Image *) NULL);
