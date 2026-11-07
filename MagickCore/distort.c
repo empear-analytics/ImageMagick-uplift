@@ -4049,6 +4049,134 @@ static void SetDistortBestFit(const DistortBestFitInput *fit,
   }  /* end bestfit destination image calculations */
 }
 
+typedef struct _DistortLineInput
+{
+  const Image
+    *image;
+
+  Image
+    *distort_image;
+
+  DistortMethod
+    method;
+
+  double
+    *coeff,
+    output_scaling;
+
+  RectangleInfo
+    geometry;
+
+  ssize_t
+    j;
+
+  int
+    id;
+
+  MagickBooleanType
+    bestfit;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  ResampleFilter
+    **resample_filter;
+
+  PixelInfo
+    invalid;
+
+  ExceptionInfo
+    *exception;
+} DistortLineInput;
+
+typedef struct _DistortPixelTargets
+{
+  double
+    *validity;
+
+  PixelInfo
+    *pixel;
+
+  Quantum
+    *magick_restrict *q;
+} DistortPixelTargets;
+
+static void DistortImagePixel(const DistortLineInput *line,
+  const DistortPixelTargets *targets,const ssize_t i,MagickBooleanType *status)
+{
+  double
+    *const validity = targets->validity;
+
+  PixelInfo
+    *const pixel = targets->pixel;
+
+  Quantum
+    *magick_restrict *const q = targets->q;
+
+  PointInfo
+    d,
+    s;  /* transform destination image x,y  to source image x,y */
+
+        DistortMapping
+          mapping;
+
+        DistortPointInput
+          tile;
+
+        /* map pixel coordinate to distortion space coordinate */
+        d.x = (double) (line->geometry.x+i+0.5)*line->output_scaling;
+        d.y = (double) (line->geometry.y+line->j+0.5)*line->output_scaling;
+        s = d;  /* default is a no-op mapping */
+        mapping.d=d;
+        mapping.coeff=line->coeff;
+        mapping.output_scaling=line->output_scaling;
+        mapping.resample_filter=line->resample_filter;
+        mapping.id=line->id;
+        mapping.image=line->image;
+        mapping.distort_image=line->distort_image;
+        mapping.method=line->method;
+        tile.method=line->method;
+        tile.coeff=line->coeff;
+        tile.output_scaling=line->output_scaling;
+        tile.mapping=mapping;
+        tile.resample_filter=line->resample_filter;
+        tile.id=line->id;
+        tile.i=i;
+        tile.j=line->j;
+        tile.number_arguments=line->number_arguments;
+        tile.arguments=line->arguments;
+        MapDistortPoint(&tile,&s,validity,&d);
+        /* map virtual canvas location back to real image coordinate */
+        if ( line->bestfit && line->method != ArcDistortion ) {
+          s.x -= line->image->page.x;
+          s.y -= line->image->page.y;
+        }
+        s.x -= 0.5;
+        s.y -= 0.5;
+
+        if ( (*validity) <= 0.0 ) {
+          /* result of distortion is an invalid pixel - don't resample */
+          SetPixelViaPixelInfo(line->distort_image,&line->invalid,(*q));
+        }
+        else {
+          DistortPixelInput
+            distort_input;
+
+          distort_input.distort_image=line->distort_image;
+          distort_input.resample_filter=line->resample_filter;
+          distort_input.id=line->id;
+          distort_input.s=s;
+          distort_input.validity=(*validity);
+          distort_input.invalid=line->invalid;
+          distort_input.exception=line->exception;
+          (*status)=ResampleDistortPixel(&distort_input,pixel,(*q));
+        }
+        (*q)+=(ptrdiff_t) GetPixelChannels(line->distort_image);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -4226,15 +4354,19 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       PixelInfo
         pixel;    /* pixel color to assign to distorted image */
 
-      PointInfo
-        d,
-        s;  /* transform destination image x,y  to source image x,y */
-
       ssize_t
         i;
 
       Quantum
         *magick_restrict q;
+
+      const DistortLineInput
+        line = { image, distort_image, method, coeff, output_scaling, geometry,
+          j, id, bestfit, number_arguments, arguments, resample_filter, invalid,
+          exception };
+
+      const DistortPixelTargets
+        targets = { &validity, &pixel, &q };
 
       q=QueueCacheViewAuthenticPixels(distort_view,0,j,distort_image->columns,1,
         exception);
@@ -4268,63 +4400,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       validity = 1.0;
 
       for (i=0; i < (ssize_t) distort_image->columns; i++)
-      {
-        DistortMapping
-          mapping;
-
-        DistortPointInput
-          tile;
-
-        /* map pixel coordinate to distortion space coordinate */
-        d.x = (double) (geometry.x+i+0.5)*output_scaling;
-        d.y = (double) (geometry.y+j+0.5)*output_scaling;
-        s = d;  /* default is a no-op mapping */
-        mapping.d=d;
-        mapping.coeff=coeff;
-        mapping.output_scaling=output_scaling;
-        mapping.resample_filter=resample_filter;
-        mapping.id=id;
-        mapping.image=image;
-        mapping.distort_image=distort_image;
-        mapping.method=method;
-        tile.method=method;
-        tile.coeff=coeff;
-        tile.output_scaling=output_scaling;
-        tile.mapping=mapping;
-        tile.resample_filter=resample_filter;
-        tile.id=id;
-        tile.i=i;
-        tile.j=j;
-        tile.number_arguments=number_arguments;
-        tile.arguments=arguments;
-        MapDistortPoint(&tile,&s,&validity,&d);
-        /* map virtual canvas location back to real image coordinate */
-        if ( bestfit && method != ArcDistortion ) {
-          s.x -= image->page.x;
-          s.y -= image->page.y;
-        }
-        s.x -= 0.5;
-        s.y -= 0.5;
-
-        if ( validity <= 0.0 ) {
-          /* result of distortion is an invalid pixel - don't resample */
-          SetPixelViaPixelInfo(distort_image,&invalid,q);
-        }
-        else {
-          DistortPixelInput
-            distort_input;
-
-          distort_input.distort_image=distort_image;
-          distort_input.resample_filter=resample_filter;
-          distort_input.id=id;
-          distort_input.s=s;
-          distort_input.validity=validity;
-          distort_input.invalid=invalid;
-          distort_input.exception=exception;
-          status=ResampleDistortPixel(&distort_input,&pixel,q);
-        }
-        q+=(ptrdiff_t) GetPixelChannels(distort_image);
-      }
+        DistortImagePixel(&line,&targets,i,&status);
       SyncDistortRow(&status,distort_view,exception);
       if (image->progress_monitor != (MagickProgressMonitor) NULL)
         {
