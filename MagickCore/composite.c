@@ -3098,6 +3098,125 @@ typedef struct _CompositeRowInputs
     geometry_info;
 } CompositeRowInputs;
 
+static void SetCompositeCoverage(const CompositeRowInputs *row,
+  const MagickRealType Sa,const MagickRealType Da,MagickRealType *alpha)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickRealType
+    canvas_dissolve = row->canvas_dissolve,
+    source_dissolve = row->source_dissolve;
+
+  switch (compose)
+  {
+    case BumpmapCompositeOp:
+    case ColorBurnCompositeOp:
+    case ColorDodgeCompositeOp:
+    case DarkenCompositeOp:
+    case DifferenceCompositeOp:
+    case DivideCompositeOp:
+    case DivideDstCompositeOp:
+    case DivideSrcCompositeOp:
+    case ExclusionCompositeOp:
+    case FreezeCompositeOp:
+    case HardLightCompositeOp:
+    case HardMixCompositeOp:
+    case InterpolateCompositeOp:
+    case LightenCompositeOp:
+    case LinearBurnCompositeOp:
+    case LinearDodgeCompositeOp:
+    case LinearLightCompositeOp:
+    case MathematicsCompositeOp:
+    case MinusDstCompositeOp:
+    case MinusSrcCompositeOp:
+    case MultiplyCompositeOp:
+    case NegateCompositeOp:
+    case OverlayCompositeOp:
+    case PegtopLightCompositeOp:
+    case PinLightCompositeOp:
+    case ReflectCompositeOp:
+    case ScreenCompositeOp:
+    case SoftBurnCompositeOp:
+    case SoftDodgeCompositeOp:
+    case SoftLightCompositeOp:
+    case StampCompositeOp:
+    case VividLightCompositeOp:
+    {
+      (*alpha)=RoundToUnity(Sa+Da-Sa*Da);
+      break;
+    }
+    case DstAtopCompositeOp:
+    case DstInCompositeOp:
+    case InCompositeOp:
+    case SrcInCompositeOp:
+    {
+      (*alpha)=Sa*Da;
+      break;
+    }
+    case DissolveCompositeOp:
+    {
+      (*alpha)=source_dissolve*Sa*(-canvas_dissolve*Da)+source_dissolve*Sa+
+        canvas_dissolve*Da;
+      break;
+    }
+    case DstOverCompositeOp:
+    case OverCompositeOp:
+    case SrcOverCompositeOp:
+    {
+      (*alpha)=Sa+Da-Sa*Da;
+      break;
+    }
+    case DstOutCompositeOp:
+    {
+      (*alpha)=Da*(1.0-Sa);
+      break;
+    }
+    case OutCompositeOp:
+    case SrcOutCompositeOp:
+    {
+      (*alpha)=Sa*(1.0-Da);
+      break;
+    }
+    case BlendCompositeOp:
+    case PlusCompositeOp:
+    {
+      (*alpha)=RoundToUnity(source_dissolve*Sa+canvas_dissolve*Da);
+      break;
+    }
+    case XorCompositeOp:
+    {
+      (*alpha)=Sa+Da-2.0*Sa*Da;
+      break;
+    }
+    case ModulusAddCompositeOp:
+    {
+      if ((Sa+Da) <= 1.0)
+        {
+          (*alpha)=(Sa+Da);
+          break;
+        }
+      (*alpha)=((Sa+Da)-1.0);
+      break;
+    }
+    case ModulusSubtractCompositeOp:
+    {
+      if ((Sa-Da) >= 0.0)
+        {
+          (*alpha)=(Sa-Da);
+          break;
+        }
+      (*alpha)=((Sa-Da)+1.0);
+      break;
+    }
+    default:
+    {
+      (*alpha)=1.0;
+      break;
+    }
+  }
+}
+
 static void CompositeImagePixel(const CompositeRowInputs *row,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
@@ -3172,113 +3291,7 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
   */
   Sa=QuantumScale*(double) GetPixelAlpha(source_image,p);
   Da=QuantumScale*(double) GetPixelAlpha(image,q);
-  switch (compose)
-  {
-    case BumpmapCompositeOp:
-    case ColorBurnCompositeOp:
-    case ColorDodgeCompositeOp:
-    case DarkenCompositeOp:
-    case DifferenceCompositeOp:
-    case DivideCompositeOp:
-    case DivideDstCompositeOp:
-    case DivideSrcCompositeOp:
-    case ExclusionCompositeOp:
-    case FreezeCompositeOp:
-    case HardLightCompositeOp:
-    case HardMixCompositeOp:
-    case InterpolateCompositeOp:
-    case LightenCompositeOp:
-    case LinearBurnCompositeOp:
-    case LinearDodgeCompositeOp:
-    case LinearLightCompositeOp:
-    case MathematicsCompositeOp:
-    case MinusDstCompositeOp:
-    case MinusSrcCompositeOp:
-    case MultiplyCompositeOp:
-    case NegateCompositeOp:
-    case OverlayCompositeOp:
-    case PegtopLightCompositeOp:
-    case PinLightCompositeOp:
-    case ReflectCompositeOp:
-    case ScreenCompositeOp:
-    case SoftBurnCompositeOp:
-    case SoftDodgeCompositeOp:
-    case SoftLightCompositeOp:
-    case StampCompositeOp:
-    case VividLightCompositeOp:
-    {
-      alpha=RoundToUnity(Sa+Da-Sa*Da);
-      break;
-    }
-    case DstAtopCompositeOp:
-    case DstInCompositeOp:
-    case InCompositeOp:
-    case SrcInCompositeOp:
-    {
-      alpha=Sa*Da;
-      break;
-    }
-    case DissolveCompositeOp:
-    {
-      alpha=source_dissolve*Sa*(-canvas_dissolve*Da)+source_dissolve*Sa+
-        canvas_dissolve*Da;
-      break;
-    }
-    case DstOverCompositeOp:
-    case OverCompositeOp:
-    case SrcOverCompositeOp:
-    {
-      alpha=Sa+Da-Sa*Da;
-      break;
-    }
-    case DstOutCompositeOp:
-    {
-      alpha=Da*(1.0-Sa);
-      break;
-    }
-    case OutCompositeOp:
-    case SrcOutCompositeOp:
-    {
-      alpha=Sa*(1.0-Da);
-      break;
-    }
-    case BlendCompositeOp:
-    case PlusCompositeOp:
-    {
-      alpha=RoundToUnity(source_dissolve*Sa+canvas_dissolve*Da);
-      break;
-    }
-    case XorCompositeOp:
-    {
-      alpha=Sa+Da-2.0*Sa*Da;
-      break;
-    }
-    case ModulusAddCompositeOp:
-    {
-      if ((Sa+Da) <= 1.0)
-        {
-          alpha=(Sa+Da);
-          break;
-        }
-      alpha=((Sa+Da)-1.0);
-      break;
-    }
-    case ModulusSubtractCompositeOp:
-    {
-      if ((Sa-Da) >= 0.0)
-        {
-          alpha=(Sa-Da);
-          break;
-        }
-      alpha=((Sa-Da)+1.0);
-      break;
-    }
-    default:
-    {
-      alpha=1.0;
-      break;
-    }
-  }
+  SetCompositeCoverage(row,Sa,Da,&alpha);
   switch (compose)
   {
     case ColorizeCompositeOp:
