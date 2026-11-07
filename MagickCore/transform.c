@@ -1670,6 +1670,15 @@ static ssize_t WrapRollOffset(ssize_t offset,const size_t extent)
   return(offset);
 }
 
+static void SetRollOffset(const Image *image,const ssize_t x_offset,
+  const ssize_t y_offset,RectangleInfo *offset)
+{
+  (*offset).x=x_offset;
+  (*offset).y=y_offset;
+  (*offset).x=WrapRollOffset((*offset).x,image->columns);
+  (*offset).y=WrapRollOffset((*offset).y,image->rows);
+}
+
 MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
   const ssize_t y_offset,ExceptionInfo *exception)
 {
@@ -1702,10 +1711,7 @@ MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
   roll_image=CloneImage(image,0,0,MagickTrue,exception);
   if (roll_image == (Image *) NULL)
     return((Image *) NULL);
-  offset.x=x_offset;
-  offset.y=y_offset;
-  offset.x=WrapRollOffset(offset.x,image->columns);
-  offset.y=WrapRollOffset(offset.y,image->rows);
+  SetRollOffset(image,x_offset,y_offset,&offset);
   /*
     Roll image.
   */
