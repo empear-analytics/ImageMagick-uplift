@@ -3730,6 +3730,77 @@ static void MapDistortCurvedPoint(const DistortPointInput *tile,PointInfo *s,
         }
 }
 
+static void MapDistortPoint(const DistortPointInput *tile,PointInfo *s,
+  double *validity,PointInfo *d)
+{
+  const DistortMethod
+    method = tile->method;
+
+  double
+    *const coeff = tile->coeff;
+
+  const double
+    output_scaling = tile->output_scaling;
+
+  const DistortMapping
+    mapping = tile->mapping;
+
+  ResampleFilter
+    **const resample_filter = tile->resample_filter;
+
+  const int
+    id = tile->id;
+
+        switch (method)
+        {
+          case AffineDistortion:
+          case RigidAffineDistortion:
+          {
+            (*s).x=coeff[0]*(*d).x+coeff[1]*(*d).y+coeff[2];
+            (*s).y=coeff[3]*(*d).x+coeff[4]*(*d).y+coeff[5];
+            /* Affine partial derivatives are constant -- set above */
+            break;
+          }
+          case PerspectiveDistortion:
+          {
+            MapPerspectivePoint(&mapping,&(*validity),&(*s));
+            break;
+          }
+          case BilinearReverseDistortion:
+          {
+            /* Reversed Mapped is just a simple polynomial */
+            (*s).x=coeff[0]*(*d).x+coeff[1]*(*d).y+coeff[2]*(*d).x*(*d).y+coeff[3];
+            (*s).y=coeff[4]*(*d).x+coeff[5]*(*d).y
+                    +coeff[6]*(*d).x*(*d).y+coeff[7];
+            /* Bilinear partial derivatives of scaling vectors */
+            ScaleFilter( resample_filter[id],
+                coeff[0] + coeff[2]*(*d).y,
+                coeff[1] + coeff[2]*(*d).x,
+                coeff[4] + coeff[6]*(*d).y,
+                coeff[5] + coeff[6]*(*d).x );
+            break;
+          }
+          case BilinearForwardDistortion:
+          {
+            /* Forward mapped needs reversed polynomial equations
+             * which unfortunately requires a square root!  */
+            MapBilinearForwardPoint(coeff,&(*d),&(*s),&(*validity));
+            break;
+          }
+#if 0
+          case BilinearDistortion:
+            /* Bilinear mapping of any Quadrilateral to any Quadrilateral */
+            /* UNDER DEVELOPMENT */
+            break;
+#endif
+          default:
+          {
+            MapDistortCurvedPoint(tile,&(*s),&(*d),&(*validity));
+            break;
+          }
+        }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -4081,54 +4152,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         tile.j=j;
         tile.number_arguments=number_arguments;
         tile.arguments=arguments;
-        switch (method)
-        {
-          case AffineDistortion:
-          case RigidAffineDistortion:
-          {
-            s.x=coeff[0]*d.x+coeff[1]*d.y+coeff[2];
-            s.y=coeff[3]*d.x+coeff[4]*d.y+coeff[5];
-            /* Affine partial derivatives are constant -- set above */
-            break;
-          }
-          case PerspectiveDistortion:
-          {
-            MapPerspectivePoint(&mapping,&validity,&s);
-            break;
-          }
-          case BilinearReverseDistortion:
-          {
-            /* Reversed Mapped is just a simple polynomial */
-            s.x=coeff[0]*d.x+coeff[1]*d.y+coeff[2]*d.x*d.y+coeff[3];
-            s.y=coeff[4]*d.x+coeff[5]*d.y
-                    +coeff[6]*d.x*d.y+coeff[7];
-            /* Bilinear partial derivatives of scaling vectors */
-            ScaleFilter( resample_filter[id],
-                coeff[0] + coeff[2]*d.y,
-                coeff[1] + coeff[2]*d.x,
-                coeff[4] + coeff[6]*d.y,
-                coeff[5] + coeff[6]*d.x );
-            break;
-          }
-          case BilinearForwardDistortion:
-          {
-            /* Forward mapped needs reversed polynomial equations
-             * which unfortunately requires a square root!  */
-            MapBilinearForwardPoint(coeff,&d,&s,&validity);
-            break;
-          }
-#if 0
-          case BilinearDistortion:
-            /* Bilinear mapping of any Quadrilateral to any Quadrilateral */
-            /* UNDER DEVELOPMENT */
-            break;
-#endif
-          default:
-          {
-            MapDistortCurvedPoint(&tile,&s,&d,&validity);
-            break;
-          }
-        }
+        MapDistortPoint(&tile,&s,&validity,&d);
         /* map virtual canvas location back to real image coordinate */
         if ( bestfit && method != ArcDistortion ) {
           s.x -= image->page.x;
