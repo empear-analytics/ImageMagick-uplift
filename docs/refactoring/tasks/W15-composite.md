@@ -90,7 +90,7 @@ unless bundled under rule 1. Not started.
    clauses; the OpenMP rule forbids moving such writes even through their addresses
    (inside the region they are the thread's private copies, so a pointer to them would be
    sound, but that is a ruling, not a recipe).
-3. **The N amendment** (792cfaac0), decided under the mandate.
+3. **The N amendment** (792cfaac0), added under the mandate; awaiting the owner's review.
 
 ## Upstream behaviour noticed, not changed
 
@@ -103,3 +103,51 @@ unless bundled under rule 1. Not started.
   reader overwrites them with `GetPixelInfoPixel` first (dead stores, kept).
 - W14's notes still stand (`white_luminance` set at its declaration and again before use;
   `SetGeometryInfo` called twice on the Displace path).
+
+## Second pass: the owner's rulings of 2026-11-07
+
+Rulings: (1) run the long chain, accepting about 125 functions, bundled so the gate
+passes; (2) a Recipe S split of the Texture family may free slots; (3) leave
+`BlendRMSEResidual` and every OpenMP reduction variable alone; (4) the N amendment
+(792cfaac0) is not ruled on and stays awaiting review.
+
+No commit came out of the second pass. Measured on scratch copies (`cs-mcp` 1.5.16):
+
+- **Colour chain, built for real.** A partition of the colour switch's groups into SD
+  helpers of cc 8 or less needs 24 helpers (the six colour-space groups stay in
+  `CompositeChannelColor`, cc 44). Packing in source order gives eight *Code
+  Duplication* helpers (2.92); first-fit-decreasing gives six (2.99); the member form
+  of the bindings makes it worse (2.92). A local search over partitions (moving and
+  swapping groups between flagged helpers, 10 s per measurement) found a clone-free
+  one after ten tries. With the alpha chain (4 helpers) it scores **3.37**, below
+  today's 3.46: the file reaches 122 functions (*Number of Functions*) and
+  `CompositeImage` still holds its setup switch.
+- **Setup switch.** Padded stubs of the bodies of the Intensity, Blur and Displace
+  groups plus the row-loop tail: 3.48 without the colour chain, 3.48 with it; with also
+  the Copy, Dissolve, Blend, Saliency and Seamless bodies moved, 3.52 with the colour
+  chain. Each piece alone: 3.46. So the whole plan ends at about **3.52** (+0.06), and
+  only if every group body and the tail leave `CompositeImage`, which stays a Complex
+  (cc 35) and Large (168 lines) Method even then. The 3.82 of a fully stubbed
+  `CompositeImage` needs the switch itself gone, but its groups write nine caller
+  variables on mixed `break`/`return` paths (Recipes I and Z stop at six).
+- **First real setup step refused by the measurement.** Recipe E step 7 with N step 1
+  on the Intensity group (its block after the guards, holding the parallel loop) gives
+  `CompositeIntensityImage`, which CodeScene pairs with W14's `CompositeCopyImage` (the
+  same row loop with another row helper): *Code Duplication*, 3.46 -> 3.21. Reverted
+  before commit. The two differ in more than one value, so Recipe D does not merge them.
+- **Recipe S on the Texture family** is refused by `tools/split_source.py`:
+  `SyncCompositeRow` is a static shared by the family and the kept code (W13's D step
+  made ten loops use it), and Recipe S forbids widening its linkage; copying it would
+  need the parked, unapproved `--copy-static` amendment. It would not help either: the
+  chain passes 110 functions with or without the seven slots, and the file without the
+  family scores the same 3.46.
+
+**Plateau: 3.46.** The long chain's measured end (about 3.52) depends on a bundled
+commit across the function-count limit, a clone-free partition that a later change can
+break, and a setup-switch decomposition whose first step already hits the duplication
+cliff. Left for a decision with these numbers: either a ruling that admits a
+`CompositeCopyImage`/`CompositeIntensityImage` merge through a row-operation parameter,
+or accepting the plateau.
+
+Oracle: the code is unchanged since the whole-catalogue run on 9a3d7f5d7 (15,900 cases,
+0 diverged).
