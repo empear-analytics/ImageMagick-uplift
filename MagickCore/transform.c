@@ -2339,15 +2339,35 @@ static Image *CropTransformImage(Image **image,Image *transform_image,
   return(transform_image);
 }
 
+static MagickBooleanType ResizeTransformImage(Image **image,
+  Image *transform_image,const char *image_geometry,ExceptionInfo *exception)
+{
+  Image
+    *resize_image;
+
+  RectangleInfo
+    geometry;
+
+  (void) ParseRegionGeometry(transform_image,image_geometry,&geometry,
+    exception);
+  if ((transform_image->columns == geometry.width) &&
+      (transform_image->rows == geometry.height))
+    return(MagickTrue);
+  resize_image=ResizeImage(transform_image,geometry.width,geometry.height,
+    transform_image->filter,exception);
+  if (resize_image == (Image *) NULL)
+    return(MagickFalse);
+  transform_image=DestroyImage(transform_image);
+  transform_image=resize_image;
+  *image=transform_image;
+  return(MagickTrue);
+}
+
 MagickPrivate MagickBooleanType TransformImage(Image **image,
   const char *crop_geometry,const char *image_geometry,ExceptionInfo *exception)
 {
   Image
-    *resize_image,
     *transform_image;
-
-  RectangleInfo
-    geometry;
 
   assert(image != (Image **) NULL);
   assert((*image)->signature == MagickCoreSignature);
@@ -2364,19 +2384,7 @@ MagickPrivate MagickBooleanType TransformImage(Image **image,
   */
   if (image_geometry == (const char *) NULL)
     return(MagickTrue);
-  (void) ParseRegionGeometry(transform_image,image_geometry,&geometry,
-    exception);
-  if ((transform_image->columns == geometry.width) &&
-      (transform_image->rows == geometry.height))
-    return(MagickTrue);
-  resize_image=ResizeImage(transform_image,geometry.width,geometry.height,
-    transform_image->filter,exception);
-  if (resize_image == (Image *) NULL)
-    return(MagickFalse);
-  transform_image=DestroyImage(transform_image);
-  transform_image=resize_image;
-  *image=transform_image;
-  return(MagickTrue);
+  return(ResizeTransformImage(image,transform_image,image_geometry,exception));
 }
 
 /*
