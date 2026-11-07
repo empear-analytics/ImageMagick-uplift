@@ -2706,6 +2706,17 @@ static Image *ToneSketchDodge(Image *dodge_image,ExceptionInfo *exception)
   return(dodge_image);
 }
 
+static void BlendSketchOverlay(Image *sketch_image,Image *blend_image,
+  ExceptionInfo *exception)
+{
+  if (blend_image->alpha_trait != BlendPixelTrait)
+    (void) SetImageAlpha(blend_image,TransparentAlpha,exception);
+  (void) SetImageArtifact(blend_image,"compose:args","20x80");
+  (void) CompositeImage(sketch_image,blend_image,BlendCompositeOp,MagickTrue,
+    0,0,exception);
+  blend_image=DestroyImage(blend_image);
+}
+
 static Image *BlendSketchImage(const Image *image,Image *blur_image,
   const double radius,ExceptionInfo *exception)
 {
@@ -2734,12 +2745,7 @@ static Image *BlendSketchImage(const Image *image,Image *blur_image,
       sketch_image=DestroyImage(sketch_image);
       return((Image *) NULL);
     }
-  if (blend_image->alpha_trait != BlendPixelTrait)
-    (void) SetImageAlpha(blend_image,TransparentAlpha,exception);
-  (void) SetImageArtifact(blend_image,"compose:args","20x80");
-  (void) CompositeImage(sketch_image,blend_image,BlendCompositeOp,MagickTrue,
-    0,0,exception);
-  blend_image=DestroyImage(blend_image);
+  BlendSketchOverlay(sketch_image,blend_image,exception);
   return(sketch_image);
 }
 
