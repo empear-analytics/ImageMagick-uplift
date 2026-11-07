@@ -3682,6 +3682,15 @@ static void SetVignettePrimitive(const Image *image,const ssize_t x,
   draw_info->primitive=AcquireString(ellipse);
 }
 
+static void CompositeVignetteMask(Image *canvas,Image *blur_image,
+  ExceptionInfo *exception)
+{
+  blur_image->alpha_trait=UndefinedPixelTrait;
+  (void) CompositeImage(canvas,blur_image,IntensityCompositeOp,MagickTrue,
+    0,0,exception);
+  blur_image=DestroyImage(blur_image);
+}
+
 MagickExport Image *VignetteImage(const Image *image,const double radius,
   const double sigma,const ssize_t x,const ssize_t y,ExceptionInfo *exception)
 {
@@ -3729,10 +3738,7 @@ MagickExport Image *VignetteImage(const Image *image,const double radius,
       canvas=DestroyImage(canvas);
       return((Image *) NULL);
     }
-  blur_image->alpha_trait=UndefinedPixelTrait;
-  (void) CompositeImage(canvas,blur_image,IntensityCompositeOp,MagickTrue,
-    0,0,exception);
-  blur_image=DestroyImage(blur_image);
+  CompositeVignetteMask(canvas,blur_image,exception);
   vignette_image=MergeImageLayers(canvas,FlattenLayer,exception);
   canvas=DestroyImage(canvas);
   if (vignette_image != (Image *) NULL)
