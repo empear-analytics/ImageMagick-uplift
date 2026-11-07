@@ -654,6 +654,20 @@ MagickExport Image *BlueShiftImage(const Image *image,const double factor,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType ToneCharcoalImage(const Image *image,
+  Image *charcoal_image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=NormalizeImage(charcoal_image,exception);
+  if (status != MagickFalse)
+    status=NegateImage(charcoal_image,MagickFalse,exception);
+  if (status != MagickFalse)
+    status=GrayscaleImage(charcoal_image,image->intensity,exception);
+  return(status);
+}
+
 MagickExport Image *CharcoalImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -681,11 +695,7 @@ MagickExport Image *CharcoalImage(const Image *image,const double radius,
   edge_image=DestroyImage(edge_image);
   if (charcoal_image == (Image *) NULL)
     return((Image *) NULL);
-  status=NormalizeImage(charcoal_image,exception);
-  if (status != MagickFalse)
-    status=NegateImage(charcoal_image,MagickFalse,exception);
-  if (status != MagickFalse)
-    status=GrayscaleImage(charcoal_image,image->intensity,exception);
+  status=ToneCharcoalImage(image,charcoal_image,exception);
   if (status == MagickFalse)
     charcoal_image=DestroyImage(charcoal_image);
   return(charcoal_image);
