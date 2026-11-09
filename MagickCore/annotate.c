@@ -1964,6 +1964,19 @@ static FT_Encoding SelectAdobeBig5Encoding(const char *encoding,
   return(encoding_type);
 }
 
+static void BlendGlyphAlpha(const Image *image,double fill_opacity,
+  Quantum *q)
+{
+  double
+    Sa,
+    Da;
+
+  Da=1.0-(QuantumScale*(double) GetPixelAlpha(image,q));
+  Sa=fill_opacity;
+  fill_opacity=(1.0-RoundToUnity(Sa+Da-Sa*Da))*(double) QuantumRange;
+  SetPixelAlpha(image,(const Quantum) fill_opacity,q);
+}
+
 static void TraceGlyphOutline(DrawInfo *annotate_info,const FT_Vector origin,
   FT_Outline outline,const FT_Outline_Funcs *outline_methods)
 {
@@ -2433,17 +2446,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
                   GetPixelAlpha(image,q),q);
               }
             else
-              {
-                double
-                  Sa,
-                  Da;
-
-                Da=1.0-(QuantumScale*(double) GetPixelAlpha(image,q));
-                Sa=fill_opacity;
-                fill_opacity=(1.0-RoundToUnity(Sa+Da-Sa*Da))*(double)
-                  QuantumRange;
-                SetPixelAlpha(image,(const Quantum) fill_opacity,q);
-              }
+              BlendGlyphAlpha(image,fill_opacity,q);
             if (SyncGlyphPixel(active,image_view,exception) == MagickFalse)
               status=MagickFalse;
             q+=(ptrdiff_t) GetPixelChannels(image);
