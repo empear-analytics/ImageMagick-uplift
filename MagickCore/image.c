@@ -4262,6 +4262,58 @@ static inline Quantum PushColormapIndex(Image *image,const Quantum index,
   return((Quantum) 0);
 }
 
+typedef struct _SyncRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} SyncRow;
+
+static void SyncImageRow(const SyncRow *row,const ssize_t y,
+  MagickBooleanType *status,
+  MagickBooleanType *range_exception)
+{
+  Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  Quantum
+    index;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    index=PushColormapIndex(image,GetPixelIndex(image,q),range_exception);
+    SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType SyncImage(Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -4294,31 +4346,9 @@ MagickExport MagickBooleanType SyncImage(Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      index;
+    const SyncRow row = { image, image_view, exception };
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      index=PushColormapIndex(image,GetPixelIndex(image,q),&range_exception);
-      SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncImageRow(&row,y,&status,&range_exception);
   }
   image_view=DestroyCacheView(image_view);
   image->taint=taint;
