@@ -3488,24 +3488,7 @@ MagickExport MagickBooleanType SetImageRegionMask(Image *image,
       }
       return(SyncImagePixelCache(image,exception));
     }
-  switch (type)
-  {
-    case ReadPixelMask:
-    {
-      image->channels=(ChannelType) (image->channels | ReadMaskChannel);
-      break;
-    }
-    case WritePixelMask:
-    {
-      image->channels=(ChannelType) (image->channels | WriteMaskChannel);
-      break;
-    }
-    default:
-    {
-      image->channels=(ChannelType) (image->channels | CompositeMaskChannel);
-      break;
-    }
-  }
+  AddImageMaskChannel(image,type);
   if (SyncImagePixelCache(image,exception) == MagickFalse)
     return(MagickFalse);
   status=MagickTrue;
