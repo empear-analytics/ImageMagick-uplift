@@ -775,6 +775,21 @@ static inline char *InsertNewlineBeforeSpace(char **caption,char *p)
   return(p);
 }
 
+static inline ssize_t CountCaptionNewlines(char *caption)
+{
+  char
+    *p;
+
+  ssize_t
+    n;
+
+  n=0;
+  for (p=caption; GetUTFCode(p) != 0; p+=(ptrdiff_t) GetUTFOctets(p))
+    if (GetUTFCode(p) == '\n')
+      n++;
+  return(n);
+}
+
 MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
   const MagickBooleanType split,TypeMetric *metrics,char **caption,
   ExceptionInfo *exception)
@@ -836,10 +851,7 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
     q=draw_info->text;
     s=(char *) NULL;
   }
-  n=0;
-  for (p=(*caption); GetUTFCode(p) != 0; p+=(ptrdiff_t) GetUTFOctets(p))
-    if (GetUTFCode(p) == '\n')
-      n++;
+  n=CountCaptionNewlines(*caption);
   return(n);
 }
 
