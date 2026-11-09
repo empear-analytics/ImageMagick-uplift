@@ -3474,6 +3474,71 @@ static inline MagickBooleanType IsInsideRegion(const RectangleInfo *region,
     MagickTrue : MagickFalse);
 }
 
+typedef struct _RegionMaskRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  const RectangleInfo
+    *region;
+
+  PixelMask
+    type;
+
+  ExceptionInfo
+    *exception;
+} RegionMaskRow;
+
+static void SetRegionMaskRow(const RegionMaskRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  const RectangleInfo
+    *region = row->region;
+
+  const PixelMask
+    type = row->type;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    Quantum
+      pixel;
+
+    pixel=QuantumRange;
+    if (IsInsideRegion(region,x,y) != MagickFalse)
+      pixel=(Quantum) 0;
+    SetMaskPixel(image,type,pixel,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType SetImageRegionMask(Image *image,
   const PixelMask type,const RectangleInfo *region,ExceptionInfo *exception)
 {
@@ -3510,33 +3575,9 @@ MagickExport MagickBooleanType SetImageRegionMask(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const RegionMaskRow row = { image, image_view, region, type, exception };
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      Quantum
-        pixel;
-
-      pixel=QuantumRange;
-      if (IsInsideRegion(region,x,y) != MagickFalse)
-        pixel=(Quantum) 0;
-      SetMaskPixel(image,type,pixel,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SetRegionMaskRow(&row,y,&status);
   }
   image->mask_trait=UpdatePixelTrait;
   image_view=DestroyCacheView(image_view);
