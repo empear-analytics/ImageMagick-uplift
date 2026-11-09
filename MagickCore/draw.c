@@ -8546,15 +8546,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         }
         case RoundJoin:
         {
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            stroke_p[p++]=box_p[4];
-          else
-            {
-              stroke_p[p++]=box_p[1];
-              stroke_p[p++]=box_p[2];
-            }
+          p=TraceMiterPointP(&boxes,stroke_p,p,miterlimit);
           center=polygon_primitive[n].point;
           theta.p=atan2(box_q[1].y-center.y,box_q[1].x-center.x);
           theta.q=atan2(box_q[2].y-center.y,box_q[2].x-center.x);
