@@ -1199,6 +1199,18 @@ static void SetRedComponent(const PixelInfo *pixel,
     *scale=1.0;
 }
 
+static void FormatScaledComponent(const PixelInfo *pixel,const double scale,
+  const double color,char *component)
+{
+  if ((scale != 100.0) ||
+      (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
+    (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
+      GetMagickPrecision(),scale*QuantumScale*color);
+  else
+    (void) FormatLocaleString(component,MagickPathExtent,"%.*g%%",
+      GetMagickPrecision(),scale*QuantumScale*color);
+}
+
 MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   const PixelChannel channel,const ComplianceType compliance,char *tuple)
 {
@@ -1277,13 +1289,8 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   if ((pixel->colorspace == OklchColorspace) && (channel == BluePixelChannel))
     (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
       GetMagickPrecision(),RadiansToDegrees(scale*QuantumScale*color));
-  else if ((scale != 100.0) ||
-           (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
-    (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
-      GetMagickPrecision(),scale*QuantumScale*color);
   else
-    (void) FormatLocaleString(component,MagickPathExtent,"%.*g%%",
-      GetMagickPrecision(),scale*QuantumScale*color);
+    FormatScaledComponent(pixel,scale,color,component);
   (void) ConcatenateMagickString(tuple,component,MagickPathExtent);
 }
 
