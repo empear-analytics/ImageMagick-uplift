@@ -2556,11 +2556,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     code=GetUTFCode(p+grapheme[i].cluster);
   }
   RelinquishFreetypeText(grapheme,utf8);
-  if (glyph.image != (FT_Glyph) NULL)
-    {
-      FT_Done_Glyph(glyph.image);
-      glyph.image=(FT_Glyph) NULL;
-    }
+  glyph.image=DestroyFreetypeGlyph(glyph.image);
   ScaleFreetypeMetrics(metrics);
   /*
     Relinquish resources.
