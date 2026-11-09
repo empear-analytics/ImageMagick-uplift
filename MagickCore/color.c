@@ -2250,6 +2250,46 @@ static char *SkipCSSSeparators(char *q,MagickStatusType *flags)
   return(q);
 }
 
+static void SetCSSComponent(GeometryInfo *geometry_info,const ssize_t i,
+  const double intensity,char **q,MagickStatusType *flags)
+{
+  switch (i)
+  {
+    case 0:
+    {
+      geometry_info->rho=intensity;
+      *flags|=RhoValue;
+      if (LocaleNCompare(*q,"deg",3) == 0)
+        *q+=(ptrdiff_t) 3;
+      break;
+    }
+    case 1:
+    {
+      geometry_info->sigma=intensity;
+      *flags|=SigmaValue;
+      break;
+    }
+    case 2:
+    {
+      geometry_info->xi=intensity;
+      *flags|=XiValue;
+      break;
+    }
+    case 3:
+    {
+      geometry_info->psi=intensity;
+      *flags|=PsiValue;
+      break;
+    }
+    case 4:
+    {
+      geometry_info->chi=intensity;
+      *flags|=ChiValue;
+      break;
+    }
+  }
+}
+
 static MagickStatusType ParseCSSColor(const char *magick_restrict color,
   GeometryInfo *geometry_info)
 {
@@ -2286,41 +2326,7 @@ static MagickStatusType ParseCSSColor(const char *magick_restrict color,
         intensity*=0.01*255.0;
         q++;
       }
-    switch (i)
-    {
-      case 0:
-      {
-        geometry_info->rho=intensity;
-        flags|=RhoValue;
-        if (LocaleNCompare(q,"deg",3) == 0)
-          q+=(ptrdiff_t) 3;
-        break;
-      }
-      case 1:
-      {
-        geometry_info->sigma=intensity;
-        flags|=SigmaValue;
-        break;
-      }
-      case 2:
-      {
-        geometry_info->xi=intensity;
-        flags|=XiValue;
-        break;
-      }
-      case 3:
-      {
-        geometry_info->psi=intensity;
-        flags|=PsiValue;
-        break;
-      }
-      case 4:
-      {
-        geometry_info->chi=intensity;
-        flags|=ChiValue;
-        break;
-      }
-    }
+    SetCSSComponent(geometry_info,i,intensity,&q,&flags);
     q=SkipCSSSeparators(q,&flags);
   }
   return(flags);
