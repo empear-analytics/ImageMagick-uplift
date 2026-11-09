@@ -1018,6 +1018,13 @@ MagickPrivate void ColorComponentTerminus(void)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsColorNameCompliant(const ColorInfo *color,
+  const ComplianceType compliance,const char *colorname)
+{
+  return((((color->compliance & compliance) != 0) &&
+    (LocaleCompare(colorname,color->name) == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport const ColorInfo *GetColorCompliance(const char *name,
   const ComplianceType compliance,ExceptionInfo *exception)
 {
@@ -1065,8 +1072,7 @@ MagickExport const ColorInfo *GetColorCompliance(const char *name,
   while (p != (ElementInfo *) NULL)
   {
     color=(const ColorInfo *) p->value;
-    if (((color->compliance & compliance) != 0) &&
-        (LocaleCompare(colorname,color->name) == 0))
+    if (IsColorNameCompliant(color,compliance,colorname) != MagickFalse)
       break;
     p=p->next;
   }
