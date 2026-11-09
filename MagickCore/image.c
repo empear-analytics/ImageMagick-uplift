@@ -3234,6 +3234,31 @@ MagickExport void SetImageInfoFile(ImageInfo *image_info,FILE *file)
   image_info->file=file;
 }
 
+static void RemoveImageMaskChannel(Image *image,const PixelMask type)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~ReadMaskChannel);
+      break;
+    }
+    case WritePixelMask:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~WriteMaskChannel);
+      magick_fallthrough;
+    }
+    default:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~CompositeMaskChannel);
+      break;
+    }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3309,27 +3334,7 @@ MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
   image->mask_trait=UndefinedPixelTrait;
   if (mask == (const Image *) NULL)
     {
-      switch (type)
-      {
-        case ReadPixelMask:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~ReadMaskChannel);
-          break;
-        }
-        case WritePixelMask:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~WriteMaskChannel);
-          magick_fallthrough;
-        }
-        default:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~CompositeMaskChannel);
-          break;
-        }
-      }
+      RemoveImageMaskChannel(image,type);
       return(SyncImagePixelCache(image,exception));
     }
   AddImageMaskChannel(image,type);
