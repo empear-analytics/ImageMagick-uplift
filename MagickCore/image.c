@@ -1133,6 +1133,85 @@ static inline void CopyPixelChannels(const Image *image,
   }
 }
 
+typedef struct _CopyRow
+{
+  Image
+    *image;
+
+  const Image
+    *source_image;
+
+  const RectangleInfo
+    *geometry;
+
+  const OffsetInfo
+    *offset;
+
+  CacheView
+    *image_view,
+    *source_view;
+
+  ExceptionInfo
+    *exception;
+} CopyRow;
+
+static MagickBooleanType CopyImageRow(const CopyRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  const Image
+    *source_image = row->source_image;
+
+  const RectangleInfo
+    *geometry = row->geometry;
+
+  const OffsetInfo
+    *offset = row->offset;
+
+  CacheView
+    *image_view = row->image_view,
+    *source_view = row->source_view;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  MagickBooleanType
+    sync;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(source_view,geometry->x,y+geometry->y,
+    geometry->width,1,exception);
+  q=QueueCacheViewAuthenticPixels(image_view,offset->x,y+offset->y,
+    geometry->width,1,exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) geometry->width; x++)
+  {
+    CopyPixelChannels(image,source_image,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(source_image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  sync=SyncCacheViewAuthenticPixels(image_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType CopyImagePixels(Image *image,
   const Image *source_image,const RectangleInfo *geometry,
   const OffsetInfo *offset,ExceptionInfo *exception)
@@ -1176,38 +1255,11 @@ MagickExport MagickBooleanType CopyImagePixels(Image *image,
 #endif
   for (y=0; y < (ssize_t) geometry->height; y++)
   {
-    MagickBooleanType
-      sync;
+    const CopyRow row = { image, source_image, geometry, offset, image_view,
+      source_view, exception };
 
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    if (CopyImageRow(&row,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(source_view,geometry->x,y+geometry->y,
-      geometry->width,1,exception);
-    q=QueueCacheViewAuthenticPixels(image_view,offset->x,y+offset->y,
-      geometry->width,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) geometry->width; x++)
-    {
-      CopyPixelChannels(image,source_image,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(source_image);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    sync=SyncCacheViewAuthenticPixels(image_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
