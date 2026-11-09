@@ -7396,6 +7396,81 @@ by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe EJ - Join an Else and its Sole If
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* or *Deep, Nested Complexity*, and the
+code holds a chain written as `else` on one line and the `if` of the next test on the
+line below, each level indented one step deeper, as `color.c`'s DOCTYPE skipper and its
+hex-digit loops do (`if (c is a digit) ...; else if (c is A-F) ...` written as `else`,
+newline, `if`). CodeScene counts every such `if` as one level deeper; the same chain
+written as `else if` is flat.
+
+**Not covered by:** Recipe EI, whose `else` holds a run of `if` statements that each
+leave the flow (here the `else` holds one `if`, and nothing leaves); Recipe CN, whose
+bump is an `if` holding an `if`, with no `else`; Recipe G, which inverts conditions into
+early exits and changes the text of the tests.
+
+**How:**
+
+1. Find `else` followed by exactly one statement that is an `if` statement (with or
+   without `else` of its own), with no braces around it and no comment between.
+2. Write `else if (...)` on one line, the `if` and everything after it in the text as it
+   was, each line of the joined `if` moved one indent level less (and, with it, the lines
+   of its own `else` chain).
+3. Repeat down the chain; every such chain of one function may go in one commit (one
+   recipe, one function).
+4. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
+   the step.
+
+**Before:**
+
+```c
+          if (*q == '[')
+            bracket_depth++;
+          else
+            if (*q == ']')
+              {
+                if (bracket_depth > 0)
+                  bracket_depth--;
+              }
+            else
+              if ((*q == '>') && (bracket_depth == 0))
+                break;
+```
+
+**After:**
+
+```c
+          if (*q == '[')
+            bracket_depth++;
+          else if (*q == ']')
+            {
+              if (bracket_depth > 0)
+                bracket_depth--;
+            }
+          else if ((*q == '>') && (bracket_depth == 0))
+            break;
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `else` followed by one statement and `else if` are the
+  same tokens; only the line breaks and the indentation change. The compiler sees the
+  same program, which the object file proves.
+- A comment between the `else` and the `if`, or braces around the `if`, are not covered: step 1 refuses them.
+- No test, statement or literal changes; only whitespace and the `else`/`if` line join.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`, and `refactor_guard.py` literal and call counts unchanged.
+
+**Provenance:** 2026-11-09, from `color.c`'s `LoadColorCache` DOCTYPE loop and
+`QueryColorCompliance`'s hex-digit loops (campaign B, M120): extracting the loop
+verbatim into a helper dropped the file 4.24 to 4.09, because the helper is itself
+Deep, Nested; the same chain joined with `else if` gave 4.42 after the extraction. Added
+by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -7697,3 +7772,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-07 | AMEND | N | Step 2's pass-through form combines: the new function may take several names the caller binds `const` locals from (unchanged, in the caller's order) and, for variables computed in the caller's body that would take it past four parameters, one new struct by steps 3, 5 and 6; at most four parameters in all. *Careful* gives the argument | `composite.c`'s `CompositeImagePixel` (campaign A, W15): its channel loop reads 16 locals bound from `row` and 8 per-pixel values; the loop's colour `switch` reads from `row`, the per-pixel struct and 6 per-channel values. The three steps that use the form: 3.44 to 3.46 in a probe | mandate (2026-10-24) |
 | 2026-11-07 | AMEND | PS | Step 6: the helper may read the input struct as `name->member` at every use (Recipe N step 4's member form, as Q step 4 allows), the text then changing by that prefix too; a member a function-like macro names keeps its `const` local. When every member's value is a plain identifier that nothing in the loop body writes, the struct may be declared `const` with the values as its initialiser among the loop body's declarations (PC step 4's form). Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): its column loop body, fourteen inputs, as a step 7 nested-loop helper with `const` locals would be a *Large Method* (about 87 lines by count); in the member form 60 lines, no finding, 6.30 to 6.51 | mandate (2026-10-24) |
 | 2026-11-07 | AMEND | N | Step 8: the sibling and later-block forms also join a PS step 7 nested-loop helper and the parallel body's head moved by PC: the head takes the PS struct (declared `const` with its initialiser among the body's declarations, which stays), the typedef and initialiser gain the members the head reads, the head binds them as `const` locals (PC keeps its text), and the inner call passes `name`. Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): PC before the column body moves gives a *Complex* and *Large* helper (6.30 to 6.21); after it, with its own struct, about 80 lines; sharing the PS struct, 52 lines and no finding, 6.51 to 6.62 | mandate (2026-10-24) |
+| 2026-11-09 | NEW | EJ | Join an Else and its Sole If: `else` and the `if` on the next line become `else if` on one line, whitespace only; proof `obj_identical.sh` | `color.c`'s DOCTYPE skipper (extraction verbatim 4.24 to 4.09; with the chain joined 4.42) and the hex-digit loops of `QueryColorCompliance`; unbraced `else`/`if` nesting counts as a level for CodeScene | mandate (2026-10-24) |
