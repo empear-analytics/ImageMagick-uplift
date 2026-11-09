@@ -2907,6 +2907,16 @@ MagickExport MagickBooleanType SetImageExtent(Image *image,const size_t columns,
   return(SyncImagePixelCache(image,exception));
 }
 
+static void UpdateSceneRange(ImageInfo *image_info,size_t first,size_t last)
+{
+  if (first > last)
+    Swap(first,last);
+  if (first < image_info->scene)
+    image_info->scene=first;
+  if (last > image_info->number_scenes)
+    image_info->number_scenes=last;
+}
+
 static void ParseSceneRange(ImageInfo *image_info,const char *component)
 {
   char
@@ -2933,12 +2943,7 @@ static void ParseSceneRange(ImageInfo *image_info,const char *component)
       q++;
     if (*q == '-')
       last=(size_t) strtol(q+1,&q,10);
-    if (first > last)
-      Swap(first,last);
-    if (first < image_info->scene)
-      image_info->scene=first;
-    if (last > image_info->number_scenes)
-      image_info->number_scenes=last;
+    UpdateSceneRange(image_info,first,last);
     p=q;
   }
   image_info->number_scenes-=image_info->scene-1;
