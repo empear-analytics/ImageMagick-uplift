@@ -8331,6 +8331,12 @@ static void WrapThetaQ(StrokeSegment *theta)
     (*theta).q+=2.0*MagickPI;
 }
 
+static void WrapThetaP(StrokeSegment *theta)
+{
+  if ((*theta).p < (*theta).q)
+    (*theta).p+=2.0*MagickPI;
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -8656,8 +8662,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
           center=polygon_primitive[n].point;
           theta.p=atan2(box_p[1].y-center.y,box_p[1].x-center.x);
           theta.q=atan2(box_p[2].y-center.y,box_p[2].x-center.x);
-          if (theta.p < theta.q)
-            theta.p+=2.0*MagickPI;
+          WrapThetaP(&theta);
           arc_segments=(size_t) CastDoubleToSsizeT(ceil((double) ((theta.p-
             theta.q)/(2.0*sqrt((double) (MagickSafeReciprocal(mid)))))));
           DisableMSCWarning(4127)
