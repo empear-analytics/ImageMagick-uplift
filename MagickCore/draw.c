@@ -8275,6 +8275,49 @@ static ssize_t TraceMiterPointQ(const StrokeBoxes *boxes,PointInfo *stroke_q,
   return(q);
 }
 
+typedef struct _StrokeTargets
+{
+  PointInfo
+    **stroke_p,
+    **stroke_q;
+
+  ssize_t
+    *p,
+    *q;
+} StrokeTargets;
+
+static void TraceMiterPoints(const StrokeBoxes *boxes,const double miterlimit,
+  const StrokeTargets *targets)
+{
+  PointInfo
+    *const box_p = boxes->box_p,
+    *const box_q = boxes->box_q,
+    **const stroke_p = targets->stroke_p,
+    **const stroke_q = targets->stroke_q;
+
+  double
+    dot_product;
+
+  ssize_t
+    *const p = targets->p,
+    *const q = targets->q;
+
+          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+          if (dot_product <= miterlimit)
+            {
+              (*stroke_q)[(*q)++]=box_q[4];
+              (*stroke_p)[(*p)++]=box_p[4];
+            }
+          else
+            {
+              (*stroke_q)[(*q)++]=box_q[1];
+              (*stroke_q)[(*q)++]=box_q[2];
+              (*stroke_p)[(*p)++]=box_p[1];
+              (*stroke_p)[(*p)++]=box_p[2];
+            }
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -8375,6 +8418,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     inverse_slope = {0.0, 0.0},
     slope = {0.0, 0.0},
     theta = {0.0, 0.0};
+
+  const StrokeTargets
+    targets = { &stroke_p, &stroke_q, &p, &q };
 
   /*
     Allocate paths.
@@ -8550,20 +8596,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         }
         case MiterJoin:
         {
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            {
-              stroke_q[q++]=box_q[4];
-              stroke_p[p++]=box_p[4];
-            }
-          else
-            {
-              stroke_q[q++]=box_q[1];
-              stroke_q[q++]=box_q[2];
-              stroke_p[p++]=box_p[1];
-              stroke_p[p++]=box_p[2];
-            }
+          TraceMiterPoints(&boxes,miterlimit,&targets);
           break;
         }
         case RoundJoin:
