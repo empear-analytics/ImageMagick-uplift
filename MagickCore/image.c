@@ -3334,6 +3334,78 @@ static void AddImageMaskChannel(Image *image,const PixelMask type)
   }
 }
 
+typedef struct _ImageMaskRow
+{
+  Image
+    *image;
+
+  const Image
+    *mask;
+
+  CacheView
+    *image_view,
+    *mask_view;
+
+  PixelMask
+    type;
+
+  ExceptionInfo
+    *exception;
+} ImageMaskRow;
+
+static void SetImageMaskRow(const ImageMaskRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  const Image
+    *mask = row->mask;
+
+  CacheView
+    *image_view = row->image_view,
+    *mask_view = row->mask_view;
+
+  const PixelMask
+    type = row->type;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(mask_view,0,y,mask->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MagickRealType
+      intensity;
+
+    intensity=0.0;
+    if ((x < (ssize_t) mask->columns) && (y < (ssize_t) mask->rows))
+      intensity=GetPixelIntensity(mask,p);
+    SetMaskPixel(image,type,ClampToQuantum(intensity),q);
+    p+=(ptrdiff_t) GetPixelChannels(mask);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
   const Image *mask,ExceptionInfo *exception)
 {
@@ -3372,38 +3444,10 @@ MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    const ImageMaskRow row = { image, mask, image_view, mask_view, type,
+      exception };
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(mask_view,0,y,mask->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MagickRealType
-        intensity;
-
-      intensity=0.0;
-      if ((x < (ssize_t) mask->columns) && (y < (ssize_t) mask->rows))
-        intensity=GetPixelIntensity(mask,p);
-      SetMaskPixel(image,type,ClampToQuantum(intensity),q);
-      p+=(ptrdiff_t) GetPixelChannels(mask);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SetImageMaskRow(&row,y,&status);
   }
   mask_view=DestroyCacheView(mask_view);
   image_view=DestroyCacheView(image_view);
