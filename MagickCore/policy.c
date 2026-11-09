@@ -1019,6 +1019,15 @@ static inline MagickBooleanType IsLimitPolicyDomain(
     MagickFalse);
 }
 
+static void ListPolicyLimit(FILE *file,const PolicyInfo **policy_info,
+  const ssize_t i)
+{
+  if (policy_info[i]->name != (char *) NULL)
+    (void) FormatLocaleFile(file,"    name: %s\n",policy_info[i]->name);
+  if (policy_info[i]->value != (char *) NULL)
+    (void) FormatLocaleFile(file,"    value: %s\n",policy_info[i]->value);
+}
+
 static void ListPolicyRights(FILE *file,const PolicyInfo **policy_info,
   const ssize_t i)
 {
@@ -1073,12 +1082,7 @@ MagickExport MagickBooleanType ListPolicyInfo(FILE *file,
       policy_info[i]->domain);
     (void) FormatLocaleFile(file,"  Policy: %s\n",domain);
     if (IsLimitPolicyDomain(policy_info,i) != MagickFalse)
-      {
-        if (policy_info[i]->name != (char *) NULL)
-          (void) FormatLocaleFile(file,"    name: %s\n",policy_info[i]->name);
-        if (policy_info[i]->value != (char *) NULL)
-          (void) FormatLocaleFile(file,"    value: %s\n",policy_info[i]->value);
-      }
+      ListPolicyLimit(file,policy_info,i);
     else
       ListPolicyRights(file,policy_info,i);
   }
