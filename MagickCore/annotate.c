@@ -378,11 +378,25 @@ static void GetGravityTextOffset(const GravityTextInfo *gravity,
   }
 }
 
+static size_t CountTextLines(const char *text)
+{
+  const char
+    *p;
+
+  size_t
+    number_lines;
+
+  number_lines=1;
+  for (p=text; *p != '\0'; p++)
+    if (*p == '\n')
+      number_lines++;
+  return(number_lines);
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
   char
-    *p,
     color[MagickPathExtent],
     primitive[MagickPathExtent],
     *text,
@@ -431,10 +445,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   text=annotate->text;
   annotate->text=(char *) NULL;
   annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-  number_lines=1;
-  for (p=text; *p != '\0'; p++)
-    if (*p == '\n')
-      number_lines++;
+  number_lines=CountTextLines(text);
   textlist=(char **) AcquireQuantumMemory(number_lines+1,sizeof(*textlist));
   if (textlist == (char **) NULL)
     {
