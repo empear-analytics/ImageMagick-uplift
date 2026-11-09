@@ -2232,6 +2232,89 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
     (*status)=MagickFalse;
 }
 
+typedef struct _GlyphBitmapTarget
+{
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  FT_BitmapGlyph
+    bitmap;
+
+  PointInfo
+    point;
+
+  DrawInfo
+    *annotate_info;
+
+  const PointInfo
+    *offset;
+
+  ExceptionInfo
+    *exception;
+} GlyphBitmapTarget;
+
+static MagickBooleanType RasterizeGlyphBitmap(const GlyphBitmapTarget *target,
+  MagickBooleanType status)
+{
+  Image
+    *const image = target->image;
+
+  const DrawInfo
+    *const draw_info = target->draw_info;
+
+  const FT_BitmapGlyph
+    bitmap = target->bitmap;
+
+  const PointInfo
+    point = target->point;
+
+  DrawInfo
+    *const annotate_info = target->annotate_info;
+
+  const PointInfo
+    *const offset = target->offset;
+
+  ExceptionInfo
+    *const exception = target->exception;
+
+  ssize_t
+    y;
+
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    transparent_fill;
+
+  unsigned char
+    *r;
+
+  /*
+    Rasterize the glyph.
+  */
+  transparent_fill=IsTransparentFill(draw_info);
+  r=bitmap->bitmap.buffer;
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,bitmap->bitmap.rows,4)
+#endif
+  for (y=0; y < (ssize_t) bitmap->bitmap.rows; y++)
+  {
+    const GlyphRows rows = { image, image_view, bitmap, point, r,
+      transparent_fill, draw_info, exception };
+
+    RasterizeGlyphRow(&rows,y,&status);
+  }
+  image_view=DestroyCacheView(image_view);
+  if (IsVisibleStroke(draw_info,status) != MagickFalse)
+    DrawFreetypeStroke(image,annotate_info,offset,exception);
+  return(status);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2342,8 +2425,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 
   ssize_t
     code,
-    last_character,
-    y;
+    last_character;
 
   static FT_Outline_Funcs
     OutlineMethods =
@@ -2584,35 +2666,17 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     point=GetGlyphBitmapPoint(offset,bitmap,origin);
     if (draw_info->render != MagickFalse)
       {
-        CacheView
-          *image_view;
+        GlyphBitmapTarget
+          glyph_target;
 
-        MagickBooleanType
-          transparent_fill;
-
-        unsigned char
-          *r;
-
-        /*
-          Rasterize the glyph.
-        */
-        transparent_fill=IsTransparentFill(draw_info);
-        r=bitmap->bitmap.buffer;
-        image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp parallel for schedule(static) shared(status) \
-          magick_number_threads(image,image,bitmap->bitmap.rows,4)
-#endif
-        for (y=0; y < (ssize_t) bitmap->bitmap.rows; y++)
-        {
-          const GlyphRows rows = { image, image_view, bitmap, point, r,
-            transparent_fill, draw_info, exception };
-
-          RasterizeGlyphRow(&rows,y,&status);
-        }
-        image_view=DestroyCacheView(image_view);
-        if (IsVisibleStroke(draw_info,status) != MagickFalse)
-          DrawFreetypeStroke(image,annotate_info,offset,exception);
+        glyph_target.image=image;
+        glyph_target.draw_info=draw_info;
+        glyph_target.bitmap=bitmap;
+        glyph_target.point=point;
+        glyph_target.annotate_info=annotate_info;
+        glyph_target.offset=offset;
+        glyph_target.exception=exception;
+        status=RasterizeGlyphBitmap(&glyph_target,status);
       }
     if (IsInterwordSpace(draw_info,p+grapheme[i].cluster,code) != MagickFalse)
       origin.x+=(FT_Pos) (64.0*draw_info->interword_spacing);
