@@ -1486,6 +1486,33 @@ MagickExport FILE *GetImageInfoFile(const ImageInfo *image_info)
   return(image_info->file);
 }
 
+static MagickBooleanType HasMaskChannel(const Image *image,
+  const PixelMask type)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      if ((image->channels & ReadMaskChannel) == 0)
+        return(MagickFalse);
+      break;
+    }
+    case WritePixelMask:
+    {
+      if ((image->channels & WriteMaskChannel) == 0)
+        return(MagickFalse);
+      break;
+    }
+    default:
+    {
+      if ((image->channels & CompositeMaskChannel) == 0)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1534,27 +1561,8 @@ MagickExport Image *GetImageMask(const Image *image,const PixelMask type,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  switch (type)
-  {
-    case ReadPixelMask:
-    {
-      if ((image->channels & ReadMaskChannel) == 0)
-        return((Image *) NULL);
-      break;
-    }
-    case WritePixelMask:
-    {
-      if ((image->channels & WriteMaskChannel) == 0)
-        return((Image *) NULL);
-      break;
-    }
-    default:
-    {
-      if ((image->channels & CompositeMaskChannel) == 0)
-        return((Image *) NULL);
-      break;
-    }
-  }
+  if (HasMaskChannel(image,type) == MagickFalse)
+    return((Image *) NULL);
   mask_image=AcquireImage((ImageInfo *) NULL,exception);
   status=SetImageExtent(mask_image,image->columns,image->rows,exception);
   if (status == MagickFalse)
