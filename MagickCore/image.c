@@ -1609,8 +1609,8 @@ typedef struct _GetMaskRow
     *exception;
 } GetMaskRow;
 
-static void GetImageMaskRow(const GetMaskRow *row,const ssize_t y,
-  MagickBooleanType *status)
+static void ConvertMaskRow(const GetMaskRow *row,const Quantum *p,
+  Quantum *q)
 {
   const Image
     *image = row->image;
@@ -1618,35 +1618,12 @@ static void GetImageMaskRow(const GetMaskRow *row,const ssize_t y,
   Image
     *mask_image = row->mask_image;
 
-  CacheView
-    *image_view = row->image_view,
-    *mask_view = row->mask_view;
-
   const PixelMask
     type = row->type;
-
-  ExceptionInfo
-    *exception = row->exception;
-
-  const Quantum
-    *magick_restrict p;
-
-  Quantum
-    *magick_restrict q;
 
   ssize_t
     x;
 
-  if ((*status) == MagickFalse)
-    return;
-  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-  q=GetCacheViewAuthenticPixels(mask_view,0,y,mask_image->columns,1,
-    exception);
-  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-    {
-      (*status)=MagickFalse;
-      return;
-    }
   for (x=0; x < (ssize_t) image->columns; x++)
   {
     switch (type)
@@ -1670,6 +1647,41 @@ static void GetImageMaskRow(const GetMaskRow *row,const ssize_t y,
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(mask_image);
   }
+}
+
+static void GetImageMaskRow(const GetMaskRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Image
+    *image = row->image;
+
+  Image
+    *mask_image = row->mask_image;
+
+  CacheView
+    *image_view = row->image_view,
+    *mask_view = row->mask_view;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(mask_view,0,y,mask_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  ConvertMaskRow(row,p,q);
   if (SyncCacheViewAuthenticPixels(mask_view,exception) == MagickFalse)
     (*status)=MagickFalse;
 }
