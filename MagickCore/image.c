@@ -3259,6 +3259,29 @@ static void RemoveImageMaskChannel(Image *image,const PixelMask type)
   }
 }
 
+static void SetMaskPixel(const Image *image,const PixelMask type,
+  const Quantum pixel,Quantum *q)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      SetPixelReadMask(image,pixel,q);
+      break;
+    }
+    case WritePixelMask:
+    {
+      SetPixelWriteMask(image,pixel,q);
+      break;
+    }
+    default:
+    {
+      SetPixelCompositeMask(image,pixel,q);
+      break;
+    }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3375,24 +3398,7 @@ MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
       intensity=0.0;
       if ((x < (ssize_t) mask->columns) && (y < (ssize_t) mask->rows))
         intensity=GetPixelIntensity(mask,p);
-      switch (type)
-      {
-        case ReadPixelMask:
-        {
-          SetPixelReadMask(image,ClampToQuantum(intensity),q);
-          break;
-        }
-        case WritePixelMask:
-        {
-          SetPixelWriteMask(image,ClampToQuantum(intensity),q);
-          break;
-        }
-        default:
-        {
-          SetPixelCompositeMask(image,ClampToQuantum(intensity),q);
-          break;
-        }
-      }
+      SetMaskPixel(image,type,ClampToQuantum(intensity),q);
       p+=(ptrdiff_t) GetPixelChannels(mask);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
@@ -3425,29 +3431,6 @@ static void RemoveRegionMaskChannel(Image *image,const PixelMask type)
     {
       image->channels=(ChannelType) ((unsigned int) image->channels &
         (unsigned int) ~CompositeMaskChannel);
-      break;
-    }
-  }
-}
-
-static void SetMaskPixel(const Image *image,const PixelMask type,
-  const Quantum pixel,Quantum *q)
-{
-  switch (type)
-  {
-    case ReadPixelMask:
-    {
-      SetPixelReadMask(image,pixel,q);
-      break;
-    }
-    case WritePixelMask:
-    {
-      SetPixelWriteMask(image,pixel,q);
-      break;
-    }
-    default:
-    {
-      SetPixelCompositeMask(image,pixel,q);
       break;
     }
   }
