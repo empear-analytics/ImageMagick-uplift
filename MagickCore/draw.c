@@ -8224,6 +8224,35 @@ static void GetStrokeSlope(const double dx,const double dy,double *slope,
       }
 }
 
+typedef struct _StrokeBoxes
+{
+  PointInfo
+    *box_p,
+    *box_q;
+} StrokeBoxes;
+
+static ssize_t TraceMiterPointP(const StrokeBoxes *boxes,PointInfo *stroke_p,
+  ssize_t p,const double miterlimit)
+{
+  PointInfo
+    *const box_p = boxes->box_p,
+    *const box_q = boxes->box_q;
+
+  double
+    dot_product;
+
+          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+          if (dot_product <= miterlimit)
+            stroke_p[p++]=box_p[4];
+          else
+            {
+              stroke_p[p++]=box_p[1];
+              stroke_p[p++]=box_p[2];
+            }
+  return(p);
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -8295,6 +8324,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     offset,
     *stroke_p,
     *stroke_q;
+
+  const StrokeBoxes
+    boxes = { box_p, box_q };
 
   PrimitiveInfo
     *polygon_primitive,
@@ -8491,15 +8523,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         {
           stroke_q[q++]=box_q[1];
           stroke_q[q++]=box_q[2];
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            stroke_p[p++]=box_p[4];
-          else
-            {
-              stroke_p[p++]=box_p[1];
-              stroke_p[p++]=box_p[2];
-            }
+          p=TraceMiterPointP(&boxes,stroke_p,p,miterlimit);
           break;
         }
         case MiterJoin:
