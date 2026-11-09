@@ -2287,6 +2287,16 @@ static PointInfo GetFreetypeTextResolution(const DrawInfo *draw_info)
   return(resolution);
 }
 
+static void SelectFreetypeCharmap(FT_Face face,FT_Encoding encoding_type)
+{
+  FT_Error
+    ft_status;
+
+  ft_status=FT_Select_Charmap(face,encoding_type);
+  if ((ft_status != 0) && (face->num_charmaps != 0))
+    (void) FT_Set_Charmap(face,face->charmaps[0]);
+}
+
 typedef struct _GlyphBitmapTarget
 {
   Image
@@ -2558,9 +2568,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
       (IsPathAccessible(draw_info->metrics) != MagickFalse))
     (void) FT_Attach_File(face,draw_info->metrics);
   encoding_type=FT_ENCODING_UNICODE;
-  ft_status=FT_Select_Charmap(face,encoding_type);
-  if ((ft_status != 0) && (face->num_charmaps != 0))
-    ft_status=FT_Set_Charmap(face,face->charmaps[0]);
+  SelectFreetypeCharmap(face,encoding_type);
   if (encoding != (const char *) NULL)
     {
       encoding_type=SelectAdobeBig5Encoding(encoding,encoding_type);
