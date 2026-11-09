@@ -753,6 +753,28 @@ static inline MagickBooleanType IsBreakableSpace(const DrawInfo *draw_info,
     (IsNonBreakingUTFSpace(code) == MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
+static inline char *InsertNewlineBeforeSpace(char **caption,char *p)
+{
+  ssize_t
+    n;
+
+  n=p-(*caption);
+  if ((n > 0) && ((*caption)[n-1] != '\n'))
+    {
+      char
+        *target;
+
+      target=AcquireString(*caption);
+      (void) CopyMagickString(target,*caption,(size_t) n+1);
+      (void) ConcatenateMagickString(target,"\n",strlen(*caption)+1);
+      (void) ConcatenateMagickString(target,p,strlen(*caption)+2);
+      (void) DestroyString(*caption);
+      *caption=target;
+      p=(*caption)+n;
+    }
+  return(p);
+}
+
 MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
   const MagickBooleanType split,TypeMetric *metrics,char **caption,
   ExceptionInfo *exception)
@@ -809,20 +831,7 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
           /*
             No convenient line breaks-- insert newline.
           */
-          n=p-(*caption);
-          if ((n > 0) && ((*caption)[n-1] != '\n'))
-            {
-              char
-                *target;
-
-              target=AcquireString(*caption);
-              (void) CopyMagickString(target,*caption,(size_t) n+1);
-              (void) ConcatenateMagickString(target,"\n",strlen(*caption)+1);
-              (void) ConcatenateMagickString(target,p,strlen(*caption)+2);
-              (void) DestroyString(*caption);
-              *caption=target;
-              p=(*caption)+n;
-            }
+          p=InsertNewlineBeforeSpace(caption,p);
         }
     q=draw_info->text;
     s=(char *) NULL;
