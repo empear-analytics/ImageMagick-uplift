@@ -1977,6 +1977,20 @@ static void BlendGlyphAlpha(const Image *image,double fill_opacity,
   SetPixelAlpha(image,(const Quantum) fill_opacity,q);
 }
 
+static void ScaleFreetypeMetrics(TypeMetric *metrics)
+{
+  /*
+    Determine font metrics.
+  */
+  metrics->bounds.x1/=64.0;
+  metrics->bounds.y1/=64.0;
+  metrics->bounds.x2/=64.0;
+  metrics->bounds.y2/=64.0;
+  metrics->origin.x/=64.0;
+  metrics->origin.y/=64.0;
+  metrics->width=ceil(metrics->width/64.0);
+}
+
 static void TraceGlyphOutline(DrawInfo *annotate_info,const FT_Vector origin,
   FT_Outline outline,const FT_Outline_Funcs *outline_methods)
 {
@@ -2480,16 +2494,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
       FT_Done_Glyph(glyph.image);
       glyph.image=(FT_Glyph) NULL;
     }
-  /*
-    Determine font metrics.
-  */
-  metrics->bounds.x1/=64.0;
-  metrics->bounds.y1/=64.0;
-  metrics->bounds.x2/=64.0;
-  metrics->bounds.y2/=64.0;
-  metrics->origin.x/=64.0;
-  metrics->origin.y/=64.0;
-  metrics->width=ceil(metrics->width/64.0);
+  ScaleFreetypeMetrics(metrics);
   /*
     Relinquish resources.
   */
