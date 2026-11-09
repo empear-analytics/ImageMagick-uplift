@@ -5161,13 +5161,32 @@ MagickExport magick_hot_spot const void *ReadBlobStream(Image *image,
 %    o string: the address of a character buffer.
 %
 */
+static size_t ReadBlobLine(Image *image,BlobInfo *magick_restrict blob_info,
+  char *string,size_t i)
+{
+  int
+    c;
+
+  do
+  {
+    c=ReadBlobByte(image);
+    if (c == EOF)
+      {
+        blob_info->eof=MagickTrue;
+        break;
+      }
+    string[i++]=(char) c;
+    if (c == '\n')
+      break;
+  } while (i < (MaxTextExtent-2));
+  string[i]='\0';
+  return(i);
+}
+
 MagickExport char *ReadBlobString(Image *image,char *string)
 {
   BlobInfo
     *magick_restrict blob_info;
-
-  int
-    c = -1;
 
   size_t
     i = 0;
@@ -5215,19 +5234,7 @@ MagickExport char *ReadBlobString(Image *image,char *string)
     }
     default:
     {
-      do
-      {
-        c=ReadBlobByte(image);
-        if (c == EOF)
-          {
-            blob_info->eof=MagickTrue;
-            break;
-          }
-        string[i++]=(char) c;
-        if (c == '\n')
-          break;
-      } while (i < (MaxTextExtent-2));
-      string[i]='\0';
+      i=ReadBlobLine(image,blob_info,string,i);
       break;
     }
   }
