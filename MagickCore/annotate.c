@@ -2068,6 +2068,16 @@ static PointInfo GetGlyphBitmapPoint(const PointInfo *offset,
   return(point);
 }
 
+static FT_Glyph DestroyFreetypeGlyph(FT_Glyph glyph_image)
+{
+  if (glyph_image != (FT_Glyph) NULL)
+    {
+      FT_Done_Glyph(glyph_image);
+      glyph_image=(FT_Glyph) NULL;
+    }
+  return(glyph_image);
+}
+
 static void TraceGlyphOutline(DrawInfo *annotate_info,const FT_Vector origin,
   FT_Outline outline,const FT_Outline_Funcs *outline_methods)
 {
@@ -2405,11 +2415,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     glyph.origin=origin;
     glyph.origin.x+=(FT_Pos) grapheme[i].x_offset;
     glyph.origin.y+=(FT_Pos) grapheme[i].y_offset;
-    if (glyph.image != (FT_Glyph) NULL)
-      {
-        FT_Done_Glyph(glyph.image);
-        glyph.image=(FT_Glyph) NULL;
-      }
+    glyph.image=DestroyFreetypeGlyph(glyph.image);
     ft_status=FT_Load_Glyph(face,glyph.id,flags);
     if (ft_status != 0)
       continue;
