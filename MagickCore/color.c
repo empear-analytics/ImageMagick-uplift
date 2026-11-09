@@ -2084,6 +2084,19 @@ static const char *SkipCommentElement(const char *q,const size_t extent,
   return(q);
 }
 
+static const char *ReadColorInfoAttribute(ColorInfo *color_info,
+  const char *keyword,const char *q,const size_t extent,char *token,
+  ExceptionInfo *exception)
+{
+  (void) GetNextToken(q,(const char **) NULL,extent,token);
+  if (*token != '=')
+    return(q);
+  (void) GetNextToken(q,&q,extent,token);
+  (void) GetNextToken(q,&q,extent,token);
+  SetColorInfoAttribute(color_info,keyword,token,exception);
+  return(q);
+}
+
 static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2171,12 +2184,7 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
         color_info=(ColorInfo *) NULL;
         continue;
       }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    SetColorInfoAttribute(color_info,keyword,token,exception);
+    q=ReadColorInfoAttribute(color_info,keyword,q,extent,token,exception);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);
