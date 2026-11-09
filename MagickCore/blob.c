@@ -3945,24 +3945,7 @@ MagickExport Image *PingBlob(const ImageInfo *image_info,const void *blob,
     ping_info->magick,ping_info->filename);
   image=ReadStream(clone_info,&PingStream,exception);
   if (image != (Image *) NULL)
-    {
-      Image
-        *images;
-
-      /*
-        Restore original filenames and image format.
-      */
-      for (images=GetFirstImageInList(image); images != (Image *) NULL; )
-      {
-        (void) CopyMagickString(images->filename,image_info->filename,
-          MagickPathExtent);
-        (void) CopyMagickString(images->magick_filename,image_info->filename,
-          MagickPathExtent);
-        (void) CopyMagickString(images->magick,magick_info->name,
-          MagickPathExtent);
-        images=GetNextImageInList(images);
-      }
-    }
+    RestoreCustomStreamFilenames(image_info,magick_info,image);
   clone_info=DestroyImageInfo(clone_info);
   (void) RelinquishUniqueFileResource(ping_info->filename);
   ping_info=DestroyImageInfo(ping_info);
