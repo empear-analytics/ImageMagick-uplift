@@ -2063,6 +2063,19 @@ static MagickStatusType LoadIncludeElement(const ColorLoadTarget *target,
   return(status);
 }
 
+static MagickStatusType AppendColorInfoToCache(LinkedListInfo *cache,
+  ColorInfo *color_info,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AppendValueToLinkedList(cache,color_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",color_info->name);
+  return(status);
+}
+
 static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2147,11 +2160,7 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
     if ((LocaleCompare(keyword,"/>") == 0) ||
         (LocaleCompare(keyword,"</policy>") == 0))
       {
-        status=AppendValueToLinkedList(cache,color_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",
-            color_info->name);
+        status=AppendColorInfoToCache(cache,color_info,exception);
         color_info=(ColorInfo *) NULL;
         continue;
       }
