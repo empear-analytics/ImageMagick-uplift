@@ -1964,6 +1964,18 @@ static FT_Encoding SelectAdobeBig5Encoding(const char *encoding,
   return(encoding_type);
 }
 
+static void TraceGlyphOutline(DrawInfo *annotate_info,const FT_Vector origin,
+  FT_Outline outline,const FT_Outline_Funcs *outline_methods)
+{
+  /*
+    Trace the glyph.
+  */
+  annotate_info->affine.tx=origin.x/64.0;
+  annotate_info->affine.ty=(-origin.y/64.0);
+  if (IsEmptyOutline(outline) == MagickFalse)
+    (void) FT_Outline_Decompose(&outline,outline_methods,annotate_info);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2319,16 +2331,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     ExtendGlyphMinBounds(bounds,metrics);
     ExtendGlyphMaxBounds(bounds,metrics);
     if (IsRenderedStroke(draw_info,status) != MagickFalse)
-      {
-        /*
-          Trace the glyph.
-        */
-        annotate_info->affine.tx=glyph.origin.x/64.0;
-        annotate_info->affine.ty=(-glyph.origin.y/64.0);
-        if (IsEmptyOutline(outline) == MagickFalse)
-          ft_status=FT_Outline_Decompose(&outline,&OutlineMethods,
-            annotate_info);
-      }
+      TraceGlyphOutline(annotate_info,glyph.origin,outline,&OutlineMethods);
     FT_Vector_Transform(&glyph.origin,&affine);
     (void) FT_Glyph_Transform(glyph.image,&affine,&glyph.origin);
     ft_status=FT_Glyph_To_Bitmap(&glyph.image,FT_RENDER_MODE_NORMAL,
