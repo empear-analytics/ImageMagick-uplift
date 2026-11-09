@@ -800,6 +800,22 @@ static inline char *AppendUTFCharacter(char *q,const char *p)
   return(q);
 }
 
+static inline char *BreakCaptionLine(char **caption,char *p,char *s,
+  const MagickBooleanType split)
+{
+  if (s != (char *) NULL)
+    p=ReplaceSpaceWithNewline(caption,s);
+  else
+    if ((split != MagickFalse) || (GetUTFOctets(p) > 2))
+      {
+        /*
+          No convenient line breaks-- insert newline.
+        */
+        p=InsertNewlineBeforeSpace(caption,p);
+      }
+  return(p);
+}
+
 MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
   const MagickBooleanType split,TypeMetric *metrics,char **caption,
   ExceptionInfo *exception)
@@ -846,16 +862,7 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
     width=CastDoubleToSizeT(metrics->width+draw_info->stroke_width+0.5);
     if (width <= image->columns)
       continue;
-    if (s != (char *) NULL)
-      p=ReplaceSpaceWithNewline(caption,s);
-    else
-      if ((split != MagickFalse) || (GetUTFOctets(p) > 2))
-        {
-          /*
-            No convenient line breaks-- insert newline.
-          */
-          p=InsertNewlineBeforeSpace(caption,p);
-        }
+    p=BreakCaptionLine(caption,p,s,split);
     q=draw_info->text;
     s=(char *) NULL;
   }
