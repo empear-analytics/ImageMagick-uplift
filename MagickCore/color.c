@@ -2236,6 +2236,20 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
 %
 */
 
+static char *SkipCSSSeparators(char *q,MagickStatusType *flags)
+{
+  while (isspace((int) ((unsigned char) *q)) != 0)
+    q++;
+  if (*q == ',')
+    q++;
+  if (*q == '/')
+    {
+      *flags|=AlphaValue;
+      q++;
+    }
+  return(q);
+}
+
 static MagickStatusType ParseCSSColor(const char *magick_restrict color,
   GeometryInfo *geometry_info)
 {
@@ -2307,15 +2321,7 @@ static MagickStatusType ParseCSSColor(const char *magick_restrict color,
         break;
       }
     }
-    while (isspace((int) ((unsigned char) *q)) != 0)
-      q++;
-    if (*q == ',')
-      q++;
-    if (*q == '/')
-      {
-        flags|=AlphaValue;
-        q++;
-      }
+    q=SkipCSSSeparators(q,&flags);
   }
   return(flags);
 }
