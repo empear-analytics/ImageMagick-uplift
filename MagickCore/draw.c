@@ -8318,6 +8318,13 @@ static void TraceMiterPoints(const StrokeBoxes *boxes,const double miterlimit,
             }
 }
 
+typedef struct _StrokeSegment
+{
+  double
+    p,
+    q;
+} StrokeSegment;
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -8365,13 +8372,6 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
       return((PrimitiveInfo *) NULL); \
     } \
 }
-
-  typedef struct _StrokeSegment
-  {
-    double
-      p,
-      q;
-  } StrokeSegment;
 
   double
     delta_theta,
