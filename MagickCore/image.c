@@ -565,6 +565,15 @@ static void AccumulateAppendDepth(const Image *next,const Image *images,
     (*image_type)=UndefinedType;
 }
 
+static void AccumulateAppendTraits(const Image *next,const Image *images,
+  MagickBooleanType *homogeneous_colorspace,PixelTrait *alpha_trait)
+{
+  if (next->colorspace != images->colorspace)
+    (*homogeneous_colorspace)=MagickFalse;
+  if (next->alpha_trait != UndefinedPixelTrait)
+    (*alpha_trait)=BlendPixelTrait;
+}
+
 MagickExport Image *AppendImages(const Image *images,
   const MagickBooleanType stack,ExceptionInfo *exception)
 {
@@ -626,10 +635,7 @@ MagickExport Image *AppendImages(const Image *images,
   for ( ; next != (Image *) NULL; next=GetNextImageInList(next))
   {
     AccumulateAppendDepth(next,images,&depth,&image_type);
-    if (next->colorspace != images->colorspace)
-      homogeneous_colorspace=MagickFalse;
-    if (next->alpha_trait != UndefinedPixelTrait)
-      alpha_trait=BlendPixelTrait;
+    AccumulateAppendTraits(next,images,&homogeneous_colorspace,&alpha_trait);
     number_images++;
     AddAppendExtent(next,stack,&width,&height);
   }
