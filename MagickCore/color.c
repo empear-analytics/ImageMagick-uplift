@@ -2882,6 +2882,30 @@ static inline MagickBooleanType IsColorNameMatch(const ColorInfo *value,
     MagickTrue : MagickFalse);
 }
 
+static void FindColorName(const PixelInfo *color,const double alpha,
+  const ComplianceType compliance,char *name)
+{
+  ElementInfo
+    *p;
+
+  LockSemaphoreInfo(color_semaphore);
+  p=GetHeadElementInLinkedList(color_cache);
+  while (p != (ElementInfo *) NULL)
+  {
+    const ColorInfo
+      *value;
+
+    value=(const ColorInfo *) p->value;
+    if (IsColorNameMatch(value,color,alpha,compliance) != MagickFalse)
+      {
+        (void) CopyMagickString(name,value->name,MagickPathExtent);
+        break;
+      }
+    p=p->next;
+  }
+  UnlockSemaphoreInfo(color_semaphore);
+}
+
 MagickExport MagickBooleanType QueryColorname(
   const Image *magick_unused(image),const PixelInfo *color,
   const ComplianceType compliance,char *name,ExceptionInfo *exception)
@@ -2891,9 +2915,6 @@ MagickExport MagickBooleanType QueryColorname(
 
   double
     alpha;
-
-  ElementInfo
-    *p;
 
   magick_unreferenced(image);
   *name='\0';
@@ -2913,21 +2934,6 @@ MagickExport MagickBooleanType QueryColorname(
   alpha=color->alpha_trait != UndefinedPixelTrait ? (double) color->alpha :
     (double) OpaqueAlpha;
   (void) GetColorInfo("*",exception);
-  LockSemaphoreInfo(color_semaphore);
-  p=GetHeadElementInLinkedList(color_cache);
-  while (p != (ElementInfo *) NULL)
-  {
-    const ColorInfo
-      *value;
-    
-    value=(const ColorInfo *) p->value;
-    if (IsColorNameMatch(value,color,alpha,compliance) != MagickFalse)
-      {
-        (void) CopyMagickString(name,value->name,MagickPathExtent);
-        break;
-      }
-    p=p->next;
-  }
-  UnlockSemaphoreInfo(color_semaphore);
+  FindColorName(color,alpha,compliance,name);
   return(MagickTrue);
 }
