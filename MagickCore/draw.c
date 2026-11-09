@@ -8253,6 +8253,28 @@ static ssize_t TraceMiterPointP(const StrokeBoxes *boxes,PointInfo *stroke_p,
   return(p);
 }
 
+static ssize_t TraceMiterPointQ(const StrokeBoxes *boxes,PointInfo *stroke_q,
+  ssize_t q,const double miterlimit)
+{
+  PointInfo
+    *const box_p = boxes->box_p,
+    *const box_q = boxes->box_q;
+
+  double
+    dot_product;
+
+          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+          if (dot_product <= miterlimit)
+            stroke_q[q++]=box_q[4];
+          else
+            {
+              stroke_q[q++]=box_q[1];
+              stroke_q[q++]=box_q[2];
+            }
+  return(q);
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -8582,15 +8604,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         {
           stroke_p[p++]=box_p[1];
           stroke_p[p++]=box_p[2];
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            stroke_q[q++]=box_q[4];
-          else
-            {
-              stroke_q[q++]=box_q[1];
-              stroke_q[q++]=box_q[2];
-            }
+          q=TraceMiterPointQ(&boxes,stroke_q,q,miterlimit);
           break;
         }
         case MiterJoin:
