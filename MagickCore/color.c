@@ -1593,6 +1593,21 @@ static void ConcatenateHexColorComponent(const PixelInfo *pixel,
   return;
 }
 
+static void ConcatenateHexColor(const PixelInfo *pixel,char *tuple)
+{
+  /*
+    Convert pixel to hex color.
+  */
+  (void) ConcatenateMagickString(tuple,"#",MagickPathExtent);
+  ConcatenateHexColorComponent(pixel,RedPixelChannel,tuple);
+  ConcatenateHexColorComponent(pixel,GreenPixelChannel,tuple);
+  ConcatenateHexColorComponent(pixel,BluePixelChannel,tuple);
+  if (pixel->colorspace == CMYKColorspace)
+    ConcatenateHexColorComponent(pixel,BlackPixelChannel,tuple);
+  if (pixel->alpha_trait != UndefinedPixelTrait)
+    ConcatenateHexColorComponent(pixel,AlphaPixelChannel,tuple);
+}
+
 MagickExport void GetColorTuple(const PixelInfo *pixel,
   const MagickBooleanType hex,char *tuple)
 {
@@ -1606,17 +1621,7 @@ MagickExport void GetColorTuple(const PixelInfo *pixel,
   *tuple='\0';
   if (hex != MagickFalse)
     {
-      /*
-        Convert pixel to hex color.
-      */
-      (void) ConcatenateMagickString(tuple,"#",MagickPathExtent);
-      ConcatenateHexColorComponent(pixel,RedPixelChannel,tuple);
-      ConcatenateHexColorComponent(pixel,GreenPixelChannel,tuple);
-      ConcatenateHexColorComponent(pixel,BluePixelChannel,tuple);
-      if (pixel->colorspace == CMYKColorspace)
-        ConcatenateHexColorComponent(pixel,BlackPixelChannel,tuple);
-      if (pixel->alpha_trait != UndefinedPixelTrait)
-        ConcatenateHexColorComponent(pixel,AlphaPixelChannel,tuple);
+      ConcatenateHexColor(pixel,tuple);
       return;
     }
   /*
