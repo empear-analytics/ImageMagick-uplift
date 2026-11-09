@@ -2232,6 +2232,18 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
     (*status)=MagickFalse;
 }
 
+static PointInfo GetFreetypeTextResolution(const DrawInfo *draw_info)
+{
+  PointInfo
+    resolution;
+
+  resolution.x=DefaultResolution;
+  resolution.y=DefaultResolution;
+  if (draw_info->density != (char *) NULL)
+    resolution=GetFreetypeResolution(draw_info,resolution);
+  return(resolution);
+}
+
 typedef struct _GlyphBitmapTarget
 {
   Image
@@ -2548,10 +2560,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   /*
     Set text size.
   */
-  resolution.x=DefaultResolution;
-  resolution.y=DefaultResolution;
-  if (draw_info->density != (char *) NULL)
-    resolution=GetFreetypeResolution(draw_info,resolution);
+  resolution=GetFreetypeTextResolution(draw_info);
   ft_status=FT_Set_Char_Size(face,(FT_F26Dot6) (64.0*draw_info->pointsize),
     (FT_F26Dot6) (64.0*draw_info->pointsize),(FT_UInt) resolution.x,
     (FT_UInt) resolution.y);
