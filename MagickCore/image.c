@@ -3430,6 +3430,29 @@ static void RemoveRegionMaskChannel(Image *image,const PixelMask type)
   }
 }
 
+static void SetMaskPixel(const Image *image,const PixelMask type,
+  const Quantum pixel,Quantum *q)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      SetPixelReadMask(image,pixel,q);
+      break;
+    }
+    case WritePixelMask:
+    {
+      SetPixelWriteMask(image,pixel,q);
+      break;
+    }
+    default:
+    {
+      SetPixelCompositeMask(image,pixel,q);
+      break;
+    }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3526,24 +3549,7 @@ MagickExport MagickBooleanType SetImageRegionMask(Image *image,
       pixel=QuantumRange;
       if (IsInsideRegion(region,x,y) != MagickFalse)
         pixel=(Quantum) 0;
-      switch (type)
-      {
-        case ReadPixelMask:
-        {
-          SetPixelReadMask(image,pixel,q);
-          break;
-        }
-        case WritePixelMask:
-        {
-          SetPixelWriteMask(image,pixel,q);
-          break;
-        }
-        default:
-        {
-          SetPixelCompositeMask(image,pixel,q);
-          break;
-        }
-      }
+      SetMaskPixel(image,type,pixel,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
