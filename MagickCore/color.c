@@ -1525,12 +1525,9 @@ MagickExport char **GetColorList(const char *pattern,
 %
 */
 
-static void ConcatenateHexColorComponent(const PixelInfo *pixel,
-  const PixelChannel channel,char *tuple)
+static double GetHexChannelValue(const PixelInfo *pixel,
+  const PixelChannel channel)
 {
-  char
-    component[MagickPathExtent];
-
   double
     color;
 
@@ -1565,6 +1562,19 @@ static void ConcatenateHexColorComponent(const PixelInfo *pixel,
     default:
       break;
   }
+  return(color);
+}
+
+static void ConcatenateHexColorComponent(const PixelInfo *pixel,
+  const PixelChannel channel,char *tuple)
+{
+  char
+    component[MagickPathExtent];
+
+  double
+    color;
+
+  color=GetHexChannelValue(pixel,channel);
   if (pixel->depth > 32)
     {
       (void) FormatLocaleString(component,MagickPathExtent,"%08lX%08lX",
