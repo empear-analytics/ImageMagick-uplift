@@ -478,6 +478,84 @@ static void AddAppendExtent(const Image *next,const MagickBooleanType stack,
     *height=next->rows;
 }
 
+typedef struct _AppendRow
+{
+  const Image
+    *next;
+
+  Image
+    *append_image;
+
+  CacheView
+    *append_view,
+    *image_view;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+} AppendRow;
+
+static void AppendImageRow(const AppendRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Image
+    *next = row->next;
+
+  Image
+    *append_image = row->append_image;
+
+  CacheView
+    *append_view = row->append_view,
+    *image_view = row->image_view;
+
+  const ssize_t
+    x_offset = row->x_offset,
+    y_offset = row->y_offset;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  MagickBooleanType
+    sync;
+
+  PixelInfo
+    pixel;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,next->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(append_view,x_offset,y+y_offset,
+    next->columns,1,exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  GetPixelInfo(next,&pixel);
+  for (x=0; x < (ssize_t) next->columns; x++)
+  {
+    GetPixelInfoPixel(next,p,&pixel);
+    SetPixelViaPixelInfo(append_image,&pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(next);
+    q+=(ptrdiff_t) GetPixelChannels(append_image);
+  }
+  sync=SyncCacheViewAuthenticPixels(append_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *AppendImages(const Image *images,
   const MagickBooleanType stack,ExceptionInfo *exception)
 {
@@ -588,42 +666,10 @@ MagickExport Image *AppendImages(const Image *images,
 #endif
     for (y=0; y < (ssize_t) next->rows; y++)
     {
-      MagickBooleanType
-        sync;
+      const AppendRow row = { next, append_image, append_view, image_view,
+        x_offset, y_offset, exception };
 
-      PixelInfo
-        pixel;
-
-      const Quantum
-        *magick_restrict p;
-
-      Quantum
-        *magick_restrict q;
-
-      ssize_t
-        x;
-
-      if (status == MagickFalse)
-        continue;
-      p=GetCacheViewVirtualPixels(image_view,0,y,next->columns,1,exception);
-      q=QueueCacheViewAuthenticPixels(append_view,x_offset,y+y_offset,
-        next->columns,1,exception);
-      if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-        {
-          status=MagickFalse;
-          continue;
-        }
-      GetPixelInfo(next,&pixel);
-      for (x=0; x < (ssize_t) next->columns; x++)
-      {
-        GetPixelInfoPixel(next,p,&pixel);
-        SetPixelViaPixelInfo(append_image,&pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(next);
-        q+=(ptrdiff_t) GetPixelChannels(append_image);
-      }
-      sync=SyncCacheViewAuthenticPixels(append_view,exception);
-      if (sync == MagickFalse)
-        status=MagickFalse;
+      AppendImageRow(&row,y,&status);
     }
     image_view=DestroyCacheView(image_view);
     AdvanceAppendOffset(next,stack,&x_offset,&y_offset);
