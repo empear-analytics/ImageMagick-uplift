@@ -2617,6 +2617,37 @@ static MagickBooleanType QueryColorFunction(const char *name,
   return(MagickTrue);
 }
 
+static MagickBooleanType ReadHexRGBDigits(const char *name,const size_t n,
+  PixelPacket *pixel)
+{
+  char
+    c;
+
+  ssize_t
+    i;
+
+  do
+  {
+    (*pixel).red=(*pixel).green;
+    (*pixel).green=(*pixel).blue;
+    (*pixel).blue=0;
+    for (i=(ssize_t) (n/3-1); i >= 0; i--)
+    {
+      c=(*name++);
+      (*pixel).blue<<=4;
+      if (IsDecimalDigitCharacter(c) != MagickFalse)
+        (*pixel).blue|=(unsigned int) (c-'0');
+      else if (IsUpperHexLetter(c) != MagickFalse)
+        (*pixel).blue|=(unsigned int) (c-('A'-10));
+      else if (IsLowerHexLetter(c) != MagickFalse)
+        (*pixel).blue|=(unsigned int) (c-('a'-10));
+      else
+        return(MagickFalse);
+    }
+  } while (isxdigit((int) ((unsigned char) *name)) != 0);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2668,25 +2699,8 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
       for (n=0; isxdigit((int) ((unsigned char) name[n])) != 0; n++) ;
       if (IsHexColorLength(n) != MagickFalse)
         {
-          do
-          {
-            pixel.red=pixel.green;
-            pixel.green=pixel.blue;
-            pixel.blue=0;
-            for (i=(ssize_t) (n/3-1); i >= 0; i--)
-            {
-              c=(*name++);
-              pixel.blue<<=4;
-              if (IsDecimalDigitCharacter(c) != MagickFalse)
-                pixel.blue|=(unsigned int) (c-'0');
-              else if (IsUpperHexLetter(c) != MagickFalse)
-                pixel.blue|=(unsigned int) (c-('A'-10));
-              else if (IsLowerHexLetter(c) != MagickFalse)
-                pixel.blue|=(unsigned int) (c-('a'-10));
-              else
-                return(MagickFalse);
-            }
-          } while (isxdigit((int) ((unsigned char) *name)) != 0);
+          if (ReadHexRGBDigits(name,n,&pixel) == MagickFalse)
+            return(MagickFalse);
           depth=4*(n/3);
         }
       else
