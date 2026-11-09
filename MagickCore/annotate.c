@@ -980,6 +980,23 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType CheckWidthLimit(Image *image,const TypeMetric extent,
+  ExceptionInfo *exception,MagickBooleanType *status)
+{
+  MagickSizeType
+    size;
+
+  size=(MagickSizeType) fabs(extent.width);
+  if (AcquireMagickResource(WidthResource,size) == MagickFalse)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "WidthOrHeightExceedsLimit","`%s'",image->filename);
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static inline void KeepWidestMetrics(TypeMetric *metrics,
   const TypeMetric extent)
 {
@@ -1066,14 +1083,8 @@ MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
         if (status == MagickFalse)
           break;
         KeepWidestMetrics(metrics,extent);
-        size=(MagickSizeType) fabs(extent.width);
-        if (AcquireMagickResource(WidthResource,size) == MagickFalse)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-              "WidthOrHeightExceedsLimit","`%s'",image->filename);
-            status=MagickFalse;
-            break;
-          }
+        if (CheckWidthLimit(image,extent,exception,&status) == MagickFalse)
+          break;
       }
       metrics->height=(double) height;
     }
