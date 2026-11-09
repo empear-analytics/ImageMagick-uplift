@@ -2664,14 +2664,12 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
               pixel.blue<<=4;
               if ((c >= '0') && (c <= '9'))
                 pixel.blue|=(unsigned int) (c-'0');
+              else if ((c >= 'A') && (c <= 'F'))
+                pixel.blue|=(unsigned int) (c-('A'-10));
+              else if ((c >= 'a') && (c <= 'f'))
+                pixel.blue|=(unsigned int) (c-('a'-10));
               else
-                if ((c >= 'A') && (c <= 'F'))
-                  pixel.blue|=(unsigned int) (c-('A'-10));
-                else
-                  if ((c >= 'a') && (c <= 'f'))
-                    pixel.blue|=(unsigned int) (c-('a'-10));
-                  else
-                    return(MagickFalse);
+                return(MagickFalse);
             }
           } while (isxdigit((int) ((unsigned char) *name)) != 0);
           depth=4*(n/3);
@@ -2696,14 +2694,12 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
               pixel.alpha<<=4;
               if ((c >= '0') && (c <= '9'))
                 pixel.alpha|=(unsigned int) (c-'0');
+              else if ((c >= 'A') && (c <= 'F'))
+                pixel.alpha|=(unsigned int) c-('A'-10);
+              else if ((c >= 'a') && (c <= 'f'))
+                pixel.alpha|=(unsigned int) c-('a'-10);
               else
-                if ((c >= 'A') && (c <= 'F'))
-                  pixel.alpha|=(unsigned int) c-('A'-10);
-                else
-                  if ((c >= 'a') && (c <= 'f'))
-                    pixel.alpha|=(unsigned int) c-('a'-10);
-                  else
-                    return(MagickFalse);
+                return(MagickFalse);
             }
           } while (isxdigit((int) ((unsigned char) *name)) != 0);
           depth=4*(n/4);
