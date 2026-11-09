@@ -2101,6 +2101,137 @@ static void TraceGlyphOutline(DrawInfo *annotate_info,const FT_Vector origin,
     (void) FT_Outline_Decompose(&outline,outline_methods,annotate_info);
 }
 
+typedef struct _GlyphRows
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  FT_BitmapGlyph
+    bitmap;
+
+  PointInfo
+    point;
+
+  unsigned char
+    *r;
+
+  MagickBooleanType
+    transparent_fill;
+
+  const DrawInfo
+    *draw_info;
+
+  ExceptionInfo
+    *exception;
+} GlyphRows;
+
+static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *const image = rows->image;
+
+  CacheView
+    *const image_view = rows->image_view;
+
+  const FT_BitmapGlyph
+    bitmap = rows->bitmap;
+
+  const PointInfo
+    point = rows->point;
+
+  unsigned char
+    *const r = rows->r;
+
+  const MagickBooleanType
+    transparent_fill = rows->transparent_fill;
+
+  const DrawInfo
+    *const draw_info = rows->draw_info;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  double
+    fill_opacity;
+
+  MagickBooleanType
+    active,
+    sync;
+
+  PixelInfo
+    fill_color;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  ssize_t
+    n,
+    x_offset,
+    y_offset;
+
+  if ((*status) == MagickFalse)
+    return;
+  x_offset=CastDoubleToSsizeT(ceil(point.x-0.5));
+  y_offset=CastDoubleToSsizeT(ceil(point.y+y-0.5));
+  if (IsRowOutside(image,y_offset) != MagickFalse)
+    return;
+  q=(Quantum *) NULL;
+  if (IsColumnOutside(image,x_offset) != MagickFalse)
+    active=MagickFalse;
+  else
+    {
+      q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,
+        bitmap->bitmap.width,1,exception);
+      active=q != (Quantum *) NULL ? MagickTrue : MagickFalse;
+    }
+  n=y*bitmap->bitmap.pitch;
+  for (x=0; x < (ssize_t) bitmap->bitmap.width; x++, n++)
+  {
+    GlyphRasterInfo
+      raster;
+
+    x_offset=CastDoubleToSsizeT(ceil(point.x+x-0.5));
+    if (IsColumnOutside(image,x_offset) != MagickFalse)
+      {
+        q=SkipGlyphPixel(image,q);
+        continue;
+      }
+    raster.bitmap=bitmap;
+    raster.r=r;
+    fill_opacity=GetGlyphFillOpacity(&raster,n,x,y);
+    if (draw_info->text_antialias == MagickFalse)
+      fill_opacity=fill_opacity >= 0.5 ? 1.0 : 0.0;
+    if (active == MagickFalse)
+      q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,1,1,
+        exception);
+    if (q == (Quantum *) NULL)
+      continue;
+    if (transparent_fill == MagickFalse)
+      {
+        GetPixelInfo(image,&fill_color);
+        GetFillColor(draw_info,x_offset,y_offset,&fill_color,exception);
+        fill_opacity=fill_opacity*fill_color.alpha;
+        CompositePixelOver(image,&fill_color,fill_opacity,q,
+          GetPixelAlpha(image,q),q);
+      }
+    else
+      BlendGlyphAlpha(image,fill_opacity,q);
+    if (SyncGlyphPixel(active,image_view,exception) == MagickFalse)
+      (*status)=MagickFalse;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  sync=SyncCacheViewAuthenticPixels(image_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2474,81 +2605,10 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 #endif
         for (y=0; y < (ssize_t) bitmap->bitmap.rows; y++)
         {
-          double
-            fill_opacity;
+          const GlyphRows rows = { image, image_view, bitmap, point, r,
+            transparent_fill, draw_info, exception };
 
-          MagickBooleanType
-            active,
-            sync;
-
-          PixelInfo
-            fill_color;
-
-          Quantum
-            *magick_restrict q;
-
-          ssize_t
-            x;
-
-          ssize_t
-            n,
-            x_offset,
-            y_offset;
-
-          if (status == MagickFalse)
-            continue;
-          x_offset=CastDoubleToSsizeT(ceil(point.x-0.5));
-          y_offset=CastDoubleToSsizeT(ceil(point.y+y-0.5));
-          if (IsRowOutside(image,y_offset) != MagickFalse)
-            continue;
-          q=(Quantum *) NULL;
-          if (IsColumnOutside(image,x_offset) != MagickFalse)
-            active=MagickFalse;
-          else
-            {
-              q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,
-                bitmap->bitmap.width,1,exception);
-              active=q != (Quantum *) NULL ? MagickTrue : MagickFalse;
-            }
-          n=y*bitmap->bitmap.pitch;
-          for (x=0; x < (ssize_t) bitmap->bitmap.width; x++, n++)
-          {
-            GlyphRasterInfo
-              raster;
-
-            x_offset=CastDoubleToSsizeT(ceil(point.x+x-0.5));
-            if (IsColumnOutside(image,x_offset) != MagickFalse)
-              {
-                q=SkipGlyphPixel(image,q);
-                continue;
-              }
-            raster.bitmap=bitmap;
-            raster.r=r;
-            fill_opacity=GetGlyphFillOpacity(&raster,n,x,y);
-            if (draw_info->text_antialias == MagickFalse)
-              fill_opacity=fill_opacity >= 0.5 ? 1.0 : 0.0;
-            if (active == MagickFalse)
-              q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,1,1,
-                exception);
-            if (q == (Quantum *) NULL)
-              continue;
-            if (transparent_fill == MagickFalse)
-              {
-                GetPixelInfo(image,&fill_color);
-                GetFillColor(draw_info,x_offset,y_offset,&fill_color,exception);
-                fill_opacity=fill_opacity*fill_color.alpha;
-                CompositePixelOver(image,&fill_color,fill_opacity,q,
-                  GetPixelAlpha(image,q),q);
-              }
-            else
-              BlendGlyphAlpha(image,fill_opacity,q);
-            if (SyncGlyphPixel(active,image_view,exception) == MagickFalse)
-              status=MagickFalse;
-            q+=(ptrdiff_t) GetPixelChannels(image);
-          }
-          sync=SyncCacheViewAuthenticPixels(image_view,exception);
-          if (sync == MagickFalse)
-            status=MagickFalse;
+          RasterizeGlyphRow(&rows,y,&status);
         }
         image_view=DestroyCacheView(image_view);
         if (IsVisibleStroke(draw_info,status) != MagickFalse)
