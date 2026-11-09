@@ -2320,6 +2320,21 @@ static inline MagickBooleanType IsInvalidHexAlphaLength(const size_t n)
     MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsDecimalDigitCharacter(const char c)
+{
+  return(((c >= '0') && (c <= '9')) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUpperHexLetter(const char c)
+{
+  return(((c >= 'A') && (c <= 'F')) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsLowerHexLetter(const char c)
+{
+  return(((c >= 'a') && (c <= 'f')) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsHueColorspaceName(const char *colorspace)
 {
   return(((LocaleCompare(colorspace,"HCL") == 0) ||
@@ -2662,11 +2677,11 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
             {
               c=(*name++);
               pixel.blue<<=4;
-              if ((c >= '0') && (c <= '9'))
+              if (IsDecimalDigitCharacter(c) != MagickFalse)
                 pixel.blue|=(unsigned int) (c-'0');
-              else if ((c >= 'A') && (c <= 'F'))
+              else if (IsUpperHexLetter(c) != MagickFalse)
                 pixel.blue|=(unsigned int) (c-('A'-10));
-              else if ((c >= 'a') && (c <= 'f'))
+              else if (IsLowerHexLetter(c) != MagickFalse)
                 pixel.blue|=(unsigned int) (c-('a'-10));
               else
                 return(MagickFalse);
@@ -2692,11 +2707,11 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
             {
               c=(*name++);
               pixel.alpha<<=4;
-              if ((c >= '0') && (c <= '9'))
+              if (IsDecimalDigitCharacter(c) != MagickFalse)
                 pixel.alpha|=(unsigned int) (c-'0');
-              else if ((c >= 'A') && (c <= 'F'))
+              else if (IsUpperHexLetter(c) != MagickFalse)
                 pixel.alpha|=(unsigned int) c-('A'-10);
-              else if ((c >= 'a') && (c <= 'f'))
+              else if (IsLowerHexLetter(c) != MagickFalse)
                 pixel.alpha|=(unsigned int) c-('a'-10);
               else
                 return(MagickFalse);
