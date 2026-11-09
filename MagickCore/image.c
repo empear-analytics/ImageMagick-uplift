@@ -4175,6 +4175,16 @@ static ssize_t SmushYGap(const Image *smush_image,const Image *images,
   return((ssize_t) gap-offset);
 }
 
+static void AddSmushStackExtent(const Image *next,const ssize_t offset,
+  size_t *width,size_t *height)
+{
+  if (next->columns > (*width))
+    (*width)=next->columns;
+  (*height)+=next->rows;
+  if (next->previous != (Image *) NULL)
+    (*height)=(size_t) MagickMax((ssize_t) (*height)+offset,0U);
+}
+
 MagickExport Image *SmushImages(const Image *images,
   const MagickBooleanType stack,const ssize_t offset,ExceptionInfo *exception)
 {
@@ -4233,11 +4243,7 @@ MagickExport Image *SmushImages(const Image *images,
     number_images++;
     if (stack != MagickFalse)
       {
-        if (next->columns > width)
-          width=next->columns;
-        height+=next->rows;
-        if (next->previous != (Image *) NULL)
-          height=(size_t) MagickMax((ssize_t) height+offset,0U);
+        AddSmushStackExtent(next,offset,&width,&height);
         continue;
       }
     width+=next->columns;
