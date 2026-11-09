@@ -1948,6 +1948,22 @@ static void ExtendGlyphMaxBounds(const FT_BBox bounds,TypeMetric *metrics)
     metrics->bounds.y2=(double) bounds.yMax;
 }
 
+static FT_Encoding SelectAdobeBig5Encoding(const char *encoding,
+  FT_Encoding encoding_type)
+{
+  if (LocaleCompare(encoding,"AdobeCustom") == 0)
+    encoding_type=FT_ENCODING_ADOBE_CUSTOM;
+  if (LocaleCompare(encoding,"AdobeExpert") == 0)
+    encoding_type=FT_ENCODING_ADOBE_EXPERT;
+  if (LocaleCompare(encoding,"AdobeStandard") == 0)
+    encoding_type=FT_ENCODING_ADOBE_STANDARD;
+  if (LocaleCompare(encoding,"AppleRoman") == 0)
+    encoding_type=FT_ENCODING_APPLE_ROMAN;
+  if (LocaleCompare(encoding,"BIG5") == 0)
+    encoding_type=FT_ENCODING_BIG5;
+  return(encoding_type);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2152,16 +2168,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     ft_status=FT_Set_Charmap(face,face->charmaps[0]);
   if (encoding != (const char *) NULL)
     {
-      if (LocaleCompare(encoding,"AdobeCustom") == 0)
-        encoding_type=FT_ENCODING_ADOBE_CUSTOM;
-      if (LocaleCompare(encoding,"AdobeExpert") == 0)
-        encoding_type=FT_ENCODING_ADOBE_EXPERT;
-      if (LocaleCompare(encoding,"AdobeStandard") == 0)
-        encoding_type=FT_ENCODING_ADOBE_STANDARD;
-      if (LocaleCompare(encoding,"AppleRoman") == 0)
-        encoding_type=FT_ENCODING_APPLE_ROMAN;
-      if (LocaleCompare(encoding,"BIG5") == 0)
-        encoding_type=FT_ENCODING_BIG5;
+      encoding_type=SelectAdobeBig5Encoding(encoding,encoding_type);
 #if defined(FT_ENCODING_PRC)
       if (LocaleCompare(encoding,"GB2312") == 0)
         encoding_type=FT_ENCODING_PRC;
