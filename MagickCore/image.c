@@ -3405,6 +3405,31 @@ MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
   return(status);
 }
 
+static void RemoveRegionMaskChannel(Image *image,const PixelMask type)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~ReadMaskChannel);
+      break;
+    }
+    case WritePixelMask:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~WriteMaskChannel);
+      break;
+    }
+    default:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~CompositeMaskChannel);
+      break;
+    }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3465,27 +3490,7 @@ MagickExport MagickBooleanType SetImageRegionMask(Image *image,
   image->mask_trait=UndefinedPixelTrait;
   if (region == (const RectangleInfo *) NULL)
     {
-      switch (type)
-      {
-        case ReadPixelMask:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~ReadMaskChannel);
-          break;
-        }
-        case WritePixelMask:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~WriteMaskChannel);
-          break;
-        }
-        default:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~CompositeMaskChannel);
-          break;
-        }
-      }
+      RemoveRegionMaskChannel(image,type);
       return(SyncImagePixelCache(image,exception));
     }
   AddImageMaskChannel(image,type);
