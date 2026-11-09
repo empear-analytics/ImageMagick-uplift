@@ -378,6 +378,67 @@ static void GetGravityTextOffset(const GravityTextInfo *gravity,
   }
 }
 
+typedef struct _TextAlignInfo
+{
+  DrawInfo
+    *annotate,
+    *annotate_info;
+
+  size_t
+    height;
+
+  ssize_t
+    i;
+
+  TypeMetric
+    metrics;
+} TextAlignInfo;
+
+static void GetAnnotateAlignOffset(const TextAlignInfo *text_align,
+  PointInfo *offset)
+{
+  DrawInfo
+    *const annotate = text_align->annotate,
+    *const annotate_info = text_align->annotate_info;
+
+  const size_t
+    height = text_align->height;
+
+  const ssize_t
+    i = text_align->i;
+
+  const TypeMetric
+    metrics = text_align->metrics;
+
+  switch (annotate->align)
+  {
+    case LeftAlign:
+    {
+      (*offset).x=annotate_info->affine.tx+i*annotate_info->affine.ry*height;
+      (*offset).y=annotate_info->affine.ty+i*annotate_info->affine.sy*height;
+      break;
+    }
+    case CenterAlign:
+    {
+      (*offset).x=annotate_info->affine.tx+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width/2.0;
+      (*offset).y=annotate_info->affine.ty+i*annotate_info->affine.sy*height-
+        annotate_info->affine.rx*metrics.width/2.0;
+      break;
+    }
+    case RightAlign:
+    {
+      (*offset).x=annotate_info->affine.tx+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width;
+      (*offset).y=annotate_info->affine.ty+i*annotate_info->affine.sy*height-
+        annotate_info->affine.rx*metrics.width;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static size_t CountTextLines(const char *text)
 {
   const char
@@ -478,6 +539,9 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   for (i=0; textlist[i] != (char *) NULL; i++)
   {
     const RenderTarget target = { image, annotate };
+
+    TextAlignInfo
+      text_align;
 
     GravityTextInfo
       gravity;
@@ -583,33 +647,12 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
         break;
       }
     }
-    switch (annotate->align)
-    {
-      case LeftAlign:
-      {
-        offset.x=annotate_info->affine.tx+i*annotate_info->affine.ry*height;
-        offset.y=annotate_info->affine.ty+i*annotate_info->affine.sy*height;
-        break;
-      }
-      case CenterAlign:
-      {
-        offset.x=annotate_info->affine.tx+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width/2.0;
-        offset.y=annotate_info->affine.ty+i*annotate_info->affine.sy*height-
-          annotate_info->affine.rx*metrics.width/2.0;
-        break;
-      }
-      case RightAlign:
-      {
-        offset.x=annotate_info->affine.tx+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width;
-        offset.y=annotate_info->affine.ty+i*annotate_info->affine.sy*height-
-          annotate_info->affine.rx*metrics.width;
-        break;
-      }
-      default:
-        break;
-    }
+    text_align.annotate=annotate;
+    text_align.annotate_info=annotate_info;
+    text_align.height=height;
+    text_align.i=i;
+    text_align.metrics=metrics;
+    GetAnnotateAlignOffset(&text_align,&offset);
     if (draw_info->undercolor.alpha != (MagickRealType) TransparentAlpha)
       {
         DrawInfo
