@@ -2671,6 +2671,44 @@ static MagickBooleanType SetHexColor(PixelInfo *color,
   return(MagickTrue);
 }
 
+static MagickBooleanType ReadHexRGBADigits(const char *name,const size_t n,
+  PixelPacket *pixel,ExceptionInfo *exception)
+{
+  char
+    c;
+
+  ssize_t
+    i;
+
+  if (IsInvalidHexAlphaLength(n) != MagickFalse)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"UnrecognizedColor","`%s'",name);
+      return(MagickFalse);
+    }
+  do
+  {
+    (*pixel).red=(*pixel).green;
+    (*pixel).green=(*pixel).blue;
+    (*pixel).blue=(*pixel).alpha;
+    (*pixel).alpha=0;
+    for (i=(ssize_t) (n/4-1); i >= 0; i--)
+    {
+      c=(*name++);
+      (*pixel).alpha<<=4;
+      if (IsDecimalDigitCharacter(c) != MagickFalse)
+        (*pixel).alpha|=(unsigned int) (c-'0');
+      else if (IsUpperHexLetter(c) != MagickFalse)
+        (*pixel).alpha|=(unsigned int) c-('A'-10);
+      else if (IsLowerHexLetter(c) != MagickFalse)
+        (*pixel).alpha|=(unsigned int) c-('a'-10);
+      else
+        return(MagickFalse);
+    }
+  } while (isxdigit((int) ((unsigned char) *name)) != 0);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2679,9 +2717,6 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
 
   const ColorInfo
     *p;
-
-  ssize_t
-    i;
 
   /*
     Initialize color return value.
@@ -2702,9 +2737,6 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   GetPixelInfo((Image *) NULL,color);
   if (*name == '#')
     {
-      char
-        c;
-
       PixelPacket
         pixel = { 0, 0, 0, 0, 0 };
 
@@ -2725,32 +2757,8 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
         }
       else
         {
-          if (IsInvalidHexAlphaLength(n) != MagickFalse)
-            {
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                OptionWarning,"UnrecognizedColor","`%s'",name);
-              return(MagickFalse);
-            }
-          do
-          {
-            pixel.red=pixel.green;
-            pixel.green=pixel.blue;
-            pixel.blue=pixel.alpha;
-            pixel.alpha=0;
-            for (i=(ssize_t) (n/4-1); i >= 0; i--)
-            {
-              c=(*name++);
-              pixel.alpha<<=4;
-              if (IsDecimalDigitCharacter(c) != MagickFalse)
-                pixel.alpha|=(unsigned int) (c-'0');
-              else if (IsUpperHexLetter(c) != MagickFalse)
-                pixel.alpha|=(unsigned int) c-('A'-10);
-              else if (IsLowerHexLetter(c) != MagickFalse)
-                pixel.alpha|=(unsigned int) c-('a'-10);
-              else
-                return(MagickFalse);
-            }
-          } while (isxdigit((int) ((unsigned char) *name)) != 0);
+          if (ReadHexRGBADigits(name,n,&pixel,exception) == MagickFalse)
+            return(MagickFalse);
           depth=4*(n/4);
         }
       return(SetHexColor(color,&pixel,depth,n));
