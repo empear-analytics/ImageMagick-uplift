@@ -8387,6 +8387,41 @@ static void TraceArcPointsQ(const StrokeArc *arc,const StrokeTargets *targets)
   }
 }
 
+static void TraceArcPointsP(const StrokeArc *arc,const StrokeTargets *targets)
+{
+  const PointInfo
+    center = arc->center;
+
+  const StrokeSegment
+    theta = arc->theta;
+
+  const double
+    mid = arc->mid;
+
+  const size_t
+    arc_segments = arc->arc_segments;
+
+  double
+    delta_theta;
+
+  PointInfo
+    **const stroke_p = targets->stroke_p;
+
+  ssize_t
+    j,
+    *const p = targets->p;
+
+  for (j=1; j < (ssize_t) arc_segments; j++)
+  {
+    delta_theta=(double) (j*(theta.q-theta.p)/arc_segments);
+    (*stroke_p)[*p].x=(double) (center.x+mid*cos(fmod((double)
+      (theta.p+delta_theta),DegreesToRadians(360.0))));
+    (*stroke_p)[*p].y=(double) (center.y+mid*sin(fmod((double)
+      (theta.p+delta_theta),DegreesToRadians(360.0))));
+    (*p)++;
+  }
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -8436,7 +8471,6 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
 }
 
   double
-    delta_theta,
     dot_product,
     mid,
     miterlimit;
@@ -8469,7 +8503,6 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     number_vertices;
 
   ssize_t
-    j,
     n,
     p,
     q;
@@ -8718,15 +8751,11 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
           CheckPathExtent(arc_segments+MaxStrokePad,MaxStrokePad);
           RestoreMSCWarning
           stroke_p[p++]=box_p[1];
-          for (j=1; j < (ssize_t) arc_segments; j++)
-          {
-            delta_theta=(double) (j*(theta.q-theta.p)/arc_segments);
-            stroke_p[p].x=(double) (center.x+mid*cos(fmod((double)
-              (theta.p+delta_theta),DegreesToRadians(360.0))));
-            stroke_p[p].y=(double) (center.y+mid*sin(fmod((double)
-              (theta.p+delta_theta),DegreesToRadians(360.0))));
-            p++;
-          }
+          arc.center=center;
+          arc.theta=theta;
+          arc.mid=mid;
+          arc.arc_segments=arc_segments;
+          TraceArcPointsP(&arc,&targets);
           stroke_p[p++]=box_p[2];
           break;
         }
