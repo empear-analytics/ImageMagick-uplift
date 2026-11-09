@@ -1811,6 +1811,18 @@ MagickPrivate MagickBooleanType IsEquivalentIntensity(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ListColorHeader(FILE *file,const ColorInfo *color_info)
+{
+  if (color_info->path != (char *) NULL)
+    (void) FormatLocaleFile(file,"\nPath: %s\n\n",color_info->path);
+  (void) FormatLocaleFile(file,
+    "Name                  Color                  "
+    "                       Compliance\n");
+  (void) FormatLocaleFile(file,
+    "-------------------------------------------------"
+    "------------------------------\n");
+}
+
 MagickExport MagickBooleanType ListColorInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1844,16 +1856,7 @@ MagickExport MagickBooleanType ListColorInfo(FILE *file,
       continue;
     if ((path == (const char *) NULL) ||
         (LocaleCompare(path,color_info[i]->path) != 0))
-      {
-        if (color_info[i]->path != (char *) NULL)
-          (void) FormatLocaleFile(file,"\nPath: %s\n\n",color_info[i]->path);
-        (void) FormatLocaleFile(file,
-          "Name                  Color                  "
-          "                       Compliance\n");
-        (void) FormatLocaleFile(file,
-          "-------------------------------------------------"
-          "------------------------------\n");
-      }
+      ListColorHeader(file,color_info[i]);
     path=color_info[i]->path;
     (void) FormatLocaleFile(file,"%-21.21s ",color_info[i]->name);
     GetColorTuple(&color_info[i]->color,MagickFalse,tuple);
