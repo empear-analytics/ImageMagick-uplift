@@ -2290,6 +2290,13 @@ static void SetCSSComponent(GeometryInfo *geometry_info,const ssize_t i,
   }
 }
 
+static inline MagickBooleanType IsCSSComponentOpen(const ssize_t i,
+  const char *q)
+{
+  return(((i < 5) && (*q != ')') && (*q != '\0')) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickStatusType ParseCSSColor(const char *magick_restrict color,
   GeometryInfo *geometry_info)
 {
@@ -2309,7 +2316,7 @@ static MagickStatusType ParseCSSColor(const char *magick_restrict color,
   q=(char *) color;
   if (*q == '(')
     q++;
-  for (i=0; (i < 5) && (*q != ')') && (*q != '\0'); i++)
+  for (i=0; IsCSSComponentOpen(i,q) != MagickFalse; i++)
   {
     char
       *p;
