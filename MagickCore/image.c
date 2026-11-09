@@ -2301,6 +2301,60 @@ MagickExport MagickBooleanType ResetImagePixels(Image *image,
   return(status);
 }
 
+typedef struct _AlphaRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  Quantum
+    alpha;
+
+  ExceptionInfo
+    *exception;
+} AlphaRow;
+
+static void SetImageAlphaRow(const AlphaRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  const Quantum
+    alpha = row->alpha;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelWriteMask(image,q) > (QuantumRange/2))
+      SetPixelAlpha(image,alpha,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2360,28 +2414,9 @@ MagickExport MagickBooleanType SetImageAlpha(Image *image,const Quantum alpha,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const AlphaRow row = { image, image_view, alpha, exception };
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetPixelWriteMask(image,q) > (QuantumRange/2))
-        SetPixelAlpha(image,alpha,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SetImageAlphaRow(&row,y,&status);
   }
   image_view=DestroyCacheView(image_view);
   image->mask_trait=original_mask;
