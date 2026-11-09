@@ -4059,6 +4059,67 @@ static inline MagickBooleanType IsBottomGapEdge(const Image *bottom_image,
     ((y+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _SmushYRows
+{
+  const Image
+    *bottom_image,
+    *top_image;
+
+  CacheView
+    *bottom_view,
+    *top_view;
+
+  RectangleInfo
+    bottom_geometry,
+    top_geometry;
+
+  ExceptionInfo
+    *exception;
+} SmushYRows;
+
+static size_t SmushYRow(const SmushYRows *rows,const ssize_t x,size_t gap)
+{
+  const Image
+    *bottom_image = rows->bottom_image,
+    *top_image = rows->top_image;
+
+  CacheView
+    *bottom_view = rows->bottom_view,
+    *top_view = rows->top_view;
+
+  const RectangleInfo
+    bottom_geometry = rows->bottom_geometry,
+    top_geometry = rows->top_geometry;
+
+  ExceptionInfo
+    *exception = rows->exception;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    i,
+    y;
+
+  for (y=(ssize_t) top_image->rows-1; y > 0; y--)
+  {
+    p=GetCacheViewVirtualPixels(top_view,top_geometry.x+x,y,1,1,exception);
+    if (IsTopGapEdge(top_image,p,y,gap) != MagickFalse)
+      break;
+  }
+  i=(ssize_t) top_image->rows-y-1;
+  for (y=0; y < (ssize_t) bottom_image->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(bottom_view,bottom_geometry.x+x,y,1,1,
+      exception);
+    if (IsBottomGapEdge(bottom_image,p,y,i,gap) != MagickFalse)
+      break;
+  }
+  if ((y+i) < (ssize_t) gap)
+    gap=(size_t) (y+i);
+  return(gap);
+}
+
 static ssize_t SmushYGap(const Image *smush_image,const Image *images,
   const ssize_t offset,ExceptionInfo *exception)
 {
@@ -4074,18 +4135,14 @@ static ssize_t SmushYGap(const Image *smush_image,const Image *images,
     bottom_geometry,
     top_geometry;
 
-  const Quantum
-    *p;
-
-  ssize_t
-    i,
-    x;
-
   size_t
     gap;
 
+  SmushYRows
+    rows;
+
   ssize_t
-    y;
+    x;
 
   if (images->previous == (Image *) NULL)
     return(0);
@@ -4100,24 +4157,16 @@ static ssize_t SmushYGap(const Image *smush_image,const Image *images,
   gap=bottom_image->rows;
   top_view=AcquireVirtualCacheView(top_image,exception);
   bottom_view=AcquireVirtualCacheView(bottom_image,exception);
+  rows.bottom_image=bottom_image;
+  rows.top_image=top_image;
+  rows.bottom_view=bottom_view;
+  rows.top_view=top_view;
+  rows.bottom_geometry=bottom_geometry;
+  rows.top_geometry=top_geometry;
+  rows.exception=exception;
   for (x=0; x < (ssize_t) smush_image->columns; x++)
   {
-    for (y=(ssize_t) top_image->rows-1; y > 0; y--)
-    {
-      p=GetCacheViewVirtualPixels(top_view,top_geometry.x+x,y,1,1,exception);
-      if (IsTopGapEdge(top_image,p,y,gap) != MagickFalse)
-        break;
-    }
-    i=(ssize_t) top_image->rows-y-1;
-    for (y=0; y < (ssize_t) bottom_image->rows; y++)
-    {
-      p=GetCacheViewVirtualPixels(bottom_view,bottom_geometry.x+x,y,1,1,
-        exception);
-      if (IsBottomGapEdge(bottom_image,p,y,i,gap) != MagickFalse)
-        break;
-    }
-    if ((y+i) < (ssize_t) gap)
-      gap=(size_t) (y+i);
+    gap=SmushYRow(&rows,x,gap);
   }
   bottom_view=DestroyCacheView(bottom_view);
   top_view=DestroyCacheView(top_view);
