@@ -2043,6 +2043,26 @@ static const char *SkipDoctypeElement(const char *q)
   return(q);
 }
 
+static MagickStatusType LoadIncludeElement(const ColorLoadTarget *target,
+  const char *filename,const size_t depth,const size_t extent,char *token,
+  const char **q,MagickStatusType status)
+{
+  char
+    keyword[MagickPathExtent];
+
+  while (IsIncludeElementOpen(token,*q) != MagickFalse)
+  {
+    (void) CopyMagickString(keyword,token,MagickPathExtent);
+    (void) GetNextToken(*q,q,extent,token);
+    if (*token != '=')
+      continue;
+    (void) GetNextToken(*q,q,extent,token);
+    if (LocaleCompare(keyword,"file") == 0)
+      status=LoadIncludedColorFile(target,filename,token,depth,status);
+  }
+  return(status);
+}
+
 static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2110,16 +2130,8 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
         /*
           Include element.
         */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          (void) CopyMagickString(keyword,token,MagickPathExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
-            continue;
-          (void) GetNextToken(q,&q,extent,token);
-          if (LocaleCompare(keyword,"file") == 0)
-            status=LoadIncludedColorFile(target,filename,token,depth,status);
-        }
+        status=LoadIncludeElement(target,filename,depth,extent,token,&q,
+          status);
         continue;
       }
     if (LocaleCompare(keyword,"<color") == 0)
