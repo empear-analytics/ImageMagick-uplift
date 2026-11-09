@@ -807,6 +807,14 @@ static inline MagickBooleanType IsBreakableSpace(const DrawInfo *draw_info,
     (IsNonBreakingUTFSpace(code) == MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
+static inline char *ReplaceWideSpace(char **caption,char *p,
+  const size_t width,const size_t columns)
+{
+  if (width > columns)
+    p=ReplaceSpaceWithNewline(caption,p);
+  return(p);
+}
+
 static inline char *InsertNewlineBeforeSpace(char **caption,char *p)
 {
   ssize_t
@@ -904,8 +912,7 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
       }
     if (IsBreakableSpace(draw_info,code) != MagickFalse)
       {
-        if (width > image->columns)
-          p=ReplaceSpaceWithNewline(caption,p);
+        p=ReplaceWideSpace(caption,p,width,image->columns);
         s=p;
       }
     q=AppendUTFCharacter(q,p);
