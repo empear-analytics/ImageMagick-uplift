@@ -1277,14 +1277,13 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   if ((pixel->colorspace == OklchColorspace) && (channel == BluePixelChannel))
     (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
       GetMagickPrecision(),RadiansToDegrees(scale*QuantumScale*color));
+  else if ((scale != 100.0) ||
+           (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
+    (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
+      GetMagickPrecision(),scale*QuantumScale*color);
   else
-    if ((scale != 100.0) ||
-        (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
-      (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
-        GetMagickPrecision(),scale*QuantumScale*color);
-      else
-        (void) FormatLocaleString(component,MagickPathExtent,"%.*g%%",
-          GetMagickPrecision(),scale*QuantumScale*color);
+    (void) FormatLocaleString(component,MagickPathExtent,"%.*g%%",
+      GetMagickPrecision(),scale*QuantumScale*color);
   (void) ConcatenateMagickString(tuple,component,MagickPathExtent);
 }
 
