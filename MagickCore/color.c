@@ -2648,6 +2648,29 @@ static MagickBooleanType ReadHexRGBDigits(const char *name,const size_t n,
   return(MagickTrue);
 }
 
+static MagickBooleanType SetHexColor(PixelInfo *color,
+  const PixelPacket *pixel,const size_t depth,const size_t n)
+{
+  QuantumAny
+    range;
+
+  color->colorspace=sRGBColorspace;
+  color->depth=depth;
+  color->alpha_trait=UndefinedPixelTrait;
+  range=GetQuantumRange(depth);
+  color->red=(double) ScaleAnyToQuantum((*pixel).red,range);
+  color->green=(double) ScaleAnyToQuantum((*pixel).green,range);
+  color->blue=(double) ScaleAnyToQuantum((*pixel).blue,range);
+  color->alpha=(double) OpaqueAlpha;
+  if ((n % 3) != 0)
+    {
+      color->alpha_trait=BlendPixelTrait;
+      color->alpha=(double) ScaleAnyToQuantum((*pixel).alpha,range);
+    }
+  color->black=0.0;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2684,9 +2707,6 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
 
       PixelPacket
         pixel = { 0, 0, 0, 0, 0 };
-
-      QuantumAny
-        range;
 
       size_t
         depth,
@@ -2733,21 +2753,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
           } while (isxdigit((int) ((unsigned char) *name)) != 0);
           depth=4*(n/4);
         }
-      color->colorspace=sRGBColorspace;
-      color->depth=depth;
-      color->alpha_trait=UndefinedPixelTrait;
-      range=GetQuantumRange(depth);
-      color->red=(double) ScaleAnyToQuantum(pixel.red,range);
-      color->green=(double) ScaleAnyToQuantum(pixel.green,range);
-      color->blue=(double) ScaleAnyToQuantum(pixel.blue,range);
-      color->alpha=(double) OpaqueAlpha;
-      if ((n % 3) != 0)
-        {
-          color->alpha_trait=BlendPixelTrait;
-          color->alpha=(double) ScaleAnyToQuantum(pixel.alpha,range);
-        }
-      color->black=0.0;
-      return(MagickTrue);
+      return(SetHexColor(color,&pixel,depth,n));
     }
   q=strchr(name,'(');
   if (q != (char *) NULL)
