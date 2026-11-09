@@ -1823,6 +1823,16 @@ static void ListColorHeader(FILE *file,const ColorInfo *color_info)
     "------------------------------\n");
 }
 
+static void ListColorCompliance(FILE *file,const ColorInfo *color_info)
+{
+  if ((color_info->compliance & SVGCompliance) != 0)
+    (void) FormatLocaleFile(file,"SVG ");
+  if ((color_info->compliance & X11Compliance) != 0)
+    (void) FormatLocaleFile(file,"X11 ");
+  if ((color_info->compliance & XPMCompliance) != 0)
+    (void) FormatLocaleFile(file,"XPM ");
+}
+
 MagickExport MagickBooleanType ListColorInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1861,12 +1871,7 @@ MagickExport MagickBooleanType ListColorInfo(FILE *file,
     (void) FormatLocaleFile(file,"%-21.21s ",color_info[i]->name);
     GetColorTuple(&color_info[i]->color,MagickFalse,tuple);
     (void) FormatLocaleFile(file,"%-45.45s ",tuple);
-    if ((color_info[i]->compliance & SVGCompliance) != 0)
-      (void) FormatLocaleFile(file,"SVG ");
-    if ((color_info[i]->compliance & X11Compliance) != 0)
-      (void) FormatLocaleFile(file,"X11 ");
-    if ((color_info[i]->compliance & XPMCompliance) != 0)
-      (void) FormatLocaleFile(file,"XPM ");
+    ListColorCompliance(file,color_info[i]);
     (void) FormatLocaleFile(file,"\n");
   }
   color_info=(const ColorInfo **) RelinquishMagickMemory((void *) color_info);
