@@ -1991,6 +1991,15 @@ static void ScaleFreetypeMetrics(TypeMetric *metrics)
   metrics->width=ceil(metrics->width/64.0);
 }
 
+static void SetFreetypeMetricsOrigin(TypeMetric *metrics,
+  const FT_Vector origin)
+{
+  metrics->origin.x=(double) origin.x;
+  metrics->origin.y=(double) origin.y;
+  if (metrics->origin.x > metrics->width)
+    metrics->width=metrics->origin.x;
+}
+
 static void TraceGlyphOutline(DrawInfo *annotate_info,const FT_Vector origin,
   FT_Outline outline,const FT_Outline_Funcs *outline_methods)
 {
@@ -2481,10 +2490,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
       else
         origin.x+=(FT_Pos) grapheme[i].x_advance;
     origin.y+=(FT_Pos) grapheme[i].y_advance;
-    metrics->origin.x=(double) origin.x;
-    metrics->origin.y=(double) origin.y;
-    if (metrics->origin.x > metrics->width)
-      metrics->width=metrics->origin.x;
+    SetFreetypeMetricsOrigin(metrics,origin);
     last_glyph_id=glyph.id;
     code=GetUTFCode(p+grapheme[i].cluster);
   }
