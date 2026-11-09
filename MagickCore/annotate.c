@@ -980,6 +980,15 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void DestroyTextLines(char **textlist,const size_t count)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) count; i++)
+    textlist[i]=DestroyString(textlist[i]);
+}
+
 static MagickBooleanType CheckWidthLimit(Image *image,const TypeMetric extent,
   ExceptionInfo *exception,MagickBooleanType *status)
 {
@@ -1093,8 +1102,7 @@ MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
   */
   annotate_info->text=(char *) NULL;
   annotate_info=DestroyDrawInfo(annotate_info);
-  for (i=0; i < (ssize_t) count; i++)
-    textlist[i]=DestroyString(textlist[i]);
+  DestroyTextLines(textlist,count);
   textlist=(char **) RelinquishMagickMemory(textlist);
   return(status);
 }
