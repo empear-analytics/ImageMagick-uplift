@@ -556,6 +556,15 @@ static void AppendImageRow(const AppendRow *row,const ssize_t y,
     (*status)=MagickFalse;
 }
 
+static void AccumulateAppendDepth(const Image *next,const Image *images,
+  size_t *depth,ImageType *image_type)
+{
+  if (next->depth > (*depth))
+    (*depth)=next->depth;
+  if (next->type != images->type)
+    (*image_type)=UndefinedType;
+}
+
 MagickExport Image *AppendImages(const Image *images,
   const MagickBooleanType stack,ExceptionInfo *exception)
 {
@@ -616,10 +625,7 @@ MagickExport Image *AppendImages(const Image *images,
   next=GetNextImageInList(images);
   for ( ; next != (Image *) NULL; next=GetNextImageInList(next))
   {
-    if (next->depth > depth)
-      depth=next->depth;
-    if (next->type != images->type)
-      image_type=UndefinedType;
+    AccumulateAppendDepth(next,images,&depth,&image_type);
     if (next->colorspace != images->colorspace)
       homogeneous_colorspace=MagickFalse;
     if (next->alpha_trait != UndefinedPixelTrait)
