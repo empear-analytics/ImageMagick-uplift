@@ -790,6 +790,16 @@ static inline ssize_t CountCaptionNewlines(char *caption)
   return(n);
 }
 
+static inline char *AppendUTFCharacter(char *q,const char *p)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetUTFOctets(p); i++)
+    *q++=(*(p+i));
+  return(q);
+}
+
 MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
   const MagickBooleanType split,TypeMetric *metrics,char **caption,
   ExceptionInfo *exception)
@@ -806,7 +816,6 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
     width;
 
   ssize_t
-    i,
     n;
 
   q=draw_info->text;
@@ -829,8 +838,7 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
           p=ReplaceSpaceWithNewline(caption,p);
         s=p;
       }
-    for (i=0; i < (ssize_t) GetUTFOctets(p); i++)
-      *q++=(*(p+i));
+    q=AppendUTFCharacter(q,p);
     *q='\0';
     status=GetTypeMetrics(image,draw_info,metrics,exception);
     if (status == MagickFalse)
