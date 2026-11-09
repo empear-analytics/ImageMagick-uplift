@@ -2207,6 +2207,53 @@ MagickExport MagickBooleanType ResetImagePage(Image *image,const char *page)
   return(MagickTrue);
 }
 
+typedef struct _ResetRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} ResetRow;
+
+static void ResetImagePixelsRow(const ResetRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    (void) memset(q,0,GetPixelChannels(image)*sizeof(Quantum));
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2275,27 +2322,9 @@ MagickExport MagickBooleanType ResetImagePixels(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const ResetRow row = { image, image_view, exception };
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      (void) memset(q,0,GetPixelChannels(image)*sizeof(Quantum));
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    ResetImagePixelsRow(&row,y,&status);
   }
   image_view=DestroyCacheView(image_view);
   return(status);
