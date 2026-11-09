@@ -4185,6 +4185,16 @@ static void AddSmushStackExtent(const Image *next,const ssize_t offset,
     (*height)=(size_t) MagickMax((ssize_t) (*height)+offset,0U);
 }
 
+static void AddSmushRowExtent(const Image *next,const ssize_t offset,
+  size_t *width,size_t *height)
+{
+  (*width)+=next->columns;
+  if (next->previous != (Image *) NULL)
+    (*width)=(size_t) MagickMax((ssize_t) (*width)+offset,0U);
+  if (next->rows > (*height))
+    (*height)=next->rows;
+}
+
 MagickExport Image *SmushImages(const Image *images,
   const MagickBooleanType stack,const ssize_t offset,ExceptionInfo *exception)
 {
@@ -4246,11 +4256,7 @@ MagickExport Image *SmushImages(const Image *images,
         AddSmushStackExtent(next,offset,&width,&height);
         continue;
       }
-    width+=next->columns;
-    if (next->previous != (Image *) NULL)
-      width=(size_t) MagickMax((ssize_t) width+offset,0U);
-    if (next->rows > height)
-      height=next->rows;
+    AddSmushRowExtent(next,offset,&width,&height);
   }
   /*
     Smush images.
