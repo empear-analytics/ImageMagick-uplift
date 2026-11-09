@@ -1019,6 +1019,24 @@ static inline MagickBooleanType IsLimitPolicyDomain(
     MagickFalse);
 }
 
+static void ListPolicyRights(FILE *file,const PolicyInfo **policy_info,
+  const ssize_t i)
+{
+  (void) FormatLocaleFile(file,"    rights: ");
+  if (policy_info[i]->rights == NoPolicyRights)
+    (void) FormatLocaleFile(file,"None ");
+  if ((policy_info[i]->rights & ReadPolicyRights) != 0)
+    (void) FormatLocaleFile(file,"Read ");
+  if ((policy_info[i]->rights & WritePolicyRights) != 0)
+    (void) FormatLocaleFile(file,"Write ");
+  if ((policy_info[i]->rights & ExecutePolicyRights) != 0)
+    (void) FormatLocaleFile(file,"Execute ");
+  (void) FormatLocaleFile(file,"\n");
+  if (policy_info[i]->pattern != (char *) NULL)
+    (void) FormatLocaleFile(file,"    pattern: %s\n",
+      policy_info[i]->pattern);
+}
+
 MagickExport MagickBooleanType ListPolicyInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1062,21 +1080,7 @@ MagickExport MagickBooleanType ListPolicyInfo(FILE *file,
           (void) FormatLocaleFile(file,"    value: %s\n",policy_info[i]->value);
       }
     else
-      {
-        (void) FormatLocaleFile(file,"    rights: ");
-        if (policy_info[i]->rights == NoPolicyRights)
-          (void) FormatLocaleFile(file,"None ");
-        if ((policy_info[i]->rights & ReadPolicyRights) != 0)
-          (void) FormatLocaleFile(file,"Read ");
-        if ((policy_info[i]->rights & WritePolicyRights) != 0)
-          (void) FormatLocaleFile(file,"Write ");
-        if ((policy_info[i]->rights & ExecutePolicyRights) != 0)
-          (void) FormatLocaleFile(file,"Execute ");
-        (void) FormatLocaleFile(file,"\n");
-        if (policy_info[i]->pattern != (char *) NULL)
-          (void) FormatLocaleFile(file,"    pattern: %s\n",
-            policy_info[i]->pattern);
-      }
+      ListPolicyRights(file,policy_info,i);
   }
   policy_info=(const PolicyInfo **) RelinquishMagickMemory((void *)
     policy_info);
