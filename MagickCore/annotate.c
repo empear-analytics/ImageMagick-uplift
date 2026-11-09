@@ -2036,6 +2036,25 @@ static void SetFreetypeMetricsOrigin(TypeMetric *metrics,
     metrics->width=metrics->origin.x;
 }
 
+static FT_StreamRec *AcquireFreetypeStream(const char *pathname)
+{
+  FT_StreamRec
+    *stream;
+
+  struct stat
+    attributes;
+
+  stream=(FT_StreamRec *) AcquireCriticalMemory(sizeof(*stream));
+  (void) memset(stream,0,sizeof(*stream));
+  if (stat(pathname,&attributes) == 0)
+    stream->size=attributes.st_size >= 0 ? (unsigned long)
+      attributes.st_size : 0;
+  stream->descriptor.pointer=fopen_utf8(pathname,"rb");
+  stream->read=(&FreetypeReadStream);
+  stream->close=(&FreetypeCloseStream);
+  return(stream);
+}
+
 static void TraceGlyphOutline(DrawInfo *annotate_info,const FT_Vector origin,
   FT_Outline outline,const FT_Outline_Funcs *outline_methods)
 {
@@ -2171,9 +2190,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
       0, 0
     };
 
-  struct stat
-    attributes;
-
   unsigned char
     *utf8;
 
@@ -2223,14 +2239,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   /*
     Configure streaming interface.
   */
-  stream=(FT_StreamRec *) AcquireCriticalMemory(sizeof(*stream));
-  (void) memset(stream,0,sizeof(*stream));
-  if (stat(args.pathname,&attributes) == 0)
-    stream->size=attributes.st_size >= 0 ? (unsigned long)
-      attributes.st_size : 0;
-  stream->descriptor.pointer=fopen_utf8(args.pathname,"rb");
-  stream->read=(&FreetypeReadStream);
-  stream->close=(&FreetypeCloseStream);
+  stream=AcquireFreetypeStream(args.pathname);
   args.flags=FT_OPEN_STREAM;
   args.stream=stream;
   face=(FT_Face) NULL;
