@@ -2076,6 +2076,14 @@ static MagickStatusType AppendColorInfoToCache(LinkedListInfo *cache,
   return(status);
 }
 
+static const char *SkipCommentElement(const char *q,const size_t extent,
+  char *token)
+{
+  while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
+    (void) GetNextToken(q,&q,extent,token);
+  return(q);
+}
+
 static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2134,8 +2142,7 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
         /*
           Comment element.
         */
-        while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
-          (void) GetNextToken(q,&q,extent,token);
+        q=SkipCommentElement(q,extent,token);
         continue;
       }
     if (LocaleCompare(keyword,"<include") == 0)
