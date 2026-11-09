@@ -2012,6 +2012,37 @@ static MagickStatusType LoadIncludedColorFile(const ColorLoadTarget *target,
   return(status);
 }
 
+static const char *SkipDoctypeElement(const char *q)
+{
+  int
+    bracket_depth = 0,
+    quote = 0;
+
+  for ( ; *q != '\0'; q++)
+  {
+    if (quote != 0)
+      {
+        if (*q == quote)
+          quote=0;
+      }
+    else if ((*q == '"') || (*q == '\''))
+      quote=(*q);
+    else if (*q == '[')
+      bracket_depth++;
+    else if (*q == ']')
+      {
+        if (bracket_depth > 0)
+          bracket_depth--;
+      }
+    else if ((*q == '>') && (bracket_depth == 0))
+      {
+        q++;   /* consume final '>' */
+        break;
+      }
+  }
+  return(q);
+}
+
 static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2059,41 +2090,10 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
     (void) CopyMagickString(keyword,token,MagickPathExtent);
     if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
       {
-        int
-          bracket_depth = 0,
-          quote = 0;
-
         /*
           DOCTYPE element.
         */
-        for ( ; *q != '\0'; q++)
-        {
-          if (quote != 0)
-            {
-              if (*q == quote)
-                quote=0;
-            }
-          else
-            {
-              if ((*q == '"') || (*q == '\''))
-                quote=(*q);
-              else
-                if (*q == '[')
-                  bracket_depth++;
-                else
-                  if (*q == ']')
-                    {
-                      if (bracket_depth > 0)
-                        bracket_depth--;
-                    }
-                  else
-                    if ((*q == '>') && (bracket_depth == 0))
-                      {
-                        q++;   /* consume final '>' */
-                        break;
-                      }
-            }
-        }
+        q=SkipDoctypeElement(q);
         continue;
       }
     if (LocaleNCompare(keyword,"<!--",4) == 0)
