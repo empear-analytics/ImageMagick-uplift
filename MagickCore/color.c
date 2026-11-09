@@ -1979,6 +1979,39 @@ static ColorInfo *AcquireColorInfo(const char *filename)
   return(color_info);
 }
 
+static MagickStatusType LoadIncludedColorFile(const ColorLoadTarget *target,
+  const char *filename,const char *token,const size_t depth,
+  MagickStatusType status)
+{
+  LinkedListInfo
+    *cache = target->cache;
+
+  ExceptionInfo
+    *exception = target->exception;
+
+  if (depth >= MagickMaxRecursionDepth)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+  else
+    {
+      const ColorLoadTarget include_target = { cache, exception };
+
+      char
+        path[MagickPathExtent],
+        *file_xml;
+
+      GetIncludePath(filename,token,path);
+      file_xml=FileToXML(path,~0UL);
+      if (file_xml != (char *) NULL)
+        {
+          status&=(MagickStatusType) LoadColorCache(
+            &include_target,file_xml,path,depth+1);
+          file_xml=DestroyString(file_xml);
+        }
+    }
+  return(status);
+}
+
 static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2085,28 +2118,7 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
             continue;
           (void) GetNextToken(q,&q,extent,token);
           if (LocaleCompare(keyword,"file") == 0)
-            {
-              if (depth >= MagickMaxRecursionDepth)
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-              else
-                {
-                  const ColorLoadTarget include_target = { cache, exception };
-
-                  char
-                    path[MagickPathExtent],
-                    *file_xml;
-
-                  GetIncludePath(filename,token,path);
-                  file_xml=FileToXML(path,~0UL);
-                  if (file_xml != (char *) NULL)
-                    {
-                      status&=(MagickStatusType) LoadColorCache(
-                        &include_target,file_xml,path,depth+1);
-                      file_xml=DestroyString(file_xml);
-                    }
-                }
-            }
+            status=LoadIncludedColorFile(target,filename,token,depth,status);
         }
         continue;
       }
