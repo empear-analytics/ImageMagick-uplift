@@ -927,14 +927,12 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
         if ((canonical_path != (char *) NULL) &&
             (GlobExpression(canonical_path,policy->pattern,MagickFalse) != MagickFalse))
           matched_canonical=MagickTrue;
-        else
-          if ((canonical_candidate != (char *) NULL) &&
-              (GlobExpression(canonical_candidate,policy->pattern,MagickFalse) != MagickFalse))
-            matched_canonical=MagickTrue;
-          else
-           if ((canonical_directory != (char *) NULL) &&
-               (GlobExpression(canonical_directory,policy->pattern,MagickFalse) != MagickFalse))
-             matched_canonical=MagickTrue;
+        else if ((canonical_candidate != (char *) NULL) &&
+                 (GlobExpression(canonical_candidate,policy->pattern,MagickFalse) != MagickFalse))
+          matched_canonical=MagickTrue;
+        else if ((canonical_directory != (char *) NULL) &&
+                 (GlobExpression(canonical_directory,policy->pattern,MagickFalse) != MagickFalse))
+          matched_canonical=MagickTrue;
       }
     if (match == MagickFalse)
       continue;
