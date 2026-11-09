@@ -8642,20 +8642,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         }
         case MiterJoin:
         {
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            {
-              stroke_q[q++]=box_q[4];
-              stroke_p[p++]=box_p[4];
-            }
-          else
-            {
-              stroke_q[q++]=box_q[1];
-              stroke_q[q++]=box_q[2];
-              stroke_p[p++]=box_p[1];
-              stroke_p[p++]=box_p[2];
-            }
+          TraceMiterPoints(&boxes,miterlimit,&targets);
           break;
         }
         case RoundJoin:
