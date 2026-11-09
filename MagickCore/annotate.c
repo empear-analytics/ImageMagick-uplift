@@ -2055,6 +2055,19 @@ static FT_StreamRec *AcquireFreetypeStream(const char *pathname)
   return(stream);
 }
 
+static PointInfo GetGlyphBitmapPoint(const PointInfo *offset,
+  const FT_BitmapGlyph bitmap,const FT_Vector origin)
+{
+  PointInfo
+    point;
+
+  point.x=offset->x+bitmap->left;
+  if (bitmap->bitmap.pixel_mode == ft_pixel_mode_mono)
+    point.x+=(origin.x/64.0);
+  point.y=offset->y-bitmap->top;
+  return(point);
+}
+
 static void TraceGlyphOutline(DrawInfo *annotate_info,const FT_Vector origin,
   FT_Outline outline,const FT_Outline_Funcs *outline_methods)
 {
@@ -2420,10 +2433,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     if (ft_status != 0)
       continue;
     bitmap=(FT_BitmapGlyph) glyph.image;
-    point.x=offset->x+bitmap->left;
-    if (bitmap->bitmap.pixel_mode == ft_pixel_mode_mono)
-      point.x+=(origin.x/64.0);
-    point.y=offset->y-bitmap->top;
+    point=GetGlyphBitmapPoint(offset,bitmap,origin);
     if (draw_info->render != MagickFalse)
       {
         CacheView
