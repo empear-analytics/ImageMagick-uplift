@@ -1184,6 +1184,21 @@ static inline MagickBooleanType IsLCHColorspace(
     (colorspace == LCHuvColorspace)) ? MagickTrue : MagickFalse);
 }
 
+static void SetRedComponent(const PixelInfo *pixel,
+  const ComplianceType compliance,double *color,double *scale)
+{
+  *color=pixel->red;
+  if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
+    *scale=360.0;
+  if ((compliance != NoCompliance) &&
+      (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
+    *scale=100.0;
+  if (pixel->colorspace == XYZColorspace)
+    (*color)/=2.55;
+  if (pixel->colorspace == OklchColorspace)
+    *scale=1.0;
+}
+
 MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   const PixelChannel channel,const ComplianceType compliance,char *tuple)
 {
@@ -1207,16 +1222,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   {
     case RedPixelChannel:
     {
-      color=pixel->red;
-      if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
-        scale=360.0;
-      if ((compliance != NoCompliance) &&
-          (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
-        scale=100.0;
-      if (pixel->colorspace == XYZColorspace)
-        color/=2.55;
-      if (pixel->colorspace == OklchColorspace)
-        scale=1.0;
+      SetRedComponent(pixel,compliance,&color,&scale);
       break;
     }
     case GreenPixelChannel:
