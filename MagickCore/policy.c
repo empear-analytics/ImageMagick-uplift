@@ -1296,21 +1296,18 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
             {
               if ((*q == '"') || (*q == '\''))
                 quote=(*q);
-              else
-                if (*q == '[')
-                  bracket_depth++;
-                else
-                  if (*q == ']')
-                    {
-                      if (bracket_depth > 0)
-                        bracket_depth--;
-                    }
-                  else
-                    if ((*q == '>') && (bracket_depth == 0))
-                      {
-                        q++;   /* consume final '>' */
-                        break;
-                      }
+              else if (*q == '[')
+                bracket_depth++;
+              else if (*q == ']')
+                {
+                  if (bracket_depth > 0)
+                    bracket_depth--;
+                }
+              else if ((*q == '>') && (bracket_depth == 0))
+                {
+                  q++;   /* consume final '>' */
+                  break;
+                }
             }
         }
         continue;
