@@ -980,6 +980,13 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline void KeepWidestMetrics(TypeMetric *metrics,
+  const TypeMetric extent)
+{
+  if (extent.width > metrics->width)
+    *metrics=extent;
+}
+
 MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
   const DrawInfo *draw_info,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -1058,8 +1065,7 @@ MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
         status=GetTypeMetrics(image,annotate_info,&extent,exception);
         if (status == MagickFalse)
           break;
-        if (extent.width > metrics->width)
-          *metrics=extent;
+        KeepWidestMetrics(metrics,extent);
         size=(MagickSizeType) fabs(extent.width);
         if (AcquireMagickResource(WidthResource,size) == MagickFalse)
           {
