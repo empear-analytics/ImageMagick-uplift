@@ -3230,7 +3230,9 @@ typedef struct _MorphologyKernelWalk
     *magick_restrict pixels;
 
   double
-    bias;
+    bias,
+    maximum,
+    minimum;
 
   ssize_t
     center,
@@ -3517,6 +3519,85 @@ static double GetMorphologyInitialPixel(const MorphologyKernelWalk *walk)
     }
   }
   return(pixel);
+}
+
+static void ApplyMorphologyIntensity(const MorphologyKernelWalk *walk,
+  const Quantum *magick_restrict *quantum_pixels,double *pixel)
+{
+  const MorphologyMethod
+    method = walk->method;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  double
+    maximum = walk->maximum,
+    minimum = walk->minimum;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  switch (method)
+  {
+    case ErodeIntensityMorphology:
+    {
+      const MorphologyIntensityWalk
+        select = { ForwardKernelWalk, &minimum };
+
+      /*
+        Select (*pixel) with minimum intensity within kernel neighbourhood.
+
+        The kernel is not reflected for this operation.
+      */
+      WalkIntensityKernel(walk,&select,quantum_pixels,pixel);
+      break;
+    }
+    case DilateIntensityMorphology:
+    {
+      const MorphologyIntensityWalk
+        select = { ReflectedKernelWalk, &maximum };
+
+      /*
+        Select (*pixel) with maximum intensity within kernel neighbourhood.
+
+        The kernel is not reflected for this operation.
+      */
+      WalkIntensityKernel(walk,&select,quantum_pixels,pixel);
+      break;
+    }
+    case IterativeDistanceMorphology:
+    {
+      /*
+         Compute th iterative distance from black edge of a white image
+         shape.  Essentially white values are decreased to the smallest
+         'distance from edge' it can find.
+
+         It works by adding kernel values to the neighbourhood, and
+         select the minimum value found. The kernel is rotated before
+         use, so kernel distances match resulting distances, when a user
+         provided asymmetric kernel is applied.
+
+         This code is nearly identical to True GrayScale Morphology but
+         not quite.
+
+         GreyDilate Kernel values added, maximum value found Kernel is
+         rotated before use.
+
+         GrayErode:  Kernel values subtracted and minimum value found No
+         kernel rotation used.
+
+         Note the Iterative Distance method is essentially a
+         GrayErode, but with negative kernel values, and kernel rotation
+         applied.
+      */
+      k=(&kernel->values[kernel->width*kernel->height-1]);
+      (*pixel)=WalkReflectedKernel(walk,MinimizeKernelDistance,k,(*pixel));
+      break;
+    }
+    case UndefinedMorphology:
+    default:
+      break;
+  }
 }
 
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
@@ -3857,6 +3938,8 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         walk.p=p;
         walk.pixels=pixels;
         walk.bias=bias;
+        walk.maximum=maximum;
+        walk.minimum=minimum;
         walk.center=center;
         walk.i=i;
         pixel=GetMorphologyInitialPixel(&walk);
@@ -3960,64 +4043,11 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                 pixel=(double) p[center+i]+minimum;
             break;
           }
-          case ErodeIntensityMorphology:
-          {
-            const MorphologyIntensityWalk
-              select = { ForwardKernelWalk, &minimum };
-
-            /*
-              Select pixel with minimum intensity within kernel neighbourhood.
-
-              The kernel is not reflected for this operation.
-            */
-            WalkIntensityKernel(&walk,&select,&quantum_pixels,&pixel);
-            break;
-          }
-          case DilateIntensityMorphology:
-          {
-            const MorphologyIntensityWalk
-              select = { ReflectedKernelWalk, &maximum };
-
-            /*
-              Select pixel with maximum intensity within kernel neighbourhood.
-
-              The kernel is not reflected for this operation.
-            */
-            WalkIntensityKernel(&walk,&select,&quantum_pixels,&pixel);
-            break;
-          }
-          case IterativeDistanceMorphology:
-          {
-            /*
-               Compute th iterative distance from black edge of a white image
-               shape.  Essentially white values are decreased to the smallest
-               'distance from edge' it can find.
-
-               It works by adding kernel values to the neighbourhood, and
-               select the minimum value found. The kernel is rotated before
-               use, so kernel distances match resulting distances, when a user
-               provided asymmetric kernel is applied.
-
-               This code is nearly identical to True GrayScale Morphology but
-               not quite.
-
-               GreyDilate Kernel values added, maximum value found Kernel is
-               rotated before use.
-
-               GrayErode:  Kernel values subtracted and minimum value found No
-               kernel rotation used.
-
-               Note the Iterative Distance method is essentially a
-               GrayErode, but with negative kernel values, and kernel rotation
-               applied.
-            */
-            k=(&kernel->values[kernel->width*kernel->height-1]);
-            pixel=WalkReflectedKernel(&walk,MinimizeKernelDistance,k,pixel);
-            break;
-          }
-          case UndefinedMorphology:
           default:
+          {
+            ApplyMorphologyIntensity(&walk,&quantum_pixels,&pixel);
             break;
+          }
         }
         if (quantum_pixels != (const Quantum *) NULL)
           {
