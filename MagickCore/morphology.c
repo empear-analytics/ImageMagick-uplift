@@ -501,6 +501,22 @@ static GeometryInfo DefaultShapeScale(const MagickStatusType flags,
   return(args);
 }
 
+static GeometryInfo SetDistanceKernelDefaults(const ssize_t type,
+  const MagickStatusType flags,GeometryInfo args)
+{
+  switch( type ) {
+    case ChebyshevKernel:
+    case ManhattanKernel:
+    case OctagonalKernel:
+    case EuclideanKernel:
+      args=DefaultDistanceScale(flags,args);
+      break;
+    default:
+      break;
+  }
+  return(args);
+}
+
 static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
   const MagickStatusType flags,GeometryInfo args)
 {
@@ -526,14 +542,8 @@ static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
       args=DefaultRectangleGeometry(flags,args);
       break;
     /* Distance Kernel Defaults */
-    case ChebyshevKernel:
-    case ManhattanKernel:
-    case OctagonalKernel:
-    case EuclideanKernel:
-      args=DefaultDistanceScale(flags,args);
-      break;
     default:
-      break;
+      return(SetDistanceKernelDefaults(type,flags,args));
   }
   return(args);
 }
