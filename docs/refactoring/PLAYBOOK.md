@@ -150,8 +150,8 @@ start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 
 **Guard-verified.** No case executes the function. It may still
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
-recipes whose guard fingerprint is exact: **E, G and P** (and B and N with the checks
-of *Unreached functions: B and N* below). The proof is the build
+recipes whose guard fingerprint is exact: **E, G and P** (and B, N and I with the
+checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below). The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
 For E and P, which add a function, `OK` means the exact fingerprint the guard names as
 expected: the literal check `OK`, and `--calls` moving nothing but `+2` for each new
@@ -159,7 +159,8 @@ helper (its definition and its call) before its `PASS` line. Any other count tha
 moves is the `WARN` that stops the commit.
 Recipes D and S fold code together or move it, the guard cannot follow them, and
 they need the oracle. The one exception is Recipe D's *Unreached functions* form,
-whose proof is an identical object file, not the guard. Recipe CN rests on the
+whose proof is an identical object file, not the guard (or, under its *Object code
+that differs only in the caller*, `tools/obj_modulo.sh` and `tools/reuse_check.py`). Recipe CN rests on the
 same proof, so it applies at either level.
 
 **Unreached functions: B and N** (owner, 2026-11-10). Recipes B and N may also be
@@ -189,7 +190,10 @@ before the commit and quoted in its message, which carries `Verified: guard`:
    object file byte for byte, D's proof) or `MODULO-IDENTICAL`: every other function of
    the file compiles to the same instructions, addresses aside; the only new function
    is the helper; and the only functions gone are ones the helper calls, which the
-   compiler now inlines into the helper instead of the caller. For B, `<Helper>` is the
+   compiler now inlines into the helper instead of the caller, or ones the caller
+   calls whose definition is the same text on both sides, which the shortened caller
+   now inlines (the script prints `now inlined into <Caller> (its text unchanged)`;
+   added 2026-11-10 with *Unreached functions: Recipe I*). For B, `<Helper>` is the
    bundled function and `<Caller>` its one caller; with more than one caller only
    `IDENTICAL` passes. `DIFFERENT` stops the step.
 
@@ -203,6 +207,49 @@ helper inline (`always_inline` in the comparison copy, or every `static` functio
 `alwaysinline` in the IR) was tried on `segment.c` and does not work: the same code
 inlined at another point of the pipeline is scheduled differently (two `mov`s swap),
 so those comparisons refuse correct steps.
+
+**Unreached functions: Recipe I** (owner, 2026-11-10). Recipe I may also be applied to
+a function no case reaches, `Verified: guard`, on the terms above: item 1 (I steps 1 to
+8 checked by reading), item 2 (`--calls` moves nothing but `+2` for the new function)
+and item 4 (`obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL`) as written, and
+in place of item 3:
+
+- `python3 tools/targets_fill_check.py <file> <Type> <local> <Helper>` prints `OK`:
+  every member is filled with the address of the variable of its own name,
+  `local.v=(&v);` in member order directly before the one call that passes `&local`
+  (`local.v=(v);` where the block passes on an address an I helper bound: step 2's
+  `&v` becomes `v`), or by step 2's `const` initialiser `{ &v1, &v2, ... }` in member
+  order; each member is bound once, to a `*const` local of its own name; the lines the
+  step removed, rewritten mechanically as step 5 says (`&v` to `v`, every other `v` to
+  `*v`, a name after `.` or `->` left alone), and the helper's body are the same lines,
+  as many times each, `(*v)` counted as `*v`, the bindings and the closing
+  `return(MagickTrue);` aside; each exit the block lost reappears unchanged in the
+  caller (step 7's `goto L;` or `return(c);`, step 8's macro call or `S return(c);`),
+  and the helper holds as many `return(MagickFalse);` as the block had exits; and
+  nothing else is added outside the helper but its typedef, its signature, the targets
+  local, its fill and the call.
+
+A block whose exit throws through `GetMagickModule()` moves at this level only in step
+8's form, the throwing exit left in the caller unchanged, so the function name it
+reports does not change; a throw inside the moved text stops the step (item 1). The type
+of each member against its variable's declaration (step 3) and the precedence of `*v`
+against `->`, `.` and `[]` are checked by reading; the members Recipe I carries are
+pointers to pointers or to structs, so a wrong precedence does not compile.
+
+Why this proves the step: `MODULO-IDENTICAL` shows, as for N, that nothing outside the
+caller and the helper changed. Inside them an I step can go wrong in four ways an E step
+at this level cannot, and the text check closes each: a member filled with another
+variable's address or out of order (the fill), a binding of another member (the
+bindings), a written variable left without its `*` or a statement edited, added or
+dropped on the way (the rewrite, compared line for line as a multiset), and an exit
+lost or added (the exit count and the caller's unchanged exit). What remains is the
+recipe's own argument (I *Careful*): each `*v` is the caller's object `v`, read and
+written at the same points. Planted errors on `segment.c`'s `GetImageDynamicThreshold`
+were each caught: a fill from another variable, a fill out of member order, a binding of
+another member, a flipped comparison and a missing `*` in the moved block, a duplicated
+moved statement, an extra exit, a statement added to another function
+(`targets_fill_check.py`), and a literal changed in a function the shortened caller now
+inlines (`obj_modulo.sh`).
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -598,6 +645,45 @@ value still present), and `--calls` may move only the functions the replaced cod
 down by the number of calls it made) and the helper it now calls (up by one); any
 other movement stops the step.
 
+**Object code that differs only in the caller** (owner, 2026-11-10). When
+`obj_identical.sh` prints `DIFFERENT` because the caller's own code is laid out or
+scheduled differently once it calls the helper, the replacement may still be made,
+`Verified: guard`, when all of these hold, each run before the commit and quoted in its
+message:
+
+- the first two conditions above (casemap 0 for the function and its callers; the
+  block identical to the helper's body, checked by the script of the next item);
+- `python3 tools/reuse_check.py <file> <Helper>` prints `OK`: the call is the only line
+  added, no preprocessor line is removed, and the removed lines, rewritten as the call
+  binds them (an argument `&v` for a pointer parameter `p` makes every `v` of the block
+  `(*p)` and every `&v` `p`; any other argument `e` for `p` makes every `e` `p`; a
+  name of the block that is a parameter's name but not its argument matches nothing),
+  are the helper's body line for line, as many times each;
+- `sh tools/obj_modulo.sh <file> <Caller> <Helper>` prints `IDENTICAL` or
+  `MODULO-IDENTICAL` (every other function's instructions unchanged; *Two levels of
+  evidence*, item 4);
+- the guard as above (the dedup `WARN` with every value present; `--calls` moving only
+  the replaced code's callees down and the helper up by one).
+
+Inside a parallel loop the helper may write the loop's shared `status`, or one of
+Recipe PS step 2's shared scalars, through a pointer parameter, when the block meets
+PS steps 1 to 3 (no `#pragma` in it, no `return`, `goto`, or `continue`/`break` leaving
+it, the scalar shared in the pragma; checked by reading) and the call passes `&status`:
+the helper is then a PS helper called a second time, and PS *Careful* is the argument
+for the threads (each `(*status)` is the shared flag, read and written at the same
+points, nothing copied or deferred). Every other OpenMP condition of *Careful* stands:
+the helper writes no other variable declared outside the loop body.
+
+Why this proves the step: `obj_modulo.sh` shows that nothing outside the caller
+changed (the helper, if it is still emitted, compiles as before); `reuse_check.py`
+shows that the call runs the helper's body on exactly the objects the block named,
+argument by argument, so the caller does what it did, statement for statement, as in
+D's renaming argument (an `&v` bound to `p` makes `(*p)` the object `v`, Recipe O's
+argument). A transposed or wrong argument leaves a name of the block unbound and fails
+the check; types are checked by the build and by reading. Planted errors on
+`transform.c`'s `ExcerptImage` (another tag constant, `excerpt_image` passed for
+`image`, a stray edit elsewhere, the `#pragma omp atomic` dropped) were each caught.
+
 **Copies without a *Code Duplication* finding.** CodeScene reports no *Code Duplication*
 for copies inside one function, nor for a block that repeats the body of an existing
 helper, though both make the function longer and add branches. D may be used for them
@@ -634,7 +720,8 @@ throws with `GetMagickModule()` now names the helper, which the oracle normalise
   stays untouched, as everywhere.
 
 **Evidence level:** oracle; or, for a function no case reaches, the identical object
-file of *Unreached functions*.
+file of *Unreached functions*, or its *Object code that differs only in the caller*
+(`tools/reuse_check.py` and `tools/obj_modulo.sh`).
 
 **Provenance:** founding recipe (2026-09-29). *Casts to the variable's own type:* 2026-10-30, from
 `colorspace.c`'s `SetImageGray` and `SetImageMonochrome`, whose closing blocks differ in
@@ -644,7 +731,13 @@ campaign A's W11 session: `vision.c`'s `ConnectedComponentsImage` (eight identic
 threshold-range parses, 2221d8d57), `effect-blur.c`'s `RotationalBlurImage` (a second
 copy of `CloneDirectImage`'s body, 42d350a1b), `enhance-tone.c`'s `GammaImage` and
 `enhance.c`'s `CLAHEImage` (a second row loop equal to an existing helper). Added by Claude
-Code (Claude Sonnet 5.5).
+Code (Claude Sonnet 5.5). *Object code that differs only in the caller:* 2026-11-10,
+owner's OK to evolve the recipes, from campaign A's W16 lane d: `transform.c`'s
+`ExcerptImage` (no case, no in-tree caller), whose progress tail is
+`SetTransformProgress`'s body (a PS helper every other loop of the file calls); the
+call compiles to a different `ExcerptImage` (DIFFERENT) with every other function
+unchanged (MODULO-IDENTICAL), 8.95 to 9.09 in a probe. Added by Claude Code (Claude
+Opus 5.5).
 
 ---
 
@@ -3167,7 +3260,9 @@ static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
   constants, or a written variable whose address the caller takes elsewhere: skip the block.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
-nothing else moved), and steps 1, 2, 6 and 7 checked by reading.
+nothing else moved), and steps 1, 2, 6 and 7 checked by reading; or, for a function no
+case reaches, guard with `tools/targets_fill_check.py` and `tools/obj_modulo.sh`
+(*Two levels of evidence*, *Unreached functions: Recipe I*).
 
 **Provenance:** 2026-10-30, from `fx.c`'s `GetFunction`, whose coordinate-qualifier block
 (`u.p[...]`, `v.p{...}`) is the file's last *Deep, Nested Complexity* (depth 4): it writes
@@ -3180,7 +3275,7 @@ during task W09, at the owner's request of 2026-10-30. Step 8's plain cleanup ru
 (2026-10-30, task W09): `layer.c`'s `OptimizeLayerFrames`, whose duplicate-frame trial
 (nesting 4) writes `dup_image`, `dup_bounds` and `cleared` and, when the clone fails,
 releases `bounds` and `disposals`, destroys `prev_image` and returns
-`(Image *) NULL`. Step 2's `const` form for five or six variables (2026-11-05, W13): `fx.c`'s `GetFunction`, whose qualifier block writes `coordQual`, `fe`, `funStr`, `chQual`, `expChLimit` and `iaQual` and returns `MagickFalse`, and whose opening chain writes five (`pushOp`, `strLimit`, `chLimit`, `expChLimit`, `nArgs`); step 2 stopped at four, and the bump each rests on stays while they are in the caller. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+`(Image *) NULL`. Step 2's `const` form for five or six variables (2026-11-05, W13): `fx.c`'s `GetFunction`, whose qualifier block writes `coordQual`, `fe`, `funStr`, `chQual`, `expChLimit` and `iaQual` and returns `MagickFalse`, and whose opening chain writes five (`pushOp`, `strLimit`, `chLimit`, `expChLimit`, `nArgs`); step 2 stopped at four, and the bump each rests on stays while they are in the caller. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24. The unreached level (2026-11-10, W16 lane d, owner's OK to evolve the recipes): `segment.c`'s `GetImageDynamicThreshold`, which no case reaches, keeps *Brain Method* and *Deep, Nested Complexity* (4) in its red/green/blue region loops, which write `cluster`, `head`, `red`, `green` and `blue` and leave through `return(ThrowClusterAllocationFailed(image,exception));`; B and N cannot carry written variables, and a probe of the two I helpers measured 7.14 to 9.02. Added by Claude Code (Claude Opus 5.5).
 
 ---
 
@@ -8966,3 +9061,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | WORDING | CF | *Provenance*: the probe timings name the command they measured (`-black-threshold` and `-white-threshold` only; `magick` lacks `-perceptible`, which only `magick convert` accepts) | Found when the commits' timing command was extended to every merged copy | after the fact |
 | 2026-11-10 | NEW | IS | Extract Block Through Pointers to the Iteration's Slots: a block of a parallel loop body over `i` that writes, besides the body's variables (and `status` by PS), only the iteration's own slot of a shared object (`x.direction[i]`, `channel_features[c].correlation[i]`, `object[i].metric[k]`) moves into a `static void` function taking the slot's address (`&x.direction[i]`, uses `x->m`) or the pointer that reaches it by value; slot pointers past four parameters in a `const` struct initialised in the body; copies identical once their slots are pointers may share one function (step 7); every access to the object in the region checked by reading to select the iteration's own `i` | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the five direction loops' finals and accumulators, which W14 lane b and W15 lane a found blocked (every legal chain below 5.25); a probe of the chain 5.25 to 5.98, no finding on a new function, features workload not slower (0.96 s to 0.92 s, median of 9). `vision.c`'s `CircularityThreshold`: 9.31 to 9.38 | owner |
 | 2026-11-10 | NEW | RA | Extract Block Accumulating a Reduction Variable Through a Pointer: a block of a parallel loop body that uses at most two variables named in the pragma's `reduction(op:v)` clauses only by applying that operator (`v+=e;`, `v++;`) moves into a `static void` function taking `T *v` (uses `(*v)`), the caller passing `&v`, which inside the region is the thread's private copy; the pragma and clauses unchanged | `composite.c`'s `BlendRMSEResidual` (campaign A, W16 lane c): its channel and column loops add to `channel_residual` and `area` (`reduction(+:...)`), the file's only Deep, Nested Complexity; W15 asked for the ruling. A probe of both steps 3.46 to 3.64 and 3.66, no finding on a new function, a seamless-blend workload 1.77 s both ways (median of 9) | owner |
+| 2026-11-10 | AMEND | I | *Two levels of evidence*, *Unreached functions: Recipe I*: Recipe I may be applied to a function no case reaches, `Verified: guard`, with *Unreached functions: B and N* items 1, 2 and 4 as written and, for item 3, `tools/targets_fill_check.py` printing `OK` (members filled with the addresses of the variables of their own names, in order, or by the `const` initialiser; bindings by name; the removed lines under step 5's mechanical rewrite and the helper's body the same multiset; each exit back unchanged in the caller and as many `return(MagickFalse);` in the helper); a throwing exit moves only in step 8's form, left in the caller. Item 4 also admits a function that vanished because the shortened caller now inlines it, when the caller calls it and its text is unchanged (`tools/obj_modulo.sh`, also for B and N). The guard-verified sentence, I's *Evidence level* and AGENTS.md say so. The new tool and the `obj_modulo.sh` change are commits of their own | `segment.c`'s `GetImageDynamicThreshold` (campaign A, W16 lane d), reached by no case: its region loops write `cluster`, `head`, `red`, `green` and `blue` (I, not B or N); two I helpers probe 7.14 to 9.02, `MODULO-IDENTICAL` with `CountImagePixelsByRGB` and `FinishDynamicThreshold` now inlined into the shortened caller. Planted errors (fill from another variable, fill out of order, binding of another member, flipped comparison, missing `*`, duplicated statement, extra exit, a statement added elsewhere, a literal changed in a newly inlined function) are each caught | owner |
+| 2026-11-10 | AMEND | D | *Unreached functions*, *Object code that differs only in the caller*: when `obj_identical.sh` prints `DIFFERENT`, the replacement may still be made at the guard level when `tools/reuse_check.py` prints `OK` (the call the only added line; the removed block, rewritten as the call's arguments bind it, `&v` for a pointer parameter `p` as `(*p)`, is the helper's body line for line) and `tools/obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL`; inside a parallel loop the helper may write the shared `status` (or a PS step 2 scalar) through a pointer when the block meets PS steps 1 to 3 (a PS helper called again; PS *Careful*). *Two levels of evidence*, D's *Evidence level* and AGENTS.md say so; the tool is a commit of its own | `transform.c`'s `ExcerptImage` (campaign A, W16 lane d), reached by no case: its progress tail is `SetTransformProgress`'s body; the call gives a different `ExcerptImage` but every other function the same instructions; 8.95 to 9.09 in a probe. Planted errors (another tag, `excerpt_image` for `image`, a stray edit, the atomic pragma dropped) are each caught | owner |

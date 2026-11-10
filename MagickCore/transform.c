@@ -1180,16 +1180,11 @@ MagickExport Image *ExcerptImage(const Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ExcerptImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetTransformProgress(image,ExcerptImageTag,progress,&status);
       }
   }
   excerpt_view=DestroyCacheView(excerpt_view);
