@@ -6619,6 +6619,65 @@ static void XPackContinuous4BitLSB(const XImageRowSource *source,
   }
 }
 
+static void XPackContinuous8BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const XResourceInfo
+    *const resource_info = source->resource_info;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  const Quantum
+    *p;
+
+  int
+    x,
+    y;
+
+  unsigned long
+    pixel;
+
+  /*
+    Convert to contiguous 8 bit continuous-tone X canvas.
+  */
+  if (resource_info->color_recovery &&
+      resource_info->quantize_info->dither_method != NoDitherMethod)
+    {
+      XDitherImage(canvas,ximage,exception);
+      return;
+    }
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (int) canvas->columns; x++)
+    {
+      pixel=XGammaPixel(canvas,map_info,p);
+      *q++=(unsigned char) pixel;
+      p+=(ptrdiff_t) GetPixelChannels(canvas);
+    }
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -6657,7 +6716,6 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
     scanline_pad;
 
   unsigned long
-    pixel,
     *pixels;
 
   XStandardColormap
@@ -6812,29 +6870,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
         case 6:
         case 8:
         {
-          /*
-            Convert to contiguous 8 bit continuous-tone X canvas.
-          */
-          if (resource_info->color_recovery &&
-              resource_info->quantize_info->dither_method != NoDitherMethod)
-            {
-              XDitherImage(canvas,ximage,exception);
-              break;
-            }
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=XGammaPixel(canvas,map_info,p);
-              *q++=(unsigned char) pixel;
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackContinuous8BitLSB(&row_source,q);
           break;
         }
         default:
