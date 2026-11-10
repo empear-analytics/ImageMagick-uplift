@@ -2972,40 +2972,8 @@ static MagickBooleanType GenericOrLogTosRGB(Image *image,
   const MagickOffsetType
     progress = input->progress;
 
-  switch (image->colorspace)
-  {
-    case Adobe98Colorspace:
-    case CMYColorspace:
-    case CAT02LMSColorspace:
-    case DisplayP3Colorspace:
-    case HCLColorspace:
-    case HCLpColorspace:
-    case HSBColorspace:
-    case HSIColorspace:
-    case HSLColorspace:
-    case HSVColorspace:
-    case HWBColorspace:
-    case JzazbzColorspace:
-    case LabColorspace:
-    case LCHColorspace:
-    case LCHabColorspace:
-    case LCHuvColorspace:
-    case LMSColorspace:
-    case LuvColorspace:
-    case OklabColorspace:
-    case OklchColorspace:
-    case ProPhotoColorspace:
-    case xyYColorspace:
-    case XYZColorspace:
-    case YCbCrColorspace:
-    case YDbDrColorspace:
-    case YIQColorspace:
-    case YPbPrColorspace:
-    case YUVColorspace:
-      return(GenericTosRGB(image,illuminant,status,exception));
-    default:
-      break;
-  }
+  if (IsGenericColorspace(image->colorspace) != MagickFalse)
+    return(GenericTosRGB(image,illuminant,status,exception));
   return(LogOrLinearRGBTosRGB(image,status,progress,exception));
 }
 
