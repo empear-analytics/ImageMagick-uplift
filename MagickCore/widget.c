@@ -1359,6 +1359,19 @@ static void XScreenTrackWidgetMapping(XWindows *windows,const XEvent *event)
     windows->widget.mapped=MagickFalse;
 }
 
+static void XScreenConvertAltButton(XEvent *event)
+{
+  if ((event->xbutton.button == Button3) &&
+      (event->xbutton.state & Mod1Mask))
+    {
+      /*
+        Convert Alt-Button3 to Button2.
+      */
+      event->xbutton.button=Button2;
+      event->xbutton.state&=(unsigned int) (~Mod1Mask);
+    }
+}
+
 static int XScreenEvent(Display *display,XEvent *event,char *data)
 {
   XWindows
@@ -1382,15 +1395,7 @@ static int XScreenEvent(Display *display,XEvent *event,char *data)
   {
     case ButtonPress:
     {
-      if ((event->xbutton.button == Button3) &&
-          (event->xbutton.state & Mod1Mask))
-        {
-          /*
-            Convert Alt-Button3 to Button2.
-          */
-          event->xbutton.button=Button2;
-          event->xbutton.state&=(unsigned int) (~Mod1Mask);
-        }
+      XScreenConvertAltButton(event);
       return(MagickTrue);
     }
     case Expose:
