@@ -3493,6 +3493,40 @@ MagickExport XrmDatabase XGetResourceDatabase(Display *display,
 %    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
 */
+static void GetResourceFontNames(XrmDatabase database,const char *client_name,
+  XResourceInfo *resource_info)
+{
+  /*
+    Font resources: font, fontList and font1 to font0.
+  */
+  resource_info->font=XGetResourceClass(database,client_name,"font",
+    (char *) NULL);
+  resource_info->font=XGetResourceClass(database,client_name,"fontList",
+    resource_info->font);
+  resource_info->font_name[0]=XGetResourceClass(database,client_name,"font1",
+    (char *) "fixed");
+  resource_info->font_name[1]=XGetResourceClass(database,client_name,"font2",
+    (char *) "variable");
+  resource_info->font_name[2]=XGetResourceClass(database,client_name,"font3",
+    (char *) "5x8");
+  resource_info->font_name[3]=XGetResourceClass(database,client_name,"font4",
+    (char *) "6x10");
+  resource_info->font_name[4]=XGetResourceClass(database,client_name,"font5",
+    (char *) "7x13bold");
+  resource_info->font_name[5]=XGetResourceClass(database,client_name,"font6",
+    (char *) "8x13bold");
+  resource_info->font_name[6]=XGetResourceClass(database,client_name,"font7",
+    (char *) "9x15bold");
+  resource_info->font_name[7]=XGetResourceClass(database,client_name,"font8",
+    (char *) "10x20");
+  resource_info->font_name[8]=XGetResourceClass(database,client_name,"font9",
+    (char *) "12x24");
+  resource_info->font_name[9]=XGetResourceClass(database,client_name,"font0",
+    (char *) "fixed");
+  resource_info->font_name[10]=XGetResourceClass(database,client_name,"font0",
+    (char *) "fixed");
+}
+
 MagickExport void XGetResourceInfo(const ImageInfo *image_info,
   XrmDatabase database,const char *client_name,XResourceInfo *resource_info)
 {
@@ -3551,32 +3585,7 @@ MagickExport void XGetResourceInfo(const ImageInfo *image_info,
   resource_value=XGetResourceClass(database,client_name,"displayWarnings",
     (char *) "True");
   resource_info->display_warnings=IsStringTrue(resource_value);
-  resource_info->font=XGetResourceClass(database,client_name,"font",
-    (char *) NULL);
-  resource_info->font=XGetResourceClass(database,client_name,"fontList",
-    resource_info->font);
-  resource_info->font_name[0]=XGetResourceClass(database,client_name,"font1",
-    (char *) "fixed");
-  resource_info->font_name[1]=XGetResourceClass(database,client_name,"font2",
-    (char *) "variable");
-  resource_info->font_name[2]=XGetResourceClass(database,client_name,"font3",
-    (char *) "5x8");
-  resource_info->font_name[3]=XGetResourceClass(database,client_name,"font4",
-    (char *) "6x10");
-  resource_info->font_name[4]=XGetResourceClass(database,client_name,"font5",
-    (char *) "7x13bold");
-  resource_info->font_name[5]=XGetResourceClass(database,client_name,"font6",
-    (char *) "8x13bold");
-  resource_info->font_name[6]=XGetResourceClass(database,client_name,"font7",
-    (char *) "9x15bold");
-  resource_info->font_name[7]=XGetResourceClass(database,client_name,"font8",
-    (char *) "10x20");
-  resource_info->font_name[8]=XGetResourceClass(database,client_name,"font9",
-    (char *) "12x24");
-  resource_info->font_name[9]=XGetResourceClass(database,client_name,"font0",
-    (char *) "fixed");
-  resource_info->font_name[10]=XGetResourceClass(database,client_name,"font0",
-    (char *) "fixed");
+  GetResourceFontNames(database,client_name,resource_info);
   resource_info->foreground_color=XGetResourceInstance(database,client_name,
     "foreground",ForegroundColor);
   resource_value=XGetResourceClass(database,client_name,"gammaCorrect",
