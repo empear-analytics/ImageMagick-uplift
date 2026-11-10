@@ -4257,6 +4257,31 @@ static void SetMorphologyKernelOrigin(const MorphologyMethod method,
   }
 }
 
+static void SetMorphologyKernelOffset(const MorphologyMethod method,
+  const KernelInfo *kernel,OffsetInfo *offset,ExceptionInfo *exception)
+{
+  switch (method)
+  {
+    case ConvolveMorphology:
+    case DilateMorphology:
+    case DilateIntensityMorphology:
+    case IterativeDistanceMorphology:
+    {
+      /*
+        Kernel needs to use a reflection about origin.
+      */
+      (*offset).x=(ssize_t) kernel->width-kernel->x-1;
+      (*offset).y=(ssize_t) kernel->height-kernel->y-1;
+      break;
+    }
+    default:
+    {
+      SetMorphologyKernelOrigin(method,kernel,offset,exception);
+      break;
+    }
+  }
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4310,26 +4335,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   width=image->columns+kernel->width-1;
   offset.x=0;
   offset.y=0;
-  switch (method)
-  {
-    case ConvolveMorphology:
-    case DilateMorphology:
-    case DilateIntensityMorphology:
-    case IterativeDistanceMorphology:
-    {
-      /*
-        Kernel needs to use a reflection about origin.
-      */
-      offset.x=(ssize_t) kernel->width-kernel->x-1;
-      offset.y=(ssize_t) kernel->height-kernel->y-1;
-      break;
-    }
-    default:
-    {
-      SetMorphologyKernelOrigin(method,kernel,&offset,exception);
-      break;
-    }
-  }
+  SetMorphologyKernelOffset(method,kernel,&offset,exception);
   changed=0;
   changes=(size_t *) AcquireQuantumMemory(GetOpenMPMaximumThreads(),
     sizeof(*changes));
