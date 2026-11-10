@@ -6024,6 +6024,15 @@ static inline MagickBooleanType IsMutableAlphaImage(const XWindowInfo *window,
     (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _XImageRowSource
+{
+  Image
+    *canvas;
+
+  XStandardColormap
+    *map_info;
+} XImageRowSource;
+
 static unsigned char *XPackGammaBGRARowLSB(const Image *canvas,const Quantum *p,
   unsigned char *q)
 {
@@ -6098,6 +6107,38 @@ static unsigned char *XPackRGBARowLSB(const Image *canvas,const Quantum *p,
   return(q);
 }
 
+static unsigned char *XPackContinuousMultiByteRowLSB(
+  const XImageRowSource *source,const unsigned int bytes_per_pixel,
+  const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  int
+    k;
+
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=XGammaPixel(canvas,map_info,p);
+    for (k=0; k < (int) bytes_per_pixel; k++)
+    {
+      *q++=(unsigned char) (pixel & 0xff);
+      pixel>>=8;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -6141,6 +6182,9 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
 
   XStandardColormap
     *map_info;
+
+  XImageRowSource
+    row_source;
 
   assert(resource_info != (XResourceInfo *) NULL);
   assert(window != (XWindowInfo *) NULL);
@@ -6186,6 +6230,8 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   q=(unsigned char *) ximage->data;
   x=0;
   canvas_view=AcquireVirtualCacheView(canvas,exception);
+  row_source.canvas=canvas;
+  row_source.map_info=map_info;
   if (ximage->format == XYBitmap)
     {
       unsigned short
@@ -6569,9 +6615,6 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
               }
             else
               {
-                int
-                  k;
-
                 unsigned int
                   bytes_per_pixel;
 
@@ -6585,16 +6628,8 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
                     canvas->columns,1,exception);
                   if (p == (const Quantum *) NULL)
                     break;
-                  for (x=0; x < (int) canvas->columns; x++)
-                  {
-                    pixel=XGammaPixel(canvas,map_info,p);
-                    for (k=0; k < (int) bytes_per_pixel; k++)
-                    {
-                      *q++=(unsigned char) (pixel & 0xff);
-                      pixel>>=8;
-                    }
-                    p+=(ptrdiff_t) GetPixelChannels(canvas);
-                  }
+                  q=XPackContinuousMultiByteRowLSB(&row_source,bytes_per_pixel,
+                    p,q);
                   q+=(ptrdiff_t) scanline_pad;
                 }
               }
