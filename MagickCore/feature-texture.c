@@ -1420,6 +1420,21 @@ static void NormalizeFeatureCooccurrence(const Image *image,
   }
 }
 
+static void InitializeFeatureGrays(PixelPacket *grays)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    grays[i].red=(~0U);
+    grays[i].green=(~0U);
+    grays[i].blue=(~0U);
+    grays[i].alpha=(~0U);
+    grays[i].black=(~0U);
+  }
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1492,14 +1507,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
       return(channel_features);
     }
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    grays[i].red=(~0U);
-    grays[i].green=(~0U);
-    grays[i].blue=(~0U);
-    grays[i].alpha=(~0U);
-    grays[i].black=(~0U);
-  }
+  InitializeFeatureGrays(grays);
   status=MagickTrue;
   image_view=AcquireVirtualCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
