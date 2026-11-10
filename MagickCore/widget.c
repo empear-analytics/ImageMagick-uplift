@@ -9847,24 +9847,23 @@ MagickPrivate void XTextViewWidget(Display *display,
         XDelay(display,delay);
         delay=SuspendTime;
         (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if (north_info.raised == MagickFalse)
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              slider_info.id--;
-              state|=RedrawListState;
-            }
-        if (south_info.raised == MagickFalse)
-          if (slider_info.id < (int) lines)
-            {
-              /*
-                Move slider down.
-              */
-              slider_info.id++;
-              state|=RedrawListState;
-            }
+        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            slider_info.id--;
+            state|=RedrawListState;
+          }
+        if ((south_info.raised == MagickFalse) &&
+            (slider_info.id < (int) lines))
+          {
+            /*
+              Move slider down.
+            */
+            slider_info.id++;
+            state|=RedrawListState;
+          }
         if (event.type != ButtonRelease)
           continue;
       }
@@ -9880,28 +9879,28 @@ MagickPrivate void XTextViewWidget(Display *display,
             slider_info.active=MagickTrue;
             break;
           }
-        if (MatteIsActive(north_info,event.xbutton))
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              north_info.raised=MagickFalse;
-              slider_info.id--;
-              state|=RedrawListState;
-              break;
-            }
-        if (MatteIsActive(south_info,event.xbutton))
-          if (slider_info.id < (int) lines)
-            {
-              /*
-                Move slider down.
-              */
-              south_info.raised=MagickFalse;
-              slider_info.id++;
-              state|=RedrawListState;
-              break;
-            }
+        if ((MatteIsActive(north_info,event.xbutton)) &&
+            (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            north_info.raised=MagickFalse;
+            slider_info.id--;
+            state|=RedrawListState;
+            break;
+          }
+        if ((MatteIsActive(south_info,event.xbutton)) &&
+            (slider_info.id < (int) lines))
+          {
+            /*
+              Move slider down.
+            */
+            south_info.raised=MagickFalse;
+            slider_info.id++;
+            state|=RedrawListState;
+            break;
+          }
         if (MatteIsActive(scroll_info,event.xbutton))
           {
             /*
@@ -9999,9 +9998,9 @@ MagickPrivate void XTextViewWidget(Display *display,
           }
         if (dismiss_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(dismiss_info,event.xbutton))
-                state|=ExitState;
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(dismiss_info,event.xbutton)))
+              state|=ExitState;
             dismiss_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&dismiss_info);
           }
