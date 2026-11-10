@@ -7000,6 +7000,101 @@ static XWidgetInfo PageListBrowserSlider(XWidgetInfo slider_info,
   return(slider_info);
 }
 
+typedef struct _ListBrowserTargets
+{
+  XWidgetInfo
+    *reply_info,
+    *selection_info,
+    *action_info;
+
+  size_t
+    *state;
+
+  XWidgetInfo
+    *list_info;
+} ListBrowserTargets;
+
+typedef struct _ListBrowserPress
+{
+  Display
+    *display;
+
+  XWindowInfo
+    *window_info;
+
+  const char
+    *const *list;
+
+  unsigned int
+    entries,
+    height;
+
+  XEvent
+    event;
+
+  XWidgetInfo
+    slider_info;
+} ListBrowserPress;
+
+static void SelectListBrowserEntry(const ListBrowserPress *press,
+  const ListBrowserTargets *targets)
+{
+  Display
+    *const display = press->display;
+
+  XWindowInfo
+    *const window_info = press->window_info;
+
+  const char
+    *const *const list = press->list;
+
+  const unsigned int
+    entries = press->entries,
+    height = press->height;
+
+  const XEvent
+    event = press->event;
+
+  const XWidgetInfo
+    slider_info = press->slider_info;
+
+  XWidgetInfo
+    *const reply_info = targets->reply_info,
+    *const selection_info = targets->selection_info,
+    *const action_info = targets->action_info;
+
+  size_t
+    *const state = targets->state;
+
+  XWidgetInfo
+    *const list_info = targets->list_info;
+
+  int
+    id;
+
+  /*
+    User pressed list matte.
+  */
+  id=slider_info.id+(event.xbutton.y-((*list_info).y+(int)
+    (height >> 1))+1)/(int) (*selection_info).height;
+  if (id >= (int) entries)
+    return;
+  (void) CopyMagickString((*reply_info).text,list[id],MagickPathExtent);
+  (*reply_info).highlight=MagickFalse;
+  (*reply_info).marker=(*reply_info).text;
+  (*reply_info).cursor=(*reply_info).text+Extent((*reply_info).text);
+  XDrawMatteText(display,window_info,reply_info);
+  (*selection_info).id=(~0);
+  if (id == (*list_info).id)
+    {
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,window_info,action_info);
+      (*state)|=ExitState;
+    }
+  (*list_info).id=id;
+  (*state)|=RedrawListState;
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7056,6 +7151,10 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
 
   XWindowChanges
     window_changes;
+
+  const ListBrowserTargets
+    targets = { &reply_info, &selection_info, &action_info, &state,
+      &list_info };
 
   /*
     Count the number of entries in the list.
@@ -7379,30 +7478,17 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
           }
         if (MatteIsActive(list_info,event.xbutton))
           {
-            int
-              id;
+            ListBrowserPress
+              press;
 
-            /*
-              User pressed list matte.
-            */
-            id=slider_info.id+(event.xbutton.y-(list_info.y+(int)
-              (height >> 1))+1)/(int) selection_info.height;
-            if (id >= (int) entries)
-              break;
-            (void) CopyMagickString(reply_info.text,list[id],MagickPathExtent);
-            reply_info.highlight=MagickFalse;
-            reply_info.marker=reply_info.text;
-            reply_info.cursor=reply_info.text+Extent(reply_info.text);
-            XDrawMatteText(display,window_info,&reply_info);
-            selection_info.id=(~0);
-            if (id == list_info.id)
-              {
-                action_info.raised=MagickFalse;
-                XDrawBeveledButton(display,window_info,&action_info);
-                state|=ExitState;
-              }
-            list_info.id=id;
-            state|=RedrawListState;
+            press.display=display;
+            press.window_info=window_info;
+            press.list=list;
+            press.entries=entries;
+            press.height=height;
+            press.event=event;
+            press.slider_info=slider_info;
+            SelectListBrowserEntry(&press,&targets);
             break;
           }
         if (MatteIsActive(action_info,event.xbutton))
