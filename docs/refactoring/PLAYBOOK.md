@@ -10099,6 +10099,176 @@ by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve th
 
 ---
 
+## Recipe CT - Extract a Case Tail Writing Through a Targets Struct
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Brain Method*, *Bumpy Road
+Ahead* or *Large Method*, and the block that would fix it is the tail of a `switch`
+case: after it the case runs nothing but its closing `break;`, it leaves the `switch`
+through `break;` on some paths, and it writes two to six of the caller's locals that
+the caller reads afterwards, as the event loops of `widget.c` do: `XListBrowserWidget`'s
+press on the list (`if (id >= (int) entries) break;`, then `reply_info`,
+`selection_info`, `action_info`, `state` and `list_info`) and its Return key
+(`if (*reply_info.text == '\0') break;`, then `action_info` and `state`), each the
+nested `if` that holds the function at depth 4 or more.
+
+**Not covered by:** Recipe E step 7, whose `switch` form takes one written variable
+(returned) or none (the `void` form); Recipes O and Z, which refuse a block containing a
+`break` that leaves it (O step 3, Z step 1); Recipes I, V, Y and W, whose exits are
+`return(c);` or `goto L;`, and whose call `if (Helper(...) == MagickFalse) break;`
+followed by the case's own `break;` would leave the nested `if` at the block's depth;
+Recipes LB and BR, whose `break;` ends a loop, not a `switch`; Recipe SD, which moves
+whole groups and keeps their nesting in the new function.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#` line. It is the run of
+   statements of a `switch` case after which the case runs only its closing `break;` on
+   every path: the whole body of a group but that `break;`, or the body of a branch
+   `if (C) { ... break; }` that ends the case, but that `break;` (Recipe E step 7's
+   position). It contains no `return`, `goto` or `continue` that leaves it; every
+   `break;` in it that leaves it ends this `switch`. A `break` or `continue` of a loop or
+   `switch` nested inside it stays as it is (and is checked by reading, step 8).
+2. List the caller's variables the block writes that the caller reads after it: two to
+   six, each meeting Recipe I step 2 (a plain local or by-value parameter, not a global,
+   `static` or array, whose address the caller passes elsewhere only to calls that keep
+   no copy of it, to another helper's targets struct, or to helpers of Recipes O and Z
+   as their written variables). Writes through pointers the block already uses stay as
+   they are; variables the block declares, and temporaries it writes before reading
+   that the caller does not read afterwards (Recipe E step 4), move with it.
+3. Directly above the new function declare a `typedef struct` of one pointer member per
+   written variable, named and typed as Recipe I step 3 says, in the order the block
+   first writes them, holding addresses only. The caller declares it once, `const`, at
+   the top of its body, with the addresses as its initialiser (`const T targets = { &a,
+   &b, ... };`). A later block of the same function whose written variables are among
+   its members takes the same struct instead of a new one and binds only the members
+   it writes; a variable outside the struct cannot be added to it later.
+4. Cut the block into a new `static void` function directly above the caller. It takes
+   the variables the block only reads by value, or in one `const` input struct filled
+   as Recipe Y steps 3 to 5 say (Recipe N step 2's conditions for struct values and its
+   by-address form), then `const T *targets` last: at most four parameters.
+5. At the top of its body bind, per member the block writes and in member order,
+   `V *const v = targets->v;` (and the input struct's members as Recipe N step 4 does).
+   Write each written variable `v` as `(*v)` at every use, reads included, `&v` as `v`;
+   each `break;` that ended the `switch` becomes `return;`. Nothing else in the text
+   changes.
+6. Where the block stood write the input struct's fill, if any, then the call
+   `Helper(...,&targets);`, directly before the case's closing `break;`, which stays.
+   Declare the input local at the top of the block that holds the call.
+7. Check every argument, member and binding by reading.
+8. Run `python3 tools/case_tail_check.py <file> <Targets> <Helper> [<Input> <local>]`;
+   it must print `OK` (targets initialiser, bindings, fill, the call followed by
+   `break;`, the rewrite line for line with `break;` as `return;`, nothing else added).
+   For a block with a nested loop's `break`, it prints `FAIL` on that line: check that
+   line by reading instead and say so in the commit.
+
+**Before:**
+
+```c
+      case ButtonPress:
+      {
+        ...
+        if (MatteIsActive(list_info,event.xbutton))
+          {
+            int
+              id;
+
+            id=slider_info.id+(event.xbutton.y-(list_info.y+(int)
+              (height >> 1))+1)/(int) selection_info.height;
+            if (id >= (int) entries)
+              break;
+            (void) CopyMagickString(reply_info.text,list[id],MagickPathExtent);
+            reply_info.highlight=MagickFalse;
+            ...
+            list_info.id=id;
+            state|=RedrawListState;
+            break;
+          }
+```
+
+**After:**
+
+```c
+static void SelectListBrowserEntry(const ListBrowserPress *press,
+  const ListBrowserTargets *targets)
+{
+  ...
+  XWidgetInfo
+    *const reply_info = targets->reply_info,
+    ...
+
+  int
+    id;
+
+  id=slider_info.id+(event.xbutton.y-((*list_info).y+(int)
+    (height >> 1))+1)/(int) (*selection_info).height;
+  if (id >= (int) entries)
+    return;
+  (void) CopyMagickString((*reply_info).text,list[id],MagickPathExtent);
+  (*reply_info).highlight=MagickFalse;
+  ...
+  (*list_info).id=id;
+  (*state)|=RedrawListState;
+}
+...
+  const ListBrowserTargets
+    targets = { &reply_info, &selection_info, &action_info, &state,
+      &list_info };
+...
+        if (MatteIsActive(list_info,event.xbutton))
+          {
+            ListBrowserPress
+              press;
+
+            press.display=display;
+            ...
+            SelectListBrowserEntry(&press,&targets);
+            break;
+          }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Every path through the block either reached a
+  `break;` that ended the `switch` or fell off its end, and in both cases the case ran
+  nothing more but leaving the `switch` (step 1). In the helper the first is `return;`
+  and the second falls off its end; either way the caller runs the case's own `break;`
+  next, so the `switch` ends at the same point after the same statements, as in Recipe
+  E step 7's `void` form.
+- The written variables stay the caller's own locals, read and written directly
+  everywhere else; only their addresses travel, fixed at the declaration and bound once
+  to `*const` locals in the helper, so each `(*v)` is the object `v` named, read and
+  written in the same order (Recipe I's and Z step 7's argument). The addresses are of
+  distinct locals, so no two members alias. Another helper that takes `&v` as its own
+  written variable (Recipes O and Z) holds that pointer only while it runs, and C calls
+  here do not overlap, so only one pointer to `v` is in use at a time.
+- A by-value input is a copy taken at the call, where the block read the variable; the
+  block wrote none of its inputs (step 2), so every read sees the value it saw. A struct
+  value whose address the block passes on must go only to `const` parameters of
+  callees that keep no copy (Recipe N step 2 (b)); a callee that writes through its
+  pointer (`XDrawMatteText` moves `marker`) makes that variable a written one.
+- `(*v).m` is `v->m`; the parenthesised form keeps the text a one-for-one substitution
+  that step 8's script can check. Re-wrap a line the prefix pushes past 80 columns.
+- An initialiser of addresses of automatic variables needs C99, as Recipe I step 2's
+  `const` form already does.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved) and steps 1, 2, 4 and 7 checked by reading; or, when no case reaches
+some of the moved lines, guard: the same, plus step 8's `OK` and `tools/obj_modulo.sh`
+(`WIDE=1` for the wide-build files) printing `IDENTICAL` or `MODULO-IDENTICAL`, the
+proof Recipe I has at the unreached level.
+
+**Provenance:** 2026-11-10, from `widget.c`'s `XListBrowserWidget` (campaign A, W16 lane
+a): its list press and its Return key hold the function's last nesting of depth 4 and
+more once its other blocks have moved under E, Z and CN, and each writes two to five
+locals and leaves the `switch` by `break;` from inside a nested `if`; E step 7, O, Z, I,
+LB and BR refuse them (see *Not covered by*), and both lie partly on lines no case
+reaches. A probe of the whole chain: widget.c 1.44 to 1.59, `XListBrowserWidget`
+leaving *Brain Method* and *Deep, Nested Complexity*, no finding on either helper; with
+either step left out the function keeps both (1.48). Added by Claude Code (Claude Opus
+5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -10434,3 +10604,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | FI | Step 8, *hoisted form*: a member-by-member fill that stands far from its declaration (in a loop body or a branch, directly before its one call) becomes a `const` initialiser when every value is `(&v)` of a variable declared at the function's top (the declaration moves to the end of the function's declarations) or every value is an identifier nothing between the top of the innermost block holding the run and the run writes or passes by address (the declaration moves to that block's top); steps 1 to 3 hold for the run, step 6's `IDENTICAL` is still required. *Careful* gives the argument (C11 6.2.4p2: addresses are constant over the lifetime; C11 6.8p3: block declarations are initialised each time they are reached) | `layer.c`'s `OptimizeLayerFrames` (campaign A, W16 lane b): `targets`, `choice_targets` and `trial`, thirteen assignments refilled per frame; a probe 7.92 to 7.98, `obj_identical.sh` `IDENTICAL`, oracle 45 cases 0 diverged | owner |
 | 2026-11-10 | NEW | PL | Peel a Leaving Label Set out of a Selection as a Predicate: groups of a `switch` whose whole body is the same leaving statement `S` (`return;`) leave the `switch` for an LP-form predicate on their labels, called in `if (Name(e) != MagickFalse) S` directly before the `switch`; the kept groups and `default:` stay; `e` side-effect free and evaluated again by the `switch`; labels and comments checked by script; TB may then make the predicate a table | `morphology.c`'s `RotateKernelInfo` (campaign A, W16 lane d): thirteen of its fifteen labels only `return;` beside the Blur group and `default:` (cc 30), which LP (two groups only), SD/SR (no `return`) and ST (value-returning) refuse; one step of a chain probe 3.10 to 3.02 to 3.16, no finding on a new function | owner |
 | 2026-11-10 | NEW | RT | Roll a Run of Copies into a Helper Looping over a Table: three or more adjacent copies of one statement sequence differing in one constant argument, each leaving through the same `return(R);`, become a `static const` table of the constants and a `static MagickBooleanType` helper looping over it (each `return(R);` written `return(MagickFalse);`); the run becomes `if (Helper(...) == MagickFalse) return(R);`, `R` reading only what the copies never write; unrolling checked by script; guard `WARN` with `0` added | `morphology.c`'s `AcquireRidgesKernel` (campaign A, W16 lane d): eight thick-ridge copies, eight of its cc 14; SV/SC/W keep one `if` per copy or make a *Complex Method* helper, the loop in place is a *Bumpy Road* (3.08); one step of a chain probe 3.10 to 3.02 to 3.16, no finding on the helper | owner |
+| 2026-11-10 | NEW | CT | Extract a Case Tail Writing Through a Targets Struct: the tail of a `switch` case (after it the case runs only its closing `break;`) that leaves the `switch` through `break;` on some paths and writes two to six of the caller's locals moves to a `static void` helper; the written variables travel as addresses in one `const` targets struct declared once at the top of the caller (Recipe I's form, later blocks binding the members they write), the inputs by value or in a Recipe Y input struct, each `break;` becomes `return;`, and the call stands before the case's `break;`; `tools/case_tail_check.py` checks the targets, bindings, fill, position and rewrite, and with `obj_modulo.sh` is the proof where no case reaches the moved lines | `widget.c`'s `XListBrowserWidget` (campaign A, W16 lane a): the list press (five written locals) and the Return key (two) hold depth 4 and more after the E, Z and CN steps; E step 7 (one variable or none), O and Z (no `break`), I/V/Y/W (the caller's `if ... break;` stays nested) and LB/BR (loops) refuse them; a chain probe 1.44 to 1.59, the function leaving *Brain Method* and *Deep, Nested Complexity*, 1.48 without either step | owner |
