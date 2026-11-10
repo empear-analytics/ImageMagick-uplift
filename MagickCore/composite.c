@@ -1205,6 +1205,68 @@ static void AddChannelResiduals(const ChannelResidualInputs *inputs,
   }
 }
 
+typedef struct _RMSEResidualRow
+{
+  const Image
+    *alpha_image,
+    *beta_image;
+
+  const Quantum
+    *p,
+    *q;
+
+  size_t
+    columns;
+} RMSEResidualRow;
+
+static void AddRMSERowResidual(const RMSEResidualRow *row,double *area,
+  double *channel_residual)
+{
+  const Image
+    *const alpha_image = row->alpha_image,
+    *const beta_image = row->beta_image;
+
+  const Quantum
+    *magick_restrict p = row->p,
+    *magick_restrict q = row->q;
+
+  const size_t
+    columns = row->columns;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) columns; x++)
+  {
+    ChannelResidualInputs
+      inputs;
+
+    double
+      Da,
+      Sa;
+
+    if ((GetPixelReadMask(alpha_image,p) <= (QuantumRange/2)) ||
+        (GetPixelReadMask(beta_image,q) <= (QuantumRange/2)))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(alpha_image);
+        q+=(ptrdiff_t) GetPixelChannels(beta_image);
+        continue;
+      }
+    Sa=QuantumScale*(double) GetPixelAlpha(alpha_image,p);
+    Da=QuantumScale*(double) GetPixelAlpha(beta_image,q);
+    inputs.alpha_image=alpha_image;
+    inputs.beta_image=beta_image;
+    inputs.p=p;
+    inputs.q=q;
+    inputs.Da=Da;
+    inputs.Sa=Sa;
+    AddChannelResiduals(&inputs,channel_residual);
+    (*area)++;
+    p+=(ptrdiff_t) GetPixelChannels(alpha_image);
+    q+=(ptrdiff_t) GetPixelChannels(beta_image);
+  }
+}
+
 static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
   const Image *beta_image,double *residual,ExceptionInfo *exception)
 {
@@ -1239,8 +1301,8 @@ static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
       *magick_restrict p,
       *magick_restrict q;
 
-    ssize_t
-      x;
+    RMSEResidualRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -1252,35 +1314,12 @@ static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
         continue;
       }
     channel_residual=0.0;
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      ChannelResidualInputs
-        inputs;
-
-      double
-        Da,
-        Sa;
-
-      if ((GetPixelReadMask(alpha_image,p) <= (QuantumRange/2)) ||
-          (GetPixelReadMask(beta_image,q) <= (QuantumRange/2)))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(alpha_image);
-          q+=(ptrdiff_t) GetPixelChannels(beta_image);
-          continue;
-        }
-      Sa=QuantumScale*(double) GetPixelAlpha(alpha_image,p);
-      Da=QuantumScale*(double) GetPixelAlpha(beta_image,q);
-      inputs.alpha_image=alpha_image;
-      inputs.beta_image=beta_image;
-      inputs.p=p;
-      inputs.q=q;
-      inputs.Da=Da;
-      inputs.Sa=Sa;
-      AddChannelResiduals(&inputs,&channel_residual);
-      area++;
-      p+=(ptrdiff_t) GetPixelChannels(alpha_image);
-      q+=(ptrdiff_t) GetPixelChannels(beta_image);
-    }
+    row.alpha_image=alpha_image;
+    row.beta_image=beta_image;
+    row.p=p;
+    row.q=q;
+    row.columns=columns;
+    AddRMSERowResidual(&row,&area,&channel_residual);
   }
   beta_view=DestroyCacheView(beta_view);
   alpha_view=DestroyCacheView(alpha_view);
