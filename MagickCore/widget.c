@@ -6838,6 +6838,17 @@ MagickPrivate void XInfoWidget(Display *display,XWindows *windows,
 %    o reply: the response from the user is returned in this parameter.
 %
 */
+static unsigned int CountListBrowserEntries(const char *const *list)
+{
+  unsigned int
+    entries;
+
+  for (entries=0; ; entries++)
+    if (list[entries] == (char *) NULL)
+      break;
+  return(entries);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -6914,9 +6925,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
       XNoticeWidget(display,windows,"No text to browse:",(char *) NULL);
       return;
     }
-  for (entries=0; ; entries++)
-    if (list[entries] == (char *) NULL)
-      break;
+  entries=CountListBrowserEntries(list);
   /*
     Determine Font Browser widget attributes.
   */
