@@ -2866,6 +2866,60 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
 %    o event: Specifies a pointer to a X11 XEvent structure.
 %
 */
+typedef struct _CommandWidgetEvent
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  XEvent
+    *event;
+
+  unsigned int
+    number_selections;
+} CommandWidgetEvent;
+
+static int PressCommandSelection(const CommandWidgetEvent *command_event,int id)
+{
+  Display
+    *const display = command_event->display;
+
+  XWindows
+    *const windows = command_event->windows;
+
+  XEvent
+    *const event = command_event->event;
+
+  const unsigned int
+    number_selections = command_event->number_selections;
+
+  int
+    i;
+
+  for (i=0; i < (int) number_selections; i++)
+  {
+    if (MatteIsActive(selection_info[i],event->xbutton) == MagickFalse)
+      continue;
+    if (i >= (int) windows->command.data)
+      {
+        selection_info[i].raised=MagickFalse;
+        XDrawBeveledButton(display,&windows->command,&selection_info[i]);
+        break;
+      }
+    submenu_info=selection_info[i];
+    submenu_info.active=MagickTrue;
+    toggle_info.y=submenu_info.y+(int) (submenu_info.height >> 1)-
+      (int) (toggle_info.height >> 1);
+    id=i;
+    (void) XCheckWindowEvent(display,windows->widget.id,LeaveWindowMask,
+      event);
+    break;
+  }
+  return(id);
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -3062,25 +3116,14 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
     {
       case ButtonPress:
       {
-        for (i=0; i < (int) number_selections; i++)
-        {
-          if (MatteIsActive(selection_info[i],event->xbutton) == MagickFalse)
-            continue;
-          if (i >= (int) windows->command.data)
-            {
-              selection_info[i].raised=MagickFalse;
-              XDrawBeveledButton(display,&windows->command,&selection_info[i]);
-              break;
-            }
-          submenu_info=selection_info[i];
-          submenu_info.active=MagickTrue;
-          toggle_info.y=submenu_info.y+(int) (submenu_info.height >> 1)-
-            (int) (toggle_info.height >> 1);
-          id=i;
-          (void) XCheckWindowEvent(display,windows->widget.id,LeaveWindowMask,
-            event);
-          break;
-        }
+        CommandWidgetEvent
+          command_event;
+
+        command_event.display=display;
+        command_event.windows=windows;
+        command_event.event=event;
+        command_event.number_selections=number_selections;
+        id=PressCommandSelection(&command_event,id);
         break;
       }
       case ButtonRelease:
