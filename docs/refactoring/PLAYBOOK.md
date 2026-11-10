@@ -8654,6 +8654,164 @@ function; a seamless-blend workload 1.77 s both ways (median of 9). Added by Cla
 
 ---
 
+## Recipe TI - Merge Twin Functions into One Inlined Function
+
+**Use when:** two `static` functions of one file are the same text except for a few
+whole-expression runs, each is called from exactly one place, and they run per pixel or
+per channel, so that the copies hold *Bumpy Road Ahead*, *Complex Method* or *Excess
+Number of Function Arguments* twice (or would be *Code Duplication* once either of them
+shrank): `resize-image.c`'s `FilterHorizontalPixel` and `FilterVerticalPixel`, ten
+parameters each, whose only difference is the index of the source pixel
+(`y*(contribution[n-1].pixel-contribution[0].pixel+1)+(contribution[j].pixel-...)`
+against `(ssize_t) ((contribution[j].pixel-...)*(ssize_t) image->columns+x)`) at three
+places.
+
+**Not covered by:** Recipe MT, which merges the copies the same way but keeps each copy's
+function, with its parameter list, as a caller of the new function, and bundles only the
+selector and the values that differ, so a ten-parameter pair stays *Excess Number of
+Function Arguments* twice and the new function takes ten parameters as well; and whose
+speed argument assumes the compiler inlines the new function, which GCC does not do for a
+function of this size with two callers (measured below). Recipe CF, whose copies differ
+only in the function called. Recipe B, which bundles one function's parameters and leaves
+the twin. Recipe D, SV, SC and TW, whose copies differ in values, never in an expression
+of other operands.
+
+**How:**
+
+1. Copies. Two `static` functions of one file whose whole bodies align under Recipe MT
+   step 1 (variables renamed to one name per role; every differing run a whole
+   expression; MT step 3 on types). Check by `grep` that each is called from exactly one
+   place in the file and that neither's address is taken.
+2. Write `typedef enum { NameA, NameB } NameSide;` and a struct `Name` whose members are
+   `NameSide side` and then, in parameter order, each parameter of the copies that the
+   new function will not take (all but at most three, which stay parameters: the pointers
+   the copies write through and those they advance), under its role name and of its
+   declared type without the top-level `const`.
+3. A differing pair that stands at several positions, where the runs at the positions
+   differ only in one operand (`j-start` at one, `j` at the others), becomes one `static
+   inline` function directly above the new function: it takes `const Name *name` and
+   that operand as a parameter of the operand's type, binds as `const` locals the
+   members it reads (Recipe N step 4), and returns `((side == NameA) ? runA : runB)`
+   with both runs verbatim, the operand written as the parameter. Each position calls it
+   with its own operand. A pair at one position is written in place, as MT step 4 does.
+4. Write one `static inline` function, taking `const Name *name` and the parameters step 2
+   kept, whose body is the first copy's text (its comments included) after `const` local
+   bindings of the members it reads, with the differing runs replaced as step 3 says;
+   nothing else changed.
+5. In each copy's caller, at the top of the block that holds the call, declare `const Name
+   name = { NameX, ... };` with the copy's own constant and, in member order, the
+   arguments the call passed for those parameters, and write the call of the new
+   function with `&name` and the remaining arguments in place of the copy's call. The
+   copies leave the file: their text is now the new function's (step 8), and nothing else
+   calls them.
+6. Inlining. Build, and list the object's local symbols (`nm` on the file's object). The
+   copies were inlined into their callers, so neither appeared there; when the new
+   function or step 3's function appears, declare it `static
+   magick_attribute((__always_inline__)) inline` (a GCC and Clang attribute; the macro is
+   empty for other compilers) and check again. A function that a later step extracts
+   from the new function's body (Recipe E) is held to the same check in its own commit.
+7. Time it as Recipe CF step 7 does (alternating runs, at least nine each, both medians
+   quoted, slower by more than 3% stops the step), on a command that runs both copies'
+   paths.
+8. Check by script that folding each conditional and each call of step 3's function to
+   copy X's run, and removing the bindings, gives copy X's token sequence after the
+   renaming of step 1; check by reading that every initialiser of step 5 fills the
+   member of the parameter it was passed for.
+
+**Before:**
+
+```c
+static void FilterHorizontalPixel(const Image *image,
+  const Image *resize_image,const ContributionInfo *contribution,
+  const ssize_t n,const ssize_t start,const ssize_t stop,const double bisect,
+  const ssize_t y,const Quantum *p,Quantum *q)
+{
+  ...
+        k=y*(contribution[n-1].pixel-contribution[0].pixel+1)+
+          (contribution[j-start].pixel-contribution[0].pixel);
+  ...
+}
+...
+  for (y=0; y < (ssize_t) column->resize_image->rows; y++)
+  {
+    FilterHorizontalPixel(column->image,column->resize_image,contribution,n,
+      start,stop,bisect,y,p,q);
+    q+=(ptrdiff_t) GetPixelChannels(column->resize_image);
+  }
+```
+
+**After:**
+
+```c
+static inline ssize_t GetResizePixelOffset(const ResizePixelFilter *filter,
+  const ssize_t j)
+{
+  ...
+  return((side == HorizontalResizePixel) ?
+    position*(contribution[n-1].pixel-contribution[0].pixel+1)+
+    (contribution[j].pixel-contribution[0].pixel) :
+    (ssize_t) ((contribution[j].pixel-contribution[0].pixel)*
+    (ssize_t) image->columns+position));
+}
+
+static magick_attribute((__always_inline__)) inline void FilterResizePixel(
+  const ResizePixelFilter *filter,const Quantum *p,Quantum *q)
+{
+  ...
+        k=GetResizePixelOffset(filter,j-start);
+  ...
+}
+...
+  for (y=0; y < (ssize_t) column->resize_image->rows; y++)
+  {
+    const ResizePixelFilter
+      filter = { HorizontalResizePixel,column->image,column->resize_image,
+        contribution,n,start,stop,bisect,y };
+
+    FilterResizePixel(&filter,p,q);
+    q+=(ptrdiff_t) GetPixelChannels(column->resize_image);
+  }
+```
+
+**Careful:**
+
+- Values. Each call runs its copy's statements in its order on the same values: the
+  members hold the arguments the call passed (a `const` struct nothing writes), the
+  bindings read them back under the parameters' names, and each conditional evaluates its
+  copy's run alone (Recipe MT's argument, C11 6.5.15). Step 3's function returns that run
+  evaluated with the operand the position passed; an operand with no side effect,
+  evaluated once, as the run evaluated it once.
+- Why step 6 is not optional. The oracle compares every byte, NaN bits included.
+  Out of line, the one compiled body serves both directions and the compiler orders the
+  commutative operands of a floating-point addition or multiplication its own way; a
+  NaN input (`mogrify -define quantum:format=floating-point -depth 32` reads an 8-bit MIFF
+  as floats) then propagates another NaN's payload or sign. On `resize-image.c` the
+  out-of-line form diverged on 12 such cases, every differing word a NaN in both outputs,
+  and was 21% and 26% slower; inlined into each caller with its constant selector, each
+  direction compiles as its copy did: 0 diverged, timing within 3%. The attribute changes
+  only where code is placed, never what it computes; compilers that ignore it compute the
+  same values, at their own speed.
+- The copies' functions leave the file, but none of their text does (step 8): each was a
+  file-local function with one caller, now replaced by the call of the function holding
+  its text, so no caller, header or symbol outside the file can tell.
+- `refactor_guard.py --calls` reports the copies' calls gone; pass
+  `--renamed OldA=New --renamed OldB=New`, and expect step 3's function to appear with
+  its definition and calls. Anything else stops the step.
+
+**Evidence level:** oracle (each copy reached by a case), with `refactor_guard.py
+--calls`, steps 1 and 8 checked by script, step 6 by `nm`, and step 7's timing.
+
+**Provenance:** 2026-11-10, from `resize-image.c`'s `FilterHorizontalPixel` and
+`FilterVerticalPixel` (campaign A, W16 lane c), named in the file's plateau since W10
+("the twin pixel functions on the hot path"). Probes: the merge 8.78 to 9.10, then the
+channel loop's body as a helper (Recipe E step 7) 9.38, no finding on a new function. The
+out-of-line form diverged and was slower (above); the inlined form measured 0.77 s to
+0.75 s and 0.87 s to 0.86 s (medians of nine, `-resize` chains on a 1500x1500 image,
+opaque and with alpha). Added by Claude Code (Claude Opus 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -8966,3 +9124,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | WORDING | CF | *Provenance*: the probe timings name the command they measured (`-black-threshold` and `-white-threshold` only; `magick` lacks `-perceptible`, which only `magick convert` accepts) | Found when the commits' timing command was extended to every merged copy | after the fact |
 | 2026-11-10 | NEW | IS | Extract Block Through Pointers to the Iteration's Slots: a block of a parallel loop body over `i` that writes, besides the body's variables (and `status` by PS), only the iteration's own slot of a shared object (`x.direction[i]`, `channel_features[c].correlation[i]`, `object[i].metric[k]`) moves into a `static void` function taking the slot's address (`&x.direction[i]`, uses `x->m`) or the pointer that reaches it by value; slot pointers past four parameters in a `const` struct initialised in the body; copies identical once their slots are pointers may share one function (step 7); every access to the object in the region checked by reading to select the iteration's own `i` | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the five direction loops' finals and accumulators, which W14 lane b and W15 lane a found blocked (every legal chain below 5.25); a probe of the chain 5.25 to 5.98, no finding on a new function, features workload not slower (0.96 s to 0.92 s, median of 9). `vision.c`'s `CircularityThreshold`: 9.31 to 9.38 | owner |
 | 2026-11-10 | NEW | RA | Extract Block Accumulating a Reduction Variable Through a Pointer: a block of a parallel loop body that uses at most two variables named in the pragma's `reduction(op:v)` clauses only by applying that operator (`v+=e;`, `v++;`) moves into a `static void` function taking `T *v` (uses `(*v)`), the caller passing `&v`, which inside the region is the thread's private copy; the pragma and clauses unchanged | `composite.c`'s `BlendRMSEResidual` (campaign A, W16 lane c): its channel and column loops add to `channel_residual` and `area` (`reduction(+:...)`), the file's only Deep, Nested Complexity; W15 asked for the ruling. A probe of both steps 3.46 to 3.64 and 3.66, no finding on a new function, a seamless-blend workload 1.77 s both ways (median of 9) | owner |
+| 2026-11-10 | NEW | TI | Merge Twin Functions into One Inlined Function: two `static` functions with one caller each, the same text but for whole-expression runs, become one `static inline` function taking a `const` struct (an enumeration selector first, then the copies' read-only parameters) and the pointers they write through or advance; a differing pair repeated at several positions that differ in one operand becomes one selector function; each call declares the struct with its own constant and calls the new function, and the copies leave the file; `nm` must show the new functions inlined, else they are declared `magick_attribute((__always_inline__))`; timed | `resize-image.c`'s `FilterHorizontalPixel` and `FilterVerticalPixel` (campaign A, W16 lane c): out of line the merged function diverged on 12 oracle cases (NaN payloads only) and was 21% and 26% slower; forced inline 0 diverged, within 3%; probes 8.78 to 9.10, then 9.38 with the channel body extracted, no finding on a new function | owner |
