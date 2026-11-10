@@ -544,6 +544,45 @@ static void ReportComplexProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
+static MagickBooleanType TryCloneComplexImages(const Image *images,
+  ExceptionInfo *exception,Image **complex_images,Image **result)
+{
+  Image
+    *image;
+
+  image=CloneImage(images,0,0,MagickTrue,exception);
+  if (image == (Image *) NULL)
+    {
+      (*result)=(Image *) NULL;
+      return(MagickTrue);
+    }
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    {
+      image=DestroyImageList(image);
+      (*result)=image;
+      return(MagickTrue);
+    }
+  image->depth=32UL;
+  *complex_images=NewImageList();
+  AppendImageToList(complex_images,image);
+  image=CloneImage(images->next,0,0,MagickTrue,exception);
+  if (image == (Image *) NULL)
+    {
+      *complex_images=DestroyImageList(*complex_images);
+      (*result)=*complex_images;
+      return(MagickTrue);
+    }
+  image->depth=32UL;
+  AppendImageToList(complex_images,image);
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    {
+      *complex_images=DestroyImageList(*complex_images);
+      (*result)=*complex_images;
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -570,7 +609,7 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
     *Ci_image,
     *complex_images,
     *Cr_image,
-    *image;
+    *returned;
 
   MagickBooleanType
     status;
@@ -594,30 +633,9 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   if (CheckComplexSequence(images,exception) == MagickFalse)
     return((Image *) NULL);
-  image=CloneImage(images,0,0,MagickTrue,exception);
-  if (image == (Image *) NULL)
-    return((Image *) NULL);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    {
-      image=DestroyImageList(image);
-      return(image);
-    }
-  image->depth=32UL;
-  complex_images=NewImageList();
-  AppendImageToList(&complex_images,image);
-  image=CloneImage(images->next,0,0,MagickTrue,exception);
-  if (image == (Image *) NULL)
-    {
-      complex_images=DestroyImageList(complex_images);
-      return(complex_images);
-    }
-  image->depth=32UL;
-  AppendImageToList(&complex_images,image);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    {
-      complex_images=DestroyImageList(complex_images);
-      return(complex_images);
-    }
+  if (TryCloneComplexImages(images,exception,&complex_images,&returned) !=
+      MagickFalse)
+    return(returned);
   /*
     Apply complex mathematics to image pixels.
   */
