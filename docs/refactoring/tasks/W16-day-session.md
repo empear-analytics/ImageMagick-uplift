@@ -119,3 +119,15 @@ are caught. Twelve interactive `xevents` drag cases remain load-sensitive (displ
 press); they are listed in `cases.py` `LOAD_SENSITIVE` and settled by a rerun alone. **For the owner:** the proper fix
 moves those presses below y=30 (new case ids, `casemap-wide.json` rebuilt); mutation kills in `display.c` that rest on
 these cases may be false. The six X11/OpenCL files of campaign A can now be verified with `WIDE=1`.
+
+## Evolved recipes (owner OK, 2026-11-10): lane d, second round
+
+**Recipe I at the unreached level** (fc96f247c): I may run on a function no case reaches, `Verified: guard`, when
+`tools/targets_fill_check.py` (2aea9fd61) shows the targets struct filled and bound member by member, the removed
+lines and the helper body the same lines, and every lost exit back in the caller unchanged; `obj_modulo.sh` must print
+IDENTICAL or MODULO-IDENTICAL, now also accepting a function the shortened caller inlines when its text is unchanged
+(53792f5fb). **Recipe D when only the caller's object code differs** (4cbd6c55e): `tools/reuse_check.py` (d488fa330)
+checks the call is the only added line and the removed lines are the helper body under the call's bindings. Planted
+errors were caught by each tool. segment.c 7.14 to 9.02, transform.c 8.95 to 9.09. **For review:** both levels rest on
+object code and text checks, not on behaviour cases; no other unreached campaign A function was found that they open.
+Upstream: `GetImageDynamicThreshold` allocates `extrema[i]` with `sizeof(**histogram)` (harmless over-allocation).
