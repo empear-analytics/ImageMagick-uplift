@@ -872,6 +872,41 @@ static void ComputeVarianceFeatures(const TextureDirection *texture,
       variance->alpha;
 }
 
+static void AccumulateDifferenceVariance(const TextureDirection *texture,
+  const TextureSlots *slots,const ssize_t x)
+{
+  PixelInfo
+    *const variance = slots->variance,
+    *const sum_squares = slots->sum_squares;
+
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    *const density_xy = texture->density_xy;
+
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Difference variance.
+  */
+  AddFeatureStatistics(image,variance,
+    &density_xy[x].direction[i]);
+  sum_squares->red+=density_xy[x].direction[i].red*
+    density_xy[x].direction[i].red;
+  sum_squares->green+=density_xy[x].direction[i].green*
+    density_xy[x].direction[i].green;
+  sum_squares->blue+=density_xy[x].direction[i].blue*
+    density_xy[x].direction[i].blue;
+  if (image->colorspace == CMYKColorspace)
+    sum_squares->black+=density_xy[x].direction[i].black*
+      density_xy[x].direction[i].black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    sum_squares->alpha+=density_xy[x].direction[i].alpha*
+      density_xy[x].direction[i].alpha;
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1283,28 +1318,23 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 #endif
   for (i=0; i < 4; i++)
   {
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
+
+    const TextureSlots
+      slots = { &correlation.direction[i], &entropy_x.direction[i],
+        &entropy_xy.direction[i], &entropy_xy1.direction[i],
+        &entropy_xy2.direction[i], &entropy_y.direction[i],
+        &mean.direction[i], &sum_squares.direction[i],
+        &variance.direction[i] };
+
     ssize_t
       x;
 
     for (x=0; x < (ssize_t) number_grays; x++)
     {
-      /*
-        Difference variance.
-      */
-      AddFeatureStatistics(image,&variance.direction[i],
-        &density_xy[x].direction[i]);
-      sum_squares.direction[i].red+=density_xy[x].direction[i].red*
-        density_xy[x].direction[i].red;
-      sum_squares.direction[i].green+=density_xy[x].direction[i].green*
-        density_xy[x].direction[i].green;
-      sum_squares.direction[i].blue+=density_xy[x].direction[i].blue*
-        density_xy[x].direction[i].blue;
-      if (image->colorspace == CMYKColorspace)
-        sum_squares.direction[i].black+=density_xy[x].direction[i].black*
-          density_xy[x].direction[i].black;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        sum_squares.direction[i].alpha+=density_xy[x].direction[i].alpha*
-          density_xy[x].direction[i].alpha;
+      AccumulateDifferenceVariance(&texture,&slots,x);
       /*
         Difference entropy.
       */
