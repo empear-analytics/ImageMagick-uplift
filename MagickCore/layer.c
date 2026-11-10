@@ -1655,6 +1655,16 @@ static Image *ReleaseFrameListsAndPrevious(RectangleInfo *bounds,
   return((Image *) NULL);
 }
 
+static Image *ReleaseFrameListsAndImages(RectangleInfo *bounds,
+  DisposeType *disposals,Image *prev_image,Image *dup_image)
+{
+  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+  disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+  prev_image=DestroyImage(prev_image);
+  dup_image=DestroyImageIfSet(dup_image);
+  return((Image *) NULL);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1846,13 +1856,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
           Now compare against a simple background disposal
         */
         if (AcquireBackgroundFrame(curr,&bgnd_image,exception) == MagickFalse)
-          {
-            bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-            disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-            prev_image=DestroyImage(prev_image);
-            dup_image=DestroyImageIfSet(dup_image);
-            return((Image *) NULL);
-          }
+          return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,dup_image));
         bgnd_bounds=bounds[i-1]; /* interim bounds of the previous image */
         ClearBounds(bgnd_image,&bgnd_bounds,exception);
         try_bounds=CompareImagesBounds(bgnd_image,curr,CompareAnyLayer,exception);
