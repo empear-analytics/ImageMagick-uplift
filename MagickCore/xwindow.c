@@ -6029,6 +6029,15 @@ typedef struct _XImageRowSource
   Image
     *canvas;
 
+  CacheView
+    *canvas_view;
+
+  ExceptionInfo
+    *exception;
+
+  unsigned int
+    scanline_pad;
+
   unsigned long
     *pixels;
 
@@ -6350,6 +6359,44 @@ static unsigned char *XPackContinuousMultiByteRowLSB(
   return(q);
 }
 
+static void XPackColormapped2BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 2 bit color-mapped X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackColormapped2BitRowLSB(canvas,pixels,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -6442,6 +6489,9 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   x=0;
   canvas_view=AcquireVirtualCacheView(canvas,exception);
   row_source.canvas=canvas;
+  row_source.canvas_view=canvas_view;
+  row_source.exception=exception;
+  row_source.scanline_pad=scanline_pad;
   row_source.pixels=pixels;
   row_source.map_info=map_info;
   if (ximage->format == XYBitmap)
@@ -6502,18 +6552,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
       {
         case 2:
         {
-          /*
-            Convert to 2 bit color-mapped X canvas.
-          */
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            q=XPackColormapped2BitRowLSB(canvas,pixels,p,q);
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackColormapped2BitLSB(&row_source,q);
           break;
         }
         case 4:
