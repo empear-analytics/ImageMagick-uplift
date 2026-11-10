@@ -261,15 +261,20 @@ static MagickCLEnv getOpenCLEnvironment(ExceptionInfo* exception)
   return(clEnv);
 }
 
+static MagickBooleanType IsRGBAChannelMask(const Image *image)
+{
+  return((((image->channel_mask & RedChannel) != 0) &&
+      ((image->channel_mask & GreenChannel) != 0) &&
+      ((image->channel_mask & BlueChannel) != 0) &&
+      ((image->channel_mask & AlphaChannel) != 0)) ? MagickTrue : MagickFalse);
+}
+
 static Image *cloneImage(const Image* image,ExceptionInfo *exception)
 {
   Image
     *clone;
 
-  if (((image->channel_mask & RedChannel) != 0) &&
-      ((image->channel_mask & GreenChannel) != 0) &&
-      ((image->channel_mask & BlueChannel) != 0) &&
-      ((image->channel_mask & AlphaChannel) != 0))
+  if (IsRGBAChannelMask(image) != MagickFalse)
     clone=CloneImage(image,0,0,MagickTrue,exception);
   else
     {
