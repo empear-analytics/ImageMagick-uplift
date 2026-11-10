@@ -2328,11 +2328,11 @@ static size_t GetHaldLevel(const Image *hald_image)
   return(level);
 }
 
+#define HaldClutImageTag  "Clut/Image"
+
 MagickExport MagickBooleanType HaldClutImage(Image *image,
   const Image *hald_image,ExceptionInfo *exception)
 {
-#define HaldClutImageTag  "Clut/Image"
-
   CacheView
     *hald_view,
     *image_view;
