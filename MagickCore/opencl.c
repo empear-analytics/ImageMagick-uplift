@@ -1011,19 +1011,10 @@ static MagickBooleanType LoadOpenCLBenchmarks(MagickCLEnv clEnv)
 #endif
 }
 
-static void AutoSelectOpenCLDevices(MagickCLEnv clEnv)
+static void SelectOpenCLDeviceOption(MagickCLEnv clEnv)
 {
   char
     *option;
-
-  double
-    best_score;
-
-  MagickBooleanType
-    benchmark;
-
-  size_t
-    i;
 
   option=GetEnvironmentValue("MAGICK_OCL_DEVICE");
   if (option != (const char *) NULL)
@@ -1034,6 +1025,20 @@ static void AutoSelectOpenCLDevices(MagickCLEnv clEnv)
         SelectOpenCLDevice(clEnv,CL_DEVICE_TYPE_CPU);
       option=DestroyString(option);
     }
+}
+
+static void AutoSelectOpenCLDevices(MagickCLEnv clEnv)
+{
+  double
+    best_score;
+
+  MagickBooleanType
+    benchmark;
+
+  size_t
+    i;
+
+  SelectOpenCLDeviceOption(clEnv);
 
   if (LoadOpenCLBenchmarks(clEnv) == MagickFalse)
     return;
