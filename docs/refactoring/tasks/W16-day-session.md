@@ -368,3 +368,18 @@ be defined outside the `#if` (unused in an X build without shared memory)? May a
 `window->immutable == MagickFalse` where `XMakeImageMSBFirst` tests `!= MagickFalse`; `XAnnotateImage` reuses the parsed
 `y` offset as its row counter and re-parses afterwards, which leaves `y = rows` when the geometry has no y offset;
 `XGetResourceInfo`'s `font_name[9]`/`[10]` and `pen_colors[9]`/`[10]` repeat "font0"/"pen0".
+
+## Lane c, sweep of the 7-9 band
+
+13 files reviewed against today's recipes; feature-texture.c 7.39 to 7.53 and fourier.c 6.45 to 6.52, the rest
+unchanged (held by `#if defined` code, public signatures, file length or open owner questions). **Not merged:** a first
+version extracted the column loop of feature-texture.c's parallel grays fill, which writes the shared `grays` table
+(not the iteration's own slot) from inside the region; the lane rebuilt without it. **Owner questions:** (1) may a block
+inside a parallel loop that writes a shared table through a pointer, with the stores exactly as upstream, be extracted
+(feature-texture.c to 7.76)? (2) may CF admit whole parallel loops with an N-style input struct (feature-texture.c's
+direction loops, ceiling 8.04)? (3) may a parameter read only by an OpenMP clause be marked `magick_unused`
+(fourier.c 6.56)? (4) colorspace-convert.c `ConvertRGBToGeneric`: its cases differ only in the callee; a table of
+function pointers would put an indirect call on a per-pixel path (as composite.c's method table). **N step 8
+amendment** (ce647f64a): a struct the caller already fills for another static function's call may serve a later block
+when every variable the block reads is a member. **Upstream:** the parallel grays fill races (threads write equal values
+into shared `grays` entries); `p+=...;;` in the co-occurrence loop.
