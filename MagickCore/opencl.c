@@ -2838,6 +2838,17 @@ MagickPrivate MagickBooleanType OpenCLThrowMagickException(
 %
 */
 
+static void UpdateKernelProfileRecord(KernelProfileRecord profile_record,
+  const cl_ulong elapsed)
+{
+  if ((elapsed < profile_record->min) || (profile_record->count == 0))
+    profile_record->min=(unsigned long) elapsed;
+  if (elapsed > profile_record->max)
+    profile_record->max=(unsigned long) elapsed;
+  profile_record->total+=(unsigned long) elapsed;
+  profile_record->count+=1;
+}
+
 MagickPrivate MagickBooleanType RecordProfileData(MagickCLDevice device,
   cl_kernel kernel,cl_event event)
 {
@@ -2922,12 +2933,7 @@ MagickPrivate MagickBooleanType RecordProfileData(MagickCLDevice device,
       device->profile_records[i]=profile_record;
       device->profile_records[i+1]=(KernelProfileRecord) NULL;
     }
-  if ((elapsed < profile_record->min) || (profile_record->count == 0))
-    profile_record->min=(unsigned long) elapsed;
-  if (elapsed > profile_record->max)
-    profile_record->max=(unsigned long) elapsed;
-  profile_record->total+=(unsigned long) elapsed;
-  profile_record->count+=1;
+  UpdateKernelProfileRecord(profile_record,elapsed);
   UnlockSemaphoreInfo(device->lock);
   return(MagickTrue);
 }
