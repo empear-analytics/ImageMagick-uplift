@@ -7915,6 +7915,33 @@ static inline MagickBooleanType IsColorRecoveryDither(const Image *image,
     (number_colors < MaxColormapSize)) ? MagickTrue : MagickFalse);
 }
 
+static void SetAffinityColormap(Image *affinity_image,
+  const XStandardColormap *map_info,const size_t number_colors,Quantum *q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_colors; i++)
+  {
+    SetPixelRed(affinity_image,(Quantum) 0,q);
+    if (map_info->red_max != 0)
+      SetPixelRed(affinity_image,ScaleXToQuantum((size_t)
+        (i/(ssize_t) map_info->red_mult),map_info->red_max),q);
+    SetPixelGreen(affinity_image,(Quantum) 0,q);
+    if (map_info->green_max != 0)
+      SetPixelGreen(affinity_image,ScaleXToQuantum((size_t)
+        ((i/(ssize_t) map_info->green_mult) % (ssize_t)
+        (map_info->green_max+1)),map_info->green_max),q);
+    SetPixelBlue(affinity_image,(Quantum) 0,q);
+    if (map_info->blue_max != 0)
+      SetPixelBlue(affinity_image,ScaleXToQuantum((size_t)
+        (i % (ssize_t) map_info->green_mult),map_info->blue_max),
+        q);
+    SetPixelAlpha(affinity_image,TransparentAlpha,q);
+    q+=(ptrdiff_t) GetPixelChannels(affinity_image);
+  }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -7981,25 +8008,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
               1,exception);
             if (q != (Quantum *) NULL)
               {
-                for (i=0; i < (ssize_t) number_colors; i++)
-                {
-                  SetPixelRed(affinity_image,(Quantum) 0,q);
-                  if (map_info->red_max != 0)
-                    SetPixelRed(affinity_image,ScaleXToQuantum((size_t)
-                      (i/(ssize_t) map_info->red_mult),map_info->red_max),q);
-                  SetPixelGreen(affinity_image,(Quantum) 0,q);
-                  if (map_info->green_max != 0)
-                    SetPixelGreen(affinity_image,ScaleXToQuantum((size_t)
-                      ((i/(ssize_t) map_info->green_mult) % (ssize_t)
-                      (map_info->green_max+1)),map_info->green_max),q);
-                  SetPixelBlue(affinity_image,(Quantum) 0,q);
-                  if (map_info->blue_max != 0)
-                    SetPixelBlue(affinity_image,ScaleXToQuantum((size_t)
-                      (i % (ssize_t) map_info->green_mult),map_info->blue_max),
-                      q);
-                  SetPixelAlpha(affinity_image,TransparentAlpha,q);
-                  q+=(ptrdiff_t) GetPixelChannels(affinity_image);
-                }
+                SetAffinityColormap(affinity_image,map_info,number_colors,q);
                 (void) SyncAuthenticPixels(affinity_image,exception);
                 (void) RemapImage(resource_info->quantize_info,image,
                   affinity_image,exception);
