@@ -4230,6 +4230,33 @@ static MagickBooleanType FetchMorphologyColumn(
   return(MagickTrue);
 }
 
+static void SetMorphologyKernelOrigin(const MorphologyMethod method,
+  const KernelInfo *kernel,OffsetInfo *offset,ExceptionInfo *exception)
+{
+  switch (method)
+  {
+    case ErodeMorphology:
+    case ErodeIntensityMorphology:
+    case HitAndMissMorphology:
+    case ThinningMorphology:
+    case ThickenMorphology:
+    {
+      /*
+        Use kernel as is, not reflection required.
+      */
+      (*offset).x=kernel->x;
+      (*offset).y=kernel->y;
+      break;
+    }
+    default:
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "InvalidOption","`%s'","not a primitive morphology method");
+      break;
+    }
+  }
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4297,23 +4324,9 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
       offset.y=(ssize_t) kernel->height-kernel->y-1;
       break;
     }
-    case ErodeMorphology:
-    case ErodeIntensityMorphology:
-    case HitAndMissMorphology:
-    case ThinningMorphology:
-    case ThickenMorphology:
-    {
-      /*
-        Use kernel as is, not reflection required.
-      */
-      offset.x=kernel->x;
-      offset.y=kernel->y;
-      break;
-    }
     default:
     {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "InvalidOption","`%s'","not a primitive morphology method");
+      SetMorphologyKernelOrigin(method,kernel,&offset,exception);
       break;
     }
   }
