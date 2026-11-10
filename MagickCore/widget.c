@@ -9601,6 +9601,24 @@ static void DrawTextViewLines(const TextViewLines *view,
   }
 }
 
+static XWidgetInfo PlaceTextViewExpose(XWidgetInfo expose_info,
+  const XWidgetInfo slider_info)
+{
+  if (slider_info.y > expose_info.y)
+    {
+      expose_info.height=(unsigned int) (slider_info.y-expose_info.y);
+      expose_info.y=slider_info.y-(int) expose_info.height-(int)
+        slider_info.bevel_width-1;
+    }
+  else
+    {
+      expose_info.height=(unsigned int) (expose_info.y-slider_info.y);
+      expose_info.y=slider_info.y+(int) slider_info.height+(int)
+        slider_info.bevel_width+1;
+    }
+  return(expose_info);
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -9874,18 +9892,7 @@ MagickPrivate void XTextViewWidget(Display *display,
             /*
               Update slider.
             */
-            if (slider_info.y > expose_info.y)
-              {
-                expose_info.height=(unsigned int) (slider_info.y-expose_info.y);
-                expose_info.y=slider_info.y-(int) expose_info.height-(int)
-                  slider_info.bevel_width-1;
-              }
-            else
-              {
-                expose_info.height=(unsigned int) (expose_info.y-slider_info.y);
-                expose_info.y=slider_info.y+(int) slider_info.height+(int)
-                  slider_info.bevel_width+1;
-              }
+            expose_info=PlaceTextViewExpose(expose_info,slider_info);
             XDrawTriangleNorth(display,&windows->widget,&north_info);
             XDrawMatte(display,&windows->widget,&expose_info);
             XDrawBeveledButton(display,&windows->widget,&slider_info);
