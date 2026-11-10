@@ -2259,6 +2259,37 @@ static KernelInfo *AcquireCornersKernel(const KernelInfoType type,
   return(kernel);
 }
 
+static KernelInfo *AcquireDistanceKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  switch(type) {
+      /*
+        Distance Measuring Kernels
+      */
+      case ChebyshevKernel:
+        return(AcquireChebyshevKernel(kernel,args));
+      case ManhattanKernel:
+        return(AcquireManhattanOrEuclideanKernel(kernel,args,
+          ManhattanKernelDistance));
+      case OctagonalKernel:
+        return(AcquireOctagonalKernel(kernel,args));
+    case EuclideanKernel:
+      return(AcquireManhattanOrEuclideanKernel(kernel,args,
+        EuclideanKernelDistance));
+    default:
+      {
+        /* No-Op Kernel - Basically just a single pixel on its own */
+        kernel=ParseKernelArray("1:1");
+        if (kernel == (KernelInfo *) NULL)
+          return(kernel);
+        kernel->type = UndefinedKernel;
+        break;
+      }
+      break;
+  }
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2496,29 +2527,8 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         return(AcquireSkeletonKernel(kernel,type,args,exception));
       case ThinSEKernel:
         return(AcquireThinSEKernel(kernel,type,args));
-      /*
-        Distance Measuring Kernels
-      */
-      case ChebyshevKernel:
-        return(AcquireChebyshevKernel(kernel,args));
-      case ManhattanKernel:
-        return(AcquireManhattanOrEuclideanKernel(kernel,args,
-          ManhattanKernelDistance));
-      case OctagonalKernel:
-        return(AcquireOctagonalKernel(kernel,args));
-    case EuclideanKernel:
-      return(AcquireManhattanOrEuclideanKernel(kernel,args,
-        EuclideanKernelDistance));
     default:
-      {
-        /* No-Op Kernel - Basically just a single pixel on its own */
-        kernel=ParseKernelArray("1:1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = UndefinedKernel;
-        break;
-      }
-      break;
+      return(AcquireDistanceKernel(kernel,type,args));
   }
   return(kernel);
 }
