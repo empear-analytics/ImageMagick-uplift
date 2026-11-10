@@ -256,14 +256,22 @@ static void GetIlluminantArtifact(const Image *image,const char **artifact,
     ParseIlluminantArtifact(artifact,illuminant);
 }
 
+static MagickBooleanType SyncPseudoClassImage(Image *image,
+  ExceptionInfo *exception)
+{
+  if (SyncImage(image,exception) == MagickFalse)
+    return(MagickFalse);
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType SyncImageToDirectClass(Image *image,
   ExceptionInfo *exception)
 {
   if (image->storage_class == PseudoClass)
     {
-      if (SyncImage(image,exception) == MagickFalse)
-        return(MagickFalse);
-      if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+      if (SyncPseudoClassImage(image,exception) == MagickFalse)
         return(MagickFalse);
     }
   return(MagickTrue);
