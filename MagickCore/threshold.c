@@ -437,26 +437,36 @@ static inline void ThresholdIntensity(const Image *image,
   method(image,threshold,pixel,q);
 }
 
-static void BlackThresholdIntensity(const Image *image,
-  const PixelInfo *threshold,Quantum *magick_restrict q)
-{
-  ThresholdIntensity(image,BlackThresholdPixel,threshold,q);
-}
-
-static void BlackThresholdRow(const Image *image,const void *arguments,
+static void BlackThresholdIntensity(const Image *image,const void *arguments,
   Quantum *magick_restrict q)
 {
   const PixelInfo
     *threshold = (const PixelInfo *) arguments;
 
+  ThresholdIntensity(image,BlackThresholdPixel,threshold,q);
+}
+
+typedef void
+  (*ThresholdPixelMethod)(const Image *,const void *,Quantum *magick_restrict);
+
+static inline void ThresholdPixels(const Image *image,
+  const ThresholdPixelMethod method,const void *arguments,
+  Quantum *magick_restrict q)
+{
   ssize_t
     x;
 
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    BlackThresholdIntensity(image,threshold,q);
+    method(image,arguments,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
+}
+
+static void BlackThresholdRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  ThresholdPixels(image,BlackThresholdIntensity,arguments,q);
 }
 
 static MagickBooleanType SetDirectColorImage(Image *image,
@@ -1912,9 +1922,12 @@ static inline Quantum PerceptibleThreshold(const Quantum quantum,
   return((Quantum) (sign*epsilon));
 }
 
-static void PerceptiblePixel(const Image *image,const double epsilon,
+static void PerceptiblePixel(const Image *image,const void *arguments,
   Quantum *magick_restrict q)
 {
+  const double
+    epsilon = (*(const double *) arguments);
+
   ssize_t
     i;
 
@@ -1947,17 +1960,7 @@ static void PerceptibleColormapEntry(const Image *image,const double epsilon,
 static void PerceptibleRow(const Image *image,const void *arguments,
   Quantum *magick_restrict q)
 {
-  const double
-    epsilon = (*(const double *) arguments);
-
-  ssize_t
-    x;
-
-  for (x=0; x < (ssize_t) image->columns; x++)
-  {
-    PerceptiblePixel(image,epsilon,q);
-    q+=(ptrdiff_t) GetPixelChannels(image);
-  }
+  ThresholdPixels(image,PerceptiblePixel,arguments,q);
 }
 
 static MagickBooleanType PerceptibleImageColormap(Image *image,
@@ -2407,26 +2410,19 @@ static void WhiteThresholdPixel(const Image *image,const PixelInfo *threshold,
   }
 }
 
-static void WhiteThresholdIntensity(const Image *image,
-  const PixelInfo *threshold,Quantum *magick_restrict q)
+static void WhiteThresholdIntensity(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
 {
+  const PixelInfo
+    *threshold = (const PixelInfo *) arguments;
+
   ThresholdIntensity(image,WhiteThresholdPixel,threshold,q);
 }
 
 static void WhiteThresholdRow(const Image *image,const void *arguments,
   Quantum *magick_restrict q)
 {
-  const PixelInfo
-    *threshold = (const PixelInfo *) arguments;
-
-  ssize_t
-    x;
-
-  for (x=0; x < (ssize_t) image->columns; x++)
-  {
-    WhiteThresholdIntensity(image,threshold,q);
-    q+=(ptrdiff_t) GetPixelChannels(image);
-  }
+  ThresholdPixels(image,WhiteThresholdIntensity,arguments,q);
 }
 
 static MagickBooleanType TryWhiteThresholdImage(Image *image,
