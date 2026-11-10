@@ -3600,6 +3600,61 @@ static void ApplyMorphologyIntensity(const MorphologyKernelWalk *walk,
   }
 }
 
+static void ApplyMorphologyHitAndMiss(const MorphologyKernelWalk *walk,
+  const Quantum *magick_restrict *quantum_pixels,double *pixel)
+{
+  const MorphologyMethod
+    method = walk->method;
+
+  const Quantum
+    *magick_restrict p = walk->p;
+
+  const ssize_t
+    center = walk->center,
+    i = walk->i;
+
+  double
+    maximum = walk->maximum,
+    minimum = walk->minimum;
+
+  switch (method)
+  {
+    case HitAndMissMorphology:
+    case ThinningMorphology:
+    case ThickenMorphology:
+    {
+      /*
+         Minimum of foreground (*pixel) minus maximum of background pixels.
+
+         The kernel is not reflected for this operation, and consists
+         of both foreground and background (*pixel) neighbourhoods, 0.0 for
+         background, and 1.0 for foreground with either Nan or 0.5 values
+         for don't care.
+
+         This never produces a meaningless negative result.  Such results
+         cause Thinning/Thicken to not work correctly when used against a
+         greyscale image.
+      */
+      WalkHitAndMissKernel(walk,&minimum,&maximum);
+      minimum-=maximum;
+      if (minimum < 0.0)
+        minimum=0.0;
+      (*pixel)=minimum;
+      if (method == ThinningMorphology)
+        (*pixel)=(double) p[center+i]-minimum;
+      else
+        if (method == ThickenMorphology)
+          (*pixel)=(double) p[center+i]+minimum;
+      break;
+    }
+    default:
+    {
+      ApplyMorphologyIntensity(walk,quantum_pixels,pixel);
+      break;
+    }
+  }
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4015,37 +4070,9 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
               MaximizeChannelValue,pixel);
             break;
           }
-          case HitAndMissMorphology:
-          case ThinningMorphology:
-          case ThickenMorphology:
-          {
-            /*
-               Minimum of foreground pixel minus maximum of background pixels.
-
-               The kernel is not reflected for this operation, and consists
-               of both foreground and background pixel neighbourhoods, 0.0 for
-               background, and 1.0 for foreground with either Nan or 0.5 values
-               for don't care.
-
-               This never produces a meaningless negative result.  Such results
-               cause Thinning/Thicken to not work correctly when used against a
-               greyscale image.
-            */
-            WalkHitAndMissKernel(&walk,&minimum,&maximum);
-            minimum-=maximum;
-            if (minimum < 0.0)
-              minimum=0.0;
-            pixel=minimum;
-            if (method == ThinningMorphology)
-              pixel=(double) p[center+i]-minimum;
-            else
-              if (method == ThickenMorphology)
-                pixel=(double) p[center+i]+minimum;
-            break;
-          }
           default:
           {
-            ApplyMorphologyIntensity(&walk,&quantum_pixels,&pixel);
+            ApplyMorphologyHitAndMiss(&walk,&quantum_pixels,&pixel);
             break;
           }
         }
