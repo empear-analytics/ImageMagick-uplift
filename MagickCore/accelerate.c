@@ -1124,30 +1124,22 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
        */
     for (i=0; i < (cl_uint) image->colors; i++)
     {
-      if ((image->channel_mask & RedChannel) != 0)
-      {
-        if (black.x != white.x)
-          image->colormap[i].red=stretch_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
-      }
-      if ((image->channel_mask & GreenChannel) != 0)
-      {
-        if (black.y != white.y)
-          image->colormap[i].green=stretch_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
-      }
-      if ((image->channel_mask & BlueChannel) != 0)
-      {
-        if (black.z != white.z)
-          image->colormap[i].blue=stretch_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
-      }
-      if ((image->channel_mask & AlphaChannel) != 0)
-      {
-        if (black.w != white.w)
-          image->colormap[i].alpha=stretch_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
-      }
+      if (((image->channel_mask & RedChannel) != 0) &&
+          (black.x != white.x))
+        image->colormap[i].red=stretch_map[
+          ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
+      if (((image->channel_mask & GreenChannel) != 0) &&
+          (black.y != white.y))
+        image->colormap[i].green=stretch_map[
+          ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
+      if (((image->channel_mask & BlueChannel) != 0) &&
+          (black.z != white.z))
+        image->colormap[i].blue=stretch_map[
+          ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
+      if (((image->channel_mask & AlphaChannel) != 0) &&
+          (black.w != white.w))
+        image->colormap[i].alpha=stretch_map[
+          ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
     }
   }
 
