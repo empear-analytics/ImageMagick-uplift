@@ -6990,6 +6990,16 @@ static void RedrawListBrowserList(const ListBrowserRedraw *redraw,
   (*expose_info).y=slider_info.y;
 }
 
+static XWidgetInfo PageListBrowserSlider(XWidgetInfo slider_info,
+  const XEvent event,const unsigned int visible_entries)
+{
+  if (event.xbutton.y < slider_info.y)
+    slider_info.id-=(int) (visible_entries-1);
+  else
+    slider_info.id+=(int) (visible_entries-1);
+  return(slider_info);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7362,10 +7372,8 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             /*
               Move slider.
             */
-            if (event.xbutton.y < slider_info.y)
-              slider_info.id-=(int) (visible_entries-1);
-            else
-              slider_info.id+=(int) (visible_entries-1);
+            slider_info=PageListBrowserSlider(slider_info,event,
+              visible_entries);
             state|=RedrawListState;
             break;
           }
