@@ -192,3 +192,9 @@ acquiring the OpenCL device and queue (leak) and may call `DestroyCacheView` on 
 all four channels with `histogram[i].s[2]`; Despeckle does not check its HullPass kernels for NULL; ComputeResizeImage
 passes `(cl_int) image->rows` where other calls pass `(cl_uint)`; LocalContrast sets the `cl_int` `iRadius` with
 `sizeof(unsigned int)`.
+
+## Lane b, third pass: compare.c measured, nothing committed
+
+The long compare.c chain was scored end to end before any commit; no legal plan whose helpers carry no finding rises
+above 2.97 (see its plateau row). Upstream: FUZZ, MSE and MEPP do not `memset` `similarity` while the other Get
+functions do; comment typos ("criss-correlation", "structual").
