@@ -4635,6 +4635,26 @@ static MagickBooleanType BeginExpression (FxInfo * pfx,
   return(MagickTrue);
 }
 
+static MagickBooleanType FinishExpression (FxInfo * pfx, TernaryT ternary,
+  MagickBooleanType * needPopAll)
+{
+  if (ternary.addr_query != NULL_ADDRESS) *needPopAll = MagickTrue;
+
+  (void) ResolveTernaryAddresses (pfx, &ternary);
+
+  pfx->teDepth--;
+
+  if (!pfx->teDepth && *needPopAll) {
+    (void) AddAddressingElement (pfx, rZerStk, NULL_ADDRESS);
+    *needPopAll = MagickFalse;
+  }
+
+  if (pfx->exception->severity >= ErrorException)
+    return MagickFalse;
+
+  return MagickTrue;
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -4687,21 +4707,7 @@ static MagickBooleanType TranslateExpression (
   if (FlushOperatorStack (pfx, Assign, Update, UserSymNdx0) == MagickFalse)
     return MagickFalse;
 
-  if (ternary.addr_query != NULL_ADDRESS) *needPopAll = MagickTrue;
-
-  (void) ResolveTernaryAddresses (pfx, &ternary);
-
-  pfx->teDepth--;
-
-  if (!pfx->teDepth && *needPopAll) {
-    (void) AddAddressingElement (pfx, rZerStk, NULL_ADDRESS);
-    *needPopAll = MagickFalse;
-  }
-
-  if (pfx->exception->severity >= ErrorException)
-    return MagickFalse;
-
-  return MagickTrue;
+  return(FinishExpression (pfx, ternary, needPopAll));
 }
 
 
