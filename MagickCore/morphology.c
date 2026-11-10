@@ -4417,6 +4417,95 @@ static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
   return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
 }
 
+static ssize_t ConvolveMorphologyColumns(const MorphologyPrimitiveSetup *setup)
+{
+  const Image
+    *image = setup->image;
+
+  Image
+    *morphology_image = setup->morphology_image;
+
+  CacheView
+    *image_view = setup->image_view,
+    *morphology_view = setup->morphology_view;
+
+  MagickBooleanType
+    status = setup->status;
+
+  MagickOffsetType
+    progress = setup->progress;
+
+  size_t
+    changed = setup->changed,
+    *changes = setup->changes;
+
+  ssize_t
+    j,
+    x;
+
+  /*
+    Special handling (for speed) of vertical (blur) kernels.  This performs
+    its handling in columns rather than in rows.  This is only done
+    for convolve as it is the only method that generates very large 1-D
+    vertical kernels (such as a 'BlurKernel')
+ */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,morphology_image,image->columns,1)
+#endif
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    const Quantum
+      *magick_restrict p;
+
+    Quantum
+      *magick_restrict q;
+
+    ssize_t
+      center;
+
+    MorphologyColumn
+      column;
+
+    const MorphologyColumnFetch
+      fetch = { image, morphology_image, setup->kernel, image_view,
+        morphology_view, setup->offset, setup->exception, x };
+
+    if (FetchMorphologyColumn(&fetch,&p,&q,&status) == MagickFalse)
+      continue;
+    center=(ssize_t) GetPixelChannels(image)*setup->offset.y;
+    column.image=image;
+    column.morphology_image=morphology_image;
+    column.kernel=setup->kernel;
+    column.bias=setup->bias;
+    column.changes=changes;
+    column.center=center;
+    column.id=id;
+    ConvolveMorphologyColumnPixels(&column,p,q);
+    if (SyncCacheViewAuthenticPixels(morphology_view,setup->exception) ==
+        MagickFalse)
+      status=MagickFalse;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ReportMorphologyProgress(image,progress,image->columns,&status);
+      }
+  }
+  morphology_image->type=image->type;
+  morphology_view=DestroyCacheView(morphology_view);
+  image_view=DestroyCacheView(image_view);
+  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    changed+=changes[j];
+  changes=(size_t *) RelinquishMagickMemory(changes);
+  return(status ? (ssize_t) (changed/GetImageChannels(image)) : 0);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4445,9 +4534,6 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   OffsetInfo
     offset;
 
-  ssize_t
-    j;
-
   size_t
     changed,
     *changes,
@@ -4475,72 +4561,6 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   SetMorphologyKernelOffset(method,kernel,&offset,exception);
   changed=0;
   changes=AcquireMorphologyChanges();
-  if ((method == ConvolveMorphology) && (kernel->width == 1))
-    {
-      ssize_t
-        x;
-
-      /*
-        Special handling (for speed) of vertical (blur) kernels.  This performs
-        its handling in columns rather than in rows.  This is only done
-        for convolve as it is the only method that generates very large 1-D
-        vertical kernels (such as a 'BlurKernel')
-     */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(progress,status) \
-        magick_number_threads(image,morphology_image,image->columns,1)
-#endif
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        const int
-          id = GetOpenMPThreadId();
-
-        const Quantum
-          *magick_restrict p;
-
-        Quantum
-          *magick_restrict q;
-
-        ssize_t
-          center;
-
-        MorphologyColumn
-          column;
-
-        const MorphologyColumnFetch
-          fetch = { image, morphology_image, kernel, image_view,
-            morphology_view, offset, exception, x };
-
-        if (FetchMorphologyColumn(&fetch,&p,&q,&status) == MagickFalse)
-          continue;
-        center=(ssize_t) GetPixelChannels(image)*offset.y;
-        column.image=image;
-        column.morphology_image=morphology_image;
-        column.kernel=kernel;
-        column.bias=bias;
-        column.changes=changes;
-        column.center=center;
-        column.id=id;
-        ConvolveMorphologyColumnPixels(&column,p,q);
-        if (SyncCacheViewAuthenticPixels(morphology_view,exception) == MagickFalse)
-          status=MagickFalse;
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp atomic
-#endif
-            progress++;
-            ReportMorphologyProgress(image,progress,image->columns,&status);
-          }
-      }
-      morphology_image->type=image->type;
-      morphology_view=DestroyCacheView(morphology_view);
-      image_view=DestroyCacheView(image_view);
-      for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
-        changed+=changes[j];
-      changes=(size_t *) RelinquishMagickMemory(changes);
-      return(status ? (ssize_t) (changed/GetImageChannels(image)) : 0);
-    }
   setup.method=method;
   setup.image=image;
   setup.morphology_image=morphology_image;
@@ -4555,6 +4575,8 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   setup.changes=changes;
   setup.width=width;
   setup.exception=exception;
+  if ((method == ConvolveMorphology) && (kernel->width == 1))
+    return(ConvolveMorphologyColumns(&setup));
   return(MorphologyRows(&setup));
 }
 
