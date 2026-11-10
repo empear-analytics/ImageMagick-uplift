@@ -8929,14 +8929,25 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
 %    o span: Specifies the span relative to completing a task.
 %
 */
+static void XRefreshExposedWindows(Display *display,XWindows *windows)
+{
+  XEvent
+    event;
+
+  while (XCheckTypedWindowEvent(display,windows->command.id,Expose,&event))
+    (void) XCommandWidget(display,windows,(const char *const *) NULL,&event);
+  while (XCheckTypedWindowEvent(display,windows->image.id,Expose,&event))
+    XRefreshWindow(display,&windows->image,&event);
+  while (XCheckTypedWindowEvent(display,windows->info.id,Expose,&event))
+    if (monitor_info.text != (char *) NULL)
+      XInfoWidget(display,windows,monitor_info.text);
+}
+
 MagickPrivate void XProgressMonitorWidget(Display *display,XWindows *windows,
   const char *task,const MagickOffsetType offset,const MagickSizeType span)
 {
   unsigned int
     width;
-
-  XEvent
-    event;
 
   assert(display != (Display *) NULL);
   assert(windows != (XWindows *) NULL);
@@ -8948,13 +8959,7 @@ MagickPrivate void XProgressMonitorWidget(Display *display,XWindows *windows,
   /*
     Update image windows if there is a pending expose event.
   */
-  while (XCheckTypedWindowEvent(display,windows->command.id,Expose,&event))
-    (void) XCommandWidget(display,windows,(const char *const *) NULL,&event);
-  while (XCheckTypedWindowEvent(display,windows->image.id,Expose,&event))
-    XRefreshWindow(display,&windows->image,&event);
-  while (XCheckTypedWindowEvent(display,windows->info.id,Expose,&event))
-    if (monitor_info.text != (char *) NULL)
-      XInfoWidget(display,windows,monitor_info.text);
+  XRefreshExposedWindows(display,windows);
   /*
     Draw progress monitor bar to represent percent completion of a task.
   */
