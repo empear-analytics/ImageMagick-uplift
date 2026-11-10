@@ -1112,46 +1112,47 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
 */
 #define ExcerptImageTag  "Excerpt/Image"
 
-MagickExport Image *ExcerptImage(const Image *image,
-  const RectangleInfo *geometry,ExceptionInfo *exception)
+typedef struct _ExcerptRows
 {
-  CacheView
-    *excerpt_view,
-    *image_view;
+  const Image
+    *image;
 
   Image
     *excerpt_image;
 
-  MagickBooleanType
-    status;
+  CacheView
+    *image_view,
+    *excerpt_view;
 
-  MagickOffsetType
-    progress;
+  const RectangleInfo
+    *geometry;
+
+  ExceptionInfo
+    *exception;
+} ExcerptRows;
+
+static MagickBooleanType ExcerptImageRows(const ExcerptRows *rows,
+  MagickBooleanType status,MagickOffsetType progress)
+{
+  const Image
+    *const image = rows->image;
+
+  Image
+    *const excerpt_image = rows->excerpt_image;
+
+  CacheView
+    *const image_view = rows->image_view,
+    *const excerpt_view = rows->excerpt_view;
+
+  const RectangleInfo
+    *const geometry = rows->geometry;
+
+  ExceptionInfo
+    *const exception = rows->exception;
 
   ssize_t
     y;
 
-  /*
-    Allocate excerpt image.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(geometry != (const RectangleInfo *) NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  excerpt_image=CloneImage(image,geometry->width,geometry->height,MagickTrue,
-    exception);
-  if (excerpt_image == (Image *) NULL)
-    return((Image *) NULL);
-  /*
-    Excerpt each row.
-  */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  excerpt_view=AcquireAuthenticCacheView(excerpt_image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(progress,status) \
     magick_number_threads(image,excerpt_image,excerpt_image->rows,2)
@@ -1187,6 +1188,56 @@ MagickExport Image *ExcerptImage(const Image *image,
         SetTransformProgress(image,ExcerptImageTag,progress,&status);
       }
   }
+  return(status);
+}
+
+MagickExport Image *ExcerptImage(const Image *image,
+  const RectangleInfo *geometry,ExceptionInfo *exception)
+{
+  CacheView
+    *excerpt_view,
+    *image_view;
+
+  Image
+    *excerpt_image;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ExcerptRows
+    rows;
+
+  /*
+    Allocate excerpt image.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(geometry != (const RectangleInfo *) NULL);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  excerpt_image=CloneImage(image,geometry->width,geometry->height,MagickTrue,
+    exception);
+  if (excerpt_image == (Image *) NULL)
+    return((Image *) NULL);
+  /*
+    Excerpt each row.
+  */
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  excerpt_view=AcquireAuthenticCacheView(excerpt_image,exception);
+  rows.image=image;
+  rows.excerpt_image=excerpt_image;
+  rows.image_view=image_view;
+  rows.excerpt_view=excerpt_view;
+  rows.geometry=geometry;
+  rows.exception=exception;
+  status=ExcerptImageRows(&rows,status,progress);
   excerpt_view=DestroyCacheView(excerpt_view);
   return(FinishChopImage(image,excerpt_image,image_view,status));
 }
