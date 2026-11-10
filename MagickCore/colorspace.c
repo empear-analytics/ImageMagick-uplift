@@ -1751,18 +1751,22 @@ static MagickBooleanType SyncLogImageToDirectClass(Image *image,
   return(MagickTrue);
 }
 
+static PixelInfo ScaleYCCPixel(const float *YCCMap,PixelInfo pixel)
+{
+  pixel.red=(double) QuantumRange*(double) YCCMap[RoundToYCC(
+    MaximumLogarithmicColorspace*pixel.red/(double) MaxMap)];
+  pixel.green=(double) QuantumRange*(double) YCCMap[RoundToYCC(
+    MaximumLogarithmicColorspace*pixel.green/(double) MaxMap)];
+  pixel.blue=(double) QuantumRange*(double) YCCMap[RoundToYCC(
+    MaximumLogarithmicColorspace*pixel.blue/(double) MaxMap)];
+  return(pixel);
+}
+
 static PixelInfo ScaleTransformedPixel(const Image *image,
   const float *YCCMap,PixelInfo pixel)
 {
   if (image->colorspace == YCCColorspace)
-    {
-      pixel.red=(double) QuantumRange*(double) YCCMap[RoundToYCC(
-        MaximumLogarithmicColorspace*pixel.red/(double) MaxMap)];
-      pixel.green=(double) QuantumRange*(double) YCCMap[RoundToYCC(
-        MaximumLogarithmicColorspace*pixel.green/(double) MaxMap)];
-      pixel.blue=(double) QuantumRange*(double) YCCMap[RoundToYCC(
-        MaximumLogarithmicColorspace*pixel.blue/(double) MaxMap)];
-    }
+    pixel=ScaleYCCPixel(YCCMap,pixel);
   else
     {
       pixel.red=(MagickRealType) ScaleMapToQuantum(pixel.red);
