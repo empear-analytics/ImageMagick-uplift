@@ -826,6 +826,52 @@ static void AccumulateCorrelationEntropies(const TextureDirection *texture,
       density_x[x].direction[i].alpha*density_y[y].direction[i].alpha));
 }
 
+static void ComputeVarianceFeatures(const TextureDirection *texture,
+  const TextureSlots *slots)
+{
+  const PixelInfo
+    *const variance = slots->variance;
+
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  const unsigned int
+    number_grays = texture->number_grays;
+
+  const ssize_t
+    i = texture->i;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) number_grays; y++)
+  {
+    ssize_t
+      x;
+
+    for (x=0; x < (ssize_t) number_grays; x++)
+    {
+      AccumulateVarianceAndDifference(texture,slots,x,y);
+      AccumulateCorrelationEntropies(texture,slots,x,y);
+    }
+  }
+  channel_features[RedPixelChannel].variance_sum_of_squares[i]=
+    variance->red;
+  channel_features[GreenPixelChannel].variance_sum_of_squares[i]=
+    variance->green;
+  channel_features[BluePixelChannel].variance_sum_of_squares[i]=
+    variance->blue;
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].variance_sum_of_squares[i]=
+      variance->black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].variance_sum_of_squares[i]=
+      variance->alpha;
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1224,32 +1270,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         &mean.direction[i], &sum_squares.direction[i],
         &variance.direction[i] };
 
-    ssize_t
-      y;
-
-    for (y=0; y < (ssize_t) number_grays; y++)
-    {
-      ssize_t
-        x;
-
-      for (x=0; x < (ssize_t) number_grays; x++)
-      {
-        AccumulateVarianceAndDifference(&texture,&slots,x,y);
-        AccumulateCorrelationEntropies(&texture,&slots,x,y);
-      }
-    }
-    channel_features[RedPixelChannel].variance_sum_of_squares[i]=
-      variance.direction[i].red;
-    channel_features[GreenPixelChannel].variance_sum_of_squares[i]=
-      variance.direction[i].green;
-    channel_features[BluePixelChannel].variance_sum_of_squares[i]=
-      variance.direction[i].blue;
-    if (image->colorspace == CMYKColorspace)
-      channel_features[BlackPixelChannel].variance_sum_of_squares[i]=
-        variance.direction[i].black;
-    if (image->alpha_trait != UndefinedPixelTrait)
-      channel_features[AlphaPixelChannel].variance_sum_of_squares[i]=
-        variance.direction[i].alpha;
+    ComputeVarianceFeatures(&texture,&slots);
   }
   /*
     Compute more texture features.
