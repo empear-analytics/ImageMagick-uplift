@@ -131,3 +131,12 @@ checks the call is the only added line and the removed lines are the helper body
 errors were caught by each tool. segment.c 7.14 to 9.02, transform.c 8.95 to 9.09. **For review:** both levels rest on
 object code and text checks, not on behaviour cases; no other unreached campaign A function was found that they open.
 Upstream: `GetImageDynamicThreshold` allocates `extrema[i]` with `sizeof(**histogram)` (harmless over-allocation).
+
+## Lane b, second round: Recipe CF amended
+
+**CF amendment** (f30299bcb): a copy may call functions in two roles (a conversion and its inverse), callees may be
+declared in an included header, and a merged function with five or more parameters takes a `const` struct holding the
+methods and enough read variables. `objdump` shows the calls stay direct once the function is inlined. enhance.c 7.72
+to 9.09 (one rule 2 flat step, `2a44f3ea7`, inside the measured plan). compare.c stays 2.97 (see its plateau row).
+Upstream: `GetMEPPSimilarity` reads the shared `maximum_error` outside its critical section while other threads write
+it inside (a data race); `SIMFilterImageNaNs` carries `SIMSquareImage`'s comment; `GetSSIMSimularity` is misspelt.
