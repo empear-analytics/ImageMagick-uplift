@@ -3152,7 +3152,7 @@ static MagickBooleanType TryAccumulate(const double term,
   return(MagickTrue);
 }
 
-static void GetXMPNumeratorAndDenominator(double value,
+static void GetXMPContinuedFraction(double value,
   unsigned long *numerator,unsigned long *denominator)
 {
   double
@@ -3169,22 +3169,6 @@ static void GetXMPNumeratorAndDenominator(double value,
   ssize_t
     i;
 
-  *numerator=0;
-  *denominator=1;
-  if (value <= MagickEpsilon)
-    return;
-  if (value > (double) MAGICK_ULONG_MAX)
-    {
-      *numerator=MAGICK_ULONG_MAX;
-      *denominator=1;
-      return;
-    }
-  if (floor(value) == value)
-    {
-      *numerator=(unsigned long) value;
-      *denominator=1;
-      return;
-    }
   num=1;
   prev_num=0;
   den=0;
@@ -3216,6 +3200,28 @@ static void GetXMPNumeratorAndDenominator(double value,
   }
   *numerator=num;
   *denominator=(den == 0 ? 1 : den);
+}
+
+static void GetXMPNumeratorAndDenominator(double value,
+  unsigned long *numerator,unsigned long *denominator)
+{
+  *numerator=0;
+  *denominator=1;
+  if (value <= MagickEpsilon)
+    return;
+  if (value > (double) MAGICK_ULONG_MAX)
+    {
+      *numerator=MAGICK_ULONG_MAX;
+      *denominator=1;
+      return;
+    }
+  if (floor(value) == value)
+    {
+      *numerator=(unsigned long) value;
+      *denominator=1;
+      return;
+    }
+  GetXMPContinuedFraction(value,numerator,denominator);
 }
 
 static void SyncXMPProfile(const Image *image,StringInfo *profile)

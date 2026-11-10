@@ -8224,6 +8224,204 @@ static void GetStrokeSlope(const double dx,const double dy,double *slope,
       }
 }
 
+typedef struct _StrokeBoxes
+{
+  PointInfo
+    *box_p,
+    *box_q;
+} StrokeBoxes;
+
+static ssize_t TraceMiterPointP(const StrokeBoxes *boxes,PointInfo *stroke_p,
+  ssize_t p,const double miterlimit)
+{
+  PointInfo
+    *const box_p = boxes->box_p,
+    *const box_q = boxes->box_q;
+
+  double
+    dot_product;
+
+          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+          if (dot_product <= miterlimit)
+            stroke_p[p++]=box_p[4];
+          else
+            {
+              stroke_p[p++]=box_p[1];
+              stroke_p[p++]=box_p[2];
+            }
+  return(p);
+}
+
+static ssize_t TraceMiterPointQ(const StrokeBoxes *boxes,PointInfo *stroke_q,
+  ssize_t q,const double miterlimit)
+{
+  PointInfo
+    *const box_p = boxes->box_p,
+    *const box_q = boxes->box_q;
+
+  double
+    dot_product;
+
+          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+          if (dot_product <= miterlimit)
+            stroke_q[q++]=box_q[4];
+          else
+            {
+              stroke_q[q++]=box_q[1];
+              stroke_q[q++]=box_q[2];
+            }
+  return(q);
+}
+
+typedef struct _StrokeTargets
+{
+  PointInfo
+    **stroke_p,
+    **stroke_q;
+
+  ssize_t
+    *p,
+    *q;
+} StrokeTargets;
+
+static void TraceMiterPoints(const StrokeBoxes *boxes,const double miterlimit,
+  const StrokeTargets *targets)
+{
+  PointInfo
+    *const box_p = boxes->box_p,
+    *const box_q = boxes->box_q,
+    **const stroke_p = targets->stroke_p,
+    **const stroke_q = targets->stroke_q;
+
+  double
+    dot_product;
+
+  ssize_t
+    *const p = targets->p,
+    *const q = targets->q;
+
+          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+          if (dot_product <= miterlimit)
+            {
+              (*stroke_q)[(*q)++]=box_q[4];
+              (*stroke_p)[(*p)++]=box_p[4];
+            }
+          else
+            {
+              (*stroke_q)[(*q)++]=box_q[1];
+              (*stroke_q)[(*q)++]=box_q[2];
+              (*stroke_p)[(*p)++]=box_p[1];
+              (*stroke_p)[(*p)++]=box_p[2];
+            }
+}
+
+typedef struct _StrokeSegment
+{
+  double
+    p,
+    q;
+} StrokeSegment;
+
+static void WrapThetaQ(StrokeSegment *theta)
+{
+  if ((*theta).q < (*theta).p)
+    (*theta).q+=2.0*MagickPI;
+}
+
+static void WrapThetaP(StrokeSegment *theta)
+{
+  if ((*theta).p < (*theta).q)
+    (*theta).p+=2.0*MagickPI;
+}
+
+typedef struct _StrokeArc
+{
+  PointInfo
+    center;
+
+  StrokeSegment
+    theta;
+
+  double
+    mid;
+
+  size_t
+    arc_segments;
+} StrokeArc;
+
+static void TraceArcPointsQ(const StrokeArc *arc,const StrokeTargets *targets)
+{
+  const PointInfo
+    center = arc->center;
+
+  const StrokeSegment
+    theta = arc->theta;
+
+  const double
+    mid = arc->mid;
+
+  const size_t
+    arc_segments = arc->arc_segments;
+
+  double
+    delta_theta;
+
+  PointInfo
+    **const stroke_q = targets->stroke_q;
+
+  ssize_t
+    j,
+    *const q = targets->q;
+
+  for (j=1; j < (ssize_t) arc_segments; j++)
+  {
+    delta_theta=(double) (j*(theta.q-theta.p)/arc_segments);
+    (*stroke_q)[*q].x=(double) (center.x+mid*cos(fmod((double)
+      (theta.p+delta_theta),DegreesToRadians(360.0))));
+    (*stroke_q)[*q].y=(double) (center.y+mid*sin(fmod((double)
+      (theta.p+delta_theta),DegreesToRadians(360.0))));
+    (*q)++;
+  }
+}
+
+static void TraceArcPointsP(const StrokeArc *arc,const StrokeTargets *targets)
+{
+  const PointInfo
+    center = arc->center;
+
+  const StrokeSegment
+    theta = arc->theta;
+
+  const double
+    mid = arc->mid;
+
+  const size_t
+    arc_segments = arc->arc_segments;
+
+  double
+    delta_theta;
+
+  PointInfo
+    **const stroke_p = targets->stroke_p;
+
+  ssize_t
+    j,
+    *const p = targets->p;
+
+  for (j=1; j < (ssize_t) arc_segments; j++)
+  {
+    delta_theta=(double) (j*(theta.q-theta.p)/arc_segments);
+    (*stroke_p)[*p].x=(double) (center.x+mid*cos(fmod((double)
+      (theta.p+delta_theta),DegreesToRadians(360.0))));
+    (*stroke_p)[*p].y=(double) (center.y+mid*sin(fmod((double)
+      (theta.p+delta_theta),DegreesToRadians(360.0))));
+    (*p)++;
+  }
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -8272,15 +8470,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     } \
 }
 
-  typedef struct _StrokeSegment
-  {
-    double
-      p,
-      q;
-  } StrokeSegment;
-
   double
-    delta_theta,
     dot_product,
     mid,
     miterlimit;
@@ -8296,6 +8486,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     *stroke_p,
     *stroke_q;
 
+  const StrokeBoxes
+    boxes = { box_p, box_q };
+
   PrimitiveInfo
     *polygon_primitive,
     *stroke_polygon;
@@ -8310,7 +8503,6 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     number_vertices;
 
   ssize_t
-    j,
     n,
     p,
     q;
@@ -8321,6 +8513,12 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     inverse_slope = {0.0, 0.0},
     slope = {0.0, 0.0},
     theta = {0.0, 0.0};
+
+  const StrokeTargets
+    targets = { &stroke_p, &stroke_q, &p, &q };
+
+  StrokeArc
+    arc;
 
   /*
     Allocate paths.
@@ -8491,51 +8689,21 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         {
           stroke_q[q++]=box_q[1];
           stroke_q[q++]=box_q[2];
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            stroke_p[p++]=box_p[4];
-          else
-            {
-              stroke_p[p++]=box_p[1];
-              stroke_p[p++]=box_p[2];
-            }
+          p=TraceMiterPointP(&boxes,stroke_p,p,miterlimit);
           break;
         }
         case MiterJoin:
         {
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            {
-              stroke_q[q++]=box_q[4];
-              stroke_p[p++]=box_p[4];
-            }
-          else
-            {
-              stroke_q[q++]=box_q[1];
-              stroke_q[q++]=box_q[2];
-              stroke_p[p++]=box_p[1];
-              stroke_p[p++]=box_p[2];
-            }
+          TraceMiterPoints(&boxes,miterlimit,&targets);
           break;
         }
         case RoundJoin:
         {
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            stroke_p[p++]=box_p[4];
-          else
-            {
-              stroke_p[p++]=box_p[1];
-              stroke_p[p++]=box_p[2];
-            }
+          p=TraceMiterPointP(&boxes,stroke_p,p,miterlimit);
           center=polygon_primitive[n].point;
           theta.p=atan2(box_q[1].y-center.y,box_q[1].x-center.x);
           theta.q=atan2(box_q[2].y-center.y,box_q[2].x-center.x);
-          if (theta.q < theta.p)
-            theta.q+=2.0*MagickPI;
+          WrapThetaQ(&theta);
           arc_segments=(size_t) CastDoubleToSsizeT(ceil((double) ((theta.q-
             theta.p)/(2.0*sqrt(MagickSafeReciprocal(mid))))));
           DisableMSCWarning(4127)
@@ -8544,15 +8712,11 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
           stroke_q[q].x=box_q[1].x;
           stroke_q[q].y=box_q[1].y;
           q++;
-          for (j=1; j < (ssize_t) arc_segments; j++)
-          {
-            delta_theta=(double) (j*(theta.q-theta.p)/arc_segments);
-            stroke_q[q].x=(double) (center.x+mid*cos(fmod((double)
-              (theta.p+delta_theta),DegreesToRadians(360.0))));
-            stroke_q[q].y=(double) (center.y+mid*sin(fmod((double)
-              (theta.p+delta_theta),DegreesToRadians(360.0))));
-            q++;
-          }
+          arc.center=center;
+          arc.theta=theta;
+          arc.mid=mid;
+          arc.arc_segments=arc_segments;
+          TraceArcPointsQ(&arc,&targets);
           stroke_q[q++]=box_q[2];
           break;
         }
@@ -8566,66 +8730,32 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         {
           stroke_p[p++]=box_p[1];
           stroke_p[p++]=box_p[2];
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            stroke_q[q++]=box_q[4];
-          else
-            {
-              stroke_q[q++]=box_q[1];
-              stroke_q[q++]=box_q[2];
-            }
+          q=TraceMiterPointQ(&boxes,stroke_q,q,miterlimit);
           break;
         }
         case MiterJoin:
         {
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            {
-              stroke_q[q++]=box_q[4];
-              stroke_p[p++]=box_p[4];
-            }
-          else
-            {
-              stroke_q[q++]=box_q[1];
-              stroke_q[q++]=box_q[2];
-              stroke_p[p++]=box_p[1];
-              stroke_p[p++]=box_p[2];
-            }
+          TraceMiterPoints(&boxes,miterlimit,&targets);
           break;
         }
         case RoundJoin:
         {
-          dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
-            (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
-          if (dot_product <= miterlimit)
-            stroke_q[q++]=box_q[4];
-          else
-            {
-              stroke_q[q++]=box_q[1];
-              stroke_q[q++]=box_q[2];
-            }
+          q=TraceMiterPointQ(&boxes,stroke_q,q,miterlimit);
           center=polygon_primitive[n].point;
           theta.p=atan2(box_p[1].y-center.y,box_p[1].x-center.x);
           theta.q=atan2(box_p[2].y-center.y,box_p[2].x-center.x);
-          if (theta.p < theta.q)
-            theta.p+=2.0*MagickPI;
+          WrapThetaP(&theta);
           arc_segments=(size_t) CastDoubleToSsizeT(ceil((double) ((theta.p-
             theta.q)/(2.0*sqrt((double) (MagickSafeReciprocal(mid)))))));
           DisableMSCWarning(4127)
           CheckPathExtent(arc_segments+MaxStrokePad,MaxStrokePad);
           RestoreMSCWarning
           stroke_p[p++]=box_p[1];
-          for (j=1; j < (ssize_t) arc_segments; j++)
-          {
-            delta_theta=(double) (j*(theta.q-theta.p)/arc_segments);
-            stroke_p[p].x=(double) (center.x+mid*cos(fmod((double)
-              (theta.p+delta_theta),DegreesToRadians(360.0))));
-            stroke_p[p].y=(double) (center.y+mid*sin(fmod((double)
-              (theta.p+delta_theta),DegreesToRadians(360.0))));
-            p++;
-          }
+          arc.center=center;
+          arc.theta=theta;
+          arc.mid=mid;
+          arc.arc_segments=arc_segments;
+          TraceArcPointsP(&arc,&targets);
           stroke_p[p++]=box_p[2];
           break;
         }

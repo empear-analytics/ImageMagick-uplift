@@ -478,6 +478,102 @@ static void AddAppendExtent(const Image *next,const MagickBooleanType stack,
     *height=next->rows;
 }
 
+typedef struct _AppendRow
+{
+  const Image
+    *next;
+
+  Image
+    *append_image;
+
+  CacheView
+    *append_view,
+    *image_view;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+} AppendRow;
+
+static void AppendImageRow(const AppendRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Image
+    *next = row->next;
+
+  Image
+    *append_image = row->append_image;
+
+  CacheView
+    *append_view = row->append_view,
+    *image_view = row->image_view;
+
+  const ssize_t
+    x_offset = row->x_offset,
+    y_offset = row->y_offset;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  MagickBooleanType
+    sync;
+
+  PixelInfo
+    pixel;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,next->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(append_view,x_offset,y+y_offset,
+    next->columns,1,exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  GetPixelInfo(next,&pixel);
+  for (x=0; x < (ssize_t) next->columns; x++)
+  {
+    GetPixelInfoPixel(next,p,&pixel);
+    SetPixelViaPixelInfo(append_image,&pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(next);
+    q+=(ptrdiff_t) GetPixelChannels(append_image);
+  }
+  sync=SyncCacheViewAuthenticPixels(append_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static void AccumulateAppendDepth(const Image *next,const Image *images,
+  size_t *depth,ImageType *image_type)
+{
+  if (next->depth > (*depth))
+    (*depth)=next->depth;
+  if (next->type != images->type)
+    (*image_type)=UndefinedType;
+}
+
+static void AccumulateAppendTraits(const Image *next,const Image *images,
+  MagickBooleanType *homogeneous_colorspace,PixelTrait *alpha_trait)
+{
+  if (next->colorspace != images->colorspace)
+    (*homogeneous_colorspace)=MagickFalse;
+  if (next->alpha_trait != UndefinedPixelTrait)
+    (*alpha_trait)=BlendPixelTrait;
+}
+
 MagickExport Image *AppendImages(const Image *images,
   const MagickBooleanType stack,ExceptionInfo *exception)
 {
@@ -538,14 +634,8 @@ MagickExport Image *AppendImages(const Image *images,
   next=GetNextImageInList(images);
   for ( ; next != (Image *) NULL; next=GetNextImageInList(next))
   {
-    if (next->depth > depth)
-      depth=next->depth;
-    if (next->type != images->type)
-      image_type=UndefinedType;
-    if (next->colorspace != images->colorspace)
-      homogeneous_colorspace=MagickFalse;
-    if (next->alpha_trait != UndefinedPixelTrait)
-      alpha_trait=BlendPixelTrait;
+    AccumulateAppendDepth(next,images,&depth,&image_type);
+    AccumulateAppendTraits(next,images,&homogeneous_colorspace,&alpha_trait);
     number_images++;
     AddAppendExtent(next,stack,&width,&height);
   }
@@ -588,42 +678,10 @@ MagickExport Image *AppendImages(const Image *images,
 #endif
     for (y=0; y < (ssize_t) next->rows; y++)
     {
-      MagickBooleanType
-        sync;
+      const AppendRow row = { next, append_image, append_view, image_view,
+        x_offset, y_offset, exception };
 
-      PixelInfo
-        pixel;
-
-      const Quantum
-        *magick_restrict p;
-
-      Quantum
-        *magick_restrict q;
-
-      ssize_t
-        x;
-
-      if (status == MagickFalse)
-        continue;
-      p=GetCacheViewVirtualPixels(image_view,0,y,next->columns,1,exception);
-      q=QueueCacheViewAuthenticPixels(append_view,x_offset,y+y_offset,
-        next->columns,1,exception);
-      if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-        {
-          status=MagickFalse;
-          continue;
-        }
-      GetPixelInfo(next,&pixel);
-      for (x=0; x < (ssize_t) next->columns; x++)
-      {
-        GetPixelInfoPixel(next,p,&pixel);
-        SetPixelViaPixelInfo(append_image,&pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(next);
-        q+=(ptrdiff_t) GetPixelChannels(append_image);
-      }
-      sync=SyncCacheViewAuthenticPixels(append_view,exception);
-      if (sync == MagickFalse)
-        status=MagickFalse;
+      AppendImageRow(&row,y,&status);
     }
     image_view=DestroyCacheView(image_view);
     AdvanceAppendOffset(next,stack,&x_offset,&y_offset);
@@ -1133,6 +1191,85 @@ static inline void CopyPixelChannels(const Image *image,
   }
 }
 
+typedef struct _CopyRow
+{
+  Image
+    *image;
+
+  const Image
+    *source_image;
+
+  const RectangleInfo
+    *geometry;
+
+  const OffsetInfo
+    *offset;
+
+  CacheView
+    *image_view,
+    *source_view;
+
+  ExceptionInfo
+    *exception;
+} CopyRow;
+
+static MagickBooleanType CopyImageRow(const CopyRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  const Image
+    *source_image = row->source_image;
+
+  const RectangleInfo
+    *geometry = row->geometry;
+
+  const OffsetInfo
+    *offset = row->offset;
+
+  CacheView
+    *image_view = row->image_view,
+    *source_view = row->source_view;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  MagickBooleanType
+    sync;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(source_view,geometry->x,y+geometry->y,
+    geometry->width,1,exception);
+  q=QueueCacheViewAuthenticPixels(image_view,offset->x,y+offset->y,
+    geometry->width,1,exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) geometry->width; x++)
+  {
+    CopyPixelChannels(image,source_image,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(source_image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  sync=SyncCacheViewAuthenticPixels(image_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType CopyImagePixels(Image *image,
   const Image *source_image,const RectangleInfo *geometry,
   const OffsetInfo *offset,ExceptionInfo *exception)
@@ -1176,38 +1313,11 @@ MagickExport MagickBooleanType CopyImagePixels(Image *image,
 #endif
   for (y=0; y < (ssize_t) geometry->height; y++)
   {
-    MagickBooleanType
-      sync;
+    const CopyRow row = { image, source_image, geometry, offset, image_view,
+      source_view, exception };
 
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    if (CopyImageRow(&row,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(source_view,geometry->x,y+geometry->y,
-      geometry->width,1,exception);
-    q=QueueCacheViewAuthenticPixels(image_view,offset->x,y+offset->y,
-      geometry->width,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) geometry->width; x++)
-    {
-      CopyPixelChannels(image,source_image,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(source_image);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    sync=SyncCacheViewAuthenticPixels(image_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -1486,6 +1596,33 @@ MagickExport FILE *GetImageInfoFile(const ImageInfo *image_info)
   return(image_info->file);
 }
 
+static MagickBooleanType HasMaskChannel(const Image *image,
+  const PixelMask type)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      if ((image->channels & ReadMaskChannel) == 0)
+        return(MagickFalse);
+      break;
+    }
+    case WritePixelMask:
+    {
+      if ((image->channels & WriteMaskChannel) == 0)
+        return(MagickFalse);
+      break;
+    }
+    default:
+    {
+      if ((image->channels & CompositeMaskChannel) == 0)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1511,6 +1648,102 @@ MagickExport FILE *GetImageInfoFile(const ImageInfo *image_info)
 %    o type: the mask type, ReadPixelMask or WritePixelMask.
 %
 */
+typedef struct _GetMaskRow
+{
+  const Image
+    *image;
+
+  Image
+    *mask_image;
+
+  CacheView
+    *image_view,
+    *mask_view;
+
+  PixelMask
+    type;
+
+  ExceptionInfo
+    *exception;
+} GetMaskRow;
+
+static void ConvertMaskRow(const GetMaskRow *row,const Quantum *p,
+  Quantum *q)
+{
+  const Image
+    *image = row->image;
+
+  Image
+    *mask_image = row->mask_image;
+
+  const PixelMask
+    type = row->type;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    switch (type)
+    {
+      case ReadPixelMask:
+      {
+        SetPixelGray(mask_image,GetPixelReadMask(image,p),q);
+        break;
+      }
+      case WritePixelMask:
+      {
+        SetPixelGray(mask_image,GetPixelWriteMask(image,p),q);
+        break;
+      }
+      default:
+      {
+        SetPixelGray(mask_image,GetPixelCompositeMask(image,p),q);
+        break;
+      }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(mask_image);
+  }
+}
+
+static void GetImageMaskRow(const GetMaskRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Image
+    *image = row->image;
+
+  Image
+    *mask_image = row->mask_image;
+
+  CacheView
+    *image_view = row->image_view,
+    *mask_view = row->mask_view;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(mask_view,0,y,mask_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  ConvertMaskRow(row,p,q);
+  if (SyncCacheViewAuthenticPixels(mask_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *GetImageMask(const Image *image,const PixelMask type,
   ExceptionInfo *exception)
 {
@@ -1534,27 +1767,8 @@ MagickExport Image *GetImageMask(const Image *image,const PixelMask type,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  switch (type)
-  {
-    case ReadPixelMask:
-    {
-      if ((image->channels & ReadMaskChannel) == 0)
-        return((Image *) NULL);
-      break;
-    }
-    case WritePixelMask:
-    {
-      if ((image->channels & WriteMaskChannel) == 0)
-        return((Image *) NULL);
-      break;
-    }
-    default:
-    {
-      if ((image->channels & CompositeMaskChannel) == 0)
-        return((Image *) NULL);
-      break;
-    }
-  }
+  if (HasMaskChannel(image,type) == MagickFalse)
+    return((Image *) NULL);
   mask_image=AcquireImage((ImageInfo *) NULL,exception);
   status=SetImageExtent(mask_image,image->columns,image->rows,exception);
   if (status == MagickFalse)
@@ -1570,50 +1784,10 @@ MagickExport Image *GetImageMask(const Image *image,const PixelMask type,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    const GetMaskRow row = { image, mask_image, image_view, mask_view, type,
+      exception };
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(mask_view,0,y,mask_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      switch (type)
-      {
-        case ReadPixelMask:
-        {
-          SetPixelGray(mask_image,GetPixelReadMask(image,p),q);
-          break;
-        }
-        case WritePixelMask:
-        {
-          SetPixelGray(mask_image,GetPixelWriteMask(image,p),q);
-          break;
-        }
-        default:
-        {
-          SetPixelGray(mask_image,GetPixelCompositeMask(image,p),q);
-          break;
-        }
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(mask_image);
-    }
-    if (SyncCacheViewAuthenticPixels(mask_view,exception) == MagickFalse)
-      status=MagickFalse;
+    GetImageMaskRow(&row,y,&status);
   }
   mask_view=DestroyCacheView(mask_view);
   image_view=DestroyCacheView(image_view);
@@ -2155,6 +2329,53 @@ MagickExport MagickBooleanType ResetImagePage(Image *image,const char *page)
   return(MagickTrue);
 }
 
+typedef struct _ResetRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} ResetRow;
+
+static void ResetImagePixelsRow(const ResetRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    (void) memset(q,0,GetPixelChannels(image)*sizeof(Quantum));
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2223,32 +2444,68 @@ MagickExport MagickBooleanType ResetImagePixels(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const ResetRow row = { image, image_view, exception };
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      (void) memset(q,0,GetPixelChannels(image)*sizeof(Quantum));
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    ResetImagePixelsRow(&row,y,&status);
   }
   image_view=DestroyCacheView(image_view);
   return(status);
 }
 
+typedef struct _AlphaRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  Quantum
+    alpha;
+
+  ExceptionInfo
+    *exception;
+} AlphaRow;
+
+static void SetImageAlphaRow(const AlphaRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  const Quantum
+    alpha = row->alpha;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelWriteMask(image,q) > (QuantumRange/2))
+      SetPixelAlpha(image,alpha,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2308,34 +2565,68 @@ MagickExport MagickBooleanType SetImageAlpha(Image *image,const Quantum alpha,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const AlphaRow row = { image, image_view, alpha, exception };
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetPixelWriteMask(image,q) > (QuantumRange/2))
-        SetPixelAlpha(image,alpha,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SetImageAlphaRow(&row,y,&status);
   }
   image_view=DestroyCacheView(image_view);
   image->mask_trait=original_mask;
   return(status);
 }
 
+typedef struct _BackgroundRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  PixelInfo
+    background;
+
+  ExceptionInfo
+    *exception;
+} BackgroundRow;
+
+static void SetImageBackgroundRow(const BackgroundRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  const PixelInfo
+    background = row->background;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    SetPixelViaPixelInfo(image,&background,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2399,27 +2690,9 @@ MagickExport MagickBooleanType SetImageBackgroundColor(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const BackgroundRow row = { image, image_view, background, exception };
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SetPixelViaPixelInfo(image,&background,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SetImageBackgroundRow(&row,y,&status);
   }
   image_view=DestroyCacheView(image_view);
   return(status);
@@ -2634,6 +2907,16 @@ MagickExport MagickBooleanType SetImageExtent(Image *image,const size_t columns,
   return(SyncImagePixelCache(image,exception));
 }
 
+static void UpdateSceneRange(ImageInfo *image_info,size_t first,size_t last)
+{
+  if (first > last)
+    Swap(first,last);
+  if (first < image_info->scene)
+    image_info->scene=first;
+  if (last > image_info->number_scenes)
+    image_info->number_scenes=last;
+}
+
 static void ParseSceneRange(ImageInfo *image_info,const char *component)
 {
   char
@@ -2660,12 +2943,7 @@ static void ParseSceneRange(ImageInfo *image_info,const char *component)
       q++;
     if (*q == '-')
       last=(size_t) strtol(q+1,&q,10);
-    if (first > last)
-      Swap(first,last);
-    if (first < image_info->scene)
-      image_info->scene=first;
-    if (last > image_info->number_scenes)
-      image_info->number_scenes=last;
+    UpdateSceneRange(image_info,first,last);
     p=q;
   }
   image_info->number_scenes-=image_info->scene-1;
@@ -3226,6 +3504,54 @@ MagickExport void SetImageInfoFile(ImageInfo *image_info,FILE *file)
   image_info->file=file;
 }
 
+static void RemoveImageMaskChannel(Image *image,const PixelMask type)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~ReadMaskChannel);
+      break;
+    }
+    case WritePixelMask:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~WriteMaskChannel);
+      magick_fallthrough;
+    }
+    default:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~CompositeMaskChannel);
+      break;
+    }
+  }
+}
+
+static void SetMaskPixel(const Image *image,const PixelMask type,
+  const Quantum pixel,Quantum *q)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      SetPixelReadMask(image,pixel,q);
+      break;
+    }
+    case WritePixelMask:
+    {
+      SetPixelWriteMask(image,pixel,q);
+      break;
+    }
+    default:
+    {
+      SetPixelCompositeMask(image,pixel,q);
+      break;
+    }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3278,6 +3604,78 @@ static void AddImageMaskChannel(Image *image,const PixelMask type)
   }
 }
 
+typedef struct _ImageMaskRow
+{
+  Image
+    *image;
+
+  const Image
+    *mask;
+
+  CacheView
+    *image_view,
+    *mask_view;
+
+  PixelMask
+    type;
+
+  ExceptionInfo
+    *exception;
+} ImageMaskRow;
+
+static void SetImageMaskRow(const ImageMaskRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  const Image
+    *mask = row->mask;
+
+  CacheView
+    *image_view = row->image_view,
+    *mask_view = row->mask_view;
+
+  const PixelMask
+    type = row->type;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(mask_view,0,y,mask->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MagickRealType
+      intensity;
+
+    intensity=0.0;
+    if ((x < (ssize_t) mask->columns) && (y < (ssize_t) mask->rows))
+      intensity=GetPixelIntensity(mask,p);
+    SetMaskPixel(image,type,ClampToQuantum(intensity),q);
+    p+=(ptrdiff_t) GetPixelChannels(mask);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
   const Image *mask,ExceptionInfo *exception)
 {
@@ -3301,27 +3699,7 @@ MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
   image->mask_trait=UndefinedPixelTrait;
   if (mask == (const Image *) NULL)
     {
-      switch (type)
-      {
-        case ReadPixelMask:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~ReadMaskChannel);
-          break;
-        }
-        case WritePixelMask:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~WriteMaskChannel);
-          magick_fallthrough;
-        }
-        default:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~CompositeMaskChannel);
-          break;
-        }
-      }
+      RemoveImageMaskChannel(image,type);
       return(SyncImagePixelCache(image,exception));
     }
   AddImageMaskChannel(image,type);
@@ -3336,55 +3714,10 @@ MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    const ImageMaskRow row = { image, mask, image_view, mask_view, type,
+      exception };
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(mask_view,0,y,mask->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MagickRealType
-        intensity;
-
-      intensity=0.0;
-      if ((x < (ssize_t) mask->columns) && (y < (ssize_t) mask->rows))
-        intensity=GetPixelIntensity(mask,p);
-      switch (type)
-      {
-        case ReadPixelMask:
-        {
-          SetPixelReadMask(image,ClampToQuantum(intensity),q);
-          break;
-        }
-        case WritePixelMask:
-        {
-          SetPixelWriteMask(image,ClampToQuantum(intensity),q);
-          break;
-        }
-        default:
-        {
-          SetPixelCompositeMask(image,ClampToQuantum(intensity),q);
-          break;
-        }
-      }
-      p+=(ptrdiff_t) GetPixelChannels(mask);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SetImageMaskRow(&row,y,&status);
   }
   mask_view=DestroyCacheView(mask_view);
   image_view=DestroyCacheView(image_view);
@@ -3392,6 +3725,31 @@ MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
   return(status);
 }
 
+static void RemoveRegionMaskChannel(Image *image,const PixelMask type)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~ReadMaskChannel);
+      break;
+    }
+    case WritePixelMask:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~WriteMaskChannel);
+      break;
+    }
+    default:
+    {
+      image->channels=(ChannelType) ((unsigned int) image->channels &
+        (unsigned int) ~CompositeMaskChannel);
+      break;
+    }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3430,6 +3788,71 @@ static inline MagickBooleanType IsInsideRegion(const RectangleInfo *region,
     MagickTrue : MagickFalse);
 }
 
+typedef struct _RegionMaskRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  const RectangleInfo
+    *region;
+
+  PixelMask
+    type;
+
+  ExceptionInfo
+    *exception;
+} RegionMaskRow;
+
+static void SetRegionMaskRow(const RegionMaskRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  const RectangleInfo
+    *region = row->region;
+
+  const PixelMask
+    type = row->type;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    Quantum
+      pixel;
+
+    pixel=QuantumRange;
+    if (IsInsideRegion(region,x,y) != MagickFalse)
+      pixel=(Quantum) 0;
+    SetMaskPixel(image,type,pixel,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType SetImageRegionMask(Image *image,
   const PixelMask type,const RectangleInfo *region,ExceptionInfo *exception)
 {
@@ -3452,47 +3875,10 @@ MagickExport MagickBooleanType SetImageRegionMask(Image *image,
   image->mask_trait=UndefinedPixelTrait;
   if (region == (const RectangleInfo *) NULL)
     {
-      switch (type)
-      {
-        case ReadPixelMask:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~ReadMaskChannel);
-          break;
-        }
-        case WritePixelMask:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~WriteMaskChannel);
-          break;
-        }
-        default:
-        {
-          image->channels=(ChannelType) ((unsigned int) image->channels &
-            (unsigned int) ~CompositeMaskChannel);
-          break;
-        }
-      }
+      RemoveRegionMaskChannel(image,type);
       return(SyncImagePixelCache(image,exception));
     }
-  switch (type)
-  {
-    case ReadPixelMask:
-    {
-      image->channels=(ChannelType) (image->channels | ReadMaskChannel);
-      break;
-    }
-    case WritePixelMask:
-    {
-      image->channels=(ChannelType) (image->channels | WriteMaskChannel);
-      break;
-    }
-    default:
-    {
-      image->channels=(ChannelType) (image->channels | CompositeMaskChannel);
-      break;
-    }
-  }
+  AddImageMaskChannel(image,type);
   if (SyncImagePixelCache(image,exception) == MagickFalse)
     return(MagickFalse);
   status=MagickTrue;
@@ -3503,50 +3889,9 @@ MagickExport MagickBooleanType SetImageRegionMask(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const RegionMaskRow row = { image, image_view, region, type, exception };
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      Quantum
-        pixel;
-
-      pixel=QuantumRange;
-      if (IsInsideRegion(region,x,y) != MagickFalse)
-        pixel=(Quantum) 0;
-      switch (type)
-      {
-        case ReadPixelMask:
-        {
-          SetPixelReadMask(image,pixel,q);
-          break;
-        }
-        case WritePixelMask:
-        {
-          SetPixelWriteMask(image,pixel,q);
-          break;
-        }
-        default:
-        {
-          SetPixelCompositeMask(image,pixel,q);
-          break;
-        }
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SetRegionMaskRow(&row,y,&status);
   }
   image->mask_trait=UpdatePixelTrait;
   image_view=DestroyCacheView(image_view);
@@ -3644,6 +3989,67 @@ static inline MagickBooleanType IsRightGapEdge(const Image *right_image,
     ((x+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _SmushXRows
+{
+  const Image
+    *left_image,
+    *right_image;
+
+  CacheView
+    *left_view,
+    *right_view;
+
+  RectangleInfo
+    left_geometry,
+    right_geometry;
+
+  ExceptionInfo
+    *exception;
+} SmushXRows;
+
+static size_t SmushXRow(const SmushXRows *rows,const ssize_t y,size_t gap)
+{
+  const Image
+    *left_image = rows->left_image,
+    *right_image = rows->right_image;
+
+  CacheView
+    *left_view = rows->left_view,
+    *right_view = rows->right_view;
+
+  const RectangleInfo
+    left_geometry = rows->left_geometry,
+    right_geometry = rows->right_geometry;
+
+  ExceptionInfo
+    *exception = rows->exception;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    i,
+    x;
+
+  for (x=(ssize_t) left_image->columns-1; x > 0; x--)
+  {
+    p=GetCacheViewVirtualPixels(left_view,x,left_geometry.y+y,1,1,exception);
+    if (IsLeftGapEdge(left_image,p,x,gap) != MagickFalse)
+      break;
+  }
+  i=(ssize_t) left_image->columns-x-1;
+  for (x=0; x < (ssize_t) right_image->columns; x++)
+  {
+    p=GetCacheViewVirtualPixels(right_view,x,right_geometry.y+y,1,1,
+      exception);
+    if (IsRightGapEdge(right_image,p,x,i,gap) != MagickFalse)
+      break;
+  }
+  if ((x+i) < (ssize_t) gap)
+    gap=(size_t) (x+i);
+  return(gap);
+}
+
 static ssize_t SmushXGap(const Image *smush_image,const Image *images,
   const ssize_t offset,ExceptionInfo *exception)
 {
@@ -3659,18 +4065,14 @@ static ssize_t SmushXGap(const Image *smush_image,const Image *images,
     left_geometry,
     right_geometry;
 
-  const Quantum
-    *p;
-
-  ssize_t
-    i,
-    y;
-
   size_t
     gap;
 
+  SmushXRows
+    rows;
+
   ssize_t
-    x;
+    y;
 
   if (images->previous == (Image *) NULL)
     return(0);
@@ -3685,24 +4087,16 @@ static ssize_t SmushXGap(const Image *smush_image,const Image *images,
   gap=right_image->columns;
   left_view=AcquireVirtualCacheView(left_image,exception);
   right_view=AcquireVirtualCacheView(right_image,exception);
+  rows.left_image=left_image;
+  rows.right_image=right_image;
+  rows.left_view=left_view;
+  rows.right_view=right_view;
+  rows.left_geometry=left_geometry;
+  rows.right_geometry=right_geometry;
+  rows.exception=exception;
   for (y=0; y < (ssize_t) smush_image->rows; y++)
   {
-    for (x=(ssize_t) left_image->columns-1; x > 0; x--)
-    {
-      p=GetCacheViewVirtualPixels(left_view,x,left_geometry.y+y,1,1,exception);
-      if (IsLeftGapEdge(left_image,p,x,gap) != MagickFalse)
-        break;
-    }
-    i=(ssize_t) left_image->columns-x-1;
-    for (x=0; x < (ssize_t) right_image->columns; x++)
-    {
-      p=GetCacheViewVirtualPixels(right_view,x,right_geometry.y+y,1,1,
-        exception);
-      if (IsRightGapEdge(right_image,p,x,i,gap) != MagickFalse)
-        break;
-    }
-    if ((x+i) < (ssize_t) gap)
-      gap=(size_t) (x+i);
+    gap=SmushXRow(&rows,y,gap);
   }
   right_view=DestroyCacheView(right_view);
   left_view=DestroyCacheView(left_view);
@@ -3728,6 +4122,67 @@ static inline MagickBooleanType IsBottomGapEdge(const Image *bottom_image,
     ((y+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _SmushYRows
+{
+  const Image
+    *bottom_image,
+    *top_image;
+
+  CacheView
+    *bottom_view,
+    *top_view;
+
+  RectangleInfo
+    bottom_geometry,
+    top_geometry;
+
+  ExceptionInfo
+    *exception;
+} SmushYRows;
+
+static size_t SmushYRow(const SmushYRows *rows,const ssize_t x,size_t gap)
+{
+  const Image
+    *bottom_image = rows->bottom_image,
+    *top_image = rows->top_image;
+
+  CacheView
+    *bottom_view = rows->bottom_view,
+    *top_view = rows->top_view;
+
+  const RectangleInfo
+    bottom_geometry = rows->bottom_geometry,
+    top_geometry = rows->top_geometry;
+
+  ExceptionInfo
+    *exception = rows->exception;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    i,
+    y;
+
+  for (y=(ssize_t) top_image->rows-1; y > 0; y--)
+  {
+    p=GetCacheViewVirtualPixels(top_view,top_geometry.x+x,y,1,1,exception);
+    if (IsTopGapEdge(top_image,p,y,gap) != MagickFalse)
+      break;
+  }
+  i=(ssize_t) top_image->rows-y-1;
+  for (y=0; y < (ssize_t) bottom_image->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(bottom_view,bottom_geometry.x+x,y,1,1,
+      exception);
+    if (IsBottomGapEdge(bottom_image,p,y,i,gap) != MagickFalse)
+      break;
+  }
+  if ((y+i) < (ssize_t) gap)
+    gap=(size_t) (y+i);
+  return(gap);
+}
+
 static ssize_t SmushYGap(const Image *smush_image,const Image *images,
   const ssize_t offset,ExceptionInfo *exception)
 {
@@ -3743,18 +4198,14 @@ static ssize_t SmushYGap(const Image *smush_image,const Image *images,
     bottom_geometry,
     top_geometry;
 
-  const Quantum
-    *p;
-
-  ssize_t
-    i,
-    x;
-
   size_t
     gap;
 
+  SmushYRows
+    rows;
+
   ssize_t
-    y;
+    x;
 
   if (images->previous == (Image *) NULL)
     return(0);
@@ -3769,30 +4220,42 @@ static ssize_t SmushYGap(const Image *smush_image,const Image *images,
   gap=bottom_image->rows;
   top_view=AcquireVirtualCacheView(top_image,exception);
   bottom_view=AcquireVirtualCacheView(bottom_image,exception);
+  rows.bottom_image=bottom_image;
+  rows.top_image=top_image;
+  rows.bottom_view=bottom_view;
+  rows.top_view=top_view;
+  rows.bottom_geometry=bottom_geometry;
+  rows.top_geometry=top_geometry;
+  rows.exception=exception;
   for (x=0; x < (ssize_t) smush_image->columns; x++)
   {
-    for (y=(ssize_t) top_image->rows-1; y > 0; y--)
-    {
-      p=GetCacheViewVirtualPixels(top_view,top_geometry.x+x,y,1,1,exception);
-      if (IsTopGapEdge(top_image,p,y,gap) != MagickFalse)
-        break;
-    }
-    i=(ssize_t) top_image->rows-y-1;
-    for (y=0; y < (ssize_t) bottom_image->rows; y++)
-    {
-      p=GetCacheViewVirtualPixels(bottom_view,bottom_geometry.x+x,y,1,1,
-        exception);
-      if (IsBottomGapEdge(bottom_image,p,y,i,gap) != MagickFalse)
-        break;
-    }
-    if ((y+i) < (ssize_t) gap)
-      gap=(size_t) (y+i);
+    gap=SmushYRow(&rows,x,gap);
   }
   bottom_view=DestroyCacheView(bottom_view);
   top_view=DestroyCacheView(top_view);
   if (x < (ssize_t) smush_image->columns)
     return(offset);
   return((ssize_t) gap-offset);
+}
+
+static void AddSmushStackExtent(const Image *next,const ssize_t offset,
+  size_t *width,size_t *height)
+{
+  if (next->columns > (*width))
+    (*width)=next->columns;
+  (*height)+=next->rows;
+  if (next->previous != (Image *) NULL)
+    (*height)=(size_t) MagickMax((ssize_t) (*height)+offset,0U);
+}
+
+static void AddSmushRowExtent(const Image *next,const ssize_t offset,
+  size_t *width,size_t *height)
+{
+  (*width)+=next->columns;
+  if (next->previous != (Image *) NULL)
+    (*width)=(size_t) MagickMax((ssize_t) (*width)+offset,0U);
+  if (next->rows > (*height))
+    (*height)=next->rows;
 }
 
 MagickExport Image *SmushImages(const Image *images,
@@ -3853,18 +4316,10 @@ MagickExport Image *SmushImages(const Image *images,
     number_images++;
     if (stack != MagickFalse)
       {
-        if (next->columns > width)
-          width=next->columns;
-        height+=next->rows;
-        if (next->previous != (Image *) NULL)
-          height=(size_t) MagickMax((ssize_t) height+offset,0U);
+        AddSmushStackExtent(next,offset,&width,&height);
         continue;
       }
-    width+=next->columns;
-    if (next->previous != (Image *) NULL)
-      width=(size_t) MagickMax((ssize_t) width+offset,0U);
-    if (next->rows > height)
-      height=next->rows;
+    AddSmushRowExtent(next,offset,&width,&height);
   }
   /*
     Smush images.
@@ -3992,6 +4447,58 @@ static inline Quantum PushColormapIndex(Image *image,const Quantum index,
   return((Quantum) 0);
 }
 
+typedef struct _SyncRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} SyncRow;
+
+static void SyncImageRow(const SyncRow *row,const ssize_t y,
+  MagickBooleanType *status,
+  MagickBooleanType *range_exception)
+{
+  Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  Quantum
+    index;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    index=PushColormapIndex(image,GetPixelIndex(image,q),range_exception);
+    SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType SyncImage(Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -4024,31 +4531,9 @@ MagickExport MagickBooleanType SyncImage(Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      index;
+    const SyncRow row = { image, image_view, exception };
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      index=PushColormapIndex(image,GetPixelIndex(image,q),&range_exception);
-      SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncImageRow(&row,y,&status,&range_exception);
   }
   image_view=DestroyCacheView(image_view);
   image->taint=taint;
