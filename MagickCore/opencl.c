@@ -818,6 +818,14 @@ static int CloseDoctypeBracket(int bracket_depth)
   return(bracket_depth);
 }
 
+static const char *SkipOpenCLBenchmarkComment(const char *q,
+  const size_t extent,char *token)
+{
+  while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
+    (void) GetNextToken(q,&q,extent,token);
+  return(q);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -888,8 +896,7 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
         /*
           Comment element.
         */
-        while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
-          (void) GetNextToken(q,&q,extent,token);
+        q=SkipOpenCLBenchmarkComment(q,extent,token);
         continue;
       }
     if (LocaleCompare(keyword,"<device") == 0)
