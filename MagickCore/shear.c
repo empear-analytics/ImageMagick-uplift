@@ -725,12 +725,6 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
     x_offset = region->x_offset,
     y_offset = region->y_offset;
 
-  typedef enum
-  {
-    UP,
-    DOWN
-  } ShearDirection;
-
   CacheView
     *image_view;
 
@@ -798,11 +792,11 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
     if (displacement == 0.0)
       continue;
     if (displacement > 0.0)
-      direction=DOWN;
+      direction=RIGHT;
     else
       {
         displacement*=(-1.0);
-        direction=UP;
+        direction=LEFT;
       }
     step=CastDoubleToSsizeT(floor((double) displacement));
     area=(double) (displacement-step);
@@ -812,7 +806,7 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
     GetPixelInfo(image,&destination);
     switch (direction)
     {
-      case UP:
+      case LEFT:
       {
         /*
           Transfer pixels top-to-bottom.
@@ -827,7 +821,7 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
         TransferPixelsForward(p,pixel,destination,&span);
         break;
       }
-      case DOWN:
+      case RIGHT:
       {
         /*
           Transfer pixels bottom-to-top.
