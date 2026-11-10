@@ -3900,16 +3900,15 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
     {
       case ButtonPress:
       {
-        if (anomaly)
-          if (MatteIsActive(special_info,event.xbutton))
-            {
-              /*
-                Option button status changed.
-              */
-              special_info.raised=!special_info.raised;
-              XDrawBeveledButton(display,&windows->widget,&special_info);
-              break;
-            }
+        if ((anomaly) && (MatteIsActive(special_info,event.xbutton)))
+          {
+            /*
+              Option button status changed.
+            */
+            special_info.raised=!special_info.raised;
+            XDrawBeveledButton(display,&windows->widget,&special_info);
+            break;
+          }
         if (MatteIsActive(action_info,event.xbutton))
           {
             /*
@@ -3974,20 +3973,20 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
           break;
         if (action_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(action_info,event.xbutton))
-                state|=ExitState;
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(action_info,event.xbutton)))
+              state|=ExitState;
             action_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&action_info);
           }
         if (cancel_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(cancel_info,event.xbutton))
-                {
-                  *reply_info.text='\0';
-                  state|=ExitState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(cancel_info,event.xbutton)))
+              {
+                *reply_info.text='\0';
+                state|=ExitState;
+              }
             cancel_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
           }
@@ -4241,10 +4240,9 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
   XCheckRefreshWindows(display,windows);
-  if (anomaly)
-    if (special_info.raised)
-      if (*reply != '\0')
-        raised=MagickTrue;
+  if ((anomaly) && (special_info.raised))
+    if (*reply != '\0')
+      raised=MagickTrue;
   return(raised == MagickFalse);
 }
 
