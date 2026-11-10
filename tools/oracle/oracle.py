@@ -49,7 +49,7 @@ FIXED_MTIME = 1000000000       # 2001-09-09; file dates end up in properties
 # Prepended to every magick invocation by run_case, e.g. a sandbox (mutate.py).
 WRAPPER = []
 TIMEOUT = 30                   # the slowest legitimate case takes under 3s
-HARNESS_VERSION = "14"        # bump when normalisation or execution changes (13: OpenCL profile at this boot's clock; 14: X11 cases keep the fixed epoch on a build without X)
+HARNESS_VERSION = "15"        # bump when normalisation or execution changes (13: OpenCL profile at this boot's clock; 14: X11 cases keep the fixed epoch on a build without X; 15: the wide build trees normalised, env/x11/stdin in the baseline key)
 # WIDE=1, as for build.sh: the builds with X11 and OpenCL (base-wide, cov-wide, ...), with a
 # case map and line coverage of their own (casemap-wide.json, oracle-wide.profdata, ...).
 WIDE = "-wide" if os.environ.get("WIDE") else ""
@@ -288,8 +288,11 @@ NORMALISE = [
     (re.compile(rb"/(CreationDate|ModDate) \(D:[0-9]+[^)]*\)"), rb"/\1 (D:DATE)"),
     (re.compile(rb"<xmp:(CreateDate|ModifyDate|MetadataDate)>[^<]*<"), rb"<xmp:\1>DATE<"),
 ]
+# The WIDE builds (base-wide/<sha>, cand-wide, cov-wide, wide) too: without them every -list
+# that prints a configuration path diverged between two wide builds of one commit (2026-11-10).
 BUILD_TREE_RE = re.compile(re.escape(OUT.encode()) +
-                           rb"/(?:(?:src|base)/[0-9a-f]{40}|cand|cov|asan|mull-[A-Za-z0-9_]+)")
+                           rb"/(?:(?:src|base(?:-wide)?)/[0-9a-f]{40}|(?:cand|cov)(?:-wide)?|wide|"
+                           rb"asan|mull-[A-Za-z0-9_]+)")
 # conjure takes `-key value` script variables, not options; -version and -list
 # are accepted only as the first argument. None of them gets -seed.
 UNSEEDED = ("conjure", "-version", "-list")
@@ -822,9 +825,17 @@ def cache_path(binary, manifest):
 
 def case_key(case):
     """Everything that determines a case's result: its commands and the files
-    it starts with (MSL cases share one command and differ only in script)."""
+    it starts with (MSL cases share one command and differ only in script), and
+    its stdin, environment and X server, which are part of its id as well. Without
+    the last three, an OpenCL case (MAGICK_OCL_DEVICE) and the plain case with the
+    same command, or one X11 case on several screens, shared one baseline entry,
+    which held whichever ran last: 129 false divergences between two wide builds of
+    one commit (2026-11-10). Cases without them keep the key they always had."""
     what = [case["steps"], sorted(case.get("files", {}).items())]
-    return hashlib.sha1(json.dumps(what).encode()).hexdigest()
+    extra = [case.get(k) for k in ("stdin", "env", "x11")]
+    if any(extra):
+        what.append(extra)
+    return hashlib.sha1(json.dumps(what, sort_keys=True).encode()).hexdigest()
 
 
 # ---------------------------------------------------------------------------
