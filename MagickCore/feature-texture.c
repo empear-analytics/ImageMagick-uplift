@@ -148,11 +148,28 @@ typedef struct _FeatureStatistics
     direction[4];  /* horizontal, vertical, left and right diagonals */
 } FeatureStatistics;
 
-static inline MagickBooleanType IsFeatureMemoryMissing(
-  FeatureStatistics **cooccurrence,FeatureStatistics *density_x,
-  FeatureStatistics *density_xy,FeatureStatistics *density_y,
-  FeatureStatistics **Q,FeatureStatistics *sum)
+typedef struct _FeatureBuffers
 {
+  FeatureStatistics
+    **cooccurrence,
+    *density_x,
+    *density_xy,
+    *density_y,
+    **Q,
+    *sum;
+} FeatureBuffers;
+
+static inline MagickBooleanType IsFeatureMemoryMissing(
+  const FeatureBuffers *buffers)
+{
+  FeatureStatistics
+    **const cooccurrence = buffers->cooccurrence,
+    *const density_x = buffers->density_x,
+    *const density_xy = buffers->density_xy,
+    *const density_y = buffers->density_y,
+    **const Q = buffers->Q,
+    *const sum = buffers->sum;
+
   return(((cooccurrence == (FeatureStatistics **) NULL) ||
     (density_x == (FeatureStatistics *) NULL) ||
     (density_xy == (FeatureStatistics *) NULL) ||
@@ -1488,6 +1505,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   ChannelFeatures
     *channel_features;
 
+  FeatureBuffers
+    buffers;
+
   FeatureStatistics
     **cooccurrence,
     correlation,
@@ -1614,8 +1634,13 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     2*sizeof(*density_y));
   Q=(FeatureStatistics **) AcquireQuantumMemory(number_grays,sizeof(*Q));
   sum=(FeatureStatistics *) AcquireQuantumMemory(number_grays,sizeof(*sum));
-  if (IsFeatureMemoryMissing(cooccurrence,density_x,density_xy,density_y,Q,
-        sum) != MagickFalse)
+  buffers.cooccurrence=cooccurrence;
+  buffers.density_x=density_x;
+  buffers.density_xy=density_xy;
+  buffers.density_y=density_y;
+  buffers.Q=Q;
+  buffers.sum=sum;
+  if (IsFeatureMemoryMissing(&buffers) != MagickFalse)
     {
       if (Q != (FeatureStatistics **) NULL)
         Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
