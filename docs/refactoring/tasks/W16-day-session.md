@@ -207,3 +207,13 @@ or blockers already measured: channel.c `ChannelFxImage` (two exit kinds no reci
 colorspace-convert.c `ConvertRGBToGeneric` (per-pixel dispatch to callees of different signatures), resize-image.c
 `ResizeImage` (OpenCL `#if`), segment.c (see its row). Files held only by Lines of Code: colorspace.c, statistic.c,
 vision.c, transform.c (9.38 each).
+
+## Lane d, morphology.c: Recipe ST amended
+
+**ST step 7** (9af7c5f1a): when a chain step would take more than four parameters it takes a Recipe N input struct;
+the caller fills it in the step 5 group directly before the call, and a later step moving that group leaves the fill
+in the caller's new `default:` group. morphology.c 3.04 to 3.10 (11 flat steps inside a measured plan, then one rise;
+see its plateau row). Added after the owner's approval of the W16 text; not yet confirmed. **Owner question:** is the
+`#else` branch of an `#if 1` (Blur in `AcquireKernelBuiltIn`) as never-compiled as `#if 0`, so that the exception lets it
+move? **Notes:** the dead `#else` text of Blur names `i`, whose compiled declaration an E step removed (said in that
+commit); the unreachable `break;` after the No-Op default now sits in `AcquireDistanceKernel`.
