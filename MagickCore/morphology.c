@@ -2180,6 +2180,40 @@ static inline KernelInfo *AcquirePlusOrCrossKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+typedef enum
+{
+  ManhattanKernelDistance,
+  EuclideanKernelDistance
+} DistanceKernelSide;
+
+static inline KernelInfo *AcquireManhattanOrEuclideanKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const DistanceKernelSide side)
+{
+  const KernelRadius
+    radius = { 1.0, 3 };  /* default radius = 1 */
+
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  SetKernelRadius(kernel,args,&radius);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      kernel->positive_range += ( kernel->values[i] =
+        ((side == ManhattanKernelDistance) ?
+        args->sigma*(labs((long) u)+labs((long) v)) :
+        args->sigma*sqrt((double) (u*u+v*v))) );
+  kernel->maximum = kernel->values[0];
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2433,22 +2467,8 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       case ChebyshevKernel:
         return(AcquireChebyshevKernel(kernel,args));
       case ManhattanKernel:
-        {
-          const KernelRadius
-            radius = { 1.0, 3 };  /* default radius = 1 */
-
-          SetKernelRadius(kernel,args,&radius);
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->positive_range += ( kernel->values[i] =
-                  args->sigma*(labs((long) u)+labs((long) v)) );
-          kernel->maximum = kernel->values[0];
-          break;
-        }
+        return(AcquireManhattanOrEuclideanKernel(kernel,args,
+          ManhattanKernelDistance));
       case OctagonalKernel:
       {
         const KernelRadius
@@ -2472,22 +2492,8 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         break;
       }
     case EuclideanKernel:
-      {
-        const KernelRadius
-          radius = { 1.0, 3 };  /* default radius = 1 */
-
-        SetKernelRadius(kernel,args,&radius);
-
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-          for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-            kernel->positive_range += ( kernel->values[i] =
-              args->sigma*sqrt((double) (u*u+v*v)) );
-        kernel->maximum = kernel->values[0];
-        break;
-      }
+      return(AcquireManhattanOrEuclideanKernel(kernel,args,
+        EuclideanKernelDistance));
     default:
       {
         /* No-Op Kernel - Basically just a single pixel on its own */
