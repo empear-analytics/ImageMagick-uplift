@@ -13160,6 +13160,11 @@ static void XSetCropGeometry(Display *display,XWindows *windows,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsTileNameCharacter(const char *q)
+{
+  return(((*q != '\xff') && (*q != '\0')) ? MagickTrue : MagickFalse);
+}
+
 static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XWindows *windows,Image *image,XEvent *event,ExceptionInfo *exception)
 {
@@ -13270,7 +13275,7 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   if (id < 0)
     return((Image *) NULL);
   q=p;
-  while ((*q != '\xff') && (*q != '\0') &&
+  while ((IsTileNameCharacter(q) != MagickFalse) &&
          ((size_t) (q-p+1) < sizeof(filename)))
     q++;
   (void) CopyMagickString(filename,p,(size_t) (q-p+1));
@@ -13364,7 +13369,7 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
           *image_view;
 
         q=p;
-        while ((*q != '\xff') && (*q != '\0') &&
+        while ((IsTileNameCharacter(q) != MagickFalse) &&
                ((size_t) (q-p+1) < sizeof(filename)))
           q++;
         (void) CopyMagickString(filename,p,(size_t) (q-p+1));
