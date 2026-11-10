@@ -6861,6 +6861,45 @@ static unsigned int WidestListBrowserEntry(XFontStruct *font_info,
   return(text_width);
 }
 
+typedef struct _ListBrowserReplyMatch
+{
+  const char
+    *const *list;
+
+  char
+    *reply;
+
+  unsigned int
+    entries,
+    visible_entries;
+} ListBrowserReplyMatch;
+
+static void MatchListBrowserReply(const ListBrowserReplyMatch *match,
+  XWidgetInfo *list_info,XWidgetInfo *slider_info)
+{
+  const char
+    *const *const list = match->list;
+
+  char
+    *const reply = match->reply;
+
+  const unsigned int
+    entries = match->entries,
+    visible_entries = match->visible_entries;
+
+  int
+    i;
+
+  for (i=0; i < (int) entries; i++)
+    if (LocaleCompare(list[i],reply) == 0)
+      {
+        (*list_info).id=i;
+        (*slider_info).id=i-(int) (visible_entries >> 1);
+        if ((*slider_info).id < 0)
+          (*slider_info).id=0;
+      }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7080,14 +7119,16 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
         list_info.x=reply_info.x;
         list_info.y=scroll_info.y;
         if (window_info->mapped == MagickFalse)
-          for (i=0; i < (int) entries; i++)
-            if (LocaleCompare(list[i],reply) == 0)
-              {
-                list_info.id=i;
-                slider_info.id=i-(int) (visible_entries >> 1);
-                if (slider_info.id < 0)
-                  slider_info.id=0;
-              }
+          {
+            ListBrowserReplyMatch
+              match;
+
+            match.list=list;
+            match.reply=reply;
+            match.entries=entries;
+            match.visible_entries=visible_entries;
+            MatchListBrowserReply(&match,&list_info,&slider_info);
+          }
         /*
           Initialize text information.
         */
