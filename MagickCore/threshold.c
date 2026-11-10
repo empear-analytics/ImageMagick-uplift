@@ -422,9 +422,12 @@ static void BlackThresholdPixel(const Image *image,const PixelInfo *threshold,
   }
 }
 
-static void BlackThresholdRow(const Image *image,const PixelInfo *threshold,
+static void BlackThresholdRow(const Image *image,const void *arguments,
   Quantum *magick_restrict q)
 {
+  const PixelInfo
+    *threshold = (const PixelInfo *) arguments;
+
   ssize_t
     x;
 
@@ -449,11 +452,24 @@ static MagickBooleanType SetDirectColorImage(Image *image,
   return(MagickTrue);
 }
 
-MagickExport MagickBooleanType BlackThresholdImage(Image *image,
-  const char *thresholds,ExceptionInfo *exception)
-{
-#define ThresholdImageTag  "Threshold/Image"
+typedef void
+  (*ThresholdRowMethod)(const Image *,const void *,Quantum *magick_restrict);
 
+typedef struct _ThresholdRows
+{
+  const char
+    *tag;
+
+  ThresholdRowMethod
+    method;
+
+  const void
+    *arguments;
+} ThresholdRows;
+
+static MagickBooleanType ThresholdImageRows(Image *image,
+  const ThresholdRows *rows,ExceptionInfo *exception)
+{
   CacheView
     *image_view;
 
@@ -463,24 +479,9 @@ MagickExport MagickBooleanType BlackThresholdImage(Image *image,
   MagickOffsetType
     progress;
 
-  PixelInfo
-    threshold;
-
   ssize_t
     y;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (thresholds == (const char *) NULL)
-    return(MagickTrue);
-  if (SetDirectColorImage(image,exception) == MagickFalse)
-    return(MagickFalse);
-  threshold=GetThresholdLevels(image,thresholds);
-  /*
-    White threshold image.
-  */
   status=MagickTrue;
   progress=0;
   image_view=AcquireAuthenticCacheView(image,exception);
@@ -498,7 +499,7 @@ MagickExport MagickBooleanType BlackThresholdImage(Image *image,
 
     if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    BlackThresholdRow(image,&threshold,q);
+    rows->method(image,rows->arguments,q);
     SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
@@ -506,11 +507,37 @@ MagickExport MagickBooleanType BlackThresholdImage(Image *image,
         #pragma omp atomic
 #endif
         progress++;
-        SetThresholdProgress(image,ThresholdImageTag,progress,&status);
+        SetThresholdProgress(image,rows->tag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
   return(status);
+}
+
+MagickExport MagickBooleanType BlackThresholdImage(Image *image,
+  const char *thresholds,ExceptionInfo *exception)
+{
+#define ThresholdImageTag  "Threshold/Image"
+
+  PixelInfo
+    threshold;
+
+  const ThresholdRows
+    rows = { ThresholdImageTag,BlackThresholdRow,&threshold };
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (thresholds == (const char *) NULL)
+    return(MagickTrue);
+  if (SetDirectColorImage(image,exception) == MagickFalse)
+    return(MagickFalse);
+  threshold=GetThresholdLevels(image,thresholds);
+  /*
+    White threshold image.
+  */
+  return(ThresholdImageRows(image,&rows,exception));
 }
 
 /*
@@ -1900,6 +1927,22 @@ static void PerceptibleColormapEntry(const Image *image,const double epsilon,
       epsilon);
 }
 
+static void PerceptibleRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  const double
+    epsilon = (*(const double *) arguments);
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    PerceptiblePixel(image,epsilon,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType PerceptibleImageColormap(Image *image,
   const double epsilon,ExceptionInfo *exception)
 {
@@ -1923,17 +1966,8 @@ MagickExport MagickBooleanType PerceptibleImage(Image *image,
 {
 #define PerceptibleImageTag  "Perceptible/Image"
 
-  CacheView
-    *image_view;
-
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
-  ssize_t
-    y;
+  const ThresholdRows
+    rows = { PerceptibleImageTag,PerceptibleRow,&epsilon };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1944,43 +1978,7 @@ MagickExport MagickBooleanType PerceptibleImage(Image *image,
   /*
     Perceptible image.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,image,image->rows,2)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    const ThresholdLine
-      line = { image,image_view,exception };
-
-    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
-      continue;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      PerceptiblePixel(image,epsilon,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    SyncThresholdRow(&line,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetThresholdProgress(image,PerceptibleImageTag,progress,&status);
-      }
-  }
-  image_view=DestroyCacheView(image_view);
-  return(status);
+  return(ThresholdImageRows(image,&rows,exception));
 }
 
 /*
@@ -2297,9 +2295,12 @@ typedef struct _RangeThresholdRow
     high_black;
 } RangeThresholdRow;
 
-static void RangeThresholdPixels(const Image *image,
-  const RangeThresholdRow *row,Quantum *magick_restrict q)
+static void RangeThresholdPixels(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
 {
+  const RangeThresholdRow
+    *row = (const RangeThresholdRow *) arguments;
+
   const double
     low_black = row->low_black,
     low_white = row->low_white,
@@ -2323,17 +2324,11 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
 {
 #define ThresholdImageTag  "Threshold/Image"
 
-  CacheView
-    *image_view;
+  const RangeThresholdRow
+    row = { low_black,low_white,high_white,high_black };
 
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
-  ssize_t
-    y;
+  const ThresholdRows
+    rows = { ThresholdImageTag,RangeThresholdPixels,&row };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -2344,43 +2339,7 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
   /*
     Range threshold image.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,image,image->rows,2)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    RangeThresholdRow
-      row;
-
-    const ThresholdLine
-      line = { image,image_view,exception };
-
-    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
-      continue;
-    row.low_black=low_black;
-    row.low_white=low_white;
-    row.high_white=high_white;
-    row.high_black=high_black;
-    RangeThresholdPixels(image,&row,q);
-    SyncThresholdRow(&line,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetThresholdProgress(image,ThresholdImageTag,progress,&status);
-      }
-  }
-  image_view=DestroyCacheView(image_view);
-  return(status);
+  return(ThresholdImageRows(image,&rows,exception));
 }
 
 /*
@@ -2441,6 +2400,22 @@ static void WhiteThresholdIntensity(const Image *image,
   WhiteThresholdPixel(image,threshold,pixel,q);
 }
 
+static void WhiteThresholdRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  const PixelInfo
+    *threshold = (const PixelInfo *) arguments;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    WhiteThresholdIntensity(image,threshold,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType TryWhiteThresholdImage(Image *image,
   const char *thresholds,ExceptionInfo *exception,MagickBooleanType *result)
 {
@@ -2462,21 +2437,14 @@ MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
 {
 #define ThresholdImageTag  "Threshold/Image"
 
-  CacheView
-    *image_view;
-
   MagickBooleanType
-    returned,
-    status;
-
-  MagickOffsetType
-    progress;
+    returned;
 
   PixelInfo
     threshold;
 
-  ssize_t
-    y;
+  const ThresholdRows
+    rows = { ThresholdImageTag,WhiteThresholdRow,&threshold };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -2488,41 +2456,5 @@ MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
   /*
     White threshold image.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,image,image->rows,2)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    const ThresholdLine
-      line = { image,image_view,exception };
-
-    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
-      continue;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      WhiteThresholdIntensity(image,&threshold,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    SyncThresholdRow(&line,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetThresholdProgress(image,ThresholdImageTag,progress,&status);
-      }
-  }
-  image_view=DestroyCacheView(image_view);
-  return(status);
+  return(ThresholdImageRows(image,&rows,exception));
 }
