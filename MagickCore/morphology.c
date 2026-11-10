@@ -5501,6 +5501,11 @@ static MagickBooleanType IsNearHalfTurnAngle(const double angle)
   return((135.0 < angle && angle <= 225.0) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType IsNearThreeQuarterTurnAngle(const double angle)
+{
+  return((225.0 < angle && angle <= 315.0) ? MagickTrue : MagickFalse);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -5529,7 +5534,7 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
     case BlurKernel:
       if (IsNearHalfTurnAngle(angle) != MagickFalse)
         return;
-      if ( 225.0 < angle && angle <= 315.0 )
+      if (IsNearThreeQuarterTurnAngle(angle) != MagickFalse)
         angle -= 180;
       break;
 
