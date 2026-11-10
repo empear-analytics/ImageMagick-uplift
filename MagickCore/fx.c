@@ -1994,6 +1994,57 @@ static MagickBooleanType TryColourFunction (
   return(MagickFalse);
 }
 
+typedef struct _ColourSpaceNames
+{
+  const char
+    *ColSp;
+
+  MagickBooleanType
+    IsGray,
+    IsIcc,
+    IsDev;
+} ColourSpaceNames;
+
+static MagickBooleanType TryColourSpaceColour (const ColourSpaceNames * names,
+  const ConstantColourContext * context, ssize_t * result)
+{
+  FxInfo
+    *const pfx = context->pfx;
+
+  ExceptionInfo
+    *dummy_exception = context->dummy_exception;
+
+  PixelInfo
+    *const colour = context->colour;
+
+  const char
+    *const ColSp = names->ColSp;
+
+  const MagickBooleanType
+    IsGray = names->IsGray,
+    IsIcc = names->IsIcc,
+    IsDev = names->IsDev;
+
+  ssize_t
+    returned;
+
+  if (!QueryColorCompliance (pfx->token, AllCompliance, colour, dummy_exception) || IsGray) {
+    ssize_t type = ParseCommandOption (MagickColorspaceOptions, MagickFalse, ColSp);
+    if (IsColourSpaceNamed(type,IsIcc,IsDev) != MagickFalse) {
+      if (TryColourFunction (context, &returned) != MagickFalse) {
+        (*result)=returned;
+        return(MagickTrue);
+      }
+    }
+    if (!IsGray) {
+      dummy_exception = DestroyExceptionInfo (dummy_exception);
+      (*result)=0;
+      return(MagickTrue);
+    }
+  }
+  return(MagickFalse);
+}
+
 static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, fxFltType *v2)
 /* Finds named colour such as "blue" and colorspace function such as "lab(10,20,30)".
    Returns number of characters to swallow.
@@ -2018,6 +2069,9 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
   ConstantColourContext
     context;
 
+  ColourSpaceNames
+    names;
+
   ssize_t
     returned;
 
@@ -2036,23 +2090,18 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
 
   /* QueryColorCompliance will raise a warning if it isn't a colour, so we discard any exceptions.
   */
-  if (!QueryColorCompliance (pfx->token, AllCompliance, &colour, dummy_exception) || IsGray) {
-    ssize_t type = ParseCommandOption (MagickColorspaceOptions, MagickFalse, ColSp);
-    if (IsColourSpaceNamed(type,IsIcc,IsDev) != MagickFalse) {
-      context.pfx=pfx;
-      context.dummy_exception=dummy_exception;
-      context.colour=(&colour);
-      context.v0=v0;
-      context.v1=v1;
-      context.v2=v2;
-      if (TryColourFunction (&context, &returned) != MagickFalse)
-        return(returned);
-    }
-    if (!IsGray) {
-      dummy_exception = DestroyExceptionInfo (dummy_exception);
-      return 0;
-    }
-  }
+  context.pfx=pfx;
+  context.dummy_exception=dummy_exception;
+  context.colour=(&colour);
+  context.v0=v0;
+  context.v1=v1;
+  context.v2=v2;
+  names.ColSp=ColSp;
+  names.IsGray=IsGray;
+  names.IsIcc=IsIcc;
+  names.IsDev=IsDev;
+  if (TryColourSpaceColour (&names, &context, &returned) != MagickFalse)
+    return(returned);
 
   *v0 = QuantumScale*colour.red;
   *v1 = QuantumScale*colour.green;
