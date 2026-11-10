@@ -1640,11 +1640,23 @@ static int GetCoordQualifier (FxInfo * pfx, int op)
   return 1;
 }
 
+static const int
+  ChannelQualifiableOperators[] =
+  {
+    fU, fV, fP,
+    fUP, fVP,
+    fS
+  };
+
 static inline MagickBooleanType IsChannelQualifiableOperator(const int op)
 {
-  return((op == fU || op == fV || op == fP ||
-    op == fUP || op == fVP ||
-    op == fS || (op >= (int) FirstImgAttr && op <= aNull)
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(ChannelQualifiableOperators)/sizeof(*ChannelQualifiableOperators)); i++)
+    if (ChannelQualifiableOperators[i] == op)
+      return(MagickTrue);
+  return(((op >= (int) FirstImgAttr && op <= aNull)
     ) ? MagickTrue : MagickFalse);
 }
 
@@ -2070,13 +2082,24 @@ static inline MagickBooleanType IsNoArgsFunction(const FunctionE fe,
     Functions[fe-(int) FirstFunc].number_args == 0) ? MagickTrue : MagickFalse);
 }
 
+static const FunctionE
+  UnqualifiedPixelFunctions[] =
+  {
+    fP, fS, fSP, fU, fUP, fV,
+    fVP
+  };
+
 static inline MagickBooleanType IsUnqualifiedPixelFunction(
   const PixelChannel chQual,const FunctionE fe)
 {
-  return(( chQual == NO_CHAN_QUAL &&
-    (fe == fP || fe == fS || fe == fSP || fe == fU || fe == fUP || fe == fV ||
-    fe == fVP)
-    ) ? MagickTrue : MagickFalse);
+  size_t
+    i;
+
+  if (chQual == NO_CHAN_QUAL)
+    for (i=0; i < (sizeof(UnqualifiedPixelFunctions)/sizeof(*UnqualifiedPixelFunctions)); i++)
+      if (UnqualifiedPixelFunctions[i] == fe)
+        return(MagickTrue);
+  return(MagickFalse);
 }
 
 static inline MagickBooleanType IsUnqualifiedCoordFunction(
@@ -2122,10 +2145,22 @@ static inline MagickBooleanType IsHslChannelQualifier(const PixelChannel chQual)
     chQual == LIGHT_CHANNEL) ? MagickTrue : MagickFalse);
 }
 
+static const FunctionE
+  PixelAccessFunctions[] =
+  {
+    fP, fU, fU0, fUP,
+    fV, fVP, fS, fSP
+  };
+
 static inline MagickBooleanType IsPixelAccessFunction(const FunctionE fe)
 {
-  return((fe == fP || fe == fU  || fe == fU0 || fe == fUP ||
-    fe == fV || fe == fVP || fe == fS || fe == fSP) ? MagickTrue : MagickFalse);
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(PixelAccessFunctions)/sizeof(*PixelAccessFunctions)); i++)
+    if (PixelAccessFunctions[i] == fe)
+      return(MagickTrue);
+  return(MagickFalse);
 }
 
 static inline MagickBooleanType IsQualifiedCoordFunction(const ImgAttrE iaQual,
@@ -4178,12 +4213,249 @@ static PixelChannel CheckStatisticsChannel (FxInfo * pfx, PixelChannel channel)
   return(channel);
 }
 
+typedef struct _ImageStatInputs
+{
+  FxInfo
+    *pfx;
+
+  ssize_t
+    ImgNum;
+
+  PixelChannel
+    channel;
+
+  ChannelStatistics
+    *cs;
+
+  ImgAttrE
+    ia;
+} ImageStatInputs;
+
+static inline MagickBooleanType HasChannelStatistics(
+  const ChannelStatistics *cs,const PixelChannel channel)
+{
+  return(((cs != (ChannelStatistics *) NULL) && (channel >= 0)) ?
+    MagickTrue : MagickFalse);
+}
+
+static void ImageStatHToZ (const ImageStatInputs *attr, fxFltType *ret)
+{
+  FxInfo
+    *const pfx = attr->pfx;
+
+  const ssize_t
+    ImgNum = attr->ImgNum;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aH:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->rows;
+      break;
+    case aN:
+      (*ret) = (fxFltType) pfx->ImgListLen;
+      break;
+    case aT: /* image index in list */
+      (*ret) = (fxFltType) ImgNum;
+      break;
+    case aW:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->columns;
+      break;
+    case aZ:
+      (*ret) = (fxFltType) GetImageDepth (pfx->Images[ImgNum], pfx->exception);
+      break;
+    default:
+      (void) ThrowMagickException (pfx->exception,GetMagickModule(),OptionError,
+        "Unknown ia=","%i",ia);
+  }
+}
+
+static void ImageStatResolutionToStdDev (const ImageStatInputs *attr, fxFltType *ret)
+{
+  FxInfo
+    *const pfx = attr->pfx;
+
+  const ssize_t
+    ImgNum = attr->ImgNum;
+
+  const PixelChannel
+    channel = attr->channel;
+
+  ChannelStatistics
+    *const cs = attr->cs;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aResX:
+      (*ret) = pfx->Images[ImgNum]->resolution.x;
+      break;
+    case aResY:
+      (*ret) = pfx->Images[ImgNum]->resolution.y;
+      break;
+    case aSkewness:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].skewness;
+      break;
+    case aStdDev:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].standard_deviation;
+      break;
+    default:
+      {
+        ImageStatHToZ (attr, &(*ret));
+        break;
+      }
+  }
+}
+
+static void ImageStatPageHeightToRes (const ImageStatInputs *attr, fxFltType *ret)
+{
+  FxInfo
+    *const pfx = attr->pfx;
+
+  const ssize_t
+    ImgNum = attr->ImgNum;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aPageHt:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->page.height;
+      break;
+    case aPrintsize:
+      /* Do nothing */
+      break;
+    case aPrintsizeX:
+      (*ret) = (fxFltType) MagickSafeReciprocal (pfx->Images[ImgNum]->resolution.x)
+                        * pfx->Images[ImgNum]->columns;
+      break;
+    case aPrintsizeY:
+      (*ret) = (fxFltType) MagickSafeReciprocal (pfx->Images[ImgNum]->resolution.y)
+                        * pfx->Images[ImgNum]->rows;
+      break;
+    case aQuality:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->quality;
+      break;
+    case aRes:
+      /* Do nothing */
+      break;
+    default:
+      {
+        ImageStatResolutionToStdDev (attr, &(*ret));
+        break;
+      }
+  }
+}
+
+static void ImageStatMinimaToPageWidth (const ImageStatInputs *attr, fxFltType *ret)
+{
+  FxInfo
+    *const pfx = attr->pfx;
+
+  const ssize_t
+    ImgNum = attr->ImgNum;
+
+  const PixelChannel
+    channel = attr->channel;
+
+  ChannelStatistics
+    *const cs = attr->cs;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aMinima:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].minima;
+      break;
+    case aPage:
+      /* Do nothing */
+      break;
+    case aPageX:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->page.x;
+      break;
+    case aPageY:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->page.y;
+      break;
+    case aPageWid:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->page.width;
+      break;
+    default:
+      {
+        ImageStatPageHeightToRes (attr, &(*ret));
+        break;
+      }
+  }
+}
+
+static void ImageStatMaximaToMedian (const ImageStatInputs *attr, fxFltType *ret)
+{
+  const PixelChannel
+    channel = attr->channel;
+
+  ChannelStatistics
+    *const cs = attr->cs;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aMaxima:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].maxima;
+      break;
+    case aMean:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].mean;
+      break;
+    case aMedian:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].median;
+      break;
+    default:
+      {
+        ImageStatMinimaToPageWidth (attr, &(*ret));
+        break;
+      }
+  }
+}
+
+static void ImageStatKurtosis (const ImageStatInputs *attr, fxFltType *ret)
+{
+  const PixelChannel
+    channel = attr->channel;
+
+  ChannelStatistics
+    *const cs = attr->cs;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aKurtosis:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].kurtosis;
+      break;
+    default:
+      {
+        ImageStatMaximaToMedian (attr, &(*ret));
+        break;
+      }
+  }
+}
+
 static inline fxFltType ImageStat (
   FxInfo * pfx, ssize_t ImgNum, PixelChannel channel, ImgAttrE ia)
 {
   ChannelStatistics * cs = NULL;
   fxFltType ret = 0;
   MagickBooleanType NeedRelinq = MagickFalse;
+  ImageStatInputs attr;
 
   if (ImgNum < 0)
     {
@@ -4202,6 +4474,11 @@ static inline fxFltType ImageStat (
     NeedRelinq = MagickTrue;
   }
 
+  attr.pfx=pfx;
+  attr.ImgNum=ImgNum;
+  attr.channel=channel;
+  attr.cs=cs;
+  attr.ia=ia;
   switch (ia) {
     case aDepth:
       ret = (fxFltType) GetImageDepth (pfx->Images[ImgNum], pfx->exception);
@@ -4209,90 +4486,11 @@ static inline fxFltType ImageStat (
     case aExtent:
       ret = (fxFltType) GetBlobSize (pfx->image);
       break;
-    case aKurtosis:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
-        ret = cs[channel].kurtosis;
-      break;
-    case aMaxima:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
-        ret = cs[channel].maxima;
-      break;
-    case aMean:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
-        ret = cs[channel].mean;
-      break;
-    case aMedian:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
-        ret = cs[channel].median;
-      break;
-    case aMinima:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
-        ret = cs[channel].minima;
-      break;
-    case aPage:
-      /* Do nothing */
-      break;
-    case aPageX:
-      ret = (fxFltType) pfx->Images[ImgNum]->page.x;
-      break;
-    case aPageY:
-      ret = (fxFltType) pfx->Images[ImgNum]->page.y;
-      break;
-    case aPageWid:
-      ret = (fxFltType) pfx->Images[ImgNum]->page.width;
-      break;
-    case aPageHt:
-      ret = (fxFltType) pfx->Images[ImgNum]->page.height;
-      break;
-    case aPrintsize:
-      /* Do nothing */
-      break;
-    case aPrintsizeX:
-      ret = (fxFltType) MagickSafeReciprocal (pfx->Images[ImgNum]->resolution.x)
-                        * pfx->Images[ImgNum]->columns;
-      break;
-    case aPrintsizeY:
-      ret = (fxFltType) MagickSafeReciprocal (pfx->Images[ImgNum]->resolution.y)
-                        * pfx->Images[ImgNum]->rows;
-      break;
-    case aQuality:
-      ret = (fxFltType) pfx->Images[ImgNum]->quality;
-      break;
-    case aRes:
-      /* Do nothing */
-      break;
-    case aResX:
-      ret = pfx->Images[ImgNum]->resolution.x;
-      break;
-    case aResY:
-      ret = pfx->Images[ImgNum]->resolution.y;
-      break;
-    case aSkewness:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
-        ret = cs[channel].skewness;
-      break;
-    case aStdDev:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
-        ret = cs[channel].standard_deviation;
-      break;
-    case aH:
-      ret = (fxFltType) pfx->Images[ImgNum]->rows;
-      break;
-    case aN:
-      ret = (fxFltType) pfx->ImgListLen;
-      break;
-    case aT: /* image index in list */
-      ret = (fxFltType) ImgNum;
-      break;
-    case aW:
-      ret = (fxFltType) pfx->Images[ImgNum]->columns;
-      break;
-    case aZ:
-      ret = (fxFltType) GetImageDepth (pfx->Images[ImgNum], pfx->exception);
-      break;
     default:
-      (void) ThrowMagickException (pfx->exception,GetMagickModule(),OptionError,
-        "Unknown ia=","%i",ia);
+      {
+        ImageStatKurtosis (&attr, &ret);
+        break;
+      }
   }
   if (NeedRelinq) cs = (ChannelStatistics *)RelinquishMagickMemory (cs);
 
@@ -6088,17 +6286,34 @@ static Image *FinishFxImage (FxInfo * pfx, MagickBooleanType status,
   return(fx_image);
 }
 
-MagickExport Image *FxImage(const Image *image,const char *expression,
-  ExceptionInfo *exception)
-{
 #define FxImageTag  "FxNew/Image"
+
+typedef struct _FxImageInputs
+{
+  const Image
+    *image;
+
+  Image
+    *fx_image;
+
+  FxInfo
+    *pfx;
+} FxImageInputs;
+
+static Image *ApplyFxImageRows (const FxImageInputs *fx_in)
+{
+  const Image
+    *const image = fx_in->image;
+
+  Image
+    *const fx_image = fx_in->fx_image;
+
+  FxInfo
+    *const pfx = fx_in->pfx;
 
   CacheView
     *fx_view,
     *image_view;
-
-  Image
-    *fx_image;
 
   MagickBooleanType
     status;
@@ -6108,34 +6323,6 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
 
   ssize_t
     y;
-
-  FxInfo
-    *pfx;
-
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (expression == (const char *) NULL)
-    return(CloneImage(image,0,0,MagickTrue,exception));
-  fx_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (!fx_image) return NULL;
-  if (SetImageStorageClass(fx_image,DirectClass,exception) == MagickFalse) {
-    fx_image=DestroyImage(fx_image);
-    return NULL;
-  }
-
-  pfx = AcquireFxInfoPrivate (image, expression, MagickTrue, exception);
-
-  if (!pfx) {
-    fx_image=DestroyImage(fx_image);
-    return NULL;
-  }
-
-  assert (pfx->image != NULL);
-  assert (pfx->Images != NULL);
-  assert (pfx->Imgs != NULL);
-  assert (pfx->fxrts != NULL);
 
   status=MagickTrue;
   progress=0;
@@ -6170,4 +6357,47 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
   image_view = DestroyCacheView (image_view);
 
   return(FinishFxImage (pfx, status, fx_image));
+}
+
+MagickExport Image *FxImage(const Image *image,const char *expression,
+  ExceptionInfo *exception)
+{
+  Image
+    *fx_image;
+
+  FxInfo
+    *pfx;
+
+  FxImageInputs
+    fx_in;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (expression == (const char *) NULL)
+    return(CloneImage(image,0,0,MagickTrue,exception));
+  fx_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (!fx_image) return NULL;
+  if (SetImageStorageClass(fx_image,DirectClass,exception) == MagickFalse) {
+    fx_image=DestroyImage(fx_image);
+    return NULL;
+  }
+
+  pfx = AcquireFxInfoPrivate (image, expression, MagickTrue, exception);
+
+  if (!pfx) {
+    fx_image=DestroyImage(fx_image);
+    return NULL;
+  }
+
+  assert (pfx->image != NULL);
+  assert (pfx->Images != NULL);
+  assert (pfx->Imgs != NULL);
+  assert (pfx->fxrts != NULL);
+
+  fx_in.image=image;
+  fx_in.fx_image=fx_image;
+  fx_in.pfx=pfx;
+  return(ApplyFxImageRows (&fx_in));
 }
