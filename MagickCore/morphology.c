@@ -3850,6 +3850,9 @@ typedef struct _MorphologyColumnWalk
   const Image
     *image;
 
+  PixelTrait
+    morphology_traits;
+
   const KernelInfo
     *kernel;
 
@@ -3900,6 +3903,49 @@ static void BlendKernelColumn(const MorphologyColumnWalk *walk,
     k--;
     pixels+=(ptrdiff_t) GetPixelChannels(image);
   }
+}
+
+static void ConvolveColumnChannelValue(const MorphologyColumnWalk *walk,
+  double *pixel,double *gamma,size_t *count)
+{
+  const Image
+    *image = walk->image;
+
+  const PixelTrait
+    morphology_traits = walk->morphology_traits;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const MagickRealType
+    *magick_restrict k = walk->k;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  ssize_t
+    v;
+
+  if (((image->alpha_trait & BlendPixelTrait) == 0) ||
+      ((morphology_traits & BlendPixelTrait) == 0))
+    for (v=0; v < (ssize_t) kernel->height; v++)
+    {
+      if (!IsNaN(*k))
+        {
+          (*pixel)+=(*k)*(double) pixels[i];
+          (*count)++;
+        }
+      k--;
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  else
+    {
+      (*gamma)=0.0;
+      BlendKernelColumn(walk,pixel,gamma,count);
+    }
 }
 
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
@@ -4064,9 +4110,6 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
             const Quantum
               *magick_restrict pixels;
 
-            ssize_t
-              v;
-
             size_t
               count;
 
@@ -4090,27 +4133,12 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
             gamma=1.0;
             count=0;
             walk.image=image;
+            walk.morphology_traits=morphology_traits;
             walk.kernel=kernel;
             walk.k=k;
             walk.pixels=pixels;
             walk.i=i;
-            if (((image->alpha_trait & BlendPixelTrait) == 0) ||
-                ((morphology_traits & BlendPixelTrait) == 0))
-              for (v=0; v < (ssize_t) kernel->height; v++)
-              {
-                if (!IsNaN(*k))
-                  {
-                    pixel+=(*k)*(double) pixels[i];
-                    count++;
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-            else
-              {
-                gamma=0.0;
-                BlendKernelColumn(&walk,&pixel,&gamma,&count);
-              }
+            ConvolveColumnChannelValue(&walk,&pixel,&gamma,&count);
             if (fabs(pixel-(double) p[center+i]) >= MagickEpsilon)
               changes[id]++;
             gamma=MagickSafeReciprocal(gamma);
