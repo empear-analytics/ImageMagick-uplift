@@ -1557,6 +1557,50 @@ static MagickBooleanType AcquireEqualizeMemory(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _EqualizeTables
+{
+  Image
+    *image;
+
+  double
+    *histogram,
+    *map,
+    *equalize_map;
+} EqualizeTables;
+
+static void EqualizeMapsAndColormap(const EqualizeTables *equalize,
+  double *black,double *white)
+{
+  Image
+    *const image = equalize->image;
+
+  double
+    *histogram = equalize->histogram,
+    *map = equalize->map;
+
+  double
+    *const equalize_map = equalize->equalize_map;
+
+  EqualizeLevels
+    levels;
+
+  IntegrateEqualizeHistogram(image,histogram,map);
+  (void) memset(equalize_map,0,(MaxMap+1)*GetPixelChannels(image)*
+    sizeof(*equalize_map));
+  (void) memset(black,0,sizeof(*black));
+  (void) memset(white,0,sizeof(*white));
+  levels.image=image;
+  levels.map=map;
+  BuildEqualizeMaps(&levels,black,white,equalize_map);
+  histogram=(double *) RelinquishMagickMemory(histogram);
+  map=(double *) RelinquishMagickMemory(map);
+  /*
+    Equalize colormap.
+  */
+  if (image->storage_class == PseudoClass)
+    EqualizeColormap(image,black,white,equalize_map);
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -1575,8 +1619,8 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   const EqualizeMemory
     targets = { &equalize_map, &histogram, &map };
 
-  EqualizeLevels
-    levels;
+  EqualizeTables
+    equalize;
 
   MagickBooleanType
     status;
@@ -1607,21 +1651,11 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   /*
     Integrate the histogram to get the equalization map.
   */
-  IntegrateEqualizeHistogram(image,histogram,map);
-  (void) memset(equalize_map,0,(MaxMap+1)*GetPixelChannels(image)*
-    sizeof(*equalize_map));
-  (void) memset(black,0,sizeof(*black));
-  (void) memset(white,0,sizeof(*white));
-  levels.image=image;
-  levels.map=map;
-  BuildEqualizeMaps(&levels,black,white,equalize_map);
-  histogram=(double *) RelinquishMagickMemory(histogram);
-  map=(double *) RelinquishMagickMemory(map);
-  /*
-    Equalize colormap.
-  */
-  if (image->storage_class == PseudoClass)
-    EqualizeColormap(image,black,white,equalize_map);
+  equalize.image=image;
+  equalize.histogram=histogram;
+  equalize.map=map;
+  equalize.equalize_map=equalize_map;
+  EqualizeMapsAndColormap(&equalize,black,white);
   /*
     Equalize image.
   */
