@@ -535,15 +535,10 @@ static GeometryInfo SetRingOrRectangleKernelDefaults(const ssize_t type,
   return(args);
 }
 
-static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
+static GeometryInfo SetShapeKernelDefaults(const ssize_t type,
   const MagickStatusType flags,GeometryInfo args)
 {
   switch( type ) {
-    /* Shape Kernel Defaults */
-    case UnityKernel:
-      if ( (flags & WidthValue) == 0 )
-        args.rho = 1.0;    /* Default scale = 1.0, zero is valid */
-      break;
     case SquareKernel:
     case DiamondKernel:
     case OctagonKernel:
@@ -554,6 +549,21 @@ static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
       break;
     default:
       return(SetRingOrRectangleKernelDefaults(type,flags,args));
+  }
+  return(args);
+}
+
+static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
+  const MagickStatusType flags,GeometryInfo args)
+{
+  switch( type ) {
+    /* Shape Kernel Defaults */
+    case UnityKernel:
+      if ( (flags & WidthValue) == 0 )
+        args.rho = 1.0;    /* Default scale = 1.0, zero is valid */
+      break;
+    default:
+      return(SetShapeKernelDefaults(type,flags,args));
   }
   return(args);
 }
