@@ -367,6 +367,17 @@ static MagickBooleanType ParseKernelSpecification(const char *kernel_string,
   return(MagickTrue);
 }
 
+static void ExpandKernelByFlags(KernelInfo *kernel,
+  const MagickStatusType flags)
+{
+  if ( (flags & AreaValue) != 0 )         /* '@' symbol in kernel size */
+    ExpandRotateKernelInfo(kernel, 45.0); /* cyclic rotate 3x3 kernels */
+  else if ( (flags & GreaterValue) != 0 ) /* '>' symbol in kernel args */
+    ExpandRotateKernelInfo(kernel, 90.0); /* 90 degree rotate of kernel */
+  else if ( (flags & LessValue) != 0 )    /* '<' symbol in kernel args */
+    ExpandMirrorKernelInfo(kernel);       /* 90 degree mirror rotate */
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -455,12 +466,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   if (kernel->minimum == MagickMaximumValue)
     return(DestroyKernelInfo(kernel));
 
-  if ( (flags & AreaValue) != 0 )         /* '@' symbol in kernel size */
-    ExpandRotateKernelInfo(kernel, 45.0); /* cyclic rotate 3x3 kernels */
-  else if ( (flags & GreaterValue) != 0 ) /* '>' symbol in kernel args */
-    ExpandRotateKernelInfo(kernel, 90.0); /* 90 degree rotate of kernel */
-  else if ( (flags & LessValue) != 0 )    /* '<' symbol in kernel args */
-    ExpandMirrorKernelInfo(kernel);       /* 90 degree mirror rotate */
+  ExpandKernelByFlags(kernel,flags);
 
   return(kernel);
 }
