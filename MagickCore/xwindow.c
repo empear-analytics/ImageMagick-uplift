@@ -5929,6 +5929,14 @@ static inline MagickBooleanType IsBlueHigh32BitMap(const XImage *ximage,
     (map_info->blue_mult == 65536L)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsMutableAlphaImage(const XWindowInfo *window,
+  const Image *image)
+{
+  return(((window->immutable == MagickFalse) &&
+    (image->storage_class == DirectClass) &&
+    (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
   const XWindowInfo *window,Image *image,XImage *ximage,XImage *matte_image,
   ExceptionInfo *exception)
@@ -5971,9 +5979,7 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   canvas=image;
-  if ((window->immutable == MagickFalse) &&
-      (image->storage_class == DirectClass) &&
-      (image->alpha_trait != UndefinedPixelTrait))
+  if (IsMutableAlphaImage(window,image) != MagickFalse)
     {
       char
         size[MagickPathExtent];
