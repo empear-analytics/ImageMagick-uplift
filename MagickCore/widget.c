@@ -7288,6 +7288,25 @@ static XWidgetInfo MoveListBrowserSlider(XWidgetInfo slider_info,
   return(slider_info);
 }
 
+static void ReadListBrowserEntry(Display *display,XWindowInfo *window_info,
+  const XWidgetInfo reply_info,const ListBrowserTargets *targets)
+{
+  XWidgetInfo
+    *const action_info = targets->action_info;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Read new entry.
+  */
+  if (*reply_info.text == '\0')
+    return;
+  (*action_info).raised=MagickFalse;
+  XDrawBeveledButton(display,window_info,action_info);
+  (*state)|=ExitState;
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7867,14 +7886,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
           }
         if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
           {
-            /*
-              Read new entry.
-            */
-            if (*reply_info.text == '\0')
-              break;
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,window_info,&action_info);
-            state|=ExitState;
+            ReadListBrowserEntry(display,window_info,reply_info,&targets);
             break;
           }
         if (key_symbol == XK_Control_L)
