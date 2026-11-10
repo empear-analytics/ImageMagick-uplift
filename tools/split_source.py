@@ -259,7 +259,10 @@ art_lines = blocks[0]
 for blk in blocks[1:]: art_lines = art_lines + [blank] + blk
 hdr = L[:art_rows[0]] + art_lines + L[art_rows[-1] + 1:tk] + [row(title, len(title))] + L[tk + 1:hend + 1]
 assert all(len(x) == 79 for x in art_lines), "header width"
-inc_a = next(k for k, l in enumerate(L) if l.strip() == "Include declarations.") - 1
+# the include block starts at its "Include declarations." comment, or, in a file that has none
+# (vision.c), at the first #include after the licence header
+inc_a = next((k - 1 for k, l in enumerate(L) if l.strip() == "Include declarations."), None)
+if inc_a is None: inc_a = next(k for k in range(hend, len(L)) if L[k].startswith("#include"))
 inc_b = max(k for k in range(len(L)) if L[k].startswith("#include") and k < first[1])
 # carry a trailing #endif etc. that closes a conditional include
 while L[inc_b + 1].startswith("#"): inc_b += 1

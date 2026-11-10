@@ -331,6 +331,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/token.h \
   MagickCore/token-private.h \
   MagickCore/transform.c \
+  MagickCore/transform-region.c \
   MagickCore/transform-tiles.c \
   MagickCore/transform.h \
   MagickCore/threshold.c \
@@ -351,6 +352,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/visual-effects-stegano.c \
   MagickCore/visual-effects.h \
   MagickCore/vision.c \
+  MagickCore/vision-components.c \
   MagickCore/vision.h \
   MagickCore/widget.c \
   MagickCore/widget.h \
