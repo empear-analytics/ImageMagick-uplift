@@ -2355,6 +2355,26 @@ static KernelInfo *AcquireHitAndMissKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireCrossShapedKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  const double
+    nan = inputs->nan;
+
+  switch(type) {
+      case PlusKernel:
+        return(AcquirePlusOrCrossKernel(kernel,args,nan,PlusKernelShape));
+      case CrossKernel:
+        return(AcquirePlusOrCrossKernel(kernel,args,nan,CrossKernelShape));
+    default:
+      return(AcquireHitAndMissKernel(kernel,type,inputs));
+  }
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2567,15 +2587,11 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         return(AcquireOctagonKernel(kernel,args,nan));
       case DiskKernel:
         return(AcquireDiskKernel(kernel,args,nan));
-      case PlusKernel:
-        return(AcquirePlusOrCrossKernel(kernel,args,nan,PlusKernelShape));
-      case CrossKernel:
-        return(AcquirePlusOrCrossKernel(kernel,args,nan,CrossKernelShape));
     default:
       inputs.args=args;
       inputs.nan=nan;
       inputs.exception=exception;
-      return(AcquireHitAndMissKernel(kernel,type,&inputs));
+      return(AcquireCrossShapedKernel(kernel,type,&inputs));
   }
   return(kernel);
 }
