@@ -1391,6 +1391,35 @@ static void NormalizeFeatureStatistics(const Image *image,
     statistics->alpha*=normalize;
 }
 
+static void NormalizeFeatureCooccurrence(const Image *image,
+  const size_t distance,FeatureStatistics **cooccurrence,
+  const unsigned int number_grays)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < 4; i++)
+  {
+    double
+      normalize;
+
+    ssize_t
+      y;
+
+    normalize=GetFeatureNormalization(image,distance,i);
+    normalize=MagickSafeReciprocal(normalize);
+    for (y=0; y < (ssize_t) number_grays; y++)
+    {
+      ssize_t
+        x;
+
+      for (x=0; x < (ssize_t) number_grays; x++)
+        NormalizeFeatureStatistics(image,&cooccurrence[x][y].direction[i],
+          normalize);
+    }
+  }
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1651,26 +1680,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Normalize spatial dependence matrix.
   */
-  for (i=0; i < 4; i++)
-  {
-    double
-      normalize;
-
-    ssize_t
-      y;
-
-    normalize=GetFeatureNormalization(image,distance,i);
-    normalize=MagickSafeReciprocal(normalize);
-    for (y=0; y < (ssize_t) number_grays; y++)
-    {
-      ssize_t
-        x;
-
-      for (x=0; x < (ssize_t) number_grays; x++)
-        NormalizeFeatureStatistics(image,&cooccurrence[x][y].direction[i],
-          normalize);
-    }
-  }
+  NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
   /*
     Compute texture features.
   */
