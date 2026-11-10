@@ -501,6 +501,27 @@ static void XDrawMatte(Display *display,const XWindowInfo *window_info,
 %      contains the extents of the text.
 %
 */
+static void XScrollTextMarker(XFontStruct *font_info,XWidgetInfo *text_info,
+  const unsigned int width)
+{
+  const char
+    *text;
+
+  int
+    i,
+    n;
+
+  text=text_info->text;
+  for (i=0; i < Extent(text); i++)
+  {
+    n=XTextWidth(font_info,(char *) text+i,(int)
+      (text_info->cursor-text-i));
+    if (n <= (int) width)
+      break;
+  }
+  text_info->marker=(char *) text+i;
+}
+
 static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
   XWidgetInfo *text_info)
 {
@@ -508,12 +529,8 @@ static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
     *text;
 
   int
-    n,
     x,
     y;
-
-  int
-    i;
 
   unsigned int
     height,
@@ -565,17 +582,7 @@ static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
       text=text_info->marker;
       if (XTextWidth(font_info,(char *) text,(int) (text_info->cursor-text)) >
           (int) width)
-        {
-          text=text_info->text;
-          for (i=0; i < Extent(text); i++)
-          {
-            n=XTextWidth(font_info,(char *) text+i,(int)
-              (text_info->cursor-text-i));
-            if (n <= (int) width)
-              break;
-          }
-          text_info->marker=(char *) text+i;
-        }
+        XScrollTextMarker(font_info,text_info,width);
     }
   /*
     Draw text and cursor.
