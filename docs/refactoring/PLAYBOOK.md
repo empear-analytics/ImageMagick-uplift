@@ -7396,6 +7396,131 @@ by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe LP - Name a Label Set as a Predicate
+
+**Use when:** CodeScene reports *Complex Method* and much of the function's complexity is
+one `switch` that holds a single group of many labels besides `default: break;`, whose
+body leaves the function on every path, as `colorspace.c`'s `sRGBTransformImage` does:
+twenty-eight colourspace labels select the generic conversion, `default:` breaks to the
+rest of the function. The label set may recur as the same single group in another
+function of the file (`GenericOrLogTosRGB`, the same twenty-eight labels), where it is a
+second *Complex Method*.
+
+**Not covered by:** Recipe P, which moves a boolean expression character for character;
+a `switch` is a statement, and its label test is no expression of the source. Recipe NS,
+which names a `?:` between two constants. Recipes SD, SR and SW, which move groups with
+their bodies: the new function keeps the labels and the body, so each site becomes its
+own label-run helper and two such helpers of one set of labels clone (and SW's step 3
+gives `sRGBTransformImage`'s helper five parameters). Recipe E step 7, which moves the
+whole `switch` with the tail of the function.
+
+**How:**
+
+1. The `switch (e)` has exactly two groups: one group `G` of labels `L1 ... Ln` with body
+   `B`, and `default:` with `break;` alone. `e` is a parameter, a local or a member access
+   (`image->colorspace`) of an enumeration type, with no call, assignment or increment.
+   `B` ends every path with `return(...)`; it holds no `break` of this `switch`, no
+   `continue`, `goto` or `case` label, and no `#pragma` or preprocessor line. The
+   `switch` lies outside every OpenMP region.
+2. Write a `static MagickBooleanType` function directly above the first function that
+   uses it, named for what the labels have in common, with one parameter of `e`'s
+   declared type, `const`: its body is `switch (<param>) { <L1 ... Ln, one per line, in
+   the first site's order> return(MagickTrue); default: break; } return(MagickFalse);`.
+3. Replace the `switch`, from `switch` to its closing brace, by
+   `if (<Name>(e) != MagickFalse)` followed by `B`. `B`'s text is unchanged except for its
+   indentation, which follows the file's style for the body of an `if` (a braced block
+   keeps its own lines; a single statement stands two columns deeper than the `if`).
+4. *Several sites.* The same function replaces another such `switch` whose label set
+   equals `L1 ... Ln` as a set (the order of labels does not matter: a `switch` selects by
+   value), each site meeting steps 1 and 3. A site in another function of the caller's is
+   its own commit.
+5. Check by script that each site's labels and the function's are the same set, each
+   label once, and that each `B` equals the original body but for indentation.
+
+**Before:**
+
+```c
+  switch (colorspace)
+  {
+    case CMYColorspace:
+    case Adobe98Colorspace:
+    ...
+    case YUVColorspace:
+    {
+      sRGBGenericInput
+        input;
+
+      input.colorspace=colorspace;
+      input.illuminant=illuminant;
+      return(sRGBToGeneric(&input,image,status,exception));
+    }
+    default:
+      break;
+  }
+  table.colorspace=colorspace;
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsGenericColorspace(const ColorspaceType colorspace)
+{
+  switch (colorspace)
+  {
+    case CMYColorspace:
+    case Adobe98Colorspace:
+    ...
+    case YUVColorspace:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+...
+  if (IsGenericColorspace(colorspace) != MagickFalse)
+    {
+      sRGBGenericInput
+        input;
+
+      input.colorspace=colorspace;
+      input.illuminant=illuminant;
+      return(sRGBToGeneric(&input,image,status,exception));
+    }
+  table.colorspace=colorspace;
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The original evaluates `e` once and runs `B` exactly when
+  `e` equals one of `L1 ... Ln`; otherwise `default:` breaks and control goes on after the
+  `switch`. The new function evaluates the same value once (step 1: `e` has no side
+  effect; its parameter has `e`'s own type, so passing converts nothing) and returns
+  `MagickTrue` exactly when the value equals one of the same labels (steps 4 and 5), so
+  `B` runs on the same inputs; otherwise control goes on after the `if`, where it went
+  after the `switch`. `B` leaves the function on every path (step 1), so nothing after the
+  `if` runs once it has run, as nothing after the `switch` did.
+- `B` holds no `break` of the `switch` (step 1), which inside an `if` would bind to an
+  enclosing loop or not compile.
+- The new function's `switch` keeps `default: break;`, so `-Wswitch` stays quiet; the
+  caller has no `switch` left to warn about. The new function is a label run: with more
+  than seven labels it is a *Complex Method* of its own, allowed for label-run helpers by
+  the owner's ruling of 2026-11-07, and it holds nothing but the labels.
+
+**Evidence level:** oracle (the cases that reach each caller), with `refactor_guard.py
+--calls` (`+2` for the new function, `+1` for each further site, nothing else moved) and
+step 5's script.
+
+**Provenance:** 2026-11-10, from `colorspace.c`'s `sRGBTransformImage` and
+`GenericOrLogTosRGB` (campaign A, W16 lane c): the same twenty-eight-label generic group,
+a *Complex Method* in each (cc 31 and 30), the last findings of the file but its length and
+mean complexity. W15 lane b measured the label run as an SW helper of `sRGBTransformImage`
+(7.46, five parameters by SW step 3). A probe of this recipe on both sites: 7.44 to 8.10
+(the first site alone 7.46), the one new function the only *Complex Method* left (cc 30, a
+label run). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -7697,3 +7822,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-07 | AMEND | N | Step 2's pass-through form combines: the new function may take several names the caller binds `const` locals from (unchanged, in the caller's order) and, for variables computed in the caller's body that would take it past four parameters, one new struct by steps 3, 5 and 6; at most four parameters in all. *Careful* gives the argument | `composite.c`'s `CompositeImagePixel` (campaign A, W15): its channel loop reads 16 locals bound from `row` and 8 per-pixel values; the loop's colour `switch` reads from `row`, the per-pixel struct and 6 per-channel values. The three steps that use the form: 3.44 to 3.46 in a probe | mandate (2026-10-24) |
 | 2026-11-07 | AMEND | PS | Step 6: the helper may read the input struct as `name->member` at every use (Recipe N step 4's member form, as Q step 4 allows), the text then changing by that prefix too; a member a function-like macro names keeps its `const` local. When every member's value is a plain identifier that nothing in the loop body writes, the struct may be declared `const` with the values as its initialiser among the loop body's declarations (PC step 4's form). Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): its column loop body, fourteen inputs, as a step 7 nested-loop helper with `const` locals would be a *Large Method* (about 87 lines by count); in the member form 60 lines, no finding, 6.30 to 6.51 | mandate (2026-10-24) |
 | 2026-11-07 | AMEND | N | Step 8: the sibling and later-block forms also join a PS step 7 nested-loop helper and the parallel body's head moved by PC: the head takes the PS struct (declared `const` with its initialiser among the body's declarations, which stays), the typedef and initialiser gain the members the head reads, the head binds them as `const` locals (PC keeps its text), and the inner call passes `name`. Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): PC before the column body moves gives a *Complex* and *Large* helper (6.30 to 6.21); after it, with its own struct, about 80 lines; sharing the PS struct, 52 lines and no finding, 6.51 to 6.62 | mandate (2026-10-24) |
+| 2026-11-10 | NEW | LP | Name a Label Set as a Predicate: a `switch (e)` whose only groups are one run of labels with a body that returns on every path and `default: break;` becomes `if (<Pred>(e) != MagickFalse)` and the body; the new `static MagickBooleanType` function holds the labels (`return(MagickTrue)`, `default: break;`, `return(MagickFalse)`) and may replace further sites with the same label set | `colorspace.c`'s `sRGBTransformImage` and `GenericOrLogTosRGB` (campaign A, W16 lane c): the same 28-label generic group, cc 31 and 30; a probe of both sites 7.44 to 8.10 (the first alone 7.46), the predicate a label-run *Complex Method* (cc 30) under the ruling of 2026-11-07 | mandate (2026-10-24) |
