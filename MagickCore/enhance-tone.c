@@ -1089,20 +1089,77 @@ static void FindStretchLevels(const StretchLevels *levels,Quantum *black,
 
 #define ContrastStretchImageTag  "ContrastStretch/Image"
 
-MagickExport MagickBooleanType ContrastStretchImage(Image *image,
-  const double black_point,const double white_point,ExceptionInfo *exception)
+typedef struct _StretchPass
 {
+  Quantum
+    *black,
+    *white,
+    *stretch_map;
+} StretchPass;
+
+static MagickBooleanType StretchImagePixels(Image *image,
+  const StretchPass *pass,ExceptionInfo *exception)
+{
+  Quantum
+    *const black = pass->black,
+    *const white = pass->white,
+    *const stretch_map = pass->stretch_map;
+
   CacheView
     *image_view;
-
-  double
-    *histogram;
 
   MagickBooleanType
     status;
 
   MagickOffsetType
     progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    const ToneLine
+      line = { image,image_view,exception };
+
+    const StretchMaps
+      maps = { black, white, stretch_map };
+
+    if (GetToneRow(&line,y,&q,&status) == MagickFalse)
+      continue;
+    StretchImageRow(image,&maps,q);
+    SyncToneRow(&line,&status);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetToneProgress(image,ContrastStretchImageTag,progress,&status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport MagickBooleanType ContrastStretchImage(Image *image,
+  const double black_point,const double white_point,ExceptionInfo *exception)
+{
+  double
+    *histogram;
+
+  MagickBooleanType
+    status;
 
   Quantum
     *black,
@@ -1112,8 +1169,8 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   StretchLevels
     levels;
 
-  ssize_t
-    y;
+  StretchPass
+    pass;
 
   /*
     Allocate histogram and stretch map.
@@ -1162,38 +1219,10 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   /*
     Stretch-contrast image.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    const ToneLine
-      line = { image,image_view,exception };
-
-    const StretchMaps
-      maps = { black, white, stretch_map };
-
-    if (GetToneRow(&line,y,&q,&status) == MagickFalse)
-      continue;
-    StretchImageRow(image,&maps,q);
-    SyncToneRow(&line,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetToneProgress(image,ContrastStretchImageTag,progress,&status);
-      }
-  }
-  image_view=DestroyCacheView(image_view);
+  pass.black=black;
+  pass.white=white;
+  pass.stretch_map=stretch_map;
+  status=StretchImagePixels(image,&pass,exception);
   SetStretchProperty(image,black,white,exception);
   white=(Quantum *) RelinquishMagickMemory(white);
   black=(Quantum *) RelinquishMagickMemory(black);
