@@ -864,16 +864,17 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
     SyncShearView(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
+        ShearProgress
+          info;
 
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,YShearImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        info.image=image;
+        info.tag=YShearImageTag;
+        info.extent=image->rows;
+        SetShearProgress(&info,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
