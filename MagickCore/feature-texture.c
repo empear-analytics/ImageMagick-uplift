@@ -1435,6 +1435,27 @@ static void InitializeFeatureGrays(PixelPacket *grays)
   }
 }
 
+static ssize_t AcquireFeatureRows(FeatureStatistics **cooccurrence,
+  FeatureStatistics **Q,const unsigned int number_grays)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_grays; i++)
+  {
+    cooccurrence[i]=(FeatureStatistics *) AcquireQuantumMemory(number_grays,
+      sizeof(**cooccurrence));
+    Q[i]=(FeatureStatistics *) AcquireQuantumMemory(number_grays,sizeof(**Q));
+    if ((cooccurrence[i] == (FeatureStatistics *) NULL) ||
+        (Q[i] == (FeatureStatistics *) NULL))
+      break;
+    (void) memset(cooccurrence[i],0,number_grays*
+      sizeof(**cooccurrence));
+    (void) memset(Q[i],0,number_grays*sizeof(**Q));
+  }
+  return(i);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1607,18 +1628,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   (void) memset(&entropy_xy2,0,sizeof(entropy_xy2));
   (void) memset(&entropy_y,0,sizeof(entropy_y));
   (void) memset(&variance,0,sizeof(variance));
-  for (i=0; i < (ssize_t) number_grays; i++)
-  {
-    cooccurrence[i]=(FeatureStatistics *) AcquireQuantumMemory(number_grays,
-      sizeof(**cooccurrence));
-    Q[i]=(FeatureStatistics *) AcquireQuantumMemory(number_grays,sizeof(**Q));
-    if ((cooccurrence[i] == (FeatureStatistics *) NULL) ||
-        (Q[i] == (FeatureStatistics *) NULL))
-      break;
-    (void) memset(cooccurrence[i],0,number_grays*
-      sizeof(**cooccurrence));
-    (void) memset(Q[i],0,number_grays*sizeof(**Q));
-  }
+  i=AcquireFeatureRows(cooccurrence,Q,number_grays);
   if (i < (ssize_t) number_grays)
     {
       for (i--; i >= 0; i--)
