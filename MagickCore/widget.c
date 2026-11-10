@@ -8404,6 +8404,49 @@ static void MoveMenuSelection(const MenuPointer *pointer,
   XDrawBevel(display,&windows->widget,highlight_info);
 }
 
+typedef struct _MenuExitTargets
+{
+  XWidgetInfo
+    *selection_info;
+
+  size_t
+    *state;
+} MenuExitTargets;
+
+static MagickBooleanType StayInMenuOnCommand(XWindows *windows,
+  const XEvent event,char *item,const MenuExitTargets *targets)
+{
+  XWidgetInfo
+    *const selection_info = targets->selection_info;
+
+  size_t
+    *const state = targets->state;
+
+  if ((submenu_info.active != 0) &&
+      (event.xmotion.window == windows->command.id))
+    {
+      if (((*state) & InactiveWidgetState) == 0)
+        {
+          if (MatteIsActive(submenu_info,event.xmotion) == MagickFalse)
+            {
+              (*selection_info).id=(~0);
+              *item='\0';
+              (*state)|=ExitState;
+              return(MagickFalse);
+            }
+        }
+      else
+        if (WindowIsActive(windows->command,event.xmotion))
+          {
+            (*selection_info).id=(~0);
+            *item='\0';
+            (*state)|=ExitState;
+            return(MagickFalse);
+          }
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -8715,6 +8758,9 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       }
       case MotionNotify:
       {
+        MenuExitTargets
+          exit_targets;
+
         MenuPointer
           pointer;
 
@@ -8722,28 +8768,11 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
           Discard pending button motion events.
         */
         while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if ((submenu_info.active != 0) &&
-            (event.xmotion.window == windows->command.id))
-          {
-            if ((state & InactiveWidgetState) == 0)
-              {
-                if (MatteIsActive(submenu_info,event.xmotion) == MagickFalse)
-                  {
-                    selection_info.id=(~0);
-                    *item='\0';
-                    state|=ExitState;
-                    break;
-                  }
-              }
-            else
-              if (WindowIsActive(windows->command,event.xmotion))
-                {
-                  selection_info.id=(~0);
-                  *item='\0';
-                  state|=ExitState;
-                  break;
-                }
-          }
+        exit_targets.selection_info=(&selection_info);
+        exit_targets.state=(&state);
+        if (StayInMenuOnCommand(windows,event,item,&exit_targets) ==
+            MagickFalse)
+          break;
         if (event.xmotion.window != windows->widget.id)
           break;
         if (state & InactiveWidgetState)
