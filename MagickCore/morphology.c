@@ -2375,6 +2375,34 @@ static KernelInfo *AcquireCrossShapedKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireAreaShapedKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  const double
+    nan = inputs->nan;
+
+  switch(type) {
+    /*
+      Boolean or Shaped Kernels
+    */
+    case DiamondKernel:
+      return(AcquireDiamondKernel(kernel,args,nan));
+    case SquareKernel:
+    case RectangleKernel:
+      return(AcquireRectangleKernel(kernel,type,args));
+      case OctagonKernel:
+        return(AcquireOctagonKernel(kernel,args,nan));
+      case DiskKernel:
+        return(AcquireDiskKernel(kernel,args,nan));
+    default:
+      return(AcquireCrossShapedKernel(kernel,type,inputs));
+  }
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2575,23 +2603,11 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       /* http://ltswww.epfl.ch/~courstiv/exos_labos/sol3.pdf -- WRONG? */
       return(AcquireFreiChenKernel(kernel,type,args,exception));
 
-    /*
-      Boolean or Shaped Kernels
-    */
-    case DiamondKernel:
-      return(AcquireDiamondKernel(kernel,args,nan));
-    case SquareKernel:
-    case RectangleKernel:
-      return(AcquireRectangleKernel(kernel,type,args));
-      case OctagonKernel:
-        return(AcquireOctagonKernel(kernel,args,nan));
-      case DiskKernel:
-        return(AcquireDiskKernel(kernel,args,nan));
     default:
       inputs.args=args;
       inputs.nan=nan;
       inputs.exception=exception;
-      return(AcquireCrossShapedKernel(kernel,type,&inputs));
+      return(AcquireAreaShapedKernel(kernel,type,&inputs));
   }
   return(kernel);
 }
