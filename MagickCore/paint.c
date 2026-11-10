@@ -1274,6 +1274,52 @@ static inline MagickBooleanType IsPixelInChromaRange(const PixelInfo *pixel,
     MagickFalse);
 }
 
+typedef struct _ChromaPaint
+{
+  const PixelInfo
+    *low,
+    *high;
+
+  Quantum
+    opacity;
+
+  MagickBooleanType
+    invert;
+} ChromaPaint;
+
+static void TransparentPaintChromaPixels(Image *image,const ChromaPaint *paint,
+  Quantum *magick_restrict q)
+{
+  const PixelInfo
+    *low = paint->low,
+    *high = paint->high;
+
+  const Quantum
+    opacity = paint->opacity;
+
+  const MagickBooleanType
+    invert = paint->invert;
+
+  MagickBooleanType
+    match;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  GetPixelInfo(image,&pixel);
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    GetPixelInfoPixel(image,q,&pixel);
+    match=IsPixelInChromaRange(&pixel,low,high);
+    if (match != invert)
+      SetPixelAlpha(image,opacity,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
   const PixelInfo *low,const PixelInfo *high,const Quantum opacity,
   const MagickBooleanType invert,ExceptionInfo *exception)
@@ -1317,29 +1363,19 @@ MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
     const PaintRows
       rows = { image,image_view,exception,y };
 
-    MagickBooleanType
-      match;
-
-    PixelInfo
-      pixel;
+    ChromaPaint
+      paint;
 
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (GetPaintRow(&rows,&q,&status) == MagickFalse)
       continue;
-    GetPixelInfo(image,&pixel);
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      GetPixelInfoPixel(image,q,&pixel);
-      match=IsPixelInChromaRange(&pixel,low,high);
-      if (match != invert)
-        SetPixelAlpha(image,opacity,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    paint.low=low;
+    paint.high=high;
+    paint.opacity=opacity;
+    paint.invert=invert;
+    TransparentPaintChromaPixels(image,&paint,q);
     SyncPaintRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
