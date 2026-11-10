@@ -957,6 +957,51 @@ static void AccumulateDifferenceEntropies(const TextureDirection *texture,
     &density_y[x].direction[i]);
 }
 
+static void SetFirstMeasureOfCorrelation(const TextureDirection *texture,
+  const TextureSlots *slots)
+{
+  const PixelInfo
+    *const entropy_x = slots->entropy_x,
+    *const entropy_xy = slots->entropy_xy,
+    *const entropy_xy1 = slots->entropy_xy1,
+    *const entropy_y = slots->entropy_y;
+
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Information Measures of Correlation.
+  */
+  channel_features[RedPixelChannel].measure_of_correlation_1[i]=
+    (entropy_xy->red-entropy_xy1->red)/
+    (entropy_x->red > entropy_y->red ?
+     entropy_x->red : entropy_y->red);
+  channel_features[GreenPixelChannel].measure_of_correlation_1[i]=
+    (entropy_xy->green-entropy_xy1->green)/
+    (entropy_x->green > entropy_y->green ?
+     entropy_x->green : entropy_y->green);
+  channel_features[BluePixelChannel].measure_of_correlation_1[i]=
+    (entropy_xy->blue-entropy_xy1->blue)/
+    (entropy_x->blue > entropy_y->blue ?
+     entropy_x->blue : entropy_y->blue);
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].measure_of_correlation_1[i]=
+      (entropy_xy->black-entropy_xy1->black)/
+      (entropy_x->black > entropy_y->black ?
+       entropy_x->black : entropy_y->black);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].measure_of_correlation_1[i]=
+      (entropy_xy->alpha-entropy_xy1->alpha)/
+      (entropy_x->alpha > entropy_y->alpha ?
+       entropy_x->alpha : entropy_y->alpha);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1412,31 +1457,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         (((double) number_grays*number_grays*sum_squares.direction[i].alpha)-
         (variance.direction[i].alpha*variance.direction[i].alpha))/
         ((double) number_grays*number_grays*number_grays*number_grays);
-    /*
-      Information Measures of Correlation.
-    */
-    channel_features[RedPixelChannel].measure_of_correlation_1[i]=
-      (entropy_xy.direction[i].red-entropy_xy1.direction[i].red)/
-      (entropy_x.direction[i].red > entropy_y.direction[i].red ?
-       entropy_x.direction[i].red : entropy_y.direction[i].red);
-    channel_features[GreenPixelChannel].measure_of_correlation_1[i]=
-      (entropy_xy.direction[i].green-entropy_xy1.direction[i].green)/
-      (entropy_x.direction[i].green > entropy_y.direction[i].green ?
-       entropy_x.direction[i].green : entropy_y.direction[i].green);
-    channel_features[BluePixelChannel].measure_of_correlation_1[i]=
-      (entropy_xy.direction[i].blue-entropy_xy1.direction[i].blue)/
-      (entropy_x.direction[i].blue > entropy_y.direction[i].blue ?
-       entropy_x.direction[i].blue : entropy_y.direction[i].blue);
-    if (image->colorspace == CMYKColorspace)
-      channel_features[BlackPixelChannel].measure_of_correlation_1[i]=
-        (entropy_xy.direction[i].black-entropy_xy1.direction[i].black)/
-        (entropy_x.direction[i].black > entropy_y.direction[i].black ?
-         entropy_x.direction[i].black : entropy_y.direction[i].black);
-    if (image->alpha_trait != UndefinedPixelTrait)
-      channel_features[AlphaPixelChannel].measure_of_correlation_1[i]=
-        (entropy_xy.direction[i].alpha-entropy_xy1.direction[i].alpha)/
-        (entropy_x.direction[i].alpha > entropy_y.direction[i].alpha ?
-         entropy_x.direction[i].alpha : entropy_y.direction[i].alpha);
+    SetFirstMeasureOfCorrelation(&texture,&slots);
     channel_features[RedPixelChannel].measure_of_correlation_2[i]=
       (sqrt(fabs(1.0-exp(-2.0*(double) (entropy_xy2.direction[i].red-
       entropy_xy.direction[i].red)))));
