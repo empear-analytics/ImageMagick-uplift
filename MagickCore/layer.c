@@ -1638,6 +1638,14 @@ static MagickBooleanType AcquireBackgroundFrame(const Image *curr,
   return(MagickTrue);
 }
 
+static Image *ReleaseFrameLists(RectangleInfo *bounds,
+  DisposeType *disposals)
+{
+  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+  disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+  return((Image *) NULL);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1724,11 +1732,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     Initialise Previous Image as fully transparent
   */
   if (AcquireTransparentFrame(curr,&prev_image,exception) == MagickFalse)
-    {
-      bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-      disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-      return((Image *) NULL);
-    }
+    return(ReleaseFrameLists(bounds,disposals));
   /*
     Figure out the area of overlay of the first frame
     No pixel could be cleared as all pixels are already cleared.
