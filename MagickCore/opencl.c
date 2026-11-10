@@ -603,6 +603,14 @@ static MagickCLDevice AcquireMagickCLDevice()
 %
 */
 
+static inline MagickBooleanType IsOpenCLDeviceOptionEnabled(
+  const char *option)
+{
+  return(((IsStringTrue(option) != MagickFalse) ||
+    (strcmp(option,"GPU") == 0) ||
+    (strcmp(option,"CPU") == 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickCLEnv AcquireMagickCLEnv(void)
 {
   char
@@ -621,9 +629,7 @@ static MagickCLEnv AcquireMagickCLEnv(void)
     option=GetEnvironmentValue("MAGICK_OCL_DEVICE");
     if (option != (const char *) NULL)
       {
-        if ((IsStringTrue(option) != MagickFalse) ||
-            (strcmp(option,"GPU") == 0) ||
-            (strcmp(option,"CPU") == 0))
+        if (IsOpenCLDeviceOptionEnabled(option) != MagickFalse)
           clEnv->enabled=MagickTrue;
         option=DestroyString(option);
       }
