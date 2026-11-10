@@ -7331,6 +7331,22 @@ static XWidgetInfo ApplyListBrowserControlKey(XWidgetInfo reply_info,
   return(reply_info);
 }
 
+static XWidgetInfo TrackListBrowserSlider(XWidgetInfo slider_info,
+  const XEvent event,const unsigned int entries)
+{
+  slider_info.y=event.xmotion.y-(int)
+    ((slider_info.height+slider_info.bevel_width) >> 1)+1;
+  if (slider_info.y < slider_info.min_y)
+    slider_info.y=slider_info.min_y;
+  if (slider_info.y > slider_info.max_y)
+    slider_info.y=slider_info.max_y;
+  slider_info.id=0;
+  if (slider_info.y != slider_info.min_y)
+    slider_info.id=((int) entries*(slider_info.y-
+      slider_info.min_y+1))/(slider_info.max_y-slider_info.min_y+1);
+  return(slider_info);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7966,16 +7982,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             /*
               Move slider matte.
             */
-            slider_info.y=event.xmotion.y-(int)
-              ((slider_info.height+slider_info.bevel_width) >> 1)+1;
-            if (slider_info.y < slider_info.min_y)
-              slider_info.y=slider_info.min_y;
-            if (slider_info.y > slider_info.max_y)
-              slider_info.y=slider_info.max_y;
-            slider_info.id=0;
-            if (slider_info.y != slider_info.min_y)
-              slider_info.id=((int) entries*(slider_info.y-
-                slider_info.min_y+1))/(slider_info.max_y-slider_info.min_y+1);
+            slider_info=TrackListBrowserSlider(slider_info,event,entries);
             state|=RedrawListState;
             break;
           }
