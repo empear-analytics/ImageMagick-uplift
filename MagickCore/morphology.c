@@ -3281,6 +3281,75 @@ static inline double WalkErodeOrDilateKernel(const MorphologyKernelWalk *walk,
   return(pixel);
 }
 
+typedef struct _MorphologyIntensityWalk
+{
+  MorphologyKernelWalkSide
+    side;
+
+  double
+    *extremum;
+} MorphologyIntensityWalk;
+
+static inline void WalkIntensityKernel(const MorphologyKernelWalk *walk,
+  const MorphologyIntensityWalk *select,
+  const Quantum *magick_restrict *quantum_pixels,double *pixel)
+{
+  const MorphologyKernelWalkSide
+    side = select->side;
+
+  double
+    *const extremum = select->extremum;
+
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  double
+    intensity;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  MorphologyIntensityTap
+    intensity_tap;
+
+  ssize_t
+    u,
+    v;
+
+  k=((side == ForwardKernelWalk) ? kernel->values :
+    (&kernel->values[kernel->width*kernel->height-1]));
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      if (!IsNaN(*k) && (*k >= 0.5))
+        {
+          intensity=(double) GetPixelIntensity(image,pixels);
+          intensity_tap.pixels=pixels;
+          intensity_tap.intensity=intensity;
+          intensity_tap.i=i;
+          ((side == ForwardKernelWalk) ?
+            SelectMinimumIntensityPixel(&intensity_tap,quantum_pixels,
+              pixel,extremum) :
+            SelectMaximumIntensityPixel(&intensity_tap,pixel,
+              quantum_pixels,extremum));
+        }
+      ((side == ForwardKernelWalk) ? k++ : k--);
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3578,7 +3647,6 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         double
           alpha,
           gamma,
-          intensity,
           maximum,
           minimum,
           pixel;
@@ -3602,9 +3670,6 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
 
         ssize_t
           v;
-
-        MorphologyIntensityTap
-          intensity_tap;
 
         MorphologyKernelTap
           kernel_tap;
@@ -3792,58 +3857,28 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
           }
           case ErodeIntensityMorphology:
           {
+            const MorphologyIntensityWalk
+              select = { ForwardKernelWalk, &minimum };
+
             /*
               Select pixel with minimum intensity within kernel neighbourhood.
 
               The kernel is not reflected for this operation.
             */
-            k=kernel->values;
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k) && (*k >= 0.5))
-                  {
-                    intensity=(double) GetPixelIntensity(image,pixels);
-                    intensity_tap.pixels=pixels;
-                    intensity_tap.intensity=intensity;
-                    intensity_tap.i=i;
-                    SelectMinimumIntensityPixel(&intensity_tap,&quantum_pixels,
-                      &pixel,&minimum);
-                  }
-                k++;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
+            WalkIntensityKernel(&walk,&select,&quantum_pixels,&pixel);
             break;
           }
           case DilateIntensityMorphology:
           {
+            const MorphologyIntensityWalk
+              select = { ReflectedKernelWalk, &maximum };
+
             /*
               Select pixel with maximum intensity within kernel neighbourhood.
 
               The kernel is not reflected for this operation.
             */
-            k=(&kernel->values[kernel->width*kernel->height-1]);
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k) && (*k >= 0.5))
-                  {
-                    intensity=(double) GetPixelIntensity(image,pixels);
-                    intensity_tap.pixels=pixels;
-                    intensity_tap.intensity=intensity;
-                    intensity_tap.i=i;
-                    SelectMaximumIntensityPixel(&intensity_tap,&pixel,
-                      &quantum_pixels,&maximum);
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
+            WalkIntensityKernel(&walk,&select,&quantum_pixels,&pixel);
             break;
           }
           case IterativeDistanceMorphology:
