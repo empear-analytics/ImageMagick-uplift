@@ -5418,6 +5418,34 @@ static MagickBooleanType XCropImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsPolygonElement(const ElementType v)
+{
+  switch (v)
+  {
+    case PointElement:
+    case PolygonElement:
+    case FillPolygonElement:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
+static inline MagickBooleanType IsBoxedElement(const ElementType v)
+{
+  switch (v)
+  {
+    case RectangleElement:
+    case CircleElement:
+    case EllipseElement:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -6219,8 +6247,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         }
     } while ((state & ExitState) == 0);
     (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-    if ((element == PointElement) || (element == PolygonElement) ||
-        (element == FillPolygonElement))
+    if (IsPolygonElement(element) != MagickFalse)
       {
         /*
           Determine polygon bounding box.
@@ -6252,8 +6279,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
       if (distance <= 9)
         continue;
       else
-        if ((element == RectangleElement) ||
-            (element == CircleElement) || (element == EllipseElement))
+        if (IsBoxedElement(element) != MagickFalse)
           {
             rectangle_info.width--;
             rectangle_info.height--;
