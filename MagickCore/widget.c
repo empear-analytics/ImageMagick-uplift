@@ -10161,10 +10161,7 @@ MagickPrivate void XTextViewWidget(Display *display,
             /*
               Move slider.
             */
-            if (event.xbutton.y < slider_info.y)
-              slider_info.id-=(int) (visible_lines-1);
-            else
-              slider_info.id+=(int) (visible_lines-1);
+            slider_info=PageListBrowserSlider(slider_info,event,visible_lines);
             state|=RedrawListState;
             break;
           }
@@ -10352,16 +10349,7 @@ MagickPrivate void XTextViewWidget(Display *display,
             /*
               Move slider matte.
             */
-            slider_info.y=event.xmotion.y-(int)
-              ((slider_info.height+slider_info.bevel_width) >> 1)+1;
-            if (slider_info.y < slider_info.min_y)
-              slider_info.y=slider_info.min_y;
-            if (slider_info.y > slider_info.max_y)
-              slider_info.y=slider_info.max_y;
-            slider_info.id=0;
-            if (slider_info.y != slider_info.min_y)
-              slider_info.id=((int) lines*(slider_info.y-slider_info.min_y+1))/
-                (slider_info.max_y-slider_info.min_y+1);
+            slider_info=TrackListBrowserSlider(slider_info,event,lines);
             state|=RedrawListState;
             break;
           }
