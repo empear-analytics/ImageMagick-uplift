@@ -445,6 +445,12 @@ static void ReleaseOpenCLBuffer(cl_mem buffer)
     ReleaseOpenCLMemObject(buffer);
 }
 
+static void ReleaseKernel(cl_kernel kernel)
+{
+  if (kernel != (cl_kernel) NULL)
+    ReleaseOpenCLKernel(kernel);
+}
+
 static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
   const double radius,const double sigma,ExceptionInfo *exception)
 {
@@ -612,8 +618,7 @@ cleanup:
     ReleaseOpenCLMemObject(tempImageBuffer);
   if (imageKernelBuffer != (cl_mem) NULL)
     ReleaseOpenCLMemObject(imageKernelBuffer);
-  if (blurRowKernel != (cl_kernel) NULL)
-    ReleaseOpenCLKernel(blurRowKernel);
+  ReleaseKernel(blurRowKernel);
   if (blurColumnKernel != (cl_kernel) NULL)
     ReleaseOpenCLKernel(blurColumnKernel);
   if (queue != (cl_command_queue) NULL)
