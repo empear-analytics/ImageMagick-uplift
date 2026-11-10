@@ -2070,13 +2070,24 @@ static inline MagickBooleanType IsNoArgsFunction(const FunctionE fe,
     Functions[fe-(int) FirstFunc].number_args == 0) ? MagickTrue : MagickFalse);
 }
 
+static const FunctionE
+  UnqualifiedPixelFunctions[] =
+  {
+    fP, fS, fSP, fU, fUP, fV,
+    fVP
+  };
+
 static inline MagickBooleanType IsUnqualifiedPixelFunction(
   const PixelChannel chQual,const FunctionE fe)
 {
-  return(( chQual == NO_CHAN_QUAL &&
-    (fe == fP || fe == fS || fe == fSP || fe == fU || fe == fUP || fe == fV ||
-    fe == fVP)
-    ) ? MagickTrue : MagickFalse);
+  size_t
+    i;
+
+  if (chQual == NO_CHAN_QUAL)
+    for (i=0; i < (sizeof(UnqualifiedPixelFunctions)/sizeof(*UnqualifiedPixelFunctions)); i++)
+      if (UnqualifiedPixelFunctions[i] == fe)
+        return(MagickTrue);
+  return(MagickFalse);
 }
 
 static inline MagickBooleanType IsUnqualifiedCoordFunction(
