@@ -2758,16 +2758,51 @@ static MagickBooleanType BlurMotionRows(const MotionBlur *motion,
   return(status);
 }
 
-MagickExport Image *MotionBlurImage(const Image *image,const double radius,
-  const double sigma,const double angle,ExceptionInfo *exception)
+typedef struct _MotionBlurTail
 {
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  MagickRealType
+    *kernel;
+
+  OffsetInfo
+    *offset;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
+} MotionBlurTail;
+
+static Image *BlurMotionImage(const MotionBlurTail *tail)
+{
+  const Image
+    *const image = tail->image;
+
+  Image
+    *const blur_image = tail->blur_image;
+
+  MagickRealType
+    *const kernel = tail->kernel;
+
+  OffsetInfo
+    *const offset = tail->offset;
+
+  const size_t
+    width = tail->width;
+
+  ExceptionInfo
+    *const exception = tail->exception;
+
   CacheView
     *blur_view,
     *image_view,
     *motion_view;
-
-  Image
-    *blur_image;
 
   MagickBooleanType
     status;
@@ -2775,11 +2810,42 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   MagickOffsetType
     progress;
 
+  MotionBlur
+    motion;
+
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  motion_view=AcquireVirtualCacheView(image,exception);
+  blur_view=AcquireAuthenticCacheView(blur_image,exception);
+  motion.image=image;
+  motion.blur_image=blur_image;
+  motion.kernel=kernel;
+  motion.motion_view=motion_view;
+  motion.offset=offset;
+  motion.width=width;
+  motion.exception=exception;
+  motion.image_view=image_view;
+  motion.blur_view=blur_view;
+  status=BlurMotionRows(&motion,status,progress);
+  blur_view=DestroyCacheView(blur_view);
+  motion_view=DestroyCacheView(motion_view);
+  image_view=DestroyCacheView(image_view);
+  RelinquishMotionTables(kernel,offset);
+  return(ReleaseFailedImage(blur_image,status));
+}
+
+MagickExport Image *MotionBlurImage(const Image *image,const double radius,
+  const double sigma,const double angle,ExceptionInfo *exception)
+{
+  Image
+    *blur_image;
+
   MagickRealType
     *kernel;
 
-  MotionBlur
-    motion;
+  MotionBlurTail
+    tail;
 
   OffsetInfo
     *offset;
@@ -2830,26 +2896,13 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
       blur_image=DestroyImage(blur_image);
       return((Image *) NULL);
     }
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  motion_view=AcquireVirtualCacheView(image,exception);
-  blur_view=AcquireAuthenticCacheView(blur_image,exception);
-  motion.image=image;
-  motion.blur_image=blur_image;
-  motion.kernel=kernel;
-  motion.motion_view=motion_view;
-  motion.offset=offset;
-  motion.width=width;
-  motion.exception=exception;
-  motion.image_view=image_view;
-  motion.blur_view=blur_view;
-  status=BlurMotionRows(&motion,status,progress);
-  blur_view=DestroyCacheView(blur_view);
-  motion_view=DestroyCacheView(motion_view);
-  image_view=DestroyCacheView(image_view);
-  RelinquishMotionTables(kernel,offset);
-  return(ReleaseFailedImage(blur_image,status));
+  tail.image=image;
+  tail.blur_image=blur_image;
+  tail.kernel=kernel;
+  tail.offset=offset;
+  tail.width=width;
+  tail.exception=exception;
+  return(BlurMotionImage(&tail));
 }
 
 /*
