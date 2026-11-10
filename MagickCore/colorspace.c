@@ -528,6 +528,17 @@ typedef struct _sRGBGenericInput
     illuminant;
 } sRGBGenericInput;
 
+static void GetWhiteLuminance(Image *image,ExceptionInfo *exception,
+  double *white_luminance)
+{
+  const char
+    *value;
+
+  value=GetImageProperty(image,"white-luminance",exception);
+  if (value != (const char *) NULL)
+    *white_luminance=StringToDouble(value,(char **) NULL);
+}
+
 static MagickBooleanType sRGBToGeneric(const sRGBGenericInput *input,
   Image *image,MagickBooleanType status,ExceptionInfo *exception)
 {
@@ -546,18 +557,13 @@ static MagickBooleanType sRGBToGeneric(const sRGBGenericInput *input,
   ColorspaceRowInfo
     finish;
 
-  const char
-    *value;
-
   double
     white_luminance = 10000.0;
 
   /*
     Transform image from sRGB to target colorspace.
   */
-  value=GetImageProperty(image,"white-luminance",exception);
-  if (value != (const char *) NULL)
-    white_luminance=StringToDouble(value,(char **) NULL);
+  GetWhiteLuminance(image,exception,&white_luminance);
   if (SyncImageToDirectClass(image,exception) == MagickFalse)
     return(MagickFalse);
   image_view=AcquireAuthenticCacheView(image,exception);
