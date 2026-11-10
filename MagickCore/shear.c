@@ -792,10 +792,14 @@ typedef struct _YShearColumn
   CacheView
     *image_view;
 
+  PixelInfo
+    background;
+
   double
     degrees;
 
   size_t
+    height,
     width;
 
   ssize_t
@@ -844,6 +848,43 @@ static MagickBooleanType YShearColumnHead(const YShearColumn *column,
   if ((*displacement) == 0.0)
     return(MagickFalse);
   return(MagickTrue);
+}
+
+static void TransferYShearColumn(const YShearColumn *column,
+  double displacement,Quantum *magick_restrict p,MagickBooleanType *status)
+{
+  Image
+    *image = column->image;
+
+  CacheView
+    *image_view = column->image_view;
+
+  const PixelInfo
+    background = column->background;
+
+  const size_t
+    height = column->height;
+
+  const ssize_t
+    y_offset = column->y_offset;
+
+  ExceptionInfo
+    *exception = column->exception;
+
+  ShearDirection
+    direction;
+
+  ShearTransfer
+    transfer;
+
+  SelectShearDirection(&displacement,&direction);
+  transfer.image=image;
+  transfer.background=background;
+  transfer.length=height;
+  transfer.offset=y_offset;
+  transfer.extent=image->rows;
+  TransferShearSpan(&transfer,direction,displacement,p);
+  SyncShearView(image_view,exception,status);
 }
 
 static MagickBooleanType YShearImage(Image *image,const double degrees,
@@ -897,25 +938,12 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
     Quantum
       *magick_restrict p;
 
-    ShearDirection
-      direction;
-
-    ShearTransfer
-      transfer;
-
-    const YShearColumn column = { image, image_view, degrees, width, x_offset,
-      y_offset, x, exception };
+    const YShearColumn column = { image, image_view, background, degrees,
+      height, width, x_offset, y_offset, x, exception };
 
     if (YShearColumnHead(&column,&p,&displacement,&status) == MagickFalse)
       continue;
-    SelectShearDirection(&displacement,&direction);
-    transfer.image=image;
-    transfer.background=background;
-    transfer.length=height;
-    transfer.offset=y_offset;
-    transfer.extent=image->rows;
-    TransferShearSpan(&transfer,direction,displacement,p);
-    SyncShearView(image_view,exception,&status);
+    TransferYShearColumn(&column,displacement,p,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         ShearProgress
