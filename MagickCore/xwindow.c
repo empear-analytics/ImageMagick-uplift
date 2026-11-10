@@ -6581,6 +6581,44 @@ static void XPackContinuous2BitLSB(const XImageRowSource *source,
   }
 }
 
+static void XPackContinuous4BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to contiguous 4 bit continuous-tone X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackContinuous4BitRowLSB(canvas,map_info,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -6768,18 +6806,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
         }
         case 4:
         {
-          /*
-            Convert to contiguous 4 bit continuous-tone X canvas.
-          */
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            q=XPackContinuous4BitRowLSB(canvas,map_info,p,q);
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackContinuous4BitLSB(&row_source,q);
           break;
         }
         case 6:
