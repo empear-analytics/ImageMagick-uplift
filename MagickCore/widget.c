@@ -7095,6 +7095,18 @@ static void SelectListBrowserEntry(const ListBrowserPress *press,
   (*state)|=RedrawListState;
 }
 
+static int FindListBrowserCursor(XFontStruct *font_info,
+  const XWidgetInfo reply_info,const int x)
+{
+  int
+    i;
+
+  for (i=1; i <= Extent(reply_info.marker); i++)
+    if (XTextWidth(font_info,reply_info.marker,i) > x)
+      break;
+  return(i);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7520,9 +7532,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
               Move text cursor to position of button press.
             */
             x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            for (i=1; i <= Extent(reply_info.marker); i++)
-              if (XTextWidth(font_info,reply_info.marker,i) > x)
-                break;
+            i=FindListBrowserCursor(font_info,reply_info,x);
             reply_info.cursor=reply_info.marker+i-1;
             if (event.xbutton.time > (click_time+(unsigned long) DoubleClick))
               reply_info.highlight=MagickFalse;
