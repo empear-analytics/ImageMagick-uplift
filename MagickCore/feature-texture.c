@@ -197,6 +197,13 @@ static unsigned int GetFeatureGrayLevels(const Image *image,
   return(number_grays);
 }
 
+static inline MagickBooleanType IsFeatureBlackGray(const Image *image,
+  const PixelPacket *grays,const ssize_t i)
+{
+  return(((image->colorspace == CMYKColorspace) && (grays[i].black != ~0U)) ?
+    MagickTrue : MagickFalse);
+}
+
 static PixelPacket CompactFeatureGrays(const Image *image,PixelPacket *grays)
 {
   PixelPacket
@@ -214,7 +221,7 @@ static PixelPacket CompactFeatureGrays(const Image *image,PixelPacket *grays)
       grays[gray.green++].green=grays[i].green;
     if (grays[i].blue != ~0U)
       grays[gray.blue++].blue=grays[i].blue;
-    if ((image->colorspace == CMYKColorspace) && (grays[i].black != ~0U))
+    if (IsFeatureBlackGray(image,grays,i) != MagickFalse)
       grays[gray.black++].black=grays[i].black;
     if ((image->alpha_trait != UndefinedPixelTrait) &&
         (grays[i].alpha != ~0U))
