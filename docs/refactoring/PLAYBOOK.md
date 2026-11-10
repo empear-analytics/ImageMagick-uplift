@@ -7684,6 +7684,175 @@ on a new function. Added by Claude Code (Claude Opus 5.5) under the mandate of
 
 ---
 
+## Recipe IS - Extract Block Through Pointers to the Iteration's Slots
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Large
+Method* or *Complex Method*, and the block that would fix it sits in the body of a
+`#pragma omp parallel for` loop over `i` and writes, besides the body's own variables
+(and the shared `status`, which Recipe PS handles), only the iteration's own slot of an
+object the region shares: `mean.direction[i]` of a function-local struct,
+`channel_features[c].correlation[i]` or `sum[y].direction[i]` of an array reached through
+a pointer, `object[i].metric[k]` of a parameter's array. No other iteration touches that
+slot. `feature-texture.c`'s `GetImageFeatures` (five loops over the four directions that
+fill `correlation`, `mean`, `variance` and the entropies at `.direction[i]`) and
+`vision.c`'s `CircularityThreshold` (one object per iteration, `object[i].metric`) are
+the cases.
+
+**Not covered by:** Recipe E and N, whose OpenMP rule refuses a write to a variable
+declared outside the loop body, by address too, and admits writes through a pointer only
+for pixel data and the thread's own slot of a per-thread array (`current_depth[id]`);
+Recipe PS, which passes `status` and up to two shared scalars that every iteration
+writes, never an element of an array or struct; Recipe K, O and the step 8 forms of PS
+and Q, which pass variables the loop body declares; Recipe RA, which passes a
+`reduction` variable.
+
+**How:**
+
+1. The block lies inside one iteration of the parallel loop body, or is its whole body
+   (Recipe PS step 7's form, `continue;` becoming `return;`). It contains no `#pragma
+   omp` line, no `return` or `goto`, and no `break` or `continue` that leaves it except
+   in that form. The pragma and every one of its clauses stay exactly as they are.
+2. List what the block writes that the loop body does not declare. Each is `status` or a
+   scalar that Recipe PS step 2 admits (passed as PS steps 2 and 4 say), or a *slot*: an
+   lvalue that selects the iteration's element with the loop variable `i` itself or an
+   index computed only from `i` (`x[i]`, `x.direction[i]`, `x[k].direction[i]` for any
+   `k`), of an object that no data-sharing clause names other than `shared` (default
+   shared included), and that the body never writes `i`. Check by reading the whole
+   region, not only the block, that every access to that object selects the iteration's
+   own `i`, so no two iterations can reach one slot. The block may also read such slots,
+   and may read any element of an object nothing in the region writes.
+3. Pass each slot in one of two forms. (a) A slot of a variable the caller declares
+   (`correlation`, a struct or array local of the function): pass its address,
+   `&x.direction[i]`, to a parameter `T *x` named as the variable (`const T *x` when the
+   block only reads it); in the moved text each use of the slot expression becomes
+   `(*x)`, written `x->m` for a member `(*x).m`, and `&x.direction[i]` passed on to a
+   callee becomes `x`. (b) A slot reached through a pointer the block reads and does not
+   write (`channel_features`, `sum`, `object`): pass the pointer by value (or as a member
+   of step 4's struct), the moved text unchanged.
+4. Cut the block into a `static void` function directly above the caller. Every other
+   variable it reads goes by value; a variable of the loop body that it writes and the
+   caller does not read afterwards is declared in the new function (Recipe E step 4).
+   With more than four parameters, bundle the read-only inputs in a `const` struct as
+   Recipe N steps 2 to 4 do (bound as `const` locals of their own names), declared in
+   the loop body with the values as its initialiser when each is a plain identifier
+   that nothing in the body writes (PS step 6's form; the loop variable `i` may be a
+   member), so each thread holds its own.
+5. Slot pointers beyond the four parameters go in one `const` struct of pointer members,
+   one per slot, declared in the loop body with the slot addresses as its initialiser
+   (`const Slots slots = { &mean.direction[i], &variance.direction[i] };`), so each
+   thread holds its own iteration's addresses. The new function takes `const Slots
+   *slots` and binds each member it uses once (`PixelInfo *const mean = slots->mean;`,
+   `const PixelInfo *const` when it only reads), then writes as step 3 (a) says.
+   Members it does not use are not bound. Sibling helpers of one loop may share it.
+6. A function this recipe made may be the caller of a later step (a column loop that
+   calls the leaf helpers moving as the body's helper): in it the slot pointers are its
+   parameters or bound locals, so the moved text passes `x` where it passed
+   `&x.direction[i]`, `name` where it passed `&name`, and `name->m` where it read
+   `name.m` of step 4's or step 5's struct.
+7. Several sites. Copies of one block in one function that are the same text once each
+   slot they write or read is written `(*x)` (`target->m`, `source->m`) may become calls
+   of one new function taking the slot addresses (`&sum[y].direction[i]`,
+   `&cooccurrence[x][y].direction[i]`), each copy its own; checked by script (whitespace
+   ignored, nothing else renamed). An index expression in a slot (`y+x+2`,
+   `MagickAbsoluteValue(y-x)`) is then evaluated once for the address instead of at
+   each statement: it must have no side effect and read nothing the block writes.
+8. Check steps 1 and 2 by reading, and every argument against its parameter. With a
+   per-pixel or per-element call added on a hot path, time the step against the
+   baseline (AGENTS.md: several runs, median; more than 3% slower and it is not taken).
+
+**Before:**
+
+```c
+#pragma omp parallel for schedule(static) shared(status) ...
+  for (i=0; i < 4; i++)
+  {
+    ...
+      mean.direction[i].red+=y*sum[y].direction[i].red;
+      sum_squares.direction[i].red+=y*y*sum[y].direction[i].red;
+      ...
+      if (image->alpha_trait != UndefinedPixelTrait)
+        {
+          mean.direction[i].alpha+=y*sum[y].direction[i].alpha;
+          sum_squares.direction[i].alpha+=y*y*sum[y].direction[i].alpha;
+        }
+```
+
+**After:**
+
+```c
+static void AccumulateTextureMean(const TextureDirection *texture,PixelInfo *mean,
+  PixelInfo *sum_squares,const ssize_t y)
+{
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    *const sum = texture->sum;
+
+  const ssize_t
+    i = texture->i;
+
+  mean->red+=y*sum[y].direction[i].red;
+  sum_squares->red+=y*y*sum[y].direction[i].red;
+  ...
+}
+...
+  for (i=0; i < 4; i++)
+  {
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
+
+    const TextureSlots
+      slots = { &correlation.direction[i], ..., &variance.direction[i] };
+    ...
+      AccumulateTextureMean(&texture,slots.mean,slots.sum_squares,y);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Through `x` the new function reads and writes the very
+  memory the inline code named, in the same order, with the same values, on the same
+  thread, inside the same iteration: `&x.direction[i]` is the address of the slot, and
+  `x->red` is `x.direction[i].red`. Taking an address reads no element. Nothing is copied
+  or written back, so no value is deferred and no other slot is read.
+- Why no thread can see a difference. Step 2 makes the slot the iteration's alone: no
+  other iteration, so no other thread, reads or writes it during the region, before or
+  after the change. Its address lives in the calling thread's parameters or in a struct
+  the loop body declares, private to that thread, and is never stored where another
+  thread could read it. The region, its clauses and its schedule are unchanged; the pragma
+  does not move and no variable changes between shared, private and reduction.
+- Form (b) changes no text: the pointer was read in the region and is read now, by value.
+- A slot pointer of step 5's struct that the helper does not use is an address computed
+  and never followed. A shared object that the region only reads (`cooccurrence` in the
+  texture loops) may be read at any element by any iteration; step 2 asks only that the
+  objects written be written and read slot by slot.
+- Step 7's index evaluated once: the copies computed the same address at each of their
+  statements, and the index reads only loop counters the copy does not write, so the
+  single evaluation gives that address. The statements keep their order and arithmetic;
+  the guard reports the removed copies as deduplication (`WARN`, every value present).
+- A `private`, `firstprivate`, `lastprivate` or `reduction` variable is not a slot (each
+  thread has its own whole copy): use Recipe RA for a reduction, nothing for the others.
+- The oracle runs single-threaded and cannot see a race: steps 1 and 2 are checked by
+  reading, and `--calls` moves only the new function's definition and calls.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, steps 1 and 2 checked by
+reading the whole region, step 7 checked by script, and step 8's timing where it applies.
+
+**Provenance:** 2026-11-10, owner ("I give you an ok to evolve the recipes", on the two
+blockers held only by recipe text: per-iteration slots and reduction variables), from
+campaign A's W16 lane c: `feature-texture.c`'s `GetImageFeatures` (cc 151, its five
+direction loops writing `correlation`, `mean`, `sum_squares`, `variance` and five
+entropies at `.direction[i]`; W14 lane b and W15 lane a found every legal chain below
+5.25). A probe of the chain (step 7 on the six `+=` runs and the two `entropy_x/y` runs,
+leaf helpers of the five loops, then each loop body): 5.25 to 5.98, no finding on a new
+function, the features workload (128x128, 256 levels) 0.96 s to 0.92 s (median of 9).
+`vision.c`'s `CircularityThreshold` (the per-object block writing `object[i].metric` and
+the shared `status`, form (b) with PS): 9.31 to 9.38. Added by Claude Code (Claude Opus
+5.5).
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -7987,3 +8156,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-07 | AMEND | N | Step 8: the sibling and later-block forms also join a PS step 7 nested-loop helper and the parallel body's head moved by PC: the head takes the PS struct (declared `const` with its initialiser among the body's declarations, which stays), the typedef and initialiser gain the members the head reads, the head binds them as `const` locals (PC keeps its text), and the inner call passes `name`. Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): PC before the column body moves gives a *Complex* and *Large* helper (6.30 to 6.21); after it, with its own struct, about 80 lines; sharing the PS struct, 52 lines and no finding, 6.51 to 6.62 | mandate (2026-10-24) |
 | 2026-11-10 | NEW | LP | Name a Label Set as a Predicate: a `switch (e)` whose only groups are one run of labels with a body that returns on every path and `default: break;` becomes `if (<Pred>(e) != MagickFalse)` and the body; the new `static MagickBooleanType` function holds the labels (`return(MagickTrue)`, `default: break;`, `return(MagickFalse)`) and may replace further sites with the same label set | `colorspace.c`'s `sRGBTransformImage` and `GenericOrLogTosRGB` (campaign A, W16 lane c): the same 28-label generic group, cc 31 and 30; a probe of both sites 7.44 to 8.10 (the first alone 7.46), the predicate a label-run *Complex Method* (cc 30) under the ruling of 2026-11-07 | mandate (2026-10-24) |
 | 2026-11-10 | NEW | SC | Extract Sibling Blocks Differing in Several Constants: copies of one block in one function that differ in two or more literal or enumeration constants move into one function taking a `const` struct of the constants (one member per role, typed as Recipe SV step 3 types the value); each copy becomes the struct's initialiser and the call; a forward declaration of the caller when the copies recurse into it | `quantize.c`'s `Riemersma` (campaign A, W16 lane c): cc 38, 109 lines, its four `level > 1` cases seven calls on four gravity constants each, its two `level == 1` cases three calls on three; as case helpers they clone (6.25, W14 lane b). A probe of the chain (this recipe twice, then Recipe O on the `level == 1` switch): 7.80 to 8.34, 8.41 and 8.74, no finding on a new function | mandate (2026-10-24) |
+| 2026-11-10 | NEW | IS | Extract Block Through Pointers to the Iteration's Slots: a block of a parallel loop body over `i` that writes, besides the body's variables (and `status` by PS), only the iteration's own slot of a shared object (`x.direction[i]`, `channel_features[c].correlation[i]`, `object[i].metric[k]`) moves into a `static void` function taking the slot's address (`&x.direction[i]`, uses `x->m`) or the pointer that reaches it by value; slot pointers past four parameters in a `const` struct initialised in the body; copies identical once their slots are pointers may share one function (step 7); every access to the object in the region checked by reading to select the iteration's own `i` | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the five direction loops' finals and accumulators, which W14 lane b and W15 lane a found blocked (every legal chain below 5.25); a probe of the chain 5.25 to 5.98, no finding on a new function, features workload not slower (0.96 s to 0.92 s, median of 9). `vision.c`'s `CircularityThreshold`: 9.31 to 9.38 | owner |
