@@ -7307,6 +7307,30 @@ static void ReadListBrowserEntry(Display *display,XWindowInfo *window_info,
   (*state)|=ExitState;
 }
 
+static XWidgetInfo ApplyListBrowserControlKey(XWidgetInfo reply_info,
+  const KeySym key_symbol,const size_t state)
+{
+  if (state & ControlState)
+    switch ((int) key_symbol)
+    {
+      case XK_u:
+      case XK_U:
+      {
+        /*
+          Erase the entire line of text.
+        */
+        *reply_info.text='\0';
+        reply_info.cursor=reply_info.text;
+        reply_info.marker=reply_info.text;
+        reply_info.highlight=MagickFalse;
+        break;
+      }
+      default:
+        break;
+    }
+  return(reply_info);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7894,24 +7918,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             state|=ControlState;
             break;
           }
-        if (state & ControlState)
-          switch ((int) key_symbol)
-          {
-            case XK_u:
-            case XK_U:
-            {
-              /*
-                Erase the entire line of text.
-              */
-              *reply_info.text='\0';
-              reply_info.cursor=reply_info.text;
-              reply_info.marker=reply_info.text;
-              reply_info.highlight=MagickFalse;
-              break;
-            }
-            default:
-              break;
-          }
+        reply_info=ApplyListBrowserControlKey(reply_info,key_symbol,state);
         XEditText(display,&reply_info,key_symbol,command,state);
         XDrawMatteText(display,window_info,&reply_info);
         break;
