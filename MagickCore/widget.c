@@ -2920,6 +2920,39 @@ static int PressCommandSelection(const CommandWidgetEvent *command_event,int id)
   return(id);
 }
 
+static int ReleaseCommandSelection(const CommandWidgetEvent *command_event,int id)
+{
+  Display
+    *const display = command_event->display;
+
+  XWindows
+    *const windows = command_event->windows;
+
+  XEvent
+    *const event = command_event->event;
+
+  const unsigned int
+    number_selections = command_event->number_selections;
+
+  int
+    i;
+
+  for (i=0; i < (int) number_selections; i++)
+  {
+    if (MatteIsActive(selection_info[i],event->xbutton) == MagickFalse)
+      continue;
+    id=i;
+    if (id >= (int) windows->command.data)
+      {
+        selection_info[id].raised=MagickTrue;
+        XDrawBeveledButton(display,&windows->command,&selection_info[id]);
+        break;
+      }
+    break;
+  }
+  return(id);
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -3128,19 +3161,14 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        for (i=0; i < (int) number_selections; i++)
-        {
-          if (MatteIsActive(selection_info[i],event->xbutton) == MagickFalse)
-            continue;
-          id=i;
-          if (id >= (int) windows->command.data)
-            {
-              selection_info[id].raised=MagickTrue;
-              XDrawBeveledButton(display,&windows->command,&selection_info[id]);
-              break;
-            }
-          break;
-        }
+        CommandWidgetEvent
+          command_event;
+
+        command_event.display=display;
+        command_event.windows=windows;
+        command_event.event=event;
+        command_event.number_selections=number_selections;
+        id=ReleaseCommandSelection(&command_event,id);
         break;
       }
       case ClientMessage:
