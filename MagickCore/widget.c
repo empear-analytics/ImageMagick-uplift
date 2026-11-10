@@ -8235,6 +8235,50 @@ static void PutBackMenuEvent(Display *display,XWindows *windows,
     (void) XPutBackEvent(display,&event);
 }
 
+typedef struct _MenuSelections
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *selections;
+
+  unsigned int
+    number_selections;
+} MenuSelections;
+
+static void DrawMenuSelections(const MenuSelections *entries,
+  XWidgetInfo *selection_info,XWidgetInfo *highlight_info)
+{
+  Display
+    *const display = entries->display;
+
+  XWindows
+    *const windows = entries->windows;
+
+  const char
+    *const *const selections = entries->selections;
+
+  const unsigned int
+    number_selections = entries->number_selections;
+
+  int
+    id;
+
+  for (id=0; id < (int) number_selections; id++)
+  {
+    (*selection_info).text=(char *) selections[id];
+    XDrawWidgetText(display,&windows->widget,&(*selection_info));
+    (*highlight_info).y=(*selection_info).y+(int) (*highlight_info).bevel_width;
+    if (id == (*selection_info).id)
+      XDrawBevel(display,&windows->widget,&(*highlight_info));
+    (*selection_info).y+=(int) (*selection_info).height;
+  }
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -8370,6 +8414,9 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       }
     if (state & RedrawWidgetState)
       {
+        MenuSelections
+          entries;
+
         /*
           Redraw Menu widget.
         */
@@ -8397,15 +8444,11 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
           XDrawWidgetText(display,&windows->widget,&selection_info);
         selection_info.center=MagickFalse;
         selection_info.y=(int) top_offset;
-        for (id=0; id < (int) number_selections; id++)
-        {
-          selection_info.text=(char *) selections[id];
-          XDrawWidgetText(display,&windows->widget,&selection_info);
-          highlight_info.y=selection_info.y+(int) highlight_info.bevel_width;
-          if (id == selection_info.id)
-            XDrawBevel(display,&windows->widget,&highlight_info);
-          selection_info.y+=(int) selection_info.height;
-        }
+        entries.display=display;
+        entries.windows=windows;
+        entries.selections=selections;
+        entries.number_selections=number_selections;
+        DrawMenuSelections(&entries,&selection_info,&highlight_info);
         XDrawBevel(display,&windows->widget,&menu_info);
         state&=(unsigned int) (~RedrawWidgetState);
       }
