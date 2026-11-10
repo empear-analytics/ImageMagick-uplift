@@ -107,3 +107,15 @@ Timings: features of a 128x128 noise image 0.96 s vs 0.92 s; seamless-blend 1.77
 `progress++` (two increments a row); in `GetImageFeatures` the Q green term tests and divides by
 `density_y[x].direction[i].red`; `density_xy` is not cleared between the sum-average and difference passes; `p+=...;;`
 in the co-occurrence loop.
+
+## Wide oracle made trustworthy: lane a (tooling only)
+
+The 153 base-vs-cand divergences between two wide builds of one commit were not behaviour: 129 came from a baseline
+cache key collision (`case_key` ignored `env`, `x11` and `stdin`, so an OpenCL twin and its plain case, or one X11 case
+on eight screens, shared one cached baseline), and 24 from configuration paths `BUILD_TREE_RE` did not normalise. Both
+are fixed in `tools/oracle/oracle.py`; `HARNESS_VERSION` is 15, so every clone rebuilds its baseline once. Two wide builds
+of the same commit now agree on all 14,145 wide cases (three runs), and planted changes in `accelerate.c` and `display.c`
+are caught. Twelve interactive `xevents` drag cases remain load-sensitive (display maps its Info window under the first
+press); they are listed in `cases.py` `LOAD_SENSITIVE` and settled by a rerun alone. **For the owner:** the proper fix
+moves those presses below y=30 (new case ids, `casemap-wide.json` rebuilt); mutation kills in `display.c` that rest on
+these cases may be false. The six X11/OpenCL files of campaign A can now be verified with `WIDE=1`.
