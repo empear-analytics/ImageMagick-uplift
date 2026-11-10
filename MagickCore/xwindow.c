@@ -6033,6 +6033,55 @@ typedef struct _XImageRowSource
     *map_info;
 } XImageRowSource;
 
+static unsigned char *XPackColormapped2BitRowLSB(const Image *canvas,
+  const unsigned long *pixels,const Quantum *p,unsigned char *q)
+{
+  unsigned int
+    nibble;
+
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  nibble=0;
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)] & 0x0f;
+    switch (nibble)
+    {
+      case 0:
+      {
+        *q=(unsigned char) pixel;
+        nibble++;
+        break;
+      }
+      case 1:
+      {
+        *q|=(unsigned char) (pixel << 2);
+        nibble++;
+        break;
+      }
+      case 2:
+      {
+        *q|=(unsigned char) (pixel << 4);
+        nibble++;
+        break;
+      }
+      case 3:
+      {
+        *q|=(unsigned char) (pixel << 6);
+        q++;
+        nibble=0;
+        break;
+      }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
 static unsigned char *XPackGammaBGRARowLSB(const Image *canvas,const Quantum *p,
   unsigned char *q)
 {
@@ -6290,9 +6339,6 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
       {
         case 2:
         {
-          unsigned int
-            nibble;
-
           /*
             Convert to 2 bit color-mapped X canvas.
           */
@@ -6302,40 +6348,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
               canvas->columns,1,exception);
             if (p == (const Quantum *) NULL)
               break;
-            nibble=0;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)] & 0x0f;
-              switch (nibble)
-              {
-                case 0:
-                {
-                  *q=(unsigned char) pixel;
-                  nibble++;
-                  break;
-                }
-                case 1:
-                {
-                  *q|=(unsigned char) (pixel << 2);
-                  nibble++;
-                  break;
-                }
-                case 2:
-                {
-                  *q|=(unsigned char) (pixel << 4);
-                  nibble++;
-                  break;
-                }
-                case 3:
-                {
-                  *q|=(unsigned char) (pixel << 6);
-                  q++;
-                  nibble=0;
-                  break;
-                }
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
+            q=XPackColormapped2BitRowLSB(canvas,pixels,p,q);
             q+=(ptrdiff_t) scanline_pad;
           }
           break;
