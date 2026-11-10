@@ -1704,6 +1704,29 @@ static void InverseSigmoidalColormapEntry(Image *image,const ssize_t i,
       image->colormap[i].alpha);
 }
 
+static void ScaledSigmoidalColormap(Image *image,const double contrast,
+  const double midpoint)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].red=(MagickRealType) ScaledSig(
+        image->colormap[i].red);
+    if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].green=(MagickRealType) ScaledSig(
+        image->colormap[i].green);
+    if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].blue=(MagickRealType) ScaledSig(
+        image->colormap[i].blue);
+    if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].alpha=(MagickRealType) ScaledSig(
+        image->colormap[i].alpha);
+  }
+}
+
 static void SigmoidalContrastColormap(Image *image,
   const MagickBooleanType sharpen,const double contrast,const double midpoint)
 {
@@ -1711,21 +1734,7 @@ static void SigmoidalContrastColormap(Image *image,
     i;
 
   if( sharpen != MagickFalse )
-    for (i=0; i < (ssize_t) image->colors; i++)
-    {
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].red=(MagickRealType) ScaledSig(
-          image->colormap[i].red);
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].green=(MagickRealType) ScaledSig(
-          image->colormap[i].green);
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].blue=(MagickRealType) ScaledSig(
-          image->colormap[i].blue);
-      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].alpha=(MagickRealType) ScaledSig(
-          image->colormap[i].alpha);
-    }
+    ScaledSigmoidalColormap(image,contrast,midpoint);
   else
     for (i=0; i < (ssize_t) image->colors; i++)
       InverseSigmoidalColormapEntry(image,i,contrast,midpoint);
