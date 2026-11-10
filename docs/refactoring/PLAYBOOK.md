@@ -7428,6 +7428,16 @@ does work would receive the moved labels' values first); Recipe RV, whose block 
 6. Applied again to the caller, the run may hold the call group of step 5, which then
    moves as the new function's `default:` group: a chain of functions, each a step and a
    commit of its own, each ending with the same `return(R_T);`.
+7. A shared input struct. When step 3 gives a step of the chain more than four
+   parameters, it takes a Recipe N input struct, `const Name *name`, binding as `const`
+   locals of their own names and types the members its groups read (N step 4), so their
+   text is unchanged; the caller fills the struct (`name.m=v;` for every member, in
+   declaration order, its declaration among the caller's) inside the step 5 group,
+   directly before `return(Helper(...,&name));`. A later step of the chain whose run
+   holds that group moves it with this one change: the fill stays in the caller's new
+   `default:` group, before the new call that passes `&name`, and the moved group is the
+   call alone, passing the new function's `name` for `&name`. The new function takes the
+   same `const Name *name` and binds only the members its groups read.
 
 **Before:**
 
@@ -7521,6 +7531,14 @@ static MagickBooleanType SetBackgroundAlpha(Image *image,
   its end.
 - The new function counts one per label towards its cyclomatic complexity; size the
   run so that it is not a *Complex Method* (step 6 chains the rest).
+
+- Step 7's struct. The fill runs in the caller where the `default:` group ran the call,
+  from the same variables, directly before the call; the members are `const` reads in
+  every function of the chain, and each function passes the pointer it received, so every
+  binding holds the value the caller's variable held when the original group read it.
+  Nothing writes the struct after the fill. The moved group's call passes the same
+  object's address the caller's call passed (`name` in the new function is `&name` of the
+  caller), so the next function reads the same members.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function and
 `+1` for the function `R_T` calls, its copy; nothing else moved), a case for each moved
@@ -9535,3 +9553,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | MA | Extract Sibling Blocks Differing in the Member They Update: copies of one block (one of them possibly a one-caller helper's whole body) that differ in constants, in the side-effect-free operand of their leading test, and in the member designator of one lvalue `e.m` they read and assign become calls of one `static void` function taking the constants, the operand's value and `T *value` (`&e.m`), every `e.m` written `(*value)`; the one-caller helper leaves the file | `enhance-tone.c`'s `EqualizeColormap` (campaign A, W16 lane c): its four colormap blocks (`GetPixel<X>Traits`, `<X>PixelChannel`, `colormap[j].<x>`), the file's only Bumpy Road since W14; a probe 8.47 to 9.09, Bumpy Road and Overall Code Complexity gone, no finding on the new function, 4 reaching cases 0 diverged | owner |
 | 2026-11-10 | AMEND | MT | Step 4: when the variables a copy reads are the members of a `const` struct local the caller declares with exactly those variables as its initialiser and never writes (Recipe E step 3's input form), the new function may take that struct by `const Struct *` beside `side`, binding the members it reads as `const` locals of their names (a struct-valued member copied as E step 3 copies it); *Careful* gives the argument. Still seven steps | `layer.c`'s `CompareImagesBounds` (campaign A, W16 lane c): its ascending and descending row scans read `alpha_image`, `beta_image`, `scan` and `exception`, the members of its `DifferingLineScan line`, which with `side` make five parameters; a probe 7.55 to 7.84, `CompareImagesBounds` leaving Bumpy Road and Complex Method, no finding on the new function | owner |
 | 2026-11-10 | NEW | TB | Replace a Label Run with a Constant Table: a `static` function whose body is one `switch` of labels that only return constants, and a closing `return(d);`, becomes a lookup in a new `static const` table directly above it: the membership form (one label group returning `MagickTrue`, `default: break;`) loops over a table of the labels; the index form (labels `0` to `k` in order, each returning a constant) returns `T[n]` when `(size_t) n` is below the count. No literal added; table checked by script against the labels and returns; guard `OK` (membership) or `WARN` with exactly the label literals (index); timing when called per pixel; string results only read as text | `colorspace.c`'s `IsGenericColorspace` (cc 30, the LP predicate) and `distort.c`'s `poly_basis_str` (cc 22), campaign A, W16 lane d: label runs no split can shorten without clones; probes 8.62 to 9.38 and 7.15 to 7.60, oracle 0 diverged | owner |
+| 2026-11-10 | AMEND | ST | Step 7: a step of the chain whose parameters exceed four takes a Recipe N input struct; the caller fills it inside the `default:` group, directly before the call passing `&name`, and a later step that moves that group leaves the fill in the caller's new `default:` group and moves the call alone, passing its `name` for `&name`; *Careful* gives the argument. Seven steps | `morphology.c`'s `AcquireKernelBuiltIn` (campaign A, W16 lane d): its chain of builder runs from the default group back (Distance, line and thinning, hit-and-miss, the cross and area shapes, edge detection) needs `args`, `nan` and `exception` with `kernel` and `type` from the hit-and-miss run on (five parameters). A probe of the chain: 3.04 to 3.10, no finding on a new function, the 2,526 reaching cases 0 diverged. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
