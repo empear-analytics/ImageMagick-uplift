@@ -2403,6 +2403,36 @@ static MagickBooleanType RiemersmaSubCurves(const RiemersmaCurve *curve,
   return(status);
 }
 
+static void RiemersmaUnitCurves(const RiemersmaCurve *curve,
+  const unsigned int direction,MagickBooleanType *status,
+  ExceptionInfo *exception)
+{
+  switch (direction)
+  {
+    case WestGravity:
+    {
+      const RiemersmaMoves
+        moves = { EastGravity,SouthGravity,WestGravity };
+
+      *status=RiemersmaUnitCurve(curve,&moves,exception);
+      break;
+    }
+    case EastGravity:
+    {
+      const RiemersmaMoves
+        moves = { WestGravity,NorthGravity,EastGravity };
+
+      *status=RiemersmaUnitCurve(curve,&moves,exception);
+      break;
+    }
+    default:
+    {
+      RiemersmaVerticalUnitCurve(curve,direction,status,exception);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType Riemersma(const RiemersmaCurve *curve,
   const size_t level,const unsigned int direction,ExceptionInfo *exception)
 {
@@ -2411,30 +2441,7 @@ static MagickBooleanType Riemersma(const RiemersmaCurve *curve,
 
   status=MagickTrue;
   if (level == 1)
-    switch (direction)
-    {
-      case WestGravity:
-      {
-        const RiemersmaMoves
-          moves = { EastGravity,SouthGravity,WestGravity };
-
-        status=RiemersmaUnitCurve(curve,&moves,exception);
-        break;
-      }
-      case EastGravity:
-      {
-        const RiemersmaMoves
-          moves = { WestGravity,NorthGravity,EastGravity };
-
-        status=RiemersmaUnitCurve(curve,&moves,exception);
-        break;
-      }
-      default:
-      {
-        RiemersmaVerticalUnitCurve(curve,direction,&status,exception);
-        break;
-      }
-    }
+    RiemersmaUnitCurves(curve,direction,&status,exception);
   else
     switch (direction)
     {
