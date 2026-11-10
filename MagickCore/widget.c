@@ -3825,6 +3825,29 @@ static void PressDialogReply(const DialogPress *press,char *primary_selection,
   click_time=event.xbutton.time;
 }
 
+static void ApplyDialogControlKey(const KeySym key_symbol,const size_t state,
+  XWidgetInfo *reply_info)
+{
+  if (state & ControlState)
+    switch ((int) key_symbol)
+    {
+      case XK_u:
+      case XK_U:
+      {
+        /*
+          Erase the entire line of text.
+        */
+        *(*reply_info).text='\0';
+        (*reply_info).cursor=(*reply_info).text;
+        (*reply_info).marker=(*reply_info).text;
+        (*reply_info).highlight=MagickFalse;
+        break;
+      }
+      default:
+        break;
+    }
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -4168,24 +4191,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
             state|=ControlState;
             break;
           }
-        if (state & ControlState)
-          switch ((int) key_symbol)
-          {
-            case XK_u:
-            case XK_U:
-            {
-              /*
-                Erase the entire line of text.
-              */
-              *reply_info.text='\0';
-              reply_info.cursor=reply_info.text;
-              reply_info.marker=reply_info.text;
-              reply_info.highlight=MagickFalse;
-              break;
-            }
-            default:
-              break;
-          }
+        ApplyDialogControlKey(key_symbol,state,&reply_info);
         XEditText(display,&reply_info,key_symbol,command,state);
         XDrawMatteText(display,&windows->widget,&reply_info);
         break;
