@@ -1640,11 +1640,23 @@ static int GetCoordQualifier (FxInfo * pfx, int op)
   return 1;
 }
 
+static const int
+  ChannelQualifiableOperators[] =
+  {
+    fU, fV, fP,
+    fUP, fVP,
+    fS
+  };
+
 static inline MagickBooleanType IsChannelQualifiableOperator(const int op)
 {
-  return((op == fU || op == fV || op == fP ||
-    op == fUP || op == fVP ||
-    op == fS || (op >= (int) FirstImgAttr && op <= aNull)
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(ChannelQualifiableOperators)/sizeof(*ChannelQualifiableOperators)); i++)
+    if (ChannelQualifiableOperators[i] == op)
+      return(MagickTrue);
+  return(((op >= (int) FirstImgAttr && op <= aNull)
     ) ? MagickTrue : MagickFalse);
 }
 
