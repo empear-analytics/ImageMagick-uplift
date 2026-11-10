@@ -1377,7 +1377,8 @@ typedef struct _EqualizeColors
     *equalize_map;
 } EqualizeColors;
 
-static void EqualizeColormapRed(const EqualizeColors *colors,const ssize_t j)
+static void EqualizeColormapValue(const EqualizeColors *colors,
+  const PixelTrait traits,const PixelChannel component,MagickRealType *value)
 {
   Image
     *const image = colors->image;
@@ -1387,14 +1388,14 @@ static void EqualizeColormapRed(const EqualizeColors *colors,const ssize_t j)
     *const white = colors->white,
     *const equalize_map = colors->equalize_map;
 
-  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+  if ((traits & UpdatePixelTrait) != 0)
     {
       PixelChannel channel = GetPixelChannelChannel(image,
-        RedPixelChannel);
+        component);
       if (black[channel] != white[channel])
-        image->colormap[j].red=equalize_map[(ssize_t)
+        (*value)=equalize_map[(ssize_t)
           GetPixelChannels(image)*ScaleQuantumToMap(
-          ClampToQuantum(image->colormap[j].red))+channel];
+          ClampToQuantum((*value)))+channel];
     }
 }
 
@@ -1413,34 +1414,14 @@ static void EqualizeColormap(Image *image,const double *black,
     colors.black=black;
     colors.white=white;
     colors.equalize_map=equalize_map;
-    EqualizeColormapRed(&colors,j);
-    if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,
-          GreenPixelChannel);
-        if (black[channel] != white[channel])
-          image->colormap[j].green=equalize_map[(ssize_t)
-            GetPixelChannels(image)*ScaleQuantumToMap(
-            ClampToQuantum(image->colormap[j].green))+channel];
-      }
-    if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,
-          BluePixelChannel);
-        if (black[channel] != white[channel])
-          image->colormap[j].blue=equalize_map[(ssize_t)
-            GetPixelChannels(image)*ScaleQuantumToMap(
-            ClampToQuantum(image->colormap[j].blue))+channel];
-      }
-    if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,
-          AlphaPixelChannel);
-        if (black[channel] != white[channel])
-          image->colormap[j].alpha=equalize_map[(ssize_t)
-            GetPixelChannels(image)*ScaleQuantumToMap(
-            ClampToQuantum(image->colormap[j].alpha))+channel];
-      }
+    EqualizeColormapValue(&colors,GetPixelRedTraits(image),RedPixelChannel,
+      &image->colormap[j].red);
+    EqualizeColormapValue(&colors,GetPixelGreenTraits(image),
+      GreenPixelChannel,&image->colormap[j].green);
+    EqualizeColormapValue(&colors,GetPixelBlueTraits(image),BluePixelChannel,
+      &image->colormap[j].blue);
+    EqualizeColormapValue(&colors,GetPixelAlphaTraits(image),
+      AlphaPixelChannel,&image->colormap[j].alpha);
   }
 }
 

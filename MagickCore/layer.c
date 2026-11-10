@@ -863,13 +863,51 @@ static ssize_t FindFirstDifferingColumn(const Image *alpha_image,
   return(x);
 }
 
-static RectangleInfo CompareImagesBounds(const Image *alpha_image,
-  const Image *beta_image,const LayerMethod method,ExceptionInfo *exception)
+typedef enum
 {
+  FirstDifferingRow,
+  LastDifferingRow
+} DifferingRowSide;
+
+static inline ssize_t FindDifferingRow(const DifferingLineScan *line,
+  const DifferingRowSide side)
+{
+  const Image
+    *const alpha_image = line->alpha_image,
+    *const beta_image = line->beta_image;
+
+  const DifferingPixelScan
+    scan = line->scan;
+
+  ExceptionInfo
+    *const exception = line->exception;
+
   const Quantum
     *p,
     *q;
 
+  ssize_t
+    x,
+    y;
+
+  for (y=((side == FirstDifferingRow) ? 0 : (ssize_t) alpha_image->rows-1);
+       ((side == FirstDifferingRow) ? y < (ssize_t) alpha_image->rows : y >= 0);
+       ((side == FirstDifferingRow) ? y++ : y--))
+  {
+    p=GetVirtualPixels(alpha_image,0,y,alpha_image->columns,1,exception);
+    q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
+    if (IsEitherRowMissing(p,q) != MagickFalse)
+      break;
+    x=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->columns);
+    if (x < (ssize_t) alpha_image->columns)
+      break;
+  }
+  return(y);
+}
+
+static RectangleInfo CompareImagesBounds(const Image *alpha_image,
+  const Image *beta_image,const LayerMethod method,ExceptionInfo *exception)
+{
   PixelInfo
     alpha_pixel,
     beta_pixel;
@@ -912,27 +950,9 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
     if (ContinueColumnScan(&line,x) == MagickFalse)
       break;
   bounds.width=(size_t) (x-bounds.x+1);
-  for (y=0; y < (ssize_t) alpha_image->rows; y++)
-  {
-    p=GetVirtualPixels(alpha_image,0,y,alpha_image->columns,1,exception);
-    q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
-    if (IsEitherRowMissing(p,q) != MagickFalse)
-      break;
-    x=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->columns);
-    if (x < (ssize_t) alpha_image->columns)
-      break;
-  }
+  y=FindDifferingRow(&line,FirstDifferingRow);
   bounds.y=y;
-  for (y=(ssize_t) alpha_image->rows-1; y >= 0; y--)
-  {
-    p=GetVirtualPixels(alpha_image,0,y,alpha_image->columns,1,exception);
-    q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
-    if (IsEitherRowMissing(p,q) != MagickFalse)
-      break;
-    x=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->columns);
-    if (x < (ssize_t) alpha_image->columns)
-      break;
-  }
+  y=FindDifferingRow(&line,LastDifferingRow);
   bounds.height=(size_t) (y-bounds.y+1);
   return(bounds);
 }

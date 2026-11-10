@@ -8364,7 +8364,13 @@ way clones the first.
    all; when that would make five or more, the selector and the read values that differ
    between the copies go in one `const` struct (`side` first, each member of the type of
    the variable it holds) passed as `const Name *name`, bound as `const` locals of their
-   role names (Recipe N step 4). Its body is a copy's text with every differing pair
+   role names (Recipe N step 4). When the variables a copy reads are the members of a `const`
+   struct local that the caller declares with exactly those variables as its initialiser
+   and never writes (Recipe E step 3's input form; `CompareImagesBounds`'s
+   `DifferingLineScan line`), the new function may take `const Struct *name` in their
+   place, beside `side`, and bind each member it reads as a `const` local of the
+   member's name and type, a struct-valued member copied as E step 3 copies it. Its body
+   is a copy's text with every differing pair
    written `((side == NameA) ? runA : runB)`, each run verbatim, nothing else changed.
 5. Replace each copy by a call that passes its own enumeration constant (directly, or in
    the initialiser of the `const` struct declared at the top of the block that holds the
@@ -8473,6 +8479,11 @@ static ssize_t FindStretchBlackLevel(const Image *image,
   value is the run's. Two integer runs converted to the conditional's common type, both
   representable in it, keep their values, and the conversion to the target (`j`) that
   each copy made is then made from the same value.
+- An input read from the caller's `const` struct (step 4): the struct was initialised from
+  the very variables the copy reads, and nothing writes them or it until the call returns,
+  so each binding holds the value the copy read. A struct-valued member is a copy whose
+  pointer members hold the caller's addresses: `&scan` passed on reaches, through them,
+  the objects the copy's `&scan` reached, and the callee writes only through those.
 - A value that differs between the copies stays where the copy read it (`point` in the
   comparison is read on every iteration, as `black_point` was); only its source moves,
   from a parameter to a struct member the caller filled from that parameter, unwritten
@@ -8772,6 +8783,305 @@ asked for the ruling. A probe of the two steps (the channel loop, then the colum
 3.46 to 3.64 and 3.66, `BlendRMSEResidual` leaving all four findings, no finding on a new
 function; a seamless-blend workload 1.77 s both ways (median of 9). Added by Claude Code
 (Claude Opus 5.5).
+
+---
+
+## Recipe TI - Merge Twin Functions into One Inlined Function
+
+**Use when:** two `static` functions of one file are the same text except for a few
+whole-expression runs, each is called from exactly one place, and they run per pixel or
+per channel, so that the copies hold *Bumpy Road Ahead*, *Complex Method* or *Excess
+Number of Function Arguments* twice (or would be *Code Duplication* once either of them
+shrank): `resize-image.c`'s `FilterHorizontalPixel` and `FilterVerticalPixel`, ten
+parameters each, whose only difference is the index of the source pixel
+(`y*(contribution[n-1].pixel-contribution[0].pixel+1)+(contribution[j].pixel-...)`
+against `(ssize_t) ((contribution[j].pixel-...)*(ssize_t) image->columns+x)`) at three
+places.
+
+**Not covered by:** Recipe MT, which merges the copies the same way but keeps each copy's
+function, with its parameter list, as a caller of the new function, and bundles only the
+selector and the values that differ, so a ten-parameter pair stays *Excess Number of
+Function Arguments* twice and the new function takes ten parameters as well; and whose
+speed argument assumes the compiler inlines the new function, which GCC does not do for a
+function of this size with two callers (measured below). Recipe CF, whose copies differ
+only in the function called. Recipe B, which bundles one function's parameters and leaves
+the twin. Recipe D, SV, SC and TW, whose copies differ in values, never in an expression
+of other operands.
+
+**How:**
+
+1. Copies. Two `static` functions of one file whose whole bodies align under Recipe MT
+   step 1 (variables renamed to one name per role; every differing run a whole
+   expression; MT step 3 on types). Check by `grep` that each is called from exactly one
+   place in the file and that neither's address is taken.
+2. Write `typedef enum { NameA, NameB } NameSide;` and a struct `Name` whose members are
+   `NameSide side` and then, in parameter order, each parameter of the copies that the
+   new function will not take (all but at most three, which stay parameters: the pointers
+   the copies write through and those they advance), under its role name and of its
+   declared type without the top-level `const`.
+3. A differing pair that stands at several positions, where the runs at the positions
+   differ only in one operand (`j-start` at one, `j` at the others), becomes one `static
+   inline` function directly above the new function: it takes `const Name *name` and
+   that operand as a parameter of the operand's type, binds as `const` locals the
+   members it reads (Recipe N step 4), and returns `((side == NameA) ? runA : runB)`
+   with both runs verbatim, the operand written as the parameter. Each position calls it
+   with its own operand. A pair at one position is written in place, as MT step 4 does.
+4. Write one `static inline` function, taking `const Name *name` and the parameters step 2
+   kept, whose body is the first copy's text (its comments included) after `const` local
+   bindings of the members it reads, with the differing runs replaced as step 3 says;
+   nothing else changed.
+5. In each copy's caller, at the top of the block that holds the call, declare `const Name
+   name = { NameX, ... };` with the copy's own constant and, in member order, the
+   arguments the call passed for those parameters, and write the call of the new
+   function with `&name` and the remaining arguments in place of the copy's call. The
+   copies leave the file: their text is now the new function's (step 8), and nothing else
+   calls them.
+6. Inlining. Build, and list the object's local symbols (`nm` on the file's object). The
+   copies were inlined into their callers, so neither appeared there; when the new
+   function or step 3's function appears, declare it `static
+   magick_attribute((__always_inline__)) inline` (a GCC and Clang attribute; the macro is
+   empty for other compilers) and check again. A function that a later step extracts
+   from the new function's body (Recipe E) is held to the same check in its own commit.
+7. Time it as Recipe CF step 7 does (alternating runs, at least nine each, both medians
+   quoted, slower by more than 3% stops the step), on a command that runs both copies'
+   paths.
+8. Check by script that folding each conditional and each call of step 3's function to
+   copy X's run, and removing the bindings, gives copy X's token sequence after the
+   renaming of step 1; check by reading that every initialiser of step 5 fills the
+   member of the parameter it was passed for.
+
+**Before:**
+
+```c
+static void FilterHorizontalPixel(const Image *image,
+  const Image *resize_image,const ContributionInfo *contribution,
+  const ssize_t n,const ssize_t start,const ssize_t stop,const double bisect,
+  const ssize_t y,const Quantum *p,Quantum *q)
+{
+  ...
+        k=y*(contribution[n-1].pixel-contribution[0].pixel+1)+
+          (contribution[j-start].pixel-contribution[0].pixel);
+  ...
+}
+...
+  for (y=0; y < (ssize_t) column->resize_image->rows; y++)
+  {
+    FilterHorizontalPixel(column->image,column->resize_image,contribution,n,
+      start,stop,bisect,y,p,q);
+    q+=(ptrdiff_t) GetPixelChannels(column->resize_image);
+  }
+```
+
+**After:**
+
+```c
+static inline ssize_t GetResizePixelOffset(const ResizePixelFilter *filter,
+  const ssize_t j)
+{
+  ...
+  return((side == HorizontalResizePixel) ?
+    position*(contribution[n-1].pixel-contribution[0].pixel+1)+
+    (contribution[j].pixel-contribution[0].pixel) :
+    (ssize_t) ((contribution[j].pixel-contribution[0].pixel)*
+    (ssize_t) image->columns+position));
+}
+
+static magick_attribute((__always_inline__)) inline void FilterResizePixel(
+  const ResizePixelFilter *filter,const Quantum *p,Quantum *q)
+{
+  ...
+        k=GetResizePixelOffset(filter,j-start);
+  ...
+}
+...
+  for (y=0; y < (ssize_t) column->resize_image->rows; y++)
+  {
+    const ResizePixelFilter
+      filter = { HorizontalResizePixel,column->image,column->resize_image,
+        contribution,n,start,stop,bisect,y };
+
+    FilterResizePixel(&filter,p,q);
+    q+=(ptrdiff_t) GetPixelChannels(column->resize_image);
+  }
+```
+
+**Careful:**
+
+- Values. Each call runs its copy's statements in its order on the same values: the
+  members hold the arguments the call passed (a `const` struct nothing writes), the
+  bindings read them back under the parameters' names, and each conditional evaluates its
+  copy's run alone (Recipe MT's argument, C11 6.5.15). Step 3's function returns that run
+  evaluated with the operand the position passed; an operand with no side effect,
+  evaluated once, as the run evaluated it once.
+- Why step 6 is not optional. The oracle compares every byte, NaN bits included.
+  Out of line, the one compiled body serves both directions and the compiler orders the
+  commutative operands of a floating-point addition or multiplication its own way; a
+  NaN input (`mogrify -define quantum:format=floating-point -depth 32` reads an 8-bit MIFF
+  as floats) then propagates another NaN's payload or sign. On `resize-image.c` the
+  out-of-line form diverged on 12 such cases, every differing word a NaN in both outputs,
+  and was 21% and 26% slower; inlined into each caller with its constant selector, each
+  direction compiles as its copy did: 0 diverged, timing within 3%. The attribute changes
+  only where code is placed, never what it computes; compilers that ignore it compute the
+  same values, at their own speed.
+- The copies' functions leave the file, but none of their text does (step 8): each was a
+  file-local function with one caller, now replaced by the call of the function holding
+  its text, so no caller, header or symbol outside the file can tell.
+- `refactor_guard.py --calls` reports the copies' calls gone; pass
+  `--renamed OldA=New --renamed OldB=New`, and expect step 3's function to appear with
+  its definition and calls. Anything else stops the step.
+
+**Evidence level:** oracle (each copy reached by a case), with `refactor_guard.py
+--calls`, steps 1 and 8 checked by script, step 6 by `nm`, and step 7's timing.
+
+**Provenance:** 2026-11-10, from `resize-image.c`'s `FilterHorizontalPixel` and
+`FilterVerticalPixel` (campaign A, W16 lane c), named in the file's plateau since W10
+("the twin pixel functions on the hot path"). Probes: the merge 8.78 to 9.10, then the
+channel loop's body as a helper (Recipe E step 7) 9.38, no finding on a new function. The
+out-of-line form diverged and was slower (above); the inlined form measured 0.77 s to
+0.75 s and 0.87 s to 0.86 s (medians of nine, `-resize` chains on a 1500x1500 image,
+opaque and with alpha). Added by Claude Code (Claude Opus 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe MA - Extract Sibling Blocks Differing in the Member They Update
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method* on
+a function that holds two or more copies of one block that update one member each of the
+same object, and differ in that member, in constants, and in the side-effect-free test
+that opens the block: `enhance-tone.c`'s `EqualizeColormap`, whose four colormap blocks
+each test `GetPixel<X>Traits(image)`, look up `<X>PixelChannel` and rewrite
+`image->colormap[j].<x>` from itself. Moved one by one they would be helpers that clone
+each other.
+
+**Not covered by:** Recipe SC, whose copies differ only in literals and enumeration
+constants, never in a member designator or a called function; Recipe SV and Recipe TW,
+which take one differing value; Recipe CF, whose copies differ only in the function
+called; Recipe D, whose copies differ in variables or one value; Recipe IS, which passes
+the slot of a shared object inside a parallel loop, not a member chosen per copy.
+
+**How:**
+
+1. Copies. Two or more blocks of one function, each meeting Recipe E steps 1 and 3 to 7
+   with no `#pragma` line and outside every OpenMP region; one of them may instead be the
+   whole body of a `static` function that the function calls from one place (a helper an
+   earlier step moved one copy into), its parameters standing for the caller's
+   variables.
+2. Align the copies by script (whitespace ignored; no variable renamed). Where they
+   differ, each differing run is one of three roles: (a) a literal or enumeration
+   constant, as Recipe SC step 2; (b) the whole controlling expression's operand that the
+   block evaluates first and unconditionally (the `x` of a leading `if ((x & M) != 0)`),
+   a call of a function with no side effect or a read of an object the block does not
+   write; (c) the member designator of one lvalue `e.m`, the same base `e` in every copy,
+   which the block reads and assigns and does not take the address of. All members of
+   role (c) have one declared type `T`. Any other difference stops the step.
+3. Write one `static void` function directly above the caller (or in place of step 1's
+   helper): its parameters are the variables a copy reads, or the input struct the
+   copies already read, then one parameter per role (a) of the constant's type (Recipe
+   SC step 3), one per role (b) of the expression's type, and `T *value` for role (c),
+   at most four in all (roles (a) beyond that in Recipe SC's `const` struct).
+4. Its body is one copy's text with each role (a) and (b) run replaced by its
+   parameter's name and every `e.m` of role (c) by `(*value)`, nothing else changed;
+   bindings of an input struct stay as they were.
+5. Replace each copy with a call passing its constants, its role (b) expression and
+   `&e.m`. A step 1 helper's one call becomes the new call, with the helper's arguments
+   substituted for its parameters, and the helper leaves the file (its text is the new
+   function's).
+6. All copies move in one commit; the message lists each copy's runs. When a copy runs per
+   pixel, time it as Recipe CF step 7 says.
+7. Check by script that substituting each copy's runs into the new function's body
+   (`(*value)` by `e.m`) gives that copy's token sequence; check by reading that the
+   caller guarantees `e` designates an object wherever a call stands (the copy evaluated
+   `e.m` only on some paths; the call computes its address always).
+
+**Before:**
+
+```c
+static void EqualizeColormapRed(const EqualizeColors *colors,const ssize_t j)
+{
+  ...
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,
+        RedPixelChannel);
+      if (black[channel] != white[channel])
+        image->colormap[j].red=equalize_map[(ssize_t)
+          GetPixelChannels(image)*ScaleQuantumToMap(
+          ClampToQuantum(image->colormap[j].red))+channel];
+    }
+}
+...
+    EqualizeColormapRed(&colors,j);
+    if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+      {
+        PixelChannel channel = GetPixelChannelChannel(image,
+          GreenPixelChannel);
+        if (black[channel] != white[channel])
+          image->colormap[j].green=equalize_map[(ssize_t)
+            GetPixelChannels(image)*ScaleQuantumToMap(
+            ClampToQuantum(image->colormap[j].green))+channel];
+      }
+    ...
+```
+
+**After:**
+
+```c
+static void EqualizeColormapValue(const EqualizeColors *colors,
+  const PixelTrait traits,const PixelChannel component,MagickRealType *value)
+{
+  ...
+  if ((traits & UpdatePixelTrait) != 0)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,
+        component);
+      if (black[channel] != white[channel])
+        (*value)=equalize_map[(ssize_t)
+          GetPixelChannels(image)*ScaleQuantumToMap(
+          ClampToQuantum((*value)))+channel];
+    }
+}
+...
+    EqualizeColormapValue(&colors,GetPixelRedTraits(image),RedPixelChannel,
+      &image->colormap[j].red);
+    EqualizeColormapValue(&colors,GetPixelGreenTraits(image),
+      GreenPixelChannel,&image->colormap[j].green);
+    ...
+```
+
+**Careful:**
+
+- Role (a): Recipe SC's argument; the constant is converted to the parameter's type,
+  the type the copy's use converted it to.
+- Role (b): the copy evaluated the expression first, on every path, and it has no side
+  effect; evaluated as an argument directly before the call, after everything the
+  previous statement did, it reads the same objects in the same state and yields the
+  same value, which the block then tests where it tested the expression.
+- Role (c): `&e.m` is the address of the member the copy named, so `(*value)` reads and
+  writes the very object `e.m` did, in the same order, with the same type `T`. Computing
+  the address reads no member; the base `e` (`image->colormap[j]`) must designate an
+  object at the call (step 7), since the call computes it even on the paths where the
+  copy never reached `e.m`. The block took no other address of `e.m` and wrote no other
+  lvalue that could alias it differently than before.
+- The removed helper of step 1 had one caller in the file, which now calls the function
+  holding its text: nothing outside the file could call it.
+- `refactor_guard.py` reports the copies' literals and callees once (`WARN`,
+  deduplication, every value still present); `--calls` with `--renamed Helper=New` for a
+  step 1 helper moves only the copies' callees (down by the copies less one) and the new
+  function; anything else stops the step.
+
+**Evidence level:** oracle (each copy reached by a case), with `refactor_guard.py
+--calls`, steps 2 and 7 checked by script and by reading.
+
+**Provenance:** 2026-11-10, from `enhance-tone.c`'s `EqualizeColormap` (campaign A, W16
+lane c): the file's only *Bumpy Road Ahead* (3 bumps), held since W14, when one block
+moved out as `EqualizeColormapRed` and the other three stayed because each further
+helper would clone it; lane b recorded that "its twins write different members, no
+recipe applies". A probe: 8.47 to 9.09, *Bumpy Road Ahead* and *Overall Code
+Complexity* leaving the file, no finding on the new function; the four reaching cases
+(`palette`, `bilevel`, `rose_alpha -colors 16`, OpenCL palette, each `-equalize`) 0
+diverged. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to
+evolve the recipes.
 
 ---
 
@@ -9090,3 +9400,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | I | *Two levels of evidence*, *Unreached functions: Recipe I*: Recipe I may be applied to a function no case reaches, `Verified: guard`, with *Unreached functions: B and N* items 1, 2 and 4 as written and, for item 3, `tools/targets_fill_check.py` printing `OK` (members filled with the addresses of the variables of their own names, in order, or by the `const` initialiser; bindings by name; the removed lines under step 5's mechanical rewrite and the helper's body the same multiset; each exit back unchanged in the caller and as many `return(MagickFalse);` in the helper); a throwing exit moves only in step 8's form, left in the caller. Item 4 also admits a function that vanished because the shortened caller now inlines it, when the caller calls it and its text is unchanged (`tools/obj_modulo.sh`, also for B and N). The guard-verified sentence, I's *Evidence level* and AGENTS.md say so. The new tool and the `obj_modulo.sh` change are commits of their own | `segment.c`'s `GetImageDynamicThreshold` (campaign A, W16 lane d), reached by no case: its region loops write `cluster`, `head`, `red`, `green` and `blue` (I, not B or N); two I helpers probe 7.14 to 9.02, `MODULO-IDENTICAL` with `CountImagePixelsByRGB` and `FinishDynamicThreshold` now inlined into the shortened caller. Planted errors (fill from another variable, fill out of order, binding of another member, flipped comparison, missing `*`, duplicated statement, extra exit, a statement added elsewhere, a literal changed in a newly inlined function) are each caught | owner |
 | 2026-11-10 | AMEND | D | *Unreached functions*, *Object code that differs only in the caller*: when `obj_identical.sh` prints `DIFFERENT`, the replacement may still be made at the guard level when `tools/reuse_check.py` prints `OK` (the call the only added line; the removed block, rewritten as the call's arguments bind it, `&v` for a pointer parameter `p` as `(*p)`, is the helper's body line for line) and `tools/obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL`; inside a parallel loop the helper may write the shared `status` (or a PS step 2 scalar) through a pointer when the block meets PS steps 1 to 3 (a PS helper called again; PS *Careful*). *Two levels of evidence*, D's *Evidence level* and AGENTS.md say so; the tool is a commit of its own | `transform.c`'s `ExcerptImage` (campaign A, W16 lane d), reached by no case: its progress tail is `SetTransformProgress`'s body; the call gives a different `ExcerptImage` but every other function the same instructions; 8.95 to 9.09 in a probe. Planted errors (another tag, `excerpt_image` for `image`, a stray edit, the atomic pragma dropped) are each caught | owner |
 | 2026-11-10 | AMEND | CF | Steps 1, 2, 4, 5: a copy may call a function at a second role (a conversion and its inverse), each role its own method; a callee may be a function a header the file includes declares (`static inline` or exported; step 3 stays for functions of the file); when the parameters would be five or more, the methods and the first read variables go in one `const` struct of designators, declared at the top of the block that holds the call and bound first in the new function; comments and the order of declarators of a declaration that initialises none are ignored by the step 1 check. *Careful* gives the argument (the call is direct once inlined; `objdump` is the evidence). Still eight steps | `enhance.c`'s `ModulateHCL`, `ModulateHCLp`, `ModulateHSB`, `ModulateHSI`, `ModulateHSL` and `ModulateHSV` (campaign A, W16 lane b): the file's *Code Duplication* (ten functions); each calls `ConvertRGBTo<X>` and `Convert<X>ToRGB` from `colorspace-private.h` or `gem.h`, which step 2 refused, and the merged function needs six parameters. A probe: 7.72 to 9.02, the finding gone, no finding on a new function, no `call *` in `enhance.o` | owner |
+| 2026-11-10 | NEW | TI | Merge Twin Functions into One Inlined Function: two `static` functions with one caller each, the same text but for whole-expression runs, become one `static inline` function taking a `const` struct (an enumeration selector first, then the copies' read-only parameters) and the pointers they write through or advance; a differing pair repeated at several positions that differ in one operand becomes one selector function; each call declares the struct with its own constant and calls the new function, and the copies leave the file; `nm` must show the new functions inlined, else they are declared `magick_attribute((__always_inline__))`; timed | `resize-image.c`'s `FilterHorizontalPixel` and `FilterVerticalPixel` (campaign A, W16 lane c): out of line the merged function diverged on 12 oracle cases (NaN payloads only) and was 21% and 26% slower; forced inline 0 diverged, within 3%; probes 8.78 to 9.10, then 9.38 with the channel body extracted, no finding on a new function | owner |
+| 2026-11-10 | NEW | MA | Extract Sibling Blocks Differing in the Member They Update: copies of one block (one of them possibly a one-caller helper's whole body) that differ in constants, in the side-effect-free operand of their leading test, and in the member designator of one lvalue `e.m` they read and assign become calls of one `static void` function taking the constants, the operand's value and `T *value` (`&e.m`), every `e.m` written `(*value)`; the one-caller helper leaves the file | `enhance-tone.c`'s `EqualizeColormap` (campaign A, W16 lane c): its four colormap blocks (`GetPixel<X>Traits`, `<X>PixelChannel`, `colormap[j].<x>`), the file's only Bumpy Road since W14; a probe 8.47 to 9.09, Bumpy Road and Overall Code Complexity gone, no finding on the new function, 4 reaching cases 0 diverged | owner |
+| 2026-11-10 | AMEND | MT | Step 4: when the variables a copy reads are the members of a `const` struct local the caller declares with exactly those variables as its initialiser and never writes (Recipe E step 3's input form), the new function may take that struct by `const Struct *` beside `side`, binding the members it reads as `const` locals of their names (a struct-valued member copied as E step 3 copies it); *Careful* gives the argument. Still seven steps | `layer.c`'s `CompareImagesBounds` (campaign A, W16 lane c): its ascending and descending row scans read `alpha_image`, `beta_image`, `scan` and `exception`, the members of its `DifferingLineScan line`, which with `side` make five parameters; a probe 7.55 to 7.84, `CompareImagesBounds` leaving Bumpy Road and Complex Method, no finding on the new function | owner |
