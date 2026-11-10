@@ -1109,6 +1109,17 @@ static void AutoSelectOpenCLDevices(MagickCLEnv clEnv)
 %    o exception: return any errors or warnings
 */
 
+static void DestroyBenchmarkImages(Image *blurredImage,Image *unsharpedImage,
+  Image *resizedImage)
+{
+  if (blurredImage != (Image *) NULL)
+    DestroyImage(blurredImage);
+  if (unsharpedImage != (Image *) NULL)
+    DestroyImage(unsharpedImage);
+  if (resizedImage != (Image *) NULL)
+    DestroyImage(resizedImage);
+}
+
 static double RunOpenCLBenchmark(MagickBooleanType is_cpu)
 {
   AccelerateTimer
@@ -1170,12 +1181,7 @@ static double RunOpenCLBenchmark(MagickBooleanType is_cpu)
     if (i > 0)
       StopAccelerateTimer(&timer);
 
-    if (blurredImage != (Image *) NULL)
-      DestroyImage(blurredImage);
-    if (unsharpedImage != (Image *) NULL)
-      DestroyImage(unsharpedImage);
-    if (resizedImage != (Image *) NULL)
-      DestroyImage(resizedImage);
+    DestroyBenchmarkImages(blurredImage,unsharpedImage,resizedImage);
   }
   DestroyImage(inputImage);
   return(ReadAccelerateTimer(&timer));
