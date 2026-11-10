@@ -1641,12 +1641,12 @@ MagickPrivate MagickCLCacheInfo CopyMagickCLCacheInfo(MagickCLCacheInfo info)
 %
 */
 
-MagickPrivate void DumpOpenCLProfileData()
-{
 #define OpenCLLog(message) \
    fwrite(message,sizeof(char),strlen(message),log); \
    fwrite("\n",sizeof(char),1,log);
 
+MagickPrivate void DumpOpenCLProfileData()
+{
   char
     buf[4096],
     filename[MagickPathExtent],
