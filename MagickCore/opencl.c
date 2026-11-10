@@ -2897,6 +2897,23 @@ MagickPrivate MagickBooleanType OpenCLThrowMagickException(
 %
 */
 
+static void FindKernelProfileRecord(MagickCLDevice device,const char *name,
+  size_t *i,KernelProfileRecord *profile_record)
+{
+  if (device->profile_records != (KernelProfileRecord *) NULL)
+    {
+      while (device->profile_records[*i] != (KernelProfileRecord) NULL)
+      {
+        if (LocaleCompare(device->profile_records[*i]->kernel_name,name) == 0)
+          {
+            *profile_record=device->profile_records[*i];
+            break;
+          }
+        (*i)++;
+      }
+    }
+}
+
 static void UpdateKernelProfileRecord(KernelProfileRecord profile_record,
   const cl_ulong elapsed)
 {
@@ -2959,18 +2976,7 @@ MagickPrivate MagickBooleanType RecordProfileData(MagickCLDevice device,
   LockSemaphoreInfo(device->lock);
   i=0;
   profile_record=(KernelProfileRecord) NULL;
-  if (device->profile_records != (KernelProfileRecord *) NULL)
-    {
-      while (device->profile_records[i] != (KernelProfileRecord) NULL)
-      {
-        if (LocaleCompare(device->profile_records[i]->kernel_name,name) == 0)
-          {
-            profile_record=device->profile_records[i];
-            break;
-          }
-        i++;
-      }
-    }
+  FindKernelProfileRecord(device,name,&i,&profile_record);
   if (profile_record != (KernelProfileRecord) NULL)
     name=DestroyString(name);
   else
