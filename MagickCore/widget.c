@@ -8355,6 +8355,55 @@ static void EnterMenuSelection(const MenuPointer *pointer,
   XDrawBevel(display,&windows->widget,highlight_info);
 }
 
+static void MoveMenuSelection(const MenuPointer *pointer,
+  const MenuTargets *targets)
+{
+  Display
+    *const display = pointer->display;
+
+  XWindows
+    *const windows = pointer->windows;
+
+  const char
+    *const *const selections = pointer->selections;
+
+  const unsigned int
+    number_selections = pointer->number_selections,
+    top_offset = pointer->top_offset;
+
+  const int
+    id = pointer->id;
+
+  XWidgetInfo
+    *const selection_info = targets->selection_info,
+    *const highlight_info = targets->highlight_info;
+
+  if (((*selection_info).id >= 0) &&
+      ((*selection_info).id < (int) number_selections))
+    {
+      /*
+        Unhighlight last selection.
+      */
+      if (id == (*selection_info).id)
+        return;
+      (*selection_info).y=((int) top_offset+(*selection_info).id*(int)
+        (*selection_info).height);
+      (*selection_info).text=(char *) selections[(*selection_info).id];
+      XDrawWidgetText(display,&windows->widget,selection_info);
+    }
+  (*selection_info).id=id;
+  if ((id < 0) || (id >= (int) number_selections))
+    return;
+  /*
+    Highlight this selection.
+  */
+  (*selection_info).y=((int) top_offset+id*(int) (*selection_info).height);
+  (*selection_info).text=(char *) selections[id];
+  XDrawWidgetText(display,&windows->widget,selection_info);
+  (*highlight_info).y=(*selection_info).y+(int) (*highlight_info).bevel_width;
+  XDrawBevel(display,&windows->widget,highlight_info);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -8666,6 +8715,9 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       }
       case MotionNotify:
       {
+        MenuPointer
+          pointer;
+
         /*
           Discard pending button motion events.
         */
@@ -8699,30 +8751,13 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
         if (selection_info.height == 0)
           break;
         id=(event.xmotion.y-(int) top_offset)/(int) selection_info.height;
-        if ((selection_info.id >= 0) &&
-            (selection_info.id < (int) number_selections))
-          {
-            /*
-              Unhighlight last selection.
-            */
-            if (id == selection_info.id)
-              break;
-            selection_info.y=((int) top_offset+selection_info.id*(int)
-              selection_info.height);
-            selection_info.text=(char *) selections[selection_info.id];
-            XDrawWidgetText(display,&windows->widget,&selection_info);
-          }
-        selection_info.id=id;
-        if ((id < 0) || (id >= (int) number_selections))
-          break;
-        /*
-          Highlight this selection.
-        */
-        selection_info.y=((int) top_offset+id*(int) selection_info.height);
-        selection_info.text=(char *) selections[id];
-        XDrawWidgetText(display,&windows->widget,&selection_info);
-        highlight_info.y=selection_info.y+(int) highlight_info.bevel_width;
-        XDrawBevel(display,&windows->widget,&highlight_info);
+        pointer.display=display;
+        pointer.windows=windows;
+        pointer.selections=selections;
+        pointer.number_selections=number_selections;
+        pointer.top_offset=top_offset;
+        pointer.id=id;
+        MoveMenuSelection(&pointer,&targets);
         break;
       }
       default:
