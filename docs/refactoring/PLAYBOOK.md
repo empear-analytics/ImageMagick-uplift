@@ -7872,14 +7872,20 @@ copies differ in variables or a value, not in the function called.
    the tail, such as `status`, `progress`, `y` and `image_view`, that nothing before the
    tail reads). Check by script that the copies are the same token sequence once each
    copy's row work is written `method(image,arguments,q);` (step 2), its tag `tag`, and
-   its per-iteration fill of a row struct removed (step 5).
+   its per-iteration fill of a row struct removed (step 5). A copy may instead end at
+   the view's destruction, `image_view=DestroyCacheView(image_view);`, when the
+   statements after it read neither the view, `y` nor `progress`: the new function
+   ends there with `return(status);`, and the caller keeps those statements (step 5).
 2. Row functions. Each copy's row work is one call of a `static` function of the file
    on the image, one input and the row pointer, `F(image,X,q)`, or an inline column loop
    (`for (x=0; ...)`, writing only its own `x` and temporaries and through `q`), which
    becomes such a function under Recipe E in this step. Each row function takes
    `(const Image *image,const void *arguments,Quantum *magick_restrict q)`, binding its
    input as Recipe CF step 3 does, and `X` becomes the address of the copy's input
-   object (`&threshold`, `&epsilon`, `&row`).
+   object (`&threshold`, `&epsilon`, `&row`), or, for an input that is itself a pointer
+   (`gamma_map`), that pointer. A row pointer declared `Quantum *q` or `Quantum
+   *magick_restrict q` fits one typedef: C ignores a parameter's qualifiers in the
+   function's type (C11 6.7.6.3p15), and each row function keeps its own declaration.
 3. Write directly above the first caller a `typedef void (*NameRowMethod)(const Image *,
    const void *,Quantum *magick_restrict);` and a struct `NameRows` with the members
    `const char *tag`, `NameRowMethod method` and `const void *arguments`.
@@ -7890,8 +7896,13 @@ copies differ in variables or a value, not in the function called.
 5. In each caller, declare `const NameRows rows = { Tag,F,&input };` among its
    declarations. A struct of row inputs that the copy filled in every iteration, member
    by member from variables the loop never writes, becomes a `const` local of the caller
-   declared with those variables as its initialiser, in member order. The tail becomes
-   `return(Name(image,&rows,exception));`, and locals only the tail used leave the caller.
+   declared with those variables as its initialiser, in member order. When an input's
+   value is assigned after the declarations (a map allocated in the body), `rows` is
+   declared without `const` or initialiser and filled member by member, in member order,
+   directly before the call (Recipe B step 5). The tail becomes
+   `return(Name(image,&rows,exception));`; a copy that ended at the view's destruction
+   becomes `status=Name(image,&rows,exception);`, or `(void) Name(image,&rows,exception);`
+   when nothing after it reads `status`. Locals only the copy used leave the caller.
 6. All copies move in one commit; the message names each function, its row function and
    its tag, and quotes Recipe CF step 7's timing (one indirect call per row).
 7. Check by reading that every member the region reads through `rows` is only read, that
@@ -7979,6 +7990,11 @@ static void PerceptibleRow(const Image *image,const void *arguments,
   it holds them still, and as a `const` local nothing writes it.
 - The tag is the string literal the copy passed, passed as the same pointer value
   through the struct; `SetImageProgress` reads the same text.
+- A copy that ended at the view's destruction: the statements after it run after the
+  call returns, in the same order, on the `status` the loop left, now the call's result;
+  `(void)` drops a result that the copy's caller never read either. A struct filled
+  directly before the call holds the values the copy read in the loop, which nothing
+  writes after the fill.
 - `refactor_guard.py --calls` shows the loop's callees down by the copies less one, the
   new function and row functions up by their definitions and calls; anything else stops
   the step.
@@ -8479,3 +8495,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | CF | Merge Twins Differing in the Function They Call: two or more copies of one block (whole `static` function bodies, or blocks meeting Recipe E) that are the same text except for the function called at one role, every callee of one type (or of types that differ only in the parameter carrying the callee's inputs, which then becomes `const void *`), become one `static inline` function taking a `const` pointer of exactly that type; each copy becomes a call passing its callee's name. Per-pixel copies are timed against the baseline binary (over 3% slower stops the step) and checked with `objdump` for new indirect calls | `threshold.c` (campaign A, W16 lane b): its *Code Duplication* (eight functions) comes from row and pixel loops that differ only in the function called, which Recipes D, SV, SC and TW refuse. A probe of the chain with Recipe RL: 8.03 to 9.09, the finding gone, no finding on a new function; the inline form timed 0.382 s to 0.377 s (medians of nine), a per-pixel call through a struct member 0.388 s to 0.439 s (rejected) | owner |
 | 2026-11-10 | NEW | RL | Share a Parallel Row Loop Through a Row Function: the tails of several functions that hold the same whole parallel row loop, differing only in the row's work and the progress tag, move into one non-inline `static` function (the pragma unchanged) taking a `const` struct of the tag, a row function pointer and a `const void *` to the row's input; each row's work becomes a `static` row function of one type, and each tail becomes the struct's initialiser and `return(...)` of the call | `threshold.c` (campaign A, W16 lane b): `BlackThresholdImage`, `WhiteThresholdImage`, `PerceptibleImage` and `RangeThresholdImage`, four of the eight functions of its *Code Duplication*. Alone 8.03 (flat, seven functions left in the finding); with Recipe CF on the row functions 9.09. One indirect call per row; timed with the chain | owner |
 | 2026-11-10 | NEW | MT | Merge Mirrored Twins Through a Constant Selector: two copies of one block that differ in a few whole-expression runs (a loop's direction, start and bound, a comparison operator, an expression read in place of another) become one `static inline` function taking a `const` enumeration selector (alone, or first in a `const` struct with the differing read values); every differing pair is written `((side == A) ? runA : runB)` with the runs verbatim, and each copy becomes a call passing its own enumeration constant. Checked by folding the conditionals back to each copy's tokens; timed when per pixel | `enhance-tone.c`'s `FindStretchBlackLevel` and `FindStretchWhiteLevel` (campaign A, W16 lane b): the pair holds the file's *Code Duplication* over its threshold; a probe measured 6.99 to 7.66, the finding gone, no finding on a new function. The mirrored `morphology.c` walks, which Recipes D, SV, SC, TW and CF refuse, motivated the operator form | owner |
+| 2026-11-10 | AMEND | RL | Step 1: a copy may end at the view's destruction when the statements after it read neither the view, `y` nor `progress`; the caller keeps them, writing `status=Name(...);` (or `(void) Name(...);` when nothing reads `status` afterwards). Step 2: an input that is itself a pointer is passed as it is; row functions declaring `Quantum *q` with or without `magick_restrict` share the typedef. Step 5: when an input is assigned after the declarations, `rows` is filled member by member directly before the call. *Careful* gives the argument. Still seven steps | `enhance-tone.c` (campaign A, W16 lane b): `StretchImagePixels`, `GammaImage`, `GrayscaleImage`, `LevelImage` and `LevelizeImage` hold the same row loop, three of them followed by their own clean-up or `ClampImage`; a probe 7.66 to 8.47, *Complex Method* leaving the file (`LevelizeImage` cc 12, `GrayscaleImage` 10, `GammaImage` 9), no finding on the new function | owner |
