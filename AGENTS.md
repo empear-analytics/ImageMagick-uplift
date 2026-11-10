@@ -100,6 +100,8 @@ python3 tools/oracle/casemap.py <Function>     # which cases execute it
   form, whose proof is `tools/obj_identical.sh` printing `IDENTICAL` for the whole
   object file (owner, 2026-10-30); and Recipes B and N with the playbook's
   *Unreached functions: B and N* checks (`tools/struct_fill_check.py`,
+  `tools/obj_modulo.sh`; owner, 2026-11-10); and Recipe I with its
+  *Unreached functions: Recipe I* checks (`tools/targets_fill_check.py`,
   `tools/obj_modulo.sh`; owner, 2026-11-10).
 
 The rules are in the playbook, *Two levels of evidence*; the reasoning and the measured

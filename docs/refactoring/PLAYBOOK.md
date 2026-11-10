@@ -150,8 +150,8 @@ start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 
 **Guard-verified.** No case executes the function. It may still
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
-recipes whose guard fingerprint is exact: **E, G and P** (and B and N with the checks
-of *Unreached functions: B and N* below). The proof is the build
+recipes whose guard fingerprint is exact: **E, G and P** (and B, N and I with the
+checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below). The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
 For E and P, which add a function, `OK` means the exact fingerprint the guard names as
 expected: the literal check `OK`, and `--calls` moving nothing but `+2` for each new
@@ -189,7 +189,10 @@ before the commit and quoted in its message, which carries `Verified: guard`:
    object file byte for byte, D's proof) or `MODULO-IDENTICAL`: every other function of
    the file compiles to the same instructions, addresses aside; the only new function
    is the helper; and the only functions gone are ones the helper calls, which the
-   compiler now inlines into the helper instead of the caller. For B, `<Helper>` is the
+   compiler now inlines into the helper instead of the caller, or ones the caller
+   calls whose definition is the same text on both sides, which the shortened caller
+   now inlines (the script prints `now inlined into <Caller> (its text unchanged)`;
+   added 2026-11-10 with *Unreached functions: Recipe I*). For B, `<Helper>` is the
    bundled function and `<Caller>` its one caller; with more than one caller only
    `IDENTICAL` passes. `DIFFERENT` stops the step.
 
@@ -203,6 +206,49 @@ helper inline (`always_inline` in the comparison copy, or every `static` functio
 `alwaysinline` in the IR) was tried on `segment.c` and does not work: the same code
 inlined at another point of the pipeline is scheduled differently (two `mov`s swap),
 so those comparisons refuse correct steps.
+
+**Unreached functions: Recipe I** (owner, 2026-11-10). Recipe I may also be applied to
+a function no case reaches, `Verified: guard`, on the terms above: item 1 (I steps 1 to
+8 checked by reading), item 2 (`--calls` moves nothing but `+2` for the new function)
+and item 4 (`obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL`) as written, and
+in place of item 3:
+
+- `python3 tools/targets_fill_check.py <file> <Type> <local> <Helper>` prints `OK`:
+  every member is filled with the address of the variable of its own name,
+  `local.v=(&v);` in member order directly before the one call that passes `&local`
+  (`local.v=(v);` where the block passes on an address an I helper bound: step 2's
+  `&v` becomes `v`), or by step 2's `const` initialiser `{ &v1, &v2, ... }` in member
+  order; each member is bound once, to a `*const` local of its own name; the lines the
+  step removed, rewritten mechanically as step 5 says (`&v` to `v`, every other `v` to
+  `*v`, a name after `.` or `->` left alone), and the helper's body are the same lines,
+  as many times each, `(*v)` counted as `*v`, the bindings and the closing
+  `return(MagickTrue);` aside; each exit the block lost reappears unchanged in the
+  caller (step 7's `goto L;` or `return(c);`, step 8's macro call or `S return(c);`),
+  and the helper holds as many `return(MagickFalse);` as the block had exits; and
+  nothing else is added outside the helper but its typedef, its signature, the targets
+  local, its fill and the call.
+
+A block whose exit throws through `GetMagickModule()` moves at this level only in step
+8's form, the throwing exit left in the caller unchanged, so the function name it
+reports does not change; a throw inside the moved text stops the step (item 1). The type
+of each member against its variable's declaration (step 3) and the precedence of `*v`
+against `->`, `.` and `[]` are checked by reading; the members Recipe I carries are
+pointers to pointers or to structs, so a wrong precedence does not compile.
+
+Why this proves the step: `MODULO-IDENTICAL` shows, as for N, that nothing outside the
+caller and the helper changed. Inside them an I step can go wrong in four ways an E step
+at this level cannot, and the text check closes each: a member filled with another
+variable's address or out of order (the fill), a binding of another member (the
+bindings), a written variable left without its `*` or a statement edited, added or
+dropped on the way (the rewrite, compared line for line as a multiset), and an exit
+lost or added (the exit count and the caller's unchanged exit). What remains is the
+recipe's own argument (I *Careful*): each `*v` is the caller's object `v`, read and
+written at the same points. Planted errors on `segment.c`'s `GetImageDynamicThreshold`
+were each caught: a fill from another variable, a fill out of member order, a binding of
+another member, a flipped comparison and a missing `*` in the moved block, a duplicated
+moved statement, an extra exit, a statement added to another function
+(`targets_fill_check.py`), and a literal changed in a function the shortened caller now
+inlines (`obj_modulo.sh`).
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -3167,7 +3213,9 @@ static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
   constants, or a written variable whose address the caller takes elsewhere: skip the block.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
-nothing else moved), and steps 1, 2, 6 and 7 checked by reading.
+nothing else moved), and steps 1, 2, 6 and 7 checked by reading; or, for a function no
+case reaches, guard with `tools/targets_fill_check.py` and `tools/obj_modulo.sh`
+(*Two levels of evidence*, *Unreached functions: Recipe I*).
 
 **Provenance:** 2026-10-30, from `fx.c`'s `GetFunction`, whose coordinate-qualifier block
 (`u.p[...]`, `v.p{...}`) is the file's last *Deep, Nested Complexity* (depth 4): it writes
@@ -3180,7 +3228,7 @@ during task W09, at the owner's request of 2026-10-30. Step 8's plain cleanup ru
 (2026-10-30, task W09): `layer.c`'s `OptimizeLayerFrames`, whose duplicate-frame trial
 (nesting 4) writes `dup_image`, `dup_bounds` and `cleared` and, when the clone fails,
 releases `bounds` and `disposals`, destroys `prev_image` and returns
-`(Image *) NULL`. Step 2's `const` form for five or six variables (2026-11-05, W13): `fx.c`'s `GetFunction`, whose qualifier block writes `coordQual`, `fe`, `funStr`, `chQual`, `expChLimit` and `iaQual` and returns `MagickFalse`, and whose opening chain writes five (`pushOp`, `strLimit`, `chLimit`, `expChLimit`, `nArgs`); step 2 stopped at four, and the bump each rests on stays while they are in the caller. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+`(Image *) NULL`. Step 2's `const` form for five or six variables (2026-11-05, W13): `fx.c`'s `GetFunction`, whose qualifier block writes `coordQual`, `fe`, `funStr`, `chQual`, `expChLimit` and `iaQual` and returns `MagickFalse`, and whose opening chain writes five (`pushOp`, `strLimit`, `chLimit`, `expChLimit`, `nArgs`); step 2 stopped at four, and the bump each rests on stays while they are in the caller. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24. The unreached level (2026-11-10, W16 lane d, owner's OK to evolve the recipes): `segment.c`'s `GetImageDynamicThreshold`, which no case reaches, keeps *Brain Method* and *Deep, Nested Complexity* (4) in its red/green/blue region loops, which write `cluster`, `head`, `red`, `green` and `blue` and leave through `return(ThrowClusterAllocationFailed(image,exception));`; B and N cannot carry written variables, and a probe of the two I helpers measured 7.14 to 9.02. Added by Claude Code (Claude Opus 5.5).
 
 ---
 
@@ -8176,3 +8224,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | SC | Extract Sibling Blocks Differing in Several Constants: copies of one block in one function that differ in two or more literal or enumeration constants move into one function taking a `const` struct of the constants (one member per role, typed as Recipe SV step 3 types the value); each copy becomes the struct's initialiser and the call; a forward declaration of the caller when the copies recurse into it | `quantize.c`'s `Riemersma` (campaign A, W16 lane c): cc 38, 109 lines, its four `level > 1` cases seven calls on four gravity constants each, its two `level == 1` cases three calls on three; as case helpers they clone (6.25, W14 lane b). A probe of the chain (this recipe twice, then Recipe O on the `level == 1` switch): 7.80 to 8.34, 8.41 and 8.74, no finding on a new function | mandate (2026-10-24) |
 | 2026-11-10 | AMEND | B, N | *Two levels of evidence*, *Unreached functions: B and N*: B and N may be applied to a function no case reaches, `Verified: guard`, when the step meets its recipe (checked by reading; no block that throws through `GetMagickModule()`), the guard prints `OK` with `--calls` moving only `+2` for an N helper (nothing for B), `tools/struct_fill_check.py` prints `OK` for N (members filled and bound by their own names, every removed line moved unchanged; B's fill checked by reading against the old call), and `tools/obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL` (every other function's instructions unchanged, no new function but the helper, only the helper's callees un-inlined). Both tools are new. Evidence lines of B and N say so | `paint.c`'s `TransparentPaintImageChroma` and `segment.c`'s `GetImageDynamicThreshold` (campaign A, W16 lane d), reached by no case: an E helper of Chroma's pixel loop takes six arguments (9.68, but a new *Excess Arguments*); the N form of it compiles byte-identical; the N form of `GetImageDynamicThreshold`'s removal tail compiles to the same instructions in every other function, the helper's two callees inlined into it. Planted errors (a member bound from another member, a fill from another variable, a flipped comparison in the moved block, a literal changed in another function) are each caught by one of the checks; forced-inline comparisons refused the correct step (scheduling) | owner |
 | 2026-11-10 | NEW | LE | Replace a Local Enum with a File-Scope Enum: a function-local `typedef enum` whose constants map one to one, by position and with default values, onto an enumeration the file already declares is deleted; its constants become the file-scope ones and its locals take the file-scope type. The values are only assigned to the function's locals, compared and switched on, never stored elsewhere, passed, returned or printed; each pair plays the same role (checked by reading); proven by `tools/obj_identical.sh` printing `IDENTICAL` | `shear.c`'s `YShearImage` (campaign A, W16 lane d): its `UP`/`DOWN` enum shadows the file's `LEFT`/`RIGHT` `ShearDirection` and is all that keeps its direction choice from `SelectShearDirection` (D) and its transfer `switch` from `TransferXShearSpan` (TW); the parked branch `w16-shear-enum` folded the replacement into a PC commit. A probe: `IDENTICAL`, 9.17 to 9.19; the chain it opens (D, TW, PS, PC, PS) reaches 10.0 | owner |
+| 2026-11-10 | AMEND | I | *Two levels of evidence*, *Unreached functions: Recipe I*: Recipe I may be applied to a function no case reaches, `Verified: guard`, with *Unreached functions: B and N* items 1, 2 and 4 as written and, for item 3, `tools/targets_fill_check.py` printing `OK` (members filled with the addresses of the variables of their own names, in order, or by the `const` initialiser; bindings by name; the removed lines under step 5's mechanical rewrite and the helper's body the same multiset; each exit back unchanged in the caller and as many `return(MagickFalse);` in the helper); a throwing exit moves only in step 8's form, left in the caller. Item 4 also admits a function that vanished because the shortened caller now inlines it, when the caller calls it and its text is unchanged (`tools/obj_modulo.sh`, also for B and N). The guard-verified sentence, I's *Evidence level* and AGENTS.md say so. The new tool and the `obj_modulo.sh` change are commits of their own | `segment.c`'s `GetImageDynamicThreshold` (campaign A, W16 lane d), reached by no case: its region loops write `cluster`, `head`, `red`, `green` and `blue` (I, not B or N); two I helpers probe 7.14 to 9.02, `MODULO-IDENTICAL` with `CountImagePixelsByRGB` and `FinishDynamicThreshold` now inlined into the shortened caller. Planted errors (fill from another variable, fill out of order, binding of another member, flipped comparison, missing `*`, duplicated statement, extra exit, a statement added elsewhere, a literal changed in a newly inlined function) are each caught | owner |
