@@ -1093,6 +1093,38 @@ static void ComputeDifferenceFeatures(const TextureDirection *texture,
   SetSecondMeasureOfCorrelation(texture,slots);
 }
 
+static void AccumulateCorrelationQ(const TextureDirection *texture,
+  const ssize_t x,const ssize_t y,const ssize_t z)
+{
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const density_x = texture->density_x,
+    *const density_y = texture->density_y,
+    **const Q = texture->Q;
+
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Maximum Correlation Coefficient.
+  */
+  if ((fabs(density_x[z].direction[i].red) > MagickEpsilon) &&
+      (fabs(density_y[x].direction[i].red) > MagickEpsilon))
+    Q[z][y].direction[i].red+=cooccurrence[z][x].direction[i].red*
+      cooccurrence[y][x].direction[i].red/density_x[z].direction[i].red/
+      density_y[x].direction[i].red;
+  if ((fabs(density_x[z].direction[i].green) > MagickEpsilon) &&
+      (fabs(density_y[x].direction[i].red) > MagickEpsilon))
+    Q[z][y].direction[i].green+=cooccurrence[z][x].direction[i].green*
+      cooccurrence[y][x].direction[i].green/
+      density_x[z].direction[i].green/density_y[x].direction[i].red;
+  if ((fabs(density_x[z].direction[i].blue) > MagickEpsilon) &&
+      (fabs(density_y[x].direction[i].blue) > MagickEpsilon))
+    Q[z][y].direction[i].blue+=cooccurrence[z][x].direction[i].blue*
+      cooccurrence[y][x].direction[i].blue/
+      density_x[z].direction[i].blue/density_y[x].direction[i].blue;
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1526,6 +1558,10 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 #endif
   for (i=0; i < 4; i++)
   {
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
+
     ssize_t
       z;
 
@@ -1553,24 +1589,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
               AddFeatureStatistics(image,&pixel.direction[i],
                 &cooccurrence[x][y].direction[i]);
             }
-          /*
-            Maximum Correlation Coefficient.
-          */
-          if ((fabs(density_x[z].direction[i].red) > MagickEpsilon) &&
-              (fabs(density_y[x].direction[i].red) > MagickEpsilon))
-            Q[z][y].direction[i].red+=cooccurrence[z][x].direction[i].red*
-              cooccurrence[y][x].direction[i].red/density_x[z].direction[i].red/
-              density_y[x].direction[i].red;
-          if ((fabs(density_x[z].direction[i].green) > MagickEpsilon) &&
-              (fabs(density_y[x].direction[i].red) > MagickEpsilon))
-            Q[z][y].direction[i].green+=cooccurrence[z][x].direction[i].green*
-              cooccurrence[y][x].direction[i].green/
-              density_x[z].direction[i].green/density_y[x].direction[i].red;
-          if ((fabs(density_x[z].direction[i].blue) > MagickEpsilon) &&
-              (fabs(density_y[x].direction[i].blue) > MagickEpsilon))
-            Q[z][y].direction[i].blue+=cooccurrence[z][x].direction[i].blue*
-              cooccurrence[y][x].direction[i].blue/
-              density_x[z].direction[i].blue/density_y[x].direction[i].blue;
+          AccumulateCorrelationQ(&texture,x,y,z);
           if (image->colorspace == CMYKColorspace)
             if ((fabs(density_x[z].direction[i].black) > MagickEpsilon) &&
                 (fabs(density_y[x].direction[i].black) > MagickEpsilon))
