@@ -3394,6 +3394,43 @@ static void WalkHitAndMissKernel(const MorphologyKernelWalk *walk,
   }
 }
 
+typedef double
+  (*MorphologyKernelMethod)(const MagickRealType *magick_restrict,
+    const Quantum *magick_restrict,const ssize_t,double);
+
+static inline double WalkReflectedKernel(const MorphologyKernelWalk *walk,
+  const MorphologyKernelMethod method,const MagickRealType *magick_restrict k,
+  double pixel)
+{
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  ssize_t
+    u,
+    v;
+
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      pixel=method(k,pixels,i,pixel);
+      k--;
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+  return(pixel);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3787,16 +3824,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                 /*
                   No alpha blending.
                 */
-                for (v=0; v < (ssize_t) kernel->height; v++)
-                {
-                  for (u=0; u < (ssize_t) kernel->width; u++)
-                  {
-                    pixel=ConvolveChannelValue(k,pixels,i,pixel);
-                    k--;
-                    pixels+=(ptrdiff_t) GetPixelChannels(image);
-                  }
-                  pixels+=(image->columns-1)*GetPixelChannels(image);
-                }
+                pixel=WalkReflectedKernel(&walk,ConvolveChannelValue,k,pixel);
                 break;
               }
             /*
@@ -3932,16 +3960,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                applied.
             */
             k=(&kernel->values[kernel->width*kernel->height-1]);
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                pixel=MinimizeKernelDistance(k,pixels,i,pixel);
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
+            pixel=WalkReflectedKernel(&walk,MinimizeKernelDistance,k,pixel);
             break;
           }
           case UndefinedMorphology:
