@@ -1621,6 +1621,59 @@ static void RelinquishInverseFourierMemory(MemoryInfo *magnitude_info,
     inverse_info=RelinquishVirtualMemory(inverse_info);
 }
 
+typedef struct _InverseFourierPhase
+{
+  CacheView
+    *phase_view;
+
+  FourierInfo
+    *fourier_info;
+
+  const InverseImagePair
+    *images;
+
+  ExceptionInfo
+    *exception;
+} InverseFourierPhase;
+
+static void GetInverseFourierPhase(const InverseFourierPhase *phase,
+  double *phase_pixels,ssize_t i)
+{
+  CacheView
+    *const phase_view = phase->phase_view;
+
+  FourierInfo
+    *const fourier_info = phase->fourier_info;
+
+  const InverseImagePair
+    *const images = phase->images;
+
+  ExceptionInfo
+    *const exception = phase->exception;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0L; y < (ssize_t) fourier_info->height; y++)
+  {
+    p=GetCacheViewVirtualPixels(phase_view,0,y,fourier_info->width,1,
+      exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0L; x < (ssize_t) fourier_info->width; x++)
+    {
+      phase_pixels[i]=GetFourierPixel(images->phase_image,
+        fourier_info->channel,p);
+      i++;
+      p+=(ptrdiff_t) GetPixelChannels(images->phase_image);
+    }
+  }
+}
+
 typedef struct _InverseFourierMemory
 {
   MemoryInfo
@@ -1669,9 +1722,6 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   CacheView
     *phase_view;
 
-  const Quantum
-    *p;
-
   double
     *inverse_pixels,
     *magnitude_pixels,
@@ -1684,6 +1734,9 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
     *inverse_info,
     *magnitude_info,
     *phase_info;
+
+  InverseFourierPhase
+    phase;
 
   const InverseFourierMemory
     targets = { &magnitude_info, &phase_info, &inverse_info };
@@ -1710,20 +1763,11 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
     fourier_info->center*sizeof(*magnitude_pixels));
   i=0L;
   phase_view=AcquireVirtualCacheView(images->phase_image,exception);
-  for (y=0L; y < (ssize_t) fourier_info->height; y++)
-  {
-    p=GetCacheViewVirtualPixels(phase_view,0,y,fourier_info->width,1,
-      exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0L; x < (ssize_t) fourier_info->width; x++)
-    {
-      phase_pixels[i]=GetFourierPixel(images->phase_image,
-        fourier_info->channel,p);
-      i++;
-      p+=(ptrdiff_t) GetPixelChannels(images->phase_image);
-    }
-  }
+  phase.phase_view=phase_view;
+  phase.fourier_info=fourier_info;
+  phase.images=images;
+  phase.exception=exception;
+  GetInverseFourierPhase(&phase,phase_pixels,i);
   ScaleInverseFourierPhase(fourier_info,phase_pixels);
   phase_view=DestroyCacheView(phase_view);
   CorrectPhaseLHS(fourier_info->width,fourier_info->height,phase_pixels);
