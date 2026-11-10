@@ -7154,6 +7154,16 @@ static XWidgetInfo HighlightListBrowserReply(const ListBrowserClick *click,
   return(reply_info);
 }
 
+static size_t ConfirmListBrowserReply(Display *display,
+  const XWidgetInfo reply_info,size_t state)
+{
+  if (*reply_info.text == '\0')
+    (void) XBell(display,0);
+  else
+    state|=ExitState;
+  return(state);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7636,10 +7646,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             if ((event.xbutton.window == window_info->id) &&
                 (MatteIsActive(action_info,event.xbutton)))
               {
-                if (*reply_info.text == '\0')
-                  (void) XBell(display,0);
-                else
-                  state|=ExitState;
+                state=ConfirmListBrowserReply(display,reply_info,state);
               }
             action_info.raised=MagickTrue;
             XDrawBeveledButton(display,window_info,&action_info);
