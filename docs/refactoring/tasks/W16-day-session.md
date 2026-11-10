@@ -321,3 +321,15 @@ redid steps 5-30; the main session checked the merged table against the original
 `RotateKernelInfo` needs a case that detects its removal (for the harness owner). **Owner questions:** FreiChen's basis
 groups: allow a table-driven merge, or leave it at cc 16? **Upstream:** `ScaleKernelInfo`'s negative-factor swap sets
 `kernel->minimum = 1;` where `= t` looks intended (now in `ApplyKernelScaling`, moved verbatim).
+
+## Lane a, widget.c second pass
+
+widget.c 1.28 to 1.44 (9 refactor commits, wide build). Reach was checked against the wide line coverage
+(`build-oracle/oracle-wide.lcov`, 2026-10-28): no case reaches `XScreenEvent`'s Expose or ButtonPress cases or the popup
+mapping run, so those steps rest on object code IDENTICAL. **Correction:** commit 2acc79850 (CN in `XScreenEvent`)
+carries `Verified: oracle` citing 237 cases; that is true of the function, not of the changed lines, whose evidence is
+the guard and object code IDENTICAL (what CN requires). **Owner questions:** (1) may MA admit a copy no case reaches when
+only the caller's object code differs in register allocation, or should such twins stay one-sided? (2) should a
+line-coverage reach check be required for oracle-level claims in the wide build, given that its lcov dates from
+2026-10-28? **Tool note:** `tools/obj_identical.sh` prints "otool: not found" on Linux before DIFFERENT (the verdict is
+right).
