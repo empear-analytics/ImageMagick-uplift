@@ -1436,24 +1436,30 @@ static void LogOpenCLBuildFailure(MagickCLDevice device,const char *kernel,
   log=(char*)RelinquishMagickMemory(log);
 }
 
+static const char
+  IllegalFileNameCharacters[] =
+  {
+    ' ',
+    '\\',
+    '/',
+    ':',
+    '*',
+    '?',
+    '"',
+    '<',
+    '>',
+    '|'
+  };
+
 static inline MagickBooleanType IsIllegalFileNameCharacter(const char c)
 {
-  switch (c)
-  {
-    case ' ':
-    case '\\':
-    case '/':
-    case ':':
-    case '*':
-    case '?':
-    case '"':
-    case '<':
-    case '>':
-    case '|':
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(IllegalFileNameCharacters)/
+       sizeof(*IllegalFileNameCharacters)); i++)
+    if (IllegalFileNameCharacters[i] == c)
       return(MagickTrue);
-    default:
-      break;
-  }
   return(MagickFalse);
 }
 
