@@ -1659,6 +1659,12 @@ static KernelInfo *AcquireDiskKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static MagickBooleanType IsWithinRingLimits(const ssize_t radius,
+  const ssize_t limit1,const ssize_t limit2)
+{
+  return((limit1 < radius && radius <= limit2) ? MagickTrue : MagickFalse);
+}
+
 static KernelInfo *AcquireRingKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,const double nan)
 {
@@ -1699,7 +1705,7 @@ static KernelInfo *AcquireRingKernel(KernelInfo *kernel,
   for ( i=0, v= -kernel->y; v <= (ssize_t)kernel->y; v++)
     for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
       { ssize_t radius=u*u+v*v;
-        if (limit1 < radius && radius <= limit2)
+        if (IsWithinRingLimits(radius,limit1,limit2) != MagickFalse)
           kernel->positive_range += kernel->values[i] = (double) scale;
         else
           kernel->values[i] = nan;
