@@ -7871,6 +7871,514 @@ TW on the transfer twins. Added by Claude Code (Claude Opus 5.5) under the owner
 
 ---
 
+## Recipe CF - Merge Twins Differing in the Function They Call
+
+**Use when:** CodeScene reports *Code Duplication* in a file (or a step towards another
+finding would create it) where two or more copies of one block are the same text except
+for the function they call at one role: `threshold.c`'s `BlackThresholdIntensity` and
+`WhiteThresholdIntensity`, which compute the pixel's intensity and pass it to
+`BlackThresholdPixel` or `WhiteThresholdPixel`; or the column loops of
+`BlackThresholdRow`, `WhiteThresholdRow` and `PerceptibleRow`, which call a different
+per-pixel function on each pixel. Every function called at the role has the same type,
+or the types differ only in the one parameter that carries the callee's inputs.
+
+**Not covered by:** Recipe D, whose copies differ in variables or one value, never in
+the function called; Recipe SV and Recipe SC, whose differing values are literals,
+enumeration constants or a macro whose call has constant arguments, and a function
+designator is none of these; Recipe TW, whose one differing value is a side-effect-free
+expression of one type read into a struct member, not a function called by the block;
+Recipe E, which moves one copy, so that a second copy moved the same way becomes a helper
+that clones the first (the *Code Duplication* cliff, W14).
+
+**How:**
+
+1. Copies. Two or more copies in one file, each the whole body of a `static` function or
+   a block that meets Recipe E steps 1 and 3 to 7 and the OpenMP rule, with no `#pragma`
+   line. Check by script that the copies are the same token sequence once each copy's
+   variables are renamed to one name per role (Recipe TW step 1) and the name of the
+   function called at the role is replaced by `method` at each of its positions; at
+   least two copies call different functions there. Literals and operators are not
+   renamed; whitespace and line breaks are ignored.
+2. The method type. Every function a copy calls at the role is a function of the file,
+   and all have the same type: the same return type and the same parameter types, in
+   order, as their definitions declare them. Write
+   `typedef R (*NameMethod)(T1,T2,...);` with exactly those types, directly above the new
+   function.
+3. Inputs passed through. When the callees' types differ only in the one parameter that
+   carries each callee's inputs (a pointer to `const` of a different type, or a scalar
+   taken by value), and every call of each callee lies in a copy, that parameter becomes
+   `const void *arguments` in every callee, and the callee's first declaration binds the
+   old name from it: `const T *name = (const T *) arguments;` for a pointer,
+   `const T name = (*(const T *) arguments);` for a scalar. A copy that passed the
+   callee an input it had itself bound in the same way from its own `const void
+   *arguments` passes `arguments` instead, and its binding goes when nothing else reads
+   it; any other copy passes the pointer it passed (converted to `const void *` by the
+   call), or for a scalar the address of the object it read.
+   Step 2's type then has `const void *` in that position.
+4. Write one `static inline` function directly above the first caller: its parameters
+   are the variables a copy reads (Recipe E step 3) and `const NameMethod method`, at
+   most four in all; its body is a copy's text with the common names and `method` at
+   the role's positions, nothing else changed.
+5. Replace each copy by a call of the new function that passes the name of that copy's
+   callee (a function designator, never a variable, a parameter or a member) and each
+   variable in the position of its parameter. A copy that was a function's whole body
+   becomes that one call, and the function keeps its name and parameters for its own
+   callers.
+6. All copies move in one commit (rule 1), with step 3's parameter changes. The message
+   names each copy and its callee.
+7. Time it. When a copy runs per pixel or per channel, build the candidate and time
+   `magick` on a command that runs every copy, alternating the baseline and candidate
+   binaries for at least nine runs each, and quote both medians in the message; a
+   candidate slower by more than 3% stops the step. Check with `objdump -d` on the
+   file's object that no new indirect call (`call *`) appears.
+8. Check by script that each copy equals the new function's body with that copy's
+   callee and variables substituted, and by reading that every argument fills its
+   parameter.
+
+**Before:**
+
+```c
+static void BlackThresholdIntensity(const Image *image,
+  const PixelInfo *threshold,Quantum *magick_restrict q)
+{
+  double
+    pixel;
+
+  pixel=GetPixelIntensity(image,q);
+  BlackThresholdPixel(image,threshold,pixel,q);
+}
+...
+static void WhiteThresholdIntensity(const Image *image,
+  const PixelInfo *threshold,Quantum *magick_restrict q)
+{
+  double
+    pixel;
+
+  pixel=GetPixelIntensity(image,q);
+  WhiteThresholdPixel(image,threshold,pixel,q);
+}
+```
+
+**After:**
+
+```c
+typedef void
+  (*ThresholdChannelsMethod)(const Image *,const PixelInfo *,double,
+    Quantum *magick_restrict);
+
+static inline void ThresholdIntensity(const Image *image,
+  const ThresholdChannelsMethod method,const PixelInfo *threshold,
+  Quantum *magick_restrict q)
+{
+  double
+    pixel;
+
+  pixel=GetPixelIntensity(image,q);
+  method(image,threshold,pixel,q);
+}
+
+static void BlackThresholdIntensity(const Image *image,
+  const PixelInfo *threshold,Quantum *magick_restrict q)
+{
+  ThresholdIntensity(image,BlackThresholdPixel,threshold,q);
+}
+...
+static void WhiteThresholdIntensity(const Image *image,
+  const PixelInfo *threshold,Quantum *magick_restrict q)
+{
+  ThresholdIntensity(image,WhiteThresholdPixel,threshold,q);
+}
+```
+
+**Careful:**
+
+- A call through a pointer whose type is the type of the function it points to calls
+  that function with the same arguments, converted as the direct call converted them
+  (C11 6.5.2.2 and 6.3.2.3p8): each call of the new function runs its copy's statements
+  in the same order on the same values. The pointer type must be the callees' exact
+  type: a call through another type is undefined behaviour. Step 2's typedef makes the
+  compiler check it, since passing a function of another type to `method` is a
+  constraint violation that the build reports (an error under `ci_warnings.sh`).
+- Step 3 changes no value. A pointer to an object converted to `const void *` and back
+  to its own type compares equal to the original (C11 6.3.2.3p1), so the callee reads
+  the same object through the same address. A scalar is read through the address of
+  the object the copy read: a parameter or local that nothing writes while the call
+  runs, so `(*(const T *) arguments)` is the value the copy passed, of the same type.
+  The `const` stays on every pointer, so nothing gains a way to write.
+- Speed. The new function is `static inline` and every call passes a function
+  designator, so once the compiler inlines it the call through `method` is a direct
+  call of a known function, which it may inline in turn; the code that runs is the
+  copy's. Under OpenMP the call stands where the copy stood, with its designator in the
+  same code, so the outlined region is optimised the same way. That argument holds in
+  optimised builds only; step 7's timing and `objdump` check are the evidence, and a
+  build without optimisation keeps the indirect call, which changes speed, not values.
+- `refactor_guard.py --calls` shows each callee down by one call (now passed by name,
+  not called), `method` up by its calls in the new function, and the new function (its
+  definition and one call per copy); any other movement stops the step.
+
+**Evidence level:** oracle (each copy reached by a case), with `refactor_guard.py
+--calls`, steps 1 and 8 checked by script, step 2 by the build, step 7 by timing and
+`objdump`.
+
+**Provenance:** 2026-11-10, from `threshold.c` (campaign A, W16 lane b). Its *Code
+Duplication* finding (eight functions) came from the threshold row loops, which differ
+in the function called on each row and each pixel; Recipes D, SV, SC and TW refuse a
+differing function name. A probe of the chain (Recipe RL on the four row loops, Recipe
+E on `BlackThresholdRow`, this recipe on the intensity pair, then on the three column
+loops with step 3): 8.03, 8.03, 8.03, 9.09, *Code Duplication* gone, no finding on a new
+function. Calling the per-pixel function through a pointer that is not a designator
+(the column loop inside the shared row loop, reading the function from a struct) was
+13% slower (0.388 s to 0.439 s, medians of nine runs of `magick` with
+`-black-threshold` and `-white-threshold` twice each on a 3000x3000 image) and was
+rejected; the inline form measured 0.382 s to 0.377 s on the same command. The commits
+quote CPU medians of a `magick convert` command that also runs `-perceptible` and
+`-range-threshold` (`magick` itself lacks `-perceptible`). Added by Claude Code (Claude Opus 5.5) under the owner's
+approval of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe RL - Share a Parallel Row Loop Through a Row Function
+
+**Use when:** CodeScene reports *Code Duplication* among functions of one file whose
+tails are the same parallel row loop (the cache view acquired, the `#pragma omp parallel
+for` with the same clauses, the row fetched, one row of work, the sync, the progress
+block, the view destroyed, `return(status);`), differing only in the work done on the
+row and the progress tag: `threshold.c`'s `BlackThresholdImage`, `WhiteThresholdImage`,
+`PerceptibleImage` and `RangeThresholdImage`.
+
+**Not covered by:** Recipe N and Recipe Z step 1, which move one function's tail with its
+parallel loop whole and unchanged, so that a second tail moved the same way clones the
+first; Recipe CF, whose copies hold no `#pragma` line and whose new function is
+`static inline` with a designator at every call, while here the call stands inside the
+parallel region and reads the row function from a struct; Recipe TW and Recipe D, whose
+copies differ in variables or a value, not in the function called.
+
+**How:**
+
+1. Copies. The tails of two or more functions of one file, each from the statement that
+   sets `status` before the loop to the function's final `return(status);`, each holding
+   one whole parallel loop under Recipe N step 1's conditions (the `#if`, the pragma and
+   the `#endif` unchanged; every variable the region writes or a clause names a local of
+   the tail, such as `status`, `progress`, `y` and `image_view`, that nothing before the
+   tail reads). Check by script that the copies are the same token sequence once each
+   copy's row work is written `method(image,arguments,q);` (step 2), its tag `tag`, and
+   its per-iteration fill of a row struct removed (step 5). A copy may instead end at
+   the view's destruction, `image_view=DestroyCacheView(image_view);`, when the
+   statements after it read neither the view, `y` nor `progress`: the new function
+   ends there with `return(status);`, and the caller keeps those statements (step 5).
+2. Row functions. Each copy's row work is one call of a `static` function of the file
+   on the image, one input and the row pointer, `F(image,X,q)`, or an inline column loop
+   (`for (x=0; ...)`, writing only its own `x` and temporaries and through `q`), which
+   becomes such a function under Recipe E in this step. Each row function takes
+   `(const Image *image,const void *arguments,Quantum *magick_restrict q)`, binding its
+   input as Recipe CF step 3 does, and `X` becomes the address of the copy's input
+   object (`&threshold`, `&epsilon`, `&row`), or, for an input that is itself a pointer
+   (`gamma_map`), that pointer. A row pointer declared `Quantum *q` or `Quantum
+   *magick_restrict q` fits one typedef: C ignores a parameter's qualifiers in the
+   function's type (C11 6.7.6.3p15), and each row function keeps its own declaration.
+3. Write directly above the first caller a `typedef void (*NameRowMethod)(const Image *,
+   const void *,Quantum *magick_restrict);` and a struct `NameRows` with the members
+   `const char *tag`, `NameRowMethod method` and `const void *arguments`.
+4. Below them, one `static MagickBooleanType` function taking `(Image *image,const
+   NameRows *rows,ExceptionInfo *exception)` (not `inline`): the tail's locals, then the
+   tail's text with the row work written `rows->method(image,rows->arguments,q);` and
+   the tag `rows->tag`, nothing else changed, the pragma lines included.
+5. In each caller, declare `const NameRows rows = { Tag,F,&input };` among its
+   declarations. A struct of row inputs that the copy filled in every iteration, member
+   by member from variables the loop never writes, becomes a `const` local of the caller
+   declared with those variables as its initialiser, in member order. When an input's
+   value is assigned after the declarations (a map allocated in the body), `rows` is
+   declared without `const` or initialiser and filled member by member, in member order,
+   directly before the call (Recipe B step 5). The tail becomes
+   `return(Name(image,&rows,exception));`; a copy that ended at the view's destruction
+   becomes `status=Name(image,&rows,exception);`, or `(void) Name(image,&rows,exception);`
+   when nothing after it reads `status`. Locals only the copy used leave the caller.
+6. All copies move in one commit; the message names each function, its row function and
+   its tag, and quotes Recipe CF step 7's timing (one indirect call per row).
+7. Check by reading that every member the region reads through `rows` is only read, that
+   every object `arguments` points to is a local or parameter of the caller that nothing
+   writes until the call returns, and that every caller passes its own tag.
+
+**Before:**
+
+```c
+MagickExport MagickBooleanType PerceptibleImage(Image *image,
+  const double epsilon,ExceptionInfo *exception)
+{
+#define PerceptibleImageTag  "Perceptible/Image"
+
+  CacheView
+    *image_view;
+  ...
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ...
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
+      continue;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      PerceptiblePixel(image,epsilon,q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    SyncThresholdRow(&line,&status);
+    ...
+        SetThresholdProgress(image,PerceptibleImageTag,progress,&status);
+  ...
+  return(status);
+}
+```
+
+**After:**
+
+```c
+static MagickBooleanType ThresholdImageRows(Image *image,
+  const ThresholdRows *rows,ExceptionInfo *exception)
+{
+  ...
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
+      continue;
+    rows->method(image,rows->arguments,q);
+    SyncThresholdRow(&line,&status);
+    ...
+        SetThresholdProgress(image,rows->tag,progress,&status);
+  ...
+}
+...
+static void PerceptibleRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  const double
+    epsilon = (*(const double *) arguments);
+  ...
+}
+...
+  const ThresholdRows
+    rows = { PerceptibleImageTag,PerceptibleRow,&epsilon };
+  ...
+  return(ThresholdImageRows(image,&rows,exception));
+```
+
+**Careful:**
+
+- The parallel loop moves whole, pragma and all, into one function per call, as Recipe N
+  step 1 moves it: what the region writes (`status`, `progress`, `y`, the row's `q`) and
+  what its clauses name are the new function's locals of the same names, so the region
+  shares, privatises and reduces what it did. The callers' inputs are now read through
+  `rows` by every thread; they were shared before as well (a local of the enclosing
+  function), and the region only reads them.
+- Each iteration calls the same row function on the same row with the same input, now
+  through `rows->method`: one indirect call per row, not per pixel. The row function's
+  own loop is the copy's text. A row struct filled in every iteration from variables the
+  loop never writes held the same values in every iteration; filled once before the call
+  it holds them still, and as a `const` local nothing writes it.
+- The tag is the string literal the copy passed, passed as the same pointer value
+  through the struct; `SetImageProgress` reads the same text.
+- A copy that ended at the view's destruction: the statements after it run after the
+  call returns, in the same order, on the `status` the loop left, now the call's result;
+  `(void)` drops a result that the copy's caller never read either. A struct filled
+  directly before the call holds the values the copy read in the loop, which nothing
+  writes after the fill.
+- `refactor_guard.py --calls` shows the loop's callees down by the copies less one, the
+  new function and row functions up by their definitions and calls; anything else stops
+  the step.
+
+**Evidence level:** oracle (each function reached by a case), with `refactor_guard.py
+--calls`, step 1 checked by script, step 7 by reading, and Recipe CF step 7's timing.
+
+**Provenance:** 2026-11-10, from `threshold.c` (campaign A, W16 lane b): the row loops
+of `BlackThresholdImage`, `WhiteThresholdImage`, `PerceptibleImage` and
+`RangeThresholdImage`, four of the eight functions of the file's *Code Duplication*
+finding. This recipe alone leaves the score flat (8.03; the finding drops from eight
+functions to seven, the row functions cloning each other); with Recipe CF on the row
+functions it reaches 9.09. Added by Claude Code (Claude Opus 5.5) under the owner's
+approval of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe MT - Merge Mirrored Twins Through a Constant Selector
+
+**Use when:** CodeScene reports *Code Duplication* in a file (or a step towards another
+finding would create it) where two copies of one block are the same text except for a
+few runs of operators and expressions: a direction (`j++`/`j--`, the loop's start and
+bound), a comparison (`>=`/`>`), or an expression read where the other copy reads
+another (`black_point`, `((double) image->columns*image->rows-white_point)`).
+`enhance-tone.c`'s `FindStretchBlackLevel` and `FindStretchWhiteLevel` walk the histogram
+up from 0 and down from `MaxMap` with the same body; `morphology.c`'s Erode and Dilate
+kernel walks differ in the start of `k`, `k++`/`k--`, `>=`/`>` and the function called.
+
+**Not covered by:** Recipe D, SV, SC and TW, whose copies differ only in variables or in
+values (literals, enumeration constants, a side-effect-free expression read into one
+member), never in an operator or a statement; Recipe CF, whose copies differ only in the
+function called; Recipe E, which moves one copy, so that the second copy moved the same
+way clones the first.
+
+**How:**
+
+1. Copies. Two copies in one file, each the whole body of a `static` function or a block
+   that meets Recipe E steps 1 and 3 to 7 and the OpenMP rule, with no `#pragma` line.
+   Align their token sequences (each copy's variables renamed to one name per role, as
+   Recipe TW step 1 renames them): where they differ, each differing run must be a whole
+   expression in both copies, an operand of the same operator, a whole controlling
+   expression, a `for` clause, an initialiser or a whole argument, with no declaration and
+   no unbalanced parenthesis or brace. A run that differs only in the function called is
+   Recipe CF's; others need this recipe.
+2. The selector. Write `typedef enum { NameA, NameB } NameSide;` directly above the new
+   function, one constant per copy, named for what that copy does (`BlackStretchLevel`,
+   `WhiteStretchLevel`).
+3. Types. In each differing pair, the two runs have the same type, or both are integer
+   expressions whose values the conditional's type (the usual arithmetic conversions)
+   holds and the pair is converted to one target, an assignment's left side or a
+   parameter, as each copy's run was (`j=0` and `j=(ssize_t) MaxMap`). A pair whose runs
+   are statements' whole expressions (`j++`, `j--`) has its value discarded, and needs
+   only scalar types.
+4. Write one `static inline` function directly above the first caller: its parameters are
+   the variables a copy reads (Recipe E step 3) and `const NameSide side`, at most four in
+   all; when that would make five or more, the selector and the read values that differ
+   between the copies go in one `const` struct (`side` first, each member of the type of
+   the variable it holds) passed as `const Name *name`, bound as `const` locals of their
+   role names (Recipe N step 4). Its body is a copy's text with every differing pair
+   written `((side == NameA) ? runA : runB)`, each run verbatim, nothing else changed.
+5. Replace each copy by a call that passes its own enumeration constant (directly, or in
+   the initialiser of the `const` struct declared at the top of the block that holds the
+   call), never a variable or a computed value, and each variable in the position of its
+   parameter. A copy that was a function's whole body becomes that call, and the function
+   keeps its name and parameters for its own callers.
+6. Both copies move in one commit (rule 1). When a copy runs per pixel or per channel,
+   time it as Recipe CF step 7 says (a slowdown over 3% stops the step).
+7. Check by script that folding every `((side == C) ? a : b)` of the new function to the
+   run of the copy's constant `C` gives exactly that copy's token sequence (after the
+   renaming of step 1 and with the struct's bindings removed), and by reading that every
+   argument fills its parameter.
+
+**Before:**
+
+```c
+static ssize_t FindStretchBlackLevel(const Image *image,
+  const double *histogram,const ssize_t i,const double black_point)
+{
+  ...
+  intensity=0.0;
+  for (j=0; j <= (ssize_t) MaxMap; j++)
+  {
+    intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+    if (intensity > black_point)
+      break;
+  }
+  return(j);
+}
+
+static ssize_t FindStretchWhiteLevel(const Image *image,
+  const double *histogram,const ssize_t i,const double white_point)
+{
+  ...
+  intensity=0.0;
+  for (j=(ssize_t) MaxMap; j != 0; j--)
+  {
+    intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+    if (intensity > ((double) image->columns*image->rows-white_point))
+      break;
+  }
+  return(j);
+}
+```
+
+**After:**
+
+```c
+typedef enum
+{
+  BlackStretchLevel,
+  WhiteStretchLevel
+} StretchLevelSide;
+
+typedef struct _StretchLevelSearch
+{
+  StretchLevelSide
+    side;
+
+  double
+    point;
+} StretchLevelSearch;
+
+static inline ssize_t FindStretchLevel(const Image *image,
+  const double *histogram,const ssize_t i,const StretchLevelSearch *search)
+{
+  const StretchLevelSide
+    side = search->side;
+
+  const double
+    point = search->point;
+  ...
+  intensity=0.0;
+  for (j=((side == BlackStretchLevel) ? 0 : (ssize_t) MaxMap);
+       ((side == BlackStretchLevel) ? j <= (ssize_t) MaxMap : j != 0);
+       ((side == BlackStretchLevel) ? j++ : j--))
+  {
+    intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+    if (intensity > ((side == BlackStretchLevel) ? point :
+        ((double) image->columns*image->rows-point)))
+      break;
+  }
+  return(j);
+}
+
+static ssize_t FindStretchBlackLevel(const Image *image,
+  const double *histogram,const ssize_t i,const double black_point)
+{
+  const StretchLevelSearch
+    search = { BlackStretchLevel,black_point };
+
+  return(FindStretchLevel(image,histogram,i,&search));
+}
+```
+
+**Careful:**
+
+- The conditional operator evaluates its first operand, then exactly one of the other
+  two, with a sequence point between (C11 6.5.15). The first operand, `side == C`, reads
+  a `const` local and has no side effect, so each call evaluates exactly its copy's run
+  at each place, in the copy's order, and nothing else: no run of the other copy is ever
+  evaluated, not even its side effects (`j++` or `j--`). In a loop's controlling
+  expression and increment the selector is tested on every iteration, as the run was
+  evaluated.
+- Step 3 keeps every value. Runs of one type give the conditional that type, so the
+  value is the run's. Two integer runs converted to the conditional's common type, both
+  representable in it, keep their values, and the conversion to the target (`j`) that
+  each copy made is then made from the same value.
+- A value that differs between the copies stays where the copy read it (`point` in the
+  comparison is read on every iteration, as `black_point` was); only its source moves,
+  from a parameter to a struct member the caller filled from that parameter, unwritten
+  until the call returns.
+- Speed. The function is `static inline` and every call passes a constant selector, so
+  once it is inlined each conditional folds to its copy's run; the timing of step 6 is
+  the evidence in an optimised build, and without optimisation the tests remain, which
+  changes speed only.
+- `refactor_guard.py` reports the copies' literals once (`WARN`, deduplication, every
+  value still present) and `--calls` moves only the copies' callees, down by one copy's
+  calls, and the new function (its definition and its calls); anything else stops the
+  step.
+
+**Evidence level:** oracle (each copy reached by a case), with `refactor_guard.py
+--calls`, steps 1 and 7 checked by script, step 3 by reading, and step 6's timing when a
+copy runs per pixel.
+
+**Provenance:** 2026-11-10, from `enhance-tone.c`'s `FindStretchBlackLevel` and
+`FindStretchWhiteLevel` (campaign A, W16 lane b), the pair that holds the file's *Code
+Duplication* above its threshold: a probe of this recipe on the pair measured 6.99 to
+7.66, the finding gone, no finding on a new function. The mirrored morphology walks
+(Erode/Dilate, the forward and reverse passes) motivated the operator form; Recipes D,
+SV, SC, TW and CF refuse them. Added by Claude Code (Claude Opus 5.5) under the owner's
+approval of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -8176,3 +8684,8 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | SC | Extract Sibling Blocks Differing in Several Constants: copies of one block in one function that differ in two or more literal or enumeration constants move into one function taking a `const` struct of the constants (one member per role, typed as Recipe SV step 3 types the value); each copy becomes the struct's initialiser and the call; a forward declaration of the caller when the copies recurse into it | `quantize.c`'s `Riemersma` (campaign A, W16 lane c): cc 38, 109 lines, its four `level > 1` cases seven calls on four gravity constants each, its two `level == 1` cases three calls on three; as case helpers they clone (6.25, W14 lane b). A probe of the chain (this recipe twice, then Recipe O on the `level == 1` switch): 7.80 to 8.34, 8.41 and 8.74, no finding on a new function | mandate (2026-10-24) |
 | 2026-11-10 | AMEND | B, N | *Two levels of evidence*, *Unreached functions: B and N*: B and N may be applied to a function no case reaches, `Verified: guard`, when the step meets its recipe (checked by reading; no block that throws through `GetMagickModule()`), the guard prints `OK` with `--calls` moving only `+2` for an N helper (nothing for B), `tools/struct_fill_check.py` prints `OK` for N (members filled and bound by their own names, every removed line moved unchanged; B's fill checked by reading against the old call), and `tools/obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL` (every other function's instructions unchanged, no new function but the helper, only the helper's callees un-inlined). Both tools are new. Evidence lines of B and N say so | `paint.c`'s `TransparentPaintImageChroma` and `segment.c`'s `GetImageDynamicThreshold` (campaign A, W16 lane d), reached by no case: an E helper of Chroma's pixel loop takes six arguments (9.68, but a new *Excess Arguments*); the N form of it compiles byte-identical; the N form of `GetImageDynamicThreshold`'s removal tail compiles to the same instructions in every other function, the helper's two callees inlined into it. Planted errors (a member bound from another member, a fill from another variable, a flipped comparison in the moved block, a literal changed in another function) are each caught by one of the checks; forced-inline comparisons refused the correct step (scheduling) | owner |
 | 2026-11-10 | NEW | LE | Replace a Local Enum with a File-Scope Enum: a function-local `typedef enum` whose constants map one to one, by position and with default values, onto an enumeration the file already declares is deleted; its constants become the file-scope ones and its locals take the file-scope type. The values are only assigned to the function's locals, compared and switched on, never stored elsewhere, passed, returned or printed; each pair plays the same role (checked by reading); proven by `tools/obj_identical.sh` printing `IDENTICAL` | `shear.c`'s `YShearImage` (campaign A, W16 lane d): its `UP`/`DOWN` enum shadows the file's `LEFT`/`RIGHT` `ShearDirection` and is all that keeps its direction choice from `SelectShearDirection` (D) and its transfer `switch` from `TransferXShearSpan` (TW); the parked branch `w16-shear-enum` folded the replacement into a PC commit. A probe: `IDENTICAL`, 9.17 to 9.19; the chain it opens (D, TW, PS, PC, PS) reaches 10.0 | owner |
+| 2026-11-10 | NEW | CF | Merge Twins Differing in the Function They Call: two or more copies of one block (whole `static` function bodies, or blocks meeting Recipe E) that are the same text except for the function called at one role, every callee of one type (or of types that differ only in the parameter carrying the callee's inputs, which then becomes `const void *`), become one `static inline` function taking a `const` pointer of exactly that type; each copy becomes a call passing its callee's name. Per-pixel copies are timed against the baseline binary (over 3% slower stops the step) and checked with `objdump` for new indirect calls | `threshold.c` (campaign A, W16 lane b): its *Code Duplication* (eight functions) comes from row and pixel loops that differ only in the function called, which Recipes D, SV, SC and TW refuse. A probe of the chain with Recipe RL: 8.03 to 9.09, the finding gone, no finding on a new function; the inline form timed 0.382 s to 0.377 s (medians of nine), a per-pixel call through a struct member 0.388 s to 0.439 s (rejected) | owner |
+| 2026-11-10 | NEW | RL | Share a Parallel Row Loop Through a Row Function: the tails of several functions that hold the same whole parallel row loop, differing only in the row's work and the progress tag, move into one non-inline `static` function (the pragma unchanged) taking a `const` struct of the tag, a row function pointer and a `const void *` to the row's input; each row's work becomes a `static` row function of one type, and each tail becomes the struct's initialiser and `return(...)` of the call | `threshold.c` (campaign A, W16 lane b): `BlackThresholdImage`, `WhiteThresholdImage`, `PerceptibleImage` and `RangeThresholdImage`, four of the eight functions of its *Code Duplication*. Alone 8.03 (flat, seven functions left in the finding); with Recipe CF on the row functions 9.09. One indirect call per row; timed with the chain | owner |
+| 2026-11-10 | NEW | MT | Merge Mirrored Twins Through a Constant Selector: two copies of one block that differ in a few whole-expression runs (a loop's direction, start and bound, a comparison operator, an expression read in place of another) become one `static inline` function taking a `const` enumeration selector (alone, or first in a `const` struct with the differing read values); every differing pair is written `((side == A) ? runA : runB)` with the runs verbatim, and each copy becomes a call passing its own enumeration constant. Checked by folding the conditionals back to each copy's tokens; timed when per pixel | `enhance-tone.c`'s `FindStretchBlackLevel` and `FindStretchWhiteLevel` (campaign A, W16 lane b): the pair holds the file's *Code Duplication* over its threshold; a probe measured 6.99 to 7.66, the finding gone, no finding on a new function. The mirrored `morphology.c` walks, which Recipes D, SV, SC, TW and CF refuse, motivated the operator form | owner |
+| 2026-11-10 | AMEND | RL | Step 1: a copy may end at the view's destruction when the statements after it read neither the view, `y` nor `progress`; the caller keeps them, writing `status=Name(...);` (or `(void) Name(...);` when nothing reads `status` afterwards). Step 2: an input that is itself a pointer is passed as it is; row functions declaring `Quantum *q` with or without `magick_restrict` share the typedef. Step 5: when an input is assigned after the declarations, `rows` is filled member by member directly before the call. *Careful* gives the argument. Still seven steps | `enhance-tone.c` (campaign A, W16 lane b): `StretchImagePixels`, `GammaImage`, `GrayscaleImage`, `LevelImage` and `LevelizeImage` hold the same row loop, three of them followed by their own clean-up or `ClampImage`; a probe 7.66 to 8.47, *Complex Method* leaving the file (`LevelizeImage` cc 12, `GrayscaleImage` 10, `GammaImage` 9), no finding on the new function | owner |
+| 2026-11-10 | WORDING | CF | *Provenance*: the probe timings name the command they measured (`-black-threshold` and `-white-threshold` only; `magick` lacks `-perceptible`, which only `magick convert` accepts) | Found when the commits' timing command was extended to every merged copy | after the fact |
