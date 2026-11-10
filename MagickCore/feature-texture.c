@@ -1207,6 +1207,35 @@ static void AccumulateContrastRow(const TextureDirection *texture,
   }
 }
 
+static void SetMaximumCorrelation(const TextureDirection *texture)
+{
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Maximum Correlation Coefficient.
+    Future: return second largest eigenvalue of Q.
+  */
+  channel_features[RedPixelChannel].maximum_correlation_coefficient[i]=
+    sqrt(-1.0);
+  channel_features[GreenPixelChannel].maximum_correlation_coefficient[i]=
+    sqrt(-1.0);
+  channel_features[BluePixelChannel].maximum_correlation_coefficient[i]=
+    sqrt(-1.0);
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].maximum_correlation_coefficient[i]=
+      sqrt(-1.0);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].maximum_correlation_coefficient[i]=
+      sqrt(-1.0);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1673,22 +1702,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         channel_features[AlphaPixelChannel].contrast[i]+=z*z*
           pixel.direction[i].alpha;
     }
-    /*
-      Maximum Correlation Coefficient.
-      Future: return second largest eigenvalue of Q.
-    */
-    channel_features[RedPixelChannel].maximum_correlation_coefficient[i]=
-      sqrt(-1.0);
-    channel_features[GreenPixelChannel].maximum_correlation_coefficient[i]=
-      sqrt(-1.0);
-    channel_features[BluePixelChannel].maximum_correlation_coefficient[i]=
-      sqrt(-1.0);
-    if (image->colorspace == CMYKColorspace)
-      channel_features[BlackPixelChannel].maximum_correlation_coefficient[i]=
-        sqrt(-1.0);
-    if (image->alpha_trait != UndefinedPixelTrait)
-      channel_features[AlphaPixelChannel].maximum_correlation_coefficient[i]=
-        sqrt(-1.0);
+    SetMaximumCorrelation(&texture);
   }
   /*
     Relinquish resources.
