@@ -1324,6 +1324,33 @@ static void XHighlightWidget(Display *display,const XWindowInfo *window_info,
 extern "C" {
 #endif
 
+static void XScreenExpose(Display *display,XWindows *windows,XEvent *event)
+{
+  if (event->xexpose.window == windows->image.id)
+    {
+      XRefreshWindow(display,&windows->image,event);
+      return;
+    }
+  if (event->xexpose.window == windows->magnify.id)
+    if ((event->xexpose.count == 0) && (windows->magnify.mapped))
+      {
+        ExceptionInfo
+          *exception;
+
+        exception=AcquireExceptionInfo();
+        XMakeMagnifyImage(display,windows,exception);
+        exception=DestroyExceptionInfo(exception);
+        return;
+      }
+  if ((event->xexpose.window == windows->command.id) &&
+      (event->xexpose.count == 0))
+    {
+      (void) XCommandWidget(display,windows,(const char *const *) NULL,
+        event);
+      return;
+    }
+}
+
 static int XScreenEvent(Display *display,XEvent *event,char *data)
 {
   XWindows
@@ -1363,29 +1390,7 @@ static int XScreenEvent(Display *display,XEvent *event,char *data)
     }
     case Expose:
     {
-      if (event->xexpose.window == windows->image.id)
-        {
-          XRefreshWindow(display,&windows->image,event);
-          break;
-        }
-      if (event->xexpose.window == windows->magnify.id)
-        if ((event->xexpose.count == 0) && (windows->magnify.mapped))
-          {
-            ExceptionInfo
-              *exception;
-
-            exception=AcquireExceptionInfo();
-            XMakeMagnifyImage(display,windows,exception);
-            exception=DestroyExceptionInfo(exception);
-            break;
-          }
-      if ((event->xexpose.window == windows->command.id) &&
-          (event->xexpose.count == 0))
-        {
-          (void) XCommandWidget(display,windows,(const char *const *) NULL,
-            event);
-          break;
-        }
+      XScreenExpose(display,windows,event);
       break;
     }
     case FocusOut:
