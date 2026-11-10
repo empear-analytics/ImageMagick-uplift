@@ -1665,6 +1665,17 @@ static MagickBooleanType IsWithinRingLimits(const ssize_t radius,
   return((limit1 < radius && radius <= limit2) ? MagickTrue : MagickFalse);
 }
 
+static void SetPeaksKernelCenter(KernelInfo *kernel,
+  const KernelInfoType type)
+{
+  if ( type == PeaksKernel ) {
+    /* set the central point in the middle */
+    kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+    kernel->positive_range = 1.0;
+    kernel->maximum = 1.0;
+  }
+}
+
 static KernelInfo *AcquireRingKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,const double nan)
 {
@@ -1711,12 +1722,7 @@ static KernelInfo *AcquireRingKernel(KernelInfo *kernel,
           kernel->values[i] = nan;
       }
   kernel->minimum = kernel->maximum = (double) scale;
-  if ( type == PeaksKernel ) {
-    /* set the central point in the middle */
-    kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-    kernel->positive_range = 1.0;
-    kernel->maximum = 1.0;
-  }
+  SetPeaksKernelCenter(kernel,type);
   return(kernel);
 }
 
