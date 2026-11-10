@@ -233,3 +233,14 @@ the median rule it would not be. **Upstream (GetImageFeatures):** a failed co-oc
 `sum` and the density arrays and reports a cache failure as MemoryAllocationFailed; the unwind `for (i--; ...)` skips
 the failing row index; `density_xy` is cleared twice with different lengths; a benign race writes equal values into
 `grays`; a gray-level search that finds nothing would run past `grays`.
+
+## Lane b, splits: transform.c and vision.c reach 10.0
+
+Recipe S splits (2026-11-07 ruling: the new file scores at least the original): transform.c to 10.0 with
+`transform-region.c` 9.38; vision.c to 10.0 with `vision-components.c` 9.38. `tools/split_source.py` now finds the
+include block without its comment (6a74372ef; no refusal rule changed). Registered in Makefile.am, Makefile.in,
+Make.com and (transform-region.c only, as vision.c is not listed there) scripts/format_c_api_docs.
+**Windows build (answers the open question):** the repository holds no Windows project files; CI generates them from
+ImageMagick/Configure, and its MSVC compile line already lists every MagickCore .c file including earlier split files,
+so splits need no Windows entries (earlier commit messages saying otherwise were wrong). Separately, the Windows jobs
+fail on main since #86 with C2220 (warnings as errors) in annotate.c, colorspace.c, compare.c and composite.c.
