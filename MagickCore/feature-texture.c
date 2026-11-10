@@ -1236,6 +1236,52 @@ static void SetMaximumCorrelation(const TextureDirection *texture)
       sqrt(-1.0);
 }
 
+static void ComputeContrastFeatures(const TextureDirection *texture)
+{
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  const unsigned int
+    number_grays = texture->number_grays;
+
+  const ssize_t
+    i = texture->i;
+
+  ssize_t
+    z;
+
+  for (z=0; z < (ssize_t) number_grays; z++)
+  {
+    ssize_t
+      y;
+
+    FeatureStatistics
+      pixel;
+
+    (void) memset(&pixel,0,sizeof(pixel));
+    for (y=0; y < (ssize_t) number_grays; y++)
+    {
+      AccumulateContrastRow(texture,&pixel.direction[i],y,z);
+    }
+    channel_features[RedPixelChannel].contrast[i]+=z*z*
+      pixel.direction[i].red;
+    channel_features[GreenPixelChannel].contrast[i]+=z*z*
+      pixel.direction[i].green;
+    channel_features[BluePixelChannel].contrast[i]+=z*z*
+      pixel.direction[i].blue;
+    if (image->colorspace == CMYKColorspace)
+      channel_features[BlackPixelChannel].contrast[i]+=z*z*
+        pixel.direction[i].black;
+    if (image->alpha_trait != UndefinedPixelTrait)
+      channel_features[AlphaPixelChannel].contrast[i]+=z*z*
+        pixel.direction[i].alpha;
+  }
+  SetMaximumCorrelation(texture);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1673,36 +1719,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
       texture = { image, channel_features, cooccurrence, density_x,
         density_xy, density_y, Q, sum, number_grays, i };
 
-    ssize_t
-      z;
-
-    for (z=0; z < (ssize_t) number_grays; z++)
-    {
-      ssize_t
-        y;
-
-      FeatureStatistics
-        pixel;
-
-      (void) memset(&pixel,0,sizeof(pixel));
-      for (y=0; y < (ssize_t) number_grays; y++)
-      {
-        AccumulateContrastRow(&texture,&pixel.direction[i],y,z);
-      }
-      channel_features[RedPixelChannel].contrast[i]+=z*z*
-        pixel.direction[i].red;
-      channel_features[GreenPixelChannel].contrast[i]+=z*z*
-        pixel.direction[i].green;
-      channel_features[BluePixelChannel].contrast[i]+=z*z*
-        pixel.direction[i].blue;
-      if (image->colorspace == CMYKColorspace)
-        channel_features[BlackPixelChannel].contrast[i]+=z*z*
-          pixel.direction[i].black;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        channel_features[AlphaPixelChannel].contrast[i]+=z*z*
-          pixel.direction[i].alpha;
-    }
-    SetMaximumCorrelation(&texture);
+    ComputeContrastFeatures(&texture);
   }
   /*
     Relinquish resources.
