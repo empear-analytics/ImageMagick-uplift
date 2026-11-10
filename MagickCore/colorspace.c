@@ -124,7 +124,7 @@ static MagickBooleanType
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport ColorspaceType GetImageColorspaceType(const Image *image,
+static ColorspaceType IdentifyColorspaceType(const Image *image,
   ExceptionInfo *exception)
 {
   ColorspaceType
@@ -133,15 +133,21 @@ MagickExport ColorspaceType GetImageColorspaceType(const Image *image,
   ImageType
     type;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   colorspace=image->colorspace;
   type=IdentifyImageType(image,exception);
   if (IsGrayImageType(type))
     colorspace=GRAYColorspace;
   return(colorspace);
+}
+
+MagickExport ColorspaceType GetImageColorspaceType(const Image *image,
+  ExceptionInfo *exception)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  return(IdentifyColorspaceType(image,exception));
 }
 
 /*
