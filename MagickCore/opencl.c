@@ -1645,19 +1645,60 @@ MagickPrivate MagickCLCacheInfo CopyMagickCLCacheInfo(MagickCLCacheInfo info)
    fwrite(message,sizeof(char),strlen(message),log); \
    fwrite("\n",sizeof(char),1,log);
 
-MagickPrivate void DumpOpenCLProfileData()
+static void DumpOpenCLDeviceProfile(FILE *log,const size_t i)
 {
   char
     buf[4096],
-    filename[MagickPathExtent],
     indent[160];
+
+  MagickCLDevice
+    device;
+
+  size_t
+    j;
+
+  device=default_CLEnv->devices[i];
+  if ((device->profile_kernels == MagickFalse) ||
+      (device->profile_records == (KernelProfileRecord *) NULL))
+    return;
+
+  OpenCLLog("====================================================");
+  fprintf(log,"Device:  %s\n",device->name);
+  fprintf(log,"Version: %s\n",device->version);
+  OpenCLLog("====================================================");
+  OpenCLLog("                     average   calls     min     max");
+  OpenCLLog("                     -------   -----     ---     ---");
+  j=0;
+  while (device->profile_records[j] != (KernelProfileRecord) NULL)
+  {
+    KernelProfileRecord
+      profile;
+
+    profile=device->profile_records[j];
+    (void) CopyMagickString(indent,"                              ",
+      sizeof(indent));
+    (void) CopyMagickString(indent,profile->kernel_name,MagickMin(strlen(
+      profile->kernel_name),strlen(indent)));
+    (void) FormatLocaleString(buf,sizeof(buf),"%s %7d %7d %7d %7d",indent,
+      (int) (profile->total/profile->count),(int) profile->count,
+      (int) profile->min,(int) profile->max);
+    OpenCLLog(buf);
+    j++;
+  }
+  OpenCLLog("====================================================");
+  fwrite("\n\n",sizeof(char),2,log);
+}
+
+MagickPrivate void DumpOpenCLProfileData()
+{
+  char
+    filename[MagickPathExtent];
 
   FILE
     *log;
 
   size_t
-    i,
-    j;
+    i;
 
   if (default_CLEnv == (MagickCLEnv) NULL)
     return;
@@ -1675,41 +1716,7 @@ MagickPrivate void DumpOpenCLProfileData()
   if (log == (FILE *) NULL)
     return;
   for (i = 0; i < default_CLEnv->number_devices; i++)
-  {
-    MagickCLDevice
-      device;
-
-    device=default_CLEnv->devices[i];
-    if ((device->profile_kernels == MagickFalse) ||
-        (device->profile_records == (KernelProfileRecord *) NULL))
-      continue;
-
-    OpenCLLog("====================================================");
-    fprintf(log,"Device:  %s\n",device->name);
-    fprintf(log,"Version: %s\n",device->version);
-    OpenCLLog("====================================================");
-    OpenCLLog("                     average   calls     min     max");
-    OpenCLLog("                     -------   -----     ---     ---");
-    j=0;
-    while (device->profile_records[j] != (KernelProfileRecord) NULL)
-    {
-      KernelProfileRecord
-        profile;
-
-      profile=device->profile_records[j];
-      (void) CopyMagickString(indent,"                              ",
-        sizeof(indent));
-      (void) CopyMagickString(indent,profile->kernel_name,MagickMin(strlen(
-        profile->kernel_name),strlen(indent)));
-      (void) FormatLocaleString(buf,sizeof(buf),"%s %7d %7d %7d %7d",indent,
-        (int) (profile->total/profile->count),(int) profile->count,
-        (int) profile->min,(int) profile->max);
-      OpenCLLog(buf);
-      j++;
-    }
-    OpenCLLog("====================================================");
-    fwrite("\n\n",sizeof(char),2,log);
-  }
+    DumpOpenCLDeviceProfile(log,i);
   fclose(log);
 }
 /*
