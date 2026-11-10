@@ -2290,6 +2290,26 @@ static KernelInfo *AcquireDistanceKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireLineOrThinningKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch(type) {
+      case LineJunctionsKernel:
+        return(AcquireLineJunctionsKernel(kernel,type,args,exception));
+      case RidgesKernel:
+        return(AcquireRidgesKernel(kernel,type,args));
+      case ConvexHullKernel:
+        return(AcquireConvexHullKernel(kernel,type));
+      case SkeletonKernel:
+        return(AcquireSkeletonKernel(kernel,type,args,exception));
+      case ThinSEKernel:
+        return(AcquireThinSEKernel(kernel,type,args));
+    default:
+      return(AcquireDistanceKernel(kernel,type,args));
+  }
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2517,18 +2537,8 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         return(AcquireDiagonalsKernel(kernel,type,args));
       case LineEndsKernel:
         return(AcquireLineEndsKernel(kernel,type,args,exception));
-      case LineJunctionsKernel:
-        return(AcquireLineJunctionsKernel(kernel,type,args,exception));
-      case RidgesKernel:
-        return(AcquireRidgesKernel(kernel,type,args));
-      case ConvexHullKernel:
-        return(AcquireConvexHullKernel(kernel,type));
-      case SkeletonKernel:
-        return(AcquireSkeletonKernel(kernel,type,args,exception));
-      case ThinSEKernel:
-        return(AcquireThinSEKernel(kernel,type,args));
     default:
-      return(AcquireDistanceKernel(kernel,type,args));
+      return(AcquireLineOrThinningKernel(kernel,type,args,exception));
   }
   return(kernel);
 }
