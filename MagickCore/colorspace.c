@@ -183,6 +183,23 @@ static inline MagickBooleanType IsTransformMapMissing(
     (z_map == (TransformPacket *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static void InitializeYCCGammaMaps(ssize_t i,TransformPacket *x_map,
+  TransformPacket *y_map,TransformPacket *z_map)
+{
+  for ( ; i <= (ssize_t) MaxMap; i++)
+  {
+    x_map[i].x=0.298839*(1.099*i-0.099);
+    x_map[i].y=(-0.298839)*(1.099*i-0.099);
+    x_map[i].z=0.70100*(1.099*i-0.099);
+    y_map[i].x=0.586811*(1.099*i-0.099);
+    y_map[i].y=(-0.586811)*(1.099*i-0.099);
+    y_map[i].z=(-0.586811)*(1.099*i-0.099);
+    z_map[i].x=0.114350*(1.099*i-0.099);
+    z_map[i].y=0.88600*(1.099*i-0.099);
+    z_map[i].z=(-0.114350)*(1.099*i-0.099);
+  }
+}
+
 static void InitializeYCCTransformMaps(TransformPacket *x_map,
   TransformPacket *y_map,TransformPacket *z_map)
 {
@@ -201,18 +218,7 @@ static void InitializeYCCTransformMaps(TransformPacket *x_map,
     z_map[i].y=0.009768*i;
     z_map[i].z=(-0.001530)*i;
   }
-  for ( ; i <= (ssize_t) MaxMap; i++)
-  {
-    x_map[i].x=0.298839*(1.099*i-0.099);
-    x_map[i].y=(-0.298839)*(1.099*i-0.099);
-    x_map[i].z=0.70100*(1.099*i-0.099);
-    y_map[i].x=0.586811*(1.099*i-0.099);
-    y_map[i].y=(-0.586811)*(1.099*i-0.099);
-    y_map[i].z=(-0.586811)*(1.099*i-0.099);
-    z_map[i].x=0.114350*(1.099*i-0.099);
-    z_map[i].y=0.88600*(1.099*i-0.099);
-    z_map[i].z=(-0.114350)*(1.099*i-0.099);
-  }
+  InitializeYCCGammaMaps(i,x_map,y_map,z_map);
 }
 
 static TransformPacket *RelinquishTransformMap(TransformPacket *map)
