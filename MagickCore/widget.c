@@ -7225,6 +7225,35 @@ static void ReleaseListBrowserCancel(const ListBrowserRelease *release,
     }
 }
 
+static void MoveListBrowserSliderByPage(const KeySym key_symbol,
+  const unsigned int visible_entries,const unsigned int entries,
+  XWidgetInfo *slider_info)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Prior:
+    case XK_KP_Prior:
+    {
+      (*slider_info).id-=(int) visible_entries;
+      break;
+    }
+    case XK_Next:
+    case XK_KP_Next:
+    {
+      (*slider_info).id+=(int) visible_entries;
+      break;
+    }
+    case XK_End:
+    case XK_KP_End:
+    {
+      (*slider_info).id=(int) entries;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static XWidgetInfo MoveListBrowserSlider(XWidgetInfo slider_info,
   const KeySym key_symbol,const unsigned int visible_entries,
   const unsigned int entries)
@@ -7249,22 +7278,10 @@ static XWidgetInfo MoveListBrowserSlider(XWidgetInfo slider_info,
       slider_info.id++;
       break;
     }
-    case XK_Prior:
-    case XK_KP_Prior:
+    default:
     {
-      slider_info.id-=(int) visible_entries;
-      break;
-    }
-    case XK_Next:
-    case XK_KP_Next:
-    {
-      slider_info.id+=(int) visible_entries;
-      break;
-    }
-    case XK_End:
-    case XK_KP_End:
-    {
-      slider_info.id=(int) entries;
+      MoveListBrowserSliderByPage(key_symbol,visible_entries,entries,
+        &slider_info);
       break;
     }
   }
