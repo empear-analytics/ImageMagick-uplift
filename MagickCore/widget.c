@@ -9742,6 +9742,52 @@ static void ReleaseTextViewDismiss(const DialogRelease *release,
     }
 }
 
+static XWidgetInfo MoveTextViewSlider(XWidgetInfo slider_info,
+  const KeySym key_symbol,const unsigned int visible_lines,
+  const unsigned int lines)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Home:
+    case XK_KP_Home:
+    {
+      slider_info.id=0;
+      break;
+    }
+    case XK_Up:
+    case XK_KP_Up:
+    {
+      slider_info.id--;
+      break;
+    }
+    case XK_Down:
+    case XK_KP_Down:
+    {
+      slider_info.id++;
+      break;
+    }
+    case XK_Prior:
+    case XK_KP_Prior:
+    {
+      slider_info.id-=(int) visible_lines;
+      break;
+    }
+    case XK_Next:
+    case XK_KP_Next:
+    {
+      slider_info.id+=(int) visible_lines;
+      break;
+    }
+    case XK_End:
+    case XK_KP_End:
+    {
+      slider_info.id=(int) lines;
+      break;
+    }
+  }
+  return(slider_info);
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -10257,45 +10303,8 @@ MagickPrivate void XTextViewWidget(Display *display,
             /*
               Move slider.
             */
-            switch ((int) key_symbol)
-            {
-              case XK_Home:
-              case XK_KP_Home:
-              {
-                slider_info.id=0;
-                break;
-              }
-              case XK_Up:
-              case XK_KP_Up:
-              {
-                slider_info.id--;
-                break;
-              }
-              case XK_Down:
-              case XK_KP_Down:
-              {
-                slider_info.id++;
-                break;
-              }
-              case XK_Prior:
-              case XK_KP_Prior:
-              {
-                slider_info.id-=(int) visible_lines;
-                break;
-              }
-              case XK_Next:
-              case XK_KP_Next:
-              {
-                slider_info.id+=(int) visible_lines;
-                break;
-              }
-              case XK_End:
-              case XK_KP_End:
-              {
-                slider_info.id=(int) lines;
-                break;
-              }
-            }
+            slider_info=MoveTextViewSlider(slider_info,key_symbol,visible_lines,
+              lines);
             state|=RedrawListState;
             break;
           }
