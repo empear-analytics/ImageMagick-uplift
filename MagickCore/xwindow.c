@@ -194,6 +194,18 @@ typedef struct _DiversityPacket
   size_t
     count;
 } DiversityPacket;
+
+typedef struct _MakeImageContext
+{
+  const XResourceInfo
+    *resource_info;
+
+  const XWindowInfo
+    *window;
+
+  ExceptionInfo
+    *exception;
+} MakeImageContext;
 
 /*
   Constant declarations.
@@ -216,8 +228,7 @@ static MagickBooleanType
   XMakePixmap(Display *,const XResourceInfo *,XWindowInfo *);
 
 static void
-  XMakeImageLSBFirst(const XResourceInfo *,const XWindowInfo *,Image *,
-    XImage *,XImage *,ExceptionInfo *),
+  XMakeImageLSBFirst(const MakeImageContext *,Image *,XImage *,XImage *),
   XMakeImageMSBFirst(const XResourceInfo *,const XWindowInfo *,Image *,
     XImage *,XImage *,ExceptionInfo *);
 
@@ -5847,9 +5858,11 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   */
   if (window->image != (Image *) NULL)
     {
+      const MakeImageContext
+        make_context = { resource_info, window, exception };
+
       if (IsLSBFirstXImage(ximage) != MagickFalse)
-        XMakeImageLSBFirst(resource_info,window,window->image,ximage,
-          matte_image,exception);
+        XMakeImageLSBFirst(&make_context,window->image,ximage,matte_image);
       else
         XMakeImageMSBFirst(resource_info,window,window->image,ximage,
           matte_image,exception);
@@ -5964,10 +5977,18 @@ static inline MagickBooleanType IsMutableAlphaImage(const XWindowInfo *window,
     (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
-static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
-  const XWindowInfo *window,Image *image,XImage *ximage,XImage *matte_image,
-  ExceptionInfo *exception)
+static void XMakeImageLSBFirst(const MakeImageContext *make_context,
+  Image *image,XImage *ximage,XImage *matte_image)
 {
+  const XResourceInfo
+    *const resource_info = make_context->resource_info;
+
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
   CacheView
     *canvas_view;
 
