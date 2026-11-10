@@ -3350,6 +3350,50 @@ static inline void WalkIntensityKernel(const MorphologyKernelWalk *walk,
   }
 }
 
+static void WalkHitAndMissKernel(const MorphologyKernelWalk *walk,
+  double *minimum,double *maximum)
+{
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  MorphologyKernelTap
+    kernel_tap;
+
+  ssize_t
+    u,
+    v;
+
+  k=kernel->values;
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      if (!IsNaN(*k))
+        {
+          kernel_tap.k=k;
+          kernel_tap.pixels=pixels;
+          kernel_tap.i=i;
+          UpdateHitAndMissExtrema(&kernel_tap,minimum,maximum);
+        }
+      k++;
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3671,9 +3715,6 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         ssize_t
           v;
 
-        MorphologyKernelTap
-          kernel_tap;
-
         MorphologyKernelWalk
           walk;
 
@@ -3827,23 +3868,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                cause Thinning/Thicken to not work correctly when used against a
                greyscale image.
             */
-            k=kernel->values;
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k))
-                  {
-                    kernel_tap.k=k;
-                    kernel_tap.pixels=pixels;
-                    kernel_tap.i=i;
-                    UpdateHitAndMissExtrema(&kernel_tap,&minimum,&maximum);
-                  }
-                k++;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
+            WalkHitAndMissKernel(&walk,&minimum,&maximum);
             minimum-=maximum;
             if (minimum < 0.0)
               minimum=0.0;
