@@ -162,3 +162,16 @@ compiler that ignores `magick_attribute` (it is empty outside GCC-compatible com
 came after the owner's approval of the W16 text and are not yet confirmed.
 Upstream: `mogrify -define quantum:format=floating-point -depth 32` on an 8-bit MIFF writes garbage pixels (NaN,
 13119%), deterministic and in the baseline too.
+
+## Lane d, third round: Recipe TB
+
+**Recipe TB** (a596d4ee4): a Complex Method that is one `switch` whose labels only return constants becomes a
+`static const` table, in membership form (`for` over the labels, `return(MagickTrue)`) or index form (labels 0..k,
+`if ((size_t) n < count) return(T[n]);`, a negative `n` still reaching the default). No literal is added; a script
+checks the table against the labels and values. Added after the owner's approval of the W16 text; not yet confirmed.
+colorspace.c 8.62 to 9.38, distort.c 7.15 to 7.60. **Owner questions:** (1) may rule 1 admit a mixed-recipe set
+whose steps each cross *Lines of Code* alone (magnify.c 8.62 to 8.81)? (2) may Recipe S and `split_source.py` accept
+family-only `static const` tables and a numeric top-of-file macro (colorspace.c split: 10.0 and 9.38)?
+**Upstream:** montage.c `MontageImageList` dereferences a NULL `image` in `ThrowImageException` after a failed
+`CloneImage`, and reads `image` after `DestroyImage` on the `AcquireMontageStrings` failure; magnify.c
+`SelectMagnifyMethod` switches on the case-sensitive first character before a case-insensitive `LocaleCompare`.
