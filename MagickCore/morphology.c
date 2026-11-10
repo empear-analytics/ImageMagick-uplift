@@ -4056,11 +4056,11 @@ static void ConvolveMorphologyColumnPixels(const MorphologyColumn *column,
   }
 }
 
+#define MorphologyTag  "Morphology/Image"
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
-#define MorphologyTag  "Morphology/Image"
-
   const MorphologyMethod
     method = pass->method;
 
