@@ -253,3 +253,18 @@ last), form B when it has its own group (run unchanged after the loop). Checked 
 after the owner's approval of the W16 text; not yet confirmed. Three flat steps (rule 2). The rest of the leg takes the
 temporary drop to 3.02 that the 2026-10-29 owner rule allows for an early step of a plan measured end to end.
 Upstream: `ScaleKernelInfo`'s negative-factor swap sets `kernel->minimum = 1;` where `= t` looks intended.
+
+## Lane a, third round: opencl.c out of the Red band
+
+opencl.c 2.85 to 5.03 and widget.c 1.19 to 1.28 (wide build; 43 refactor commits), each step built, warned, guarded,
+oracle-checked and object-compared with `WIDE=1`. **Recipe EC** (9aac62d8e): a `||` chain comparing one
+side-effect-free integer with distinct constants by `==` becomes a `static inline` label-run predicate (a `switch`
+returning `MagickTrue`); duplicate labels would not compile. **TB amendments** (a912c5f3f, 2c9dbf7a0): character
+constants of the basic character set as membership labels, and the guard wording. Added after the owner's approval of
+the W16 text; not yet confirmed. **Owner questions:** may Recipe LB gain an `S break;` exit form (the DOCTYPE scan,
+the same text in color, configure, delegate, locale, log, policy and type.c)? May a recipe add same-type wrappers so CF
+merges twins calling library function pointers of different types? **Note:** commit ed27c19c5's message says
+`RunOpenCLBenchmark` left Bumpy Road; it left Complex Method, and Bumpy Road only at dac546fe6, whose message corrects
+it. **Upstream:** `RunOpenCLBenchmark` never destroys its `exception` or `imageInfo`; `LoadOpenCLDeviceBenchmark` leaks
+the previous entry when a second `<device` arrives before `/>`; `RequestOpenCLDevice`'s single-device path never
+increments `requested`.
