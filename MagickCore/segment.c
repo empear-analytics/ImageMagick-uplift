@@ -1684,6 +1684,56 @@ static void FinishDynamicThreshold(const DynamicThresholdTail *tail,
   RelinquishDynamicThresholdResources(head,histogram,extrema);
 }
 
+typedef struct _DynamicClusterTargets
+{
+  Cluster
+    **cluster,
+    **head;
+
+  ExtentPacket
+    *green,
+    *blue;
+} DynamicClusterTargets;
+
+static MagickBooleanType FormDynamicClusters(short **extrema,
+  const ExtentPacket red,const DynamicClusterTargets *targets)
+{
+  Cluster
+    **const cluster = targets->cluster,
+    **const head = targets->head;
+
+  ExtentPacket
+    *const green = targets->green,
+    *const blue = targets->blue;
+
+  while (DefineRegion(extrema[Green],green) != 0)
+  {
+    (*blue).index=0;
+    while (DefineRegion(extrema[Blue],blue) != 0)
+    {
+      /*
+        Allocate a new class.
+      */
+      if (*head != (Cluster *) NULL)
+        {
+          *cluster=AppendCluster(*cluster);
+        }
+      else
+        {
+          *cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(**cluster));
+          *head=*cluster;
+        }
+      if (*cluster == (Cluster *) NULL)
+        return(MagickFalse);
+      /*
+        Initialize a new class.
+      */
+      InitializeNewCluster(*cluster,red,*green,*blue);
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1745,32 +1795,16 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   (void) memset(&blue,0,sizeof(blue));
   while (DefineRegion(extrema[Red],&red) != 0)
   {
+    DynamicClusterTargets
+      targets;
+
     green.index=0;
-    while (DefineRegion(extrema[Green],&green) != 0)
-    {
-      blue.index=0;
-      while (DefineRegion(extrema[Blue],&blue) != 0)
-      {
-        /*
-          Allocate a new class.
-        */
-        if (head != (Cluster *) NULL)
-          {
-            cluster=AppendCluster(cluster);
-          }
-        else
-          {
-            cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(*cluster));
-            head=cluster;
-          }
-        if (cluster == (Cluster *) NULL)
-          return(ThrowClusterAllocationFailed(image,exception));
-        /*
-          Initialize a new class.
-        */
-        InitializeNewCluster(cluster,red,green,blue);
-      }
-    }
+    targets.cluster=(&cluster);
+    targets.head=(&head);
+    targets.green=(&green);
+    targets.blue=(&blue);
+    if (FormDynamicClusters(extrema,red,&targets) == MagickFalse)
+      return(ThrowClusterAllocationFailed(image,exception));
   }
   if (head == (Cluster *) NULL)
     {
