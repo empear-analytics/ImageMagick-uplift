@@ -333,3 +333,17 @@ only the caller's object code differs in register allocation, or should such twi
 line-coverage reach check be required for oracle-level claims in the wide build, given that its lcov dates from
 2026-10-28? **Tool note:** `tools/obj_identical.sh` prints "otool: not found" on Linux before DIFFERENT (the verdict is
 right).
+
+## Lane c, fx.c second leg: RV step 6, N step 8, BR step 8
+
+fx.c 3.73 to 4.61 (14 refactor commits, every one rising), the ceiling with everything but `ExecuteRPN` done.
+**RV step 6** (c164a865f): a caller of another return type passes `T *result`; the block may write up to four plain
+locals through pointers; more than four parameters go in a const struct, and an earlier helper's struct may be passed
+on. **N step 8** (309c8444b): statements of one function body count as siblings, so a later block running to the
+function's end may pass an earlier sibling's struct on. **BR step 8** (1e37f5588): a block may write two to four
+variables through a const targets struct and take inputs from at most two structs the caller already fills. Added after
+the owner's approval of the W16 text; not yet confirmed. **Owner questions:** the struct fills are long
+(`FunctionClosing` has 13 members, `ExpressionTargets` 6): is that readability cost acceptable? `ExecuteRPN`'s parked
+per-pixel chain is the only lever above 4.61. **Upstream:** a bare `gray` is rejected in `-fx` (`GetConstantColour`'s
+fall-through to the named colour never runs unless `(` follows); `gray(...)` after a failed query uses `colour` as the
+failed `QueryColorCompliance` left it; `StartEleNdx` is a dead store.
