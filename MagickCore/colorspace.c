@@ -1863,39 +1863,12 @@ typedef struct _ColorspaceLogRowInfo
     *logmap;
 } ColorspaceLogRowInfo;
 
-static void TransformLogRowTosRGB(MagickBooleanType *status,
-  const ColorspaceLogRowInfo *row,const ssize_t y)
+static void LogPixelsTosRGB(Image *image,Quantum *const logmap,
+  Quantum *magick_restrict q)
 {
-  Image
-    *const image = row->image;
-
-  CacheView
-    *const image_view = row->image_view;
-
-  ExceptionInfo
-    *const exception = row->exception;
-
-  Quantum
-    *const logmap = row->logmap;
-
-  MagickBooleanType
-    sync;
-
   ssize_t
     x;
 
-  Quantum
-    *magick_restrict q;
-
-  if ((*status) == MagickFalse)
-    return;
-  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-    exception);
-  if (q == (Quantum *) NULL)
-    {
-      (*status)=MagickFalse;
-      return;
-    }
   for (x=(ssize_t) image->columns; x != 0; x--)
   {
     double
@@ -1914,6 +1887,39 @@ static void TransformLogRowTosRGB(MagickBooleanType *status,
       blue)),q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
+}
+
+static void TransformLogRowTosRGB(MagickBooleanType *status,
+  const ColorspaceLogRowInfo *row,const ssize_t y)
+{
+  Image
+    *const image = row->image;
+
+  CacheView
+    *const image_view = row->image_view;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  Quantum
+    *const logmap = row->logmap;
+
+  MagickBooleanType
+    sync;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  LogPixelsTosRGB(image,logmap,q);
   sync=SyncCacheViewAuthenticPixels(image_view,exception);
   if (sync == MagickFalse)
     (*status)=MagickFalse;
