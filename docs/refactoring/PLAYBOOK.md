@@ -9546,6 +9546,138 @@ owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe PL - Peel a Leaving Label Set out of a Selection as a Predicate
+
+**Use when:** CodeScene reports *Complex Method* on a function whose `switch` holds,
+besides groups that do work, one or more groups whose body is the same statement that
+leaves the function, under many labels, as `morphology.c`'s `RotateKernelInfo` does: nine
+cylindrical kernel types and four shape types each `return;` at once, while the Blur
+group adjusts the angle and `default:` breaks (fifteen labels of the function's cc 30).
+
+**Not covered by:** Recipe LP, whose `switch` has exactly two groups, the label set and
+`default: break;`. Recipes SD and SR, which refuse a group holding `return`, and Recipe
+ST, whose function returns a value and whose moved groups keep their labels in the new
+function's `switch`. Recipes TB and KT, which replace a whole `switch` of constants.
+Recipe E step 7, which would move the whole `switch` with the end of the function, labels
+and all.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region; `e` is a parameter, a local or a
+   member access of an enumeration type, with no call, assignment or increment. The
+   groups to peel each have, comments aside, the same one statement `S` as their whole
+   body, a statement that leaves the function (`return;`, or `return(c);` of a
+   constant); their labels are enumeration constants. No group falls into a peeled
+   group (the group before each ends in `break;` or a `return`), and a kept group
+   carries `default:`. No `#` line stands in the peeled groups.
+2. Write LP step 2's predicate directly above the function: `static MagickBooleanType
+   Name(const T x)` (`T` the declared type of `e`), whose body is `switch (x) { <every
+   peeled group's comment lines and labels, in the original order> return(MagickTrue);
+   default: break; } return(MagickFalse);`, named for what the labels have in common.
+3. Directly before the `switch` statement (after the comment lines that stand above
+   it), write `if (Name(e) != MagickFalse)` followed by `S` two columns deeper, and
+   delete the peeled groups (their comments, labels and bodies, and a blank line that
+   closed one) from the `switch`. The kept groups stay, unchanged and in their order.
+4. Check by script that the predicate's labels are exactly the peeled groups' labels,
+   each once; that every comment of a peeled group stands in the predicate; and that the
+   kept `switch` is the original with the peeled groups taken out and nothing else
+   changed.
+5. The predicate is a label run (allowed as a *Complex Method* by the owner's ruling of
+   2026-11-07); Recipe TB's membership form may make it a table, in a commit of its own.
+
+**Before:**
+
+```c
+  /* Handle special cases */
+  switch (kernel->type) {
+    /* These built-in kernels are cylindrical kernels, rotating is useless */
+    case GaussianKernel:
+    ...
+    case EuclideanKernel:
+      return;
+
+    /* These may be rotatable at non-90 angles in the future */
+    /* but simply rotating them in multiples of 90 degrees is useless */
+    case SquareKernel:
+    ...
+    case CrossKernel:
+      return;
+
+    /* These only allows a +/-90 degree rotation (by transpose) */
+    /* A 180 degree rotation is useless */
+    case BlurKernel:
+      ...
+      break;
+
+    default:
+      break;
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsRotationUselessKernel(const KernelInfoType type)
+{
+  switch (type)
+  {
+    /* These built-in kernels are cylindrical kernels, rotating is useless */
+    case GaussianKernel:
+    ...
+    case EuclideanKernel:
+    /* These may be rotatable at non-90 angles in the future */
+    /* but simply rotating them in multiples of 90 degrees is useless */
+    case SquareKernel:
+    ...
+    case CrossKernel:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+...
+  /* Handle special cases */
+  if (IsRotationUselessKernel(kernel->type) != MagickFalse)
+    return;
+  switch (kernel->type) {
+    /* These only allows a +/-90 degree rotation (by transpose) */
+    /* A 180 degree rotation is useless */
+    case BlurKernel:
+      ...
+```
+
+**Careful:**
+
+- Why the behaviour is the same, value by value. A value of `e` among the peeled labels:
+  the original `switch` jumped to its group and ran `S`, which left the function. Now the
+  predicate, called on the same value (`e` has no side effect, and its parameter has
+  `e`'s declared type, so passing converts nothing), returns `MagickTrue` for exactly
+  those labels (step 4), and `S` runs and leaves; nothing ran in between, as nothing ran
+  before. Any other value: the predicate returns `MagickFalse` and has done nothing else
+  (it only reads its argument); the `switch` then evaluates `e` again, which nothing has
+  written since, and selects the same kept group as before, since its labels are
+  unchanged; a value that matched no label reaches the kept `default:` as before.
+- The peeled groups' labels are gone from the `switch`, but no value that would select
+  them reaches it any more. Step 1's ban on a group falling into a peeled group keeps
+  every path through the kept groups as it was; a peeled group itself always left.
+- Both `switch` statements have `default:`, so `-Wswitch` warns about neither. The cost
+  is a second evaluation of `e`, a load, and a call outside any pixel loop (check the
+  function's callers by reading; time it as CF step 7 says otherwise).
+
+**Evidence level:** oracle (the cases that reach the function), with step 4's script and
+`refactor_guard.py --calls` (`+2` for the predicate, nothing else moved).
+
+**Provenance:** 2026-11-10, from `morphology.c`'s `RotateKernelInfo` (campaign A, W16
+lane d): cc 30, fifteen of it labels, thirteen of which only return. One step of the
+kernel-parser leg, whose chain probe measured 3.10 to 3.02 (the file's 110th function)
+and back to 3.16 over thirty steps; `RotateKernelInfo` leaves *Complex Method* after
+this recipe, TB on the predicate, Recipes E and P, with no finding on a new function.
+Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the
+recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -9873,3 +10005,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | LS | Extract Linear Searches Over a Member Chosen by Its Offset: copies of `u=0; while (a[u].m != e) u++;` that differ in the integer member `m` and the side-effect-free integer value `e` (the paired form `u=0; v=0;` before two loops included) become `u=FindName(a,offsetof(S,m),e);` of one `static inline` function whose test reads `(*(const T *) ((const char *) &a[u]+member))` against `value`; *Careful* gives the argument (the member object read through its offset, the loop-invariant value evaluated once, the counter returned); checked by script, timed | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the ten gray-level searches of the sequential co-occurrence build, which held the file's depth 5; five per-channel helpers clone each other (5.98 to 5.57); a probe of this step 5.98 to 6.14, of the chain it opens 7.44; features workload 4.83 s to 4.57 s (medians of nine) | owner |
 | 2026-11-10 | AMEND | E | Step 3: an element of an array reached through a pointer, which the block updates member by member outside every OpenMP region, passes by address (`&e`, the element expression verbatim, to `T *v`; each `e.m` becomes `v->m`) when its indices have no side effect and are not written by the block and the block touches the element only through its members; the address computed once names the element every statement named | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the normalisation of the co-occurrence matrix, `cooccurrence[x][y].direction[i].<c>*=normalize;` for five channels at depth 4, which as a by-value block would take six parameters; a probe of the step 6.28 to 6.70, no finding on the new function | owner |
 | 2026-11-10 | NEW | KT | Replace a Keyed Label Run with a Table Lookup: a `switch` on an integer whose groups each assign one variable from the same call with one constant argument, under sparse integer labels, with `default:` sharing one group (form A) or in a group of its own that leaves the function (form B), becomes a `static const` table of `{ key, constant }` elements (one shared `typedef struct`) and a lookup loop that ends on the matching element, or on the last element (form A, the `default:` group placed last) or past the table (form B, which then runs the `default:` body); table checked by script; guard `WARN` with `0` and `1` added once each (form A); string constants only read as text | `morphology.c`'s `AcquireThinSEKernel` (cc 25, 78 lines), `AcquireLaplacianKernel` (cc 11) and `AcquireLineJunctionsKernel` (cc 9), campaign A, W16 lane d: label runs that TB's forms refuse (the function goes on after the `switch`; sparse keys); probes: each leaves *Complex Method* with no new function, the file flat at 3.10 (17 to 14 *Complex Method* functions), Laplacian 68 reaching cases 0 diverged | owner |
+| 2026-11-10 | NEW | PL | Peel a Leaving Label Set out of a Selection as a Predicate: groups of a `switch` whose whole body is the same leaving statement `S` (`return;`) leave the `switch` for an LP-form predicate on their labels, called in `if (Name(e) != MagickFalse) S` directly before the `switch`; the kept groups and `default:` stay; `e` side-effect free and evaluated again by the `switch`; labels and comments checked by script; TB may then make the predicate a table | `morphology.c`'s `RotateKernelInfo` (campaign A, W16 lane d): thirteen of its fifteen labels only `return;` beside the Blur group and `default:` (cc 30), which LP (two groups only), SD/SR (no `return`) and ST (value-returning) refuse; one step of a chain probe 3.10 to 3.02 to 3.16, no finding on a new function | owner |
