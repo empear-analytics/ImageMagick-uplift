@@ -465,6 +465,18 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   return(kernel);
 }
 
+static GeometryInfo DefaultDistanceScale(const MagickStatusType flags,
+  GeometryInfo args)
+{
+  if ( (flags & HeightValue) == 0 )           /* no distance scale */
+    args.sigma = 100.0;                       /* default distance scaling */
+  else if ( (flags & AspectValue ) != 0 )     /* '!' flag */
+    args.sigma = (double) QuantumRange/(args.sigma+1); /* maximum pixel distance */
+  else if ( (flags & PercentValue ) != 0 )    /* '%' flag */
+    args.sigma *= (double) QuantumRange/100.0;         /* percentage of color range */
+  return(args);
+}
+
 static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
   const MagickStatusType flags,GeometryInfo args)
 {
@@ -504,12 +516,7 @@ static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
     case ManhattanKernel:
     case OctagonalKernel:
     case EuclideanKernel:
-      if ( (flags & HeightValue) == 0 )           /* no distance scale */
-        args.sigma = 100.0;                       /* default distance scaling */
-      else if ( (flags & AspectValue ) != 0 )     /* '!' flag */
-        args.sigma = (double) QuantumRange/(args.sigma+1); /* maximum pixel distance */
-      else if ( (flags & PercentValue ) != 0 )    /* '%' flag */
-        args.sigma *= (double) QuantumRange/100.0;         /* percentage of color range */
+      args=DefaultDistanceScale(flags,args);
       break;
     default:
       break;
