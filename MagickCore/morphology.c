@@ -517,6 +517,24 @@ static GeometryInfo SetDistanceKernelDefaults(const ssize_t type,
   return(args);
 }
 
+static GeometryInfo SetRingOrRectangleKernelDefaults(const ssize_t type,
+  const MagickStatusType flags,GeometryInfo args)
+{
+  switch( type ) {
+    case RingKernel:
+      if ( (flags & XValue) == 0 )
+        args.xi = 1.0;       /* Default scale = 1.0, zero is valid */
+      break;
+    case RectangleKernel:    /* Rectangle - set size defaults */
+      args=DefaultRectangleGeometry(flags,args);
+      break;
+    /* Distance Kernel Defaults */
+    default:
+      return(SetDistanceKernelDefaults(type,flags,args));
+  }
+  return(args);
+}
+
 static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
   const MagickStatusType flags,GeometryInfo args)
 {
@@ -534,16 +552,8 @@ static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
     case CrossKernel:
       args=DefaultShapeScale(flags,args);
       break;
-    case RingKernel:
-      if ( (flags & XValue) == 0 )
-        args.xi = 1.0;       /* Default scale = 1.0, zero is valid */
-      break;
-    case RectangleKernel:    /* Rectangle - set size defaults */
-      args=DefaultRectangleGeometry(flags,args);
-      break;
-    /* Distance Kernel Defaults */
     default:
-      return(SetDistanceKernelDefaults(type,flags,args));
+      return(SetRingOrRectangleKernelDefaults(type,flags,args));
   }
   return(args);
 }
