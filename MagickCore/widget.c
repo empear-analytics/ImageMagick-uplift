@@ -9742,6 +9742,35 @@ static void ReleaseTextViewDismiss(const DialogRelease *release,
     }
 }
 
+static void MoveTextViewSliderByPage(const KeySym key_symbol,
+  const unsigned int visible_lines,const unsigned int lines,
+  XWidgetInfo *slider_info)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Prior:
+    case XK_KP_Prior:
+    {
+      (*slider_info).id-=(int) visible_lines;
+      break;
+    }
+    case XK_Next:
+    case XK_KP_Next:
+    {
+      (*slider_info).id+=(int) visible_lines;
+      break;
+    }
+    case XK_End:
+    case XK_KP_End:
+    {
+      (*slider_info).id=(int) lines;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static XWidgetInfo MoveTextViewSlider(XWidgetInfo slider_info,
   const KeySym key_symbol,const unsigned int visible_lines,
   const unsigned int lines)
@@ -9766,22 +9795,9 @@ static XWidgetInfo MoveTextViewSlider(XWidgetInfo slider_info,
       slider_info.id++;
       break;
     }
-    case XK_Prior:
-    case XK_KP_Prior:
+    default:
     {
-      slider_info.id-=(int) visible_lines;
-      break;
-    }
-    case XK_Next:
-    case XK_KP_Next:
-    {
-      slider_info.id+=(int) visible_lines;
-      break;
-    }
-    case XK_End:
-    case XK_KP_End:
-    {
-      slider_info.id=(int) lines;
+      MoveTextViewSliderByPage(key_symbol,visible_lines,lines,&slider_info);
       break;
     }
   }
