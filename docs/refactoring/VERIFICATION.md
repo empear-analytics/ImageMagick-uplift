@@ -47,6 +47,38 @@ The Windows build also compiles the `MAGICKCORE_WINDOWS_SUPPORT` branches of the
 files (`utility.c`, `blob.c`, `resource.c`, ...) and the Windows-only coders `emf.c`,
 `clipboard.c` and `screenshot.c`.
 
+### ImageMagick's own CI: `ci_warnings.sh` and `ci_linux_warnings.sh`
+
+The oracle builds use neither `-Werror` nor the CI's warning flags, so a step can pass the
+oracle and still break `main.yml`. Two scripts check a changed file against the CI before
+it is committed:
+
+| Script | Stands for | Build it reads | Flags |
+| --- | --- | --- | --- |
+| `tools/ci_warnings.sh` | the *Build MacOS arm64* job | the oracle's `build-oracle/cand` (HDRI) | the job's, above all `-Wdeclaration-after-statement`, plus `-Wconditional-uninitialized` for MSVC's C4701 |
+| `tools/ci_linux_warnings.sh` | the *Build Linux* gcc and clang jobs, and the Windows jobs' MSVC errors | four trees of its own, `build-oracle/ci-{gcc,clang}-{min,dlg}`, configured on first use as the jobs configure (`--with-quantum-depth=16 --enable-hdri=no`, `-O0`); `min` without delegate libraries (the CI container), `dlg` with the installed ones and FFTW (what Windows compiles); both `--without-x` | the jobs' `-Wall -Wextra` (`-Werror` left out so every diagnostic shows), plus `-Wshadow` and the discarded-qualifier warning for MSVC's C4456/C4457/C4459 and C2440/C2664, and a scan for C4065 (a `switch` with a `default:` and no `case`) |
+
+On Linux `ci_warnings.sh` runs `ci_linux_warnings.sh` on the same files, so the AGENTS.md
+loop and the lanes' `verify_wt.sh` get both (`CI_LINUX=0` skips the second).
+`ci_linux_warnings.sh --campaign-a` checks every campaign A file (about 50 s warm).
+
+Why the second script (W16, 2026-11-10): from #86 the `Main` workflow failed on main. The
+Linux jobs stopped at `blob.c` (campaign B; reproduced by the `min` trees, which compile
+its no-zlib branch), and the Windows jobs reported nine diagnostics in campaign A files,
+each from a refactor commit: a `const` member or parameter between two helpers
+(`effect-blur.c`, `shear-deskew.c`), a parameter kept only for a pragma's `shared(status)`
+(`colorspace.c`, `quantize-posterize.c`), a body-local hiding an outer one (`fourier.c`;
+two in `composite.c` and one in `shear.c`, gone by then), and two default-only switches
+left by Recipe SD (`compare.c`). Behind `blob.c` the Linux jobs would also have stopped on
+helpers taking `Quantum **` or `MagickRealType **` for a caller's `magick_restrict` pointer
+(`colorspace.c`, `quantize.c`, `effect-blur.c`), which gcc and clang reject by default. All
+were repaired by `fix(...)` commits with identical object files.
+
+What neither script sees: MSVC's C4702 (unreachable code), the Windows-only `#if`
+branches (the Windows build above), and differences between the CI's compilers (gcc 11
+and clang 14 on Ubuntu 22.04) and WSL's (gcc 13, clang 18). The CI is the final word;
+these scripts catch what they can before a push.
+
 ---
 
 ## Three levels of evidence
