@@ -1037,13 +1037,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   white.y=MaxRange(QuantumRange);
   if ((image->channel_mask & GreenChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.y=(cl_float) i;
     intensity=0.0;
     for (i=(ssize_t) MaxMap; i != 0; i--)
@@ -1058,13 +1052,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   white.z=MaxRange(QuantumRange);
   if ((image->channel_mask & BlueChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.z=(cl_float) i;
     intensity=0.0;
     for (i=(ssize_t) MaxMap; i != 0; i--)
@@ -1079,13 +1067,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   white.w=MaxRange(QuantumRange);
   if ((image->channel_mask & AlphaChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.w=(cl_float) i;
     intensity=0.0;
     for (i=(ssize_t) MaxMap; i != 0; i--)
