@@ -874,6 +874,33 @@ static void SetOpenCLBenchmarkScoreAttribute(
   }
 }
 
+static void SetOpenCLBenchmarkNamePlatformAttribute(
+  MagickCLDeviceBenchmark *device_benchmark,char *keyword,char *token)
+{
+  switch (*keyword)
+  {
+    case 'N':
+    case 'n':
+    {
+      if (LocaleCompare((char *) keyword,"name") == 0)
+        device_benchmark->name=ConstantString(token);
+      break;
+    }
+    case 'P':
+    case 'p':
+    {
+      if (LocaleCompare((char *) keyword,"platform") == 0)
+        device_benchmark->platform_name=ConstantString(token);
+      break;
+    }
+    default:
+    {
+      SetOpenCLBenchmarkScoreAttribute(device_benchmark,keyword,token);
+      break;
+    }
+  }
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -989,23 +1016,9 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
           }
         break;
       }
-      case 'N':
-      case 'n':
-      {
-        if (LocaleCompare((char *) keyword,"name") == 0)
-          device_benchmark->name=ConstantString(token);
-        break;
-      }
-      case 'P':
-      case 'p':
-      {
-        if (LocaleCompare((char *) keyword,"platform") == 0)
-          device_benchmark->platform_name=ConstantString(token);
-        break;
-      }
       default:
       {
-        SetOpenCLBenchmarkScoreAttribute(device_benchmark,keyword,token);
+        SetOpenCLBenchmarkNamePlatformAttribute(device_benchmark,keyword,token);
         break;
       }
     }
