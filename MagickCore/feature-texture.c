@@ -1579,6 +1579,31 @@ static MagickBooleanType FillFeatureCooccurrence(
   return(status);
 }
 
+static void RelinquishFeatureBuffers(const FeatureBuffers *buffers)
+{
+  FeatureStatistics
+    **cooccurrence = buffers->cooccurrence,
+    *density_x = buffers->density_x,
+    *density_xy = buffers->density_xy,
+    *density_y = buffers->density_y,
+    **Q = buffers->Q,
+    *sum = buffers->sum;
+
+  if (Q != (FeatureStatistics **) NULL)
+    Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
+  if (sum != (FeatureStatistics *) NULL)
+    sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
+  if (density_y != (FeatureStatistics *) NULL)
+    density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
+  if (density_xy != (FeatureStatistics *) NULL)
+    density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
+  if (density_x != (FeatureStatistics *) NULL)
+    density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
+  if (cooccurrence != (FeatureStatistics **) NULL)
+    cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(
+      cooccurrence);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1728,19 +1753,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   buffers.sum=sum;
   if (IsFeatureMemoryMissing(&buffers) != MagickFalse)
     {
-      if (Q != (FeatureStatistics **) NULL)
-        Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
-      if (sum != (FeatureStatistics *) NULL)
-        sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
-      if (density_y != (FeatureStatistics *) NULL)
-        density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
-      if (density_xy != (FeatureStatistics *) NULL)
-        density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
-      if (density_x != (FeatureStatistics *) NULL)
-        density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
-      if (cooccurrence != (FeatureStatistics **) NULL)
-        cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(
-          cooccurrence);
+      RelinquishFeatureBuffers(&buffers);
       grays=(PixelPacket *) RelinquishMagickMemory(grays);
       channel_features=(ChannelFeatures *) RelinquishMagickMemory(
         channel_features);
