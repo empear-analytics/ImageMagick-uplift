@@ -5873,6 +5873,24 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsRedHigh32BitMap(const XImage *ximage,
+  const XStandardColormap *map_info)
+{
+  return(((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
+    (map_info->green_max == 255) && (map_info->blue_max == 255) &&
+    (map_info->red_mult == 65536L) && (map_info->green_mult == 256) &&
+    (map_info->blue_mult == 1)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsBlueHigh32BitMap(const XImage *ximage,
+  const XStandardColormap *map_info)
+{
+  return(((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
+    (map_info->green_max == 255) && (map_info->blue_max == 255) &&
+    (map_info->red_mult == 1) && (map_info->green_mult == 256) &&
+    (map_info->blue_mult == 65536L)) ? MagickTrue : MagickFalse);
+}
+
 static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
   const XWindowInfo *window,Image *image,XImage *ximage,XImage *matte_image,
   ExceptionInfo *exception)
@@ -6291,10 +6309,7 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
         }
         default:
         {
-          if ((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
-              (map_info->green_max == 255) && (map_info->blue_max == 255) &&
-              (map_info->red_mult == 65536L) && (map_info->green_mult == 256) &&
-              (map_info->blue_mult == 1))
+          if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
             {
               /*
                 Convert to 32 bit continuous-tone X canvas.
@@ -6335,10 +6350,7 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
               }
             }
           else
-            if ((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
-                (map_info->green_max == 255) && (map_info->blue_max == 255) &&
-                (map_info->red_mult == 1) && (map_info->green_mult == 256) &&
-                (map_info->blue_mult == 65536L))
+            if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
               {
                 /*
                   Convert to 32 bit continuous-tone X canvas.
