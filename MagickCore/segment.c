@@ -1734,6 +1734,46 @@ static MagickBooleanType FormDynamicClusters(short **extrema,
   return(MagickTrue);
 }
 
+typedef struct _DynamicRegionTargets
+{
+  Cluster
+    **cluster,
+    **head;
+
+  ExtentPacket
+    *red,
+    *green,
+    *blue;
+} DynamicRegionTargets;
+
+static MagickBooleanType FormDynamicRegionClusters(short **extrema,
+  const DynamicRegionTargets *region)
+{
+  Cluster
+    **const cluster = region->cluster,
+    **const head = region->head;
+
+  ExtentPacket
+    *const red = region->red,
+    *const green = region->green,
+    *const blue = region->blue;
+
+  while (DefineRegion(extrema[Red],red) != 0)
+  {
+    DynamicClusterTargets
+      targets;
+
+    (*green).index=0;
+    targets.cluster=(cluster);
+    targets.head=(head);
+    targets.green=(green);
+    targets.blue=(blue);
+    if (FormDynamicClusters(extrema,*red,&targets) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1749,6 +1789,9 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     blue,
     green,
     red;
+
+  const DynamicRegionTargets
+    region = { &cluster, &head, &red, &green, &blue };
 
   ssize_t
     i;
@@ -1793,19 +1836,8 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   (void) memset(&red,0,sizeof(red));
   (void) memset(&green,0,sizeof(green));
   (void) memset(&blue,0,sizeof(blue));
-  while (DefineRegion(extrema[Red],&red) != 0)
-  {
-    DynamicClusterTargets
-      targets;
-
-    green.index=0;
-    targets.cluster=(&cluster);
-    targets.head=(&head);
-    targets.green=(&green);
-    targets.blue=(&blue);
-    if (FormDynamicClusters(extrema,red,&targets) == MagickFalse)
-      return(ThrowClusterAllocationFailed(image,exception));
-  }
+  if (FormDynamicRegionClusters(extrema,&region) == MagickFalse)
+    return(ThrowClusterAllocationFailed(image,exception));
   if (head == (Cluster *) NULL)
     {
       /*
