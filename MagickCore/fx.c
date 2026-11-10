@@ -4221,6 +4221,12 @@ typedef struct _ImageStatInputs
   ssize_t
     ImgNum;
 
+  PixelChannel
+    channel;
+
+  ChannelStatistics
+    *cs;
+
   ImgAttrE
     ia;
 } ImageStatInputs;
@@ -4265,6 +4271,46 @@ static void ImageStatHToZ (const ImageStatInputs *attr, fxFltType *ret)
   }
 }
 
+static void ImageStatResolutionToStdDev (const ImageStatInputs *attr, fxFltType *ret)
+{
+  FxInfo
+    *const pfx = attr->pfx;
+
+  const ssize_t
+    ImgNum = attr->ImgNum;
+
+  const PixelChannel
+    channel = attr->channel;
+
+  ChannelStatistics
+    *const cs = attr->cs;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aResX:
+      (*ret) = pfx->Images[ImgNum]->resolution.x;
+      break;
+    case aResY:
+      (*ret) = pfx->Images[ImgNum]->resolution.y;
+      break;
+    case aSkewness:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].skewness;
+      break;
+    case aStdDev:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].standard_deviation;
+      break;
+    default:
+      {
+        ImageStatHToZ (attr, &(*ret));
+        break;
+      }
+  }
+}
+
 static inline fxFltType ImageStat (
   FxInfo * pfx, ssize_t ImgNum, PixelChannel channel, ImgAttrE ia)
 {
@@ -4292,6 +4338,8 @@ static inline fxFltType ImageStat (
 
   attr.pfx=pfx;
   attr.ImgNum=ImgNum;
+  attr.channel=channel;
+  attr.cs=cs;
   attr.ia=ia;
   switch (ia) {
     case aDepth:
@@ -4352,23 +4400,9 @@ static inline fxFltType ImageStat (
     case aRes:
       /* Do nothing */
       break;
-    case aResX:
-      ret = pfx->Images[ImgNum]->resolution.x;
-      break;
-    case aResY:
-      ret = pfx->Images[ImgNum]->resolution.y;
-      break;
-    case aSkewness:
-      if (HasChannelStatistics(cs,channel) != MagickFalse)
-        ret = cs[channel].skewness;
-      break;
-    case aStdDev:
-      if (HasChannelStatistics(cs,channel) != MagickFalse)
-        ret = cs[channel].standard_deviation;
-      break;
     default:
       {
-        ImageStatHToZ (&attr, &ret);
+        ImageStatResolutionToStdDev (&attr, &ret);
         break;
       }
   }
