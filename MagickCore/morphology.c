@@ -2107,14 +2107,342 @@ static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
   return(kernel);
 }
 
-MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
-  const GeometryInfo *args,ExceptionInfo *exception)
+static KernelInfo *AcquireNamedEdgeKernel(const KernelInfoType type,
+  const GeometryInfo *args,const char *kernel_array)
 {
   KernelInfo
     *kernel;
 
+  kernel=ParseKernelArray(kernel_array);
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->rho);
+  return(kernel);
+}
+
+typedef struct _KernelRadius
+{
+  double
+    minimum;
+
+  size_t
+    default_width;
+} KernelRadius;
+
+static void SetKernelRadius(KernelInfo *kernel,const GeometryInfo *args,
+  const KernelRadius *radius)
+{
+  const double
+    minimum = radius->minimum;
+
+  const size_t
+    default_width = radius->default_width;
+
+  if (args->rho < minimum)
+    kernel->width = kernel->height = default_width;
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+}
+
+typedef enum
+{
+  PlusKernelShape,
+  CrossKernelShape
+} PlusKernelSide;
+
+static inline KernelInfo *AcquirePlusOrCrossKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan,const PlusKernelSide side)
+{
+  const KernelRadius
+    radius = { 1.0, 5 };  /* default radius 2 */
+
   ssize_t
     i;
+
+  ssize_t
+    u,
+    v;
+
+  SetKernelRadius(kernel,args,&radius);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* set all kernel values along axises to given scale */
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      kernel->values[i] = ((side == PlusKernelShape) ? (u == 0 || v == 0) :
+        (u == v || u == -v)) ? args->sigma : nan;
+  kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
+  kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
+  return(kernel);
+}
+
+typedef enum
+{
+  ManhattanKernelDistance,
+  EuclideanKernelDistance
+} DistanceKernelSide;
+
+static inline KernelInfo *AcquireManhattanOrEuclideanKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const DistanceKernelSide side)
+{
+  const KernelRadius
+    radius = { 1.0, 3 };  /* default radius = 1 */
+
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  SetKernelRadius(kernel,args,&radius);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      kernel->positive_range += ( kernel->values[i] =
+        ((side == ManhattanKernelDistance) ?
+        args->sigma*(labs((long) u)+labs((long) v)) :
+        args->sigma*sqrt((double) (u*u+v*v))) );
+  kernel->maximum = kernel->values[0];
+  return(kernel);
+}
+
+static KernelInfo *AcquireOctagonalKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  const KernelRadius
+    radius = { 2.0, 5 };  /* default/minimum radius = 2 */
+
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  SetKernelRadius(kernel,args,&radius);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      {
+        double
+          r1 = MagickMax(fabs((double)u),fabs((double)v)),
+          r2 = floor((double)(labs((long)u)+labs((long)v)+1)/1.5);
+        kernel->positive_range += kernel->values[i] =
+                  args->sigma*MagickMax(r1,r2);
+      }
+  kernel->maximum = kernel->values[0];
+  return(kernel);
+}
+
+static KernelInfo *AcquireCornersKernel(const KernelInfoType type,
+  ExceptionInfo *exception)
+{
+  KernelInfo
+    *kernel;
+
+  kernel=AcquireKernelInfo("ThinSE:87",exception);
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  ExpandRotateKernelInfo(kernel, 90.0); /* Expand 90 degree rotations */
+  return(kernel);
+}
+
+static KernelInfo *AcquireDistanceKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  switch(type) {
+      /*
+        Distance Measuring Kernels
+      */
+      case ChebyshevKernel:
+        return(AcquireChebyshevKernel(kernel,args));
+      case ManhattanKernel:
+        return(AcquireManhattanOrEuclideanKernel(kernel,args,
+          ManhattanKernelDistance));
+      case OctagonalKernel:
+        return(AcquireOctagonalKernel(kernel,args));
+    case EuclideanKernel:
+      return(AcquireManhattanOrEuclideanKernel(kernel,args,
+        EuclideanKernelDistance));
+    default:
+      {
+        /* No-Op Kernel - Basically just a single pixel on its own */
+        kernel=ParseKernelArray("1:1");
+        if (kernel == (KernelInfo *) NULL)
+          return(kernel);
+        kernel->type = UndefinedKernel;
+        break;
+      }
+      break;
+  }
+  return(kernel);
+}
+
+static KernelInfo *AcquireLineOrThinningKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch(type) {
+      case LineJunctionsKernel:
+        return(AcquireLineJunctionsKernel(kernel,type,args,exception));
+      case RidgesKernel:
+        return(AcquireRidgesKernel(kernel,type,args));
+      case ConvexHullKernel:
+        return(AcquireConvexHullKernel(kernel,type));
+      case SkeletonKernel:
+        return(AcquireSkeletonKernel(kernel,type,args,exception));
+      case ThinSEKernel:
+        return(AcquireThinSEKernel(kernel,type,args));
+    default:
+      return(AcquireDistanceKernel(kernel,type,args));
+  }
+  return(kernel);
+}
+
+typedef struct _BuiltInKernelInputs
+{
+  const GeometryInfo
+    *args;
+
+  double
+    nan;
+
+  ExceptionInfo
+    *exception;
+} BuiltInKernelInputs;
+
+static KernelInfo *AcquireHitAndMissKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  const double
+    nan = inputs->nan;
+
+  ExceptionInfo
+    *exception = inputs->exception;
+
+  switch(type) {
+      /*
+        HitAndMiss Kernels
+      */
+      case RingKernel:
+      case PeaksKernel:
+        return(AcquireRingKernel(kernel,type,args,nan));
+      case EdgesKernel:
+        return(AcquireEdgesKernel(kernel,type,exception));
+      case CornersKernel:
+        return(AcquireCornersKernel(type,exception));
+      case DiagonalsKernel:
+        return(AcquireDiagonalsKernel(kernel,type,args));
+      case LineEndsKernel:
+        return(AcquireLineEndsKernel(kernel,type,args,exception));
+    default:
+      return(AcquireLineOrThinningKernel(kernel,type,args,exception));
+  }
+  return(kernel);
+}
+
+static KernelInfo *AcquireCrossShapedKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  const double
+    nan = inputs->nan;
+
+  switch(type) {
+      case PlusKernel:
+        return(AcquirePlusOrCrossKernel(kernel,args,nan,PlusKernelShape));
+      case CrossKernel:
+        return(AcquirePlusOrCrossKernel(kernel,args,nan,CrossKernelShape));
+    default:
+      return(AcquireHitAndMissKernel(kernel,type,inputs));
+  }
+  return(kernel);
+}
+
+static KernelInfo *AcquireAreaShapedKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  const double
+    nan = inputs->nan;
+
+  switch(type) {
+    /*
+      Boolean or Shaped Kernels
+    */
+    case DiamondKernel:
+      return(AcquireDiamondKernel(kernel,args,nan));
+    case SquareKernel:
+    case RectangleKernel:
+      return(AcquireRectangleKernel(kernel,type,args));
+      case OctagonKernel:
+        return(AcquireOctagonKernel(kernel,args,nan));
+      case DiskKernel:
+        return(AcquireDiskKernel(kernel,args,nan));
+    default:
+      return(AcquireCrossShapedKernel(kernel,type,inputs));
+  }
+  return(kernel);
+}
+
+static KernelInfo *AcquireEdgeDetectionKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  ExceptionInfo
+    *exception = inputs->exception;
+
+  switch(type) {
+    case SobelKernel: /* Simple Sobel Kernel */
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,0,-1  2,0,-2  1,0,-1"));
+    case RobertsKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 0,0,0  1,-1,0  0,0,0"));
+    case PrewittKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,0,-1  1,0,-1  1,0,-1"));
+    case CompassKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,1,-1  1,-2,-1  1,1,-1"));
+    case KirschKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 5,-3,-3  5,0,-3  5,-3,-3"));
+    case FreiChenKernel:
+      /* Direction is set to be left to right positive */
+      /* http://www.math.tau.ac.il/~turkel/notes/edge_detectors.pdf -- RIGHT? */
+      /* http://ltswww.epfl.ch/~courstiv/exos_labos/sol3.pdf -- WRONG? */
+      return(AcquireFreiChenKernel(kernel,type,args,exception));
+
+    default:
+      return(AcquireAreaShapedKernel(kernel,type,inputs));
+  }
+  return(kernel);
+}
+
+MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
+  const GeometryInfo *args,ExceptionInfo *exception)
+{
+  BuiltInKernelInputs
+    inputs;
+
+  KernelInfo
+    *kernel;
 
   ssize_t
     u,
@@ -2291,212 +2619,11 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     */
     case LaplacianKernel:
       return(AcquireLaplacianKernel(kernel,type,args));
-    case SobelKernel:
-      { /* Simple Sobel Kernel */
-        kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
-    case RobertsKernel:
-      {
-        kernel=ParseKernelArray("3: 0,0,0  1,-1,0  0,0,0");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
-    case PrewittKernel:
-      {
-        kernel=ParseKernelArray("3: 1,0,-1  1,0,-1  1,0,-1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
-    case CompassKernel:
-      {
-        kernel=ParseKernelArray("3: 1,1,-1  1,-2,-1  1,1,-1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
-    case KirschKernel:
-      {
-        kernel=ParseKernelArray("3: 5,-3,-3  5,0,-3  5,-3,-3");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
-    case FreiChenKernel:
-      /* Direction is set to be left to right positive */
-      /* http://www.math.tau.ac.il/~turkel/notes/edge_detectors.pdf -- RIGHT? */
-      /* http://ltswww.epfl.ch/~courstiv/exos_labos/sol3.pdf -- WRONG? */
-      return(AcquireFreiChenKernel(kernel,type,args,exception));
-
-    /*
-      Boolean or Shaped Kernels
-    */
-    case DiamondKernel:
-      return(AcquireDiamondKernel(kernel,args,nan));
-    case SquareKernel:
-    case RectangleKernel:
-      return(AcquireRectangleKernel(kernel,type,args));
-      case OctagonKernel:
-        return(AcquireOctagonKernel(kernel,args,nan));
-      case DiskKernel:
-        return(AcquireDiskKernel(kernel,args,nan));
-      case PlusKernel:
-        {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 5;  /* default radius 2 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          /* set all kernel values along axises to given scale */
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->values[i] = (u == 0 || v == 0) ? args->sigma : nan;
-          kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
-          kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
-          break;
-        }
-      case CrossKernel:
-        {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 5;  /* default radius 2 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          /* set all kernel values along axises to given scale */
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->values[i] = (u == v || u == -v) ? args->sigma : nan;
-          kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
-          kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
-          break;
-        }
-      /*
-        HitAndMiss Kernels
-      */
-      case RingKernel:
-      case PeaksKernel:
-        return(AcquireRingKernel(kernel,type,args,nan));
-      case EdgesKernel:
-        return(AcquireEdgesKernel(kernel,type,exception));
-      case CornersKernel:
-        {
-          kernel=AcquireKernelInfo("ThinSE:87",exception);
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          ExpandRotateKernelInfo(kernel, 90.0); /* Expand 90 degree rotations */
-          break;
-        }
-      case DiagonalsKernel:
-        return(AcquireDiagonalsKernel(kernel,type,args));
-      case LineEndsKernel:
-        return(AcquireLineEndsKernel(kernel,type,args,exception));
-      case LineJunctionsKernel:
-        return(AcquireLineJunctionsKernel(kernel,type,args,exception));
-      case RidgesKernel:
-        return(AcquireRidgesKernel(kernel,type,args));
-      case ConvexHullKernel:
-        return(AcquireConvexHullKernel(kernel,type));
-      case SkeletonKernel:
-        return(AcquireSkeletonKernel(kernel,type,args,exception));
-      case ThinSEKernel:
-        return(AcquireThinSEKernel(kernel,type,args));
-      /*
-        Distance Measuring Kernels
-      */
-      case ChebyshevKernel:
-        return(AcquireChebyshevKernel(kernel,args));
-      case ManhattanKernel:
-        {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 3;  /* default radius = 1 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->positive_range += ( kernel->values[i] =
-                  args->sigma*(labs((long) u)+labs((long) v)) );
-          kernel->maximum = kernel->values[0];
-          break;
-        }
-      case OctagonalKernel:
-      {
-        if (args->rho < 2.0)
-          kernel->width = kernel->height = 5;  /* default/minimum radius = 2 */
-        else
-          kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-        kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-          for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-            {
-              double
-                r1 = MagickMax(fabs((double)u),fabs((double)v)),
-                r2 = floor((double)(labs((long)u)+labs((long)v)+1)/1.5);
-              kernel->positive_range += kernel->values[i] =
-                        args->sigma*MagickMax(r1,r2);
-            }
-        kernel->maximum = kernel->values[0];
-        break;
-      }
-    case EuclideanKernel:
-      {
-        if (args->rho < 1.0)
-          kernel->width = kernel->height = 3;  /* default radius = 1 */
-        else
-          kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-        kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-          for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-            kernel->positive_range += ( kernel->values[i] =
-              args->sigma*sqrt((double) (u*u+v*v)) );
-        kernel->maximum = kernel->values[0];
-        break;
-      }
     default:
-      {
-        /* No-Op Kernel - Basically just a single pixel on its own */
-        kernel=ParseKernelArray("1:1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = UndefinedKernel;
-        break;
-      }
-      break;
+      inputs.args=args;
+      inputs.nan=nan;
+      inputs.exception=exception;
+      return(AcquireEdgeDetectionKernel(kernel,type,&inputs));
   }
   return(kernel);
 }
