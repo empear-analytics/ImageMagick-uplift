@@ -7853,6 +7853,112 @@ the shared `status`, form (b) with PS): 9.31 to 9.38. Added by Claude Code (Clau
 
 ---
 
+## Recipe RA - Extract Block Accumulating a Reduction Variable Through a Pointer
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Large
+Method* or *Complex Method*, and the block that would fix it sits in a parallel loop
+whose pragma has a `reduction(op:v)` clause and adds to `v` (`v+=e;`, `v++;`), as
+`composite.c`'s `BlendRMSEResidual` does with `area` and `channel_residual`.
+
+**Not covered by:** Recipe E and N, whose OpenMP rule refuses any write to a variable
+declared outside the loop body, by address too; Recipe PS, whose step 2 refuses a
+variable named in `reduction`; Recipe K, O and the step 8 forms, which pass variables the
+loop body declares; Recipe IS, which passes a slot of a shared object.
+
+**How:**
+
+1. The block lies inside one iteration of the parallel loop body, contains no `#pragma
+   omp` line (no `critical` or `atomic` moves), no `return` or `goto`, and no `break` or
+   `continue` that leaves it. The pragma and every clause stay exactly as they are.
+2. At most two variables `v` that the block writes are declared outside the loop body,
+   and each is named in a `reduction(op:v)` clause of that pragma. The block uses each
+   only by applying that operator to it: `v op= e;` or, for `+`, `v++;`; it does not read
+   `v` otherwise, assign it, or take its address. Any other write is to a variable the
+   loop body declares (Recipe E step 4), or as Recipe PS or IS admit.
+3. Cut the block into a `static void` function directly above the caller, taking `T *v`
+   for each such variable after its other parameters; in the moved text every use of `v`
+   becomes `(*v)` (`(*v)+=e;`, `(*v)++;`), and `&v` passed on to a callee becomes `v`.
+   Nothing else in the text changes.
+4. Pass every other variable the block reads by value; with more than four parameters,
+   bundle the read-only inputs in a `const` struct as Recipe N steps 2 to 7 do, declared
+   in the loop body (or in the block that holds the call), so each thread fills its own;
+   a variable the block reads and then advances that nothing after it reads (a row
+   pointer `p`) may be a member under N step 2's read-then-written form.
+5. Where the block stood, write `Helper(...,&v);`.
+6. A function this recipe made may be the caller of a later step whose block contains
+   that call: there `v` is already the pointer, so the moved call passes `v`.
+7. Check steps 1 and 2 by reading, every argument against its parameter, and time a
+   per-pixel call against the baseline (AGENTS.md: several runs, median).
+
+**Before:**
+
+```c
+  #pragma omp parallel for schedule(static) shared(status) \
+    reduction(+:area) reduction(+:channel_residual) ...
+  for (y=0; y < (ssize_t) rows; y++)
+  {
+    ...
+    for (x=0; x < (ssize_t) columns; x++)
+    {
+      ...
+        channel_residual+=distance*distance;
+      ...
+      area++;
+```
+
+**After:**
+
+```c
+static void AddRMSERowResidual(const RMSEResidualRow *row,double *area,
+  double *channel_residual)
+{
+  ...
+  for (x=0; x < (ssize_t) columns; x++)
+  {
+    ...
+    AddChannelResiduals(&inputs,channel_residual);
+    (*area)++;
+    ...
+}
+...
+    AddRMSERowResidual(&row,&area,&channel_residual);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Inside the region `v` names the thread's private copy,
+  which OpenMP creates and initialises to the operator's identity; `&v` taken in the loop
+  body is the address of that copy, and the new function, called by the same thread in
+  the same iteration, applies the same operator with the same operands to that copy at
+  the same points, in the same order. When the region ends, the copies combine into the
+  original as before. Single-threaded (the oracle's build, or OpenMP off) `v` is the
+  ordinary variable and the pointer is its address.
+- The address never leaves the thread: it is a parameter of a function the thread calls
+  and returns from inside the iteration. No clause changes, so what is private, shared
+  or reduced is as before.
+- Step 2 keeps the helper to the operator: a block that reads the partial value, assigns
+  it, or applies another operator would be reasoning about a thread's partial sum, which
+  this recipe does not cover (an assignment such as `channel_residual=0.0;` stays in the
+  caller).
+- The floating-point additions are the same additions in the same order within each
+  thread; nothing is regrouped.
+- The oracle runs single-threaded and cannot see a race: steps 1 and 2 are checked by
+  reading, and `--calls` moves only the new function's definition and calls.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, steps 1 and 2 checked by
+reading, and step 7's timing for a per-pixel call.
+
+**Provenance:** 2026-11-10, owner ("I give you an ok to evolve the recipes"), from
+campaign A's W16 lane c: `composite.c`'s `BlendRMSEResidual` (the file's only *Deep,
+Nested Complexity*, depth 4; Bumpy Road 3, cc 14, 86 lines), whose channel and column
+loops add to `channel_residual` and `area`, named in `reduction(+:...)` clauses; W15
+asked for the ruling. A probe of the two steps (the channel loop, then the column loop):
+3.46 to 3.64 and 3.66, `BlendRMSEResidual` leaving all four findings, no finding on a new
+function; a seamless-blend workload 1.77 s both ways (median of 9). Added by Claude Code
+(Claude Opus 5.5).
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -8157,3 +8263,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | LP | Name a Label Set as a Predicate: a `switch (e)` whose only groups are one run of labels with a body that returns on every path and `default: break;` becomes `if (<Pred>(e) != MagickFalse)` and the body; the new `static MagickBooleanType` function holds the labels (`return(MagickTrue)`, `default: break;`, `return(MagickFalse)`) and may replace further sites with the same label set | `colorspace.c`'s `sRGBTransformImage` and `GenericOrLogTosRGB` (campaign A, W16 lane c): the same 28-label generic group, cc 31 and 30; a probe of both sites 7.44 to 8.10 (the first alone 7.46), the predicate a label-run *Complex Method* (cc 30) under the ruling of 2026-11-07 | mandate (2026-10-24) |
 | 2026-11-10 | NEW | SC | Extract Sibling Blocks Differing in Several Constants: copies of one block in one function that differ in two or more literal or enumeration constants move into one function taking a `const` struct of the constants (one member per role, typed as Recipe SV step 3 types the value); each copy becomes the struct's initialiser and the call; a forward declaration of the caller when the copies recurse into it | `quantize.c`'s `Riemersma` (campaign A, W16 lane c): cc 38, 109 lines, its four `level > 1` cases seven calls on four gravity constants each, its two `level == 1` cases three calls on three; as case helpers they clone (6.25, W14 lane b). A probe of the chain (this recipe twice, then Recipe O on the `level == 1` switch): 7.80 to 8.34, 8.41 and 8.74, no finding on a new function | mandate (2026-10-24) |
 | 2026-11-10 | NEW | IS | Extract Block Through Pointers to the Iteration's Slots: a block of a parallel loop body over `i` that writes, besides the body's variables (and `status` by PS), only the iteration's own slot of a shared object (`x.direction[i]`, `channel_features[c].correlation[i]`, `object[i].metric[k]`) moves into a `static void` function taking the slot's address (`&x.direction[i]`, uses `x->m`) or the pointer that reaches it by value; slot pointers past four parameters in a `const` struct initialised in the body; copies identical once their slots are pointers may share one function (step 7); every access to the object in the region checked by reading to select the iteration's own `i` | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the five direction loops' finals and accumulators, which W14 lane b and W15 lane a found blocked (every legal chain below 5.25); a probe of the chain 5.25 to 5.98, no finding on a new function, features workload not slower (0.96 s to 0.92 s, median of 9). `vision.c`'s `CircularityThreshold`: 9.31 to 9.38 | owner |
+| 2026-11-10 | NEW | RA | Extract Block Accumulating a Reduction Variable Through a Pointer: a block of a parallel loop body that uses at most two variables named in the pragma's `reduction(op:v)` clauses only by applying that operator (`v+=e;`, `v++;`) moves into a `static void` function taking `T *v` (uses `(*v)`), the caller passing `&v`, which inside the region is the thread's private copy; the pragma and clauses unchanged | `composite.c`'s `BlendRMSEResidual` (campaign A, W16 lane c): its channel and column loops add to `channel_residual` and `area` (`reduction(+:...)`), the file's only Deep, Nested Complexity; W15 asked for the ruling. A probe of both steps 3.46 to 3.64 and 3.66, no finding on a new function, a seamless-blend workload 1.77 s both ways (median of 9) | owner |
