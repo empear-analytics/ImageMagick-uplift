@@ -4506,6 +4506,99 @@ static MagickBooleanType PrepareNextOperand (
   return(MagickTrue);
 }
 
+typedef struct _ExpressionTargets
+{
+  MagickBooleanType
+    *Assign,
+    *Update;
+
+  int
+    *UserSymNdx0;
+
+  TernaryT
+    *ternary;
+
+  MagickBooleanType
+    *UserSymbol,
+    *NewUserSymbol;
+} ExpressionTargets;
+
+static MagickBooleanType TranslateOperatorsAndOperands (
+  const ExpressionContext * context, const char * strLimit,
+  const ExpressionTargets * targets)
+{
+  FxInfo
+    *const pfx = context->pfx;
+
+  char
+    *const chLimit = context->chLimit;
+
+  MagickBooleanType
+    *const needPopAll = context->needPopAll;
+
+  MagickBooleanType
+    *const Assign = targets->Assign,
+    *const Update = targets->Update;
+
+  int
+    *const UserSymNdx0 = targets->UserSymNdx0;
+
+  TernaryT
+    *const ternary = targets->ternary;
+
+  MagickBooleanType
+    *const UserSymbol = targets->UserSymbol,
+    *const NewUserSymbol = targets->NewUserSymbol;
+
+  MagickBooleanType
+    IncrDecr = MagickFalse;
+
+  MagickBooleanType broke = MagickFalse;
+
+  UserSymbolAssignment assignment;
+
+  while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
+    OperatorFlags flags;
+    OperandTargets operandTargets;
+    NextOperandTargets nextTargets;
+
+    flags.Assign=(Assign);
+    flags.Update=(Update);
+    flags.IncrDecr=(&IncrDecr);
+    if (GetExpressionOperator (pfx, *UserSymbol, *NewUserSymbol, &flags) ==
+        MagickFalse)
+      return MagickFalse;
+    assignment.pfx=pfx;
+    assignment.strLimit=strLimit;
+    assignment.chLimit=chLimit;
+    assignment.needPopAll=needPopAll;
+    assignment.UserSymbol=*UserSymbol;
+    assignment.Assign=*Assign;
+    assignment.Update=*Update;
+    assignment.IncrDecr=IncrDecr;
+    if (TranslateAssignmentOperand (&assignment, UserSymNdx0, &broke) ==
+        MagickFalse)
+      return MagickFalse;
+    if (broke != MagickFalse) break;
+
+    nextTargets.ternary=(ternary);
+    nextTargets.UserSymbol=(UserSymbol);
+    nextTargets.NewUserSymbol=(NewUserSymbol);
+    if (PrepareNextOperand (context, &assignment, &nextTargets, &broke) ==
+        MagickFalse)
+      return MagickFalse;
+    if (broke != MagickFalse) break;
+
+    operandTargets.UserSymbol=(UserSymbol);
+    operandTargets.NewUserSymbol=(NewUserSymbol);
+    operandTargets.UserSymNdx0=(UserSymNdx0);
+    if (GetExpressionOperand (pfx, *Assign, needPopAll, &operandTargets) ==
+        MagickFalse)
+      return MagickFalse;
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -4516,21 +4609,21 @@ static MagickBooleanType TranslateExpression (
 
   MagickBooleanType
     Assign = MagickFalse,
-    Update = MagickFalse,
-    IncrDecr = MagickFalse;
+    Update = MagickFalse;
 
   int StartEleNdx;
-
-  MagickBooleanType broke = MagickFalse;
 
   const OperandSymbols
     operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll };
 
   ExpressionContext context;
 
-  UserSymbolAssignment assignment;
-
   TernaryT ternary;
+
+  const ExpressionTargets
+    targets = { &Assign, &Update, &UserSymNdx0, &ternary, &UserSymbol,
+      &NewUserSymbol };
+
   ternary.addr_query = NULL_ADDRESS;
   ternary.addr_colon = NULL_ADDRESS;
 
@@ -4571,45 +4664,9 @@ static MagickBooleanType TranslateExpression (
   context.pfx=pfx;
   context.chLimit=chLimit;
   context.needPopAll=needPopAll;
-  while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
-    OperatorFlags flags;
-    OperandTargets operandTargets;
-    NextOperandTargets nextTargets;
-
-    flags.Assign=(&Assign);
-    flags.Update=(&Update);
-    flags.IncrDecr=(&IncrDecr);
-    if (GetExpressionOperator (pfx, UserSymbol, NewUserSymbol, &flags) ==
-        MagickFalse)
-      return MagickFalse;
-    assignment.pfx=pfx;
-    assignment.strLimit=strLimit;
-    assignment.chLimit=chLimit;
-    assignment.needPopAll=needPopAll;
-    assignment.UserSymbol=UserSymbol;
-    assignment.Assign=Assign;
-    assignment.Update=Update;
-    assignment.IncrDecr=IncrDecr;
-    if (TranslateAssignmentOperand (&assignment, &UserSymNdx0, &broke) ==
-        MagickFalse)
-      return MagickFalse;
-    if (broke != MagickFalse) break;
-
-    nextTargets.ternary=(&ternary);
-    nextTargets.UserSymbol=(&UserSymbol);
-    nextTargets.NewUserSymbol=(&NewUserSymbol);
-    if (PrepareNextOperand (&context, &assignment, &nextTargets, &broke) ==
-        MagickFalse)
-      return MagickFalse;
-    if (broke != MagickFalse) break;
-
-    operandTargets.UserSymbol=(&UserSymbol);
-    operandTargets.NewUserSymbol=(&NewUserSymbol);
-    operandTargets.UserSymNdx0=(&UserSymNdx0);
-    if (GetExpressionOperand (pfx, Assign, needPopAll, &operandTargets) ==
-        MagickFalse)
-      return MagickFalse;
-  }
+  if (TranslateOperatorsAndOperands (&context, strLimit, &targets) ==
+      MagickFalse)
+    return MagickFalse;
 
   if ((IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
       MagickFalse) && (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)))
