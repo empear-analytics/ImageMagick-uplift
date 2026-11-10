@@ -1318,6 +1318,18 @@ static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *RotateFreiChenKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  if ( fabs(args->sigma) >= MagickEpsilon )
+    /* Rotate by correctly supplied 'angle' */
+    RotateKernelInfo(kernel, args->sigma);
+  else if ( args->rho > 30.0 || args->rho < -30.0 )
+    /* Rotate by out of bounds 'type' */
+    RotateKernelInfo(kernel, args->rho);
+  return(kernel);
+}
+
 static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1426,13 +1438,7 @@ static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
       ScaleKernelInfo(kernel, 1.0/3.0, NoValue);
       break;
   }
-  if ( fabs(args->sigma) >= MagickEpsilon )
-    /* Rotate by correctly supplied 'angle' */
-    RotateKernelInfo(kernel, args->sigma);
-  else if ( args->rho > 30.0 || args->rho < -30.0 )
-    /* Rotate by out of bounds 'type' */
-    RotateKernelInfo(kernel, args->rho);
-  return(kernel);
+  return(RotateFreiChenKernel(kernel,args));
 }
 
 static double SetSquareKernelGeometry(KernelInfo *kernel,
