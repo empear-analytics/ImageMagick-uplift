@@ -477,6 +477,22 @@ static GeometryInfo DefaultDistanceScale(const MagickStatusType flags,
   return(args);
 }
 
+static GeometryInfo DefaultRectangleGeometry(const MagickStatusType flags,
+  GeometryInfo args)
+{
+  if ( (flags & WidthValue) == 0 ) /* if no width then */
+    args.rho = args.sigma;         /* then  width = height */
+  if ( args.rho < 1.0 )            /* if width too small */
+      args.rho = 3;                /* then  width = 3 */
+  if ( args.sigma < 1.0 )          /* if height too small */
+    args.sigma = args.rho;         /* then  height = width */
+  if ( (flags & XValue) == 0 )     /* center offset if not defined */
+    args.xi = (double)(((ssize_t)args.rho-1)/2);
+  if ( (flags & YValue) == 0 )
+    args.psi = (double)(((ssize_t)args.sigma-1)/2);
+  return(args);
+}
+
 static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
   const MagickStatusType flags,GeometryInfo args)
 {
@@ -500,16 +516,7 @@ static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
         args.xi = 1.0;       /* Default scale = 1.0, zero is valid */
       break;
     case RectangleKernel:    /* Rectangle - set size defaults */
-      if ( (flags & WidthValue) == 0 ) /* if no width then */
-        args.rho = args.sigma;         /* then  width = height */
-      if ( args.rho < 1.0 )            /* if width too small */
-          args.rho = 3;                /* then  width = 3 */
-      if ( args.sigma < 1.0 )          /* if height too small */
-        args.sigma = args.rho;         /* then  height = width */
-      if ( (flags & XValue) == 0 )     /* center offset if not defined */
-        args.xi = (double)(((ssize_t)args.rho-1)/2);
-      if ( (flags & YValue) == 0 )
-        args.psi = (double)(((ssize_t)args.sigma-1)/2);
+      args=DefaultRectangleGeometry(flags,args);
       break;
     /* Distance Kernel Defaults */
     case ChebyshevKernel:
