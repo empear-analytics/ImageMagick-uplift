@@ -1682,36 +1682,40 @@ static KernelInfo *AcquireLineEndsKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static const KeyedKernelArray
+  LineJunctionsKernelArrays[] =
+  {
+    /* Y Junction */
+    { 1, "3: 1,-,1  -,1,-  -,1,-" },
+    /* Diagonal T Junctions */
+    { 2, "3: 1,-,-  -,1,-  1,-,1" },
+    /* Orthogonal T Junctions */
+    { 3, "3: -,-,-  1,1,1  -,1,-" },
+    /* Diagonal X Junctions */
+    { 4, "3: 1,-,1  -,1,-  1,-,1" },
+    /* Orthogonal X Junctions - minimal diamond kernel */
+    { 5, "3: -,1,-  1,1,1  -,1,-" }
+  };
+
 static KernelInfo *AcquireLineJunctionsKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
+  const int
+    key = (int) args->rho;
+
+  size_t
+    i;
+
   /* kernels for finding the junctions of multiple lines */
-  switch ( (int) args->rho ) {
-    case 0:
-    default:
-      /* set of kernels to find all line junctions */
-      return(AcquireKernelInfo("LineJunctions:1@;LineJunctions:2>",exception));
-    case 1:
-      /* Y Junction */
-      kernel=ParseKernelArray("3: 1,-,1  -,1,-  -,1,-");
+  for (i=0; i < (sizeof(LineJunctionsKernelArrays)/
+       sizeof(*LineJunctionsKernelArrays)); i++)
+    if (LineJunctionsKernelArrays[i].key == key)
       break;
-    case 2:
-      /* Diagonal T Junctions */
-      kernel=ParseKernelArray("3: 1,-,-  -,1,-  1,-,1");
-      break;
-    case 3:
-      /* Orthogonal T Junctions */
-      kernel=ParseKernelArray("3: -,-,-  1,1,1  -,1,-");
-      break;
-    case 4:
-      /* Diagonal X Junctions */
-      kernel=ParseKernelArray("3: 1,-,1  -,1,-  1,-,1");
-      break;
-    case 5:
-      /* Orthogonal X Junctions - minimal diamond kernel */
-      kernel=ParseKernelArray("3: -,1,-  1,1,1  -,1,-");
-      break;
-  }
+  if (i == (sizeof(LineJunctionsKernelArrays)/
+       sizeof(*LineJunctionsKernelArrays)))
+    /* set of kernels to find all line junctions */
+    return(AcquireKernelInfo("LineJunctions:1@;LineJunctions:2>",exception));
+  kernel=ParseKernelArray(LineJunctionsKernelArrays[i].definition);
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
   kernel->type = type;
