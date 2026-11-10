@@ -1654,22 +1654,12 @@ MagickExport MagickBooleanType SetImageMonochrome(Image *image,
 %   o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport MagickBooleanType TransformImageColorspace(Image *image,
+static MagickBooleanType TransformThroughsRGB(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
   MagickBooleanType
     status;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (image->colorspace == colorspace)
-    return(SetImageColorspace(image,colorspace,exception));
-  (void) DeleteImageProfile(image,"icc");
-  (void) DeleteImageProfile(image,"icm");
-  if (colorspace == UndefinedColorspace)
-    return(SetImageColorspace(image,colorspace,exception));
   /*
     Convert the reference image from an alternate colorspace to sRGB.
   */
@@ -1686,6 +1676,22 @@ MagickExport MagickBooleanType TransformImageColorspace(Image *image,
   if (sRGBTransformImage(image,colorspace,exception) == MagickFalse)
     status=MagickFalse;
   return(status);
+}
+
+MagickExport MagickBooleanType TransformImageColorspace(Image *image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (image->colorspace == colorspace)
+    return(SetImageColorspace(image,colorspace,exception));
+  (void) DeleteImageProfile(image,"icc");
+  (void) DeleteImageProfile(image,"icm");
+  if (colorspace == UndefinedColorspace)
+    return(SetImageColorspace(image,colorspace,exception));
+  return(TransformThroughsRGB(image,colorspace,exception));
 }
 
 /*
