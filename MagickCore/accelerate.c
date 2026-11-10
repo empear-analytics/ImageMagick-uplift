@@ -868,9 +868,6 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   cl_uint4
     *histogram;
 
-  double
-    intensity;
-
   cl_float4
     black,
     white;
@@ -1052,13 +1049,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   {
     i=FindStretchBlackBin(histogram,black_point);
     black.y=(cl_float) i;
-    intensity=0.0;
-    for (i=(ssize_t) MaxMap; i != 0; i--)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    i=FindStretchWhiteBin(image,histogram,white_point);
     white.y=(cl_float) i;
   }
   black.z=0.0;
@@ -1067,13 +1058,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   {
     i=FindStretchBlackBin(histogram,black_point);
     black.z=(cl_float) i;
-    intensity=0.0;
-    for (i=(ssize_t) MaxMap; i != 0; i--)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    i=FindStretchWhiteBin(image,histogram,white_point);
     white.z=(cl_float) i;
   }
   black.w=0.0;
@@ -1082,13 +1067,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   {
     i=FindStretchBlackBin(histogram,black_point);
     black.w=(cl_float) i;
-    intensity=0.0;
-    for (i=(ssize_t) MaxMap; i != 0; i--)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    i=FindStretchWhiteBin(image,histogram,white_point);
     white.w=(cl_float) i;
   }
 
