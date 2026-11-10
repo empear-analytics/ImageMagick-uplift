@@ -205,17 +205,13 @@ static MagickBooleanType checkPixelIntensity(const Image *image,
   const PixelIntensityMethod method)
 {
   /* EncodePixelGamma and DecodePixelGamma are not supported */
-  if (IsLumaIntensityMethod(method) != MagickFalse)
-    {
-      if (image->colorspace == RGBColorspace)
-        return(MagickFalse);
-    }
+  if ((IsLumaIntensityMethod(method) != MagickFalse) &&
+      (image->colorspace == RGBColorspace))
+    return(MagickFalse);
 
-  if (IsLuminanceIntensityMethod(method) != MagickFalse)
-    {
-      if (image->colorspace == sRGBColorspace)
-        return(MagickFalse);
-    }
+  if ((IsLuminanceIntensityMethod(method) != MagickFalse) &&
+      (image->colorspace == sRGBColorspace))
+    return(MagickFalse);
 
   return(MagickTrue);
 }
