@@ -6900,6 +6900,96 @@ static void MatchListBrowserReply(const ListBrowserReplyMatch *match,
       }
 }
 
+typedef struct _ListBrowserRedraw
+{
+  Display
+    *display;
+
+  XWindowInfo
+    *window_info;
+
+  const char
+    *const *list;
+
+  unsigned int
+    entries,
+    height,
+    visible_entries;
+
+  const XWidgetInfo
+    *list_info;
+
+  XWidgetInfo
+    north_info,
+    slider_info,
+    south_info;
+} ListBrowserRedraw;
+
+static void RedrawListBrowserList(const ListBrowserRedraw *redraw,
+  XWidgetInfo *selection_info,XWidgetInfo *expose_info)
+{
+  Display
+    *const display = redraw->display;
+
+  XWindowInfo
+    *const window_info = redraw->window_info;
+
+  const char
+    *const *const list = redraw->list;
+
+  const unsigned int
+    entries = redraw->entries,
+    height = redraw->height,
+    visible_entries = redraw->visible_entries;
+
+  const XWidgetInfo
+    *const list_info = redraw->list_info;
+
+  const XWidgetInfo
+    north_info = redraw->north_info,
+    slider_info = redraw->slider_info,
+    south_info = redraw->south_info;
+
+  int
+    i;
+
+  /*
+    Redraw scroll bar and file names.
+  */
+  (*selection_info).id=slider_info.id;
+  (*selection_info).y=(*list_info).y+(int) (height >> 3)+2;
+  for (i=0; i < (int) visible_entries; i++)
+  {
+    (*selection_info).raised=(slider_info.id+i) != (*list_info).id ?
+      MagickTrue : MagickFalse;
+    (*selection_info).text=(char *) NULL;
+    if ((slider_info.id+i) < (int) entries)
+      (*selection_info).text=(char *) list[slider_info.id+i];
+    XDrawWidgetText(display,window_info,&(*selection_info));
+    (*selection_info).y+=(int) (*selection_info).height;
+  }
+  /*
+    Update slider.
+  */
+  if (slider_info.y > (*expose_info).y)
+    {
+      (*expose_info).height=(unsigned int) (slider_info.y-(*expose_info).y);
+      (*expose_info).y=slider_info.y-(int) (*expose_info).height-(int)
+        slider_info.bevel_width-1;
+    }
+  else
+    {
+      (*expose_info).height=(unsigned int) ((*expose_info).y-slider_info.y);
+      (*expose_info).y=slider_info.y+(int) slider_info.height+(int)
+        slider_info.bevel_width+1;
+    }
+  XDrawTriangleNorth(display,window_info,&north_info);
+  XDrawMatte(display,window_info,&(*expose_info));
+  XDrawBeveledButton(display,window_info,&slider_info);
+  XDrawTriangleSouth(display,window_info,&south_info);
+  (*expose_info).y=slider_info.y;
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7183,41 +7273,20 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             slider_info.min_y+1)/(int) entries;
         if (slider_info.id != selection_info.id)
           {
-            /*
-              Redraw scroll bar and file names.
-            */
-            selection_info.id=slider_info.id;
-            selection_info.y=list_info.y+(int) (height >> 3)+2;
-            for (i=0; i < (int) visible_entries; i++)
-            {
-              selection_info.raised=(slider_info.id+i) != list_info.id ?
-                MagickTrue : MagickFalse;
-              selection_info.text=(char *) NULL;
-              if ((slider_info.id+i) < (int) entries)
-                selection_info.text=(char *) list[slider_info.id+i];
-              XDrawWidgetText(display,window_info,&selection_info);
-              selection_info.y+=(int) selection_info.height;
-            }
-            /*
-              Update slider.
-            */
-            if (slider_info.y > expose_info.y)
-              {
-                expose_info.height=(unsigned int) (slider_info.y-expose_info.y);
-                expose_info.y=slider_info.y-(int) expose_info.height-(int)
-                  slider_info.bevel_width-1;
-              }
-            else
-              {
-                expose_info.height=(unsigned int) (expose_info.y-slider_info.y);
-                expose_info.y=slider_info.y+(int) slider_info.height+(int)
-                  slider_info.bevel_width+1;
-              }
-            XDrawTriangleNorth(display,window_info,&north_info);
-            XDrawMatte(display,window_info,&expose_info);
-            XDrawBeveledButton(display,window_info,&slider_info);
-            XDrawTriangleSouth(display,window_info,&south_info);
-            expose_info.y=slider_info.y;
+            ListBrowserRedraw
+              redraw;
+
+            redraw.display=display;
+            redraw.window_info=window_info;
+            redraw.list=list;
+            redraw.entries=entries;
+            redraw.height=height;
+            redraw.visible_entries=visible_entries;
+            redraw.list_info=(&list_info);
+            redraw.north_info=north_info;
+            redraw.slider_info=slider_info;
+            redraw.south_info=south_info;
+            RedrawListBrowserList(&redraw,&selection_info,&expose_info);
           }
         state&=(unsigned int) (~RedrawListState);
       }
