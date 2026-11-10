@@ -3762,6 +3762,69 @@ static void ReleaseDialogCancel(const DialogRelease *release,
     }
 }
 
+typedef struct _DialogPress
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  XFontStruct
+    *font_info;
+} DialogPress;
+
+static void PressDialogReply(const DialogPress *press,char *primary_selection,
+  XWidgetInfo *reply_info)
+{
+  Display
+    *const display = press->display;
+
+  XWindows
+    *const windows = press->windows;
+
+  const XEvent
+    event = press->event;
+
+  XFontStruct
+    *const font_info = press->font_info;
+
+  int
+    i,
+    x;
+
+  static Time
+    click_time;
+
+  /*
+    Move text cursor to position of button press.
+  */
+  x=event.xbutton.x-(*reply_info).x-(int) (QuantumMargin >> 2);
+  for (i=1; i <= Extent((*reply_info).marker); i++)
+    if (XTextWidth(font_info,(*reply_info).marker,i) > x)
+      break;
+  (*reply_info).cursor=(*reply_info).marker+i-1;
+  if (event.xbutton.time > (click_time+(unsigned long) DoubleClick))
+    (*reply_info).highlight=MagickFalse;
+  else
+    {
+      /*
+        Become the XA_PRIMARY selection owner.
+      */
+      (void) CopyMagickString(primary_selection,(*reply_info).text,
+        MagickPathExtent);
+      (void) XSetSelectionOwner(display,XA_PRIMARY,windows->widget.id,
+        event.xbutton.time);
+      (*reply_info).highlight=XGetSelectionOwner(display,XA_PRIMARY) ==
+        windows->widget.id ? MagickTrue : MagickFalse;
+    }
+  XDrawMatteText(display,&windows->widget,reply_info);
+  click_time=event.xbutton.time;
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -3769,12 +3832,6 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
 
   char
     primary_selection[MagickPathExtent];
-
-  int
-    x;
-
-  int
-    i;
 
   static MagickBooleanType
     raised = MagickFalse;
@@ -3990,33 +4047,14 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
           break;
         if (event.xbutton.button != Button2)
           {
-            static Time
-              click_time;
+            DialogPress
+              press;
 
-            /*
-              Move text cursor to position of button press.
-            */
-            x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            for (i=1; i <= Extent(reply_info.marker); i++)
-              if (XTextWidth(font_info,reply_info.marker,i) > x)
-                break;
-            reply_info.cursor=reply_info.marker+i-1;
-            if (event.xbutton.time > (click_time+(unsigned long) DoubleClick))
-              reply_info.highlight=MagickFalse;
-            else
-              {
-                /*
-                  Become the XA_PRIMARY selection owner.
-                */
-                (void) CopyMagickString(primary_selection,reply_info.text,
-                  MagickPathExtent);
-                (void) XSetSelectionOwner(display,XA_PRIMARY,windows->widget.id,
-                  event.xbutton.time);
-                reply_info.highlight=XGetSelectionOwner(display,XA_PRIMARY) ==
-                  windows->widget.id ? MagickTrue : MagickFalse;
-              }
-            XDrawMatteText(display,&windows->widget,&reply_info);
-            click_time=event.xbutton.time;
+            press.display=display;
+            press.windows=windows;
+            press.event=event;
+            press.font_info=font_info;
+            PressDialogReply(&press,primary_selection,&reply_info);
             break;
           }
         /*
