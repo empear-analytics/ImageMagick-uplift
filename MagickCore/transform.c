@@ -2759,6 +2759,59 @@ static MagickBooleanType SyncTransverseRow(CacheView *transverse_view,
   return(status);
 }
 
+typedef struct _TransverseRow
+{
+  const Image
+    *image;
+
+  Image
+    *transverse_image;
+
+  CacheView
+    *image_view,
+    *transverse_view;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    y;
+} TransverseRow;
+
+static MagickBooleanType FetchTransverseRow(const TransverseRow *row,
+  const Quantum *magick_restrict *p,Quantum *magick_restrict *q,
+  MagickBooleanType *status)
+{
+  const Image
+    *const image = row->image;
+
+  Image
+    *const transverse_image = row->transverse_image;
+
+  CacheView
+    *const image_view = row->image_view,
+    *const transverse_view = row->transverse_view;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  const ssize_t
+    y = row->y;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*p)=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,
+    exception);
+  (*q)=QueueCacheViewAuthenticPixels(transverse_view,
+    (ssize_t) image->rows-y-1,0,1,transverse_image->rows,exception);
+  if (IsPixelRowMissing((*p),(*q)) != MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
 {
 #define TransverseImageTag  "Transverse/Image"
@@ -2808,16 +2861,12 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const TransverseRow
+      row = { image, transverse_image, image_view, transverse_view,
+        exception, y };
+
+    if (FetchTransverseRow(&row,&p,&q,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(transverse_view,(ssize_t) image->rows-y-1,
-      0,1,transverse_image->rows,exception);
-    if (IsPixelRowMissing(p,q) != MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
     TransversePixelRow(image,transverse_image,p,q);
     if (SyncTransverseRow(transverse_view,exception) == MagickFalse)
       status=MagickFalse;
