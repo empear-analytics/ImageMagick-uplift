@@ -5446,6 +5446,30 @@ MagickPrivate Cursor XMakeCursor(Display *display,Window window,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsImageBeyondDisplay(Display *display,
+  const XWindowInfo *window)
+{
+  return(((window->pixel_info->colors == 0) &&
+    (window->image->rows > (unsigned long) XDisplayHeight(display,window->screen)) &&
+    (window->image->columns > (unsigned long) XDisplayWidth(display,window->screen))) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsShapeWithinDisplay(Display *display,
+  const XWindowInfo *window,const unsigned int width,const unsigned int height)
+{
+  return(((window->image->alpha_trait != UndefinedPixelTrait) &&
+    ((int) width <= XDisplayWidth(display,window->screen)) &&
+    ((int) height <= XDisplayHeight(display,window->screen))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsLSBFirstXImage(const XImage *ximage)
+{
+  return(((ximage->byte_order == LSBFirst) || ((ximage->format == XYBitmap) &&
+    (ximage->bitmap_bit_order == LSBFirst))) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -5516,9 +5540,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
             Resize image.
           */
           resize_image=NewImageList();
-          if ((window->pixel_info->colors == 0) &&
-              (window->image->rows > (unsigned long) XDisplayHeight(display,window->screen)) &&
-              (window->image->columns > (unsigned long) XDisplayWidth(display,window->screen)))
+          if (IsImageBeyondDisplay(display,window) != MagickFalse)
               resize_image=ResizeImage(window->image,width,height,
                 image->filter,exception);
           else
@@ -5743,9 +5765,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   window->ximage=ximage;
   matte_image=(XImage *) NULL;
   if ((window->shape != MagickFalse) && (window->image != (Image *) NULL))
-    if ((window->image->alpha_trait != UndefinedPixelTrait) &&
-        ((int) width <= XDisplayWidth(display,window->screen)) &&
-        ((int) height <= XDisplayHeight(display,window->screen)))
+    if (IsShapeWithinDisplay(display,window,width,height) != MagickFalse)
       {
         /*
           Create matte image.
@@ -5800,8 +5820,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   */
   if (window->image != (Image *) NULL)
     {
-      if ((ximage->byte_order == LSBFirst) || ((ximage->format == XYBitmap) &&
-          (ximage->bitmap_bit_order == LSBFirst)))
+      if (IsLSBFirstXImage(ximage) != MagickFalse)
         XMakeImageLSBFirst(resource_info,window,window->image,ximage,
           matte_image,exception);
       else
