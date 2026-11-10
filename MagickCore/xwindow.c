@@ -206,6 +206,15 @@ typedef struct _MakeImageContext
   ExceptionInfo
     *exception;
 } MakeImageContext;
+
+typedef struct _WindowImageContext
+{
+  Display
+    *display;
+
+  ExceptionInfo
+    *exception;
+} WindowImageContext;
 
 /*
   Constant declarations.
@@ -4036,9 +4045,15 @@ static inline MagickBooleanType IsInsideWindowBounds(
     MagickFalse);
 }
 
-static Image *XGetWindowImage(Display *display,const Window window,
-  const unsigned int borders,const unsigned int level,ExceptionInfo *exception)
+static Image *XGetWindowImage(const WindowImageContext *window_context,
+  const Window window,const unsigned int borders,const unsigned int level)
 {
+  Display
+    *const display = window_context->display;
+
+  ExceptionInfo
+    *const exception = window_context->exception;
+
   typedef struct _ColormapInfo
   {
     Colormap
@@ -4194,9 +4209,12 @@ static Image *XGetWindowImage(Display *display,const Window window,
           }
       if ((status == True) && (number_children != 0))
         {
+          const WindowImageContext
+            child_context = { display, exception };
+
           for (i=0; i < (int) number_children; i++)
-            (void) XGetWindowImage(display,children[i],MagickFalse,level+1,
-              exception);
+            (void) XGetWindowImage(&child_context,children[i],MagickFalse,
+              level+1);
           (void) XFree((void *) children);
         }
     }
@@ -4948,6 +4966,9 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
   XTextProperty
     window_name;
 
+  WindowImageContext
+    window_context;
+
   /*
     Open X server connection.
   */
@@ -5105,8 +5126,10 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
     Get image by window id.
   */
   (void) XGrabServer(display);
-  image=XGetWindowImage(display,target,ximage_info->borders,
-    ximage_info->descend ? 1U : 0U,exception);
+  window_context.display=display;
+  window_context.exception=exception;
+  image=XGetWindowImage(&window_context,target,ximage_info->borders,
+    ximage_info->descend ? 1U : 0U);
   (void) XUngrabServer(display);
   if (image != (Image *) NULL)
     {
