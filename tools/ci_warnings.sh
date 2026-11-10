@@ -14,6 +14,8 @@
 # include paths and defines; checks only, writes no object file. Prints the
 # diagnostics and exits non-zero if any file has one. WIDE=1 uses the wide
 # build's (build.sh wide) instead, which compiles the X11 and OpenCL code.
+# On Linux it then runs tools/ci_linux_warnings.sh on the same files (the
+# Linux jobs' -Werror flags and MSVC's stand-ins); CI_LINUX=0 leaves that out.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -48,5 +50,10 @@ for f in "$@"; do
     failed=1
   fi
 done
+# On Linux, also the flags of main.yml's Linux jobs and the stand-ins for the
+# Windows jobs' MSVC errors (tools/ci_linux_warnings.sh); CI_LINUX=0 skips them.
+if [ "$(uname)" = Linux ] && [ "${CI_LINUX:-1}" != 0 ]; then
+  "$ROOT/tools/ci_linux_warnings.sh" "$@" || failed=1
+fi
 [ $failed = 0 ] && echo "ci_warnings: OK ($# file(s))"
 exit $failed

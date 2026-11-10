@@ -648,11 +648,11 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   for (y=0; y < (ssize_t) rows; y++)
   {
     const ComplexRowInputs
-      rows = { Ai_view, Ar_view, Bi_view, Br_view, Ci_view, Cr_view, Ai_image,
-        Ar_image, Bi_image, Br_image, Ci_image, Cr_image, columns,
+      inputs = { Ai_view, Ar_view, Bi_view, Br_view, Ci_view, Cr_view,
+        Ai_image, Ar_image, Bi_image, Br_image, Ci_image, Cr_image, columns,
         number_channels, op, snr, exception };
 
-    if (ComplexImageRow(&rows,y,&status) == MagickFalse)
+    if (ComplexImageRow(&inputs,y,&status) == MagickFalse)
       continue;
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
       {

@@ -662,7 +662,7 @@ typedef struct _QuantizeRowInfo
 } QuantizeRowInfo;
 
 static MagickBooleanType FetchQuantizeRow(const QuantizeRowInfo *row,
-  const ssize_t y,Quantum **q,MagickBooleanType *status)
+  const ssize_t y,Quantum *magick_restrict *q,MagickBooleanType *status)
 {
   if ((*status) == MagickFalse)
     return(MagickFalse);
