@@ -784,6 +784,68 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _YShearColumn
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  double
+    degrees;
+
+  size_t
+    width;
+
+  ssize_t
+    x_offset,
+    y_offset,
+    x;
+
+  ExceptionInfo
+    *exception;
+} YShearColumn;
+
+static MagickBooleanType YShearColumnHead(const YShearColumn *column,
+  Quantum *magick_restrict *p,double *displacement,MagickBooleanType *status)
+{
+  Image
+    *image = column->image;
+
+  CacheView
+    *image_view = column->image_view;
+
+  const double
+    degrees = column->degrees;
+
+  const size_t
+    width = column->width;
+
+  const ssize_t
+    x_offset = column->x_offset,
+    y_offset = column->y_offset,
+    x = column->x;
+
+  ExceptionInfo
+    *exception = column->exception;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*p)=GetCacheViewAuthenticPixels(image_view,x_offset+x,0,1,image->rows,
+    exception);
+  if ((*p) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  (*p)+=(ptrdiff_t) y_offset*(ssize_t) GetPixelChannels(image);
+  (*displacement)=degrees*(double) (x-width/2.0);
+  if ((*displacement) == 0.0)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType YShearImage(Image *image,const double degrees,
   const ShearRegion *region,ExceptionInfo *exception)
 {
@@ -841,18 +903,10 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
     ShearTransfer
       transfer;
 
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewAuthenticPixels(image_view,x_offset+x,0,1,image->rows,
-      exception);
-    if (p == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    p+=(ptrdiff_t) y_offset*(ssize_t) GetPixelChannels(image);
-    displacement=degrees*(double) (x-width/2.0);
-    if (displacement == 0.0)
+    const YShearColumn column = { image, image_view, degrees, width, x_offset,
+      y_offset, x, exception };
+
+    if (YShearColumnHead(&column,&p,&displacement,&status) == MagickFalse)
       continue;
     SelectShearDirection(&displacement,&direction);
     transfer.image=image;
