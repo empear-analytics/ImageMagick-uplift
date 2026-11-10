@@ -7200,6 +7200,31 @@ static void ReleaseListBrowserAction(const ListBrowserRelease *release,
     }
 }
 
+static void ReleaseListBrowserCancel(const ListBrowserRelease *release,
+  const XWidgetInfo reply_info,XWidgetInfo *cancel_info,size_t *state)
+{
+  Display
+    *const display = release->display;
+
+  XWindowInfo
+    *const window_info = release->window_info;
+
+  const XEvent
+    event = release->event;
+
+  if ((*cancel_info).raised == MagickFalse)
+    {
+      if ((event.xbutton.window == window_info->id) &&
+          (MatteIsActive((*cancel_info),event.xbutton)))
+        {
+          *reply_info.text='\0';
+          (*state)|=ExitState;
+        }
+      (*cancel_info).raised=MagickTrue;
+      XDrawBeveledButton(display,window_info,&(*cancel_info));
+    }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7684,17 +7709,10 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
         release.window_info=window_info;
         release.event=event;
         ReleaseListBrowserAction(&release,reply_info,&action_info,&state);
-        if (cancel_info.raised == MagickFalse)
-          {
-            if ((event.xbutton.window == window_info->id) &&
-                (MatteIsActive(cancel_info,event.xbutton)))
-              {
-                *reply_info.text='\0';
-                state|=ExitState;
-              }
-            cancel_info.raised=MagickTrue;
-            XDrawBeveledButton(display,window_info,&cancel_info);
-          }
+        release.display=display;
+        release.window_info=window_info;
+        release.event=event;
+        ReleaseListBrowserCancel(&release,reply_info,&cancel_info,&state);
         if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
           break;
         break;
