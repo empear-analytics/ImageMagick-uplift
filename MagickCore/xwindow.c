@@ -6081,6 +6081,23 @@ static unsigned char *XPackGammaRGBARowLSB(const Image *canvas,const Quantum *p,
   return(q);
 }
 
+static unsigned char *XPackRGBARowLSB(const Image *canvas,const Quantum *p,
+  unsigned char *q)
+{
+  int
+    x;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
+    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
+    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
+    *q++=0;
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -6547,14 +6564,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
                       q=XPackGammaRGBARowLSB(canvas,p,q);
                       continue;
                     }
-                  for (x=(int) canvas->columns-1; x >= 0; x--)
-                  {
-                    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
-                    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
-                    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
-                    *q++=0;
-                    p+=(ptrdiff_t) GetPixelChannels(canvas);
-                  }
+                  q=XPackRGBARowLSB(canvas,p,q);
                 }
               }
             else
