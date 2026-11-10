@@ -7730,6 +7730,147 @@ on a new function. Added by Claude Code (Claude Opus 5.5) under the mandate of
 
 ---
 
+## Recipe LE - Replace a Local Enum with a File-Scope Enum
+
+**Use when:** a function declares its own `typedef enum` whose constants mirror, one to one,
+those of an enumeration the file already declares at file scope, and the local type is
+what keeps a step from the function: a block that would reuse a file helper taking the
+file-scope type (Recipe D), or a block whose twin elsewhere in the file differs from it only
+in those constants, which no renaming of variables equates (Recipes TW and D compare
+token for token and do not rename constants). `shear.c`'s `YShearImage` declares
+`typedef enum { UP, DOWN } ShearDirection;`, shadowing the file's `typedef enum { LEFT,
+RIGHT } ShearDirection;`; its direction choice is `SelectShearDirection`'s body, and its
+pixel-transfer `switch` is `TransferXShearSpan`'s, both but for `UP`/`DOWN` against
+`LEFT`/`RIGHT`. CodeScene reports nothing on the type itself; the step it opens is what
+reduces a finding (*Bumpy Road Ahead*, *Complex Method*, *Large Method*, *Code
+Duplication*).
+
+**Not covered by:** Recipe L, which hoists a local type to file scope under a new name when
+the name is taken: the function would keep its own constants, so the helper and the twin
+stay out of reach. Recipe D, which merges statements, not types. Recipe NS, which names a
+selection between constants and leaves the constants as they are. No recipe deletes a
+declaration that the code still needs; this one deletes none: every use is re-pointed to an
+existing declaration of the same values.
+
+**How:**
+
+1. The function's body declares `typedef enum { A1, ..., An } T;` and the file declares,
+   at file scope above the function, `typedef enum { B1, ..., Bn } U;` with the same
+   number of constants. Neither list gives any constant an explicit value, so `Ai` and
+   `Bi` both have the value `i-1`.
+2. Inside the function every use of a constant `Ai` is an operand of `==` or `!=`, a
+   `case` label, or the right side of an assignment to a variable of type `T`; every
+   variable of type `T` is a local of the function, used only in those ways (assigned,
+   compared, switched on): never passed to a function, returned, stored through a
+   pointer, cast, used in arithmetic or as an index, or printed. Check by `grep` that the
+   constants and the variables appear nowhere else.
+3. Map `Ai` to `Bi` and check by reading that each pair plays the same role: where the
+   function assigns or tests `Ai`, the file assigns or tests `Bi` for the same purpose
+   (`UP`, top-to-bottom, selects `TransferPixelsForward` as `LEFT`, left-to-right, does;
+   `DOWN` and `RIGHT` select `TransferPixelsBackward`; `DOWN` is chosen for a positive
+   displacement as `SelectShearDirection` chooses `RIGHT`). Name each pair in the commit
+   message.
+4. Delete the local `typedef`, write `U` for `T` in each declaration of a local of type
+   `T` (nothing to write when `T` is `U`, whose local declaration only shadowed the file's),
+   and replace each `Ai` by `Bi`. Nothing else in the text changes: no statement, no
+   `switch` arm and no comment.
+5. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert. The
+   step that uses the opened shape (D, TW) is a commit of its own, after this one.
+
+**Before:**
+
+```c
+static MagickBooleanType YShearImage(Image *image,const double degrees,
+  const ShearRegion *region,ExceptionInfo *exception)
+{
+  ...
+  typedef enum
+  {
+    UP,
+    DOWN
+  } ShearDirection;
+  ...
+    if (displacement > 0.0)
+      direction=DOWN;
+    else
+      {
+        displacement*=(-1.0);
+        direction=UP;
+      }
+    ...
+    switch (direction)
+    {
+      case UP:
+      {
+        ...
+      }
+      case DOWN:
+```
+
+**After:**
+
+```c
+static MagickBooleanType YShearImage(Image *image,const double degrees,
+  const ShearRegion *region,ExceptionInfo *exception)
+{
+  ...
+    if (displacement > 0.0)
+      direction=RIGHT;
+    else
+      {
+        displacement*=(-1.0);
+        direction=LEFT;
+      }
+    ...
+    switch (direction)
+    {
+      case LEFT:
+      {
+        ...
+      }
+      case RIGHT:
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Step 1 gives `Ai` and `Bi` the same value, so every
+  assignment stores the value it stored and every comparison and `case` compares the
+  values it compared. Step 2 keeps the values inside the function and inside these
+  operations, so no other code, output or file sees the type or its constants; the
+  type's width cannot change anything a store or a comparison of these values does.
+  `obj_identical.sh` printing `IDENTICAL` (step 5) proves it for this build, and it
+  also catches a mapping that step 3 got wrong in value: `UP` written as `RIGHT` changes
+  the compiled comparison.
+- Step 3 is about meaning, not behaviour. A role mapping that disagrees with the values
+  (the file's first constant meaning the function's second) is not this recipe: swapping
+  constants to keep the names apt changes values, and the comparison proves nothing then.
+  The file-scope names may read oddly in the new place (`LEFT` for a top-to-bottom
+  transfer); the commit says which role each constant plays, and renaming constants is not
+  part of the step.
+- When `T` and `U` share a name, the local declaration shadowed the file's; after the step
+  the same name in the function means the file's type, as it does everywhere else in the
+  file. Code below the deleted `typedef` that named `T` now names `U` (step 4), which
+  must already be declared above the function (step 1).
+- The function now depends on the file-scope enumeration: reordering that list later
+  changes it too. Within this campaign enum values never change (*Absolutely forbidden*).
+- A local enumeration with explicit values, or one whose values escape the function (a
+  member of a struct, a return value, an argument), is not this recipe: values that a
+  caller, a file or a message can see are behaviour, and step 2 cannot check them.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD` (step 5), and steps 2 and 3 checked by reading; it applies at either level.
+
+**Provenance:** 2026-11-10, from `shear.c`'s `YShearImage` (campaign A, W16 lane d): the
+parked local branch `w16-shear-enum` (c74c70fd5, 1ae3779b3) took `shear.c` 9.17 to 10.0 in
+two commits that folded this replacement, a `switch` rewritten as an `if`, and Recipes PC,
+N, D and PS into each other; the owner asked for the replacement as a recipe and the rest
+one recipe per commit. A probe: the replacement alone is `IDENTICAL` (26,840 bytes of
+object code) and moves `shear.c` 9.17 to 9.19; it opens D on `SelectShearDirection` and
+TW on the transfer twins. Added by Claude Code (Claude Opus 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -8034,3 +8175,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | LP | Name a Label Set as a Predicate: a `switch (e)` whose only groups are one run of labels with a body that returns on every path and `default: break;` becomes `if (<Pred>(e) != MagickFalse)` and the body; the new `static MagickBooleanType` function holds the labels (`return(MagickTrue)`, `default: break;`, `return(MagickFalse)`) and may replace further sites with the same label set | `colorspace.c`'s `sRGBTransformImage` and `GenericOrLogTosRGB` (campaign A, W16 lane c): the same 28-label generic group, cc 31 and 30; a probe of both sites 7.44 to 8.10 (the first alone 7.46), the predicate a label-run *Complex Method* (cc 30) under the ruling of 2026-11-07 | mandate (2026-10-24) |
 | 2026-11-10 | NEW | SC | Extract Sibling Blocks Differing in Several Constants: copies of one block in one function that differ in two or more literal or enumeration constants move into one function taking a `const` struct of the constants (one member per role, typed as Recipe SV step 3 types the value); each copy becomes the struct's initialiser and the call; a forward declaration of the caller when the copies recurse into it | `quantize.c`'s `Riemersma` (campaign A, W16 lane c): cc 38, 109 lines, its four `level > 1` cases seven calls on four gravity constants each, its two `level == 1` cases three calls on three; as case helpers they clone (6.25, W14 lane b). A probe of the chain (this recipe twice, then Recipe O on the `level == 1` switch): 7.80 to 8.34, 8.41 and 8.74, no finding on a new function | mandate (2026-10-24) |
 | 2026-11-10 | AMEND | B, N | *Two levels of evidence*, *Unreached functions: B and N*: B and N may be applied to a function no case reaches, `Verified: guard`, when the step meets its recipe (checked by reading; no block that throws through `GetMagickModule()`), the guard prints `OK` with `--calls` moving only `+2` for an N helper (nothing for B), `tools/struct_fill_check.py` prints `OK` for N (members filled and bound by their own names, every removed line moved unchanged; B's fill checked by reading against the old call), and `tools/obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL` (every other function's instructions unchanged, no new function but the helper, only the helper's callees un-inlined). Both tools are new. Evidence lines of B and N say so | `paint.c`'s `TransparentPaintImageChroma` and `segment.c`'s `GetImageDynamicThreshold` (campaign A, W16 lane d), reached by no case: an E helper of Chroma's pixel loop takes six arguments (9.68, but a new *Excess Arguments*); the N form of it compiles byte-identical; the N form of `GetImageDynamicThreshold`'s removal tail compiles to the same instructions in every other function, the helper's two callees inlined into it. Planted errors (a member bound from another member, a fill from another variable, a flipped comparison in the moved block, a literal changed in another function) are each caught by one of the checks; forced-inline comparisons refused the correct step (scheduling) | owner |
+| 2026-11-10 | NEW | LE | Replace a Local Enum with a File-Scope Enum: a function-local `typedef enum` whose constants map one to one, by position and with default values, onto an enumeration the file already declares is deleted; its constants become the file-scope ones and its locals take the file-scope type. The values are only assigned to the function's locals, compared and switched on, never stored elsewhere, passed, returned or printed; each pair plays the same role (checked by reading); proven by `tools/obj_identical.sh` printing `IDENTICAL` | `shear.c`'s `YShearImage` (campaign A, W16 lane d): its `UP`/`DOWN` enum shadows the file's `LEFT`/`RIGHT` `ShearDirection` and is all that keeps its direction choice from `SelectShearDirection` (D) and its transfer `switch` from `TransferXShearSpan` (TW); the parked branch `w16-shear-enum` folded the replacement into a PC commit. A probe: `IDENTICAL`, 9.17 to 9.19; the chain it opens (D, TW, PS, PC, PS) reaches 10.0 | owner |
