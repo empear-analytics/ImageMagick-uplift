@@ -2315,6 +2315,19 @@ static void HaldClutRow(MagickBooleanType *status,
   }
 }
 
+static size_t GetHaldLevel(const Image *hald_image)
+{
+  size_t
+    length,
+    level;
+
+  length=(size_t) MagickMin((MagickRealType) hald_image->columns,
+    (MagickRealType) hald_image->rows);
+  for (level=2; (level*level*level) < length; level++) ;
+  level*=level;
+  return(level);
+}
+
 MagickExport MagickBooleanType HaldClutImage(Image *image,
   const Image *hald_image,ExceptionInfo *exception)
 {
@@ -2338,7 +2351,6 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
 
   size_t
     cube_size,
-    length,
     level;
 
   ssize_t
@@ -2357,10 +2369,7 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
   */
   status=MagickTrue;
   progress=0;
-  length=(size_t) MagickMin((MagickRealType) hald_image->columns,
-    (MagickRealType) hald_image->rows);
-  for (level=2; (level*level*level) < length; level++) ;
-  level*=level;
+  level=GetHaldLevel(hald_image);
   cube_size=level*level;
   width=(double) hald_image->columns;
   GetPixelInfo(hald_image,&zero);
