@@ -1379,6 +1379,18 @@ static void CountFeatureCooccurrence(const FeatureCooccurrence *scan,
   }
 }
 
+static void NormalizeFeatureStatistics(const Image *image,
+  PixelInfo *statistics,const double normalize)
+{
+  statistics->red*=normalize;
+  statistics->green*=normalize;
+  statistics->blue*=normalize;
+  if (image->colorspace == CMYKColorspace)
+    statistics->black*=normalize;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    statistics->alpha*=normalize;
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1655,15 +1667,8 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         x;
 
       for (x=0; x < (ssize_t) number_grays; x++)
-      {
-        cooccurrence[x][y].direction[i].red*=normalize;
-        cooccurrence[x][y].direction[i].green*=normalize;
-        cooccurrence[x][y].direction[i].blue*=normalize;
-        if (image->colorspace == CMYKColorspace)
-          cooccurrence[x][y].direction[i].black*=normalize;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          cooccurrence[x][y].direction[i].alpha*=normalize;
-      }
+        NormalizeFeatureStatistics(image,&cooccurrence[x][y].direction[i],
+          normalize);
     }
   }
   /*
