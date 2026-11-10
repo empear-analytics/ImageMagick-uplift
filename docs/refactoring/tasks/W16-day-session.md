@@ -48,3 +48,23 @@ Several Constants: SV generalised to two or more constants, carried in a const s
 once the constants are named by role). **Note:** `Riemersma`'s recursion now passes through one extra function per
 level. Upstream, not changed: `TransformsRGBByTables` takes `status` from `TransformsRGBPixels` and returns
 `MagickTrue` anyway.
+
+## Lanes with Recipes SC and LP (Opus and Sonnet)
+
+- **Lane b:** `transform.c` 7.85 -> 8.95 (6 commits); `effect-blur.c` unchanged. Upstream, not changed: `MotionBlurImage`
+  releases `kernel` and `offset` before destroying `blur_image`, the reverse of `CloneDirectImage`'s order.
+- **Lane a:** `morphology.c` unchanged; a script check shows every mirrored twin differs in operators, expressions or
+  called function, so SC does not apply.
+- **Lane c:** `visual-effects.c`, `vision.c`, `enhance-tone.c`, `visual-effects-plasma.c` unchanged; the twins span two
+  functions and differ in non-constants. Upstream, not changed: `GetGammaLumaIntensity`'s Rec709 case repeats
+  `EncodeGrayscaleGamma`'s body inline where the Rec601 case calls it.
+- **Lane d:** no further LP site in the campaign A files (every candidate switch ends its groups in `break` or has a
+  `default:` that does work).
+
+## Where W16 leaves campaign A
+
+The remaining low files are held by things only an owner ruling can open: twins that differ in operators or called
+functions (morphology, threshold, resize-image pixel functions, enhance-tone, effect-blur), `#if defined`/`#else` code
+(fourier, resample, attribute-depth), per-iteration array slots (feature-texture), OpenMP reduction variables written
+by a helper (composite), unreached functions needing B (paint, segment), and the parked chains (`w16-shear-enum`,
+`w14-fourier-ifdef`, `w14-fx-annealed`, `w14-tone-splits`).
