@@ -117,6 +117,38 @@ issues) went unnoticed for a day. A case that times out on the
 baseline is reported by `run` as a catalogue bug: it compares nothing and costs
 30 seconds on every run.
 
+### The wide build (`WIDE=1`): base against candidate (2026-11-10)
+
+`selfcheck` passing is not enough: it runs one binary, without the baseline cache. Until
+2026-11-10 two wide builds of the same commit (`WIDE=1 oracle.py run --base HEAD` on an
+unchanged tree) diverged on 153 of 14,145 cases, so the wide oracle could not vouch for a
+change. None of them was ImageMagick's behaviour:
+
+| Cause | Cases | Fix |
+| --- | ---: | --- |
+| The baseline cache was keyed on a case's steps and files only. A plain case and its OpenCL twin (`MAGICK_OCL_DEVICE=CPU`, same command), and one X11 case on eight screens, shared one entry, which held whichever ran last | 129 (99 `x11`, 13 `unary`, 8 `opencl`, 4 `convert`, 3 `intensity`, 2 `xevents`) | `case_key` includes `env`, `x11` and `stdin` (they were already part of the id) |
+| `-list configure`, `policy`, `font`, `delegate` print configuration paths; `BUILD_TREE_RE` knew neither `base-wide/<sha>` nor `cand-wide` | 24 | the wide build trees are normalised like the others |
+
+Nothing was due to timestamps, pocl's kernel cache, device selection, X server state or
+threading: run alone, every one of the 153 agreed between the builds. `HARNESS_VERSION` is
+15 for these. Proof, on `6b549f087` against a candidate built from the same tree: the whole
+wide catalogue, 0 diverged, three times (one without the cache); a planted sign flip in
+`accelerate.c` `ComputeContrastImage` diverged on all 21 cases that reach it and nothing
+else, and a planted one-pixel shift in `display.c` `XCropImage` on 11 of its 13.
+
+**Load-sensitive cases.** Twelve interactive `display` cases (`xevents`: crop, cut, copy and
+paste, chop) press inside the top left 70x26 of the image window, where those modes map
+display's Info window and withdraw it as the pointer moves. Whether a press reaches the image
+or Info depends on when display handles its own `MapNotify`, so on scheduling: under load a
+crop's grab shows Info still up over the uncropped image, and display never quits (exit 124).
+One at a time they agree every time; with 24 busy loops beside 16 jobs, 10 or 11 differed in
+4 `selfcheck` runs, and 2 did in one ordinary wide run. They are listed, with the reason, in
+`cases.LOAD_SENSITIVE`. `run` reruns a listed case alone, baseline and candidate, up to three
+times when it diverges, and reports it as `SETTLED` when a pair agrees (`last-report.json`,
+`"settled"`); one that never agrees stays a divergence. `selfcheck` lists them apart. Moving
+the presses below y=30, as the draw-mode cases already do, would remove the cause but make
+new cases (new ids, a new `casemap-wide.json`); that is left to the owner.
+
 ## What it reaches
 
 Line coverage, measured with a coverage build (`tools/oracle/build.sh cov`,
