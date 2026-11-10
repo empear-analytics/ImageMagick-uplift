@@ -826,6 +826,15 @@ static const char *SkipOpenCLBenchmarkComment(const char *q,
   return(q);
 }
 
+static MagickCLDeviceBenchmark *EndOpenCLDeviceBenchmark(MagickCLEnv clEnv,
+  MagickCLDeviceBenchmark *device_benchmark)
+{
+  if (device_benchmark->score != MAGICKCORE_OPENCL_UNDEFINED_SCORE)
+    SetOpenCLBenchmarkScore(clEnv,device_benchmark);
+  device_benchmark=RelinquishDeviceBenchmark(device_benchmark);
+  return(device_benchmark);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -916,9 +925,7 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
       continue;
     if (LocaleCompare(keyword,"/>") == 0)
       {
-        if (device_benchmark->score != MAGICKCORE_OPENCL_UNDEFINED_SCORE)
-          SetOpenCLBenchmarkScore(clEnv,device_benchmark);
-        device_benchmark=RelinquishDeviceBenchmark(device_benchmark);
+        device_benchmark=EndOpenCLDeviceBenchmark(clEnv,device_benchmark);
         continue;
       }
     (void) GetNextToken(q,(const char **) NULL,extent,token);
