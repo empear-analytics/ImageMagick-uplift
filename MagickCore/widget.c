@@ -8967,6 +8967,34 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
 %    o description: Specifies any description to the message.
 %
 */
+typedef struct _NoticeTargets
+{
+  XWidgetInfo
+    *dismiss_info;
+
+  size_t
+    *state;
+} NoticeTargets;
+
+static void ReleaseNoticeDismiss(Display *display,XWindows *windows,
+  const XEvent event,const NoticeTargets *targets)
+{
+  XWidgetInfo
+    *const dismiss_info = targets->dismiss_info;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*dismiss_info).raised == MagickFalse)
+    {
+      if ((event.xbutton.window == windows->widget.id) &&
+          (MatteIsActive((*dismiss_info),event.xbutton)))
+        (*state)|=ExitState;
+      (*dismiss_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+    }
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -9007,6 +9035,9 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
 
   XWindowChanges
     window_changes;
+
+  const NoticeTargets
+    targets = { &dismiss_info, &state };
 
   /*
     Determine Notice widget attributes.
@@ -9142,14 +9173,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
       {
         if (windows->widget.mapped == MagickFalse)
           break;
-        if (dismiss_info.raised == MagickFalse)
-          {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(dismiss_info,event.xbutton)))
-              state|=ExitState;
-            dismiss_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-          }
+        ReleaseNoticeDismiss(display,windows,event,&targets);
         break;
       }
       case ClientMessage:
