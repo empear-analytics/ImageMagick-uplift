@@ -2335,6 +2335,33 @@ static void RiemersmaVerticalUnitCurve(const RiemersmaCurve *curve,
   }
 }
 
+typedef struct _RiemersmaMoves
+{
+  unsigned int
+    first,
+    second,
+    third;
+} RiemersmaMoves;
+
+static MagickBooleanType RiemersmaUnitCurve(const RiemersmaCurve *curve,
+  const RiemersmaMoves *moves,ExceptionInfo *exception)
+{
+  const unsigned int
+    first = moves->first,
+    second = moves->second,
+    third = moves->third;
+
+  MagickBooleanType
+    status;
+
+  status=RiemersmaDither(curve,first,exception);
+  if (status != MagickFalse)
+    status=RiemersmaDither(curve,second,exception);
+  if (status != MagickFalse)
+    status=RiemersmaDither(curve,third,exception);
+  return(status);
+}
+
 typedef struct _RiemersmaTurns
 {
   unsigned int
@@ -2388,20 +2415,18 @@ static MagickBooleanType Riemersma(const RiemersmaCurve *curve,
     {
       case WestGravity:
       {
-        status=RiemersmaDither(curve,EastGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,WestGravity,exception);
+        const RiemersmaMoves
+          moves = { EastGravity,SouthGravity,WestGravity };
+
+        status=RiemersmaUnitCurve(curve,&moves,exception);
         break;
       }
       case EastGravity:
       {
-        status=RiemersmaDither(curve,WestGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,EastGravity,exception);
+        const RiemersmaMoves
+          moves = { WestGravity,NorthGravity,EastGravity };
+
+        status=RiemersmaUnitCurve(curve,&moves,exception);
         break;
       }
       default:
