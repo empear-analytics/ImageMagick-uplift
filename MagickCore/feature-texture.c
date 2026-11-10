@@ -1503,6 +1503,125 @@ static void RelinquishFeatureMatrix(FeatureStatistics **matrix,
     matrix[i]=(FeatureStatistics *) RelinquishMagickMemory(matrix[i]);
 }
 
+typedef struct _FeatureMatrixInputs
+{
+  const Image
+    *image;
+
+  size_t
+    distance;
+
+  PixelPacket
+    *grays;
+
+  FeatureStatistics
+    **cooccurrence;
+
+  ExceptionInfo
+    *exception;
+} FeatureMatrixInputs;
+
+static MagickBooleanType FillFeatureCooccurrence(
+  const FeatureMatrixInputs *matrix)
+{
+  const Image
+    *const image = matrix->image;
+
+  const size_t
+    distance = matrix->distance;
+
+  PixelPacket
+    *grays = matrix->grays;
+
+  FeatureStatistics
+    **const cooccurrence = matrix->cooccurrence;
+
+  ExceptionInfo
+    *const exception = matrix->exception;
+
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    r;
+
+  status=MagickTrue;
+  image_view=AcquireVirtualCacheView(image,exception);
+  for (r=0; r < (ssize_t) image->rows; r++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    FeatureCooccurrence
+      scan;
+
+    if (status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(image_view,-(ssize_t) distance,r,image->columns+
+      2*distance,distance+2,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    p+=(ptrdiff_t) distance*GetPixelChannels(image);;
+    scan.image=image;
+    scan.distance=distance;
+    scan.grays=grays;
+    scan.cooccurrence=cooccurrence;
+    CountFeatureCooccurrence(&scan,p);
+  }
+  grays=(PixelPacket *) RelinquishMagickMemory(grays);
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+static void RelinquishFeatureBuffers(const FeatureBuffers *buffers)
+{
+  FeatureStatistics
+    **cooccurrence = buffers->cooccurrence,
+    *density_x = buffers->density_x,
+    *density_xy = buffers->density_xy,
+    *density_y = buffers->density_y,
+    **Q = buffers->Q,
+    *sum = buffers->sum;
+
+  if (Q != (FeatureStatistics **) NULL)
+    Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
+  if (sum != (FeatureStatistics *) NULL)
+    sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
+  if (density_y != (FeatureStatistics *) NULL)
+    density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
+  if (density_xy != (FeatureStatistics *) NULL)
+    density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
+  if (density_x != (FeatureStatistics *) NULL)
+    density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
+  if (cooccurrence != (FeatureStatistics **) NULL)
+    cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(
+      cooccurrence);
+}
+
+static void RelinquishAcquiredFeatureBuffers(const FeatureBuffers *buffers)
+{
+  FeatureStatistics
+    **cooccurrence = buffers->cooccurrence,
+    *density_x = buffers->density_x,
+    *density_xy = buffers->density_xy,
+    *density_y = buffers->density_y,
+    **Q = buffers->Q,
+    *sum = buffers->sum;
+
+  Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
+  cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
+  sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
+  density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
+  density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
+  density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1514,6 +1633,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 
   FeatureBuffers
     buffers;
+
+  FeatureMatrixInputs
+    matrix;
 
   FeatureStatistics
     **cooccurrence,
@@ -1649,19 +1771,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   buffers.sum=sum;
   if (IsFeatureMemoryMissing(&buffers) != MagickFalse)
     {
-      if (Q != (FeatureStatistics **) NULL)
-        Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
-      if (sum != (FeatureStatistics *) NULL)
-        sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
-      if (density_y != (FeatureStatistics *) NULL)
-        density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
-      if (density_xy != (FeatureStatistics *) NULL)
-        density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
-      if (density_x != (FeatureStatistics *) NULL)
-        density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
-      if (cooccurrence != (FeatureStatistics **) NULL)
-        cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(
-          cooccurrence);
+      RelinquishFeatureBuffers(&buffers);
       grays=(PixelPacket *) RelinquishMagickMemory(grays);
       channel_features=(ChannelFeatures *) RelinquishMagickMemory(
         channel_features);
@@ -1687,12 +1797,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   if (i < (ssize_t) number_grays)
     {
       RelinquishFeatureRows(cooccurrence,Q,i);
-      Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
-      cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
-      sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
-      density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
-      density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
-      density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
+      RelinquishAcquiredFeatureBuffers(&buffers);
       grays=(PixelPacket *) RelinquishMagickMemory(grays);
       channel_features=(ChannelFeatures *) RelinquishMagickMemory(
         channel_features);
@@ -1703,34 +1808,12 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Initialize spatial dependence matrix.
   */
-  status=MagickTrue;
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (r=0; r < (ssize_t) image->rows; r++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    FeatureCooccurrence
-      scan;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,-(ssize_t) distance,r,image->columns+
-      2*distance,distance+2,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    p+=(ptrdiff_t) distance*GetPixelChannels(image);;
-    scan.image=image;
-    scan.distance=distance;
-    scan.grays=grays;
-    scan.cooccurrence=cooccurrence;
-    CountFeatureCooccurrence(&scan,p);
-  }
-  grays=(PixelPacket *) RelinquishMagickMemory(grays);
-  image_view=DestroyCacheView(image_view);
+  matrix.image=image;
+  matrix.distance=distance;
+  matrix.grays=grays;
+  matrix.cooccurrence=cooccurrence;
+  matrix.exception=exception;
+  status=FillFeatureCooccurrence(&matrix);
   if (status == MagickFalse)
     {
       RelinquishFeatureMatrix(cooccurrence,number_grays);
