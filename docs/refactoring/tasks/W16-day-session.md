@@ -148,3 +148,17 @@ and RA, and the unreached-function levels for Recipes B, N, I and D (with `tools
 `tools/struct_fill_check.py`, `tools/targets_fill_check.py` and `tools/reuse_check.py`). Their Catalogue changes rows
 already read Decided by `owner`. Still open: the AGENTS.md edit and tools bundled into the B/N amendment commit,
 the *Overall Code Complexity* step in feature-texture.c, the xevents drag cases, and the older questions above.
+
+## Lane c, second round: Recipes TI and MA, MT amended
+
+**Recipe TI** (7f3eb3ee4): two static twin functions with one caller each merge into one `static inline` function
+taking an enum side and a `const` struct of their read-only inputs; `nm` must show it inlined, otherwise it is declared
+`static magick_attribute((__always_inline__)) inline`. **Recipe MA** (141a93848): sibling blocks that differ in
+constants, a leading test operand and the member of one lvalue they update become calls passing `&e.m`. **MT step 4**
+(8714830f8) may take a `const` struct pointer of the copy's inputs. resize-image.c 8.78 to 9.38, effect-blur.c 8.68
+to 9.09, enhance-tone.c 8.47 to 9.09, layer.c 7.55 to 7.84. **For review:** TI on the resize pixel path depends on the
+inlining: without it GCC kept the function out of line, 21-26% slower, and 12 cases diverged in NaN payloads only. A
+compiler that ignores `magick_attribute` (it is empty outside GCC-compatible compilers) is not measured. These recipes
+came after the owner's approval of the W16 text and are not yet confirmed.
+Upstream: `mogrify -define quantum:format=floating-point -depth 32` on an 8-bit MIFF writes garbage pixels (NaN,
+13119%), deterministic and in the baseline too.
