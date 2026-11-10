@@ -2227,6 +2227,27 @@ MagickExport const KernelProfileRecord *GetOpenCLKernelProfileRecords(
 %
 */
 
+static MagickBooleanType HasOpenCLKernelPrograms(MagickCLEnv clEnv)
+{
+  MagickBooleanType
+    status;
+
+  size_t
+    i;
+
+  status=MagickTrue;
+  for (i = 0; i < clEnv->number_devices; i++)
+  {
+    if ((clEnv->devices[i]->enabled != MagickFalse) &&
+        (clEnv->devices[i]->program == (cl_program) NULL))
+    {
+      status=MagickFalse;
+      break;
+    }
+  }
+  return(status);
+}
+
 static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2253,16 +2274,7 @@ static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
     return(MagickFalse);
 
   /* Check if we need to compile a kernel for one of the devices */
-  status=MagickTrue;
-  for (i = 0; i < clEnv->number_devices; i++)
-  {
-    if ((clEnv->devices[i]->enabled != MagickFalse) &&
-        (clEnv->devices[i]->program == (cl_program) NULL))
-    {
-      status=MagickFalse;
-      break;
-    }
-  }
+  status=HasOpenCLKernelPrograms(clEnv);
   if (status != MagickFalse)
     return(MagickTrue);
 
