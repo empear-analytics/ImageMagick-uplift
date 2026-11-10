@@ -1563,14 +1563,23 @@ static MagickBooleanType SetGrayImageType(Image *image,const ImageType type,
   return(MagickTrue);
 }
 
+static MagickBooleanType SetIdentifiedGrayType(Image *image,
+  ExceptionInfo *exception)
+{
+  ImageType
+    type;
+
+  type=IdentifyImageGray(image,exception);
+  if (type == UndefinedType)
+    return(MagickFalse);
+  return(SetGrayImageType(image,type,exception));
+}
+
 MagickExport MagickBooleanType SetImageGray(Image *image,
   ExceptionInfo *exception)
 {
   const char
     *value;
-
-  ImageType
-    type;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1583,10 +1592,7 @@ MagickExport MagickBooleanType SetImageGray(Image *image,
   value=GetImageProperty(image,"colorspace:auto-grayscale",exception);
   if (IsStringFalse(value) != MagickFalse)
     return(MagickFalse);
-  type=IdentifyImageGray(image,exception);
-  if (type == UndefinedType)
-    return(MagickFalse);
-  return(SetGrayImageType(image,type,exception));
+  return(SetIdentifiedGrayType(image,exception));
 }
 
 /*
