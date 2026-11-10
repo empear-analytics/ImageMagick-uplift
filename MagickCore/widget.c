@@ -1092,6 +1092,27 @@ static void XDrawWidgetText(Display *display,const XWindowInfo *window_info,
 %      control character or not.
 %
 */
+static void XInsertWidgetText(XWidgetInfo *text_info,char *text)
+{
+  char
+    *p,
+    *q;
+
+  int
+    i;
+
+  q=text_info->text+Extent(text_info->text)+strlen(text);
+  for (i=0; i <= Extent(text_info->cursor); i++)
+  {
+    if ((q-Extent(text)) > text_info->text)
+      *q=(*(q-Extent(text)));
+    q--;
+  }
+  p=text;
+  for (i=0; i < Extent(text); i++)
+    *text_info->cursor++=(*p++);
+}
+
 static void XEditText(Display *display,XWidgetInfo *text_info,
   const KeySym key_symbol,char *text,const size_t state)
 {
@@ -1147,13 +1168,6 @@ static void XEditText(Display *display,XWidgetInfo *text_info,
     }
     default:
     {
-      char
-        *p,
-        *q;
-
-      int
-        i;
-
       if (state & ControlState)
         break;
       if (*text == '\0')
@@ -1175,16 +1189,7 @@ static void XEditText(Display *display,XWidgetInfo *text_info,
           /*
             Insert a string into the text.
           */
-          q=text_info->text+Extent(text_info->text)+strlen(text);
-          for (i=0; i <= Extent(text_info->cursor); i++)
-          {
-            if ((q-Extent(text)) > text_info->text)
-              *q=(*(q-Extent(text)));
-            q--;
-          }
-          p=text;
-          for (i=0; i < Extent(text); i++)
-            *text_info->cursor++=(*p++);
+          XInsertWidgetText(text_info,text);
         }
       break;
     }
