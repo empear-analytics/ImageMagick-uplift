@@ -194,6 +194,27 @@ typedef struct _DiversityPacket
   size_t
     count;
 } DiversityPacket;
+
+typedef struct _MakeImageContext
+{
+  const XResourceInfo
+    *resource_info;
+
+  const XWindowInfo
+    *window;
+
+  ExceptionInfo
+    *exception;
+} MakeImageContext;
+
+typedef struct _WindowImageContext
+{
+  Display
+    *display;
+
+  ExceptionInfo
+    *exception;
+} WindowImageContext;
 
 /*
   Constant declarations.
@@ -216,10 +237,8 @@ static MagickBooleanType
   XMakePixmap(Display *,const XResourceInfo *,XWindowInfo *);
 
 static void
-  XMakeImageLSBFirst(const XResourceInfo *,const XWindowInfo *,Image *,
-    XImage *,XImage *,ExceptionInfo *),
-  XMakeImageMSBFirst(const XResourceInfo *,const XWindowInfo *,Image *,
-    XImage *,XImage *,ExceptionInfo *);
+  XMakeImageLSBFirst(const MakeImageContext *,Image *,XImage *,XImage *),
+  XMakeImageMSBFirst(const MakeImageContext *,Image *,XImage *,XImage *);
 
 static Window
   XSelectWindow(Display *,RectangleInfo *);
@@ -466,6 +485,39 @@ MagickExport void DestroyXResources(void)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetAnnotateBoxPixel(const Image *annotate_image,
+  const XPixelInfo *pixel,const XAnnotateInfo *annotate_info,Quantum *q)
+{
+  /*
+    Set this pixel to the background color.
+  */
+  SetPixelRed(annotate_image,ScaleShortToQuantum(
+    pixel->box_color.red),q);
+  SetPixelGreen(annotate_image,ScaleShortToQuantum(
+    pixel->box_color.green),q);
+  SetPixelBlue(annotate_image,ScaleShortToQuantum(
+    pixel->box_color.blue),q);
+  if ((annotate_info->stencil == ForegroundStencil) ||
+      (annotate_info->stencil == OpaqueStencil))
+    SetPixelAlpha(annotate_image,TransparentAlpha,q);
+}
+
+static void SetAnnotatePenPixel(const Image *annotate_image,
+  const XPixelInfo *pixel,const XAnnotateInfo *annotate_info,Quantum *q)
+{
+  /*
+    Set this pixel to the pen color.
+  */
+  SetPixelRed(annotate_image,ScaleShortToQuantum(
+    pixel->pen_color.red),q);
+  SetPixelGreen(annotate_image,ScaleShortToQuantum(
+    pixel->pen_color.green),q);
+  SetPixelBlue(annotate_image,ScaleShortToQuantum(
+    pixel->pen_color.blue),q);
+  if (annotate_info->stencil == BackgroundStencil)
+    SetPixelAlpha(annotate_image,TransparentAlpha,q);
+}
+
 MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
   ExceptionInfo *exception)
@@ -583,34 +635,9 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
     {
       SetPixelAlpha(annotate_image,OpaqueAlpha,q);
       if (XGetPixel(annotate_ximage,x,y) == 0)
-        {
-          /*
-            Set this pixel to the background color.
-          */
-          SetPixelRed(annotate_image,ScaleShortToQuantum(
-            pixel->box_color.red),q);
-          SetPixelGreen(annotate_image,ScaleShortToQuantum(
-            pixel->box_color.green),q);
-          SetPixelBlue(annotate_image,ScaleShortToQuantum(
-            pixel->box_color.blue),q);
-          if ((annotate_info->stencil == ForegroundStencil) ||
-              (annotate_info->stencil == OpaqueStencil))
-            SetPixelAlpha(annotate_image,TransparentAlpha,q);
-        }
+        SetAnnotateBoxPixel(annotate_image,pixel,annotate_info,q);
       else
-        {
-          /*
-            Set this pixel to the pen color.
-          */
-          SetPixelRed(annotate_image,ScaleShortToQuantum(
-            pixel->pen_color.red),q);
-          SetPixelGreen(annotate_image,ScaleShortToQuantum(
-            pixel->pen_color.green),q);
-          SetPixelBlue(annotate_image,ScaleShortToQuantum(
-            pixel->pen_color.blue),q);
-          if (annotate_info->stencil == BackgroundStencil)
-            SetPixelAlpha(annotate_image,TransparentAlpha,q);
-        }
+        SetAnnotatePenPixel(annotate_image,pixel,annotate_info,q);
       q+=(ptrdiff_t) GetPixelChannels(annotate_image);
     }
     if (SyncCacheViewAuthenticPixels(annotate_view,exception) == MagickFalse)
@@ -1876,6 +1903,13 @@ MagickExport void XDestroyResourceInfo(XResourceInfo *resource_info)
 %    o window: Specifies a pointer to a Window structure.
 %
 */
+static inline MagickBooleanType IsRootPixmapProperty(const Atom type,
+  const int format,const unsigned long length,const unsigned long after)
+{
+  return(((type == XA_PIXMAP) && (format == 32) && (length == 1) &&
+    (after == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate void XDestroyWindowColors(Display *display,Window window)
 {
   Atom
@@ -1912,7 +1946,7 @@ MagickPrivate void XDestroyWindowColors(Display *display,Window window)
     (Atom) AnyPropertyType,&type,&format,&length,&after,&data);
   if (status != Success)
     return;
-  if ((type == XA_PIXMAP) && (format == 32) && (length == 1) && (after == 0))
+  if (IsRootPixmapProperty(type,format,length,after) != MagickFalse)
     {
       (void) XKillClient(display,(XID) (*((Pixmap *) data)));
       (void) XDeleteProperty(display,window,property);
@@ -3459,6 +3493,70 @@ MagickExport XrmDatabase XGetResourceDatabase(Display *display,
 %    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
 */
+static void GetResourceFontNames(XrmDatabase database,const char *client_name,
+  XResourceInfo *resource_info)
+{
+  /*
+    Font resources: font, fontList and font1 to font0.
+  */
+  resource_info->font=XGetResourceClass(database,client_name,"font",
+    (char *) NULL);
+  resource_info->font=XGetResourceClass(database,client_name,"fontList",
+    resource_info->font);
+  resource_info->font_name[0]=XGetResourceClass(database,client_name,"font1",
+    (char *) "fixed");
+  resource_info->font_name[1]=XGetResourceClass(database,client_name,"font2",
+    (char *) "variable");
+  resource_info->font_name[2]=XGetResourceClass(database,client_name,"font3",
+    (char *) "5x8");
+  resource_info->font_name[3]=XGetResourceClass(database,client_name,"font4",
+    (char *) "6x10");
+  resource_info->font_name[4]=XGetResourceClass(database,client_name,"font5",
+    (char *) "7x13bold");
+  resource_info->font_name[5]=XGetResourceClass(database,client_name,"font6",
+    (char *) "8x13bold");
+  resource_info->font_name[6]=XGetResourceClass(database,client_name,"font7",
+    (char *) "9x15bold");
+  resource_info->font_name[7]=XGetResourceClass(database,client_name,"font8",
+    (char *) "10x20");
+  resource_info->font_name[8]=XGetResourceClass(database,client_name,"font9",
+    (char *) "12x24");
+  resource_info->font_name[9]=XGetResourceClass(database,client_name,"font0",
+    (char *) "fixed");
+  resource_info->font_name[10]=XGetResourceClass(database,client_name,"font0",
+    (char *) "fixed");
+}
+
+static void GetResourcePenColors(XrmDatabase database,const char *client_name,
+  XResourceInfo *resource_info)
+{
+  /*
+    Pen colour resources: pen1 to pen0.
+  */
+  resource_info->pen_colors[0]=XGetResourceClass(database,client_name,"pen1",
+    (char *) "black");
+  resource_info->pen_colors[1]=XGetResourceClass(database,client_name,"pen2",
+    (char *) "blue");
+  resource_info->pen_colors[2]=XGetResourceClass(database,client_name,"pen3",
+    (char *) "cyan");
+  resource_info->pen_colors[3]=XGetResourceClass(database,client_name,"pen4",
+    (char *) "green");
+  resource_info->pen_colors[4]=XGetResourceClass(database,client_name,"pen5",
+    (char *) "gray");
+  resource_info->pen_colors[5]=XGetResourceClass(database,client_name,"pen6",
+    (char *) "red");
+  resource_info->pen_colors[6]=XGetResourceClass(database,client_name,"pen7",
+    (char *) "magenta");
+  resource_info->pen_colors[7]=XGetResourceClass(database,client_name,"pen8",
+    (char *) "yellow");
+  resource_info->pen_colors[8]=XGetResourceClass(database,client_name,"pen9",
+    (char *) "white");
+  resource_info->pen_colors[9]=XGetResourceClass(database,client_name,"pen0",
+    (char *) "gray");
+  resource_info->pen_colors[10]=XGetResourceClass(database,client_name,"pen0",
+    (char *) "gray");
+}
+
 MagickExport void XGetResourceInfo(const ImageInfo *image_info,
   XrmDatabase database,const char *client_name,XResourceInfo *resource_info)
 {
@@ -3517,32 +3615,7 @@ MagickExport void XGetResourceInfo(const ImageInfo *image_info,
   resource_value=XGetResourceClass(database,client_name,"displayWarnings",
     (char *) "True");
   resource_info->display_warnings=IsStringTrue(resource_value);
-  resource_info->font=XGetResourceClass(database,client_name,"font",
-    (char *) NULL);
-  resource_info->font=XGetResourceClass(database,client_name,"fontList",
-    resource_info->font);
-  resource_info->font_name[0]=XGetResourceClass(database,client_name,"font1",
-    (char *) "fixed");
-  resource_info->font_name[1]=XGetResourceClass(database,client_name,"font2",
-    (char *) "variable");
-  resource_info->font_name[2]=XGetResourceClass(database,client_name,"font3",
-    (char *) "5x8");
-  resource_info->font_name[3]=XGetResourceClass(database,client_name,"font4",
-    (char *) "6x10");
-  resource_info->font_name[4]=XGetResourceClass(database,client_name,"font5",
-    (char *) "7x13bold");
-  resource_info->font_name[5]=XGetResourceClass(database,client_name,"font6",
-    (char *) "8x13bold");
-  resource_info->font_name[6]=XGetResourceClass(database,client_name,"font7",
-    (char *) "9x15bold");
-  resource_info->font_name[7]=XGetResourceClass(database,client_name,"font8",
-    (char *) "10x20");
-  resource_info->font_name[8]=XGetResourceClass(database,client_name,"font9",
-    (char *) "12x24");
-  resource_info->font_name[9]=XGetResourceClass(database,client_name,"font0",
-    (char *) "fixed");
-  resource_info->font_name[10]=XGetResourceClass(database,client_name,"font0",
-    (char *) "fixed");
+  GetResourceFontNames(database,client_name,resource_info);
   resource_info->foreground_color=XGetResourceInstance(database,client_name,
     "foreground",ForegroundColor);
   resource_value=XGetResourceClass(database,client_name,"gammaCorrect",
@@ -3574,28 +3647,7 @@ MagickExport void XGetResourceInfo(const ImageInfo *image_info,
     "mattecolor",(char *) NULL);
   resource_info->name=ConstantString(XGetResourceClass(database,client_name,
     "name",(char *) NULL));
-  resource_info->pen_colors[0]=XGetResourceClass(database,client_name,"pen1",
-    (char *) "black");
-  resource_info->pen_colors[1]=XGetResourceClass(database,client_name,"pen2",
-    (char *) "blue");
-  resource_info->pen_colors[2]=XGetResourceClass(database,client_name,"pen3",
-    (char *) "cyan");
-  resource_info->pen_colors[3]=XGetResourceClass(database,client_name,"pen4",
-    (char *) "green");
-  resource_info->pen_colors[4]=XGetResourceClass(database,client_name,"pen5",
-    (char *) "gray");
-  resource_info->pen_colors[5]=XGetResourceClass(database,client_name,"pen6",
-    (char *) "red");
-  resource_info->pen_colors[6]=XGetResourceClass(database,client_name,"pen7",
-    (char *) "magenta");
-  resource_info->pen_colors[7]=XGetResourceClass(database,client_name,"pen8",
-    (char *) "yellow");
-  resource_info->pen_colors[8]=XGetResourceClass(database,client_name,"pen9",
-    (char *) "white");
-  resource_info->pen_colors[9]=XGetResourceClass(database,client_name,"pen0",
-    (char *) "gray");
-  resource_info->pen_colors[10]=XGetResourceClass(database,client_name,"pen0",
-    (char *) "gray");
+  GetResourcePenColors(database,client_name,resource_info);
   resource_value=XGetResourceClass(database,client_name,"pause",(char *) "0");
   resource_info->pause=(unsigned int) StringToUnsignedLong(resource_value);
   resource_value=XGetResourceClass(database,client_name,"quantum",(char *) "1");
@@ -3971,9 +4023,63 @@ MagickPrivate MagickBooleanType XGetWindowColor(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static Image *XGetWindowImage(Display *display,const Window window,
-  const unsigned int borders,const unsigned int level,ExceptionInfo *exception)
+typedef struct _WindowInfo
 {
+  Window
+    window,
+    parent;
+
+  Visual
+    *visual;
+
+  Colormap
+    colormap;
+
+  XSegment
+    bounds;
+
+  RectangleInfo
+    crop_info;
+} WindowInfo;
+
+static inline MagickBooleanType IsSameVisualParent(
+  const WindowInfo *window_info,const int id,const int i)
+{
+  return(((window_info[i].window == window_info[id].parent) &&
+    (window_info[i].visual == window_info[id].visual) &&
+    (window_info[i].colormap == window_info[id].colormap)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsOutsideParentBounds(
+  const WindowInfo *window_info,const int id,const int i)
+{
+  return(((window_info[id].bounds.x1 < window_info[i].bounds.x1) ||
+    (window_info[id].bounds.x2 > window_info[i].bounds.x2) ||
+    (window_info[id].bounds.y1 < window_info[i].bounds.y1) ||
+    (window_info[id].bounds.y2 > window_info[i].bounds.y2)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsInsideWindowBounds(
+  const WindowInfo *window_info,const int id,const int j)
+{
+  return(((window_info[id].bounds.x1 >= window_info[j].bounds.x1) &&
+    (window_info[id].bounds.x2 <= window_info[j].bounds.x2) &&
+    (window_info[id].bounds.y1 >= window_info[j].bounds.y1) &&
+    (window_info[id].bounds.y2 <= window_info[j].bounds.y2)) ? MagickTrue :
+    MagickFalse);
+}
+
+static Image *XGetWindowImage(const WindowImageContext *window_context,
+  const Window window,const unsigned int borders,const unsigned int level)
+{
+  Display
+    *const display = window_context->display;
+
+  ExceptionInfo
+    *const exception = window_context->exception;
+
   typedef struct _ColormapInfo
   {
     Colormap
@@ -3985,25 +4091,6 @@ static Image *XGetWindowImage(Display *display,const Window window,
     struct _ColormapInfo
       *next;
   } ColormapInfo;
-
-  typedef struct _WindowInfo
-  {
-    Window
-      window,
-      parent;
-
-    Visual
-      *visual;
-
-    Colormap
-      colormap;
-
-    XSegment
-      bounds;
-
-    RectangleInfo
-      crop_info;
-  } WindowInfo;
 
   int
     display_height,
@@ -4135,14 +4222,9 @@ static Image *XGetWindowImage(Display *display,const Window window,
       status=XQueryTree(display,window,&root_window,&window_info[id].parent,
         &children,&number_children);
       for (i=0; i < id; i++)
-        if ((window_info[i].window == window_info[id].parent) &&
-            (window_info[i].visual == window_info[id].visual) &&
-            (window_info[i].colormap == window_info[id].colormap))
+        if (IsSameVisualParent(window_info,id,i) != MagickFalse)
           {
-            if ((window_info[id].bounds.x1 < window_info[i].bounds.x1) ||
-                (window_info[id].bounds.x2 > window_info[i].bounds.x2) ||
-                (window_info[id].bounds.y1 < window_info[i].bounds.y1) ||
-                (window_info[id].bounds.y2 > window_info[i].bounds.y2))
+            if (IsOutsideParentBounds(window_info,id,i) != MagickFalse)
               {
                 /*
                   Eliminate windows not circumscribed by their parent.
@@ -4153,9 +4235,12 @@ static Image *XGetWindowImage(Display *display,const Window window,
           }
       if ((status == True) && (number_children != 0))
         {
+          const WindowImageContext
+            child_context = { display, exception };
+
           for (i=0; i < (int) number_children; i++)
-            (void) XGetWindowImage(display,children[i],MagickFalse,level+1,
-              exception);
+            (void) XGetWindowImage(&child_context,children[i],MagickFalse,
+              level+1);
           (void) XFree((void *) children);
         }
     }
@@ -4217,10 +4302,7 @@ static Image *XGetWindowImage(Display *display,const Window window,
           if ((window_info[id].visual == window_info[j].visual) &&
               (window_info[id].colormap == window_info[j].colormap))
             {
-              if ((window_info[id].bounds.x1 >= window_info[j].bounds.x1) &&
-                  (window_info[id].bounds.x2 <= window_info[j].bounds.x2) &&
-                  (window_info[id].bounds.y1 >= window_info[j].bounds.y1) &&
-                  (window_info[id].bounds.y2 <= window_info[j].bounds.y2))
+              if (IsInsideWindowBounds(window_info,id,j) != MagickFalse)
                 import=MagickFalse;
             }
         if (import == MagickFalse)
@@ -4870,6 +4952,13 @@ MagickPrivate void XHighlightRectangle(Display *display,Window window,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsWindowTreeTop(const Status status,
+  const Window parent,const Window root)
+{
+  return(((status == False) || (parent == (Window) NULL) ||
+    (parent == root)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *XImportImage(const ImageInfo *image_info,
   XImportInfo *ximage_info,ExceptionInfo *exception)
 {
@@ -4902,6 +4991,9 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
 
   XTextProperty
     window_name;
+
+  WindowImageContext
+    window_context;
 
   /*
     Open X server connection.
@@ -4980,8 +5072,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
             status=XQueryTree(display,target,&root,&parent,&children,&d);
             if ((status != False) && (children != (Window *) NULL))
               (void) XFree((char *) children);
-            if ((status == False) || (parent == (Window) NULL) ||
-                (parent == root))
+            if (IsWindowTreeTop(status,parent,root) != MagickFalse)
               break;
             target=parent;
           }
@@ -5061,8 +5152,10 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
     Get image by window id.
   */
   (void) XGrabServer(display);
-  image=XGetWindowImage(display,target,ximage_info->borders,
-    ximage_info->descend ? 1U : 0U,exception);
+  window_context.display=display;
+  window_context.exception=exception;
+  image=XGetWindowImage(&window_context,target,ximage_info->borders,
+    ximage_info->descend ? 1U : 0U);
   (void) XUngrabServer(display);
   if (image != (Image *) NULL)
     {
@@ -5132,6 +5225,14 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
 %    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
 */
+static inline MagickBooleanType IsWindowsInfoMissing(const XWindows *windows)
+{
+  return(((windows->pixel_info == (XPixelInfo *) NULL) ||
+    (windows->icon_pixel == (XPixelInfo *) NULL) ||
+    (windows->icon_resources == (XResourceInfo *) NULL)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickPrivate XWindows *XInitializeWindows(Display *display,
   XResourceInfo *resource_info)
 {
@@ -5158,9 +5259,7 @@ MagickPrivate XWindows *XInitializeWindows(Display *display,
     sizeof(*windows->icon_pixel));
   windows->icon_resources=(XResourceInfo *) AcquireQuantumMemory(1,
     sizeof(*windows->icon_resources));
-  if ((windows->pixel_info == (XPixelInfo *) NULL) ||
-      (windows->icon_pixel == (XPixelInfo *) NULL) ||
-      (windows->icon_resources == (XResourceInfo *) NULL))
+  if (IsWindowsInfoMissing(windows) != MagickFalse)
     {
       ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
         "...");
@@ -5433,6 +5532,30 @@ MagickPrivate Cursor XMakeCursor(Display *display,Window window,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsImageBeyondDisplay(Display *display,
+  const XWindowInfo *window)
+{
+  return(((window->pixel_info->colors == 0) &&
+    (window->image->rows > (unsigned long) XDisplayHeight(display,window->screen)) &&
+    (window->image->columns > (unsigned long) XDisplayWidth(display,window->screen))) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsShapeWithinDisplay(Display *display,
+  const XWindowInfo *window,const unsigned int width,const unsigned int height)
+{
+  return(((window->image->alpha_trait != UndefinedPixelTrait) &&
+    ((int) width <= XDisplayWidth(display,window->screen)) &&
+    ((int) height <= XDisplayHeight(display,window->screen))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsLSBFirstXImage(const XImage *ximage)
+{
+  return(((ximage->byte_order == LSBFirst) || ((ximage->format == XYBitmap) &&
+    (ximage->bitmap_bit_order == LSBFirst))) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -5503,9 +5626,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
             Resize image.
           */
           resize_image=NewImageList();
-          if ((window->pixel_info->colors == 0) &&
-              (window->image->rows > (unsigned long) XDisplayHeight(display,window->screen)) &&
-              (window->image->columns > (unsigned long) XDisplayWidth(display,window->screen)))
+          if (IsImageBeyondDisplay(display,window) != MagickFalse)
               resize_image=ResizeImage(window->image,width,height,
                 image->filter,exception);
           else
@@ -5730,9 +5851,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   window->ximage=ximage;
   matte_image=(XImage *) NULL;
   if ((window->shape != MagickFalse) && (window->image != (Image *) NULL))
-    if ((window->image->alpha_trait != UndefinedPixelTrait) &&
-        ((int) width <= XDisplayWidth(display,window->screen)) &&
-        ((int) height <= XDisplayHeight(display,window->screen)))
+    if (IsShapeWithinDisplay(display,window,width,height) != MagickFalse)
       {
         /*
           Create matte image.
@@ -5787,13 +5906,13 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   */
   if (window->image != (Image *) NULL)
     {
-      if ((ximage->byte_order == LSBFirst) || ((ximage->format == XYBitmap) &&
-          (ximage->bitmap_bit_order == LSBFirst)))
-        XMakeImageLSBFirst(resource_info,window,window->image,ximage,
-          matte_image,exception);
+      const MakeImageContext
+        make_context = { resource_info, window, exception };
+
+      if (IsLSBFirstXImage(ximage) != MagickFalse)
+        XMakeImageLSBFirst(&make_context,window->image,ximage,matte_image);
       else
-        XMakeImageMSBFirst(resource_info,window,window->image,ximage,
-          matte_image,exception);
+        XMakeImageMSBFirst(&make_context,window->image,ximage,matte_image);
     }
   if (window->matte_image != (XImage *) NULL)
     {
@@ -5873,10 +5992,50 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
-  const XWindowInfo *window,Image *image,XImage *ximage,XImage *matte_image,
-  ExceptionInfo *exception)
+static inline MagickBooleanType IsGammaCorrected(void)
 {
+  return(((red_gamma != 1.0) || (green_gamma != 1.0) ||
+    (blue_gamma != 1.0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsRedHigh32BitMap(const XImage *ximage,
+  const XStandardColormap *map_info)
+{
+  return(((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
+    (map_info->green_max == 255) && (map_info->blue_max == 255) &&
+    (map_info->red_mult == 65536L) && (map_info->green_mult == 256) &&
+    (map_info->blue_mult == 1)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsBlueHigh32BitMap(const XImage *ximage,
+  const XStandardColormap *map_info)
+{
+  return(((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
+    (map_info->green_max == 255) && (map_info->blue_max == 255) &&
+    (map_info->red_mult == 1) && (map_info->green_mult == 256) &&
+    (map_info->blue_mult == 65536L)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsMutableAlphaImage(const XWindowInfo *window,
+  const Image *image)
+{
+  return(((window->immutable == MagickFalse) &&
+    (image->storage_class == DirectClass) &&
+    (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
+static void XMakeImageLSBFirst(const MakeImageContext *make_context,
+  Image *image,XImage *ximage,XImage *matte_image)
+{
+  const XResourceInfo
+    *const resource_info = make_context->resource_info;
+
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
   CacheView
     *canvas_view;
 
@@ -5915,9 +6074,7 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   canvas=image;
-  if ((window->immutable == MagickFalse) &&
-      (image->storage_class == DirectClass) &&
-      (image->alpha_trait != UndefinedPixelTrait))
+  if (IsMutableAlphaImage(window,image) != MagickFalse)
     {
       char
         size[MagickPathExtent];
@@ -6291,10 +6448,7 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
         }
         default:
         {
-          if ((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
-              (map_info->green_max == 255) && (map_info->blue_max == 255) &&
-              (map_info->red_mult == 65536L) && (map_info->green_mult == 256) &&
-              (map_info->blue_mult == 1))
+          if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
             {
               /*
                 Convert to 32 bit continuous-tone X canvas.
@@ -6305,8 +6459,7 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
                   canvas->columns,1,exception);
                 if (p == (const Quantum *) NULL)
                   break;
-                if ((red_gamma != 1.0) || (green_gamma != 1.0) ||
-                    (blue_gamma != 1.0))
+                if (IsGammaCorrected() != MagickFalse)
                   {
                     /*
                       Gamma correct canvas.
@@ -6335,10 +6488,7 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
               }
             }
           else
-            if ((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
-                (map_info->green_max == 255) && (map_info->blue_max == 255) &&
-                (map_info->red_mult == 1) && (map_info->green_mult == 256) &&
-                (map_info->blue_mult == 65536L))
+            if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
               {
                 /*
                   Convert to 32 bit continuous-tone X canvas.
@@ -6349,8 +6499,7 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
                     canvas->columns,1,exception);
                   if (p == (const Quantum *) NULL)
                     break;
-                  if ((red_gamma != 1.0) || (green_gamma != 1.0) ||
-                      (blue_gamma != 1.0))
+                  if (IsGammaCorrected() != MagickFalse)
                     {
                       /*
                         Gamma correct canvas.
@@ -6491,10 +6640,26 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
-  const XWindowInfo *window,Image *image,XImage *ximage,XImage *matte_image,
-  ExceptionInfo *exception)
+static inline MagickBooleanType IsImmutableAlphaImage(const XWindowInfo *window,
+  const Image *image)
 {
+  return(((window->immutable != MagickFalse) &&
+    (image->storage_class == DirectClass) &&
+    (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
+static void XMakeImageMSBFirst(const MakeImageContext *make_context,
+  Image *image,XImage *ximage,XImage *matte_image)
+{
+  const XResourceInfo
+    *const resource_info = make_context->resource_info;
+
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
   CacheView
     *canvas_view;
 
@@ -6533,9 +6698,7 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   canvas=image;
-  if ((window->immutable != MagickFalse) &&
-      (image->storage_class == DirectClass) &&
-      (image->alpha_trait != UndefinedPixelTrait))
+  if (IsImmutableAlphaImage(window,image) != MagickFalse)
     {
       char
         size[MagickPathExtent];
@@ -6917,10 +7080,7 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
         }
         default:
         {
-          if ((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
-              (map_info->green_max == 255) && (map_info->blue_max == 255) &&
-              (map_info->red_mult == 65536L) && (map_info->green_mult == 256) &&
-              (map_info->blue_mult == 1))
+          if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
             {
               /*
                 Convert to 32 bit continuous-tone X canvas.
@@ -6931,8 +7091,7 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
                   canvas->columns,1,exception);
                 if (p == (const Quantum *) NULL)
                   break;
-                if ((red_gamma != 1.0) || (green_gamma != 1.0) ||
-                    (blue_gamma != 1.0))
+                if (IsGammaCorrected() != MagickFalse)
                   {
                     /*
                       Gamma correct canvas.
@@ -6961,10 +7120,7 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
               }
             }
           else
-            if ((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
-                (map_info->green_max == 255) && (map_info->blue_max == 255) &&
-                (map_info->red_mult == 1) && (map_info->green_mult == 256) &&
-                (map_info->blue_mult == 65536L))
+            if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
               {
                 /*
                   Convert to 32 bit continuous-tone X canvas.
@@ -6975,8 +7131,7 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
                     canvas->columns,1,exception);
                   if (p == (const Quantum *) NULL)
                     break;
-                  if ((red_gamma != 1.0) || (green_gamma != 1.0) ||
-                      (blue_gamma != 1.0))
+                  if (IsGammaCorrected() != MagickFalse)
                     {
                       /*
                         Gamma correct canvas.
@@ -7111,6 +7266,13 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsMagnifyWithinHalf(const unsigned int magnify,
+  const unsigned int width,const unsigned int height)
+{
+  return(((magnify > 1) && ((magnify <= (width >> 1)) &&
+    (magnify <= (height >> 1)))) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7486,8 +7648,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   (void) XPutImage(display,windows->magnify.pixmap,
     windows->magnify.annotate_context,windows->magnify.ximage,0,0,x,y,
     (unsigned int) ((int) width-x),(unsigned int) ((int) height-y));
-  if ((magnify > 1) && ((magnify <= (width >> 1)) &&
-      (magnify <= (height >> 1))))
+  if (IsMagnifyWithinHalf(magnify,width,height) != MagickFalse)
     {
       RectangleInfo
         highlight_info;
@@ -7745,6 +7906,42 @@ static inline Quantum ScaleXToQuantum(const size_t x,
   return((Quantum) (((double) QuantumRange*x)/scale+0.5));
 }
 
+static inline MagickBooleanType IsColorRecoveryDither(const Image *image,
+  const XResourceInfo *resource_info,const size_t number_colors)
+{
+  return((((image->alpha_trait & BlendPixelTrait) == 0) &&
+    (resource_info->color_recovery == MagickFalse) &&
+    (resource_info->quantize_info->dither_method != NoDitherMethod) &&
+    (number_colors < MaxColormapSize)) ? MagickTrue : MagickFalse);
+}
+
+static void SetAffinityColormap(Image *affinity_image,
+  const XStandardColormap *map_info,const size_t number_colors,Quantum *q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_colors; i++)
+  {
+    SetPixelRed(affinity_image,(Quantum) 0,q);
+    if (map_info->red_max != 0)
+      SetPixelRed(affinity_image,ScaleXToQuantum((size_t)
+        (i/(ssize_t) map_info->red_mult),map_info->red_max),q);
+    SetPixelGreen(affinity_image,(Quantum) 0,q);
+    if (map_info->green_max != 0)
+      SetPixelGreen(affinity_image,ScaleXToQuantum((size_t)
+        ((i/(ssize_t) map_info->green_mult) % (ssize_t)
+        (map_info->green_max+1)),map_info->green_max),q);
+    SetPixelBlue(affinity_image,(Quantum) 0,q);
+    if (map_info->blue_max != 0)
+      SetPixelBlue(affinity_image,ScaleXToQuantum((size_t)
+        (i % (ssize_t) map_info->green_mult),map_info->blue_max),
+        q);
+    SetPixelAlpha(affinity_image,TransparentAlpha,q);
+    q+=(ptrdiff_t) GetPixelChannels(affinity_image);
+  }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -7787,10 +7984,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       number_colors=(unsigned int) (map_info->base_pixel+
         (map_info->red_max+1)*(map_info->green_max+1)*(map_info->blue_max+1));
       if ((map_info->red_max*map_info->green_max*map_info->blue_max) != 0)
-        if (((image->alpha_trait & BlendPixelTrait) == 0) &&
-            (resource_info->color_recovery == MagickFalse) &&
-            (resource_info->quantize_info->dither_method != NoDitherMethod) &&
-            (number_colors < MaxColormapSize))
+        if (IsColorRecoveryDither(image,resource_info,number_colors) != MagickFalse)
           {
             Image
               *affinity_image;
@@ -7814,25 +8008,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
               1,exception);
             if (q != (Quantum *) NULL)
               {
-                for (i=0; i < (ssize_t) number_colors; i++)
-                {
-                  SetPixelRed(affinity_image,(Quantum) 0,q);
-                  if (map_info->red_max != 0)
-                    SetPixelRed(affinity_image,ScaleXToQuantum((size_t)
-                      (i/(ssize_t) map_info->red_mult),map_info->red_max),q);
-                  SetPixelGreen(affinity_image,(Quantum) 0,q);
-                  if (map_info->green_max != 0)
-                    SetPixelGreen(affinity_image,ScaleXToQuantum((size_t)
-                      ((i/(ssize_t) map_info->green_mult) % (ssize_t)
-                      (map_info->green_max+1)),map_info->green_max),q);
-                  SetPixelBlue(affinity_image,(Quantum) 0,q);
-                  if (map_info->blue_max != 0)
-                    SetPixelBlue(affinity_image,ScaleXToQuantum((size_t)
-                      (i % (ssize_t) map_info->green_mult),map_info->blue_max),
-                      q);
-                  SetPixelAlpha(affinity_image,TransparentAlpha,q);
-                  q+=(ptrdiff_t) GetPixelChannels(affinity_image);
-                }
+                SetAffinityColormap(affinity_image,map_info,number_colors,q);
                 (void) SyncAuthenticPixels(affinity_image,exception);
                 (void) RemapImage(resource_info->quantize_info,image,
                   affinity_image,exception);
