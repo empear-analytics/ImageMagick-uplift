@@ -244,3 +244,12 @@ Make.com and (transform-region.c only, as vision.c is not listed there) scripts/
 ImageMagick/Configure, and its MSVC compile line already lists every MagickCore .c file including earlier split files,
 so splits need no Windows entries (earlier commit messages saying otherwise were wrong). Separately, the Windows jobs
 fail on main since #86 with C2220 (warnings as errors) in annotate.c, colorspace.c, compare.c and composite.c.
+
+## Lane d, morphology.c second leg: Recipe KT
+
+**Recipe KT** (d4de2635e): a `switch` on an integer whose groups each assign `v=F("constant");` under sparse labels
+becomes a `static const` table of `{key, constant}` and a loop; form A when `default:` shares a group (that element
+last), form B when it has its own group (run unchanged after the loop). Checked by script against the groups. Added
+after the owner's approval of the W16 text; not yet confirmed. Three flat steps (rule 2). The rest of the leg takes the
+temporary drop to 3.02 that the 2026-10-29 owner rule allows for an early step of a plan measured end to end.
+Upstream: `ScaleKernelInfo`'s negative-factor swap sets `kernel->minimum = 1;` where `= t` looks intended.
