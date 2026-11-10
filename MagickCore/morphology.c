@@ -2159,6 +2159,13 @@ static void SetLoGOrUnityKernelValues(KernelInfo *kernel,const double sigma)
     }
 }
 
+static MagickBooleanType IsGaussianSigmaWidest(const KernelInfoType type,
+  const double sigma,const double sigma2)
+{
+  return(((type != DoGKernel) || (sigma >= sigma2)) ? MagickTrue :
+    MagickFalse);
+}
+
 static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -2168,7 +2175,7 @@ static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
 
   if ( args->rho >= 1.0 )
     kernel->width = CastDoubleToSizeT(args->rho)*2+1;
-  else if ( (type != DoGKernel) || (sigma >= sigma2) )
+  else if (IsGaussianSigmaWidest(type,sigma,sigma2) != MagickFalse)
     kernel->width = GetOptimalKernelWidth2D(args->rho,sigma);
   else
     kernel->width = GetOptimalKernelWidth2D(args->rho,sigma2);
