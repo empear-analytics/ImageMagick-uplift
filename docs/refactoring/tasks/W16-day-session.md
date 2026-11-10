@@ -22,3 +22,11 @@ reaches 8.78). Upstream, not changed: `ChannelFxImage` leaks the image list when
 `SharpenAdaptiveRows` releases its kernels with an inline copy of `RelinquishAdaptiveKernelSet`'s body.
 
 ## Lane d, second batch: threshold.c, resample.c, colorspace-convert.c at plateau (Sonnet, no commits)
+
+## Lane a: enhance-tone.c 5.99 -> 6.99, fourier.c 6.33 -> 6.45 (Opus, 11 commits)
+
+**For the owner:** 6f54268cc uses Recipe N for a tail that reads only three caller variables (N's *Use when* asks
+for five or more), because whole-parallel-loop tails go to N or Z, not E; should E admit whole loops under N step 1's
+conditions? dfad29877 and e7f09ffbc use I step 2's const-addresses form for three variables. **Upstream, likely a
+bug, not changed:** `EqualizeImage`'s `memset(black,0,sizeof(*black))` and `memset(white,...)` clear one double
+each, not the whole arrays.
