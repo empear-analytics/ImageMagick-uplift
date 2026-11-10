@@ -1647,6 +1647,10 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    Or, instead of the `const` locals, write `name->member` for every use of a member in
    the block, as Recipe B step 3 allows (Recipe Wa step 3): the form for a block whose
    sibling helper unpacks the same members or tests the same channel traits.
+   The choice may be made member by member: each member is either bound once as a
+   `const` local or written `name->member` at every use, never both. A member that an
+   OpenMP clause or a function-like macro of the text names keeps its `const` local, and
+   a member the block writes keeps step 2's local without `const`.
 5. In the caller, declare a `Name` local among the declarations at the top of the block
    that holds the call (the loop body, for a call inside a loop), never after a
    statement.
@@ -8083,6 +8087,9 @@ that clones the first (the *Code Duplication* cliff, W14).
    variable it holds), passed as `const Name *name` and bound first in the body as
    `const` locals of their role names (Recipe N step 4). Its body is a copy's text with
    the common names and the methods at the roles' positions, nothing else changed.
+   Copies in one function that already fills a Recipe N step 8 struct may instead read
+   the variables through it (`const Name *name` passed as `&name`, Recipe MT step 8
+   (a)), `method` then staying a parameter of its own, within four parameters in all.
 5. Replace each copy by a call of the new function that passes the name of that copy's
    callee (a function designator, never a variable, a parameter or a member), directly
    or in the initialiser of a `const` struct of step 4 declared at the top of the block
@@ -8214,7 +8221,11 @@ pass) from `enhance.c`'s six `Modulate` hue-space functions (`ModulateHCL` to
 `colorspace-private.h` or `gem.h`, and declare their three temporaries in different
 orders: the second role, header callees, the struct form (six parameters otherwise) and
 the declarator order. A probe: 7.72 to 9.02, *Code Duplication* gone, no finding on a
-new function, no indirect call in the object.
+new function, no indirect call in the object. Step 4's shared struct (2026-11-10, W16 lane d) from
+`morphology.c`'s `MorphologyPrimitive`: its Convolve and IterativeDistance walks differ
+only in `ConvolveChannelValue`/`MinimizeKernelDistance` and read the channel body's walk
+struct; a probe 3.28 to 3.33 (after Recipe Q on the hit-and-miss walk), no finding on a
+new function.
 
 ---
 
@@ -8443,6 +8454,27 @@ way clones the first.
    run of the copy's constant `C` gives exactly that copy's token sequence (after the
    renaming of step 1 and with the struct's bindings removed), and by reading that every
    argument fills its parameter.
+8. Copies in one function that already shares an input struct. (a) When the variables
+   both copies read, apart from the differing runs, are members of a struct local
+   `name` that the caller fills once under Recipe N step 8 (its sibling form) at a point
+   both copies follow, with nothing on a path from the fill to either copy writing a
+   member's variable, the new function may take `const Name *name` in their place,
+   beside `side`, and bind each member it reads as a `const` local of the member's name
+   and type (Recipe N step 4); a member whose variable the copy advances (`pixels`) is
+   bound as a local without `const`, Recipe N step 2's read-then-written form. Each
+   copy passes `&name`. (b) A differing pair that is one call with the same arguments
+   and a different callee (`MinimizeChannelValue` in one copy, `MaximizeChannelValue`
+   in the other) may take Recipe CF's form instead of a conditional: a parameter
+   `const NameMethod method` of CF step 2's typedef, the run written `method(...)`,
+   each copy passing its callee's designator; CF steps 2 and 7 apply. (c) A variable
+   a copy writes and the caller reads after it goes by pointer, as Recipe O passes it
+   (`(*v)` at every use, `&v` passed on written `v`). A written variable whose name
+   differs between the copies but whose role is the same (the extremum, `minimum` in
+   one copy and `maximum` in the other) is one role: its address is a differing value,
+   carried in step 4's `const` struct after `side` (`{ ForwardKernelWalk, &minimum }`),
+   and the function writes through it where the copy wrote the variable. The
+   parameters stay within four. Step 7's check folds `method(` to each copy's callee
+   and the role pointers to each copy's variables as well.
 
 **Before:**
 
@@ -8557,6 +8589,17 @@ static ssize_t FindStretchBlackLevel(const Image *image,
   calls, and the new function (its definition and its calls); anything else stops the
   step.
 
+- Step 8. (a) The struct's members hold the values the copies read (Recipe N step 8's
+  argument: filled from the variables of their names, nothing writes them before the
+  call), so each binding reads what the copy read; an advanced member is a local copy,
+  which the copy's own advancing variable was not read after (N step 2). (b) A call
+  through a pointer of the callee's exact type passing a designator runs that callee on
+  the same arguments (Recipe CF's argument), and once the `static inline` function is
+  inlined with its constant designator the call is direct. (c) Through `&v` the
+  function reads and writes the very object the copy named, in the copy's order (Recipe
+  O's argument); the role's address in the selector struct is the copy's own
+  variable's, so each copy's writes land where they landed before.
+
 **Evidence level:** oracle (each copy reached by a case), with `refactor_guard.py
 --calls`, steps 1 and 7 checked by script, step 3 by reading, and step 6's timing when a
 copy runs per pixel.
@@ -8567,7 +8610,13 @@ Duplication* above its threshold: a probe of this recipe on the pair measured 6.
 7.66, the finding gone, no finding on a new function. The mirrored morphology walks
 (Erode/Dilate, the forward and reverse passes) motivated the operator form; Recipes D,
 SV, SC, TW and CF refuse them. Added by Claude Code (Claude Opus 5.5) under the owner's
-approval of 2026-11-10 to evolve the recipes.
+approval of 2026-11-10 to evolve the recipes. Step 8 (2026-11-10, W16 lane d) from
+`morphology.c`'s `MorphologyPrimitive`, whose channel body fills one walk struct for all
+its kernel walks: the Erode/Dilate walks as one helper with a `?:` on the callee are a
+cc 9 *Complex Method* (W16 lane b's probe), with the callee as a designator cc 8; the
+ErodeIntensity/DilateIntensity walks write `quantum_pixels`, `pixel` and their own
+extremum. Probes: 3.16 to 3.22 and 3.28, no finding on a new function, no indirect call
+in the object, timing within 1%.
 
 ---
 
@@ -10434,3 +10483,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | FI | Step 8, *hoisted form*: a member-by-member fill that stands far from its declaration (in a loop body or a branch, directly before its one call) becomes a `const` initialiser when every value is `(&v)` of a variable declared at the function's top (the declaration moves to the end of the function's declarations) or every value is an identifier nothing between the top of the innermost block holding the run and the run writes or passes by address (the declaration moves to that block's top); steps 1 to 3 hold for the run, step 6's `IDENTICAL` is still required. *Careful* gives the argument (C11 6.2.4p2: addresses are constant over the lifetime; C11 6.8p3: block declarations are initialised each time they are reached) | `layer.c`'s `OptimizeLayerFrames` (campaign A, W16 lane b): `targets`, `choice_targets` and `trial`, thirteen assignments refilled per frame; a probe 7.92 to 7.98, `obj_identical.sh` `IDENTICAL`, oracle 45 cases 0 diverged | owner |
 | 2026-11-10 | NEW | PL | Peel a Leaving Label Set out of a Selection as a Predicate: groups of a `switch` whose whole body is the same leaving statement `S` (`return;`) leave the `switch` for an LP-form predicate on their labels, called in `if (Name(e) != MagickFalse) S` directly before the `switch`; the kept groups and `default:` stay; `e` side-effect free and evaluated again by the `switch`; labels and comments checked by script; TB may then make the predicate a table | `morphology.c`'s `RotateKernelInfo` (campaign A, W16 lane d): thirteen of its fifteen labels only `return;` beside the Blur group and `default:` (cc 30), which LP (two groups only), SD/SR (no `return`) and ST (value-returning) refuse; one step of a chain probe 3.10 to 3.02 to 3.16, no finding on a new function | owner |
 | 2026-11-10 | NEW | RT | Roll a Run of Copies into a Helper Looping over a Table: three or more adjacent copies of one statement sequence differing in one constant argument, each leaving through the same `return(R);`, become a `static const` table of the constants and a `static MagickBooleanType` helper looping over it (each `return(R);` written `return(MagickFalse);`); the run becomes `if (Helper(...) == MagickFalse) return(R);`, `R` reading only what the copies never write; unrolling checked by script; guard `WARN` with `0` added | `morphology.c`'s `AcquireRidgesKernel` (campaign A, W16 lane d): eight thick-ridge copies, eight of its cc 14; SV/SC/W keep one `if` per copy or make a *Complex Method* helper, the loop in place is a *Bumpy Road* (3.08); one step of a chain probe 3.10 to 3.02 to 3.16, no finding on the helper | owner |
+| 2026-11-10 | AMEND | MT | Step 8: copies in a function that already fills a Recipe N step 8 struct may read their inputs through it (`const Name *name` beside `side`, advanced members bound without `const`); a differing pair that is one call with a different callee takes CF's `method` parameter and designators; written variables go by pointer as in Recipe O, and a written variable whose name differs but whose role is the same passes its address in the selector struct. *Careful* gives the argument | `morphology.c`'s `MorphologyPrimitive` (campaign A, W16 lane d): the Erode/Dilate walks with a `?:` on the callee are a cc 9 *Complex Method*, cc 8 with the designator; the intensity walks write `quantum_pixels`, `pixel` and `minimum` or `maximum`, and every walk reads the channel body's one walk struct. Probes 3.16 to 3.22 and 3.28, no finding on a new function, no indirect call, timing within 1%. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-10 | AMEND | CF | Step 4: copies in a function that already fills a Recipe N step 8 struct may read their inputs through it (MT step 8 (a)), `method` staying a parameter of its own, within four | `morphology.c`'s `MorphologyPrimitive` (campaign A, W16 lane d): the Convolve and IterativeDistance walks differ only in the callee and read the walk struct; step 4's own struct would repeat it. A probe 3.30 to 3.33, no finding on a new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-10 | AMEND | N | Step 4: the choice between `const` locals and the member form may be made member by member, a member named by an OpenMP clause or a function-like macro keeping its `const` local and a written member its step 2 local | `morphology.c`'s `MorphologyPrimitive` (campaign A, W16 lane d): its column pass as a Recipe N step 1 helper must bind `image`, `morphology_image`, `status` and `progress` (the pragma names them) and the six members it writes, and is a 76-line *Large Method* with every member bound; with the four read-only members its fetch and fill read in the member form, 66 lines, no finding (4.32 to 4.48 in a probe). Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
