@@ -9720,6 +9720,28 @@ static void SelectTextViewLine(const TextViewPress *press,
   (*state)|=RedrawListState;
 }
 
+static void ReleaseTextViewDismiss(const DialogRelease *release,
+  XWidgetInfo *dismiss_info,size_t *state)
+{
+  Display
+    *const display = release->display;
+
+  XWindows
+    *const windows = release->windows;
+
+  const XEvent
+    event = release->event;
+
+  if ((*dismiss_info).raised == MagickFalse)
+    {
+      if ((event.xbutton.window == windows->widget.id) &&
+          (MatteIsActive((*dismiss_info),event.xbutton)))
+        (*state)|=ExitState;
+      (*dismiss_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,&(*dismiss_info));
+    }
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -10112,6 +10134,9 @@ MagickPrivate void XTextViewWidget(Display *display,
       }
       case ButtonRelease:
       {
+        DialogRelease
+          release;
+
         if (windows->widget.mapped == MagickFalse)
           break;
         if (north_info.raised == MagickFalse)
@@ -10140,14 +10165,10 @@ MagickPrivate void XTextViewWidget(Display *display,
             slider_info.active=MagickFalse;
             break;
           }
-        if (dismiss_info.raised == MagickFalse)
-          {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(dismiss_info,event.xbutton)))
-              state|=ExitState;
-            dismiss_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-          }
+        release.display=display;
+        release.windows=windows;
+        release.event=event;
+        ReleaseTextViewDismiss(&release,&dismiss_info,&state);
         break;
       }
       case ClientMessage:
