@@ -1331,34 +1331,8 @@ static MagickBooleanType sRGBTransformCMYKOrGray(
   return(sRGBTransformLogOrLinear(table,image,status,exception));
 }
 
-static MagickBooleanType sRGBTransformImage(Image *image,
-  const ColorspaceType colorspace,ExceptionInfo *exception)
+static MagickBooleanType IsGenericColorspace(const ColorspaceType colorspace)
 {
-  const char
-    *artifact;
-
-  sRGBTableInput
-    table;
-
-  IlluminantType
-    illuminant = D65Illuminant;
-
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(colorspace != sRGBColorspace);
-  assert(colorspace != TransparentColorspace);
-  assert(colorspace != UndefinedColorspace);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  GetIlluminantArtifact(image,&artifact,&illuminant);
-  status=MagickTrue;
-  progress=0;
   switch (colorspace)
   {
     case CMYColorspace:
@@ -1389,6 +1363,42 @@ static MagickBooleanType sRGBTransformImage(Image *image,
     case YIQColorspace:
     case YPbPrColorspace:
     case YUVColorspace:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
+static MagickBooleanType sRGBTransformImage(Image *image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  sRGBTableInput
+    table;
+
+  IlluminantType
+    illuminant = D65Illuminant;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(colorspace != sRGBColorspace);
+  assert(colorspace != TransparentColorspace);
+  assert(colorspace != UndefinedColorspace);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  GetIlluminantArtifact(image,&artifact,&illuminant);
+  status=MagickTrue;
+  progress=0;
+  if (IsGenericColorspace(colorspace) != MagickFalse)
     {
       sRGBGenericInput
         input;
@@ -1397,9 +1407,6 @@ static MagickBooleanType sRGBTransformImage(Image *image,
       input.illuminant=illuminant;
       return(sRGBToGeneric(&input,image,status,exception));
     }
-    default:
-      break;
-  }
   table.colorspace=colorspace;
   table.progress=progress;
   return(sRGBTransformCMYKOrGray(&table,image,status,exception));
