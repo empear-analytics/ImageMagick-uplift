@@ -5506,6 +5506,14 @@ static MagickBooleanType IsNearThreeQuarterTurnAngle(const double angle)
   return((225.0 < angle && angle <= 315.0) ? MagickTrue : MagickFalse);
 }
 
+static double NormalizeKernelAngle(double angle)
+{
+  angle = fmod(angle, 360.0);
+  if ( angle < 0 )
+    angle += 360.0;
+  return(angle);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -5518,9 +5526,7 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
   */
 
   /* Modulus the angle */
-  angle = fmod(angle, 360.0);
-  if ( angle < 0 )
-    angle += 360.0;
+  angle=NormalizeKernelAngle(angle);
 
   if (IsNearZeroAngle(angle) != MagickFalse)
     return;   /* Near zero angle - no change! - At least not at this time */
