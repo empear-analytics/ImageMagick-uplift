@@ -596,6 +596,29 @@ static void SelectShearDirection(double *displacement,
     }
 }
 
+typedef struct _ShearProgress
+{
+  Image
+    *image;
+
+  const char
+    *tag;
+
+  size_t
+    extent;
+} ShearProgress;
+
+static void SetShearProgress(const ShearProgress *info,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(info->image,info->tag,progress,info->extent);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType XShearLine(const XShearRow *row,const ssize_t y,
   MagickBooleanType *status)
 {
@@ -709,16 +732,17 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
+        ShearProgress
+          info;
 
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,XShearImageTag,progress,height);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        info.image=image;
+        info.tag=XShearImageTag;
+        info.extent=height;
+        SetShearProgress(&info,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
