@@ -14,3 +14,11 @@ original; no new OpenMP exceptions). Start: campaign A mean 8.19, 27 of 74 files
   recipe covers. Merge it if you accept that.
 - No step on `vision.c`, `paint.c`, `statistic.c`, `effect.c`, `feature.c`, `resize.c`, `visual-effects.c`: their
   remaining findings are public argument counts and file length (or need B on an unreached function).
+
+## Lane b: channel.c 8.58 -> 9.28, effect-blur.c 8.22 -> 8.68, resize-image.c 8.32 -> 8.78 (Opus, 8 commits)
+
+One temporary drop: fcf5f64f4 (`resize-image.c` 8.32 -> 8.25, `--no-verify`, step 1 of a measured plan; the next step
+reaches 8.78). Upstream, not changed: `ChannelFxImage` leaks the image list when `AppendChannelCanvas` fails;
+`SharpenAdaptiveRows` releases its kernels with an inline copy of `RelinquishAdaptiveKernelSet`'s body.
+
+## Lane d, second batch: threshold.c, resample.c, colorspace-convert.c at plateau (Sonnet, no commits)
