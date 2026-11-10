@@ -7760,6 +7760,15 @@ static inline Quantum ScaleXToQuantum(const size_t x,
   return((Quantum) (((double) QuantumRange*x)/scale+0.5));
 }
 
+static inline MagickBooleanType IsColorRecoveryDither(const Image *image,
+  const XResourceInfo *resource_info,const size_t number_colors)
+{
+  return((((image->alpha_trait & BlendPixelTrait) == 0) &&
+    (resource_info->color_recovery == MagickFalse) &&
+    (resource_info->quantize_info->dither_method != NoDitherMethod) &&
+    (number_colors < MaxColormapSize)) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -7802,10 +7811,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       number_colors=(unsigned int) (map_info->base_pixel+
         (map_info->red_max+1)*(map_info->green_max+1)*(map_info->blue_max+1));
       if ((map_info->red_max*map_info->green_max*map_info->blue_max) != 0)
-        if (((image->alpha_trait & BlendPixelTrait) == 0) &&
-            (resource_info->color_recovery == MagickFalse) &&
-            (resource_info->quantize_info->dither_method != NoDitherMethod) &&
-            (number_colors < MaxColormapSize))
+        if (IsColorRecoveryDither(image,resource_info,number_colors) != MagickFalse)
           {
             Image
               *affinity_image;
