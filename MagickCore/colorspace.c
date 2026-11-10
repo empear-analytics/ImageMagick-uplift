@@ -1805,6 +1805,12 @@ typedef struct _LogTransformMap
     reference_white;
 } LogTransformMap;
 
+static void FillLogTransformMapTop(ssize_t i,Quantum *logmap)
+{
+  for ( ; i <= (ssize_t) MaxMap; i++)
+    logmap[i]=QuantumRange;
+}
+
 static void FillLogTransformMap(const LogTransformMap *log_map,
   Quantum *logmap)
 {
@@ -1825,8 +1831,7 @@ static void FillLogTransformMap(const LogTransformMap *log_map,
     logmap[i]=ClampToQuantum((double) QuantumRange/(1.0-black)*
       (pow(10.0,(MaximumLogarithmicColorspace*i/MaxMap-reference_white)*
       (gamma/density)*0.002*MagickSafeReciprocal(film_gamma))-black));
-  for ( ; i <= (ssize_t) MaxMap; i++)
-    logmap[i]=QuantumRange;
+  FillLogTransformMapTop(i,logmap);
 }
 
 typedef struct _ColorspaceLogRowInfo
