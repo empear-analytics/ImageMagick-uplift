@@ -7996,6 +7996,183 @@ approval of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe MT - Merge Mirrored Twins Through a Constant Selector
+
+**Use when:** CodeScene reports *Code Duplication* in a file (or a step towards another
+finding would create it) where two copies of one block are the same text except for a
+few runs of operators and expressions: a direction (`j++`/`j--`, the loop's start and
+bound), a comparison (`>=`/`>`), or an expression read where the other copy reads
+another (`black_point`, `((double) image->columns*image->rows-white_point)`).
+`enhance-tone.c`'s `FindStretchBlackLevel` and `FindStretchWhiteLevel` walk the histogram
+up from 0 and down from `MaxMap` with the same body; `morphology.c`'s Erode and Dilate
+kernel walks differ in the start of `k`, `k++`/`k--`, `>=`/`>` and the function called.
+
+**Not covered by:** Recipe D, SV, SC and TW, whose copies differ only in variables or in
+values (literals, enumeration constants, a side-effect-free expression read into one
+member), never in an operator or a statement; Recipe CF, whose copies differ only in the
+function called; Recipe E, which moves one copy, so that the second copy moved the same
+way clones the first.
+
+**How:**
+
+1. Copies. Two copies in one file, each the whole body of a `static` function or a block
+   that meets Recipe E steps 1 and 3 to 7 and the OpenMP rule, with no `#pragma` line.
+   Align their token sequences (each copy's variables renamed to one name per role, as
+   Recipe TW step 1 renames them): where they differ, each differing run must be a whole
+   expression in both copies, an operand of the same operator, a whole controlling
+   expression, a `for` clause, an initialiser or a whole argument, with no declaration and
+   no unbalanced parenthesis or brace. A run that differs only in the function called is
+   Recipe CF's; others need this recipe.
+2. The selector. Write `typedef enum { NameA, NameB } NameSide;` directly above the new
+   function, one constant per copy, named for what that copy does (`BlackStretchLevel`,
+   `WhiteStretchLevel`).
+3. Types. In each differing pair, the two runs have the same type, or both are integer
+   expressions whose values the conditional's type (the usual arithmetic conversions)
+   holds and the pair is converted to one target, an assignment's left side or a
+   parameter, as each copy's run was (`j=0` and `j=(ssize_t) MaxMap`). A pair whose runs
+   are statements' whole expressions (`j++`, `j--`) has its value discarded, and needs
+   only scalar types.
+4. Write one `static inline` function directly above the first caller: its parameters are
+   the variables a copy reads (Recipe E step 3) and `const NameSide side`, at most four in
+   all; when that would make five or more, the selector and the read values that differ
+   between the copies go in one `const` struct (`side` first, each member of the type of
+   the variable it holds) passed as `const Name *name`, bound as `const` locals of their
+   role names (Recipe N step 4). Its body is a copy's text with every differing pair
+   written `((side == NameA) ? runA : runB)`, each run verbatim, nothing else changed.
+5. Replace each copy by a call that passes its own enumeration constant (directly, or in
+   the initialiser of the `const` struct declared at the top of the block that holds the
+   call), never a variable or a computed value, and each variable in the position of its
+   parameter. A copy that was a function's whole body becomes that call, and the function
+   keeps its name and parameters for its own callers.
+6. Both copies move in one commit (rule 1). When a copy runs per pixel or per channel,
+   time it as Recipe CF step 7 says (a slowdown over 3% stops the step).
+7. Check by script that folding every `((side == C) ? a : b)` of the new function to the
+   run of the copy's constant `C` gives exactly that copy's token sequence (after the
+   renaming of step 1 and with the struct's bindings removed), and by reading that every
+   argument fills its parameter.
+
+**Before:**
+
+```c
+static ssize_t FindStretchBlackLevel(const Image *image,
+  const double *histogram,const ssize_t i,const double black_point)
+{
+  ...
+  intensity=0.0;
+  for (j=0; j <= (ssize_t) MaxMap; j++)
+  {
+    intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+    if (intensity > black_point)
+      break;
+  }
+  return(j);
+}
+
+static ssize_t FindStretchWhiteLevel(const Image *image,
+  const double *histogram,const ssize_t i,const double white_point)
+{
+  ...
+  intensity=0.0;
+  for (j=(ssize_t) MaxMap; j != 0; j--)
+  {
+    intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+    if (intensity > ((double) image->columns*image->rows-white_point))
+      break;
+  }
+  return(j);
+}
+```
+
+**After:**
+
+```c
+typedef enum
+{
+  BlackStretchLevel,
+  WhiteStretchLevel
+} StretchLevelSide;
+
+typedef struct _StretchLevelSearch
+{
+  StretchLevelSide
+    side;
+
+  double
+    point;
+} StretchLevelSearch;
+
+static inline ssize_t FindStretchLevel(const Image *image,
+  const double *histogram,const ssize_t i,const StretchLevelSearch *search)
+{
+  const StretchLevelSide
+    side = search->side;
+
+  const double
+    point = search->point;
+  ...
+  intensity=0.0;
+  for (j=((side == BlackStretchLevel) ? 0 : (ssize_t) MaxMap);
+       ((side == BlackStretchLevel) ? j <= (ssize_t) MaxMap : j != 0);
+       ((side == BlackStretchLevel) ? j++ : j--))
+  {
+    intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+    if (intensity > ((side == BlackStretchLevel) ? point :
+        ((double) image->columns*image->rows-point)))
+      break;
+  }
+  return(j);
+}
+
+static ssize_t FindStretchBlackLevel(const Image *image,
+  const double *histogram,const ssize_t i,const double black_point)
+{
+  const StretchLevelSearch
+    search = { BlackStretchLevel,black_point };
+
+  return(FindStretchLevel(image,histogram,i,&search));
+}
+```
+
+**Careful:**
+
+- The conditional operator evaluates its first operand, then exactly one of the other
+  two, with a sequence point between (C11 6.5.15). The first operand, `side == C`, reads
+  a `const` local and has no side effect, so each call evaluates exactly its copy's run
+  at each place, in the copy's order, and nothing else: no run of the other copy is ever
+  evaluated, not even its side effects (`j++` or `j--`). In a loop's controlling
+  expression and increment the selector is tested on every iteration, as the run was
+  evaluated.
+- Step 3 keeps every value. Runs of one type give the conditional that type, so the
+  value is the run's. Two integer runs converted to the conditional's common type, both
+  representable in it, keep their values, and the conversion to the target (`j`) that
+  each copy made is then made from the same value.
+- A value that differs between the copies stays where the copy read it (`point` in the
+  comparison is read on every iteration, as `black_point` was); only its source moves,
+  from a parameter to a struct member the caller filled from that parameter, unwritten
+  until the call returns.
+- Speed. The function is `static inline` and every call passes a constant selector, so
+  once it is inlined each conditional folds to its copy's run; the timing of step 6 is
+  the evidence in an optimised build, and without optimisation the tests remain, which
+  changes speed only.
+- `refactor_guard.py` reports the copies' literals once (`WARN`, deduplication, every
+  value still present) and `--calls` moves only the copies' callees, down by one copy's
+  calls, and the new function (its definition and its calls); anything else stops the
+  step.
+
+**Evidence level:** oracle (each copy reached by a case), with `refactor_guard.py
+--calls`, steps 1 and 7 checked by script, step 3 by reading, and step 6's timing when a
+copy runs per pixel.
+
+**Provenance:** 2026-11-10, from `enhance-tone.c`'s `FindStretchBlackLevel` and
+`FindStretchWhiteLevel` (campaign A, W16 lane b), the pair that holds the file's *Code
+Duplication* above its threshold: a probe of this recipe on the pair measured 6.99 to
+7.66, the finding gone, no finding on a new function. The mirrored morphology walks
+(Erode/Dilate, the forward and reverse passes) motivated the operator form; Recipes D,
+SV, SC, TW and CF refuse them. Added by Claude Code (Claude Opus 5.5) under the owner's
+approval of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -8301,3 +8478,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | SC | Extract Sibling Blocks Differing in Several Constants: copies of one block in one function that differ in two or more literal or enumeration constants move into one function taking a `const` struct of the constants (one member per role, typed as Recipe SV step 3 types the value); each copy becomes the struct's initialiser and the call; a forward declaration of the caller when the copies recurse into it | `quantize.c`'s `Riemersma` (campaign A, W16 lane c): cc 38, 109 lines, its four `level > 1` cases seven calls on four gravity constants each, its two `level == 1` cases three calls on three; as case helpers they clone (6.25, W14 lane b). A probe of the chain (this recipe twice, then Recipe O on the `level == 1` switch): 7.80 to 8.34, 8.41 and 8.74, no finding on a new function | mandate (2026-10-24) |
 | 2026-11-10 | NEW | CF | Merge Twins Differing in the Function They Call: two or more copies of one block (whole `static` function bodies, or blocks meeting Recipe E) that are the same text except for the function called at one role, every callee of one type (or of types that differ only in the parameter carrying the callee's inputs, which then becomes `const void *`), become one `static inline` function taking a `const` pointer of exactly that type; each copy becomes a call passing its callee's name. Per-pixel copies are timed against the baseline binary (over 3% slower stops the step) and checked with `objdump` for new indirect calls | `threshold.c` (campaign A, W16 lane b): its *Code Duplication* (eight functions) comes from row and pixel loops that differ only in the function called, which Recipes D, SV, SC and TW refuse. A probe of the chain with Recipe RL: 8.03 to 9.09, the finding gone, no finding on a new function; the inline form timed 0.382 s to 0.377 s (medians of nine), a per-pixel call through a struct member 0.388 s to 0.439 s (rejected) | owner |
 | 2026-11-10 | NEW | RL | Share a Parallel Row Loop Through a Row Function: the tails of several functions that hold the same whole parallel row loop, differing only in the row's work and the progress tag, move into one non-inline `static` function (the pragma unchanged) taking a `const` struct of the tag, a row function pointer and a `const void *` to the row's input; each row's work becomes a `static` row function of one type, and each tail becomes the struct's initialiser and `return(...)` of the call | `threshold.c` (campaign A, W16 lane b): `BlackThresholdImage`, `WhiteThresholdImage`, `PerceptibleImage` and `RangeThresholdImage`, four of the eight functions of its *Code Duplication*. Alone 8.03 (flat, seven functions left in the finding); with Recipe CF on the row functions 9.09. One indirect call per row; timed with the chain | owner |
+| 2026-11-10 | NEW | MT | Merge Mirrored Twins Through a Constant Selector: two copies of one block that differ in a few whole-expression runs (a loop's direction, start and bound, a comparison operator, an expression read in place of another) become one `static inline` function taking a `const` enumeration selector (alone, or first in a `const` struct with the differing read values); every differing pair is written `((side == A) ? runA : runB)` with the runs verbatim, and each copy becomes a call passing its own enumeration constant. Checked by folding the conditionals back to each copy's tokens; timed when per pixel | `enhance-tone.c`'s `FindStretchBlackLevel` and `FindStretchWhiteLevel` (campaign A, W16 lane b): the pair holds the file's *Code Duplication* over its threshold; a probe measured 6.99 to 7.66, the finding gone, no finding on a new function. The mirrored `morphology.c` walks, which Recipes D, SV, SC, TW and CF refuse, motivated the operator form | owner |
