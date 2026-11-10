@@ -159,7 +159,8 @@ helper (its definition and its call) before its `PASS` line. Any other count tha
 moves is the `WARN` that stops the commit.
 Recipes D and S fold code together or move it, the guard cannot follow them, and
 they need the oracle. The one exception is Recipe D's *Unreached functions* form,
-whose proof is an identical object file, not the guard. Recipe CN rests on the
+whose proof is an identical object file, not the guard (or, under its *Object code
+that differs only in the caller*, `tools/obj_modulo.sh` and `tools/reuse_check.py`). Recipe CN rests on the
 same proof, so it applies at either level.
 
 **Unreached functions: B and N** (owner, 2026-11-10). Recipes B and N may also be
@@ -644,6 +645,45 @@ value still present), and `--calls` may move only the functions the replaced cod
 down by the number of calls it made) and the helper it now calls (up by one); any
 other movement stops the step.
 
+**Object code that differs only in the caller** (owner, 2026-11-10). When
+`obj_identical.sh` prints `DIFFERENT` because the caller's own code is laid out or
+scheduled differently once it calls the helper, the replacement may still be made,
+`Verified: guard`, when all of these hold, each run before the commit and quoted in its
+message:
+
+- the first two conditions above (casemap 0 for the function and its callers; the
+  block identical to the helper's body, checked by the script of the next item);
+- `python3 tools/reuse_check.py <file> <Helper>` prints `OK`: the call is the only line
+  added, no preprocessor line is removed, and the removed lines, rewritten as the call
+  binds them (an argument `&v` for a pointer parameter `p` makes every `v` of the block
+  `(*p)` and every `&v` `p`; any other argument `e` for `p` makes every `e` `p`; a
+  name of the block that is a parameter's name but not its argument matches nothing),
+  are the helper's body line for line, as many times each;
+- `sh tools/obj_modulo.sh <file> <Caller> <Helper>` prints `IDENTICAL` or
+  `MODULO-IDENTICAL` (every other function's instructions unchanged; *Two levels of
+  evidence*, item 4);
+- the guard as above (the dedup `WARN` with every value present; `--calls` moving only
+  the replaced code's callees down and the helper up by one).
+
+Inside a parallel loop the helper may write the loop's shared `status`, or one of
+Recipe PS step 2's shared scalars, through a pointer parameter, when the block meets
+PS steps 1 to 3 (no `#pragma` in it, no `return`, `goto`, or `continue`/`break` leaving
+it, the scalar shared in the pragma; checked by reading) and the call passes `&status`:
+the helper is then a PS helper called a second time, and PS *Careful* is the argument
+for the threads (each `(*status)` is the shared flag, read and written at the same
+points, nothing copied or deferred). Every other OpenMP condition of *Careful* stands:
+the helper writes no other variable declared outside the loop body.
+
+Why this proves the step: `obj_modulo.sh` shows that nothing outside the caller
+changed (the helper, if it is still emitted, compiles as before); `reuse_check.py`
+shows that the call runs the helper's body on exactly the objects the block named,
+argument by argument, so the caller does what it did, statement for statement, as in
+D's renaming argument (an `&v` bound to `p` makes `(*p)` the object `v`, Recipe O's
+argument). A transposed or wrong argument leaves a name of the block unbound and fails
+the check; types are checked by the build and by reading. Planted errors on
+`transform.c`'s `ExcerptImage` (another tag constant, `excerpt_image` passed for
+`image`, a stray edit elsewhere, the `#pragma omp atomic` dropped) were each caught.
+
 **Copies without a *Code Duplication* finding.** CodeScene reports no *Code Duplication*
 for copies inside one function, nor for a block that repeats the body of an existing
 helper, though both make the function longer and add branches. D may be used for them
@@ -680,7 +720,8 @@ throws with `GetMagickModule()` now names the helper, which the oracle normalise
   stays untouched, as everywhere.
 
 **Evidence level:** oracle; or, for a function no case reaches, the identical object
-file of *Unreached functions*.
+file of *Unreached functions*, or its *Object code that differs only in the caller*
+(`tools/reuse_check.py` and `tools/obj_modulo.sh`).
 
 **Provenance:** founding recipe (2026-09-29). *Casts to the variable's own type:* 2026-10-30, from
 `colorspace.c`'s `SetImageGray` and `SetImageMonochrome`, whose closing blocks differ in
@@ -690,7 +731,13 @@ campaign A's W11 session: `vision.c`'s `ConnectedComponentsImage` (eight identic
 threshold-range parses, 2221d8d57), `effect-blur.c`'s `RotationalBlurImage` (a second
 copy of `CloneDirectImage`'s body, 42d350a1b), `enhance-tone.c`'s `GammaImage` and
 `enhance.c`'s `CLAHEImage` (a second row loop equal to an existing helper). Added by Claude
-Code (Claude Sonnet 5.5).
+Code (Claude Sonnet 5.5). *Object code that differs only in the caller:* 2026-11-10,
+owner's OK to evolve the recipes, from campaign A's W16 lane d: `transform.c`'s
+`ExcerptImage` (no case, no in-tree caller), whose progress tail is
+`SetTransformProgress`'s body (a PS helper every other loop of the file calls); the
+call compiles to a different `ExcerptImage` (DIFFERENT) with every other function
+unchanged (MODULO-IDENTICAL), 8.95 to 9.09 in a probe. Added by Claude Code (Claude
+Opus 5.5).
 
 ---
 
@@ -8225,3 +8272,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | B, N | *Two levels of evidence*, *Unreached functions: B and N*: B and N may be applied to a function no case reaches, `Verified: guard`, when the step meets its recipe (checked by reading; no block that throws through `GetMagickModule()`), the guard prints `OK` with `--calls` moving only `+2` for an N helper (nothing for B), `tools/struct_fill_check.py` prints `OK` for N (members filled and bound by their own names, every removed line moved unchanged; B's fill checked by reading against the old call), and `tools/obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL` (every other function's instructions unchanged, no new function but the helper, only the helper's callees un-inlined). Both tools are new. Evidence lines of B and N say so | `paint.c`'s `TransparentPaintImageChroma` and `segment.c`'s `GetImageDynamicThreshold` (campaign A, W16 lane d), reached by no case: an E helper of Chroma's pixel loop takes six arguments (9.68, but a new *Excess Arguments*); the N form of it compiles byte-identical; the N form of `GetImageDynamicThreshold`'s removal tail compiles to the same instructions in every other function, the helper's two callees inlined into it. Planted errors (a member bound from another member, a fill from another variable, a flipped comparison in the moved block, a literal changed in another function) are each caught by one of the checks; forced-inline comparisons refused the correct step (scheduling) | owner |
 | 2026-11-10 | NEW | LE | Replace a Local Enum with a File-Scope Enum: a function-local `typedef enum` whose constants map one to one, by position and with default values, onto an enumeration the file already declares is deleted; its constants become the file-scope ones and its locals take the file-scope type. The values are only assigned to the function's locals, compared and switched on, never stored elsewhere, passed, returned or printed; each pair plays the same role (checked by reading); proven by `tools/obj_identical.sh` printing `IDENTICAL` | `shear.c`'s `YShearImage` (campaign A, W16 lane d): its `UP`/`DOWN` enum shadows the file's `LEFT`/`RIGHT` `ShearDirection` and is all that keeps its direction choice from `SelectShearDirection` (D) and its transfer `switch` from `TransferXShearSpan` (TW); the parked branch `w16-shear-enum` folded the replacement into a PC commit. A probe: `IDENTICAL`, 9.17 to 9.19; the chain it opens (D, TW, PS, PC, PS) reaches 10.0 | owner |
 | 2026-11-10 | AMEND | I | *Two levels of evidence*, *Unreached functions: Recipe I*: Recipe I may be applied to a function no case reaches, `Verified: guard`, with *Unreached functions: B and N* items 1, 2 and 4 as written and, for item 3, `tools/targets_fill_check.py` printing `OK` (members filled with the addresses of the variables of their own names, in order, or by the `const` initialiser; bindings by name; the removed lines under step 5's mechanical rewrite and the helper's body the same multiset; each exit back unchanged in the caller and as many `return(MagickFalse);` in the helper); a throwing exit moves only in step 8's form, left in the caller. Item 4 also admits a function that vanished because the shortened caller now inlines it, when the caller calls it and its text is unchanged (`tools/obj_modulo.sh`, also for B and N). The guard-verified sentence, I's *Evidence level* and AGENTS.md say so. The new tool and the `obj_modulo.sh` change are commits of their own | `segment.c`'s `GetImageDynamicThreshold` (campaign A, W16 lane d), reached by no case: its region loops write `cluster`, `head`, `red`, `green` and `blue` (I, not B or N); two I helpers probe 7.14 to 9.02, `MODULO-IDENTICAL` with `CountImagePixelsByRGB` and `FinishDynamicThreshold` now inlined into the shortened caller. Planted errors (fill from another variable, fill out of order, binding of another member, flipped comparison, missing `*`, duplicated statement, extra exit, a statement added elsewhere, a literal changed in a newly inlined function) are each caught | owner |
+| 2026-11-10 | AMEND | D | *Unreached functions*, *Object code that differs only in the caller*: when `obj_identical.sh` prints `DIFFERENT`, the replacement may still be made at the guard level when `tools/reuse_check.py` prints `OK` (the call the only added line; the removed block, rewritten as the call's arguments bind it, `&v` for a pointer parameter `p` as `(*p)`, is the helper's body line for line) and `tools/obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL`; inside a parallel loop the helper may write the shared `status` (or a PS step 2 scalar) through a pointer when the block meets PS steps 1 to 3 (a PS helper called again; PS *Careful*). *Two levels of evidence*, D's *Evidence level* and AGENTS.md say so; the tool is a commit of its own | `transform.c`'s `ExcerptImage` (campaign A, W16 lane d), reached by no case: its progress tail is `SetTransformProgress`'s body; the call gives a different `ExcerptImage` but every other function the same instructions; 8.95 to 9.09 in a probe. Planted errors (another tag, `excerpt_image` for `image`, a stray edit, the atomic pragma dropped) are each caught | owner |
