@@ -38,3 +38,13 @@ merging `CompositeCopyImage`/`CompositeIntensityImage` through a row-operation p
 reduction variables through pointers (`BlendRMSEResidual`); merging mirrored forward/reverse twins
 (`morphology.c`). **Upstream, likely a real bug, not changed:** `BlendRMSEResidual` resets `channel_residual=0.0`
 on every row inside its reduction loop, so only the last row's sum survives.
+
+## Lane c: colorspace.c 7.44 -> 8.62, quantize.c 7.80 -> 8.74 (Opus, 24 commits + 2 playbook)
+
+New recipes under the mandate, not yet ruled on: **Recipe LP** (eb285eae6, Name a Label Set as a Predicate: a
+two-group `switch` whose single group returns on every path becomes `if (Pred(e) != MagickFalse)` with a predicate
+holding the labels; equal label sets may share it) and **Recipe SC** (bd93823d5, Extract Sibling Blocks Differing in
+Several Constants: SV generalised to two or more constants, carried in a const struct; copies identical by script
+once the constants are named by role). **Note:** `Riemersma`'s recursion now passes through one extra function per
+level. Upstream, not changed: `TransformsRGBByTables` takes `status` from `TransformsRGBPixels` and returns
+`MagickTrue` anyway.
