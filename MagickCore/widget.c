@@ -8279,6 +8279,82 @@ static void DrawMenuSelections(const MenuSelections *entries,
   }
 }
 
+typedef struct _MenuTargets
+{
+  XWidgetInfo
+    *selection_info,
+    *highlight_info;
+} MenuTargets;
+
+typedef struct _MenuPointer
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *selections;
+
+  unsigned int
+    number_selections,
+    top_offset;
+
+  int
+    id;
+} MenuPointer;
+
+static void EnterMenuSelection(const MenuPointer *pointer,
+  const MenuTargets *targets)
+{
+  Display
+    *const display = pointer->display;
+
+  XWindows
+    *const windows = pointer->windows;
+
+  const char
+    *const *const selections = pointer->selections;
+
+  const unsigned int
+    number_selections = pointer->number_selections,
+    top_offset = pointer->top_offset;
+
+  const int
+    id = pointer->id;
+
+  XWidgetInfo
+    *const selection_info = targets->selection_info,
+    *const highlight_info = targets->highlight_info;
+
+  if (((*selection_info).id >= 0) &&
+      ((*selection_info).id < (int) number_selections))
+    {
+      /*
+        Unhighlight last selection.
+      */
+      if (id == (*selection_info).id)
+        return;
+      (*selection_info).y=((int) top_offset+(*selection_info).id*(int)
+        (*selection_info).height);
+      (*selection_info).text=(char *) selections[(*selection_info).id];
+      XDrawWidgetText(display,&windows->widget,selection_info);
+    }
+  if ((id < 0) || (id >= (int) number_selections))
+    return;
+  /*
+    Highlight this selection.
+  */
+  (*selection_info).id=id;
+  (*selection_info).y=((int) top_offset+(*selection_info).id*(int)
+    (*selection_info).height);
+  (*selection_info).text=(char *) selections[(*selection_info).id];
+  XDrawWidgetText(display,&windows->widget,selection_info);
+  (*highlight_info).y=(*selection_info).y+(int) (*highlight_info).bevel_width;
+  XDrawBevel(display,&windows->widget,highlight_info);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -8316,6 +8392,9 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
 
   XWindowChanges
     window_changes;
+
+  const MenuTargets
+    targets = { &selection_info, &highlight_info };
 
   /*
     Determine Menu widget attributes.
@@ -8539,6 +8618,9 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       }
       case EnterNotify:
       {
+        MenuPointer
+          pointer;
+
         if (event.xcrossing.window != windows->widget.id)
           break;
         if (event.xcrossing.state == 0)
@@ -8547,31 +8629,13 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
         if (selection_info.height == 0)
           break;
         id=((event.xcrossing.y-(int) top_offset)/(int) selection_info.height);
-        if ((selection_info.id >= 0) &&
-            (selection_info.id < (int) number_selections))
-          {
-            /*
-              Unhighlight last selection.
-            */
-            if (id == selection_info.id)
-              break;
-            selection_info.y=((int) top_offset+selection_info.id*(int)
-              selection_info.height);
-            selection_info.text=(char *) selections[selection_info.id];
-            XDrawWidgetText(display,&windows->widget,&selection_info);
-          }
-        if ((id < 0) || (id >= (int) number_selections))
-          break;
-        /*
-          Highlight this selection.
-        */
-        selection_info.id=id;
-        selection_info.y=((int) top_offset+selection_info.id*(int)
-          selection_info.height);
-        selection_info.text=(char *) selections[selection_info.id];
-        XDrawWidgetText(display,&windows->widget,&selection_info);
-        highlight_info.y=selection_info.y+(int) highlight_info.bevel_width;
-        XDrawBevel(display,&windows->widget,&highlight_info);
+        pointer.display=display;
+        pointer.windows=windows;
+        pointer.selections=selections;
+        pointer.number_selections=number_selections;
+        pointer.top_offset=top_offset;
+        pointer.id=id;
+        EnterMenuSelection(&pointer,&targets);
         break;
       }
       case Expose:
