@@ -6944,8 +6944,7 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
                   canvas->columns,1,exception);
                 if (p == (const Quantum *) NULL)
                   break;
-                if ((red_gamma != 1.0) || (green_gamma != 1.0) ||
-                    (blue_gamma != 1.0))
+                if (IsGammaCorrected() != MagickFalse)
                   {
                     /*
                       Gamma correct canvas.
@@ -6985,8 +6984,7 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
                     canvas->columns,1,exception);
                   if (p == (const Quantum *) NULL)
                     break;
-                  if ((red_gamma != 1.0) || (green_gamma != 1.0) ||
-                      (blue_gamma != 1.0))
+                  if (IsGammaCorrected() != MagickFalse)
                     {
                       /*
                         Gamma correct canvas.
