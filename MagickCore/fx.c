@@ -3102,6 +3102,79 @@ static MagickBooleanType FinishFunctionArguments (FxInfo * pfx, int FndArgs,
   return(CloseFunction (pfx, chLimit, closing));
 }
 
+typedef struct _ArgumentCount
+{
+  FunctionE
+    fe;
+
+  const char
+    *funStr,
+    *strLimit;
+
+  char
+    chLimit;
+
+  int
+    FndOne,
+    ndx0;
+
+  ArgumentIndexes
+    indexes;
+} ArgumentCount;
+
+typedef struct _ArgumentCountTargets
+{
+  int
+    *FndArgs,
+    *nArgs;
+} ArgumentCountTargets;
+
+static MagickBooleanType CountFunctionArgument (FxInfo * pfx,
+  const ArgumentCount *count, const ArgumentCountTargets *targets)
+{
+  const FunctionE
+    fe = count->fe;
+
+  const char
+    *const funStr = count->funStr,
+    *const strLimit = count->strLimit;
+
+  const char
+    chLimit = count->chLimit;
+
+  const int
+    FndOne = count->FndOne,
+    ndx0 = count->ndx0;
+
+  const ArgumentIndexes
+    indexes = count->indexes;
+
+  int
+    *const FndArgs = targets->FndArgs,
+    *const nArgs = targets->nArgs;
+
+  ArgumentAddressing addressing;
+
+    if (strchr (strLimit, chLimit)==NULL) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "For function", "'%s' expected one of '%s' after expression but found '%c' at '%s'",
+        funStr, strLimit, chLimit ? chLimit : ' ', SetShortExp(pfx));
+      return MagickFalse;
+    }
+    if (FndOne) {
+      (*FndArgs)++;
+      (*nArgs)--;
+    }
+    addressing.fe=fe;
+    addressing.funStr=funStr;
+    addressing.FndArgs=*FndArgs;
+    addressing.ndx0=ndx0;
+    if (AddArgumentAddressing (&addressing, pfx, &indexes) == MagickFalse)
+      return MagickFalse;
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -3147,7 +3220,8 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
   while (nArgs > 0) {
     int FndOne = 0;
-    ArgumentAddressing addressing;
+    ArgumentCount count;
+    ArgumentCountTargets countTargets;
     const ArgumentIndexes indexes = { &ndx1, &ndx2, &ndx3 };
     if (TranslateStatementList (pfx, strLimit, &chLimit)) {
       FndOne = 1;
@@ -3165,22 +3239,16 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       FndOne = 1;
     }
 
-    if (strchr (strLimit, chLimit)==NULL) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "For function", "'%s' expected one of '%s' after expression but found '%c' at '%s'",
-        funStr, strLimit, chLimit ? chLimit : ' ', SetShortExp(pfx));
-      return MagickFalse;
-    }
-    if (FndOne) {
-      FndArgs++;
-      nArgs--;
-    }
-    addressing.fe=fe;
-    addressing.funStr=funStr;
-    addressing.FndArgs=FndArgs;
-    addressing.ndx0=ndx0;
-    if (AddArgumentAddressing (&addressing, pfx, &indexes) == MagickFalse)
+    count.fe=fe;
+    count.funStr=funStr;
+    count.strLimit=strLimit;
+    count.chLimit=chLimit;
+    count.FndOne=FndOne;
+    count.ndx0=ndx0;
+    count.indexes=indexes;
+    countTargets.FndArgs=(&FndArgs);
+    countTargets.nArgs=(&nArgs);
+    if (CountFunctionArgument (pfx, &count, &countTargets) == MagickFalse)
       return MagickFalse;
     if (chLimit == expChLimit) {
       lenExp = (size_t) (pfx->pex - pExpStart - 1);
