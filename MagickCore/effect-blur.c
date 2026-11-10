@@ -2305,7 +2305,7 @@ typedef struct _MotionSum
 } MotionSum;
 
 static MagickBooleanType SumMotionPixels(const MotionSum *sum,double *pixel,
-  MagickRealType **k)
+  MagickRealType *magick_restrict *k)
 {
   CacheView
     *const motion_view = sum->motion_view;
@@ -2373,7 +2373,7 @@ typedef struct _MotionBlendedSum
 } MotionBlendedSum;
 
 static MagickBooleanType SumMotionBlendedPixels(const MotionBlendedSum *sum,
-  double *pixel,double *gamma,MagickRealType **k)
+  double *pixel,double *gamma,MagickRealType *magick_restrict *k)
 {
   const Quantum
     *magick_restrict r;
@@ -3977,7 +3977,7 @@ typedef struct _SelectiveRow
   Image
     *blur_image;
 
-  const Image
+  Image
     *luminance_image;
 
   CacheView
