@@ -9546,6 +9546,118 @@ owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe EM - Replace an Equality Chain with a Membership Table
+
+**Use when:** CodeScene reports *Complex Method* on a predicate whose complexity is one
+chain of equality tests of one parameter against enumeration constants joined by `||`,
+returned as `MagickTrue` or `MagickFalse`: `fx.c`'s `IsPixelAccessFunction` (eight
+functions, cc 9), `IsUnqualifiedPixelFunction` (the same chain behind a channel test,
+cc 9) and `IsChannelQualifiableOperator` (six operators before an attribute range test,
+cc 9). Each `||` counts one, so a chain of eight constants is a *Complex Method* however
+short its text.
+
+**Not covered by:** Recipe TB, whose membership form starts from a `switch` of labels and
+a closing `return(MagickFalse);`: here there is no `switch`, only an expression. Recipe
+LP, which makes such a predicate from a `switch` and keeps its labels. Recipe P, which
+names a condition and moves it whole; its *Leading operands of a chain* form moves only a
+prefix and only when the whole chain would take five or more parameters, and the
+predicate here already is the whole chain. Recipe CN, which joins nested `if`s. No
+recipe turns an expression into data.
+
+**How:**
+
+1. The function is `static`, lies outside every OpenMP region and is not called per
+   pixel or per channel (check its callers by reading; otherwise time the step as Recipe
+   CF step 7 says, a slowdown over 3% stopping it). Its body is, apart from comments,
+   `return((C) ? MagickTrue : MagickFalse);`, where `C` is, line breaks and spaces aside,
+   one of: (a) the *chain* `n == L1 || n == L2 || ... || n == Lk`, `k` at least 2, `n` a
+   parameter of an integer or enumeration type that no operand writes, each `Li` an
+   enumeration constant, all distinct; (b) `a && (chain)`, where `a` is a comparison of
+   another parameter with a constant (no call, no assignment, no increment); (c) `chain
+   || (r)`, where `r` is a last parenthesised operand with no call, assignment or
+   increment. No `#if` line stands inside the function.
+2. Directly above the function write a `static const` array with no size, of the
+   declared type of `n` (`FunctionE`, `int`), named for what it holds, whose elements are
+   `L1 ... Lk` in the chain's order, its line breaks where the chain's were.
+3. Declare `size_t i;` at the top of the function and replace the `return` with the
+   lookup `for (i=0; i < (sizeof(T)/sizeof(*T)); i++)` / `if (T[i] == n)` /
+   `return(MagickTrue);`, then: in form (a) `return(MagickFalse);`; in form (b) the
+   lookup stands under `if (a)`, `a`'s text unchanged, followed by
+   `return(MagickFalse);`; in form (c) the lookup is followed by
+   `return((r) ? MagickTrue : MagickFalse);`, `r`'s text unchanged. The function's
+   name, parameters, return type and comments stay.
+4. Check by script that the table holds exactly the constants of the chain, each once
+   and in its order, that `a` or `r` reappears unchanged, and that nothing else in the
+   file changed.
+5. `refactor_guard.py`: `WARN` with the literal `0` (the loop's start) added once and
+   nothing else added or removed; `--calls` moves nothing. One function per commit.
+
+**Before:**
+
+```c
+static inline MagickBooleanType IsPixelAccessFunction(const FunctionE fe)
+{
+  return((fe == fP || fe == fU  || fe == fU0 || fe == fUP ||
+    fe == fV || fe == fVP || fe == fS || fe == fSP) ? MagickTrue : MagickFalse);
+}
+```
+
+**After:**
+
+```c
+static const FunctionE
+  PixelAccessFunctions[] =
+  {
+    fP, fU, fU0, fUP,
+    fV, fVP, fS, fSP
+  };
+
+static inline MagickBooleanType IsPixelAccessFunction(const FunctionE fe)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(PixelAccessFunctions)/sizeof(*PixelAccessFunctions)); i++)
+    if (PixelAccessFunctions[i] == fe)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same, form (a). `||` evaluates its operands left to right and
+  stops at the first true one (C11 6.5.14); no operand has a side effect, so the chain's
+  value is whether `n` equals one of `L1 ... Lk`, and nothing else is observable. The loop
+  compares `n` with the same constants (step 4) in the same order and returns
+  `MagickTrue` at the first equal one; when none is equal it returns `MagickFalse`, the
+  value `?:` gave a false chain. Each element has `n`'s declared type, so `T[i] == n`
+  compares the values `n == Li` compared: an enumeration constant has type `int` (C11
+  6.4.4.3) and converts to the enumeration or stays `int` without change of value.
+- Form (b). `a && (chain)` evaluates `a` first and the chain only when `a` is true; `if
+  (a)` runs the lookup exactly then, and a false `a` reaches `return(MagickFalse);` as the
+  `&&` made the condition false. Form (c). `r` was evaluated only when no `Li` matched;
+  the closing `return((r) ? ...)` is reached exactly then, and returns what `?:` returned
+  for `r` alone.
+- The table is new data the function only reads: `static`, `const`, not visible outside
+  the file; no existing table changes (*Absolutely forbidden*). Every constant of the
+  chain is still written once, in the table. No literal is changed; the loop adds `0`.
+- Only the number of comparisons and a loop counter change, which is speed (step 1).
+
+**Evidence level:** oracle (the cases that reach the predicate's callers), with step 4's
+script, step 5's guard fingerprint, and step 1 checked by reading.
+
+**Provenance:** 2026-11-10, from `fx.c`'s parse-time predicates `IsPixelAccessFunction`,
+`IsUnqualifiedPixelFunction` and `IsChannelQualifiableOperator` (campaign A, W16 lane c),
+each a *Complex Method* of cc 9 made of one `||` chain, three of the nine *Complex
+Method* functions that hold the file; TB, LP and P refuse them. A probe of the three:
+each leaves *Complex Method* with no new function, the file flat at 3.62; with the
+`FxImage` tail (Recipes H and N) and the `ImageStat` chain (Recipes P and SD) it
+measured 3.62 to 3.73 end to end. Added by Claude Code (Claude Opus 5.5) under the
+owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -9873,3 +9985,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | LS | Extract Linear Searches Over a Member Chosen by Its Offset: copies of `u=0; while (a[u].m != e) u++;` that differ in the integer member `m` and the side-effect-free integer value `e` (the paired form `u=0; v=0;` before two loops included) become `u=FindName(a,offsetof(S,m),e);` of one `static inline` function whose test reads `(*(const T *) ((const char *) &a[u]+member))` against `value`; *Careful* gives the argument (the member object read through its offset, the loop-invariant value evaluated once, the counter returned); checked by script, timed | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the ten gray-level searches of the sequential co-occurrence build, which held the file's depth 5; five per-channel helpers clone each other (5.98 to 5.57); a probe of this step 5.98 to 6.14, of the chain it opens 7.44; features workload 4.83 s to 4.57 s (medians of nine) | owner |
 | 2026-11-10 | AMEND | E | Step 3: an element of an array reached through a pointer, which the block updates member by member outside every OpenMP region, passes by address (`&e`, the element expression verbatim, to `T *v`; each `e.m` becomes `v->m`) when its indices have no side effect and are not written by the block and the block touches the element only through its members; the address computed once names the element every statement named | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the normalisation of the co-occurrence matrix, `cooccurrence[x][y].direction[i].<c>*=normalize;` for five channels at depth 4, which as a by-value block would take six parameters; a probe of the step 6.28 to 6.70, no finding on the new function | owner |
 | 2026-11-10 | NEW | KT | Replace a Keyed Label Run with a Table Lookup: a `switch` on an integer whose groups each assign one variable from the same call with one constant argument, under sparse integer labels, with `default:` sharing one group (form A) or in a group of its own that leaves the function (form B), becomes a `static const` table of `{ key, constant }` elements (one shared `typedef struct`) and a lookup loop that ends on the matching element, or on the last element (form A, the `default:` group placed last) or past the table (form B, which then runs the `default:` body); table checked by script; guard `WARN` with `0` and `1` added once each (form A); string constants only read as text | `morphology.c`'s `AcquireThinSEKernel` (cc 25, 78 lines), `AcquireLaplacianKernel` (cc 11) and `AcquireLineJunctionsKernel` (cc 9), campaign A, W16 lane d: label runs that TB's forms refuse (the function goes on after the `switch`; sparse keys); probes: each leaves *Complex Method* with no new function, the file flat at 3.10 (17 to 14 *Complex Method* functions), Laplacian 68 reaching cases 0 diverged | owner |
+| 2026-11-10 | NEW | EM | Replace an Equality Chain with a Membership Table: a `static` predicate whose body is `return((C) ? MagickTrue : MagickFalse);` with `C` a logical-or chain of `n == Li` (a parameter against distinct enumeration constants), alone, behind `a &&` (a side-effect-free comparison of another parameter), or before a last side-effect-free parenthesised operand `r`, becomes a loop over a new `static const` table of the constants in chain order (under `if (a)`, or followed by `return((r) ? MagickTrue : MagickFalse);`); table checked by script; guard `WARN` with `0` added once; timing when called per pixel | `fx.c`'s `IsPixelAccessFunction`, `IsUnqualifiedPixelFunction` and `IsChannelQualifiableOperator` (cc 9 each), campaign A, W16 lane c: logical-or chains that TB (no `switch`), LP and P refuse; probes: each leaves *Complex Method* with no new function, fx.c flat at 3.62, and 3.62 to 3.73 with the planned `FxImage` and `ImageStat` steps. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
