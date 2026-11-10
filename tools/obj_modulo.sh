@@ -16,7 +16,8 @@
 #           instruction;
 #       (2) the functions present after but not before to be HELPER alone;
 #       (3) the functions present before but not after to be functions that HELPER's
-#           body calls (a different inlining decision, not a change of code);
+#           body calls, or that CALLER's body calls and whose definition is the same
+#           text on both sides (a different inlining decision, not a change of code);
 #     and prints MODULO-IDENTICAL and exits 0, or DIFFERENT and exits 1.
 # CALLER and HELPER themselves are not compared here: their text is checked by
 # refactor_guard.py (literals and calls) and by tools/struct_fill_check.py.
@@ -74,14 +75,29 @@ for f in $only_after
 do
   [ "$f" = "$helper" ] || { echo "  unexpected new function $f"; rc=1; }
 done
-body=$(awk -v h="$helper" '
-  $0 ~ "^static .*[ *]" h "\\(" { on=1 }
-  on { print }
-  on && /^}/ { exit }' "$root/$file")
+fn_text() {  # fn_text NAME FILE: the definition of NAME in FILE
+  awk -v h="$1" '
+    $0 ~ "^(static|MagickExport|MagickPrivate|ModuleExport) .*[ *]" h "\\(" { on=1 }
+    on { print }
+    on && /^}/ { exit }' "$2"
+}
+body=$(fn_text "$helper" "$root/$file")
+caller_body=$(fn_text "$caller" "$root/$file")
 for f in $only_before
 do
-  echo "$body" | grep -q "[^A-Za-z0-9_]$f(" ||
-    { echo "  $f vanished but $helper does not call it"; rc=1; }
+  echo "$body" | grep -q "[^A-Za-z0-9_]$f(" && continue
+  # A function the shortened caller now inlines: allowed when the caller calls it
+  # and its definition is the same text on both sides (an inlining decision, not a
+  # change of code).
+  if echo "$caller_body" | grep -q "[^A-Za-z0-9_]$f(" &&
+     [ -n "$(fn_text "$f" "$tmp/before/$base")" ] &&
+     [ "$(fn_text "$f" "$tmp/before/$base")" = "$(fn_text "$f" "$tmp/after/$base")" ]
+  then
+    echo "  $f now inlined into $caller (its text unchanged)"
+    continue
+  fi
+  echo "  $f vanished but neither $helper calls it nor $caller with its text unchanged"
+  rc=1
 done
 compared=0
 for f in $(comm -12 "$tmp/before.syms" "$tmp/after.syms")
