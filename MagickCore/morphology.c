@@ -2121,6 +2121,31 @@ static KernelInfo *AcquireNamedEdgeKernel(const KernelInfoType type,
   return(kernel);
 }
 
+typedef struct _KernelRadius
+{
+  double
+    minimum;
+
+  size_t
+    default_width;
+} KernelRadius;
+
+static void SetKernelRadius(KernelInfo *kernel,const GeometryInfo *args,
+  const KernelRadius *radius)
+{
+  const double
+    minimum = radius->minimum;
+
+  const size_t
+    default_width = radius->default_width;
+
+  if (args->rho < minimum)
+    kernel->width = kernel->height = default_width;
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2335,11 +2360,10 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         return(AcquireDiskKernel(kernel,args,nan));
       case PlusKernel:
         {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 5;  /* default radius 2 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+          const KernelRadius
+            radius = { 1.0, 5 };  /* default radius 2 */
+
+          SetKernelRadius(kernel,args,&radius);
 
           if (AcquireKernelValues(kernel) == MagickFalse)
             return(DestroyKernelInfo(kernel));
@@ -2354,11 +2378,10 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         }
       case CrossKernel:
         {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 5;  /* default radius 2 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+          const KernelRadius
+            radius = { 1.0, 5 };  /* default radius 2 */
+
+          SetKernelRadius(kernel,args,&radius);
 
           if (AcquireKernelValues(kernel) == MagickFalse)
             return(DestroyKernelInfo(kernel));
@@ -2409,11 +2432,10 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         return(AcquireChebyshevKernel(kernel,args));
       case ManhattanKernel:
         {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 3;  /* default radius = 1 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+          const KernelRadius
+            radius = { 1.0, 3 };  /* default radius = 1 */
+
+          SetKernelRadius(kernel,args,&radius);
 
           if (AcquireKernelValues(kernel) == MagickFalse)
             return(DestroyKernelInfo(kernel));
@@ -2427,11 +2449,10 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         }
       case OctagonalKernel:
       {
-        if (args->rho < 2.0)
-          kernel->width = kernel->height = 5;  /* default/minimum radius = 2 */
-        else
-          kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-        kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+        const KernelRadius
+          radius = { 2.0, 5 };  /* default/minimum radius = 2 */
+
+        SetKernelRadius(kernel,args,&radius);
 
         if (AcquireKernelValues(kernel) == MagickFalse)
           return(DestroyKernelInfo(kernel));
@@ -2450,11 +2471,10 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       }
     case EuclideanKernel:
       {
-        if (args->rho < 1.0)
-          kernel->width = kernel->height = 3;  /* default radius = 1 */
-        else
-          kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-        kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+        const KernelRadius
+          radius = { 1.0, 3 };  /* default radius = 1 */
+
+        SetKernelRadius(kernel,args,&radius);
 
         if (AcquireKernelValues(kernel) == MagickFalse)
           return(DestroyKernelInfo(kernel));
