@@ -2999,6 +2999,41 @@ static int TrackCommandSelections(const CommandWidgetEvent *command_event,int id
   return(id);
 }
 
+static int FollowCommandMotion(const CommandWidgetEvent *motion,int id)
+{
+  Display
+    *const display = motion->display;
+
+  XWindows
+    *const windows = motion->windows;
+
+  XEvent
+    *const event = motion->event;
+
+  const unsigned int
+    number_selections = motion->number_selections;
+
+  for ( ; ; )
+  {
+    CommandWidgetEvent
+      command_event;
+
+    command_event.display=display;
+    command_event.windows=windows;
+    command_event.event=event;
+    command_event.number_selections=number_selections;
+    id=TrackCommandSelections(&command_event,id);
+    XDelay(display,SuspendTime);
+    if (XCheckMaskEvent(display,ButtonMotionMask,event) == MagickFalse)
+      break;
+    while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
+    toggle_info.raised=MagickFalse;
+    if (windows->command.data != 0)
+      XDrawTriangleEast(display,&windows->command,&toggle_info);
+  }
+  return(id);
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -3263,27 +3298,17 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
       }
       case MotionNotify:
       {
+        CommandWidgetEvent
+          motion;
+
         /*
           Return the ID of the highlighted menu entry.
         */
-        for ( ; ; )
-        {
-          CommandWidgetEvent
-            command_event;
-
-          command_event.display=display;
-          command_event.windows=windows;
-          command_event.event=event;
-          command_event.number_selections=number_selections;
-          id=TrackCommandSelections(&command_event,id);
-          XDelay(display,SuspendTime);
-          if (XCheckMaskEvent(display,ButtonMotionMask,event) == MagickFalse)
-            break;
-          while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
-          toggle_info.raised=MagickFalse;
-          if (windows->command.data != 0)
-            XDrawTriangleEast(display,&windows->command,&toggle_info);
-        }
+        motion.display=display;
+        motion.windows=windows;
+        motion.event=event;
+        motion.number_selections=number_selections;
+        id=FollowCommandMotion(&motion,id);
         break;
       }
       case MapNotify:
