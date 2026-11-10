@@ -1503,6 +1503,82 @@ static void RelinquishFeatureMatrix(FeatureStatistics **matrix,
     matrix[i]=(FeatureStatistics *) RelinquishMagickMemory(matrix[i]);
 }
 
+typedef struct _FeatureMatrixInputs
+{
+  const Image
+    *image;
+
+  size_t
+    distance;
+
+  PixelPacket
+    *grays;
+
+  FeatureStatistics
+    **cooccurrence;
+
+  ExceptionInfo
+    *exception;
+} FeatureMatrixInputs;
+
+static MagickBooleanType FillFeatureCooccurrence(
+  const FeatureMatrixInputs *matrix)
+{
+  const Image
+    *const image = matrix->image;
+
+  const size_t
+    distance = matrix->distance;
+
+  PixelPacket
+    *grays = matrix->grays;
+
+  FeatureStatistics
+    **const cooccurrence = matrix->cooccurrence;
+
+  ExceptionInfo
+    *const exception = matrix->exception;
+
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    r;
+
+  status=MagickTrue;
+  image_view=AcquireVirtualCacheView(image,exception);
+  for (r=0; r < (ssize_t) image->rows; r++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    FeatureCooccurrence
+      scan;
+
+    if (status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(image_view,-(ssize_t) distance,r,image->columns+
+      2*distance,distance+2,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    p+=(ptrdiff_t) distance*GetPixelChannels(image);;
+    scan.image=image;
+    scan.distance=distance;
+    scan.grays=grays;
+    scan.cooccurrence=cooccurrence;
+    CountFeatureCooccurrence(&scan,p);
+  }
+  grays=(PixelPacket *) RelinquishMagickMemory(grays);
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1514,6 +1590,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 
   FeatureBuffers
     buffers;
+
+  FeatureMatrixInputs
+    matrix;
 
   FeatureStatistics
     **cooccurrence,
@@ -1703,34 +1782,12 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Initialize spatial dependence matrix.
   */
-  status=MagickTrue;
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (r=0; r < (ssize_t) image->rows; r++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    FeatureCooccurrence
-      scan;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,-(ssize_t) distance,r,image->columns+
-      2*distance,distance+2,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    p+=(ptrdiff_t) distance*GetPixelChannels(image);;
-    scan.image=image;
-    scan.distance=distance;
-    scan.grays=grays;
-    scan.cooccurrence=cooccurrence;
-    CountFeatureCooccurrence(&scan,p);
-  }
-  grays=(PixelPacket *) RelinquishMagickMemory(grays);
-  image_view=DestroyCacheView(image_view);
+  matrix.image=image;
+  matrix.distance=distance;
+  matrix.grays=grays;
+  matrix.cooccurrence=cooccurrence;
+  matrix.exception=exception;
+  status=FillFeatureCooccurrence(&matrix);
   if (status == MagickFalse)
     {
       RelinquishFeatureMatrix(cooccurrence,number_grays);
