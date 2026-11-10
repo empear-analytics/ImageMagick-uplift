@@ -786,6 +786,31 @@ static MagickCLDeviceBenchmark* RelinquishDeviceBenchmark(
     device_benchmark));
 }
 
+static void SetOpenCLBenchmarkScore(MagickCLEnv clEnv,
+  MagickCLDeviceBenchmark *device_benchmark)
+{
+  size_t
+    i;
+
+  if (LocaleCompare(device_benchmark->name,"CPU") == 0)
+    clEnv->cpu_score=device_benchmark->score;
+  else
+    {
+      MagickCLDevice
+        device;
+
+      /*
+        Set the score for all devices that match this device.
+      */
+      for (i = 0; i < clEnv->number_devices; i++)
+      {
+        device=clEnv->devices[i];
+        if (IsBenchmarkedOpenCLDevice(device,device_benchmark))
+          device->score=device_benchmark->score;
+      }
+    }
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -799,7 +824,6 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
     *device_benchmark;
 
   size_t
-    i,
     extent;
 
   if (xml == (char *) NULL)
@@ -882,25 +906,7 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
     if (LocaleCompare(keyword,"/>") == 0)
       {
         if (device_benchmark->score != MAGICKCORE_OPENCL_UNDEFINED_SCORE)
-          {
-            if (LocaleCompare(device_benchmark->name,"CPU") == 0)
-              clEnv->cpu_score=device_benchmark->score;
-            else
-              {
-                MagickCLDevice
-                  device;
-
-                /*
-                  Set the score for all devices that match this device.
-                */
-                for (i = 0; i < clEnv->number_devices; i++)
-                {
-                  device=clEnv->devices[i];
-                  if (IsBenchmarkedOpenCLDevice(device,device_benchmark))
-                    device->score=device_benchmark->score;
-                }
-              }
-          }
+          SetOpenCLBenchmarkScore(clEnv,device_benchmark);
         device_benchmark=RelinquishDeviceBenchmark(device_benchmark);
         continue;
       }
