@@ -1266,41 +1266,52 @@ static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+typedef struct _KeyedKernelArray
+{
+  int
+    key;
+
+  const char
+    *definition;
+} KeyedKernelArray;
+
+static const KeyedKernelArray
+  LaplacianKernelArrays[] =
+  {
+    { 1, "3: 0,-1,0  -1,4,-1  0,-1,0" }, /* laplacian diamond filter */
+    { 2, "3: -2,1,-2  1,4,1  -2,1,-2" },
+    { 3, "3: 1,-2,1  -2,4,-2  1,-2,1" },
+    /* a 5x5 laplacian */
+    { 5,
+      "5: -4,-1,0,-1,-4  -1,2,3,2,-1  0,3,4,3,0  -1,2,3,2,-1  -4,-1,0,-1,-4" },
+    /* a 7x7 laplacian */
+    { 7,
+      "7:-10,-5,-2,-1,-2,-5,-10 -5,0,3,4,3,0,-5 -2,3,6,7,6,3,-2 -1,4,7,8,7,4,-1 -2,3,6,7,6,3,-2 -5,0,3,4,3,0,-5 -10,-5,-2,-1,-2,-5,-10" },
+    /* a 5x5 LoG (sigma approx 1.4) */
+    { 15,
+      "5: 0,0,-1,0,0  0,-1,-2,-1,0  -1,-2,16,-2,-1  0,-1,-2,-1,0  0,0,-1,0,0" },
+    /* a 9x9 LoG (sigma approx 1.4) */
+    /* http://www.cscjournals.org/csc/manuscript/Journals/IJIP/volume3/Issue1/IJIP-15.pdf */
+    { 19,
+      "9: 0,-1,-1,-2,-2,-2,-1,-1,0  -1,-2,-4,-5,-5,-5,-4,-2,-1  -1,-4,-5,-3,-0,-3,-5,-4,-1  -2,-5,-3,12,24,12,-3,-5,-2  -2,-5,-0,24,40,24,-0,-5,-2  -2,-5,-3,12,24,12,-3,-5,-2  -1,-4,-5,-3,-0,-3,-5,-4,-1  -1,-2,-4,-5,-5,-5,-4,-2,-1  0,-1,-1,-2,-2,-2,-1,-1,0" },
+    /* laplacian square filter -- default */
+    { 0, "3: -1,-1,-1  -1,8,-1  -1,-1,-1" }
+  };
+
 static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
-  switch ( (int) args->rho ) {
-    case 0:
-    default: /* laplacian square filter -- default */
-      kernel=ParseKernelArray("3: -1,-1,-1  -1,8,-1  -1,-1,-1");
+  const int
+    key = (int) args->rho;
+
+  size_t
+    i;
+
+  for (i=0; i < ((sizeof(LaplacianKernelArrays)/
+       sizeof(*LaplacianKernelArrays))-1); i++)
+    if (LaplacianKernelArrays[i].key == key)
       break;
-    case 1:  /* laplacian diamond filter */
-      kernel=ParseKernelArray("3: 0,-1,0  -1,4,-1  0,-1,0");
-      break;
-    case 2:
-      kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
-      break;
-    case 3:
-      kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  1,-2,1");
-      break;
-    case 5:   /* a 5x5 laplacian */
-      kernel=ParseKernelArray(
-        "5: -4,-1,0,-1,-4  -1,2,3,2,-1  0,3,4,3,0  -1,2,3,2,-1  -4,-1,0,-1,-4");
-      break;
-    case 7:   /* a 7x7 laplacian */
-      kernel=ParseKernelArray(
-        "7:-10,-5,-2,-1,-2,-5,-10 -5,0,3,4,3,0,-5 -2,3,6,7,6,3,-2 -1,4,7,8,7,4,-1 -2,3,6,7,6,3,-2 -5,0,3,4,3,0,-5 -10,-5,-2,-1,-2,-5,-10" );
-      break;
-    case 15:  /* a 5x5 LoG (sigma approx 1.4) */
-      kernel=ParseKernelArray(
-        "5: 0,0,-1,0,0  0,-1,-2,-1,0  -1,-2,16,-2,-1  0,-1,-2,-1,0  0,0,-1,0,0");
-      break;
-    case 19:  /* a 9x9 LoG (sigma approx 1.4) */
-      /* http://www.cscjournals.org/csc/manuscript/Journals/IJIP/volume3/Issue1/IJIP-15.pdf */
-      kernel=ParseKernelArray(
-        "9: 0,-1,-1,-2,-2,-2,-1,-1,0  -1,-2,-4,-5,-5,-5,-4,-2,-1  -1,-4,-5,-3,-0,-3,-5,-4,-1  -2,-5,-3,12,24,12,-3,-5,-2  -2,-5,-0,24,40,24,-0,-5,-2  -2,-5,-3,12,24,12,-3,-5,-2  -1,-4,-5,-3,-0,-3,-5,-4,-1  -1,-2,-4,-5,-5,-5,-4,-2,-1  0,-1,-1,-2,-2,-2,-1,-1,0");
-      break;
-  }
+  kernel=ParseKernelArray(LaplacianKernelArrays[i].definition);
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
   kernel->type = type;
