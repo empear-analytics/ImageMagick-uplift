@@ -969,14 +969,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   /* If the host pointer is aligned to the size of CLPixelPacket,
      then use the host buffer directly from the GPU; otherwise,
      create a buffer on the GPU and copy the data over */
-  if (ALIGNED(inputPixels,CLPixelPacket))
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
-  }
+  mem_flags=GetInputBufferFlags(inputPixels);
   /* create a CL buffer from image pixel buffer */
   length = image->columns * image->rows;
   imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
