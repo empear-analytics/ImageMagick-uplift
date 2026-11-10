@@ -4351,6 +4351,48 @@ static void ImageStatPageHeightToRes (const ImageStatInputs *attr, fxFltType *re
   }
 }
 
+static void ImageStatMinimaToPageWidth (const ImageStatInputs *attr, fxFltType *ret)
+{
+  FxInfo
+    *const pfx = attr->pfx;
+
+  const ssize_t
+    ImgNum = attr->ImgNum;
+
+  const PixelChannel
+    channel = attr->channel;
+
+  ChannelStatistics
+    *const cs = attr->cs;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aMinima:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].minima;
+      break;
+    case aPage:
+      /* Do nothing */
+      break;
+    case aPageX:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->page.x;
+      break;
+    case aPageY:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->page.y;
+      break;
+    case aPageWid:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->page.width;
+      break;
+    default:
+      {
+        ImageStatPageHeightToRes (attr, &(*ret));
+        break;
+      }
+  }
+}
+
 static inline fxFltType ImageStat (
   FxInfo * pfx, ssize_t ImgNum, PixelChannel channel, ImgAttrE ia)
 {
@@ -4404,25 +4446,9 @@ static inline fxFltType ImageStat (
       if (HasChannelStatistics(cs,channel) != MagickFalse)
         ret = cs[channel].median;
       break;
-    case aMinima:
-      if (HasChannelStatistics(cs,channel) != MagickFalse)
-        ret = cs[channel].minima;
-      break;
-    case aPage:
-      /* Do nothing */
-      break;
-    case aPageX:
-      ret = (fxFltType) pfx->Images[ImgNum]->page.x;
-      break;
-    case aPageY:
-      ret = (fxFltType) pfx->Images[ImgNum]->page.y;
-      break;
-    case aPageWid:
-      ret = (fxFltType) pfx->Images[ImgNum]->page.width;
-      break;
     default:
       {
-        ImageStatPageHeightToRes (&attr, &ret);
+        ImageStatMinimaToPageWidth (&attr, &ret);
         break;
       }
   }
