@@ -1798,6 +1798,33 @@ static MagickBooleanType ReadHistogramBuffer(const HistogramBufferInfo *info,
   return(MagickTrue);
 }
 
+typedef struct _EqualizeLevels
+{
+  cl_float4
+    white,
+    black;
+} EqualizeLevels;
+
+static void EqualizeColormapSync(Image *image,PixelPacket *equalize_map,
+  const cl_uint i,const EqualizeLevels *levels)
+{
+  const cl_float4
+    white = levels->white,
+    black = levels->black;
+
+  if (white.x != black.x)
+  {
+    image->colormap[i].red=equalize_map[
+      ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
+    image->colormap[i].green=equalize_map[
+      ScaleQuantumToMap((const Quantum) image->colormap[i].green)].red;
+    image->colormap[i].blue=equalize_map[
+      ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].red;
+    image->colormap[i].alpha=equalize_map[
+      ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].red;
+  }
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2036,17 +2063,12 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     {
       if ((image->channel_mask & SyncChannels) != 0)
       {
-        if (white.x != black.x)
-        {
-          image->colormap[i].red=equalize_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
-          image->colormap[i].green=equalize_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].green)].red;
-          image->colormap[i].blue=equalize_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].red;
-          image->colormap[i].alpha=equalize_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].red;
-        }
+        EqualizeLevels
+          levels;
+
+        levels.white=white;
+        levels.black=black;
+        EqualizeColormapSync(image,equalize_map,i,&levels);
         continue;
       }
       if (((image->channel_mask & RedChannel) != 0) && (white.x != black.x))
