@@ -1919,6 +1919,81 @@ static ssize_t ReportColourSpaceWithoutArgs (FxInfo * pfx,
   return -1;
 }
 
+typedef struct _ConstantColourContext
+{
+  FxInfo
+    *pfx;
+
+  ExceptionInfo
+    *dummy_exception;
+
+  PixelInfo
+    *colour;
+
+  fxFltType
+    *v0,
+    *v1,
+    *v2;
+} ConstantColourContext;
+
+static MagickBooleanType TryColourFunction (
+  const ConstantColourContext * context, ssize_t * result)
+{
+  FxInfo
+    *const pfx = context->pfx;
+
+  ExceptionInfo
+    *dummy_exception = context->dummy_exception;
+
+  PixelInfo
+    *const colour = context->colour;
+
+  fxFltType
+    *const v0 = context->v0,
+    *const v1 = context->v1,
+    *const v2 = context->v2;
+
+      char * q = pfx->pex + pfx->lenToken;
+      while (isspace((int) ((unsigned char) *q))) q++;
+      if (*q == '(') {
+        size_t lenfun;
+        char sFunc[MagickPathExtent];
+        while (*q && *q != ')') q++;
+        if (!*q) {
+          (void) ThrowMagickException (
+            pfx->exception, GetMagickModule(), OptionError,
+            "constant color missing ')'", "at '%s'",
+            SetShortExp(pfx));
+          dummy_exception = DestroyExceptionInfo (dummy_exception);
+          (*result)=-1;
+          return(MagickTrue);
+        }
+        lenfun = (size_t) (q - pfx->pex + 1);
+        if (lenfun > MaxTokenLen) {
+          (void) ThrowMagickException (
+            pfx->exception, GetMagickModule(), OptionError,
+            "lenfun too long", "'%lu' at '%s'",
+            (unsigned long) lenfun, SetShortExp(pfx));
+          dummy_exception = DestroyExceptionInfo (dummy_exception);
+          (*result)=-1;
+          return(MagickTrue);
+        }
+        (void) CopyMagickString (sFunc, pfx->pex, lenfun+1);
+        if (QueryColorCompliance (sFunc, AllCompliance, colour, dummy_exception)) {
+          *v0 = QuantumScale*(*colour).red;
+          *v1 = QuantumScale*(*colour).green;
+          *v2 = QuantumScale*(*colour).blue;
+          dummy_exception = DestroyExceptionInfo (dummy_exception);
+          (*result)=(ssize_t)lenfun;
+          return(MagickTrue);
+        }
+      } else {
+        (*result)=(ReportColourSpaceWithoutArgs (pfx, dummy_exception));
+        return(MagickTrue);
+      }
+  return(MagickFalse);
+}
+
 static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, fxFltType *v2)
 /* Finds named colour such as "blue" and colorspace function such as "lab(10,20,30)".
    Returns number of characters to swallow.
@@ -1940,6 +2015,12 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
     IsIcc,
     IsDev;
 
+  ConstantColourContext
+    context;
+
+  ssize_t
+    returned;
+
   char ColSp[MagickPathExtent];
   (void) CopyMagickString (ColSp, pfx->token, MaxTokenLen);
   p = ColSp + pfx->lenToken - 1;
@@ -1958,40 +2039,14 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
   if (!QueryColorCompliance (pfx->token, AllCompliance, &colour, dummy_exception) || IsGray) {
     ssize_t type = ParseCommandOption (MagickColorspaceOptions, MagickFalse, ColSp);
     if (IsColourSpaceNamed(type,IsIcc,IsDev) != MagickFalse) {
-      char * q = pfx->pex + pfx->lenToken;
-      while (isspace((int) ((unsigned char) *q))) q++;
-      if (*q == '(') {
-        size_t lenfun;
-        char sFunc[MagickPathExtent];
-        while (*q && *q != ')') q++;
-        if (!*q) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "constant color missing ')'", "at '%s'",
-            SetShortExp(pfx));
-          dummy_exception = DestroyExceptionInfo (dummy_exception);
-          return -1;
-        }
-        lenfun = (size_t) (q - pfx->pex + 1);
-        if (lenfun > MaxTokenLen) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "lenfun too long", "'%lu' at '%s'",
-            (unsigned long) lenfun, SetShortExp(pfx));
-          dummy_exception = DestroyExceptionInfo (dummy_exception);
-          return -1;
-        }
-        (void) CopyMagickString (sFunc, pfx->pex, lenfun+1);
-        if (QueryColorCompliance (sFunc, AllCompliance, &colour, dummy_exception)) {
-          *v0 = QuantumScale*colour.red;
-          *v1 = QuantumScale*colour.green;
-          *v2 = QuantumScale*colour.blue;
-          dummy_exception = DestroyExceptionInfo (dummy_exception);
-          return (ssize_t)lenfun;
-        }
-      } else {
-        return (ReportColourSpaceWithoutArgs (pfx, dummy_exception));
-      }
+      context.pfx=pfx;
+      context.dummy_exception=dummy_exception;
+      context.colour=(&colour);
+      context.v0=v0;
+      context.v1=v1;
+      context.v2=v2;
+      if (TryColourFunction (&context, &returned) != MagickFalse)
+        return(returned);
     }
     if (!IsGray) {
       dummy_exception = DestroyExceptionInfo (dummy_exception);
