@@ -3845,6 +3845,63 @@ static void MorphologyRowChannel(const MorphologyRow *row,
     row->changes[row->id]++;
 }
 
+typedef struct _MorphologyColumnWalk
+{
+  const Image
+    *image;
+
+  const KernelInfo
+    *kernel;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  ssize_t
+    i;
+} MorphologyColumnWalk;
+
+static void BlendKernelColumn(const MorphologyColumnWalk *walk,
+  double *pixel,double *gamma,size_t *count)
+{
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const MagickRealType
+    *magick_restrict k = walk->k;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  double
+    alpha;
+
+  ssize_t
+    v;
+
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    if (!IsNaN(*k))
+      {
+        alpha=(double) (QuantumScale*(double)
+          GetPixelAlpha(image,pixels));
+        (*pixel)+=alpha*(*k)*(double) pixels[i];
+        (*gamma)+=alpha*(*k);
+        (*count)++;
+      }
+    k--;
+    pixels+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3991,7 +4048,6 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
           for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
           {
             double
-              alpha,
               gamma,
               pixel;
 
@@ -4014,6 +4070,9 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
             size_t
               count;
 
+            MorphologyColumnWalk
+              walk;
+
             channel=GetPixelChannelChannel(image,i);
             traits=GetPixelChannelTraits(image,channel);
             morphology_traits=GetPixelChannelTraits(morphology_image,channel);
@@ -4030,6 +4089,11 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
             pixel=bias;
             gamma=1.0;
             count=0;
+            walk.image=image;
+            walk.kernel=kernel;
+            walk.k=k;
+            walk.pixels=pixels;
+            walk.i=i;
             if (((image->alpha_trait & BlendPixelTrait) == 0) ||
                 ((morphology_traits & BlendPixelTrait) == 0))
               for (v=0; v < (ssize_t) kernel->height; v++)
@@ -4045,19 +4109,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
             else
               {
                 gamma=0.0;
-                for (v=0; v < (ssize_t) kernel->height; v++)
-                {
-                  if (!IsNaN(*k))
-                    {
-                      alpha=(double) (QuantumScale*(double)
-                        GetPixelAlpha(image,pixels));
-                      pixel+=alpha*(*k)*(double) pixels[i];
-                      gamma+=alpha*(*k);
-                      count++;
-                    }
-                  k--;
-                  pixels+=(ptrdiff_t) GetPixelChannels(image);
-                }
+                BlendKernelColumn(&walk,&pixel,&gamma,&count);
               }
             if (fabs(pixel-(double) p[center+i]) >= MagickEpsilon)
               changes[id]++;
