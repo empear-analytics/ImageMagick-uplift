@@ -3997,6 +3997,35 @@ typedef struct _WindowInfo
     crop_info;
 } WindowInfo;
 
+static inline MagickBooleanType IsSameVisualParent(
+  const WindowInfo *window_info,const int id,const int i)
+{
+  return(((window_info[i].window == window_info[id].parent) &&
+    (window_info[i].visual == window_info[id].visual) &&
+    (window_info[i].colormap == window_info[id].colormap)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsOutsideParentBounds(
+  const WindowInfo *window_info,const int id,const int i)
+{
+  return(((window_info[id].bounds.x1 < window_info[i].bounds.x1) ||
+    (window_info[id].bounds.x2 > window_info[i].bounds.x2) ||
+    (window_info[id].bounds.y1 < window_info[i].bounds.y1) ||
+    (window_info[id].bounds.y2 > window_info[i].bounds.y2)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsInsideWindowBounds(
+  const WindowInfo *window_info,const int id,const int j)
+{
+  return(((window_info[id].bounds.x1 >= window_info[j].bounds.x1) &&
+    (window_info[id].bounds.x2 <= window_info[j].bounds.x2) &&
+    (window_info[id].bounds.y1 >= window_info[j].bounds.y1) &&
+    (window_info[id].bounds.y2 <= window_info[j].bounds.y2)) ? MagickTrue :
+    MagickFalse);
+}
+
 static Image *XGetWindowImage(Display *display,const Window window,
   const unsigned int borders,const unsigned int level,ExceptionInfo *exception)
 {
@@ -4142,14 +4171,9 @@ static Image *XGetWindowImage(Display *display,const Window window,
       status=XQueryTree(display,window,&root_window,&window_info[id].parent,
         &children,&number_children);
       for (i=0; i < id; i++)
-        if ((window_info[i].window == window_info[id].parent) &&
-            (window_info[i].visual == window_info[id].visual) &&
-            (window_info[i].colormap == window_info[id].colormap))
+        if (IsSameVisualParent(window_info,id,i) != MagickFalse)
           {
-            if ((window_info[id].bounds.x1 < window_info[i].bounds.x1) ||
-                (window_info[id].bounds.x2 > window_info[i].bounds.x2) ||
-                (window_info[id].bounds.y1 < window_info[i].bounds.y1) ||
-                (window_info[id].bounds.y2 > window_info[i].bounds.y2))
+            if (IsOutsideParentBounds(window_info,id,i) != MagickFalse)
               {
                 /*
                   Eliminate windows not circumscribed by their parent.
@@ -4224,10 +4248,7 @@ static Image *XGetWindowImage(Display *display,const Window window,
           if ((window_info[id].visual == window_info[j].visual) &&
               (window_info[id].colormap == window_info[j].colormap))
             {
-              if ((window_info[id].bounds.x1 >= window_info[j].bounds.x1) &&
-                  (window_info[id].bounds.x2 <= window_info[j].bounds.x2) &&
-                  (window_info[id].bounds.y1 >= window_info[j].bounds.y1) &&
-                  (window_info[id].bounds.y2 <= window_info[j].bounds.y2))
+              if (IsInsideWindowBounds(window_info,id,j) != MagickFalse)
                 import=MagickFalse;
             }
         if (import == MagickFalse)
