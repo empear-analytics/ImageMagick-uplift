@@ -2407,6 +2407,35 @@ static inline char *GetOpenCLDeviceString(cl_device_id device,
   return(value);
 }
 
+static void SetOpenCLDeviceInfo(MagickCLDevice device,cl_context context,
+  cl_platform_id platform,cl_device_id device_id)
+{
+  device->context=context;
+  device->deviceID=device_id;
+
+  device->platform_name=GetOpenCLPlatformString(platform,
+    CL_PLATFORM_NAME);
+
+  device->vendor_name=GetOpenCLPlatformString(platform,
+    CL_PLATFORM_VENDOR);
+
+  device->name=GetOpenCLDeviceString(device_id,CL_DEVICE_NAME);
+
+  device->version=GetOpenCLDeviceString(device_id,CL_DRIVER_VERSION);
+
+  openCL_library->clGetDeviceInfo(device_id,CL_DEVICE_MAX_CLOCK_FREQUENCY,
+    sizeof(cl_uint),&device->max_clock_frequency,NULL);
+
+  openCL_library->clGetDeviceInfo(device_id,CL_DEVICE_MAX_COMPUTE_UNITS,
+    sizeof(cl_uint),&device->max_compute_units,NULL);
+
+  openCL_library->clGetDeviceInfo(device_id,CL_DEVICE_TYPE,
+    sizeof(cl_device_type),&device->type,NULL);
+
+  openCL_library->clGetDeviceInfo(device_id,CL_DEVICE_LOCAL_MEM_SIZE,
+    sizeof(cl_ulong),&device->local_memory_size,NULL);
+}
+
 static void LoadOpenCLDevices(MagickCLEnv clEnv)
 {
   cl_context_properties
@@ -2512,30 +2541,7 @@ static void LoadOpenCLDevices(MagickCLEnv clEnv)
       if (device == (MagickCLDevice) NULL)
         break;
 
-      device->context=clEnv->contexts[i];
-      device->deviceID=devices[j];
-
-      device->platform_name=GetOpenCLPlatformString(platforms[i],
-        CL_PLATFORM_NAME);
-
-      device->vendor_name=GetOpenCLPlatformString(platforms[i],
-        CL_PLATFORM_VENDOR);
-
-      device->name=GetOpenCLDeviceString(devices[j],CL_DEVICE_NAME);
-
-      device->version=GetOpenCLDeviceString(devices[j],CL_DRIVER_VERSION);
-
-      openCL_library->clGetDeviceInfo(devices[j],CL_DEVICE_MAX_CLOCK_FREQUENCY,
-        sizeof(cl_uint),&device->max_clock_frequency,NULL);
-
-      openCL_library->clGetDeviceInfo(devices[j],CL_DEVICE_MAX_COMPUTE_UNITS,
-        sizeof(cl_uint),&device->max_compute_units,NULL);
-
-      openCL_library->clGetDeviceInfo(devices[j],CL_DEVICE_TYPE,
-        sizeof(cl_device_type),&device->type,NULL);
-
-      openCL_library->clGetDeviceInfo(devices[j],CL_DEVICE_LOCAL_MEM_SIZE,
-        sizeof(cl_ulong),&device->local_memory_size,NULL);
+      SetOpenCLDeviceInfo(device,clEnv->contexts[i],platforms[i],devices[j]);
 
       clEnv->devices[next]=device;
       (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
