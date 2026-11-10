@@ -29,6 +29,9 @@ rev=${4:-HEAD}
   echo "usage: obj_modulo.sh FILE CALLER HELPER [REV]"; exit 2; }
 root=$(git rev-parse --show-toplevel)
 build=$root/build-oracle/cand
+# WIDE=1: the wide candidate (X11 and OpenCL), the only build that compiles
+# accelerate.c, animate.c, display.c, opencl.c, widget.c and xwindow.c.
+[ -n "${WIDE:-}" ] && build=$root/build-oracle/cand-wide
 cd "$build"
 cflags=$(sed -n 's/^CFLAGS = //p' Makefile)
 cppflags=$(sed -n 's/^CPPFLAGS = //p' Makefile)
@@ -46,6 +49,10 @@ do
       -I"$build/config" -I"$root/$(dirname "$file")" $cppflags $cflags -g0 \
       -o "$tmp/$side.o" "$base" ) || { echo "BUILD FAILED ($side)"; exit 1; }
 done
+# An object file with no function in it proves nothing: the build does not
+# compile the file (all of it inside an #if this configuration leaves out).
+objdump -d "$tmp/after.o" | grep -q '^[0-9a-f]* <[^>]*>:$' ||
+  { echo "NOTHING COMPILED $file in $build (try WIDE=1)"; exit 2; }
 if cmp -s "$tmp/before.o" "$tmp/after.o"
 then
   echo "IDENTICAL $file ($(wc -c < "$tmp/after.o" | tr -d ' ') bytes of object code)"
