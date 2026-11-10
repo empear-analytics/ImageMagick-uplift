@@ -646,6 +646,26 @@ static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
 %      contains the extents of the triangle.
 %
 */
+static void XDrawTriangleEastLabel(Display *display,
+  const XWindowInfo *window_info,const XWidgetInfo *triangle_info)
+{
+  int
+    x1,
+    y1;
+
+  XFontStruct
+    *font_info;
+
+  font_info=window_info->font_info;
+  XSetTextColor(display,window_info,MagickTrue);
+  x1=triangle_info->x+(int) triangle_info->width+(int)
+    triangle_info->bevel_width+(QuantumMargin >> 1);
+  y1=triangle_info->y+(((int) triangle_info->height-(int)
+    (font_info->ascent+font_info->descent)) >> 1)+(int) font_info->ascent;
+  (void) XDrawString(display,window_info->id,window_info->widget_context,x1,y1,
+    triangle_info->text,Extent(triangle_info->text));
+}
+
 static void XDrawTriangleEast(Display *display,const XWindowInfo *window_info,
   const XWidgetInfo *triangle_info)
 {
@@ -659,9 +679,6 @@ static void XDrawTriangleEast(Display *display,const XWindowInfo *window_info,
 
   unsigned int
     bevel_width;
-
-  XFontStruct
-    *font_info;
 
   XPoint
     points[4];
@@ -732,14 +749,7 @@ static void XDrawTriangleEast(Display *display,const XWindowInfo *window_info,
   /*
     Write label to right of triangle.
   */
-  font_info=window_info->font_info;
-  XSetTextColor(display,window_info,MagickTrue);
-  x1=triangle_info->x+(int) triangle_info->width+(int)
-    triangle_info->bevel_width+(QuantumMargin >> 1);
-  y1=triangle_info->y+(((int) triangle_info->height-(int)
-    (font_info->ascent+font_info->descent)) >> 1)+(int) font_info->ascent;
-  (void) XDrawString(display,window_info->id,window_info->widget_context,x1,y1,
-    triangle_info->text,Extent(triangle_info->text));
+  XDrawTriangleEastLabel(display,window_info,triangle_info);
 }
 
 /*
