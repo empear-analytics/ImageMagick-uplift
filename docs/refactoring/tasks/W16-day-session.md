@@ -356,3 +356,15 @@ Multiply, Xor, Darken, Overlay, SoftLight; recipe text sketched as "MD, Replace 
 Table")? (2) may a step accept a transient Code Duplication finding when its measured plan removes it (41 functions
 here, about 40 steps)? (3) may MT take three or more twins? **Note:** the oracle tolerates `__LINE__` in ImageMagick's
 warning texts (`compose:args` on Blur), so refactoring changes stderr there.
+
+## Lane b, xwindow.c (wide build)
+
+xwindow.c 1.10 to 1.57 (22 refactor commits, existing recipes only). **Evidence note:** for `XGetWindowImage` and
+`XImportImage`, 159 of the 173 cases that reach them exit non-zero on the baseline; commits 6f0d74a78 (P x3 in
+`XGetWindowImage`) and afaae27fe (B `WindowImageContext`) change object code and rest on that weak function-level
+reach. **Owner questions:** may a helper for code inside a compiled `#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)` branch
+be defined outside the `#if` (unused in an X build without shared memory)? May a block that logs through
+`GetMagickModule()` move (it changes the function name in `-debug X11` output)? **Upstream:** `XMakeImageLSBFirst` tests
+`window->immutable == MagickFalse` where `XMakeImageMSBFirst` tests `!= MagickFalse`; `XAnnotateImage` reuses the parsed
+`y` offset as its row counter and re-parses afterwards, which leaves `y = rows` when the geometry has no y offset;
+`XGetResourceInfo`'s `font_name[9]`/`[10]` and `pen_colors[9]`/`[10]` repeat "font0"/"pen0".
