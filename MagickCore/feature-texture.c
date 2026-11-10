@@ -1604,6 +1604,24 @@ static void RelinquishFeatureBuffers(const FeatureBuffers *buffers)
       cooccurrence);
 }
 
+static void RelinquishAcquiredFeatureBuffers(const FeatureBuffers *buffers)
+{
+  FeatureStatistics
+    **cooccurrence = buffers->cooccurrence,
+    *density_x = buffers->density_x,
+    *density_xy = buffers->density_xy,
+    *density_y = buffers->density_y,
+    **Q = buffers->Q,
+    *sum = buffers->sum;
+
+  Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
+  cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
+  sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
+  density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
+  density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
+  density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1779,12 +1797,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   if (i < (ssize_t) number_grays)
     {
       RelinquishFeatureRows(cooccurrence,Q,i);
-      Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
-      cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
-      sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
-      density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
-      density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
-      density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
+      RelinquishAcquiredFeatureBuffers(&buffers);
       grays=(PixelPacket *) RelinquishMagickMemory(grays);
       channel_features=(ChannelFeatures *) RelinquishMagickMemory(
         channel_features);
