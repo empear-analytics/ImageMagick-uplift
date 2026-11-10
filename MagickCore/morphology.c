@@ -378,6 +378,17 @@ static void ExpandKernelByFlags(KernelInfo *kernel,
     ExpandMirrorKernelInfo(kernel);       /* 90 degree mirror rotate */
 }
 
+static const char *FindKernelEnd(const char *kernel_string)
+{
+  const char
+    *end;
+
+  end = strchr(kernel_string, ';');
+  if ( end == (char *) NULL )
+    end = strchr(kernel_string, '\0');
+  return(end);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -415,9 +426,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
     return(kernel);
 
   /* find end of this specific kernel definition string */
-  end = strchr(kernel_string, ';');
-  if ( end == (char *) NULL )
-    end = strchr(kernel_string, '\0');
+  end=FindKernelEnd(kernel_string);
 
   /* clear flags - for Expanding kernel lists through rotations */
    flags = NoValue;
