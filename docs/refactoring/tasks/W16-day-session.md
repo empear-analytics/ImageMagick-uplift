@@ -80,3 +80,30 @@ commit of their own). **Recipe LE** (368e86789): replace a function-local enum w
 map one to one, values only compared or switched on, object code IDENTICAL. The parked branch `w16-shear-enum` is
 superseded and can be deleted. Note: N's *Careful* recommends the member form to avoid clones while the brief forbids
 changing forms to hide a clone; the lane did not use the member form.
+
+## Evolved recipes (owner OK, 2026-11-10): lanes b and c
+
+**Lane b, twin merging.** Recipe **CF** (merge twins differing only in the function they call: a `typedef`, a
+`static inline` body with a `const` method parameter, callees passed by name, a `const void *` input where the callees
+differ only in that parameter); Recipe **RL** (share a parallel row loop through a row function: one non-inline
+function holds the loop with its pragma text unchanged, each caller passes a `const` struct `{tag, method,
+arguments}`), amended so that a loop may end at its view's destruction; Recipe **MT** (merge mirrored twins through a
+constant selector: each differing run becomes `((side == A) ? runA : runB)` with the runs verbatim, checked by folding).
+threshold.c 8.03 to 9.09 and enhance-tone.c 6.99 to 8.47. **For review:** RL makes the row work an indirect call once per
+row (`objdump`: the only `call *` is in `ThresholdImageRows`); a per-pixel indirect call was probed and rejected (13%
+slower). Timings (baseline vs candidate, CPU medians, alternating): threshold RL 0.860 s vs 0.860 s, CF rows 0.870 s vs
+0.870 s; enhance-tone MT 3.09 s vs 3.01 s, RL 1.910 s vs 1.900 s. RL step 2 lets an inline column loop become a row
+function by Recipe E in the same commit. Three threshold.c steps were flat (rule 2) before the 9.09 step.
+
+**Lane c, OpenMP blockers.** Recipe **IS** (extract a block in one iteration that writes only that iteration's slots,
+`x[i]` or an index computed only from `i`, passed as pointers; the whole region is read to check every access uses its
+own `i`); Recipe **RA** (extract a block that only applies its operator to at most two `reduction` variables, passed as
+`&v`, the thread's private copy). Neither touches a pragma. feature-texture.c 5.25 to 5.98, composite.c 3.46 to 3.66,
+vision.c 9.31 to 9.38. **For review:** feature-texture.c now carries *Overall Code Complexity* (W11 said to report such
+a step rather than commit it; it was committed because the score rose and a probe shows the finding is unavoidable).
+Timings: features of a 128x128 noise image 0.96 s vs 0.92 s; seamless-blend 1.77 s both.
+
+**Upstream oddities noted, not changed:** `BilevelImage` passes `progress++` to the progress call right after the atomic
+`progress++` (two increments a row); in `GetImageFeatures` the Q green term tests and divides by
+`density_y[x].direction[i].red`; `density_xy` is not cleared between the sum-average and difference passes; `p+=...;;`
+in the co-occurrence loop.
