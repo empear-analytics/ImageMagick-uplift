@@ -8228,6 +8228,13 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
 %      is returned here.
 %
 */
+static void PutBackMenuEvent(Display *display,XWindows *windows,
+  XEvent event)
+{
+  if (event.xbutton.window == windows->command.id)
+    (void) XPutBackEvent(display,&event);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -8432,8 +8439,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
             /*
               exit menu.
             */
-            if (event.xbutton.window == windows->command.id)
-              (void) XPutBackEvent(display,&event);
+            PutBackMenuEvent(display,windows,event);
             selection_info.id=(~0);
             *item='\0';
             state|=ExitState;
