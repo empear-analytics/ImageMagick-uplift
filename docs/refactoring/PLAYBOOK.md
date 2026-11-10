@@ -563,7 +563,11 @@ reading each copy.
 **Leading operands of a chain.** The expression may be the leading operands of a
 longer chain of one operator (`a && b` of `a && b && c`) when the whole chain as one
 predicate would take five or more parameters (*Excess Number of Function Arguments*,
-which the pre-commit gate refuses on a new function). C groups `&&` and `||` from the
+which the pre-commit gate refuses on a new function), or when an operand after the
+prefix applies `sizeof` to an array the calling function declares: an array argument
+reaches a function as a pointer, so that operand copied into the predicate would
+measure the pointer, not the array, and the whole chain cannot move character for
+character (amended 2026-11-10). C groups `&&` and `||` from the
 left (C11 6.5.13, 6.5.14): `a && b && c` is `(a && b) && c`, so `a && b` is a whole
 operand of the last `&&`. The predicate returns those leading operands, copied
 character for character, in the form above, and the site becomes
@@ -578,7 +582,11 @@ the question in PR #16 (segment.c, a guard-level reuse showing +1 in `--calls`) 
 delegate.c's `GetDelegateList`, whose decode and encode tests are the same expression on
 two fields. *Leading operands of a chain:* 2026-10-30, from
 `attribute-bounds.c`'s `GetImageBoundingBox`, whose lower-left test reads `x`, `y`,
-`bounding_box`, `pixel` and `target` (task W10).
+`bounding_box`, `pixel` and `target` (task W10). Its `sizeof` form: 2026-11-10, from
+`display.c`'s `XTileImage`, whose two file-name scans test
+`(*q != '\xff') && (*q != '\0') && ((size_t) (q-p+1) < sizeof(filename))` with
+`filename` a local array (campaign A, W16 lane c, wide build; added by Claude Code,
+Claude Opus 5.5, under the owner's OK of 2026-11-10 to evolve the recipes).
 
 ---
 
@@ -10611,3 +10619,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | MT | Step 8: copies in a function that already fills a Recipe N step 8 struct may read their inputs through it (`const Name *name` beside `side`, advanced members bound without `const`); a differing pair that is one call with a different callee takes CF's `method` parameter and designators; written variables go by pointer as in Recipe O, and a written variable whose name differs but whose role is the same passes its address in the selector struct. *Careful* gives the argument | `morphology.c`'s `MorphologyPrimitive` (campaign A, W16 lane d): the Erode/Dilate walks with a `?:` on the callee are a cc 9 *Complex Method*, cc 8 with the designator; the intensity walks write `quantum_pixels`, `pixel` and `minimum` or `maximum`, and every walk reads the channel body's one walk struct. Probes 3.16 to 3.22 and 3.28, no finding on a new function, no indirect call, timing within 1%. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-10 | AMEND | CF | Step 4: copies in a function that already fills a Recipe N step 8 struct may read their inputs through it (MT step 8 (a)), `method` staying a parameter of its own, within four | `morphology.c`'s `MorphologyPrimitive` (campaign A, W16 lane d): the Convolve and IterativeDistance walks differ only in the callee and read the walk struct; step 4's own struct would repeat it. A probe 3.30 to 3.33, no finding on a new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-10 | AMEND | N | Step 4: the choice between `const` locals and the member form may be made member by member, a member named by an OpenMP clause or a function-like macro keeping its `const` local and a written member its step 2 local | `morphology.c`'s `MorphologyPrimitive` (campaign A, W16 lane d): its column pass as a Recipe N step 1 helper must bind `image`, `morphology_image`, `status` and `progress` (the pragma names them) and the six members it writes, and is a 76-line *Large Method* with every member bound; with the four read-only members its fetch and fill read in the member form, 66 lines, no finding (4.32 to 4.48 in a probe). Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-10 | AMEND | P | *Leading operands of a chain*: the prefix may also move when an operand after it applies `sizeof` to an array the calling function declares (in a predicate the array would be a pointer, so the whole chain cannot be copied character for character) | `display.c`'s `XTileImage` (campaign A, W16 lane c, wide build): its two file-name scans `while ((*q != '\xff') && (*q != '\0') && ((size_t) (q-p+1) < sizeof(filename)))` are the file's last two *Complex Conditional* sites; with the two leading operands as one predicate the category leaves the file (probe 1.0454 to 1.0523, no finding on the new function). Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
