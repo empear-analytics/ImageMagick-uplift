@@ -3159,17 +3159,38 @@ static MagickCLEnv RelinquishMagickCLEnv(MagickCLEnv clEnv)
 %    o clEnv: the OpenCL environment.
 */
 
+static MagickCLDevice SelectBestOpenCLDevice(MagickCLEnv clEnv,
+  MagickCLDevice device,double best_score)
+{
+  double
+    score;
+
+  size_t
+    i;
+
+  for (i = 0; i < clEnv->number_devices; i++)
+  {
+    if (clEnv->devices[i]->enabled == MagickFalse)
+      continue;
+
+    score=clEnv->devices[i]->score+(clEnv->devices[i]->score*
+      clEnv->devices[i]->requested);
+    if ((device == (MagickCLDevice) NULL) || (score < best_score))
+    {
+      device=clEnv->devices[i];
+      best_score=score;
+    }
+  }
+  return(device);
+}
+
 MagickPrivate MagickCLDevice RequestOpenCLDevice(MagickCLEnv clEnv)
 {
   MagickCLDevice
     device;
 
   double
-    score,
     best_score;
-
-  size_t
-    i;
 
   if (clEnv == (MagickCLEnv) NULL)
     return((MagickCLDevice) NULL);
@@ -3185,19 +3206,7 @@ MagickPrivate MagickCLDevice RequestOpenCLDevice(MagickCLEnv clEnv)
   device=(MagickCLDevice) NULL;
   best_score=0.0;
   LockSemaphoreInfo(openCL_lock);
-  for (i = 0; i < clEnv->number_devices; i++)
-  {
-    if (clEnv->devices[i]->enabled == MagickFalse)
-      continue;
-
-    score=clEnv->devices[i]->score+(clEnv->devices[i]->score*
-      clEnv->devices[i]->requested);
-    if ((device == (MagickCLDevice) NULL) || (score < best_score))
-    {
-      device=clEnv->devices[i];
-      best_score=score;
-    }
-  }
+  device=SelectBestOpenCLDevice(clEnv,device,best_score);
   if (device != (MagickCLDevice)NULL)
     device->requested++;
   UnlockSemaphoreInfo(openCL_lock);
