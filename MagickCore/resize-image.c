@@ -636,6 +636,162 @@ static void SyncResizeView(CacheView *resize_view,ExceptionInfo *exception,
     (*status)=MagickFalse;
 }
 
+typedef struct _VerticalFilterRow
+{
+  const ResizeFilter
+    *resize_filter;
+
+  const Image
+    *image;
+
+  Image
+    *resize_image;
+
+  CacheView
+    *image_view,
+    *resize_view;
+
+  ContributionInfo
+    **contributions;
+
+  double
+    y_factor,
+    scale,
+    support;
+
+  ExceptionInfo
+    *exception;
+} VerticalFilterRow;
+
+static MagickBooleanType FilterVerticalRow(const VerticalFilterRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const image = row->image;
+
+  Image
+    *const resize_image = row->resize_image;
+
+  const double
+    support = row->support;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  const int
+    id = GetOpenMPThreadId();
+
+  const Quantum
+    *magick_restrict p;
+
+  ContributionInfo
+    *magick_restrict contribution;
+
+  double
+    bisect,
+    density;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    n,
+    start,
+    stop,
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  bisect=(double) (y+0.5)/row->y_factor+MagickEpsilon;
+  start=(ssize_t) MagickMax(bisect-support+0.5,0.0);
+  stop=(ssize_t) MagickMin(bisect+support+0.5,(double) image->rows);
+  density=0.0;
+  contribution=row->contributions[id];
+  for (n=0; n < (stop-start); n++)
+  {
+    contribution[n].pixel=start+n;
+    contribution[n].weight=GetResizeFilterWeight(row->resize_filter,row->scale*
+      ((double) (start+n)-bisect+0.5));
+    density+=contribution[n].weight;
+  }
+  if (n == 0)
+    return(MagickFalse);
+  NormalizeContributionDensity(contribution,n,density);
+  p=GetCacheViewVirtualPixels(row->image_view,0,contribution[0].pixel,
+    image->columns,(size_t) (contribution[n-1].pixel-contribution[0].pixel+1),
+    exception);
+  q=QueueCacheViewAuthenticPixels(row->resize_view,0,y,resize_image->columns,1,
+    exception);
+  if (IsFilterRowMissing(p,q) != MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) resize_image->columns; x++)
+  {
+    FilterVerticalPixel(image,resize_image,contribution,n,start,stop,bisect,
+      x,p,q);
+    q+=(ptrdiff_t) GetPixelChannels(resize_image);
+  }
+  SyncResizeView(row->resize_view,exception,status);
+  return(MagickTrue);
+}
+
+static MagickBooleanType FilterVerticalRows(const VerticalFilterRow *filter,
+  const MagickSizeType span,MagickOffsetType *magick_restrict progress,
+  MagickBooleanType status)
+{
+  const ResizeFilter
+    *const resize_filter = filter->resize_filter;
+
+  const Image
+    *const image = filter->image;
+
+  Image
+    *const resize_image = filter->resize_image;
+
+  CacheView
+    *const image_view = filter->image_view,
+    *const resize_view = filter->resize_view;
+
+  ContributionInfo
+    **const contributions = filter->contributions;
+
+  const double
+    y_factor = filter->y_factor,
+    scale = filter->scale,
+    support = filter->support;
+
+  ExceptionInfo
+    *const exception = filter->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,resize_image,resize_image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) resize_image->rows; y++)
+  {
+    const VerticalFilterRow
+      row = { resize_filter, image, resize_image, image_view, resize_view,
+        contributions, y_factor, scale, support, exception };
+
+    if (FilterVerticalRow(&row,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        (*progress)++;
+        SetResizeProgress(image,*progress,span,&status);
+      }
+  }
+  return(status);
+}
+
 static MagickBooleanType VerticalFilter(
   const ResizeFilter *magick_restrict resize_filter,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
@@ -656,8 +812,8 @@ static MagickBooleanType VerticalFilter(
   MagickBooleanType
     status;
 
-  ssize_t
-    y;
+  VerticalFilterRow
+    filter;
 
   /*
     Apply filter to resize vertically from image to resize image.
@@ -674,77 +830,17 @@ static MagickBooleanType VerticalFilter(
   scale=MagickSafeReciprocal(scale);
   image_view=AcquireVirtualCacheView(image,exception);
   resize_view=AcquireAuthenticCacheView(resize_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,resize_image,resize_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) resize_image->rows; y++)
-  {
-    const int
-      id = GetOpenMPThreadId();
-
-    const Quantum
-      *magick_restrict p;
-
-    ContributionInfo
-      *magick_restrict contribution;
-
-    double
-      bisect,
-      density;
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      n,
-      start,
-      stop,
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    bisect=(double) (y+0.5)/y_factor+MagickEpsilon;
-    start=(ssize_t) MagickMax(bisect-support+0.5,0.0);
-    stop=(ssize_t) MagickMin(bisect+support+0.5,(double) image->rows);
-    density=0.0;
-    contribution=contributions[id];
-    for (n=0; n < (stop-start); n++)
-    {
-      contribution[n].pixel=start+n;
-      contribution[n].weight=GetResizeFilterWeight(resize_filter,scale*
-        ((double) (start+n)-bisect+0.5));
-      density+=contribution[n].weight;
-    }
-    if (n == 0)
-      continue;
-    NormalizeContributionDensity(contribution,n,density);
-    p=GetCacheViewVirtualPixels(image_view,0,contribution[0].pixel,
-      image->columns,(size_t) (contribution[n-1].pixel-contribution[0].pixel+1),
-      exception);
-    q=QueueCacheViewAuthenticPixels(resize_view,0,y,resize_image->columns,1,
-      exception);
-    if (IsFilterRowMissing(p,q) != MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) resize_image->columns; x++)
-    {
-      FilterVerticalPixel(image,resize_image,contribution,n,start,stop,bisect,
-        x,p,q);
-      q+=(ptrdiff_t) GetPixelChannels(resize_image);
-    }
-    SyncResizeView(resize_view,exception,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        (*progress)++;
-        SetResizeProgress(image,*progress,span,&status);
-      }
-  }
+  filter.resize_filter=resize_filter;
+  filter.image=image;
+  filter.resize_image=resize_image;
+  filter.image_view=image_view;
+  filter.resize_view=resize_view;
+  filter.contributions=contributions;
+  filter.y_factor=y_factor;
+  filter.scale=scale;
+  filter.support=support;
+  filter.exception=exception;
+  status=FilterVerticalRows(&filter,span,progress,status);
   return(DestroyFilterResources(image_view,resize_view,contributions,status));
 }
 
