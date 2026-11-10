@@ -30,3 +30,11 @@ for five or more), because whole-parallel-loop tails go to N or Z, not E; should
 conditions? dfad29877 and e7f09ffbc use I step 2's const-addresses form for three variables. **Upstream, likely a
 bug, not changed:** `EqualizeImage`'s `memset(black,0,sizeof(*black))` and `memset(white,...)` clear one double
 each, not the whole arrays.
+
+## Second looks under the 2026-11-07 rulings: composite.c, morphology.c, compare.c unchanged (Opus, no commits)
+
+All three stay where they were (3.46, 3.04, 2.97); see their plateau rows. **Owner options that would move them:**
+merging `CompositeCopyImage`/`CompositeIntensityImage` through a row-operation parameter; helpers writing OpenMP
+reduction variables through pointers (`BlendRMSEResidual`); merging mirrored forward/reverse twins
+(`morphology.c`). **Upstream, likely a real bug, not changed:** `BlendRMSEResidual` resets `channel_residual=0.0`
+on every row inside its reduction loop, so only the last row's sum survives.
