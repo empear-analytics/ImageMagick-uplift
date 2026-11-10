@@ -1143,6 +1143,25 @@ static void XEraseHighlightedText(XWidgetInfo *text_info)
     }
 }
 
+static void XEditTextInsertKey(Display *display,XWidgetInfo *text_info,
+  char *text,const size_t state)
+{
+  if (state & ControlState)
+    return;
+  if (*text == '\0')
+    return;
+  if ((Extent(text_info->text)+1) >= (int) MagickPathExtent)
+    (void) XBell(display,0);
+  else
+    {
+      XEraseHighlightedText(text_info);
+      /*
+        Insert a string into the text.
+      */
+      XInsertWidgetText(text_info,text);
+    }
+}
+
 static void XEditText(Display *display,XWidgetInfo *text_info,
   const KeySym key_symbol,char *text,const size_t state)
 {
@@ -1198,20 +1217,7 @@ static void XEditText(Display *display,XWidgetInfo *text_info,
     }
     default:
     {
-      if (state & ControlState)
-        break;
-      if (*text == '\0')
-        break;
-      if ((Extent(text_info->text)+1) >= (int) MagickPathExtent)
-        (void) XBell(display,0);
-      else
-        {
-          XEraseHighlightedText(text_info);
-          /*
-            Insert a string into the text.
-          */
-          XInsertWidgetText(text_info,text);
-        }
+      XEditTextInsertKey(display,text_info,text,state);
       break;
     }
   }
