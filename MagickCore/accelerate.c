@@ -107,6 +107,22 @@ static const ResizeWeightingFunctionType supportedResizeWeighting[] =
 /*
   Helper functions.
 */
+static MagickBooleanType IsUnsupportedColorspace(const Image *image)
+{
+  return((image->colorspace != RGBColorspace &&
+      image->colorspace != sRGBColorspace &&
+      image->colorspace != LinearGRAYColorspace &&
+      image->colorspace != GRAYColorspace) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType HasImageMaskChannel(const Image *image)
+{
+  return((((image->channels & ReadMaskChannel) != 0) ||
+      ((image->channels & WriteMaskChannel) != 0) ||
+      ((image->channels & CompositeMaskChannel) != 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType checkAccelerateCondition(const Image* image)
 {
   /* only direct class images are supported */
@@ -114,10 +130,7 @@ static MagickBooleanType checkAccelerateCondition(const Image* image)
     return(MagickFalse);
 
   /* check if the image's colorspace is supported */
-  if (image->colorspace != RGBColorspace &&
-      image->colorspace != sRGBColorspace &&
-      image->colorspace != LinearGRAYColorspace &&
-      image->colorspace != GRAYColorspace)
+  if (IsUnsupportedColorspace(image) != MagickFalse)
     return(MagickFalse);
 
   /* check if the virtual pixel method is compatible with the OpenCL implementation */
@@ -126,9 +139,7 @@ static MagickBooleanType checkAccelerateCondition(const Image* image)
     return(MagickFalse);
 
   /* check if the image has mask */
-  if (((image->channels & ReadMaskChannel) != 0) ||
-      ((image->channels & WriteMaskChannel) != 0) ||
-      ((image->channels & CompositeMaskChannel) != 0))
+  if (HasImageMaskChannel(image) != MagickFalse)
     return(MagickFalse);
 
   if (image->number_channels > 4)
