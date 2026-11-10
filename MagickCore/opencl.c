@@ -1027,6 +1027,31 @@ static void SelectOpenCLDeviceOption(MagickCLEnv clEnv)
     }
 }
 
+static MagickBooleanType IsOpenCLBenchmarkNeeded(MagickCLEnv clEnv)
+{
+  MagickBooleanType
+    benchmark;
+
+  size_t
+    i;
+
+  benchmark=MagickFalse;
+  if (clEnv->cpu_score == MAGICKCORE_OPENCL_UNDEFINED_SCORE)
+    benchmark=MagickTrue;
+  else
+    {
+      for (i = 0; i < clEnv->number_devices; i++)
+      {
+        if (clEnv->devices[i]->score == MAGICKCORE_OPENCL_UNDEFINED_SCORE)
+        {
+          benchmark=MagickTrue;
+          break;
+        }
+      }
+    }
+  return(benchmark);
+}
+
 static void AutoSelectOpenCLDevices(MagickCLEnv clEnv)
 {
   double
@@ -1043,20 +1068,7 @@ static void AutoSelectOpenCLDevices(MagickCLEnv clEnv)
   if (LoadOpenCLBenchmarks(clEnv) == MagickFalse)
     return;
 
-  benchmark=MagickFalse;
-  if (clEnv->cpu_score == MAGICKCORE_OPENCL_UNDEFINED_SCORE)
-    benchmark=MagickTrue;
-  else
-    {
-      for (i = 0; i < clEnv->number_devices; i++)
-      {
-        if (clEnv->devices[i]->score == MAGICKCORE_OPENCL_UNDEFINED_SCORE)
-        {
-          benchmark=MagickTrue;
-          break;
-        }
-      }
-    }
+  benchmark=IsOpenCLBenchmarkNeeded(clEnv);
 
   if (benchmark != MagickFalse)
     BenchmarkOpenCLDevices(clEnv);
