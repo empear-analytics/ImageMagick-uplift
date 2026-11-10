@@ -2245,6 +2245,20 @@ static KernelInfo *AcquireOctagonalKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireCornersKernel(const KernelInfoType type,
+  ExceptionInfo *exception)
+{
+  KernelInfo
+    *kernel;
+
+  kernel=AcquireKernelInfo("ThinSE:87",exception);
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  ExpandRotateKernelInfo(kernel, 90.0); /* Expand 90 degree rotations */
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2467,14 +2481,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       case EdgesKernel:
         return(AcquireEdgesKernel(kernel,type,exception));
       case CornersKernel:
-        {
-          kernel=AcquireKernelInfo("ThinSE:87",exception);
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          ExpandRotateKernelInfo(kernel, 90.0); /* Expand 90 degree rotations */
-          break;
-        }
+        return(AcquireCornersKernel(type,exception));
       case DiagonalsKernel:
         return(AcquireDiagonalsKernel(kernel,type,args));
       case LineEndsKernel:
