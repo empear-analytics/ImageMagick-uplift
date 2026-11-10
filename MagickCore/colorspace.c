@@ -743,13 +743,11 @@ typedef struct _sRGBTransformTables
     *exception;
 } sRGBTransformTables;
 
-static void sRGBTransformColormap(const sRGBTransformTables *tables)
+static void sRGBTransformColormapEntry(const sRGBTransformTables *tables,
+  const ssize_t i)
 {
   const PrimaryInfo
     primary_info = tables->primary_info;
-
-  ExceptionInfo
-    *const exception = tables->exception;
 
   Image
     *const image = tables->image;
@@ -759,32 +757,41 @@ static void sRGBTransformColormap(const sRGBTransformTables *tables)
     *const y_map = tables->y_map,
     *const z_map = tables->z_map;
 
-  ssize_t
-    i;
-
   unsigned int
     blue,
     green,
     red;
 
+  PixelInfo
+    pixel;
+
+  red=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].red));
+  green=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].green));
+  blue=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].blue));
+  pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x+primary_info.x;
+  pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y+primary_info.y;
+  pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z+primary_info.z;
+  image->colormap[i].red=(double) ScaleMapToQuantum(pixel.red);
+  image->colormap[i].green=(double) ScaleMapToQuantum(pixel.green);
+  image->colormap[i].blue=(double) ScaleMapToQuantum(pixel.blue);
+}
+
+static void sRGBTransformColormap(const sRGBTransformTables *tables)
+{
+  ExceptionInfo
+    *const exception = tables->exception;
+
+  Image
+    *const image = tables->image;
+
+  ssize_t
+    i;
+
   /*
     Convert PseudoClass image.
   */
   for (i=0; i < (ssize_t) image->colors; i++)
-  {
-    PixelInfo
-      pixel;
-
-    red=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].red));
-    green=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].green));
-    blue=ScaleQuantumToMap(ClampToQuantum(image->colormap[i].blue));
-    pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x+primary_info.x;
-    pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y+primary_info.y;
-    pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z+primary_info.z;
-    image->colormap[i].red=(double) ScaleMapToQuantum(pixel.red);
-    image->colormap[i].green=(double) ScaleMapToQuantum(pixel.green);
-    image->colormap[i].blue=(double) ScaleMapToQuantum(pixel.blue);
-  }
+    sRGBTransformColormapEntry(tables,i);
   (void) SyncImage(image,exception);
 }
 
