@@ -1265,15 +1265,54 @@ static void SetFlipPage(Image *flip_image,RectangleInfo page)
   flip_image->page=page;
 }
 
+typedef struct _TransformFinish
+{
+  const Image
+    *image;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+
+  const char
+    *format;
+} TransformFinish;
+
+static Image *FinishTransformImage(const TransformFinish *finish,
+  Image *transform_image)
+{
+  const Image
+    *const image = finish->image;
+
+  const MagickBooleanType
+    status = finish->status;
+
+  ExceptionInfo
+    *const exception = finish->exception;
+
+  const char
+    *const format = finish->format;
+
+  if (status != MagickFalse)
+    AppendTransformProperty(image,transform_image,format,exception);
+  if (status == MagickFalse)
+    transform_image=DestroyImage(transform_image);
+  return(transform_image);
+}
+
 static Image *FinishFlipImage(const Image *image,Image *flip_image,
   const MagickBooleanType status,ExceptionInfo *exception)
 {
-  if (status != MagickFalse)
-    AppendTransformProperty(image,flip_image,"flip %.17gx%.17g",
-      exception);
-  if (status == MagickFalse)
-    flip_image=DestroyImage(flip_image);
-  return(flip_image);
+  TransformFinish
+    finish;
+
+  finish.image=image;
+  finish.status=status;
+  finish.exception=exception;
+  finish.format="flip %.17gx%.17g";
+  return(FinishTransformImage(&finish,flip_image));
 }
 
 static MagickBooleanType FlipImageLine(const TransformLine *line,
@@ -1468,6 +1507,9 @@ MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
   ssize_t
     y;
 
+  TransformFinish
+    finish;
+
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
@@ -1514,12 +1556,11 @@ MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
   image_view=DestroyCacheView(image_view);
   flop_image->type=image->type;
   SetFlopPage(flop_image,page);
-  if (status != MagickFalse)
-    AppendTransformProperty(image,flop_image,"flop %.17gx%.17g",
-      exception);
-  if (status == MagickFalse)
-    flop_image=DestroyImage(flop_image);
-  return(flop_image);
+  finish.image=image;
+  finish.status=status;
+  finish.exception=exception;
+  finish.format="flop %.17gx%.17g";
+  return(FinishTransformImage(&finish,flop_image));
 }
 
 /*
