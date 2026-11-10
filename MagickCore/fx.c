@@ -4320,6 +4320,49 @@ static MagickBooleanType FlushOperatorStack (FxInfo * pfx,
   return(MagickTrue);
 }
 
+typedef struct _OperatorFlags
+{
+  MagickBooleanType
+    *Assign,
+    *Update,
+    *IncrDecr;
+} OperatorFlags;
+
+static MagickBooleanType GetExpressionOperator (FxInfo * pfx,
+  const MagickBooleanType UserSymbol, const MagickBooleanType NewUserSymbol,
+  const OperatorFlags * targets)
+{
+  MagickBooleanType
+    *const Assign = targets->Assign,
+    *const Update = targets->Update,
+    *const IncrDecr = targets->IncrDecr;
+
+    if (!GetOperator (pfx, Assign, Update, IncrDecr)) return MagickFalse;
+    SkipSpaces (pfx);
+    if (NewUserSymbol && !*Assign) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Expected assignment after new UserSymbol", "'%s' at '%s'",
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+    if (!UserSymbol && *Assign) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Attempted assignment to non-UserSymbol", "'%s' at '%s'",
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+    if (!UserSymbol && *Update) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Attempted update to non-UserSymbol", "'%s' at '%s'",
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -4387,29 +4430,14 @@ static MagickBooleanType TranslateExpression (
   context.chLimit=chLimit;
   context.needPopAll=needPopAll;
   while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
-    if (!GetOperator (pfx, &Assign, &Update, &IncrDecr)) return MagickFalse;
-    SkipSpaces (pfx);
-    if (NewUserSymbol && !Assign) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Expected assignment after new UserSymbol", "'%s' at '%s'",
-        pfx->token, SetShortExp(pfx));
+    OperatorFlags flags;
+
+    flags.Assign=(&Assign);
+    flags.Update=(&Update);
+    flags.IncrDecr=(&IncrDecr);
+    if (GetExpressionOperator (pfx, UserSymbol, NewUserSymbol, &flags) ==
+        MagickFalse)
       return MagickFalse;
-    }
-    if (!UserSymbol && Assign) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Attempted assignment to non-UserSymbol", "'%s' at '%s'",
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
-    if (!UserSymbol && Update) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Attempted update to non-UserSymbol", "'%s' at '%s'",
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
     assignment.pfx=pfx;
     assignment.strLimit=strLimit;
     assignment.chLimit=chLimit;
