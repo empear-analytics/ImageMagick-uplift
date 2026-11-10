@@ -5145,6 +5145,14 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
 %    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
 */
+static inline MagickBooleanType IsWindowsInfoMissing(const XWindows *windows)
+{
+  return(((windows->pixel_info == (XPixelInfo *) NULL) ||
+    (windows->icon_pixel == (XPixelInfo *) NULL) ||
+    (windows->icon_resources == (XResourceInfo *) NULL)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickPrivate XWindows *XInitializeWindows(Display *display,
   XResourceInfo *resource_info)
 {
@@ -5171,9 +5179,7 @@ MagickPrivate XWindows *XInitializeWindows(Display *display,
     sizeof(*windows->icon_pixel));
   windows->icon_resources=(XResourceInfo *) AcquireQuantumMemory(1,
     sizeof(*windows->icon_resources));
-  if ((windows->pixel_info == (XPixelInfo *) NULL) ||
-      (windows->icon_pixel == (XPixelInfo *) NULL) ||
-      (windows->icon_resources == (XResourceInfo *) NULL))
+  if (IsWindowsInfoMissing(windows) != MagickFalse)
     {
       ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
         "...");
