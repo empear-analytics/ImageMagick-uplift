@@ -1726,6 +1726,78 @@ MagickPrivate Image *AccelerateDespeckleImage(const Image* image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _HistogramBufferInfo
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    histogramBuffer;
+
+  cl_uint4
+    *histogram;
+} HistogramBufferInfo;
+
+static MagickBooleanType ReadHistogramBuffer(const HistogramBufferInfo *info,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = info->clEnv;
+
+  const MagickCLDevice
+    device = info->device;
+
+  const cl_command_queue
+    queue = info->queue;
+
+  const cl_mem
+    histogramBuffer = info->histogramBuffer;
+
+  cl_uint4
+    *const histogram = info->histogram;
+
+  cl_int
+    clStatus;
+
+  size_t
+    length;
+
+  /* read from the kernel output */
+  if (ALIGNED(histogram,cl_uint4))
+  {
+    length = (MaxMap+1);
+    clEnv->library->clEnqueueMapBuffer(queue, histogramBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(cl_uint4), 0, NULL, NULL, &clStatus);
+  }
+  else
+  {
+    length = (MaxMap+1);
+    clStatus = clEnv->library->clEnqueueReadBuffer(queue, histogramBuffer, CL_TRUE, 0, length * sizeof(cl_uint4), histogram, 0, NULL, NULL);
+  }
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    return(MagickFalse);
+  }
+
+  /* unmap, don't block gpu to use this buffer again.  */
+  if (ALIGNED(histogram,cl_uint4))
+  {
+    clStatus = clEnv->library->clEnqueueUnmapMemObject(queue, histogramBuffer, histogram, 0, NULL, NULL);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -1767,6 +1839,9 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     black,
     intensity,
     *map;
+
+  HistogramBufferInfo
+    histogram_info;
 
   MagickBooleanType
     outputReady,
@@ -1881,33 +1956,13 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   if (status == MagickFalse)
     goto cleanup;
 
-  /* read from the kernel output */
-  if (ALIGNED(histogram,cl_uint4))
-  {
-    length = (MaxMap+1);
-    clEnv->library->clEnqueueMapBuffer(queue, histogramBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(cl_uint4), 0, NULL, NULL, &clStatus);
-  }
-  else
-  {
-    length = (MaxMap+1);
-    clStatus = clEnv->library->clEnqueueReadBuffer(queue, histogramBuffer, CL_TRUE, 0, length * sizeof(cl_uint4), histogram, 0, NULL, NULL);
-  }
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+  histogram_info.clEnv=clEnv;
+  histogram_info.device=device;
+  histogram_info.queue=queue;
+  histogram_info.histogramBuffer=histogramBuffer;
+  histogram_info.histogram=histogram;
+  if (ReadHistogramBuffer(&histogram_info,exception) == MagickFalse)
     goto cleanup;
-  }
-
-  /* unmap, don't block gpu to use this buffer again.  */
-  if (ALIGNED(histogram,cl_uint4))
-  {
-    clStatus = clEnv->library->clEnqueueUnmapMemObject(queue, histogramBuffer, histogram, 0, NULL, NULL);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
-      goto cleanup;
-    }
-  }
 
   /* recreate input buffer later, in case image updated */
 #ifdef RECREATEBUFFER
