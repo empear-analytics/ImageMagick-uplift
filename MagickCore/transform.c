@@ -2484,10 +2484,10 @@ MagickPrivate MagickBooleanType TransformImage(Image **image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
-{
 #define TransposeImageTag  "Transpose/Image"
 
+MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
+{
   CacheView
     *image_view,
     *transpose_view;
