@@ -352,6 +352,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/visual-effects-stegano.c \
   MagickCore/visual-effects.h \
   MagickCore/vision.c \
+  MagickCore/vision-components.c \
   MagickCore/vision.h \
   MagickCore/widget.c \
   MagickCore/widget.h \
