@@ -6545,6 +6545,14 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsImmutableAlphaImage(const XWindowInfo *window,
+  const Image *image)
+{
+  return(((window->immutable != MagickFalse) &&
+    (image->storage_class == DirectClass) &&
+    (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
   const XWindowInfo *window,Image *image,XImage *ximage,XImage *matte_image,
   ExceptionInfo *exception)
@@ -6587,9 +6595,7 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   canvas=image;
-  if ((window->immutable != MagickFalse) &&
-      (image->storage_class == DirectClass) &&
-      (image->alpha_trait != UndefinedPixelTrait))
+  if (IsImmutableAlphaImage(window,image) != MagickFalse)
     {
       char
         size[MagickPathExtent];
