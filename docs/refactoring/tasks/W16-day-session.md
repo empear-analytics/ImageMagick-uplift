@@ -283,3 +283,15 @@ parameters and variable; the Linux jobs' first stop), type.c:1222 and 1233 (disc
 annotate.c, pixel-export.c and pixel-import.c (shadowing), utility.c:457 (implicit fallthrough), pixel-export.c:3412 and
 pixel-import.c:3574 (default-only switches), utility.c:229 and quantum-import.c:4788, 5235 (MSVC only). Not reproducible
 here: MSVC C4702 and Windows-only branches.
+
+## Lane c, fx.c: Recipe EM
+
+**Recipe EM** (3052b9eb1): a `static` predicate returning `(C) ? MagickTrue : MagickFalse` where C is an `==` chain of
+a parameter against distinct enumeration constants (alone, after `a &&`, or before `|| r`) becomes a `static const`
+table and a membership loop. Added after the owner's approval of the W16 text; not yet confirmed. **For the owner:**
+EM and lane a's EC (an `==` chain becomes a label-run `switch` predicate) cover overlapping shapes; one may be enough.
+Commit eedc41bae uses Recipe N for a tail reading three caller variables, below N's *Use when* of five (lane a's
+6f54268cc did the same): should E admit these tails, or N's *Use when* be widened? fx.c 3.62 to 3.73.
+**Upstream:** `ExecuteRPN`'s statistic cases test `channel > 0` where `ImageStat` tests `channel >= 0`; `aExtent` reads
+`img->extent` where `ImageStat` reads `GetBlobSize(pfx->image)` and ignores `ImgNum`; the "NoSuchImage" message prints a
+negative `ImgNum` through `%lu`.
