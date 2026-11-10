@@ -6849,6 +6849,18 @@ static unsigned int CountListBrowserEntries(const char *const *list)
   return(entries);
 }
 
+static unsigned int WidestListBrowserEntry(XFontStruct *font_info,
+  const char *const *list,const unsigned int entries,unsigned int text_width)
+{
+  int
+    i;
+
+  for (i=0; i < (int) entries; i++)
+    if (WidgetTextWidth(font_info,(char *) list[i]) > text_width)
+      text_width=WidgetTextWidth(font_info,(char *) list[i]);
+  return(text_width);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -6931,9 +6943,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   */
   font_info=window_info->font_info;
   text_width=WidgetTextWidth(font_info,(char *) query);
-  for (i=0; i < (int) entries; i++)
-    if (WidgetTextWidth(font_info,(char *) list[i]) > text_width)
-      text_width=WidgetTextWidth(font_info,(char *) list[i]);
+  text_width=WidestListBrowserEntry(font_info,list,entries,text_width);
   width=WidgetTextWidth(font_info,(char *) action);
   if (WidgetTextWidth(font_info,CancelButtonText) > width)
     width=WidgetTextWidth(font_info,CancelButtonText);
