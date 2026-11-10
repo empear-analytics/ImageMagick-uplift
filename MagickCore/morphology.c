@@ -637,9 +637,7 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
           (*p == ',') || (*p == ':' )) && (*p != '\0') && (*p != ';'))
     p++;
 
-  end = strchr(p, ';'); /* end of this kernel definition */
-  if ( end == (char *) NULL )
-    end = strchr(p, '\0');
+  end=FindKernelEnd(p); /* end of this kernel definition */
 
   /* ParseGeometry() needs the geometry separated! -- Arrgghh */
   length=MagickMin((size_t) (end-p),sizeof(token)-1);
