@@ -140,3 +140,11 @@ methods and enough read variables. `objdump` shows the calls stay direct once th
 to 9.09 (one rule 2 flat step, `2a44f3ea7`, inside the measured plan). compare.c stays 2.97 (see its plateau row).
 Upstream: `GetMEPPSimilarity` reads the shared `maximum_error` outside its critical section while other threads write
 it inside (a data race); `SIMFilterImageNaNs` carries `SIMSquareImage`'s comment; `GetSSIMSimularity` is misspelt.
+
+## Owner approval (2026-11-10)
+
+The owner approved the W16 playbook text: Recipes LP, SC, LE, CF (with its amendment), RL (with its amendment), MT, IS
+and RA, and the unreached-function levels for Recipes B, N, I and D (with `tools/obj_modulo.sh`,
+`tools/struct_fill_check.py`, `tools/targets_fill_check.py` and `tools/reuse_check.py`). Their Catalogue changes rows
+already read Decided by `owner`. Still open: the AGENTS.md edit and tools bundled into the B/N amendment commit,
+the *Overall Code Complexity* step in feature-texture.c, the xevents drag cases, and the older questions above.
