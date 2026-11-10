@@ -278,6 +278,33 @@ static MagickBooleanType CreateOpenCLCachePath(const char *path)
   return(status);
 }
 
+static char *CreateOpenCLCacheDirectory(char *home,char *path,char *temp)
+{
+  MagickBooleanType
+    status;
+
+  /* first check if $HOME exists */
+  (void) FormatLocaleString(path,MagickPathExtent,"%s",home);
+  status=CreateOpenCLCachePath(path);
+
+  /* first check if $HOME/ImageMagick exists */
+  if (status != MagickFalse)
+    {
+      (void) FormatLocaleString(path,MagickPathExtent,
+        "%s%sImageMagick",home,DirectorySeparator);
+
+      status=CreateOpenCLCachePath(path);
+    }
+
+  if (status != MagickFalse)
+    {
+      temp=(char*) AcquireCriticalMemory(strlen(path)+1);
+      (void) CopyMagickString(temp,path,strlen(path)+1);
+    }
+  home=DestroyString(home);
+  return(temp);
+}
+
 static const char *GetOpenCLCacheDirectory()
 {
   if (cache_directory == (char *) NULL)
@@ -312,25 +339,7 @@ static const char *GetOpenCLCacheDirectory()
 
           if (home != (char *) NULL)
             {
-              /* first check if $HOME exists */
-              (void) FormatLocaleString(path,MagickPathExtent,"%s",home);
-              status=CreateOpenCLCachePath(path);
-
-              /* first check if $HOME/ImageMagick exists */
-              if (status != MagickFalse)
-                {
-                  (void) FormatLocaleString(path,MagickPathExtent,
-                    "%s%sImageMagick",home,DirectorySeparator);
-
-                  status=CreateOpenCLCachePath(path);
-                }
-
-              if (status != MagickFalse)
-                {
-                  temp=(char*) AcquireCriticalMemory(strlen(path)+1);
-                  (void) CopyMagickString(temp,path,strlen(path)+1);
-                }
-              home=DestroyString(home);
+              temp=CreateOpenCLCacheDirectory(home,path,temp);
             }
           else
             {
