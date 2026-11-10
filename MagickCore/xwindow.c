@@ -6929,10 +6929,7 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
         }
         default:
         {
-          if ((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
-              (map_info->green_max == 255) && (map_info->blue_max == 255) &&
-              (map_info->red_mult == 65536L) && (map_info->green_mult == 256) &&
-              (map_info->blue_mult == 1))
+          if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
             {
               /*
                 Convert to 32 bit continuous-tone X canvas.
@@ -6973,10 +6970,7 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
               }
             }
           else
-            if ((ximage->bits_per_pixel == 32) && (map_info->red_max == 255) &&
-                (map_info->green_max == 255) && (map_info->blue_max == 255) &&
-                (map_info->red_mult == 1) && (map_info->green_mult == 256) &&
-                (map_info->blue_mult == 65536L))
+            if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
               {
                 /*
                   Convert to 32 bit continuous-tone X canvas.
