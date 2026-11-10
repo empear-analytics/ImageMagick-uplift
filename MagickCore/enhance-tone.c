@@ -1087,11 +1087,11 @@ static void FindStretchLevels(const StretchLevels *levels,Quantum *black,
   }
 }
 
+#define ContrastStretchImageTag  "ContrastStretch/Image"
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
-#define ContrastStretchImageTag  "ContrastStretch/Image"
-
   CacheView
     *image_view;
 
