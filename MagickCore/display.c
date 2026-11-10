@@ -1772,6 +1772,13 @@ MagickExport MagickBooleanType RemoteDisplayCommand(const ImageInfo *image_info,
 %
 */
 
+static inline MagickBooleanType IsSelectionUnusable(const int status,
+  const Atom type,const int format,const unsigned long length)
+{
+  return(((status != Success) || (type != XA_STRING) || (format == 32) ||
+    (length == 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -2562,8 +2569,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         status=XGetWindowProperty(display,event.xselection.requestor,
           event.xselection.property,0L,(long) MagickPathExtent,True,XA_STRING,
           &type,&format,&length,&after,&data);
-        if ((status != Success) || (type != XA_STRING) || (format == 32) ||
-            (length == 0))
+        if (IsSelectionUnusable(status,type,format,length) != MagickFalse)
           break;
         /*
           Annotate Image window with primary selection.
