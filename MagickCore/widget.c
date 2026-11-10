@@ -7174,24 +7174,23 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
         XDelay(display,delay);
         delay=SuspendTime;
         (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if (north_info.raised == MagickFalse)
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              slider_info.id--;
-              state|=RedrawListState;
-            }
-        if (south_info.raised == MagickFalse)
-          if (slider_info.id < (int) entries)
-            {
-              /*
-                Move slider down.
-              */
-              slider_info.id++;
-              state|=RedrawListState;
-            }
+        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            slider_info.id--;
+            state|=RedrawListState;
+          }
+        if ((south_info.raised == MagickFalse) &&
+            (slider_info.id < (int) entries))
+          {
+            /*
+              Move slider down.
+            */
+            slider_info.id++;
+            state|=RedrawListState;
+          }
         if (event.type != ButtonRelease)
           continue;
       }
@@ -7207,28 +7206,28 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             slider_info.active=MagickTrue;
             break;
           }
-        if (MatteIsActive(north_info,event.xbutton))
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              north_info.raised=MagickFalse;
-              slider_info.id--;
-              state|=RedrawListState;
-              break;
-            }
-        if (MatteIsActive(south_info,event.xbutton))
-          if (slider_info.id < (int) entries)
-            {
-              /*
-                Move slider down.
-              */
-              south_info.raised=MagickFalse;
-              slider_info.id++;
-              state|=RedrawListState;
-              break;
-            }
+        if ((MatteIsActive(north_info,event.xbutton)) &&
+            (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            north_info.raised=MagickFalse;
+            slider_info.id--;
+            state|=RedrawListState;
+            break;
+          }
+        if ((MatteIsActive(south_info,event.xbutton)) &&
+            (slider_info.id < (int) entries))
+          {
+            /*
+              Move slider down.
+            */
+            south_info.raised=MagickFalse;
+            slider_info.id++;
+            state|=RedrawListState;
+            break;
+          }
         if (MatteIsActive(scroll_info,event.xbutton))
           {
             /*
@@ -7359,27 +7358,25 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
           }
         if (action_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == window_info->id)
+            if ((event.xbutton.window == window_info->id) &&
+                (MatteIsActive(action_info,event.xbutton)))
               {
-                if (MatteIsActive(action_info,event.xbutton))
-                  {
-                    if (*reply_info.text == '\0')
-                      (void) XBell(display,0);
-                    else
-                      state|=ExitState;
-                  }
+                if (*reply_info.text == '\0')
+                  (void) XBell(display,0);
+                else
+                  state|=ExitState;
               }
             action_info.raised=MagickTrue;
             XDrawBeveledButton(display,window_info,&action_info);
           }
         if (cancel_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == window_info->id)
-              if (MatteIsActive(cancel_info,event.xbutton))
-                {
-                  *reply_info.text='\0';
-                  state|=ExitState;
-                }
+            if ((event.xbutton.window == window_info->id) &&
+                (MatteIsActive(cancel_info,event.xbutton)))
+              {
+                *reply_info.text='\0';
+                state|=ExitState;
+              }
             cancel_info.raised=MagickTrue;
             XDrawBeveledButton(display,window_info,&cancel_info);
           }
