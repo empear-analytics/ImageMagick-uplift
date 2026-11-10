@@ -1002,6 +1002,41 @@ static void SetFirstMeasureOfCorrelation(const TextureDirection *texture,
        entropy_x->alpha : entropy_y->alpha);
 }
 
+static void SetSecondMeasureOfCorrelation(const TextureDirection *texture,
+  const TextureSlots *slots)
+{
+  const PixelInfo
+    *const entropy_xy = slots->entropy_xy,
+    *const entropy_xy2 = slots->entropy_xy2;
+
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  const ssize_t
+    i = texture->i;
+
+  channel_features[RedPixelChannel].measure_of_correlation_2[i]=
+    (sqrt(fabs(1.0-exp(-2.0*(double) (entropy_xy2->red-
+    entropy_xy->red)))));
+  channel_features[GreenPixelChannel].measure_of_correlation_2[i]=
+    (sqrt(fabs(1.0-exp(-2.0*(double) (entropy_xy2->green-
+    entropy_xy->green)))));
+  channel_features[BluePixelChannel].measure_of_correlation_2[i]=
+    (sqrt(fabs(1.0-exp(-2.0*(double) (entropy_xy2->blue-
+    entropy_xy->blue)))));
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].measure_of_correlation_2[i]=
+      (sqrt(fabs(1.0-exp(-2.0*(double) (entropy_xy2->black-
+      entropy_xy->black)))));
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].measure_of_correlation_2[i]=
+      (sqrt(fabs(1.0-exp(-2.0*(double) (entropy_xy2->alpha-
+      entropy_xy->alpha)))));
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1458,23 +1493,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         (variance.direction[i].alpha*variance.direction[i].alpha))/
         ((double) number_grays*number_grays*number_grays*number_grays);
     SetFirstMeasureOfCorrelation(&texture,&slots);
-    channel_features[RedPixelChannel].measure_of_correlation_2[i]=
-      (sqrt(fabs(1.0-exp(-2.0*(double) (entropy_xy2.direction[i].red-
-      entropy_xy.direction[i].red)))));
-    channel_features[GreenPixelChannel].measure_of_correlation_2[i]=
-      (sqrt(fabs(1.0-exp(-2.0*(double) (entropy_xy2.direction[i].green-
-      entropy_xy.direction[i].green)))));
-    channel_features[BluePixelChannel].measure_of_correlation_2[i]=
-      (sqrt(fabs(1.0-exp(-2.0*(double) (entropy_xy2.direction[i].blue-
-      entropy_xy.direction[i].blue)))));
-    if (image->colorspace == CMYKColorspace)
-      channel_features[BlackPixelChannel].measure_of_correlation_2[i]=
-        (sqrt(fabs(1.0-exp(-2.0*(double) (entropy_xy2.direction[i].black-
-        entropy_xy.direction[i].black)))));
-    if (image->alpha_trait != UndefinedPixelTrait)
-      channel_features[AlphaPixelChannel].measure_of_correlation_2[i]=
-        (sqrt(fabs(1.0-exp(-2.0*(double) (entropy_xy2.direction[i].alpha-
-        entropy_xy.direction[i].alpha)))));
+    SetSecondMeasureOfCorrelation(&texture,&slots);
   }
   /*
     Compute more texture features.
