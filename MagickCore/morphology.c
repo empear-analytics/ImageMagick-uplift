@@ -5447,6 +5447,17 @@ static double AttemptKernelRotationBy90Degrees(KernelInfo *kernel,
   return(angle);
 }
 
+static void AttemptKernelRotations(KernelInfo *kernel,double angle)
+{
+  /* Attempt rotations by 45 degrees  -- 3x3 kernels only */
+  if ( 22.5 < fmod(angle,90.0) && fmod(angle,90.0) <= 67.5 )
+    angle=AttemptKernelRotationBy45Degrees(kernel,angle);
+  if ( 45.0 < fmod(angle, 180.0)  && fmod(angle,180.0) <= 135.0 )
+    angle=AttemptKernelRotationBy90Degrees(kernel,angle);
+  if ( 135.0 < angle && angle <= 225.0 )
+    angle=ReflectKernel(kernel,angle);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -5500,13 +5511,7 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
     default:
       break;
   }
-  /* Attempt rotations by 45 degrees  -- 3x3 kernels only */
-  if ( 22.5 < fmod(angle,90.0) && fmod(angle,90.0) <= 67.5 )
-    angle=AttemptKernelRotationBy45Degrees(kernel,angle);
-  if ( 45.0 < fmod(angle, 180.0)  && fmod(angle,180.0) <= 135.0 )
-    angle=AttemptKernelRotationBy90Degrees(kernel,angle);
-  if ( 135.0 < angle && angle <= 225.0 )
-    angle=ReflectKernel(kernel,angle);
+  AttemptKernelRotations(kernel,angle);
   /* At this point angle should at least between -45 (315) and +45 degrees
    * In the future some form of non-orthogonal angled rotates could be
    * performed here, possibly with a linear kernel restriction.
