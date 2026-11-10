@@ -347,3 +347,12 @@ the owner's approval of the W16 text; not yet confirmed. **Owner questions:** th
 per-pixel chain is the only lever above 4.61. **Upstream:** a bare `gray` is rejected in `-fx` (`GetConstantColour`'s
 fall-through to the named colour never runs unless `(` follows); `gray(...)` after a failed query uses `colour` as the
 failed `QueryColorCompliance` left it; `StartEleNdx` is a dead store.
+
+## Lane c, composite.c third pass: a method table is faster but needs rulings
+
+No non-chained dispatch form passes (see the plateau row). **Owner questions:** (1) may a per-pixel path use a
+function-pointer method table when it is measured faster (composite.c: 11-15% faster, 17-21% fewer instructions on
+Multiply, Xor, Darken, Overlay, SoftLight; recipe text sketched as "MD, Replace an Operator Selection with a Method
+Table")? (2) may a step accept a transient Code Duplication finding when its measured plan removes it (41 functions
+here, about 40 steps)? (3) may MT take three or more twins? **Note:** the oracle tolerates `__LINE__` in ImageMagick's
+warning texts (`compose:args` on Blur), so refactoring changes stderr there.
