@@ -2248,6 +2248,19 @@ static MagickBooleanType HasOpenCLKernelPrograms(MagickCLEnv clEnv)
   return(status);
 }
 
+static size_t FindEnabledOpenCLDevice(MagickCLEnv clEnv)
+{
+  size_t
+    i;
+
+  for (i = 0; i < clEnv->number_devices; i++)
+  {
+    if ((clEnv->devices[i]->enabled != MagickFalse))
+      break;
+  }
+  return(i);
+}
+
 static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2265,11 +2278,7 @@ static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
     signature;
 
   /* Check if there are enabled devices */
-  for (i = 0; i < clEnv->number_devices; i++)
-  {
-    if ((clEnv->devices[i]->enabled != MagickFalse))
-      break;
-  }
+  i=FindEnabledOpenCLDevice(clEnv);
   if (i == clEnv->number_devices)
     return(MagickFalse);
 
