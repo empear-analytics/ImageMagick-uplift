@@ -942,9 +942,30 @@ static void StretchImageRow(const Image *image,const StretchMaps *maps,
   }
 }
 
-static ssize_t FindStretchBlackLevel(const Image *image,
-  const double *histogram,const ssize_t i,const double black_point)
+typedef enum
 {
+  BlackStretchLevel,
+  WhiteStretchLevel
+} StretchLevelSide;
+
+typedef struct _StretchLevelSearch
+{
+  StretchLevelSide
+    side;
+
+  double
+    point;
+} StretchLevelSearch;
+
+static inline ssize_t FindStretchLevel(const Image *image,
+  const double *histogram,const ssize_t i,const StretchLevelSearch *search)
+{
+  const StretchLevelSide
+    side = search->side;
+
+  const double
+    point = search->point;
+
   double
     intensity;
 
@@ -952,32 +973,34 @@ static ssize_t FindStretchBlackLevel(const Image *image,
     j;
 
   intensity=0.0;
-  for (j=0; j <= (ssize_t) MaxMap; j++)
+  for (j=((side == BlackStretchLevel) ? 0 : (ssize_t) MaxMap);
+       ((side == BlackStretchLevel) ? j <= (ssize_t) MaxMap : j != 0);
+       ((side == BlackStretchLevel) ? j++ : j--))
   {
     intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
-    if (intensity > black_point)
+    if (intensity > ((side == BlackStretchLevel) ? point :
+        ((double) image->columns*image->rows-point)))
       break;
   }
   return(j);
 }
 
+static ssize_t FindStretchBlackLevel(const Image *image,
+  const double *histogram,const ssize_t i,const double black_point)
+{
+  const StretchLevelSearch
+    search = { BlackStretchLevel,black_point };
+
+  return(FindStretchLevel(image,histogram,i,&search));
+}
+
 static ssize_t FindStretchWhiteLevel(const Image *image,
   const double *histogram,const ssize_t i,const double white_point)
 {
-  double
-    intensity;
+  const StretchLevelSearch
+    search = { WhiteStretchLevel,white_point };
 
-  ssize_t
-    j;
-
-  intensity=0.0;
-  for (j=(ssize_t) MaxMap; j != 0; j--)
-  {
-    intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
-    if (intensity > ((double) image->columns*image->rows-white_point))
-      break;
-  }
-  return(j);
+  return(FindStretchLevel(image,histogram,i,&search));
 }
 
 static void RelinquishStretchMemory(double *histogram,Quantum *stretch_map,
