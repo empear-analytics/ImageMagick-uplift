@@ -501,6 +501,27 @@ static void XDrawMatte(Display *display,const XWindowInfo *window_info,
 %      contains the extents of the text.
 %
 */
+static void XScrollTextMarker(XFontStruct *font_info,XWidgetInfo *text_info,
+  const unsigned int width)
+{
+  const char
+    *text;
+
+  int
+    i,
+    n;
+
+  text=text_info->text;
+  for (i=0; i < Extent(text); i++)
+  {
+    n=XTextWidth(font_info,(char *) text+i,(int)
+      (text_info->cursor-text-i));
+    if (n <= (int) width)
+      break;
+  }
+  text_info->marker=(char *) text+i;
+}
+
 static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
   XWidgetInfo *text_info)
 {
@@ -508,12 +529,8 @@ static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
     *text;
 
   int
-    n,
     x,
     y;
-
-  int
-    i;
 
   unsigned int
     height,
@@ -565,17 +582,7 @@ static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
       text=text_info->marker;
       if (XTextWidth(font_info,(char *) text,(int) (text_info->cursor-text)) >
           (int) width)
-        {
-          text=text_info->text;
-          for (i=0; i < Extent(text); i++)
-          {
-            n=XTextWidth(font_info,(char *) text+i,(int)
-              (text_info->cursor-text-i));
-            if (n <= (int) width)
-              break;
-          }
-          text_info->marker=(char *) text+i;
-        }
+        XScrollTextMarker(font_info,text_info,width);
     }
   /*
     Draw text and cursor.
@@ -1609,6 +1616,13 @@ static void XSetTextColor(Display *display,const XWindowInfo *window_info,
 %    o reply: the response from the user is returned in this parameter.
 %
 */
+static MagickBooleanType IsUnusableSelection(const Status status,const Atom type,
+  const int format,const unsigned long length)
+{
+  return(((status != Success) || (type != XA_STRING) || (format == 32) ||
+    (length == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2697,8 +2711,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
         status=XGetWindowProperty(display,event.xselection.requestor,
           event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
           &format,&length,&after,&data);
-        if ((status != Success) || (type != XA_STRING) || (format == 32) ||
-            (length == 0))
+        if (IsUnusableSelection(status,type,format,length) != MagickFalse)
           break;
         if ((Extent(reply_info.text)+(int) length) >= (MagickPathExtent-1))
           (void) XBell(display,0);
@@ -4128,8 +4141,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
         status=XGetWindowProperty(display,event.xselection.requestor,
           event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
           &format,&length,&after,&data);
-        if ((status != Success) || (type != XA_STRING) || (format == 32) ||
-            (length == 0))
+        if (IsUnusableSelection(status,type,format,length) != MagickFalse)
           break;
         if ((Extent(reply_info.text)+(int) length) >= (MagickPathExtent-1))
           (void) XBell(display,0);
@@ -5353,8 +5365,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         status=XGetWindowProperty(display,event.xselection.requestor,
           event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
           &format,&length,&after,&data);
-        if ((status != Success) || (type != XA_STRING) || (format == 32) ||
-            (length == 0))
+        if (IsUnusableSelection(status,type,format,length) != MagickFalse)
           break;
         if ((Extent(reply_info.text)+(int) length) >= (MagickPathExtent-1))
           (void) XBell(display,0);
@@ -5466,6 +5477,12 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 extern "C" {
 #endif
 
+static inline MagickBooleanType IsSameFontCharacter(const char *p,const char *q)
+{
+  return(((*p != '\0') && (*q != '\0') && (*p == *q)) ? MagickTrue :
+    MagickFalse);
+}
+
 static int FontCompare(const void *x,const void *y)
 {
   char
@@ -5474,7 +5491,7 @@ static int FontCompare(const void *x,const void *y)
 
   p=(char *) *((char **) x);
   q=(char *) *((char **) y);
-  while ((*p != '\0') && (*q != '\0') && (*p == *q))
+  while (IsSameFontCharacter(p,q) != MagickFalse)
   {
     p++;
     q++;
@@ -6581,8 +6598,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
         status=XGetWindowProperty(display,event.xselection.requestor,
           event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
           &format,&length,&after,&data);
-        if ((status != Success) || (type != XA_STRING) || (format == 32) ||
-            (length == 0))
+        if (IsUnusableSelection(status,type,format,length) != MagickFalse)
           break;
         if ((Extent(reply_info.text)+(int) length) >= (MagickPathExtent-1))
           (void) XBell(display,0);
@@ -7595,8 +7611,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
         status=XGetWindowProperty(display,
           event.xselection.requestor,event.xselection.property,0L,2047L,
           MagickTrue,XA_STRING,&type,&format,&length,&after,&data);
-        if ((status != Success) || (type != XA_STRING) || (format == 32) ||
-            (length == 0))
+        if (IsUnusableSelection(status,type,format,length) != MagickFalse)
           break;
         if ((Extent(reply_info.text)+(int) length) >= (MagickPathExtent-1))
           (void) XBell(display,0);
@@ -8921,14 +8936,25 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
 %    o span: Specifies the span relative to completing a task.
 %
 */
+static void XRefreshExposedWindows(Display *display,XWindows *windows)
+{
+  XEvent
+    event;
+
+  while (XCheckTypedWindowEvent(display,windows->command.id,Expose,&event))
+    (void) XCommandWidget(display,windows,(const char *const *) NULL,&event);
+  while (XCheckTypedWindowEvent(display,windows->image.id,Expose,&event))
+    XRefreshWindow(display,&windows->image,&event);
+  while (XCheckTypedWindowEvent(display,windows->info.id,Expose,&event))
+    if (monitor_info.text != (char *) NULL)
+      XInfoWidget(display,windows,monitor_info.text);
+}
+
 MagickPrivate void XProgressMonitorWidget(Display *display,XWindows *windows,
   const char *task,const MagickOffsetType offset,const MagickSizeType span)
 {
   unsigned int
     width;
-
-  XEvent
-    event;
 
   assert(display != (Display *) NULL);
   assert(windows != (XWindows *) NULL);
@@ -8940,13 +8966,7 @@ MagickPrivate void XProgressMonitorWidget(Display *display,XWindows *windows,
   /*
     Update image windows if there is a pending expose event.
   */
-  while (XCheckTypedWindowEvent(display,windows->command.id,Expose,&event))
-    (void) XCommandWidget(display,windows,(const char *const *) NULL,&event);
-  while (XCheckTypedWindowEvent(display,windows->image.id,Expose,&event))
-    XRefreshWindow(display,&windows->image,&event);
-  while (XCheckTypedWindowEvent(display,windows->info.id,Expose,&event))
-    if (monitor_info.text != (char *) NULL)
-      XInfoWidget(display,windows,monitor_info.text);
+  XRefreshExposedWindows(display,windows);
   /*
     Draw progress monitor bar to represent percent completion of a task.
   */

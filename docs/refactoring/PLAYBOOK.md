@@ -9139,6 +9139,9 @@ recipe turns control flow into data.
    from comments, one `switch (n)` followed by one `return(d);`. Membership form: the
    `switch` has exactly one group of labels `L1 ... Ln`, each an enumeration constant,
    whose body is `return(MagickTrue);`, and `default: break;`; `d` is `MagickFalse`.
+   The labels may instead all be character constants when `n` is a parameter of type
+   `char` (a predicate Recipe EC made), each the value of a member of the basic
+   character set (C11 5.2.1), so that it is representable in `char` and non-negative.
    Index form: the labels are the integer literals `0` to `k` in increasing order, one
    per case, each case's body is `return(vi);` of a constant `vi` (a string literal, a
    numeric literal or an enumeration constant), there is no `default:` or it is `break;`
@@ -9151,8 +9154,8 @@ recipe turns control flow into data.
    never compares, stores or writes through the pointer itself (check by `grep`), since
    two equal literals need not share one address.
 3. Directly above the function write a `static const` array with no size, named for what
-   it holds: in the membership form of `n`'s enumeration type with the labels `L1 ... Ln`
-   as its elements in the order of the `switch`; in the index form of the function's
+   it holds: in the membership form of `n`'s enumeration type (of `char` for character
+   labels) with the labels `L1 ... Ln` as its elements in the order of the `switch`; in the index form of the function's
    return type (for a pointer, `const char *const`), with `v0 ... vk` in label order.
    Each case's comment stays on its element's line, unchanged.
 4. Replace the `switch` by a lookup that reads the table and returns what the case
@@ -9165,7 +9168,8 @@ recipe turns control flow into data.
    the case labelled `i` returned, for every `i` from `0` to `k`, and that nothing else
    in the file changed.
 6. `refactor_guard.py`: membership form `OK` (enumeration constants are not literals to
-   it); index form `WARN` with exactly the label literals `0` to `k` each removed once and
+   it; character constants each move once, from a label to an element), or `WARN` that
+   lists nothing but the `0` of the loop's `i=0` as added once, nothing removed; index form `WARN` with exactly the label literals `0` to `k` each removed once and
    every value still present, nothing else. `--calls` moves nothing.
 
 **Before:**
@@ -9214,6 +9218,12 @@ static const char *poly_basis_str(ssize_t n)
   function returns `MagickFalse`. Each element has `n`'s own type, so `==` compares the
   values the `switch` compared. Reading a `const` table and comparing have no side
   effect; only the number of comparisons changes, which is speed (step 2).
+- Character labels. A `case` compares the promoted value of `n` with the constant
+  converted to the promoted type (C11 6.8.4.2p5); a character constant is an `int`
+  whose value, for a member of the basic character set, is non-negative and fits in
+  `char` (C11 6.2.5p3), so the element initialised from it holds the same value, and
+  `T[i] == n` promotes both `char` operands to `int` and compares the values the `case`
+  compared.
 - Index form. For `0 <= n <= k` the `switch` returns `vn`; the table's element `n` is
   `vn` (step 5), of the return type, so `T[n]` is the value the `return` converted.
   Otherwise the `switch` falls through to `return(d);`. The count `sizeof(T)/sizeof(*T)`
@@ -9237,10 +9247,133 @@ by script and step 2 by reading.
 **Provenance:** 2026-11-10, from `colorspace.c`'s `IsGenericColorspace` (the membership
 predicate W16 lane c made with Recipe LP, cc 30, the file's last finding but its length)
 and `distort.c`'s `poly_basis_str` (cc 22, a label run since W11; its SW split clones
-`poly_basis_fn`'s, 6.73), campaign A, W16 lane d. Earlier reports called a lookup table
+`poly_basis_fn`'s, 6.73), campaign A, W16 lane d. *Character labels*: 2026-11-10, from
+`opencl.c`'s `IsIllegalFileNameCharacter` (the ten-label predicate Recipe EC made from
+`CompileOpenCLKernel`'s device-name test, cc 13; campaign A, W16 lane a, wide build), 3.52
+to 3.62 in a probe, no finding left on the function; added under the owner's OK of
+2026-11-10 to evolve the recipes. Earlier reports called a lookup table
 the only fix and no recipe (M23, `option.c`'s `GetOptionInfo`). Probes: `colorspace.c`
 8.62 to 9.38, `distort.c` 7.15 to 7.60; both oracle 0 diverged. Added by Claude Code
 (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe EC - Name an Equality Chain as a Label Set
+
+**Use when:** CodeScene reports *Complex Conditional* (and often *Complex Method*) on a
+controlling expression that is a chain of `||` whose every operand compares one and the
+same side-effect-free expression with a different constant by `==`, as `opencl.c`'s
+`CompileOpenCLKernel` does: ten tests of `*ptr` against the characters a file name may
+not hold (`' '`, `'\\'`, `'/'`, ...), cc 17, nine complex conditional expressions.
+
+**Not covered by:** Recipe P, which moves the chain character for character: its
+predicate keeps the ten `||` operands, a *Complex Method* of its own (cc 12 on
+`CompileOpenCLKernel`'s chain, measured) that the owner's ruling on label runs does not
+cover, and the pre-commit gate's rule against new findings refuses. Recipe LP, which
+starts from a `switch` and names its label set; here there is no `switch`. Recipe TB,
+which starts from a label run. Recipe CN, which combines nested `if`s into one
+condition. Recipe NS, which names a `?:` between two constants.
+
+**How:**
+
+1. The chain is the whole controlling expression of an `if`, `while` or `for`, built
+   only of `||` and parentheses, and each of its operands is `(e == c)` or `e == c`
+   (a parenthesised sub-chain of `||` of such operands included) with the same text of
+   `e` in every operand. `e` is a variable, `*p` of a pointer variable `p`, or a member
+   access, of an integer type (a character type, `int`, an enumeration); it contains no
+   call, assignment, increment or `volatile` object. Each `c` is a character constant,
+   an integer literal or an enumeration constant, and the constants are all different
+   values, each representable in `e`'s type. The chain contains no `#pragma` or
+   preprocessor line.
+2. Write a `static inline MagickBooleanType` function directly above the function that
+   holds the chain, named for what the constants have in common, with one parameter
+   `const T v`, `T` the declared type of the object `e` designates: its body is
+   `switch (v) { <case c: for each c, one per line, in the chain's order>
+   return(MagickTrue); default: break; } return(MagickFalse);`.
+3. Replace the chain, inside its outer parentheses, by `Name(e) != MagickFalse`. Nothing
+   else in the statement changes.
+4. *Several sites.* The same function replaces another chain of the file whose
+   constants are the same set (in any order) under steps 1 and 3; a site in another
+   function is its own commit.
+5. Check by script that the labels are the chain's constants, each once and in the
+   chain's order, and that every operand of the chain had the same `e`.
+6. `refactor_guard.py` prints `OK` (each constant written once, now as a label), and
+   `--calls` moves only the new function (`+2`, and `+1` per further site).
+
+**Before:**
+
+```c
+  while (*ptr != '\0')
+  {
+    if ((*ptr == ' ') || (*ptr == '\\') || (*ptr == '/') || (*ptr == ':') ||
+        (*ptr == '*') || (*ptr == '?') || (*ptr == '"') || (*ptr == '<') ||
+        (*ptr == '>' || *ptr == '|'))
+      *ptr = '_';
+    ptr++;
+  }
+```
+
+**After:**
+
+```c
+static inline MagickBooleanType IsIllegalFileNameCharacter(const char c)
+{
+  switch (c)
+  {
+    case ' ':
+    case '\\':
+    ...
+    case '|':
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+...
+  while (*ptr != '\0')
+  {
+    if (IsIllegalFileNameCharacter(*ptr) != MagickFalse)
+      *ptr = '_';
+    ptr++;
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `||` evaluates its operands left to right and stops at
+  the first nonzero one (C11 6.5.14), and its value is 1 exactly when some operand is
+  nonzero. Each operand compares the value of `e` with its constant after the integer
+  promotions; `e` has no side effect and the chain writes nothing, so every evaluation
+  of `e` gives the same value. The chain is therefore 1 exactly when that value equals
+  one of the constants, and 0 otherwise. The new function receives the same value (a
+  parameter of `e`'s own type converts nothing); its `switch` promotes it in the same
+  way and compares it with each case constant converted to the promoted type (C11
+  6.8.4.2p5), so it returns `MagickTrue` exactly when the value equals one of the same
+  constants. The `if` tests `!= MagickFalse` where it tested the chain's 1 or 0.
+- `e` is now evaluated once instead of up to once per operand: it reads an object and
+  has no side effect (step 1), so the number of reads is not behaviour.
+- Duplicate case values do not compile (C11 6.8.4.2p3), so the build checks that the
+  constants are different; a chain that tests one constant twice is not this recipe.
+- The order of the labels does not matter to a `switch`; keeping the chain's order lets
+  step 5's script and the reader compare them line for line.
+- The new function is a pure label run: with more than seven labels it is a *Complex
+  Method* of its own, allowed for label-run helpers by the owner's ruling of 2026-11-07,
+  and Recipe TB's membership form may turn it into a table lookup in a later commit.
+
+**Evidence level:** oracle (the cases that reach the function holding the chain), with
+`refactor_guard.py --calls` and step 5's script.
+
+**Provenance:** 2026-11-10, from `opencl.c`'s `CompileOpenCLKernel` (campaign A, W16
+lane a, wide build): the character test that cleans a device name for the kernel cache
+file name, the file's largest *Complex Conditional* (nine complex conditional
+expressions) and most of the function's cc 17. Recipe P measured 3.24 to 3.52 with a
+predicate of cc 12 that holds the chain (a new *Complex Method* that is no label run); a
+probe of this recipe the same 3.24 to 3.52 (`CompileOpenCLKernel` leaves *Complex
+Method* and *Complex Conditional*; the new function cc 13, a label run), and with Recipe
+TB (membership form, amended for character constants) after it 3.62, no finding left on
+the new function. Added by Claude Code (Claude Opus 5.5) under the owner's
+OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -9873,3 +10006,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | LS | Extract Linear Searches Over a Member Chosen by Its Offset: copies of `u=0; while (a[u].m != e) u++;` that differ in the integer member `m` and the side-effect-free integer value `e` (the paired form `u=0; v=0;` before two loops included) become `u=FindName(a,offsetof(S,m),e);` of one `static inline` function whose test reads `(*(const T *) ((const char *) &a[u]+member))` against `value`; *Careful* gives the argument (the member object read through its offset, the loop-invariant value evaluated once, the counter returned); checked by script, timed | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the ten gray-level searches of the sequential co-occurrence build, which held the file's depth 5; five per-channel helpers clone each other (5.98 to 5.57); a probe of this step 5.98 to 6.14, of the chain it opens 7.44; features workload 4.83 s to 4.57 s (medians of nine) | owner |
 | 2026-11-10 | AMEND | E | Step 3: an element of an array reached through a pointer, which the block updates member by member outside every OpenMP region, passes by address (`&e`, the element expression verbatim, to `T *v`; each `e.m` becomes `v->m`) when its indices have no side effect and are not written by the block and the block touches the element only through its members; the address computed once names the element every statement named | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the normalisation of the co-occurrence matrix, `cooccurrence[x][y].direction[i].<c>*=normalize;` for five channels at depth 4, which as a by-value block would take six parameters; a probe of the step 6.28 to 6.70, no finding on the new function | owner |
 | 2026-11-10 | NEW | KT | Replace a Keyed Label Run with a Table Lookup: a `switch` on an integer whose groups each assign one variable from the same call with one constant argument, under sparse integer labels, with `default:` sharing one group (form A) or in a group of its own that leaves the function (form B), becomes a `static const` table of `{ key, constant }` elements (one shared `typedef struct`) and a lookup loop that ends on the matching element, or on the last element (form A, the `default:` group placed last) or past the table (form B, which then runs the `default:` body); table checked by script; guard `WARN` with `0` and `1` added once each (form A); string constants only read as text | `morphology.c`'s `AcquireThinSEKernel` (cc 25, 78 lines), `AcquireLaplacianKernel` (cc 11) and `AcquireLineJunctionsKernel` (cc 9), campaign A, W16 lane d: label runs that TB's forms refuse (the function goes on after the `switch`; sparse keys); probes: each leaves *Complex Method* with no new function, the file flat at 3.10 (17 to 14 *Complex Method* functions), Laplacian 68 reaching cases 0 diverged | owner |
+| 2026-11-10 | NEW | EC | Name an Equality Chain as a Label Set: a controlling expression that is a chain of logical-or operators whose every operand compares one side-effect-free integer expression `e` with a different constant by `==` becomes `Name(e) != MagickFalse`, `Name` a `static inline` predicate of one `const T v` parameter whose body is `switch (v)` with the constants as labels in the chain's order, `return(MagickTrue);`, `default: break;`, and `return(MagickFalse);`. *Careful* gives the argument (C11 6.5.14, 6.8.4.2p5; duplicate labels do not compile); the new function is a label run (owner, 2026-11-07), which Recipe TB may later turn into a table | `opencl.c`'s `CompileOpenCLKernel` (campaign A, W16 lane a, wide build): its device-name test, ten `*ptr == c` operands, is the file's largest *Complex Conditional* (nine) and most of its cc 17. Recipe P leaves the chain in a predicate of cc 12 that is no label run (3.24 to 3.52 with that new finding); this recipe 3.24 to 3.52 with only the label run, 3.62 with TB after it | owner |
+| 2026-11-10 | AMEND | TB | Membership form, *character labels*: the labels may all be character constants of the basic character set when `n` is a `char` parameter (a predicate Recipe EC made); the table is then of `char`, and the guard sees each character constant move once (`OK`, or `WARN` listing only the loop's `0` as added). *Careful* gives the argument (C11 6.8.4.2p5, 6.2.5p3: each value is non-negative and fits in `char`, so the element holds it and `==` compares the values the `case` compared). Still six steps | `opencl.c`'s `IsIllegalFileNameCharacter` (campaign A, W16 lane a, wide build), the ten-label predicate Recipe EC made from `CompileOpenCLKernel`'s device-name test (cc 13, a label run); a probe 3.52 to 3.62, no finding left on it | owner |
