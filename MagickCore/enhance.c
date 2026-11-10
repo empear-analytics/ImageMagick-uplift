@@ -1073,9 +1073,30 @@ static inline void ModulateHWB(const ModulateInfo *modulate_info,
   ConvertHWBToRGB(hue,whiteness,blackness,red,green,blue);
 }
 
-static inline void ModulateLCHab(const ModulateInfo *modulate_info,
+typedef void
+  (*ModulateLCHMethod)(const double,const double,const double,
+    const IlluminantType,double *,double *,double *);
+
+typedef struct _ModulateLCHConversion
+{
+  const ModulateInfo
+    *modulate_info;
+
+  ModulateLCHMethod
+    convert_from_rgb,
+    convert_to_rgb;
+} ModulateLCHConversion;
+
+static inline void ModulateLCHSpace(const ModulateLCHConversion *conversion,
   double *red,double *green,double *blue)
 {
+  const ModulateInfo
+    *modulate_info = conversion->modulate_info;
+
+  const ModulateLCHMethod
+    convert_from_rgb = conversion->convert_from_rgb,
+    convert_to_rgb = conversion->convert_to_rgb;
+
   const double
     percent_luma = modulate_info->percent_brightness,
     percent_chroma = modulate_info->percent_saturation,
@@ -1092,37 +1113,29 @@ static inline void ModulateLCHab(const ModulateInfo *modulate_info,
   /*
     Increase or decrease color luma, chroma, or hue.
   */
-  ConvertRGBToLCHab(*red,*green,*blue,illuminant,&luma,&chroma,&hue);
+  convert_from_rgb(*red,*green,*blue,illuminant,&luma,&chroma,&hue);
   luma*=0.01*percent_luma;
   chroma*=0.01*percent_chroma;
   hue+=fmod((percent_hue-100.0),200.0)/200.0;
-  ConvertLCHabToRGB(luma,chroma,hue,illuminant,red,green,blue);
+  convert_to_rgb(luma,chroma,hue,illuminant,red,green,blue);
+}
+
+static inline void ModulateLCHab(const ModulateInfo *modulate_info,
+  double *red,double *green,double *blue)
+{
+  const ModulateLCHConversion
+    conversion = { modulate_info,ConvertRGBToLCHab,ConvertLCHabToRGB };
+
+  ModulateLCHSpace(&conversion,red,green,blue);
 }
 
 static inline void ModulateLCHuv(const ModulateInfo *modulate_info,
   double *red,double *green,double *blue)
 {
-  const double
-    percent_luma = modulate_info->percent_brightness,
-    percent_chroma = modulate_info->percent_saturation,
-    percent_hue = modulate_info->percent_hue;
+  const ModulateLCHConversion
+    conversion = { modulate_info,ConvertRGBToLCHuv,ConvertLCHuvToRGB };
 
-  const IlluminantType
-    illuminant = modulate_info->illuminant;
-
-  double
-    hue,
-    luma,
-    chroma;
-
-  /*
-    Increase or decrease color luma, chroma, or hue.
-  */
-  ConvertRGBToLCHuv(*red,*green,*blue,illuminant,&luma,&chroma,&hue);
-  luma*=0.01*percent_luma;
-  chroma*=0.01*percent_chroma;
-  hue+=fmod((percent_hue-100.0),200.0)/200.0;
-  ConvertLCHuvToRGB(luma,chroma,hue,illuminant,red,green,blue);
+  ModulateLCHSpace(&conversion,red,green,blue);
 }
 
 static void ModulateDefaultColorspaces(const ModulateInfo *modulate_info,double *red,
