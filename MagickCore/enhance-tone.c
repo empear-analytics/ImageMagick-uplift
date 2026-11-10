@@ -651,6 +651,38 @@ static MagickBooleanType LoadColorCorrection(
   return(MagickTrue);
 }
 
+typedef struct _ColorCorrectionTargets
+{
+  ColorCorrection
+    *color_correction;
+
+  PixelInfo
+    **cdl_map;
+} ColorCorrectionTargets;
+
+static MagickBooleanType PrepareColorCorrection(const Image *image,
+  const char *color_correction_collection,
+  const ColorCorrectionTargets *targets,ExceptionInfo *exception)
+{
+  ColorCorrection
+    *const color_correction = targets->color_correction;
+
+  PixelInfo
+    **const cdl_map = targets->cdl_map;
+
+  if (LoadColorCorrection(color_correction_collection,color_correction,
+        exception) == MagickFalse)
+    return(MagickFalse);
+  LogColorCorrection(image,(*color_correction));
+  (*cdl_map)=(PixelInfo *) AcquireQuantumMemory(MaxMap+1UL,
+    sizeof(*(*cdl_map)));
+  if ((*cdl_map) == (PixelInfo *) NULL)
+    ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+      image->filename);
+  BuildCDLMap((*color_correction),(*cdl_map));
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   const char *color_correction_collection,ExceptionInfo *exception)
 {
@@ -671,6 +703,9 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   PixelInfo
     *cdl_map;
 
+  ColorCorrectionTargets
+    targets;
+
   ssize_t
     y;
 
@@ -681,15 +716,11 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (LoadColorCorrection(color_correction_collection,&color_correction,
+  targets.color_correction=(&color_correction);
+  targets.cdl_map=(&cdl_map);
+  if (PrepareColorCorrection(image,color_correction_collection,&targets,
         exception) == MagickFalse)
     return(MagickFalse);
-  LogColorCorrection(image,color_correction);
-  cdl_map=(PixelInfo *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*cdl_map));
-  if (cdl_map == (PixelInfo *) NULL)
-    ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-      image->filename);
-  BuildCDLMap(color_correction,cdl_map);
   if (image->storage_class == PseudoClass)
     {
       ApplyCDLToColormap(image,color_correction,cdl_map);
@@ -1087,22 +1118,79 @@ static void FindStretchLevels(const StretchLevels *levels,Quantum *black,
   }
 }
 
-MagickExport MagickBooleanType ContrastStretchImage(Image *image,
-  const double black_point,const double white_point,ExceptionInfo *exception)
-{
 #define ContrastStretchImageTag  "ContrastStretch/Image"
+
+typedef struct _StretchPass
+{
+  Quantum
+    *black,
+    *white,
+    *stretch_map;
+} StretchPass;
+
+static MagickBooleanType StretchImagePixels(Image *image,
+  const StretchPass *pass,ExceptionInfo *exception)
+{
+  Quantum
+    *const black = pass->black,
+    *const white = pass->white,
+    *const stretch_map = pass->stretch_map;
 
   CacheView
     *image_view;
-
-  double
-    *histogram;
 
   MagickBooleanType
     status;
 
   MagickOffsetType
     progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    const ToneLine
+      line = { image,image_view,exception };
+
+    const StretchMaps
+      maps = { black, white, stretch_map };
+
+    if (GetToneRow(&line,y,&q,&status) == MagickFalse)
+      continue;
+    StretchImageRow(image,&maps,q);
+    SyncToneRow(&line,&status);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetToneProgress(image,ContrastStretchImageTag,progress,&status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport MagickBooleanType ContrastStretchImage(Image *image,
+  const double black_point,const double white_point,ExceptionInfo *exception)
+{
+  double
+    *histogram;
+
+  MagickBooleanType
+    status;
 
   Quantum
     *black,
@@ -1112,8 +1200,8 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   StretchLevels
     levels;
 
-  ssize_t
-    y;
+  StretchPass
+    pass;
 
   /*
     Allocate histogram and stretch map.
@@ -1162,38 +1250,10 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   /*
     Stretch-contrast image.
   */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    const ToneLine
-      line = { image,image_view,exception };
-
-    const StretchMaps
-      maps = { black, white, stretch_map };
-
-    if (GetToneRow(&line,y,&q,&status) == MagickFalse)
-      continue;
-    StretchImageRow(image,&maps,q);
-    SyncToneRow(&line,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetToneProgress(image,ContrastStretchImageTag,progress,&status);
-      }
-  }
-  image_view=DestroyCacheView(image_view);
+  pass.black=black;
+  pass.white=white;
+  pass.stretch_map=stretch_map;
+  status=StretchImagePixels(image,&pass,exception);
   SetStretchProperty(image,black,white,exception);
   white=(Quantum *) RelinquishMagickMemory(white);
   black=(Quantum *) RelinquishMagickMemory(black);
@@ -1496,6 +1556,82 @@ static void RelinquishEqualizeMemory(double *map,double *histogram,
     equalize_map=(double *) RelinquishMagickMemory(equalize_map);
 }
 
+typedef struct _EqualizeMemory
+{
+  double
+    **equalize_map,
+    **histogram,
+    **map;
+} EqualizeMemory;
+
+static MagickBooleanType AcquireEqualizeMemory(const Image *image,
+  const EqualizeMemory *targets,ExceptionInfo *exception)
+{
+  double
+    **const equalize_map = targets->equalize_map,
+    **const histogram = targets->histogram,
+    **const map = targets->map;
+
+  (*equalize_map)=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
+    sizeof(*(*equalize_map)));
+  (*histogram)=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
+    sizeof(*(*histogram)));
+  (*map)=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
+    sizeof(*(*map)));
+  if (IsEqualizeMemoryMissing((*equalize_map),(*histogram),(*map)) !=
+      MagickFalse)
+    {
+      RelinquishEqualizeMemory((*map),(*histogram),(*equalize_map));
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _EqualizeTables
+{
+  Image
+    *image;
+
+  double
+    *histogram,
+    *map,
+    *equalize_map;
+} EqualizeTables;
+
+static void EqualizeMapsAndColormap(const EqualizeTables *equalize,
+  double *black,double *white)
+{
+  Image
+    *const image = equalize->image;
+
+  double
+    *histogram = equalize->histogram,
+    *map = equalize->map;
+
+  double
+    *const equalize_map = equalize->equalize_map;
+
+  EqualizeLevels
+    levels;
+
+  IntegrateEqualizeHistogram(image,histogram,map);
+  (void) memset(equalize_map,0,(MaxMap+1)*GetPixelChannels(image)*
+    sizeof(*equalize_map));
+  (void) memset(black,0,sizeof(*black));
+  (void) memset(white,0,sizeof(*white));
+  levels.image=image;
+  levels.map=map;
+  BuildEqualizeMaps(&levels,black,white,equalize_map);
+  histogram=(double *) RelinquishMagickMemory(histogram);
+  map=(double *) RelinquishMagickMemory(map);
+  /*
+    Equalize colormap.
+  */
+  if (image->storage_class == PseudoClass)
+    EqualizeColormap(image,black,white,equalize_map);
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -1511,8 +1647,11 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
     *map,
     white[2*CompositePixelChannel+1];
 
-  EqualizeLevels
-    levels;
+  const EqualizeMemory
+    targets = { &equalize_map, &histogram, &map };
+
+  EqualizeTables
+    equalize;
 
   MagickBooleanType
     status;
@@ -1534,17 +1673,8 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
 #endif
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  equalize_map=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
-    sizeof(*equalize_map));
-  histogram=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
-    sizeof(*histogram));
-  map=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*sizeof(*map));
-  if (IsEqualizeMemoryMissing(equalize_map,histogram,map) != MagickFalse)
-    {
-      RelinquishEqualizeMemory(map,histogram,equalize_map);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
+  if (AcquireEqualizeMemory(image,&targets,exception) == MagickFalse)
+    return(MagickFalse);
   /*
     Form histogram.
   */
@@ -1552,21 +1682,11 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   /*
     Integrate the histogram to get the equalization map.
   */
-  IntegrateEqualizeHistogram(image,histogram,map);
-  (void) memset(equalize_map,0,(MaxMap+1)*GetPixelChannels(image)*
-    sizeof(*equalize_map));
-  (void) memset(black,0,sizeof(*black));
-  (void) memset(white,0,sizeof(*white));
-  levels.image=image;
-  levels.map=map;
-  BuildEqualizeMaps(&levels,black,white,equalize_map);
-  histogram=(double *) RelinquishMagickMemory(histogram);
-  map=(double *) RelinquishMagickMemory(map);
-  /*
-    Equalize colormap.
-  */
-  if (image->storage_class == PseudoClass)
-    EqualizeColormap(image,black,white,equalize_map);
+  equalize.image=image;
+  equalize.histogram=histogram;
+  equalize.map=map;
+  equalize.equalize_map=equalize_map;
+  EqualizeMapsAndColormap(&equalize,black,white);
   /*
     Equalize image.
   */
@@ -2286,10 +2406,43 @@ static void HaldClutRow(MagickBooleanType *status,
   }
 }
 
-MagickExport MagickBooleanType HaldClutImage(Image *image,
-  const Image *hald_image,ExceptionInfo *exception)
+static size_t GetHaldLevel(const Image *hald_image)
 {
+  size_t
+    length,
+    level;
+
+  length=(size_t) MagickMin((MagickRealType) hald_image->columns,
+    (MagickRealType) hald_image->rows);
+  for (level=2; (level*level*level) < length; level++) ;
+  level*=level;
+  return(level);
+}
+
 #define HaldClutImageTag  "Clut/Image"
+
+typedef struct _HaldClutPass
+{
+  Image
+    *image;
+
+  const Image
+    *hald_image;
+
+  ExceptionInfo
+    *exception;
+} HaldClutPass;
+
+static MagickBooleanType HaldClutImagePixels(const HaldClutPass *pass)
+{
+  Image
+    *const image = pass->image;
+
+  const Image
+    *const hald_image = pass->hald_image;
+
+  ExceptionInfo
+    *const exception = pass->exception;
 
   CacheView
     *hald_view,
@@ -2309,29 +2462,14 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
 
   size_t
     cube_size,
-    length,
     level;
 
   ssize_t
     y;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  assert(hald_image != (Image *) NULL);
-  assert(hald_image->signature == MagickCoreSignature);
-  if (PrepareHaldClutImage(image,hald_image,exception) == MagickFalse)
-    return(MagickFalse);
-  /*
-    Hald clut image.
-  */
   status=MagickTrue;
   progress=0;
-  length=(size_t) MagickMin((MagickRealType) hald_image->columns,
-    (MagickRealType) hald_image->rows);
-  for (level=2; (level*level*level) < length; level++) ;
-  level*=level;
+  level=GetHaldLevel(hald_image);
   cube_size=level*level;
   width=(double) hald_image->columns;
   GetPixelInfo(hald_image,&zero);
@@ -2375,6 +2513,33 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
   }
   hald_view=DestroyCacheView(hald_view);
   image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport MagickBooleanType HaldClutImage(Image *image,
+  const Image *hald_image,ExceptionInfo *exception)
+{
+  HaldClutPass
+    pass;
+
+  MagickBooleanType
+    status;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  assert(hald_image != (Image *) NULL);
+  assert(hald_image->signature == MagickCoreSignature);
+  if (PrepareHaldClutImage(image,hald_image,exception) == MagickFalse)
+    return(MagickFalse);
+  /*
+    Hald clut image.
+  */
+  pass.image=image;
+  pass.hald_image=hald_image;
+  pass.exception=exception;
+  status=HaldClutImagePixels(&pass);
   return(status);
 }
 
