@@ -3175,6 +3175,115 @@ static MagickBooleanType CountFunctionArgument (FxInfo * pfx,
   return(MagickTrue);
 }
 
+typedef struct _FunctionArgumentInputs
+{
+  FunctionE
+    fe;
+
+  const char
+    *funStr,
+    *strLimit;
+
+  char
+    expChLimit;
+
+  int
+    ndx0,
+    nArgs;
+
+  char
+    *pExpStart;
+} FunctionArgumentInputs;
+
+typedef struct _FunctionArgumentTargets
+{
+  char
+    *chLimit;
+
+  int
+    *FndArgs,
+    *ndx1,
+    *ndx2,
+    *ndx3;
+
+  size_t
+    *lenExp;
+} FunctionArgumentTargets;
+
+static MagickBooleanType TranslateFunctionArguments (FxInfo * pfx,
+  const FunctionArgumentInputs *inputs, const FunctionArgumentTargets *targets)
+{
+  const FunctionE
+    fe = inputs->fe;
+
+  const char
+    *const funStr = inputs->funStr,
+    *const strLimit = inputs->strLimit;
+
+  const char
+    expChLimit = inputs->expChLimit;
+
+  const int
+    ndx0 = inputs->ndx0;
+
+  int
+    nArgs = inputs->nArgs;
+
+  char
+    *const pExpStart = inputs->pExpStart;
+
+  char
+    *const chLimit = targets->chLimit;
+
+  int
+    *const FndArgs = targets->FndArgs,
+    *const ndx1 = targets->ndx1,
+    *const ndx2 = targets->ndx2,
+    *const ndx3 = targets->ndx3;
+
+  size_t
+    *const lenExp = targets->lenExp;
+
+  while (nArgs > 0) {
+    int FndOne = 0;
+    ArgumentCount count;
+    ArgumentCountTargets countTargets;
+    const ArgumentIndexes indexes = { ndx1, ndx2, ndx3 };
+    if (TranslateStatementList (pfx, strLimit, chLimit)) {
+      FndOne = 1;
+    } else if (!*pfx->pex) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "For function", "'%s' expected ')' at '%s'",
+        funStr, SetShortExp(pfx));
+      return MagickFalse;
+    } else if (!*chLimit) {
+      /* Maybe don't break because other expressions may be not empty. */
+      break;
+    } else if (IsPadFunction(fe) != MagickFalse) {
+      (void) AddElement (pfx, (fxFltType) 0, oNull);
+      FndOne = 1;
+    }
+
+    count.fe=fe;
+    count.funStr=funStr;
+    count.strLimit=strLimit;
+    count.chLimit=*chLimit;
+    count.FndOne=FndOne;
+    count.ndx0=ndx0;
+    count.indexes=indexes;
+    countTargets.FndArgs=(FndArgs);
+    countTargets.nArgs=(&nArgs);
+    if (CountFunctionArgument (pfx, &count, &countTargets) == MagickFalse)
+      return MagickFalse;
+    if (*chLimit == expChLimit) {
+      *lenExp = (size_t) (pfx->pex - pExpStart - 1);
+      break;
+    }
+  } /* end while args of a function */
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -3201,6 +3310,11 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
   FunctionClosing closing;
 
+  FunctionArgumentInputs arguments;
+
+  const FunctionArgumentTargets argumentTargets = { &chLimit, &FndArgs, &ndx1,
+    &ndx2, &ndx3, &lenExp };
+
   const FunctionOpening opening = { &pushOp, &strLimit, &chLimit, &expChLimit,
     &nArgs };
 
@@ -3218,43 +3332,16 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   if (TryEpochFunction (pfx, fe, pushOp, &returned) != MagickFalse)
     return returned;
 
-  while (nArgs > 0) {
-    int FndOne = 0;
-    ArgumentCount count;
-    ArgumentCountTargets countTargets;
-    const ArgumentIndexes indexes = { &ndx1, &ndx2, &ndx3 };
-    if (TranslateStatementList (pfx, strLimit, &chLimit)) {
-      FndOne = 1;
-    } else if (!*pfx->pex) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "For function", "'%s' expected ')' at '%s'",
-        funStr, SetShortExp(pfx));
-      return MagickFalse;
-    } else if (!chLimit) {
-      /* Maybe don't break because other expressions may be not empty. */
-      break;
-    } else if (IsPadFunction(fe) != MagickFalse) {
-      (void) AddElement (pfx, (fxFltType) 0, oNull);
-      FndOne = 1;
-    }
-
-    count.fe=fe;
-    count.funStr=funStr;
-    count.strLimit=strLimit;
-    count.chLimit=chLimit;
-    count.FndOne=FndOne;
-    count.ndx0=ndx0;
-    count.indexes=indexes;
-    countTargets.FndArgs=(&FndArgs);
-    countTargets.nArgs=(&nArgs);
-    if (CountFunctionArgument (pfx, &count, &countTargets) == MagickFalse)
-      return MagickFalse;
-    if (chLimit == expChLimit) {
-      lenExp = (size_t) (pfx->pex - pExpStart - 1);
-      break;
-    }
-  } /* end while args of a function */
+  arguments.fe=fe;
+  arguments.funStr=funStr;
+  arguments.strLimit=strLimit;
+  arguments.expChLimit=expChLimit;
+  arguments.ndx0=ndx0;
+  arguments.nArgs=nArgs;
+  arguments.pExpStart=pExpStart;
+  if (TranslateFunctionArguments (pfx, &arguments, &argumentTargets) ==
+      MagickFalse)
+    return MagickFalse;
   closing.fe=fe;
   closing.funStr=funStr;
   closing.ndx0=ndx0;
