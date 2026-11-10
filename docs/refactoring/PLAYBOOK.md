@@ -8812,6 +8812,147 @@ opaque and with alpha). Added by Claude Code (Claude Opus 5.5) under the owner's
 
 ---
 
+## Recipe MA - Extract Sibling Blocks Differing in the Member They Update
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method* on
+a function that holds two or more copies of one block that update one member each of the
+same object, and differ in that member, in constants, and in the side-effect-free test
+that opens the block: `enhance-tone.c`'s `EqualizeColormap`, whose four colormap blocks
+each test `GetPixel<X>Traits(image)`, look up `<X>PixelChannel` and rewrite
+`image->colormap[j].<x>` from itself. Moved one by one they would be helpers that clone
+each other.
+
+**Not covered by:** Recipe SC, whose copies differ only in literals and enumeration
+constants, never in a member designator or a called function; Recipe SV and Recipe TW,
+which take one differing value; Recipe CF, whose copies differ only in the function
+called; Recipe D, whose copies differ in variables or one value; Recipe IS, which passes
+the slot of a shared object inside a parallel loop, not a member chosen per copy.
+
+**How:**
+
+1. Copies. Two or more blocks of one function, each meeting Recipe E steps 1 and 3 to 7
+   with no `#pragma` line and outside every OpenMP region; one of them may instead be the
+   whole body of a `static` function that the function calls from one place (a helper an
+   earlier step moved one copy into), its parameters standing for the caller's
+   variables.
+2. Align the copies by script (whitespace ignored; no variable renamed). Where they
+   differ, each differing run is one of three roles: (a) a literal or enumeration
+   constant, as Recipe SC step 2; (b) the whole controlling expression's operand that the
+   block evaluates first and unconditionally (the `x` of a leading `if ((x & M) != 0)`),
+   a call of a function with no side effect or a read of an object the block does not
+   write; (c) the member designator of one lvalue `e.m`, the same base `e` in every copy,
+   which the block reads and assigns and does not take the address of. All members of
+   role (c) have one declared type `T`. Any other difference stops the step.
+3. Write one `static void` function directly above the caller (or in place of step 1's
+   helper): its parameters are the variables a copy reads, or the input struct the
+   copies already read, then one parameter per role (a) of the constant's type (Recipe
+   SC step 3), one per role (b) of the expression's type, and `T *value` for role (c),
+   at most four in all (roles (a) beyond that in Recipe SC's `const` struct).
+4. Its body is one copy's text with each role (a) and (b) run replaced by its
+   parameter's name and every `e.m` of role (c) by `(*value)`, nothing else changed;
+   bindings of an input struct stay as they were.
+5. Replace each copy with a call passing its constants, its role (b) expression and
+   `&e.m`. A step 1 helper's one call becomes the new call, with the helper's arguments
+   substituted for its parameters, and the helper leaves the file (its text is the new
+   function's).
+6. All copies move in one commit; the message lists each copy's runs. When a copy runs per
+   pixel, time it as Recipe CF step 7 says.
+7. Check by script that substituting each copy's runs into the new function's body
+   (`(*value)` by `e.m`) gives that copy's token sequence; check by reading that the
+   caller guarantees `e` designates an object wherever a call stands (the copy evaluated
+   `e.m` only on some paths; the call computes its address always).
+
+**Before:**
+
+```c
+static void EqualizeColormapRed(const EqualizeColors *colors,const ssize_t j)
+{
+  ...
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,
+        RedPixelChannel);
+      if (black[channel] != white[channel])
+        image->colormap[j].red=equalize_map[(ssize_t)
+          GetPixelChannels(image)*ScaleQuantumToMap(
+          ClampToQuantum(image->colormap[j].red))+channel];
+    }
+}
+...
+    EqualizeColormapRed(&colors,j);
+    if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+      {
+        PixelChannel channel = GetPixelChannelChannel(image,
+          GreenPixelChannel);
+        if (black[channel] != white[channel])
+          image->colormap[j].green=equalize_map[(ssize_t)
+            GetPixelChannels(image)*ScaleQuantumToMap(
+            ClampToQuantum(image->colormap[j].green))+channel];
+      }
+    ...
+```
+
+**After:**
+
+```c
+static void EqualizeColormapValue(const EqualizeColors *colors,
+  const PixelTrait traits,const PixelChannel component,MagickRealType *value)
+{
+  ...
+  if ((traits & UpdatePixelTrait) != 0)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,
+        component);
+      if (black[channel] != white[channel])
+        (*value)=equalize_map[(ssize_t)
+          GetPixelChannels(image)*ScaleQuantumToMap(
+          ClampToQuantum((*value)))+channel];
+    }
+}
+...
+    EqualizeColormapValue(&colors,GetPixelRedTraits(image),RedPixelChannel,
+      &image->colormap[j].red);
+    EqualizeColormapValue(&colors,GetPixelGreenTraits(image),
+      GreenPixelChannel,&image->colormap[j].green);
+    ...
+```
+
+**Careful:**
+
+- Role (a): Recipe SC's argument; the constant is converted to the parameter's type,
+  the type the copy's use converted it to.
+- Role (b): the copy evaluated the expression first, on every path, and it has no side
+  effect; evaluated as an argument directly before the call, after everything the
+  previous statement did, it reads the same objects in the same state and yields the
+  same value, which the block then tests where it tested the expression.
+- Role (c): `&e.m` is the address of the member the copy named, so `(*value)` reads and
+  writes the very object `e.m` did, in the same order, with the same type `T`. Computing
+  the address reads no member; the base `e` (`image->colormap[j]`) must designate an
+  object at the call (step 7), since the call computes it even on the paths where the
+  copy never reached `e.m`. The block took no other address of `e.m` and wrote no other
+  lvalue that could alias it differently than before.
+- The removed helper of step 1 had one caller in the file, which now calls the function
+  holding its text: nothing outside the file could call it.
+- `refactor_guard.py` reports the copies' literals and callees once (`WARN`,
+  deduplication, every value still present); `--calls` with `--renamed Helper=New` for a
+  step 1 helper moves only the copies' callees (down by the copies less one) and the new
+  function; anything else stops the step.
+
+**Evidence level:** oracle (each copy reached by a case), with `refactor_guard.py
+--calls`, steps 2 and 7 checked by script and by reading.
+
+**Provenance:** 2026-11-10, from `enhance-tone.c`'s `EqualizeColormap` (campaign A, W16
+lane c): the file's only *Bumpy Road Ahead* (3 bumps), held since W14, when one block
+moved out as `EqualizeColormapRed` and the other three stayed because each further
+helper would clone it; lane b recorded that "its twins write different members, no
+recipe applies". A probe: 8.47 to 9.09, *Bumpy Road Ahead* and *Overall Code
+Complexity* leaving the file, no finding on the new function; the four reaching cases
+(`palette`, `bilevel`, `rose_alpha -colors 16`, OpenCL palette, each `-equalize`) 0
+diverged. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to
+evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -9125,3 +9266,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | IS | Extract Block Through Pointers to the Iteration's Slots: a block of a parallel loop body over `i` that writes, besides the body's variables (and `status` by PS), only the iteration's own slot of a shared object (`x.direction[i]`, `channel_features[c].correlation[i]`, `object[i].metric[k]`) moves into a `static void` function taking the slot's address (`&x.direction[i]`, uses `x->m`) or the pointer that reaches it by value; slot pointers past four parameters in a `const` struct initialised in the body; copies identical once their slots are pointers may share one function (step 7); every access to the object in the region checked by reading to select the iteration's own `i` | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the five direction loops' finals and accumulators, which W14 lane b and W15 lane a found blocked (every legal chain below 5.25); a probe of the chain 5.25 to 5.98, no finding on a new function, features workload not slower (0.96 s to 0.92 s, median of 9). `vision.c`'s `CircularityThreshold`: 9.31 to 9.38 | owner |
 | 2026-11-10 | NEW | RA | Extract Block Accumulating a Reduction Variable Through a Pointer: a block of a parallel loop body that uses at most two variables named in the pragma's `reduction(op:v)` clauses only by applying that operator (`v+=e;`, `v++;`) moves into a `static void` function taking `T *v` (uses `(*v)`), the caller passing `&v`, which inside the region is the thread's private copy; the pragma and clauses unchanged | `composite.c`'s `BlendRMSEResidual` (campaign A, W16 lane c): its channel and column loops add to `channel_residual` and `area` (`reduction(+:...)`), the file's only Deep, Nested Complexity; W15 asked for the ruling. A probe of both steps 3.46 to 3.64 and 3.66, no finding on a new function, a seamless-blend workload 1.77 s both ways (median of 9) | owner |
 | 2026-11-10 | NEW | TI | Merge Twin Functions into One Inlined Function: two `static` functions with one caller each, the same text but for whole-expression runs, become one `static inline` function taking a `const` struct (an enumeration selector first, then the copies' read-only parameters) and the pointers they write through or advance; a differing pair repeated at several positions that differ in one operand becomes one selector function; each call declares the struct with its own constant and calls the new function, and the copies leave the file; `nm` must show the new functions inlined, else they are declared `magick_attribute((__always_inline__))`; timed | `resize-image.c`'s `FilterHorizontalPixel` and `FilterVerticalPixel` (campaign A, W16 lane c): out of line the merged function diverged on 12 oracle cases (NaN payloads only) and was 21% and 26% slower; forced inline 0 diverged, within 3%; probes 8.78 to 9.10, then 9.38 with the channel body extracted, no finding on a new function | owner |
+| 2026-11-10 | NEW | MA | Extract Sibling Blocks Differing in the Member They Update: copies of one block (one of them possibly a one-caller helper's whole body) that differ in constants, in the side-effect-free operand of their leading test, and in the member designator of one lvalue `e.m` they read and assign become calls of one `static void` function taking the constants, the operand's value and `T *value` (`&e.m`), every `e.m` written `(*value)`; the one-caller helper leaves the file | `enhance-tone.c`'s `EqualizeColormap` (campaign A, W16 lane c): its four colormap blocks (`GetPixel<X>Traits`, `<X>PixelChannel`, `colormap[j].<x>`), the file's only Bumpy Road since W14; a probe 8.47 to 9.09, Bumpy Road and Overall Code Complexity gone, no finding on the new function, 4 reaching cases 0 diverged | owner |
