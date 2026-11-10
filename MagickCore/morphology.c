@@ -3948,6 +3948,88 @@ static void ConvolveColumnChannelValue(const MorphologyColumnWalk *walk,
     }
 }
 
+typedef struct _MorphologyColumn
+{
+  const Image
+    *image;
+
+  Image
+    *morphology_image;
+
+  const KernelInfo
+    *kernel;
+
+  double
+    bias;
+
+  size_t
+    *changes;
+
+  ssize_t
+    center;
+
+  int
+    id;
+} MorphologyColumn;
+
+static void ConvolveMorphologyColumnChannel(const MorphologyColumn *column,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,const ssize_t i)
+{
+  double
+    gamma,
+    pixel;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    morphology_traits,
+    traits;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  size_t
+    count;
+
+  MorphologyColumnWalk
+    walk;
+
+  channel=GetPixelChannelChannel(column->image,i);
+  traits=GetPixelChannelTraits(column->image,channel);
+  morphology_traits=GetPixelChannelTraits(column->morphology_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (morphology_traits == UndefinedPixelTrait))
+    return;
+  if ((traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(column->morphology_image,channel,p[column->center+i],q);
+      return;
+    }
+  k=(&column->kernel->values[column->kernel->height-1]);
+  pixels=p;
+  pixel=column->bias;
+  gamma=1.0;
+  count=0;
+  walk.image=column->image;
+  walk.morphology_traits=morphology_traits;
+  walk.kernel=column->kernel;
+  walk.k=k;
+  walk.pixels=pixels;
+  walk.i=i;
+  ConvolveColumnChannelValue(&walk,&pixel,&gamma,&count);
+  if (fabs(pixel-(double) p[column->center+i]) >= MagickEpsilon)
+    column->changes[column->id]++;
+  gamma=MagickSafeReciprocal(gamma);
+  if (count != 0)
+    gamma*=(double) column->kernel->height/count;
+  SetPixelChannel(column->morphology_image,channel,ClampToQuantum(gamma*
+    pixel),q);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4074,6 +4156,9 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
           center,
           r;
 
+        MorphologyColumn
+          column;
+
         if (status == MagickFalse)
           continue;
         p=GetCacheViewVirtualPixels(image_view,x,-offset.y,1,image->rows+
@@ -4086,6 +4171,13 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
             continue;
           }
         center=(ssize_t) GetPixelChannels(image)*offset.y;
+        column.image=image;
+        column.morphology_image=morphology_image;
+        column.kernel=kernel;
+        column.bias=bias;
+        column.changes=changes;
+        column.center=center;
+        column.id=id;
         for (r=0; r < (ssize_t) image->rows; r++)
         {
           ssize_t
@@ -4093,59 +4185,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
 
           for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
           {
-            double
-              gamma,
-              pixel;
-
-            PixelChannel
-              channel;
-
-            PixelTrait
-              morphology_traits,
-              traits;
-
-            const MagickRealType
-              *magick_restrict k;
-
-            const Quantum
-              *magick_restrict pixels;
-
-            size_t
-              count;
-
-            MorphologyColumnWalk
-              walk;
-
-            channel=GetPixelChannelChannel(image,i);
-            traits=GetPixelChannelTraits(image,channel);
-            morphology_traits=GetPixelChannelTraits(morphology_image,channel);
-            if ((traits == UndefinedPixelTrait) ||
-                (morphology_traits == UndefinedPixelTrait))
-              continue;
-            if ((traits & CopyPixelTrait) != 0)
-              {
-                SetPixelChannel(morphology_image,channel,p[center+i],q);
-                continue;
-              }
-            k=(&kernel->values[kernel->height-1]);
-            pixels=p;
-            pixel=bias;
-            gamma=1.0;
-            count=0;
-            walk.image=image;
-            walk.morphology_traits=morphology_traits;
-            walk.kernel=kernel;
-            walk.k=k;
-            walk.pixels=pixels;
-            walk.i=i;
-            ConvolveColumnChannelValue(&walk,&pixel,&gamma,&count);
-            if (fabs(pixel-(double) p[center+i]) >= MagickEpsilon)
-              changes[id]++;
-            gamma=MagickSafeReciprocal(gamma);
-            if (count != 0)
-              gamma*=(double) kernel->height/count;
-            SetPixelChannel(morphology_image,channel,ClampToQuantum(gamma*
-              pixel),q);
+            ConvolveMorphologyColumnChannel(&column,p,q,i);
           }
           p+=(ptrdiff_t) GetPixelChannels(image);
           q+=(ptrdiff_t) GetPixelChannels(morphology_image);
