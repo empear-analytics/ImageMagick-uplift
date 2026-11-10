@@ -745,6 +745,17 @@ static MagickBooleanType IsColormapMismatch(const Image *next,
     MagickFalse);
 }
 
+static ssize_t FindColormapDifference(const Image *next,const Image *images)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) images->colors; i++)
+    if (IsPixelInfoEquivalent(next->colormap+i,images->colormap+i) == MagickFalse)
+      break;
+  return(i);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -898,9 +909,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
           next->alpha_trait=UndefinedPixelTrait;
           if (IsColormapMismatch(next,images,visual_info) != MagickFalse)
             break;
-          for (i=0; i < (ssize_t) images->colors; i++)
-            if (IsPixelInfoEquivalent(next->colormap+i,images->colormap+i) == MagickFalse)
-              break;
+          i=FindColormapDifference(next,images);
           if (i < (ssize_t) images->colors)
             break;
           next=GetNextImageInList(next);
