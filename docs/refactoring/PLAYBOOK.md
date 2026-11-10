@@ -7847,6 +7847,155 @@ approval of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe RL - Share a Parallel Row Loop Through a Row Function
+
+**Use when:** CodeScene reports *Code Duplication* among functions of one file whose
+tails are the same parallel row loop (the cache view acquired, the `#pragma omp parallel
+for` with the same clauses, the row fetched, one row of work, the sync, the progress
+block, the view destroyed, `return(status);`), differing only in the work done on the
+row and the progress tag: `threshold.c`'s `BlackThresholdImage`, `WhiteThresholdImage`,
+`PerceptibleImage` and `RangeThresholdImage`.
+
+**Not covered by:** Recipe N and Recipe Z step 1, which move one function's tail with its
+parallel loop whole and unchanged, so that a second tail moved the same way clones the
+first; Recipe CF, whose copies hold no `#pragma` line and whose new function is
+`static inline` with a designator at every call, while here the call stands inside the
+parallel region and reads the row function from a struct; Recipe TW and Recipe D, whose
+copies differ in variables or a value, not in the function called.
+
+**How:**
+
+1. Copies. The tails of two or more functions of one file, each from the statement that
+   sets `status` before the loop to the function's final `return(status);`, each holding
+   one whole parallel loop under Recipe N step 1's conditions (the `#if`, the pragma and
+   the `#endif` unchanged; every variable the region writes or a clause names a local of
+   the tail, such as `status`, `progress`, `y` and `image_view`, that nothing before the
+   tail reads). Check by script that the copies are the same token sequence once each
+   copy's row work is written `method(image,arguments,q);` (step 2), its tag `tag`, and
+   its per-iteration fill of a row struct removed (step 5).
+2. Row functions. Each copy's row work is one call of a `static` function of the file
+   on the image, one input and the row pointer, `F(image,X,q)`, or an inline column loop
+   (`for (x=0; ...)`, writing only its own `x` and temporaries and through `q`), which
+   becomes such a function under Recipe E in this step. Each row function takes
+   `(const Image *image,const void *arguments,Quantum *magick_restrict q)`, binding its
+   input as Recipe CF step 3 does, and `X` becomes the address of the copy's input
+   object (`&threshold`, `&epsilon`, `&row`).
+3. Write directly above the first caller a `typedef void (*NameRowMethod)(const Image *,
+   const void *,Quantum *magick_restrict);` and a struct `NameRows` with the members
+   `const char *tag`, `NameRowMethod method` and `const void *arguments`.
+4. Below them, one `static MagickBooleanType` function taking `(Image *image,const
+   NameRows *rows,ExceptionInfo *exception)` (not `inline`): the tail's locals, then the
+   tail's text with the row work written `rows->method(image,rows->arguments,q);` and
+   the tag `rows->tag`, nothing else changed, the pragma lines included.
+5. In each caller, declare `const NameRows rows = { Tag,F,&input };` among its
+   declarations. A struct of row inputs that the copy filled in every iteration, member
+   by member from variables the loop never writes, becomes a `const` local of the caller
+   declared with those variables as its initialiser, in member order. The tail becomes
+   `return(Name(image,&rows,exception));`, and locals only the tail used leave the caller.
+6. All copies move in one commit; the message names each function, its row function and
+   its tag, and quotes Recipe CF step 7's timing (one indirect call per row).
+7. Check by reading that every member the region reads through `rows` is only read, that
+   every object `arguments` points to is a local or parameter of the caller that nothing
+   writes until the call returns, and that every caller passes its own tag.
+
+**Before:**
+
+```c
+MagickExport MagickBooleanType PerceptibleImage(Image *image,
+  const double epsilon,ExceptionInfo *exception)
+{
+#define PerceptibleImageTag  "Perceptible/Image"
+
+  CacheView
+    *image_view;
+  ...
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ...
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
+      continue;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      PerceptiblePixel(image,epsilon,q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    SyncThresholdRow(&line,&status);
+    ...
+        SetThresholdProgress(image,PerceptibleImageTag,progress,&status);
+  ...
+  return(status);
+}
+```
+
+**After:**
+
+```c
+static MagickBooleanType ThresholdImageRows(Image *image,
+  const ThresholdRows *rows,ExceptionInfo *exception)
+{
+  ...
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
+      continue;
+    rows->method(image,rows->arguments,q);
+    SyncThresholdRow(&line,&status);
+    ...
+        SetThresholdProgress(image,rows->tag,progress,&status);
+  ...
+}
+...
+static void PerceptibleRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  const double
+    epsilon = (*(const double *) arguments);
+  ...
+}
+...
+  const ThresholdRows
+    rows = { PerceptibleImageTag,PerceptibleRow,&epsilon };
+  ...
+  return(ThresholdImageRows(image,&rows,exception));
+```
+
+**Careful:**
+
+- The parallel loop moves whole, pragma and all, into one function per call, as Recipe N
+  step 1 moves it: what the region writes (`status`, `progress`, `y`, the row's `q`) and
+  what its clauses name are the new function's locals of the same names, so the region
+  shares, privatises and reduces what it did. The callers' inputs are now read through
+  `rows` by every thread; they were shared before as well (a local of the enclosing
+  function), and the region only reads them.
+- Each iteration calls the same row function on the same row with the same input, now
+  through `rows->method`: one indirect call per row, not per pixel. The row function's
+  own loop is the copy's text. A row struct filled in every iteration from variables the
+  loop never writes held the same values in every iteration; filled once before the call
+  it holds them still, and as a `const` local nothing writes it.
+- The tag is the string literal the copy passed, passed as the same pointer value
+  through the struct; `SetImageProgress` reads the same text.
+- `refactor_guard.py --calls` shows the loop's callees down by the copies less one, the
+  new function and row functions up by their definitions and calls; anything else stops
+  the step.
+
+**Evidence level:** oracle (each function reached by a case), with `refactor_guard.py
+--calls`, step 1 checked by script, step 7 by reading, and Recipe CF step 7's timing.
+
+**Provenance:** 2026-11-10, from `threshold.c` (campaign A, W16 lane b): the row loops
+of `BlackThresholdImage`, `WhiteThresholdImage`, `PerceptibleImage` and
+`RangeThresholdImage`, four of the eight functions of the file's *Code Duplication*
+finding. This recipe alone leaves the score flat (8.03; the finding drops from eight
+functions to seven, the row functions cloning each other); with Recipe CF on the row
+functions it reaches 9.09. Added by Claude Code (Claude Opus 5.5) under the owner's
+approval of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -8151,3 +8300,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | LP | Name a Label Set as a Predicate: a `switch (e)` whose only groups are one run of labels with a body that returns on every path and `default: break;` becomes `if (<Pred>(e) != MagickFalse)` and the body; the new `static MagickBooleanType` function holds the labels (`return(MagickTrue)`, `default: break;`, `return(MagickFalse)`) and may replace further sites with the same label set | `colorspace.c`'s `sRGBTransformImage` and `GenericOrLogTosRGB` (campaign A, W16 lane c): the same 28-label generic group, cc 31 and 30; a probe of both sites 7.44 to 8.10 (the first alone 7.46), the predicate a label-run *Complex Method* (cc 30) under the ruling of 2026-11-07 | mandate (2026-10-24) |
 | 2026-11-10 | NEW | SC | Extract Sibling Blocks Differing in Several Constants: copies of one block in one function that differ in two or more literal or enumeration constants move into one function taking a `const` struct of the constants (one member per role, typed as Recipe SV step 3 types the value); each copy becomes the struct's initialiser and the call; a forward declaration of the caller when the copies recurse into it | `quantize.c`'s `Riemersma` (campaign A, W16 lane c): cc 38, 109 lines, its four `level > 1` cases seven calls on four gravity constants each, its two `level == 1` cases three calls on three; as case helpers they clone (6.25, W14 lane b). A probe of the chain (this recipe twice, then Recipe O on the `level == 1` switch): 7.80 to 8.34, 8.41 and 8.74, no finding on a new function | mandate (2026-10-24) |
 | 2026-11-10 | NEW | CF | Merge Twins Differing in the Function They Call: two or more copies of one block (whole `static` function bodies, or blocks meeting Recipe E) that are the same text except for the function called at one role, every callee of one type (or of types that differ only in the parameter carrying the callee's inputs, which then becomes `const void *`), become one `static inline` function taking a `const` pointer of exactly that type; each copy becomes a call passing its callee's name. Per-pixel copies are timed against the baseline binary (over 3% slower stops the step) and checked with `objdump` for new indirect calls | `threshold.c` (campaign A, W16 lane b): its *Code Duplication* (eight functions) comes from row and pixel loops that differ only in the function called, which Recipes D, SV, SC and TW refuse. A probe of the chain with Recipe RL: 8.03 to 9.09, the finding gone, no finding on a new function; the inline form timed 0.382 s to 0.377 s (medians of nine), a per-pixel call through a struct member 0.388 s to 0.439 s (rejected) | owner |
+| 2026-11-10 | NEW | RL | Share a Parallel Row Loop Through a Row Function: the tails of several functions that hold the same whole parallel row loop, differing only in the row's work and the progress tag, move into one non-inline `static` function (the pragma unchanged) taking a `const` struct of the tag, a row function pointer and a `const void *` to the row's input; each row's work becomes a `static` row function of one type, and each tail becomes the struct's initialiser and `return(...)` of the call | `threshold.c` (campaign A, W16 lane b): `BlackThresholdImage`, `WhiteThresholdImage`, `PerceptibleImage` and `RangeThresholdImage`, four of the eight functions of its *Code Duplication*. Alone 8.03 (flat, seven functions left in the finding); with Recipe CF on the row functions 9.09. One indirect call per row; timed with the chain | owner |
