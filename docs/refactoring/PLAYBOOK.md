@@ -8243,7 +8243,13 @@ way clones the first.
    all; when that would make five or more, the selector and the read values that differ
    between the copies go in one `const` struct (`side` first, each member of the type of
    the variable it holds) passed as `const Name *name`, bound as `const` locals of their
-   role names (Recipe N step 4). Its body is a copy's text with every differing pair
+   role names (Recipe N step 4). When the variables a copy reads are the members of a `const`
+   struct local that the caller declares with exactly those variables as its initialiser
+   and never writes (Recipe E step 3's input form; `CompareImagesBounds`'s
+   `DifferingLineScan line`), the new function may take `const Struct *name` in their
+   place, beside `side`, and bind each member it reads as a `const` local of the
+   member's name and type, a struct-valued member copied as E step 3 copies it. Its body
+   is a copy's text with every differing pair
    written `((side == NameA) ? runA : runB)`, each run verbatim, nothing else changed.
 5. Replace each copy by a call that passes its own enumeration constant (directly, or in
    the initialiser of the `const` struct declared at the top of the block that holds the
@@ -8352,6 +8358,11 @@ static ssize_t FindStretchBlackLevel(const Image *image,
   value is the run's. Two integer runs converted to the conditional's common type, both
   representable in it, keep their values, and the conversion to the target (`j`) that
   each copy made is then made from the same value.
+- An input read from the caller's `const` struct (step 4): the struct was initialised from
+  the very variables the copy reads, and nothing writes them or it until the call returns,
+  so each binding holds the value the copy read. A struct-valued member is a copy whose
+  pointer members hold the caller's addresses: `&scan` passed on reaches, through them,
+  the objects the copy's `&scan` reached, and the callee writes only through those.
 - A value that differs between the copies stays where the copy read it (`point` in the
   comparison is read on every iteration, as `black_point` was); only its source moves,
   from a parameter to a struct member the caller filled from that parameter, unwritten
@@ -9267,3 +9278,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | RA | Extract Block Accumulating a Reduction Variable Through a Pointer: a block of a parallel loop body that uses at most two variables named in the pragma's `reduction(op:v)` clauses only by applying that operator (`v+=e;`, `v++;`) moves into a `static void` function taking `T *v` (uses `(*v)`), the caller passing `&v`, which inside the region is the thread's private copy; the pragma and clauses unchanged | `composite.c`'s `BlendRMSEResidual` (campaign A, W16 lane c): its channel and column loops add to `channel_residual` and `area` (`reduction(+:...)`), the file's only Deep, Nested Complexity; W15 asked for the ruling. A probe of both steps 3.46 to 3.64 and 3.66, no finding on a new function, a seamless-blend workload 1.77 s both ways (median of 9) | owner |
 | 2026-11-10 | NEW | TI | Merge Twin Functions into One Inlined Function: two `static` functions with one caller each, the same text but for whole-expression runs, become one `static inline` function taking a `const` struct (an enumeration selector first, then the copies' read-only parameters) and the pointers they write through or advance; a differing pair repeated at several positions that differ in one operand becomes one selector function; each call declares the struct with its own constant and calls the new function, and the copies leave the file; `nm` must show the new functions inlined, else they are declared `magick_attribute((__always_inline__))`; timed | `resize-image.c`'s `FilterHorizontalPixel` and `FilterVerticalPixel` (campaign A, W16 lane c): out of line the merged function diverged on 12 oracle cases (NaN payloads only) and was 21% and 26% slower; forced inline 0 diverged, within 3%; probes 8.78 to 9.10, then 9.38 with the channel body extracted, no finding on a new function | owner |
 | 2026-11-10 | NEW | MA | Extract Sibling Blocks Differing in the Member They Update: copies of one block (one of them possibly a one-caller helper's whole body) that differ in constants, in the side-effect-free operand of their leading test, and in the member designator of one lvalue `e.m` they read and assign become calls of one `static void` function taking the constants, the operand's value and `T *value` (`&e.m`), every `e.m` written `(*value)`; the one-caller helper leaves the file | `enhance-tone.c`'s `EqualizeColormap` (campaign A, W16 lane c): its four colormap blocks (`GetPixel<X>Traits`, `<X>PixelChannel`, `colormap[j].<x>`), the file's only Bumpy Road since W14; a probe 8.47 to 9.09, Bumpy Road and Overall Code Complexity gone, no finding on the new function, 4 reaching cases 0 diverged | owner |
+| 2026-11-10 | AMEND | MT | Step 4: when the variables a copy reads are the members of a `const` struct local the caller declares with exactly those variables as its initialiser and never writes (Recipe E step 3's input form), the new function may take that struct by `const Struct *` beside `side`, binding the members it reads as `const` locals of their names (a struct-valued member copied as E step 3 copies it); *Careful* gives the argument. Still seven steps | `layer.c`'s `CompareImagesBounds` (campaign A, W16 lane c): its ascending and descending row scans read `alpha_image`, `beta_image`, `scan` and `exception`, the members of its `DifferingLineScan line`, which with `side` make five parameters; a probe 7.55 to 7.84, `CompareImagesBounds` leaving Bumpy Road and Complex Method, no finding on the new function | owner |
