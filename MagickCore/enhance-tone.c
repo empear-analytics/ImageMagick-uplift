@@ -651,6 +651,38 @@ static MagickBooleanType LoadColorCorrection(
   return(MagickTrue);
 }
 
+typedef struct _ColorCorrectionTargets
+{
+  ColorCorrection
+    *color_correction;
+
+  PixelInfo
+    **cdl_map;
+} ColorCorrectionTargets;
+
+static MagickBooleanType PrepareColorCorrection(const Image *image,
+  const char *color_correction_collection,
+  const ColorCorrectionTargets *targets,ExceptionInfo *exception)
+{
+  ColorCorrection
+    *const color_correction = targets->color_correction;
+
+  PixelInfo
+    **const cdl_map = targets->cdl_map;
+
+  if (LoadColorCorrection(color_correction_collection,color_correction,
+        exception) == MagickFalse)
+    return(MagickFalse);
+  LogColorCorrection(image,(*color_correction));
+  (*cdl_map)=(PixelInfo *) AcquireQuantumMemory(MaxMap+1UL,
+    sizeof(*(*cdl_map)));
+  if ((*cdl_map) == (PixelInfo *) NULL)
+    ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+      image->filename);
+  BuildCDLMap((*color_correction),(*cdl_map));
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   const char *color_correction_collection,ExceptionInfo *exception)
 {
@@ -671,6 +703,9 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   PixelInfo
     *cdl_map;
 
+  ColorCorrectionTargets
+    targets;
+
   ssize_t
     y;
 
@@ -681,15 +716,11 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (LoadColorCorrection(color_correction_collection,&color_correction,
+  targets.color_correction=(&color_correction);
+  targets.cdl_map=(&cdl_map);
+  if (PrepareColorCorrection(image,color_correction_collection,&targets,
         exception) == MagickFalse)
     return(MagickFalse);
-  LogColorCorrection(image,color_correction);
-  cdl_map=(PixelInfo *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*cdl_map));
-  if (cdl_map == (PixelInfo *) NULL)
-    ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-      image->filename);
-  BuildCDLMap(color_correction,cdl_map);
   if (image->storage_class == PseudoClass)
     {
       ApplyCDLToColormap(image,color_correction,cdl_map);
