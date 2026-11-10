@@ -7163,6 +7163,13 @@ static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsMagnifyWithinHalf(const unsigned int magnify,
+  const unsigned int width,const unsigned int height)
+{
+  return(((magnify > 1) && ((magnify <= (width >> 1)) &&
+    (magnify <= (height >> 1)))) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7538,8 +7545,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   (void) XPutImage(display,windows->magnify.pixmap,
     windows->magnify.annotate_context,windows->magnify.ximage,0,0,x,y,
     (unsigned int) ((int) width-x),(unsigned int) ((int) height-y));
-  if ((magnify > 1) && ((magnify <= (width >> 1)) &&
-      (magnify <= (height >> 1))))
+  if (IsMagnifyWithinHalf(magnify,width,height) != MagickFalse)
     {
       RectangleInfo
         highlight_info;
