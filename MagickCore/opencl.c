@@ -929,6 +929,13 @@ static void SetOpenCLBenchmarkAttribute(
   }
 }
 
+static int EndDoctypeQuote(const char *q,int quote)
+{
+  if (*q == quote)
+    quote=0;
+  return(quote);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -970,10 +977,7 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
         for ( ; *q != '\0'; q++)
         {
           if (quote != 0)
-            {
-              if (*q == quote)
-                quote=0;
-            }
+            quote=EndDoctypeQuote(q,quote);
           else
             {
               if ((*q == '"') || (*q == '\''))
