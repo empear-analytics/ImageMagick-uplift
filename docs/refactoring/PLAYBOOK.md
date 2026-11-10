@@ -9234,6 +9234,174 @@ the only fix and no recipe (M23, `option.c`'s `GetOptionInfo`). Probes: `colorsp
 
 ---
 
+## Recipe KT - Replace a Keyed Label Run with a Table Lookup
+
+**Use when:** CodeScene reports *Complex Method* (or *Large Method*) on a function whose
+complexity is one `switch` on an integer whose groups each assign one variable from the
+same call with one constant argument, and differ only in that constant, under sparse
+integer labels, with `default:` sharing one of the groups or standing in a group of its
+own that leaves the function: `morphology.c`'s `AcquireThinSEKernel` (twenty-two labels
+from `41` to `823`, each `kernel=ParseKernelArray("...");`, `default:` sharing `case
+482:`, cc 25, 78 lines), `AcquireLaplacianKernel` (`case 0: default:`, labels `1` to
+`19` with gaps) and `AcquireLineJunctionsKernel` (labels `1` to `5`, `case 0: default:`
+returning a kernel list of its own).
+
+**Not covered by:** Recipe TB, whose function is the `switch` and a closing `return(d);`
+alone and whose cases return the constant: here every group assigns a call's result and
+the function goes on after the `switch` (the NULL test, the type, the rotation), and the
+labels are sparse keys, not `0` to `k` in order, so no index form applies. Recipe LP,
+which names a set of labels sharing one body. Recipes SD, SR, SW and ST, which split the
+run into shorter runs that clone each other (every group is the same statement). Recipes
+SV and SC, which pass one copy's differing values to a helper: twenty-two copies would
+remain twenty-two labels, each a call. Recipe F, which moves an existing table.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region; `e` is an integer expression with
+   no call, assignment or increment (a cast of a parameter's member, `(int) args->rho`).
+   Every label is an integer literal or `default:`. Each group but one is one label
+   whose body is `v=F(c);` and `break;` (comments aside), with the same variable `v` and
+   function `F`, and a constant `c` (a string literal or a numeric literal) as the only
+   argument; no group falls through. The one other group carries `default:`, either
+   (form A) with exactly one integer label and the same body shape, or (form B) with at
+   most one integer label and a body that leaves the function on every path
+   (`return(...);`), with no `break`, `continue`, `goto` or `#` line. No `#if` line
+   stands inside the `switch`. Nothing in the `switch` writes what `e` reads.
+2. The function is not called per pixel or per channel (check its callers by reading);
+   otherwise time the step as Recipe CF step 7 says. For string constants, `F` only reads
+   the characters of its argument (check by reading), since two equal literals need not
+   share one address and the table's element is another array of the same characters.
+3. Declare once in the file, directly above the first table that uses it, a `typedef
+   struct` of two members: `key`, of `e`'s type, and one member of the type of `F`'s
+   parameter (`const char *definition`). A later step reuses it; a step whose function
+   stands above the type's declaration moves the declaration, unchanged, directly above
+   its own table.
+4. Directly above the function, write a `static const` array of that type with no size,
+   named for what it holds, one element `{ L, c }` per group: in form A each one-label
+   group in the `switch`'s order and then the `default:` group, with its integer label,
+   last; in form B the one-label groups in order and no element for the `default:`
+   group. Each label's comment and each comment of a group's body stands on or directly
+   above its element, unchanged; a comment between groups stands where the groups stood.
+5. Declare at the top of the function `const T key = e;` (the text of `e`, its type `T`)
+   and `size_t i;`. Replace the `switch`, from `switch` to its closing brace, with: form
+   A `for (i=0; i < ((sizeof(K)/sizeof(*K))-1); i++) if (K[i].key == key) break;` then
+   `v=F(K[i].m);`; form B `for (i=0; i < (sizeof(K)/sizeof(*K)); i++) if (K[i].key ==
+   key) break;` then `if (i == (sizeof(K)/sizeof(*K)))` followed by the `default:`
+   group's body, its comments and statement unchanged but for indentation, then
+   `v=F(K[i].m);`. Nothing else in the function changes.
+6. Check by script that each label of the `switch` but `default:` (and, in form B, but
+   the `default:` group's label) is the key of exactly one element whose constant is the
+   one its group passed, that in form A the last element is the `default:` group's, that
+   every comment of the `switch` stands in the table or the function, and that nothing
+   else in the file changed.
+7. `refactor_guard.py`: `WARN` with `0` and (form A) `1` added once each and nothing else
+   added or removed (form B: the `default:` group's label, when it was `0`, balances the
+   added `0`); `--calls` moves only `F`, down by the number of groups less one.
+
+**Before:**
+
+```c
+static KernelInfo *AcquireThinSEKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  ...
+  switch ( (int) args->rho ) {
+    /* SE for 4-connected thinning */
+    case 41: /* SE_4_1 */
+      kernel=ParseKernelArray("3: -,-,1  0,-,1  -,-,1");
+      break;
+    ...
+    default:
+    case 482: /* SE_48_2 - General Edge Kernel */
+      kernel=ParseKernelArray("3: 0,-,1  0,-,1  0,-,1");
+      break;
+  }
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+```
+
+**After:**
+
+```c
+typedef struct _KeyedKernelArray
+{
+  int
+    key;
+
+  const char
+    *definition;
+} KeyedKernelArray;
+...
+static const KeyedKernelArray
+  ThinSEKernelArrays[] =
+  {
+    /* SE for 4-connected thinning */
+    { 41, "3: -,-,1  0,-,1  -,-,1" }, /* SE_4_1 */
+    ...
+    { 482, "3: 0,-,1  0,-,1  0,-,1" } /* SE_48_2 - General Edge Kernel */
+  };
+
+static KernelInfo *AcquireThinSEKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  const int
+    key = (int) args->rho;
+
+  size_t
+    i;
+  ...
+  for (i=0; i < ((sizeof(ThinSEKernelArrays)/
+       sizeof(*ThinSEKernelArrays))-1); i++)
+    if (ThinSEKernelArrays[i].key == key)
+      break;
+  kernel=ParseKernelArray(ThinSEKernelArrays[i].definition);
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+```
+
+**Careful:**
+
+- Why the behaviour is the same, form A. `key` holds the value the `switch` evaluated:
+  the same text, evaluated once, at the same point (nothing runs before the `switch` but
+  declarations), of the same type, so `==` compares the values the `switch` compared
+  with its labels. The loop visits every element but the last; at the first whose key
+  equals `key` it stops with `i` on it, and that element's constant is the one the
+  matching label's group passed (step 6). Labels are distinct, so the first match is the
+  only one. When no element matches, the loop ends with `i` on the last element, the
+  `default:` group's, which is what the `switch` ran for an unmatched value; its own
+  label is never compared, and needs not be: that value reaches the last element by the
+  same route. Then `F` is called once with that constant, where the group called it.
+- Form B. The loop visits every element; a match leaves `i` on it as above. No match
+  leaves `i` equal to the count, and the `default:` group's body runs, as the `switch`
+  ran it for a value matching no label or its own label; it leaves the function, as it
+  did. Otherwise `F` runs with the matched constant.
+- The conversion of `e` (a `double` cast to `int`) happens once, as before; a value the
+  cast cannot represent was undefined before and stays so, at the same point.
+- A string constant becomes an array of the same characters; `F` reads only the
+  characters (step 2). A numeric constant becomes a member of the type of `F`'s
+  parameter, the type the call converted it to (Recipe SC's rule).
+- The tables are `static const`, written once by their initialisers and never written:
+  no existing table changes (*Absolutely forbidden*). The order of the groups never
+  mattered (no group falls through); only the last element's place carries meaning,
+  which step 6 checks.
+- Searching up to twenty-two elements in place of a jump costs nanoseconds per kernel
+  built, outside every pixel loop (step 2).
+
+**Evidence level:** oracle (the cases that reach the function), with step 6's script and
+step 7's guard fingerprint, and step 2 checked by reading.
+
+**Provenance:** 2026-11-10, from `morphology.c`'s kernel builders (campaign A, W16 lane
+d): `AcquireThinSEKernel` (cc 25, 78 lines), `AcquireLaplacianKernel` (cc 11) and
+`AcquireLineJunctionsKernel` (cc 9), label runs that the next leg on the file needs out
+of *Complex Method* and that no split shortens without clones; TB's forms refuse them
+(the brief asked for a keyed form of TB). Probes: each leaves *Complex Method*
+(`AcquireThinSEKernel` also *Large Method*) with no new function; the file stays at 3.10
+(17 to 14 *Complex Method* functions), since its score moves only once nine of the
+kernel builders and parsers have left. Added by Claude Code (Claude Opus 5.5) under the
+owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -9556,3 +9724,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | MT | Step 4: when the variables a copy reads are the members of a `const` struct local the caller declares with exactly those variables as its initialiser and never writes (Recipe E step 3's input form), the new function may take that struct by `const Struct *` beside `side`, binding the members it reads as `const` locals of their names (a struct-valued member copied as E step 3 copies it); *Careful* gives the argument. Still seven steps | `layer.c`'s `CompareImagesBounds` (campaign A, W16 lane c): its ascending and descending row scans read `alpha_image`, `beta_image`, `scan` and `exception`, the members of its `DifferingLineScan line`, which with `side` make five parameters; a probe 7.55 to 7.84, `CompareImagesBounds` leaving Bumpy Road and Complex Method, no finding on the new function | owner |
 | 2026-11-10 | NEW | TB | Replace a Label Run with a Constant Table: a `static` function whose body is one `switch` of labels that only return constants, and a closing `return(d);`, becomes a lookup in a new `static const` table directly above it: the membership form (one label group returning `MagickTrue`, `default: break;`) loops over a table of the labels; the index form (labels `0` to `k` in order, each returning a constant) returns `T[n]` when `(size_t) n` is below the count. No literal added; table checked by script against the labels and returns; guard `OK` (membership) or `WARN` with exactly the label literals (index); timing when called per pixel; string results only read as text | `colorspace.c`'s `IsGenericColorspace` (cc 30, the LP predicate) and `distort.c`'s `poly_basis_str` (cc 22), campaign A, W16 lane d: label runs no split can shorten without clones; probes 8.62 to 9.38 and 7.15 to 7.60, oracle 0 diverged | owner |
 | 2026-11-10 | AMEND | ST | Step 7: a step of the chain whose parameters exceed four takes a Recipe N input struct; the caller fills it inside the `default:` group, directly before the call passing `&name`, and a later step that moves that group leaves the fill in the caller's new `default:` group and moves the call alone, passing its `name` for `&name`; *Careful* gives the argument. Seven steps | `morphology.c`'s `AcquireKernelBuiltIn` (campaign A, W16 lane d): its chain of builder runs from the default group back (Distance, line and thinning, hit-and-miss, the cross and area shapes, edge detection) needs `args`, `nan` and `exception` with `kernel` and `type` from the hit-and-miss run on (five parameters). A probe of the chain: 3.04 to 3.10, no finding on a new function, the 2,526 reaching cases 0 diverged. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-10 | NEW | KT | Replace a Keyed Label Run with a Table Lookup: a `switch` on an integer whose groups each assign one variable from the same call with one constant argument, under sparse integer labels, with `default:` sharing one group (form A) or in a group of its own that leaves the function (form B), becomes a `static const` table of `{ key, constant }` elements (one shared `typedef struct`) and a lookup loop that ends on the matching element, or on the last element (form A, the `default:` group placed last) or past the table (form B, which then runs the `default:` body); table checked by script; guard `WARN` with `0` and `1` added once each (form A); string constants only read as text | `morphology.c`'s `AcquireThinSEKernel` (cc 25, 78 lines), `AcquireLaplacianKernel` (cc 11) and `AcquireLineJunctionsKernel` (cc 9), campaign A, W16 lane d: label runs that TB's forms refuse (the function goes on after the `switch`; sparse keys); probes: each leaves *Complex Method* with no new function, the file flat at 3.10 (17 to 14 *Complex Method* functions), Laplacian 68 reaching cases 0 diverged | owner |
