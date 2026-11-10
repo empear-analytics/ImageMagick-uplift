@@ -7164,6 +7164,42 @@ static size_t ConfirmListBrowserReply(Display *display,
   return(state);
 }
 
+typedef struct _ListBrowserRelease
+{
+  Display
+    *display;
+
+  XWindowInfo
+    *window_info;
+
+  XEvent
+    event;
+} ListBrowserRelease;
+
+static void ReleaseListBrowserAction(const ListBrowserRelease *release,
+  const XWidgetInfo reply_info,XWidgetInfo *action_info,size_t *state)
+{
+  Display
+    *const display = release->display;
+
+  XWindowInfo
+    *const window_info = release->window_info;
+
+  const XEvent
+    event = release->event;
+
+  if ((*action_info).raised == MagickFalse)
+    {
+      if ((event.xbutton.window == window_info->id) &&
+          (MatteIsActive((*action_info),event.xbutton)))
+        {
+          (*state)=ConfirmListBrowserReply(display,reply_info,(*state));
+        }
+      (*action_info).raised=MagickTrue;
+      XDrawBeveledButton(display,window_info,&(*action_info));
+    }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7613,6 +7649,9 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
+        ListBrowserRelease
+          release;
+
         if (window_info->mapped == MagickFalse)
           break;
         if (north_info.raised == MagickFalse)
@@ -7641,16 +7680,10 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             slider_info.active=MagickFalse;
             break;
           }
-        if (action_info.raised == MagickFalse)
-          {
-            if ((event.xbutton.window == window_info->id) &&
-                (MatteIsActive(action_info,event.xbutton)))
-              {
-                state=ConfirmListBrowserReply(display,reply_info,state);
-              }
-            action_info.raised=MagickTrue;
-            XDrawBeveledButton(display,window_info,&action_info);
-          }
+        release.display=display;
+        release.window_info=window_info;
+        release.event=event;
+        ReleaseListBrowserAction(&release,reply_info,&action_info,&state);
         if (cancel_info.raised == MagickFalse)
           {
             if ((event.xbutton.window == window_info->id) &&
