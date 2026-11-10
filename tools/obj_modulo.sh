@@ -70,6 +70,11 @@ do
       gsub(/[0-9a-f]+ <([^>]+)>/,"<&>");
       gsub(/<[0-9a-f]+ /,"<");
       gsub(/# [0-9a-f]+ <[^>]*>/,"");
+      # A %rip-relative address of a whole function of the same section (`lea
+      # -0x9120(%rip),%rdx # <<XScreenEvent>>`, a callback passed by address) is
+      # resolved by the assembler, so its displacement moves with the code between;
+      # the annotation names the target, which is what is compared.
+      if ($0 ~ /# <<[^>+]+>>$/) gsub(/-?0x[0-9a-f]+\(%rip\)/,"(%rip)");
       print > out }'
   ls "$tmp/$side.fn" | sort > "$tmp/$side.syms"
 done
