@@ -1876,6 +1876,13 @@ MagickExport void XDestroyResourceInfo(XResourceInfo *resource_info)
 %    o window: Specifies a pointer to a Window structure.
 %
 */
+static inline MagickBooleanType IsRootPixmapProperty(const Atom type,
+  const int format,const unsigned long length,const unsigned long after)
+{
+  return(((type == XA_PIXMAP) && (format == 32) && (length == 1) &&
+    (after == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate void XDestroyWindowColors(Display *display,Window window)
 {
   Atom
@@ -1912,7 +1919,7 @@ MagickPrivate void XDestroyWindowColors(Display *display,Window window)
     (Atom) AnyPropertyType,&type,&format,&length,&after,&data);
   if (status != Success)
     return;
-  if ((type == XA_PIXMAP) && (format == 32) && (length == 1) && (after == 0))
+  if (IsRootPixmapProperty(type,format,length,after) != MagickFalse)
     {
       (void) XKillClient(display,(XID) (*((Pixmap *) data)));
       (void) XDeleteProperty(display,window,property);
