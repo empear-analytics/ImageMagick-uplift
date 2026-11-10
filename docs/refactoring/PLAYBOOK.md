@@ -9678,6 +9678,150 @@ recipes.
 
 ---
 
+## Recipe RT - Roll a Run of Copies into a Helper Looping over a Table
+
+**Use when:** CodeScene reports *Complex Method* (or *Bumpy Road Ahead*) on a function
+that holds a run of three or more adjacent copies of one statement sequence, the copies
+differing only in one constant argument, each leaving the function through the same
+`return(R);` on failure, as `morphology.c`'s `AcquireRidgesKernel` does: eight copies of
+`new_kernel=ParseKernelArray("..."); if (new_kernel == (KernelInfo *) NULL)
+return(DestroyKernelInfo(kernel)); new_kernel->type = type; LastKernelInfo(kernel)->next =
+new_kernel;`, one `if` each (cc 14).
+
+**Not covered by:** Recipes SV and SC, whose copies become one call each: the copies'
+exits would stay in the caller, one `if` per copy, and the complexity with them. Recipe W,
+which moves one block whose exits share `R` and keeps no loop: the eight copies as one
+block give a helper with eight `if`s, a *Complex Method* of its own, and W step 2 asks `R`
+to be a constant or read what the block wrote through a pointer. Recipe D, which needs a
+call per copy. Recipes KT and TB, which replace the groups of a `switch`, not a run of
+statements. Rolling the copies into a loop in place leaves the loop and its `if` nested in
+the caller (a *Bumpy Road Ahead* in `AcquireRidgesKernel`, 3.08 in a probe).
+
+**How:**
+
+1. The run is three or more adjacent copies in one block, outside every OpenMP region,
+   with no `#` line, label, declaration, `break`, `continue` or `goto` in them; they are
+   the same token sequence once one constant at one position (a string literal or a
+   numeric literal) is replaced by a name, checked by script. Each copy's only exit is
+   `return(R);` inside a selection, with the same text `R` in every copy.
+2. `R` reads only parameters and locals of the caller that no copy writes, so the caller
+   evaluating `R` right after the helper returns reads what the copy's `return` would
+   have read; any object it reaches through them the copies write only as the helper
+   will, in the same order.
+3. The variables of the caller that the copies write are locals that each copy writes
+   before it reads them and that nothing after the run reads (Recipe E step 4): they are
+   declared in the helper, and their declaration leaves the caller when nothing else
+   there uses it. Writes through pointers the copies already use stay as they are.
+4. Directly above the function, write a `static const` array with no size, named for
+   what it holds, of the type of the parameter the constant is passed to (`const char
+   *const` for a `const char *` parameter), with the copies' constants in run order.
+5. Below it, write `static MagickBooleanType Helper(...)` taking the variables the
+   copies read (at most four), declaring step 3's locals and `size_t j;`, whose body is
+   `for (j=0; j < (sizeof(T)/sizeof(*T)); j++) { <one copy, its constant written T[j],
+   each return(R); written return(MagickFalse);> }` followed by `return(MagickTrue);`.
+   Nothing else in the copy's text changes.
+6. Replace the run by `if (Helper(...) == MagickFalse)` followed by `return(R);`, `R`'s
+   text unchanged; comments before the run stay where they stood.
+7. Check by script that unrolling the loop (each iteration with its element, each
+   `return(MagickFalse);` written `return(R);`) gives the run, copy for copy, and that
+   the table lists the constants in run order. `refactor_guard.py`: `WARN` with `0`
+   added once (the loop's start) and every value still present; `--calls` moves the
+   copies' callees and `R`'s callee down by the copies less one, and the helper up by
+   two.
+
+**Before:**
+
+```c
+    case 2:
+      ...
+      /* Kernels to find a stepped 'thick' line, 4 rotates + mirrors */
+      /* Unfortunately we can not yet rotate a non-square kernel */
+      /* But then we can't flip a non-symmetrical kernel either */
+      new_kernel=ParseKernelArray("4x3+1+1:0,1,1,- -,1,1,- -,1,1,0");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("4x3+2+1:0,1,1,- -,1,1,- -,1,1,0");
+      ...
+      LastKernelInfo(kernel)->next = new_kernel;
+      break;
+```
+
+**After:**
+
+```c
+static const char
+  *const ThickRidgeKernelArrays[] =
+  {
+    "4x3+1+1:0,1,1,- -,1,1,- -,1,1,0",
+    ...
+    "3x4+1+2:-,-,0 1,1,1 1,1,1 0,-,-"
+  };
+
+static MagickBooleanType AppendThickRidgeKernels(KernelInfo *kernel,
+  const KernelInfoType type)
+{
+  KernelInfo
+    *new_kernel;
+
+  size_t
+    j;
+
+  for (j=0; j < (sizeof(ThickRidgeKernelArrays)/
+       sizeof(*ThickRidgeKernelArrays)); j++)
+  {
+    new_kernel=ParseKernelArray(ThickRidgeKernelArrays[j]);
+    if (new_kernel == (KernelInfo *) NULL)
+      return(MagickFalse);
+    new_kernel->type = type;
+    LastKernelInfo(kernel)->next = new_kernel;
+  }
+  return(MagickTrue);
+}
+...
+      /* But then we can't flip a non-symmetrical kernel either */
+      if (AppendThickRidgeKernels(kernel,type) == MagickFalse)
+        return(DestroyKernelInfo(kernel));
+      break;
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The loop runs the copy's statements once per element,
+  in table order, which is run order (step 7): iteration `j` passes element `j`, an
+  array of the same characters as copy `j`'s literal (a numeric element has the type the
+  parameter converted the literal to), to the same function, and then does what copy `j`
+  did, on the same objects (`kernel` and `type` by value, the list through `kernel`).
+  When copy `k` would have left, iteration `k` reaches the same test with the same
+  values and the helper returns `MagickFalse` with nothing run after the test, as
+  nothing ran after the copy's `return`. The caller then evaluates `R` at once; `R`
+  reads only what the copies never write (step 2), so it is the same call on the same
+  argument in the same state (`DestroyKernelInfo(kernel)` frees the list as far as it
+  was built, as before). When no copy leaves, the helper returns `MagickTrue` after the
+  last iteration and the caller goes on after the run, as before.
+- Step 3's locals were written before they were read in every copy and are read nowhere
+  after the run, so declaring them in the helper changes no value anyone reads.
+- A string element is read through its pointer as the literal was; the callee must only
+  read the characters (`ParseKernelArray` does), since the element is not the copy's
+  literal object. The table is new, `static const`, and written by nothing; no existing
+  table changes (*Absolutely forbidden*).
+- Speed: one loop over `n` elements in place of `n` straight-line copies, in code that
+  builds kernels once per call, outside any pixel loop; check by reading that the run is
+  not on a per-pixel path, or time it as Recipe CF step 7 says.
+
+**Evidence level:** oracle (the cases that reach each copy), with step 7's script and
+guard fingerprint, steps 2 and 3 checked by reading.
+
+**Provenance:** 2026-11-10, from `morphology.c`'s `AcquireRidgesKernel` (campaign A, W16
+lane d): cc 14, of which eight `if`s are the copies' exits; one step of the kernel-parser
+leg, whose chain probe measured 3.10 to 3.02 (the file's 110th function) and back to 3.16
+over thirty steps, `AcquireRidgesKernel` leaving *Complex Method* with no finding on the
+helper; the rolled loop left in place measured 3.08 with a new *Bumpy Road Ahead*. Added
+by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -10006,3 +10150,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | E | Step 3: an element of an array reached through a pointer, which the block updates member by member outside every OpenMP region, passes by address (`&e`, the element expression verbatim, to `T *v`; each `e.m` becomes `v->m`) when its indices have no side effect and are not written by the block and the block touches the element only through its members; the address computed once names the element every statement named | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the normalisation of the co-occurrence matrix, `cooccurrence[x][y].direction[i].<c>*=normalize;` for five channels at depth 4, which as a by-value block would take six parameters; a probe of the step 6.28 to 6.70, no finding on the new function | owner |
 | 2026-11-10 | NEW | KT | Replace a Keyed Label Run with a Table Lookup: a `switch` on an integer whose groups each assign one variable from the same call with one constant argument, under sparse integer labels, with `default:` sharing one group (form A) or in a group of its own that leaves the function (form B), becomes a `static const` table of `{ key, constant }` elements (one shared `typedef struct`) and a lookup loop that ends on the matching element, or on the last element (form A, the `default:` group placed last) or past the table (form B, which then runs the `default:` body); table checked by script; guard `WARN` with `0` and `1` added once each (form A); string constants only read as text | `morphology.c`'s `AcquireThinSEKernel` (cc 25, 78 lines), `AcquireLaplacianKernel` (cc 11) and `AcquireLineJunctionsKernel` (cc 9), campaign A, W16 lane d: label runs that TB's forms refuse (the function goes on after the `switch`; sparse keys); probes: each leaves *Complex Method* with no new function, the file flat at 3.10 (17 to 14 *Complex Method* functions), Laplacian 68 reaching cases 0 diverged | owner |
 | 2026-11-10 | NEW | PL | Peel a Leaving Label Set out of a Selection as a Predicate: groups of a `switch` whose whole body is the same leaving statement `S` (`return;`) leave the `switch` for an LP-form predicate on their labels, called in `if (Name(e) != MagickFalse) S` directly before the `switch`; the kept groups and `default:` stay; `e` side-effect free and evaluated again by the `switch`; labels and comments checked by script; TB may then make the predicate a table | `morphology.c`'s `RotateKernelInfo` (campaign A, W16 lane d): thirteen of its fifteen labels only `return;` beside the Blur group and `default:` (cc 30), which LP (two groups only), SD/SR (no `return`) and ST (value-returning) refuse; one step of a chain probe 3.10 to 3.02 to 3.16, no finding on a new function | owner |
+| 2026-11-10 | NEW | RT | Roll a Run of Copies into a Helper Looping over a Table: three or more adjacent copies of one statement sequence differing in one constant argument, each leaving through the same `return(R);`, become a `static const` table of the constants and a `static MagickBooleanType` helper looping over it (each `return(R);` written `return(MagickFalse);`); the run becomes `if (Helper(...) == MagickFalse) return(R);`, `R` reading only what the copies never write; unrolling checked by script; guard `WARN` with `0` added | `morphology.c`'s `AcquireRidgesKernel` (campaign A, W16 lane d): eight thick-ridge copies, eight of its cc 14; SV/SC/W keep one `if` per copy or make a *Complex Method* helper, the loop in place is a *Bumpy Road* (3.08); one step of a chain probe 3.10 to 3.02 to 3.16, no finding on the helper | owner |
