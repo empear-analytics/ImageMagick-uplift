@@ -150,7 +150,8 @@ start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 
 **Guard-verified.** No case executes the function. It may still
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
-recipes whose guard fingerprint is exact: **E, G and P**. The proof is the build
+recipes whose guard fingerprint is exact: **E, G and P** (and B and N with the checks
+of *Unreached functions: B and N* below). The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
 For E and P, which add a function, `OK` means the exact fingerprint the guard names as
 expected: the literal check `OK`, and `--calls` moving nothing but `+2` for each new
@@ -160,6 +161,48 @@ Recipes D and S fold code together or move it, the guard cannot follow them, and
 they need the oracle. The one exception is Recipe D's *Unreached functions* form,
 whose proof is an identical object file, not the guard. Recipe CN rests on the
 same proof, so it applies at either level.
+
+**Unreached functions: B and N** (owner, 2026-11-10). Recipes B and N may also be
+applied to a function no case reaches (`casemap.py` 0 for it and for each of its callers
+in the catalogue). They change more text than E does: a struct carries what a parameter
+list carried, and the guard cannot see a member filled from the wrong variable or a
+binding that reads the wrong member. The step is proven by all of these, each run
+before the commit and quoted in its message, which carries `Verified: guard`:
+
+1. The step is the recipe's own step, every condition of its *How* met and checked by
+   reading as at the oracle level (N steps 1 to 8, B steps 1 to 8, the OpenMP rules
+   included). A block that throws through `GetMagickModule()` does not move at this
+   level: the function name the message reports would change, and no case shows it.
+2. `refactor_guard.py` prints `OK`, and `--calls` moves nothing but `+2` for the new
+   function (N) or nothing at all (B), as for E at this level.
+3. For N, `python3 tools/struct_fill_check.py <file> <Type> <local> <Helper>` prints
+   `OK`: every member is filled from the variable of its own name, in declaration
+   order, directly before the one call that passes `&local` (or by a `const`
+   initialiser naming the members in order); every binding in the helper reads the
+   member of its own name; and every line the step removed reappears, indentation
+   aside, among the lines it added (the block moved, nothing in it was rewritten).
+   For B, whose members take the old call's argument expressions, step 7's check by
+   reading stands in for it: the message quotes the old call and the fill side by side.
+   The type of each member against the variable's declaration (N step 3, B
+   *Careful*) is checked by reading.
+4. `sh tools/obj_modulo.sh <file> <Caller> <Helper>` prints `IDENTICAL` (the whole
+   object file byte for byte, D's proof) or `MODULO-IDENTICAL`: every other function of
+   the file compiles to the same instructions, addresses aside; the only new function
+   is the helper; and the only functions gone are ones the helper calls, which the
+   compiler now inlines into the helper instead of the caller. For B, `<Helper>` is the
+   bundled function and `<Caller>` its one caller; with more than one caller only
+   `IDENTICAL` passes. `DIFFERENT` stops the step.
+
+`IDENTICAL` alone proves the step, as for D. `MODULO-IDENTICAL` proves that the step
+touched nothing outside the caller and the helper (no stray edit, no shared type or
+macro changed under another function); inside those two the proof is items 2 and 3,
+which close the three ways a B or N step can go wrong that an E step at this level
+cannot: a member filled from the wrong variable, a binding of the wrong member, and a
+block edited on the way. Comparing the caller and helper themselves after forcing the
+helper inline (`always_inline` in the comparison copy, or every `static` function
+`alwaysinline` in the IR) was tried on `segment.c` and does not work: the same code
+inlined at another point of the pipeline is scheduled differently (two `mov`s swap),
+so those comparisons refuse correct steps.
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -1170,7 +1213,8 @@ static inline void CopyPixels(const MagnifyPixels *magnify,
   atomic` statement on it (`(*progress)++;`) keeps its text.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (no call may appear or
-vanish), and steps 4 to 7 checked by reading.
+vanish), and steps 4 to 7 checked by reading; or, for a function no case reaches, guard
+with `tools/obj_modulo.sh` (*Two levels of evidence*, *Unreached functions: B and N*).
 
 **Provenance:** 2026-10-24, from `magnify.c`'s pixel kernels (`CopyPixels`, `MixPixels`,
 `Mix2Pixels`: 5 or 6 arguments, three of them the same at every call in a kernel),
@@ -1703,7 +1747,9 @@ static void ThresholdWaveletLevel(float *pixels,
   shared locals. Keep the step only when no duplication appears.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
-nothing else moved), and steps 1, 2 and 8 checked by reading.
+nothing else moved), and steps 1, 2 and 8 checked by reading; or, for a function no
+case reaches, guard with `tools/struct_fill_check.py` and `tools/obj_modulo.sh`
+(*Two levels of evidence*, *Unreached functions: B and N*).
 
 **Provenance:** 2026-10-29, from `visual-effects.c`'s `WaveletDenoiseImage`, whose last
 depth-4 site is the coefficient threshold loop (six inputs: the buffer, both offsets, the
@@ -7987,3 +8033,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-07 | AMEND | N | Step 8: the sibling and later-block forms also join a PS step 7 nested-loop helper and the parallel body's head moved by PC: the head takes the PS struct (declared `const` with its initialiser among the body's declarations, which stays), the typedef and initialiser gain the members the head reads, the head binds them as `const` locals (PC keeps its text), and the inner call passes `name`. Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): PC before the column body moves gives a *Complex* and *Large* helper (6.30 to 6.21); after it, with its own struct, about 80 lines; sharing the PS struct, 52 lines and no finding, 6.51 to 6.62 | mandate (2026-10-24) |
 | 2026-11-10 | NEW | LP | Name a Label Set as a Predicate: a `switch (e)` whose only groups are one run of labels with a body that returns on every path and `default: break;` becomes `if (<Pred>(e) != MagickFalse)` and the body; the new `static MagickBooleanType` function holds the labels (`return(MagickTrue)`, `default: break;`, `return(MagickFalse)`) and may replace further sites with the same label set | `colorspace.c`'s `sRGBTransformImage` and `GenericOrLogTosRGB` (campaign A, W16 lane c): the same 28-label generic group, cc 31 and 30; a probe of both sites 7.44 to 8.10 (the first alone 7.46), the predicate a label-run *Complex Method* (cc 30) under the ruling of 2026-11-07 | mandate (2026-10-24) |
 | 2026-11-10 | NEW | SC | Extract Sibling Blocks Differing in Several Constants: copies of one block in one function that differ in two or more literal or enumeration constants move into one function taking a `const` struct of the constants (one member per role, typed as Recipe SV step 3 types the value); each copy becomes the struct's initialiser and the call; a forward declaration of the caller when the copies recurse into it | `quantize.c`'s `Riemersma` (campaign A, W16 lane c): cc 38, 109 lines, its four `level > 1` cases seven calls on four gravity constants each, its two `level == 1` cases three calls on three; as case helpers they clone (6.25, W14 lane b). A probe of the chain (this recipe twice, then Recipe O on the `level == 1` switch): 7.80 to 8.34, 8.41 and 8.74, no finding on a new function | mandate (2026-10-24) |
+| 2026-11-10 | AMEND | B, N | *Two levels of evidence*, *Unreached functions: B and N*: B and N may be applied to a function no case reaches, `Verified: guard`, when the step meets its recipe (checked by reading; no block that throws through `GetMagickModule()`), the guard prints `OK` with `--calls` moving only `+2` for an N helper (nothing for B), `tools/struct_fill_check.py` prints `OK` for N (members filled and bound by their own names, every removed line moved unchanged; B's fill checked by reading against the old call), and `tools/obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL` (every other function's instructions unchanged, no new function but the helper, only the helper's callees un-inlined). Both tools are new. Evidence lines of B and N say so | `paint.c`'s `TransparentPaintImageChroma` and `segment.c`'s `GetImageDynamicThreshold` (campaign A, W16 lane d), reached by no case: an E helper of Chroma's pixel loop takes six arguments (9.68, but a new *Excess Arguments*); the N form of it compiles byte-identical; the N form of `GetImageDynamicThreshold`'s removal tail compiles to the same instructions in every other function, the helper's two callees inlined into it. Planted errors (a member bound from another member, a fill from another variable, a flipped comparison in the moved block, a literal changed in another function) are each caught by one of the checks; forced-inline comparisons refused the correct step (scheduling) | owner |
