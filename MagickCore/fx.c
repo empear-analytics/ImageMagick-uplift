@@ -1919,6 +1919,132 @@ static ssize_t ReportColourSpaceWithoutArgs (FxInfo * pfx,
   return -1;
 }
 
+typedef struct _ConstantColourContext
+{
+  FxInfo
+    *pfx;
+
+  ExceptionInfo
+    *dummy_exception;
+
+  PixelInfo
+    *colour;
+
+  fxFltType
+    *v0,
+    *v1,
+    *v2;
+} ConstantColourContext;
+
+static MagickBooleanType TryColourFunction (
+  const ConstantColourContext * context, ssize_t * result)
+{
+  FxInfo
+    *const pfx = context->pfx;
+
+  ExceptionInfo
+    *dummy_exception = context->dummy_exception;
+
+  PixelInfo
+    *const colour = context->colour;
+
+  fxFltType
+    *const v0 = context->v0,
+    *const v1 = context->v1,
+    *const v2 = context->v2;
+
+      char * q = pfx->pex + pfx->lenToken;
+      while (isspace((int) ((unsigned char) *q))) q++;
+      if (*q == '(') {
+        size_t lenfun;
+        char sFunc[MagickPathExtent];
+        while (*q && *q != ')') q++;
+        if (!*q) {
+          (void) ThrowMagickException (
+            pfx->exception, GetMagickModule(), OptionError,
+            "constant color missing ')'", "at '%s'",
+            SetShortExp(pfx));
+          dummy_exception = DestroyExceptionInfo (dummy_exception);
+          (*result)=-1;
+          return(MagickTrue);
+        }
+        lenfun = (size_t) (q - pfx->pex + 1);
+        if (lenfun > MaxTokenLen) {
+          (void) ThrowMagickException (
+            pfx->exception, GetMagickModule(), OptionError,
+            "lenfun too long", "'%lu' at '%s'",
+            (unsigned long) lenfun, SetShortExp(pfx));
+          dummy_exception = DestroyExceptionInfo (dummy_exception);
+          (*result)=-1;
+          return(MagickTrue);
+        }
+        (void) CopyMagickString (sFunc, pfx->pex, lenfun+1);
+        if (QueryColorCompliance (sFunc, AllCompliance, colour, dummy_exception)) {
+          *v0 = QuantumScale*(*colour).red;
+          *v1 = QuantumScale*(*colour).green;
+          *v2 = QuantumScale*(*colour).blue;
+          dummy_exception = DestroyExceptionInfo (dummy_exception);
+          (*result)=(ssize_t)lenfun;
+          return(MagickTrue);
+        }
+      } else {
+        (*result)=(ReportColourSpaceWithoutArgs (pfx, dummy_exception));
+        return(MagickTrue);
+      }
+  return(MagickFalse);
+}
+
+typedef struct _ColourSpaceNames
+{
+  const char
+    *ColSp;
+
+  MagickBooleanType
+    IsGray,
+    IsIcc,
+    IsDev;
+} ColourSpaceNames;
+
+static MagickBooleanType TryColourSpaceColour (const ColourSpaceNames * names,
+  const ConstantColourContext * context, ssize_t * result)
+{
+  FxInfo
+    *const pfx = context->pfx;
+
+  ExceptionInfo
+    *dummy_exception = context->dummy_exception;
+
+  PixelInfo
+    *const colour = context->colour;
+
+  const char
+    *const ColSp = names->ColSp;
+
+  const MagickBooleanType
+    IsGray = names->IsGray,
+    IsIcc = names->IsIcc,
+    IsDev = names->IsDev;
+
+  ssize_t
+    returned;
+
+  if (!QueryColorCompliance (pfx->token, AllCompliance, colour, dummy_exception) || IsGray) {
+    ssize_t type = ParseCommandOption (MagickColorspaceOptions, MagickFalse, ColSp);
+    if (IsColourSpaceNamed(type,IsIcc,IsDev) != MagickFalse) {
+      if (TryColourFunction (context, &returned) != MagickFalse) {
+        (*result)=returned;
+        return(MagickTrue);
+      }
+    }
+    if (!IsGray) {
+      dummy_exception = DestroyExceptionInfo (dummy_exception);
+      (*result)=0;
+      return(MagickTrue);
+    }
+  }
+  return(MagickFalse);
+}
+
 static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, fxFltType *v2)
 /* Finds named colour such as "blue" and colorspace function such as "lab(10,20,30)".
    Returns number of characters to swallow.
@@ -1940,6 +2066,15 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
     IsIcc,
     IsDev;
 
+  ConstantColourContext
+    context;
+
+  ColourSpaceNames
+    names;
+
+  ssize_t
+    returned;
+
   char ColSp[MagickPathExtent];
   (void) CopyMagickString (ColSp, pfx->token, MaxTokenLen);
   p = ColSp + pfx->lenToken - 1;
@@ -1955,49 +2090,18 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
 
   /* QueryColorCompliance will raise a warning if it isn't a colour, so we discard any exceptions.
   */
-  if (!QueryColorCompliance (pfx->token, AllCompliance, &colour, dummy_exception) || IsGray) {
-    ssize_t type = ParseCommandOption (MagickColorspaceOptions, MagickFalse, ColSp);
-    if (IsColourSpaceNamed(type,IsIcc,IsDev) != MagickFalse) {
-      char * q = pfx->pex + pfx->lenToken;
-      while (isspace((int) ((unsigned char) *q))) q++;
-      if (*q == '(') {
-        size_t lenfun;
-        char sFunc[MagickPathExtent];
-        while (*q && *q != ')') q++;
-        if (!*q) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "constant color missing ')'", "at '%s'",
-            SetShortExp(pfx));
-          dummy_exception = DestroyExceptionInfo (dummy_exception);
-          return -1;
-        }
-        lenfun = (size_t) (q - pfx->pex + 1);
-        if (lenfun > MaxTokenLen) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "lenfun too long", "'%lu' at '%s'",
-            (unsigned long) lenfun, SetShortExp(pfx));
-          dummy_exception = DestroyExceptionInfo (dummy_exception);
-          return -1;
-        }
-        (void) CopyMagickString (sFunc, pfx->pex, lenfun+1);
-        if (QueryColorCompliance (sFunc, AllCompliance, &colour, dummy_exception)) {
-          *v0 = QuantumScale*colour.red;
-          *v1 = QuantumScale*colour.green;
-          *v2 = QuantumScale*colour.blue;
-          dummy_exception = DestroyExceptionInfo (dummy_exception);
-          return (ssize_t)lenfun;
-        }
-      } else {
-        return (ReportColourSpaceWithoutArgs (pfx, dummy_exception));
-      }
-    }
-    if (!IsGray) {
-      dummy_exception = DestroyExceptionInfo (dummy_exception);
-      return 0;
-    }
-  }
+  context.pfx=pfx;
+  context.dummy_exception=dummy_exception;
+  context.colour=(&colour);
+  context.v0=v0;
+  context.v1=v1;
+  context.v2=v2;
+  names.ColSp=ColSp;
+  names.IsGray=IsGray;
+  names.IsIcc=IsIcc;
+  names.IsDev=IsDev;
+  if (TryColourSpaceColour (&names, &context, &returned) != MagickFalse)
+    return(returned);
 
   *v0 = QuantumScale*colour.red;
   *v1 = QuantumScale*colour.green;
@@ -2755,141 +2859,59 @@ static MagickBooleanType AddArgumentAddressing (
   return MagickTrue;
 }
 
-static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
+typedef struct _FunctionCompletion
 {
-  /* A function, so get open-parens, n args, close-parens
-  */
-  const char * funStr = Functions[fe-(int) FirstFunc].str;
-  int nArgs = Functions[fe-(int) FirstFunc].number_args;
-  char chLimit = ')';
-  char expChLimit = ')';
-  const char *strLimit = ",)";
-  OperatorE pushOp = oOpenParen;
+  FunctionE
+    fe;
 
-  char * pExpStart;
+  int
+    ndx0,
+    ndx1,
+    ndx2,
+    ndx3;
 
-  size_t lenExp = 0;
+  char
+    expChLimit;
 
-  int FndArgs = 0;
-  int ndx0 = NULL_ADDRESS, ndx1 = NULL_ADDRESS, ndx2 = NULL_ADDRESS, ndx3 = NULL_ADDRESS;
+  PixelChannel
+    chQual;
 
-  MagickBooleanType coordQual = MagickFalse;
-  PixelChannel chQual = NO_CHAN_QUAL;
-  ImgAttrE iaQual = aNull;
+  ImgAttrE
+    iaQual;
 
-  MagickBooleanType returned = MagickFalse;
+  char
+    *pExpStart;
 
-  const FunctionQualifiers qualifiers = { &coordQual, &fe, &funStr, &chQual,
-    &expChLimit, &iaQual };
+  size_t
+    lenExp;
+} FunctionCompletion;
 
-  const FunctionOpening opening = { &pushOp, &strLimit, &chLimit, &expChLimit,
-    &nArgs };
+static MagickBooleanType CompleteFunction (FxInfo * pfx,
+  const FunctionCompletion *completion)
+{
+  FunctionE
+    fe = completion->fe;
 
-  pfx->pex += pfx->lenToken;
+  const int
+    ndx0 = completion->ndx0,
+    ndx1 = completion->ndx1,
+    ndx2 = completion->ndx2,
+    ndx3 = completion->ndx3;
 
-  if (OpenFunction (pfx, fe, &opening) == MagickFalse)
-    return MagickFalse;
-  if (!PushOperatorStack (pfx, (int) pushOp)) return MagickFalse;
+  const char
+    expChLimit = completion->expChLimit;
 
-  pExpStart = pfx->pex;
-  ndx0 = pfx->usedElements;
-  if (fe==fDo) {
-    (void) AddAddressingElement (pfx, rGoto, NULL_ADDRESS); /* address will be ndx1+1 */
-  }
-  if (TryEpochFunction (pfx, fe, pushOp, &returned) != MagickFalse)
-    return returned;
+  const PixelChannel
+    chQual = completion->chQual;
 
-  while (nArgs > 0) {
-    int FndOne = 0;
-    ArgumentAddressing addressing;
-    const ArgumentIndexes indexes = { &ndx1, &ndx2, &ndx3 };
-    if (TranslateStatementList (pfx, strLimit, &chLimit)) {
-      FndOne = 1;
-    } else if (!*pfx->pex) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "For function", "'%s' expected ')' at '%s'",
-        funStr, SetShortExp(pfx));
-      return MagickFalse;
-    } else if (!chLimit) {
-      /* Maybe don't break because other expressions may be not empty. */
-      break;
-    } else if (IsPadFunction(fe) != MagickFalse) {
-      (void) AddElement (pfx, (fxFltType) 0, oNull);
-      FndOne = 1;
-    }
+  const ImgAttrE
+    iaQual = completion->iaQual;
 
-    if (strchr (strLimit, chLimit)==NULL) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "For function", "'%s' expected one of '%s' after expression but found '%c' at '%s'",
-        funStr, strLimit, chLimit ? chLimit : ' ', SetShortExp(pfx));
-      return MagickFalse;
-    }
-    if (FndOne) {
-      FndArgs++;
-      nArgs--;
-    }
-    addressing.fe=fe;
-    addressing.funStr=funStr;
-    addressing.FndArgs=FndArgs;
-    addressing.ndx0=ndx0;
-    if (AddArgumentAddressing (&addressing, pfx, &indexes) == MagickFalse)
-      return MagickFalse;
-    if (chLimit == expChLimit) {
-      lenExp = (size_t) (pfx->pex - pExpStart - 1);
-      break;
-    }
-  } /* end while args of a function */
-  if (IsUnexpectedLimit(chLimit,expChLimit) != MagickFalse) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "For function", "'%s' expected '%c', found '%c' at '%s'",
-      funStr, expChLimit, chLimit ? chLimit : ' ', SetShortExp(pfx));
-    return MagickFalse;
-  }
+  char
+    *const pExpStart = completion->pExpStart;
 
-  if (IsDefaultArgsFunction(fe) != MagickFalse) {
-    FndArgs = AddDefaultArgs (pfx, fe, FndArgs);
-  }
-
-  if (FndArgs > Functions[fe-(int) FirstFunc].number_args)
-  {
-    return (ReportTooManyArgs (pfx, fe, funStr, FndArgs));
-  }
-  if (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "For function", "'%s' expected %i arguments, found too few (%i) at '%s'",
-      funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
-    return MagickFalse;
-  }
-  /* This is for "rand()" and similar. */
-  if ((IsNoArgsFunction(fe,FndArgs) != MagickFalse) &&
-      (ExpectNoArgsClose (pfx, expChLimit, &chLimit) == MagickFalse))
-    return MagickFalse;
-
-  if (chLimit != expChLimit) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "For function", "'%s', arguments don't end with '%c' at '%s'",
-      funStr, expChLimit, SetShortExp(pfx));
-    return MagickFalse;
-  }
-  if (!PopOprOpenParen (pfx, pushOp)) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "Bug: For function", "'%s' tos not '%s' at '%s'",
-      funStr, Operators[pushOp].str, SetShortExp(pfx));
-    return MagickFalse;
-  }
-
-  if (QualifyFunction (pfx, &qualifiers) == MagickFalse)
-    return MagickFalse;
-
-  if ((IsChannelQualifiedAttr(iaQual,chQual) != MagickFalse) &&
-      (!CheckAttrChannelQualifier (pfx, iaQual, chQual)))
-    return MagickFalse;
+  const size_t
+    lenExp = completion->lenExp;
 
   if (fe==fWhile) {
     pfx->Elements[ndx1].element_index = ndx2+1;
@@ -2923,6 +2945,417 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
     pfx->ContainsDebug = MagickTrue;
 
   return MagickTrue;
+}
+
+typedef struct _FunctionClosing
+{
+  FunctionE
+    fe;
+
+  const char
+    *funStr;
+
+  int
+    ndx0,
+    ndx1,
+    ndx2,
+    ndx3;
+
+  char
+    expChLimit;
+
+  OperatorE
+    pushOp;
+
+  MagickBooleanType
+    coordQual;
+
+  PixelChannel
+    chQual;
+
+  ImgAttrE
+    iaQual;
+
+  char
+    *pExpStart;
+
+  size_t
+    lenExp;
+} FunctionClosing;
+
+static MagickBooleanType CloseFunction (FxInfo * pfx, const char chLimit,
+  const FunctionClosing *closing)
+{
+  FunctionE
+    fe = closing->fe;
+
+  const char
+    *funStr = closing->funStr;
+
+  const int
+    ndx0 = closing->ndx0,
+    ndx1 = closing->ndx1,
+    ndx2 = closing->ndx2,
+    ndx3 = closing->ndx3;
+
+  char
+    expChLimit = closing->expChLimit;
+
+  const OperatorE
+    pushOp = closing->pushOp;
+
+  MagickBooleanType
+    coordQual = closing->coordQual;
+
+  PixelChannel
+    chQual = closing->chQual;
+
+  ImgAttrE
+    iaQual = closing->iaQual;
+
+  char
+    *const pExpStart = closing->pExpStart;
+
+  const size_t
+    lenExp = closing->lenExp;
+
+  FunctionCompletion completion;
+
+  const FunctionQualifiers qualifiers = { &coordQual, &fe, &funStr, &chQual,
+    &expChLimit, &iaQual };
+
+  if (chLimit != expChLimit) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "For function", "'%s', arguments don't end with '%c' at '%s'",
+      funStr, expChLimit, SetShortExp(pfx));
+    return MagickFalse;
+  }
+  if (!PopOprOpenParen (pfx, pushOp)) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Bug: For function", "'%s' tos not '%s' at '%s'",
+      funStr, Operators[pushOp].str, SetShortExp(pfx));
+    return MagickFalse;
+  }
+
+  if (QualifyFunction (pfx, &qualifiers) == MagickFalse)
+    return MagickFalse;
+
+  if ((IsChannelQualifiedAttr(iaQual,chQual) != MagickFalse) &&
+      (!CheckAttrChannelQualifier (pfx, iaQual, chQual)))
+    return MagickFalse;
+
+  completion.fe=fe;
+  completion.ndx0=ndx0;
+  completion.ndx1=ndx1;
+  completion.ndx2=ndx2;
+  completion.ndx3=ndx3;
+  completion.expChLimit=expChLimit;
+  completion.chQual=chQual;
+  completion.iaQual=iaQual;
+  completion.pExpStart=pExpStart;
+  completion.lenExp=lenExp;
+  return(CompleteFunction (pfx, &completion));
+}
+
+static MagickBooleanType FinishFunctionArguments (FxInfo * pfx, int FndArgs,
+  char chLimit, const FunctionClosing *closing)
+{
+  const FunctionE
+    fe = closing->fe;
+
+  const char
+    *const funStr = closing->funStr;
+
+  const char
+    expChLimit = closing->expChLimit;
+
+  if (IsUnexpectedLimit(chLimit,expChLimit) != MagickFalse) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "For function", "'%s' expected '%c', found '%c' at '%s'",
+      funStr, expChLimit, chLimit ? chLimit : ' ', SetShortExp(pfx));
+    return MagickFalse;
+  }
+
+  if (IsDefaultArgsFunction(fe) != MagickFalse) {
+    FndArgs = AddDefaultArgs (pfx, fe, FndArgs);
+  }
+
+  if (FndArgs > Functions[fe-(int) FirstFunc].number_args)
+  {
+    return (ReportTooManyArgs (pfx, fe, funStr, FndArgs));
+  }
+  if (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "For function", "'%s' expected %i arguments, found too few (%i) at '%s'",
+      funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
+    return MagickFalse;
+  }
+  /* This is for "rand()" and similar. */
+  if ((IsNoArgsFunction(fe,FndArgs) != MagickFalse) &&
+      (ExpectNoArgsClose (pfx, expChLimit, &chLimit) == MagickFalse))
+    return MagickFalse;
+
+  return(CloseFunction (pfx, chLimit, closing));
+}
+
+typedef struct _ArgumentCount
+{
+  FunctionE
+    fe;
+
+  const char
+    *funStr,
+    *strLimit;
+
+  char
+    chLimit;
+
+  int
+    FndOne,
+    ndx0;
+
+  ArgumentIndexes
+    indexes;
+} ArgumentCount;
+
+typedef struct _ArgumentCountTargets
+{
+  int
+    *FndArgs,
+    *nArgs;
+} ArgumentCountTargets;
+
+static MagickBooleanType CountFunctionArgument (FxInfo * pfx,
+  const ArgumentCount *count, const ArgumentCountTargets *targets)
+{
+  const FunctionE
+    fe = count->fe;
+
+  const char
+    *const funStr = count->funStr,
+    *const strLimit = count->strLimit;
+
+  const char
+    chLimit = count->chLimit;
+
+  const int
+    FndOne = count->FndOne,
+    ndx0 = count->ndx0;
+
+  const ArgumentIndexes
+    indexes = count->indexes;
+
+  int
+    *const FndArgs = targets->FndArgs,
+    *const nArgs = targets->nArgs;
+
+  ArgumentAddressing addressing;
+
+    if (strchr (strLimit, chLimit)==NULL) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "For function", "'%s' expected one of '%s' after expression but found '%c' at '%s'",
+        funStr, strLimit, chLimit ? chLimit : ' ', SetShortExp(pfx));
+      return MagickFalse;
+    }
+    if (FndOne) {
+      (*FndArgs)++;
+      (*nArgs)--;
+    }
+    addressing.fe=fe;
+    addressing.funStr=funStr;
+    addressing.FndArgs=*FndArgs;
+    addressing.ndx0=ndx0;
+    if (AddArgumentAddressing (&addressing, pfx, &indexes) == MagickFalse)
+      return MagickFalse;
+  return(MagickTrue);
+}
+
+typedef struct _FunctionArgumentInputs
+{
+  FunctionE
+    fe;
+
+  const char
+    *funStr,
+    *strLimit;
+
+  char
+    expChLimit;
+
+  int
+    ndx0,
+    nArgs;
+
+  char
+    *pExpStart;
+} FunctionArgumentInputs;
+
+typedef struct _FunctionArgumentTargets
+{
+  char
+    *chLimit;
+
+  int
+    *FndArgs,
+    *ndx1,
+    *ndx2,
+    *ndx3;
+
+  size_t
+    *lenExp;
+} FunctionArgumentTargets;
+
+static MagickBooleanType TranslateFunctionArguments (FxInfo * pfx,
+  const FunctionArgumentInputs *inputs, const FunctionArgumentTargets *targets)
+{
+  const FunctionE
+    fe = inputs->fe;
+
+  const char
+    *const funStr = inputs->funStr,
+    *const strLimit = inputs->strLimit;
+
+  const char
+    expChLimit = inputs->expChLimit;
+
+  const int
+    ndx0 = inputs->ndx0;
+
+  int
+    nArgs = inputs->nArgs;
+
+  char
+    *const pExpStart = inputs->pExpStart;
+
+  char
+    *const chLimit = targets->chLimit;
+
+  int
+    *const FndArgs = targets->FndArgs,
+    *const ndx1 = targets->ndx1,
+    *const ndx2 = targets->ndx2,
+    *const ndx3 = targets->ndx3;
+
+  size_t
+    *const lenExp = targets->lenExp;
+
+  while (nArgs > 0) {
+    int FndOne = 0;
+    ArgumentCount count;
+    ArgumentCountTargets countTargets;
+    const ArgumentIndexes indexes = { ndx1, ndx2, ndx3 };
+    if (TranslateStatementList (pfx, strLimit, chLimit)) {
+      FndOne = 1;
+    } else if (!*pfx->pex) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "For function", "'%s' expected ')' at '%s'",
+        funStr, SetShortExp(pfx));
+      return MagickFalse;
+    } else if (!*chLimit) {
+      /* Maybe don't break because other expressions may be not empty. */
+      break;
+    } else if (IsPadFunction(fe) != MagickFalse) {
+      (void) AddElement (pfx, (fxFltType) 0, oNull);
+      FndOne = 1;
+    }
+
+    count.fe=fe;
+    count.funStr=funStr;
+    count.strLimit=strLimit;
+    count.chLimit=*chLimit;
+    count.FndOne=FndOne;
+    count.ndx0=ndx0;
+    count.indexes=indexes;
+    countTargets.FndArgs=(FndArgs);
+    countTargets.nArgs=(&nArgs);
+    if (CountFunctionArgument (pfx, &count, &countTargets) == MagickFalse)
+      return MagickFalse;
+    if (*chLimit == expChLimit) {
+      *lenExp = (size_t) (pfx->pex - pExpStart - 1);
+      break;
+    }
+  } /* end while args of a function */
+  return(MagickTrue);
+}
+
+static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
+{
+  /* A function, so get open-parens, n args, close-parens
+  */
+  const char * funStr = Functions[fe-(int) FirstFunc].str;
+  int nArgs = Functions[fe-(int) FirstFunc].number_args;
+  char chLimit = ')';
+  char expChLimit = ')';
+  const char *strLimit = ",)";
+  OperatorE pushOp = oOpenParen;
+
+  char * pExpStart;
+
+  size_t lenExp = 0;
+
+  int FndArgs = 0;
+  int ndx0 = NULL_ADDRESS, ndx1 = NULL_ADDRESS, ndx2 = NULL_ADDRESS, ndx3 = NULL_ADDRESS;
+
+  MagickBooleanType coordQual = MagickFalse;
+  PixelChannel chQual = NO_CHAN_QUAL;
+  ImgAttrE iaQual = aNull;
+
+  MagickBooleanType returned = MagickFalse;
+
+  FunctionClosing closing;
+
+  FunctionArgumentInputs arguments;
+
+  const FunctionArgumentTargets argumentTargets = { &chLimit, &FndArgs, &ndx1,
+    &ndx2, &ndx3, &lenExp };
+
+  const FunctionOpening opening = { &pushOp, &strLimit, &chLimit, &expChLimit,
+    &nArgs };
+
+  pfx->pex += pfx->lenToken;
+
+  if (OpenFunction (pfx, fe, &opening) == MagickFalse)
+    return MagickFalse;
+  if (!PushOperatorStack (pfx, (int) pushOp)) return MagickFalse;
+
+  pExpStart = pfx->pex;
+  ndx0 = pfx->usedElements;
+  if (fe==fDo) {
+    (void) AddAddressingElement (pfx, rGoto, NULL_ADDRESS); /* address will be ndx1+1 */
+  }
+  if (TryEpochFunction (pfx, fe, pushOp, &returned) != MagickFalse)
+    return returned;
+
+  arguments.fe=fe;
+  arguments.funStr=funStr;
+  arguments.strLimit=strLimit;
+  arguments.expChLimit=expChLimit;
+  arguments.ndx0=ndx0;
+  arguments.nArgs=nArgs;
+  arguments.pExpStart=pExpStart;
+  if (TranslateFunctionArguments (pfx, &arguments, &argumentTargets) ==
+      MagickFalse)
+    return MagickFalse;
+  closing.fe=fe;
+  closing.funStr=funStr;
+  closing.ndx0=ndx0;
+  closing.ndx1=ndx1;
+  closing.ndx2=ndx2;
+  closing.ndx3=ndx3;
+  closing.expChLimit=expChLimit;
+  closing.pushOp=pushOp;
+  closing.coordQual=coordQual;
+  closing.chQual=chQual;
+  closing.iaQual=iaQual;
+  closing.pExpStart=pExpStart;
+  closing.lenExp=lenExp;
+  return(FinishFunctionArguments (pfx, FndArgs, chLimit, &closing));
 }
 
 static MagickBooleanType IsStealth (int op)
@@ -3887,34 +4320,289 @@ static MagickBooleanType FlushOperatorStack (FxInfo * pfx,
   return(MagickTrue);
 }
 
-static MagickBooleanType TranslateExpression (
-  FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
+typedef struct _OperatorFlags
 {
-  /* There should be only one New per expression (oAssign), but can be many Old.
-  */
-  MagickBooleanType UserSymbol, NewUserSymbol;
-  int UserSymNdx0, UserSymNdx1;
+  MagickBooleanType
+    *Assign,
+    *Update,
+    *IncrDecr;
+} OperatorFlags;
+
+static MagickBooleanType GetExpressionOperator (FxInfo * pfx,
+  const MagickBooleanType UserSymbol, const MagickBooleanType NewUserSymbol,
+  const OperatorFlags * targets)
+{
+  MagickBooleanType
+    *const Assign = targets->Assign,
+    *const Update = targets->Update,
+    *const IncrDecr = targets->IncrDecr;
+
+    if (!GetOperator (pfx, Assign, Update, IncrDecr)) return MagickFalse;
+    SkipSpaces (pfx);
+    if (NewUserSymbol && !*Assign) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Expected assignment after new UserSymbol", "'%s' at '%s'",
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+    if (!UserSymbol && *Assign) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Attempted assignment to non-UserSymbol", "'%s' at '%s'",
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+    if (!UserSymbol && *Update) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Attempted update to non-UserSymbol", "'%s' at '%s'",
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+  return(MagickTrue);
+}
+
+typedef struct _OperandTargets
+{
+  MagickBooleanType
+    *UserSymbol,
+    *NewUserSymbol;
+
+  int
+    *UserSymNdx0;
+} OperandTargets;
+
+static MagickBooleanType GetExpressionOperand (FxInfo * pfx,
+  const MagickBooleanType Assign, MagickBooleanType * needPopAll,
+  const OperandTargets * targets)
+{
+  MagickBooleanType
+    *const UserSymbol = targets->UserSymbol,
+    *const NewUserSymbol = targets->NewUserSymbol;
+
+  int
+    *const UserSymNdx0 = targets->UserSymNdx0;
+
+  int UserSymNdx1;
+
+  const OperandSymbols
+    operand1 = { UserSymbol, NewUserSymbol, &UserSymNdx1, needPopAll };
+
+    if (!GetOperand (pfx, &operand1)) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Expected operand at", "'%s'",
+        SetShortExp(pfx));
+      return MagickFalse;
+    }
+    SkipSpaces (pfx);
+    if (*NewUserSymbol && !Assign) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "NewUserSymbol", "'%s' after non-assignment operator at '%s'",
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+    if (*UserSymbol && !*NewUserSymbol) {
+      (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx1);
+      UserSymNdx1 = NULL_ADDRESS;
+    }
+    *UserSymNdx0 = UserSymNdx1;
+  return(MagickTrue);
+}
+
+static MagickBooleanType TranslateAssignmentOperand (
+  const UserSymbolAssignment * assignment, int * UserSymNdx0,
+  MagickBooleanType * broke)
+{
+  FxInfo
+    *const pfx = assignment->pfx;
+
+  const MagickBooleanType
+    UserSymbol = assignment->UserSymbol,
+    Assign = assignment->Assign,
+    Update = assignment->Update;
+
+  (*broke)=MagickFalse;
+    if (TranslateAssignedExpression (assignment, broke) == MagickFalse)
+      return MagickFalse;
+    if ((*broke) != MagickFalse) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+    if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,*UserSymNdx0) !=
+        MagickFalse) {
+      ElementT * pel;
+      (void) AddAddressingElement (pfx, rCopyFrom, *UserSymNdx0);
+      *UserSymNdx0 = NULL_ADDRESS;
+      pel = &pfx->Elements[pfx->usedElements-1];
+      pel->do_push = MagickTrue;
+    }
+
+    if (UserSymbol) {
+      FlushUnaryPrefixOperators (pfx);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _NextOperandTargets
+{
+  TernaryT
+    *ternary;
 
   MagickBooleanType
-    Assign = MagickFalse,
-    Update = MagickFalse,
-    IncrDecr = MagickFalse;
+    *UserSymbol,
+    *NewUserSymbol;
+} NextOperandTargets;
 
-  int StartEleNdx;
+static MagickBooleanType PrepareNextOperand (
+  const ExpressionContext * context, const UserSymbolAssignment * assignment,
+  const NextOperandTargets * targets, MagickBooleanType * broke)
+{
+  FxInfo
+    *const pfx = assignment->pfx;
+
+  const char
+    *const strLimit = assignment->strLimit;
+
+  const MagickBooleanType
+    IncrDecr = assignment->IncrDecr;
+
+  TernaryT
+    *const ternary = targets->ternary;
+
+  MagickBooleanType
+    *const UserSymbol = targets->UserSymbol,
+    *const NewUserSymbol = targets->NewUserSymbol;
+
+  (*broke)=MagickFalse;
+    if (!ProcessTernaryOpr (pfx, ternary)) return MagickFalse;
+
+    if (TranslateTernaryElse (context, *ternary, broke) == MagickFalse)
+      return MagickFalse;
+    if ((*broke) != MagickFalse) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+
+    *UserSymbol = *NewUserSymbol = MagickFalse;
+
+    if (ExpectOperandAfterOperator (pfx, strLimit, IncrDecr, broke) ==
+        MagickFalse)
+      return MagickFalse;
+    if ((*broke) != MagickFalse) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+
+    if (IncrDecr) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "'++' and '--' must be the final operators in an expression at", "'%s'",
+        SetShortExp(pfx));
+      return MagickFalse;
+    }
+  return(MagickTrue);
+}
+
+typedef struct _ExpressionTargets
+{
+  MagickBooleanType
+    *Assign,
+    *Update;
+
+  int
+    *UserSymNdx0;
+
+  TernaryT
+    *ternary;
+
+  MagickBooleanType
+    *UserSymbol,
+    *NewUserSymbol;
+} ExpressionTargets;
+
+static MagickBooleanType TranslateOperatorsAndOperands (
+  const ExpressionContext * context, const char * strLimit,
+  const ExpressionTargets * targets)
+{
+  FxInfo
+    *const pfx = context->pfx;
+
+  char
+    *const chLimit = context->chLimit;
+
+  MagickBooleanType
+    *const needPopAll = context->needPopAll;
+
+  MagickBooleanType
+    *const Assign = targets->Assign,
+    *const Update = targets->Update;
+
+  int
+    *const UserSymNdx0 = targets->UserSymNdx0;
+
+  TernaryT
+    *const ternary = targets->ternary;
+
+  MagickBooleanType
+    *const UserSymbol = targets->UserSymbol,
+    *const NewUserSymbol = targets->NewUserSymbol;
+
+  MagickBooleanType
+    IncrDecr = MagickFalse;
 
   MagickBooleanType broke = MagickFalse;
 
-  const OperandSymbols
-    operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll },
-    operand1 = { &UserSymbol, &NewUserSymbol, &UserSymNdx1, needPopAll };
-
-  ExpressionContext context;
-
   UserSymbolAssignment assignment;
 
-  TernaryT ternary;
-  ternary.addr_query = NULL_ADDRESS;
-  ternary.addr_colon = NULL_ADDRESS;
+  while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
+    OperatorFlags flags;
+    OperandTargets operandTargets;
+    NextOperandTargets nextTargets;
+
+    flags.Assign=(Assign);
+    flags.Update=(Update);
+    flags.IncrDecr=(&IncrDecr);
+    if (GetExpressionOperator (pfx, *UserSymbol, *NewUserSymbol, &flags) ==
+        MagickFalse)
+      return MagickFalse;
+    assignment.pfx=pfx;
+    assignment.strLimit=strLimit;
+    assignment.chLimit=chLimit;
+    assignment.needPopAll=needPopAll;
+    assignment.UserSymbol=*UserSymbol;
+    assignment.Assign=*Assign;
+    assignment.Update=*Update;
+    assignment.IncrDecr=IncrDecr;
+    if (TranslateAssignmentOperand (&assignment, UserSymNdx0, &broke) ==
+        MagickFalse)
+      return MagickFalse;
+    if (broke != MagickFalse) break;
+
+    nextTargets.ternary=(ternary);
+    nextTargets.UserSymbol=(UserSymbol);
+    nextTargets.NewUserSymbol=(NewUserSymbol);
+    if (PrepareNextOperand (context, &assignment, &nextTargets, &broke) ==
+        MagickFalse)
+      return MagickFalse;
+    if (broke != MagickFalse) break;
+
+    operandTargets.UserSymbol=(UserSymbol);
+    operandTargets.NewUserSymbol=(NewUserSymbol);
+    operandTargets.UserSymNdx0=(UserSymNdx0);
+    if (GetExpressionOperand (pfx, *Assign, needPopAll, &operandTargets) ==
+        MagickFalse)
+      return MagickFalse;
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType BeginExpression (FxInfo * pfx,
+  const char * strLimit, char * chLimit)
+{
+  int StartEleNdx;
 
   if (pfx->teDepth >= MagickMaxRecursionDepth) {
     (void) ThrowMagickException(pfx->exception, GetMagickModule(), OptionError,
@@ -3944,117 +4632,12 @@ static MagickBooleanType TranslateExpression (
 
     return MagickFalse;
   }
+  return(MagickTrue);
+}
 
-  if (!GetOperand (pfx, &operand0)) return MagickFalse;
-  SkipSpaces (pfx);
-
-  /* Loop through Operator, Operand, Operator, Operand, ...
-  */
-  context.pfx=pfx;
-  context.chLimit=chLimit;
-  context.needPopAll=needPopAll;
-  while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
-    if (!GetOperator (pfx, &Assign, &Update, &IncrDecr)) return MagickFalse;
-    SkipSpaces (pfx);
-    if (NewUserSymbol && !Assign) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Expected assignment after new UserSymbol", "'%s' at '%s'",
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
-    if (!UserSymbol && Assign) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Attempted assignment to non-UserSymbol", "'%s' at '%s'",
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
-    if (!UserSymbol && Update) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Attempted update to non-UserSymbol", "'%s' at '%s'",
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
-    assignment.pfx=pfx;
-    assignment.strLimit=strLimit;
-    assignment.chLimit=chLimit;
-    assignment.needPopAll=needPopAll;
-    assignment.UserSymbol=UserSymbol;
-    assignment.Assign=Assign;
-    assignment.Update=Update;
-    assignment.IncrDecr=IncrDecr;
-    if (TranslateAssignedExpression (&assignment, &broke) == MagickFalse)
-      return MagickFalse;
-    if (broke != MagickFalse) break;
-    if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
-        MagickFalse) {
-      ElementT * pel;
-      (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx0);
-      UserSymNdx0 = NULL_ADDRESS;
-      pel = &pfx->Elements[pfx->usedElements-1];
-      pel->do_push = MagickTrue;
-    }
-
-    if (UserSymbol) {
-      FlushUnaryPrefixOperators (pfx);
-    }
-
-    if (!ProcessTernaryOpr (pfx, &ternary)) return MagickFalse;
-
-    if (TranslateTernaryElse (&context, ternary, &broke) == MagickFalse)
-      return MagickFalse;
-    if (broke != MagickFalse) break;
-
-    UserSymbol = NewUserSymbol = MagickFalse;
-
-    if (ExpectOperandAfterOperator (pfx, strLimit, IncrDecr, &broke) ==
-        MagickFalse)
-      return MagickFalse;
-    if (broke != MagickFalse) break;
-
-    if (IncrDecr) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "'++' and '--' must be the final operators in an expression at", "'%s'",
-        SetShortExp(pfx));
-      return MagickFalse;
-    }
-
-    if (!GetOperand (pfx, &operand1)) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Expected operand at", "'%s'",
-        SetShortExp(pfx));
-      return MagickFalse;
-    }
-    SkipSpaces (pfx);
-    if (NewUserSymbol && !Assign) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "NewUserSymbol", "'%s' after non-assignment operator at '%s'",
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
-    if (UserSymbol && !NewUserSymbol) {
-      (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx1);
-      UserSymNdx1 = NULL_ADDRESS;
-    }
-    UserSymNdx0 = UserSymNdx1;
-  }
-
-  if ((IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
-      MagickFalse) && (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)))
-    return MagickFalse;
-
-  if (IsPendingLimitChar(pfx,chLimit,strLimit) != MagickFalse) {
-    *chLimit = *pfx->pex;
-    pfx->pex++;
-  }
-  if (FlushOperatorStack (pfx, Assign, Update, UserSymNdx0) == MagickFalse)
-    return MagickFalse;
-
+static MagickBooleanType FinishExpression (FxInfo * pfx, TernaryT ternary,
+  MagickBooleanType * needPopAll)
+{
   if (ternary.addr_query != NULL_ADDRESS) *needPopAll = MagickTrue;
 
   (void) ResolveTernaryAddresses (pfx, &ternary);
@@ -4070,6 +4653,61 @@ static MagickBooleanType TranslateExpression (
     return MagickFalse;
 
   return MagickTrue;
+}
+
+static MagickBooleanType TranslateExpression (
+  FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
+{
+  /* There should be only one New per expression (oAssign), but can be many Old.
+  */
+  MagickBooleanType UserSymbol, NewUserSymbol;
+  int UserSymNdx0;
+
+  MagickBooleanType
+    Assign = MagickFalse,
+    Update = MagickFalse;
+
+  const OperandSymbols
+    operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll };
+
+  ExpressionContext context;
+
+  TernaryT ternary;
+
+  const ExpressionTargets
+    targets = { &Assign, &Update, &UserSymNdx0, &ternary, &UserSymbol,
+      &NewUserSymbol };
+
+  ternary.addr_query = NULL_ADDRESS;
+  ternary.addr_colon = NULL_ADDRESS;
+
+  if (BeginExpression (pfx, strLimit, chLimit) == MagickFalse)
+    return MagickFalse;
+
+  if (!GetOperand (pfx, &operand0)) return MagickFalse;
+  SkipSpaces (pfx);
+
+  /* Loop through Operator, Operand, Operator, Operand, ...
+  */
+  context.pfx=pfx;
+  context.chLimit=chLimit;
+  context.needPopAll=needPopAll;
+  if (TranslateOperatorsAndOperands (&context, strLimit, &targets) ==
+      MagickFalse)
+    return MagickFalse;
+
+  if ((IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
+      MagickFalse) && (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)))
+    return MagickFalse;
+
+  if (IsPendingLimitChar(pfx,chLimit,strLimit) != MagickFalse) {
+    *chLimit = *pfx->pex;
+    pfx->pex++;
+  }
+  if (FlushOperatorStack (pfx, Assign, Update, UserSymNdx0) == MagickFalse)
+    return MagickFalse;
+
+  return(FinishExpression (pfx, ternary, needPopAll));
 }
 
 

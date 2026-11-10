@@ -1674,6 +1674,15 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    members its own text reads (each filled with the others, from the variable of its
    name), the block reads them as `name->member`, and each inner call passes `name`
    where it passed `&name`.
+   The statements of one function body are siblings in the same sense (2026-11-10): a
+   later block that holds an earlier sibling's call and runs to the end of the
+   function (Recipe E step 7's value form, each moved in its own commit) may take that
+   sibling's `const Name *name` and pass it on unchanged, when no statement of the later
+   block before the call writes a member's variable. The fill then moves with the call,
+   unchanged, to directly before the later block's call; the later block binds the
+   members it reads as step 4 does, and each variable it writes that is not a member
+   (step 2's read-then-written variable, which nothing after it reads) goes by value as
+   a parameter, at most four parameters in all.
    The same holds in a parallel loop body when the earlier sibling is a nested loop's
    whole body moved under Recipe PS step 7, its struct declared `const` with its
    initialiser among the body's declarations (PS step 6), and the later block is the
@@ -1816,6 +1825,13 @@ static void ThresholdWaveletLevel(float *pixels,
   last call. A pointer member the block writes through (`channel_sum`, under Recipe
   Q's read-only pointers) is read, not written: the new function reaches the same
   array through the same address the caller's `const` local held.
+- Under step 8's function-body form the fill runs earlier, before the later block's
+  statements, which write none of the members' variables (checked by reading every
+  path), so each member still holds at the inner call the value its variable holds
+  there, the value the earlier sibling read; the struct reaches the later block only
+  through a pointer to `const`, so nothing writes it in between. The variables the
+  later block writes go by value and are written in its copies, which hold what the
+  caller's would have held at the inner call.
 - A member bound to a non-`const` local (step 2's read-then-written variable) is
   Recipe E step 4's by-value input in another form: the local holds the value the
   variable held at the fill, which is its value at the call (nothing between them
@@ -1891,6 +1907,14 @@ struct of its own, the helper would bind sixteen locals and fill the row struct 
 from them (about 80 lines by count, *Large*); sharing it, the helper is 52 lines with
 no finding, 6.51 to 6.62. Added by Claude Code (Claude Opus
 5.5) under the mandate of 2026-10-24.
+Step 8's function-body form (2026-11-10, W16 lane c, owner's OK to evolve the recipes):
+`fx.c`'s `GetFunction`, whose tail (argument-count checks, then the closing checks and
+qualifiers, then the completion) moves outermost last as three E step 7 helpers. The
+argument-count block writes `FndArgs` and `chLimit` and holds the call of the closing
+helper, whose struct holds thirteen other variables; with a struct of its own it would
+bind them all and fill the inner struct again (*Large Method*, 72 lines, fx.c 3.99 to
+3.90 in a probe); passing the struct on, fx.c 3.99 to 4.04, no finding on any helper.
+Added by Claude Code (Claude Opus 5.5).
 
 ---
 
@@ -6582,6 +6606,30 @@ Recipe LB (a `break;`, not a `return`).
    and checks every argument against its parameter by reading. When a compiler warns that
    `returned` may be used uninitialised, the declaration gets `=MagickFalse` instead of
    a new statement.
+6. Three widenings of steps 1, 2 and 4 (2026-11-10), each optional:
+   (a) The caller may return another type `T` than `MagickBooleanType` (a length that is
+   `0` for "not this", `-1` for an error): each `R` is an expression of type `T`, the new
+   function takes `T *result` last, and the caller declares `T returned;`. The new
+   function still returns `MagickBooleanType`, the *did it return* flag.
+   (b) The block may write up to four plain locals of the caller that the caller reads
+   after it (Recipe O step 2, with its exception for an address the caller passes
+   elsewhere only to calls that keep no copy, such as `GetPixelInfo(image,&colour)`): each
+   goes as a pointer, written `*v` at every use as Recipe O step 5 says (`v.m` becomes
+   `(*v).m`; `&v` passed on to a callee becomes `v`). A local the block writes only on
+   paths that leave through `return(R);` (Recipe W step 3), such as
+   `dummy_exception = DestroyExceptionInfo (dummy_exception);` directly before a
+   `return`, goes by value like an input: the caller returns at once and never reads
+   its own copy again.
+   (c) When the inputs and pointers would give more than four parameters they go in a
+   `const` struct (Recipe N's member form: `T *const v = name->v;` per pointer, `T v =
+   name->v;` without `const` for a by-value input of (b) the block writes), filled
+   member by member directly before the call. A block holding the call of an earlier
+   helper of this step takes that helper's struct as one parameter and passes it on
+   unchanged (Recipe N step 2's pass-through); its own further inputs go in a second
+   `const` struct, so at most two structs and `T *result`. The earlier helper's fill
+   then moves with its call to directly before the new call, past statements that write
+   none of the members' values (check by reading: an address `&v` is fixed for the
+   caller's whole body).
 
 **Before:**
 
@@ -6634,6 +6682,22 @@ static MagickBooleanType TryLeadingOperand (FxInfo * pfx,
   *did it fall through*; the name says so (`Try...`), where V's helpers are `NotA...`.
 - A block with one return value is Recipe V, not this recipe; a block with a nested
   `if` that returns is fine, its `return`s are rewritten one for one.
+- Step 6 (a) changes only the type of the value that travels: `(*result)=R;` converts
+  `R` to `T` as `return(R);` did (C11 6.8.6.4p3 and 6.5.16.1p2 apply the same conversion
+  as if by assignment), and the caller returns the stored `T` unchanged.
+- Under step 6 (b) each pointer names the caller's local and nothing else names it while
+  the new function runs (Recipe O step 2), so every read sees, and every write lands in,
+  the object the block named, at the same point; on the fall-through path the caller
+  reads after the call what the block left there, as before. The by-value local of (b)
+  is written in the new function only on paths that set `(*result)` and return
+  `MagickTrue`, after which the caller returns without reading its own copy; on the
+  other paths the new function never writes it, so the copy and the caller's agree.
+- Under step 6 (c) a struct holds only values the caller had at the fill and addresses
+  of its locals; a member is read where the block read the variable, after nothing
+  between the fill and that read has written the variable (moving an earlier helper's
+  fill is allowed only past statements that write none of its members' values). A
+  `const` struct is not written by any helper, so passing it on hands the inner helper
+  exactly what its caller filled.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new function,
 nothing else moved), and steps 1 and 2 checked by reading.
@@ -6644,6 +6708,15 @@ block (`(`, unary prefix, `#`, a number or a property) and its function block re
 different values or falls through" plateau W09 recorded. A probe of both and the constant
 block (Recipe V): GetOperand leaves Bumpy Road Ahead, 3.35 to 3.37, no finding on a helper.
 Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+Step 6 (2026-11-10, W16 lane c, owner's OK to evolve the recipes): `fx.c`'s
+`GetConstantColour` (cc 17, `ssize_t`): its colour-function block returns `-1`, `lenfun`
+or `ReportColourSpaceWithoutArgs(...)`, writes `colour` through `QueryColorCompliance`
+(read after it on the `gray` path) and `*v0` to `*v2`, and destroys `dummy_exception`
+only before a `return`; the colour-space block around it returns `0` or what the inner
+block returned. Step 4 refused the `ssize_t` result, step 2 the written `colour`, and
+both blocks need six or more parameters. A probe of both: the function leaves Complex
+Method, fx.c 3.73 to 3.78 to 3.88, no finding on either helper. Added by Claude Code
+(Claude Opus 5.5).
 
 ---
 
@@ -6950,6 +7023,19 @@ exits in the block.
    `(*broke)`, as Recipe O step 5 writes a written variable (`&v` becomes `v`). The
    block's `break;` statements are rewritten as step 3 says, those under the test
    included. Nothing else in the text changes.
+8. Steps 2 and 4 widen as Recipe LB's do (2026-11-10). A block that writes two to four
+   variables the caller reads after it passes their addresses in one `const` targets
+   struct of Recipe LB step 8's form (a `typedef struct` of pointers in the order the
+   block first writes them, assigned `targets.v=(&v);` directly before the call, each
+   bound `T *const v = targets->v;` and written `*v`), each variable meeting Recipe I
+   step 2. Its inputs may then come from at most two `const` structs that the caller
+   already fills: the struct of an earlier helper of the same loop body, filled
+   earlier in the same iteration when nothing from that fill to the call writes a
+   member's variable (Recipe N step 8's siblings), bound as Recipe N step 4 does; and a
+   struct local the block itself passes by address to a callee (`&context`), which goes
+   as a pointer parameter, `&context` in the block becoming `context` (Recipe N step 2's
+   pass-through). The order is the input structs, `const Targets *targets`, then
+   `broke`: at most four parameters.
 
 **Before:**
 
@@ -7028,6 +7114,13 @@ static MagickBooleanType ExpectOperandAfterOperator (FxInfo * pfx,
   before; nothing else writes it between the two. The new function's own first
   statement clears it before that call, which clears it again, so no value from before
   the block is read, as step 5's argument requires.
+- Under step 8 each written variable stays the caller's own: only its address travels,
+  fixed for the caller's whole body, so each `*v` reads and writes the object `v`
+  named, at the same point, on every path, the `break;` and `return(R);` paths
+  included (Recipe I's argument). A shared input struct holds the values its fill
+  copied, and nothing between that fill and the call writes a member's variable, so
+  each bound local holds what the block would have read; a struct passed on by
+  pointer is the object the block passed by address, unchanged.
 - The `return` and `break` paths are mostly error paths: the oracle checks the paths its
   cases take; each `break;` and `return(R);` is checked by reading against its rewrite,
   and `refactor_guard.py --calls` moves only `+2` for each new function.
@@ -7048,6 +7141,15 @@ else if (SetInPlaceOperatorTarget(...,&broke) == MagickFalse) { return MagickFal
 else if (broke != MagickFalse) { break; }`), whose first branch keeps the loop's bump; a
 probe of it as one helper, then the loop moved by Recipe W: `TranslateExpression` leaves
 Bumpy Road Ahead, fx.c 3.59 to 3.62, no finding on any new function.
+Step 8 (2026-11-10, W16 lane c, owner's OK to evolve the recipes): the same function's
+operator loop, which must leave `TranslateExpression` whole (Recipe I, six targets) and
+so needs a body of cc 6 or less first. The run from the ternary to the `++`/`--` check
+(`ProcessTernaryOpr`, the ternary else, `UserSymbol = NewUserSymbol = MagickFalse;`, the
+missing-operand test, the increment check) leaves through `break;` and `return
+MagickFalse;` and writes `ternary`, `UserSymbol` and `NewUserSymbol`; step 2 allowed one.
+A probe of the chain (I, I, BR, this step, I on the loop, W, E step 7): fx.c 4.33 to
+4.37 for this step, `TranslateExpression` out of *Complex Method* and *Large Method*,
+4.21 to 4.61, no finding on any new function. Added by Claude Code (Claude Opus 5.5).
 
 ---
 
@@ -10434,3 +10536,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | FI | Step 8, *hoisted form*: a member-by-member fill that stands far from its declaration (in a loop body or a branch, directly before its one call) becomes a `const` initialiser when every value is `(&v)` of a variable declared at the function's top (the declaration moves to the end of the function's declarations) or every value is an identifier nothing between the top of the innermost block holding the run and the run writes or passes by address (the declaration moves to that block's top); steps 1 to 3 hold for the run, step 6's `IDENTICAL` is still required. *Careful* gives the argument (C11 6.2.4p2: addresses are constant over the lifetime; C11 6.8p3: block declarations are initialised each time they are reached) | `layer.c`'s `OptimizeLayerFrames` (campaign A, W16 lane b): `targets`, `choice_targets` and `trial`, thirteen assignments refilled per frame; a probe 7.92 to 7.98, `obj_identical.sh` `IDENTICAL`, oracle 45 cases 0 diverged | owner |
 | 2026-11-10 | NEW | PL | Peel a Leaving Label Set out of a Selection as a Predicate: groups of a `switch` whose whole body is the same leaving statement `S` (`return;`) leave the `switch` for an LP-form predicate on their labels, called in `if (Name(e) != MagickFalse) S` directly before the `switch`; the kept groups and `default:` stay; `e` side-effect free and evaluated again by the `switch`; labels and comments checked by script; TB may then make the predicate a table | `morphology.c`'s `RotateKernelInfo` (campaign A, W16 lane d): thirteen of its fifteen labels only `return;` beside the Blur group and `default:` (cc 30), which LP (two groups only), SD/SR (no `return`) and ST (value-returning) refuse; one step of a chain probe 3.10 to 3.02 to 3.16, no finding on a new function | owner |
 | 2026-11-10 | NEW | RT | Roll a Run of Copies into a Helper Looping over a Table: three or more adjacent copies of one statement sequence differing in one constant argument, each leaving through the same `return(R);`, become a `static const` table of the constants and a `static MagickBooleanType` helper looping over it (each `return(R);` written `return(MagickFalse);`); the run becomes `if (Helper(...) == MagickFalse) return(R);`, `R` reading only what the copies never write; unrolling checked by script; guard `WARN` with `0` added | `morphology.c`'s `AcquireRidgesKernel` (campaign A, W16 lane d): eight thick-ridge copies, eight of its cc 14; SV/SC/W keep one `if` per copy or make a *Complex Method* helper, the loop in place is a *Bumpy Road* (3.08); one step of a chain probe 3.10 to 3.02 to 3.16, no finding on the helper | owner |
+| 2026-11-10 | AMEND | RV | Step 6: (a) a caller returning another type `T` (`ssize_t`) passes `T *result` and declares `T returned;`; (b) the block may write up to four plain locals the caller reads after it, each as a pointer (Recipe O steps 2 and 5: `*v`, `(*v).m`, `&v` becomes `v`), and a local it writes only on returning paths (Recipe W step 3) goes by value; (c) more than four parameters go in a `const` input struct (Recipe N's member form), and a block holding an earlier helper's call passes that helper's struct on unchanged (N step 2 pass-through) beside a second struct of its own inputs, the earlier fill moving with the call past statements that write none of its members. *Careful* gives the argument | `fx.c`'s `GetConstantColour` (campaign A, W16 lane c): the colour-function block returns `-1`, `lenfun` or a call's value as `ssize_t`, writes `colour` (read after it on the `gray` path) and `*v0` to `*v2`, and destroys `dummy_exception` before returning; the colour-space block around it returns `0` or the inner value. A probe of both: Complex Method (cc 17) leaves, fx.c 3.73 to 3.78 to 3.88, no finding on either helper | owner |
+| 2026-11-10 | AMEND | N | Step 8: the statements of one function body are siblings as well: a later block that holds an earlier sibling's call and runs to the end of the function (E step 7's value form) may take that sibling's `const Name *name` and pass it on unchanged when none of its statements before the call writes a member's variable; the fill moves with the call to directly before the later block's call, and the variables the later block writes go by value (step 2's read-then-written form, nothing after reads them). *Careful* gives the argument | `fx.c`'s `GetFunction` (campaign A, W16 lane c): the argument-count tail writes `FndArgs` and `chLimit` and holds the call of the closing tail, whose struct holds thirteen variables; with its own struct the helper is a *Large Method* (72 lines, fx.c 3.99 to 3.90), passing the struct on 3.99 to 4.04 with no finding | owner |
+| 2026-11-10 | AMEND | BR | Step 8: a block writing two to four variables the caller reads after it passes their addresses in one `const` targets struct (Recipe LB step 8's form, each variable meeting Recipe I step 2); its inputs may come from at most two `const` structs the caller already fills (an earlier sibling helper's struct filled earlier in the same iteration with no member's variable written since, Recipe N step 8; and a struct the block passes by address to a callee, as a pointer, `&context` becoming `context`); input structs, targets, then `broke`, at most four parameters. *Careful* gives the argument | `fx.c`'s `TranslateExpression` (campaign A, W16 lane c): the operator loop's run from the ternary to the `++`/`--` check leaves through `break;` and `return MagickFalse;` and writes `ternary`, `UserSymbol` and `NewUserSymbol`; step 2 allowed one. A probe: 4.33 to 4.37 for the step, and the whole chain takes `TranslateExpression` out of *Complex Method* and *Large Method*, 4.21 to 4.61, no finding on any new function | owner |
