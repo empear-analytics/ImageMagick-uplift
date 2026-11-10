@@ -2673,11 +2673,11 @@ static void RelinquishMotionTables(MagickRealType *kernel,OffsetInfo *offset)
   offset=(OffsetInfo *) RelinquishMagickMemory(offset);
 }
 
+#define BlurImageTag  "Blur/Image"
+
 MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
-#define BlurImageTag  "Blur/Image"
-
   CacheView
     *blur_view,
     *image_view,
