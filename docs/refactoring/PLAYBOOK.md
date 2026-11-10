@@ -7992,13 +7992,18 @@ that clones the first (the *Code Duplication* cliff, W14).
    line. Check by script that the copies are the same token sequence once each copy's
    variables are renamed to one name per role (Recipe TW step 1) and the name of the
    function called at the role is replaced by `method` at each of its positions; at
-   least two copies call different functions there. Literals and operators are not
-   renamed; whitespace and line breaks are ignored.
+   least two copies call different functions there. A copy may call a function at a
+   second role (a conversion and its inverse): each role's callees are replaced by that
+   role's own name. Literals and operators are not renamed; whitespace, line breaks and
+   comments are ignored, and so is the order of the declarators of a declaration that
+   initialises none of them (the script compares them sorted).
 2. The method type. Every function a copy calls at the role is a function of the file,
-   and all have the same type: the same return type and the same parameter types, in
-   order, as their definitions declare them. Write
+   or a function that a header the file includes declares (`static inline` in a private
+   header, or exported), and all have the same type: the same return type and the same
+   parameter types, in order, as their definitions declare them. Write
    `typedef R (*NameMethod)(T1,T2,...);` with exactly those types, directly above the new
-   function.
+   function; two roles whose callees have one type share it. Step 3 applies only to
+   functions of the file.
 3. Inputs passed through. When the callees' types differ only in the one parameter that
    carries each callee's inputs (a pointer to `const` of a different type, or a scalar
    taken by value), and every call of each callee lies in a copy, that parameter becomes
@@ -8011,12 +8016,17 @@ that clones the first (the *Code Duplication* cliff, W14).
    call), or for a scalar the address of the object it read.
    Step 2's type then has `const void *` in that position.
 4. Write one `static inline` function directly above the first caller: its parameters
-   are the variables a copy reads (Recipe E step 3) and `const NameMethod method`, at
-   most four in all; its body is a copy's text with the common names and `method` at
-   the role's positions, nothing else changed.
+   are the variables a copy reads (Recipe E step 3) and `const NameMethod method` (one
+   per role), at most four in all; when that would make five or more, the methods and,
+   in parameter order, as many of the read variables as bring the count to four go in
+   one struct (each method of its typedef, each other member of the type of the
+   variable it holds), passed as `const Name *name` and bound first in the body as
+   `const` locals of their role names (Recipe N step 4). Its body is a copy's text with
+   the common names and the methods at the roles' positions, nothing else changed.
 5. Replace each copy by a call of the new function that passes the name of that copy's
-   callee (a function designator, never a variable, a parameter or a member) and each
-   variable in the position of its parameter. A copy that was a function's whole body
+   callee (a function designator, never a variable, a parameter or a member), directly
+   or in the initialiser of a `const` struct of step 4 declared at the top of the block
+   that holds the call, and each variable in the position of its parameter. A copy that was a function's whole body
    becomes that one call, and the function keeps its name and parameters for its own
    callers.
 6. All copies move in one commit (rule 1), with step 3's parameter changes. The message
@@ -8107,6 +8117,16 @@ static void WhiteThresholdIntensity(const Image *image,
   same code, so the outlined region is optimised the same way. That argument holds in
   optimised builds only; step 7's timing and `objdump` check are the evidence, and a
   build without optimisation keeps the indirect call, which changes speed, not values.
+- Methods in a struct (step 4). The struct is a `const` local of the copy's function
+  initialised with designators, and the `static inline` function binds its members to
+  `const` locals before any call, so once inlined the compiler loads each method from an
+  object whose value it knows and the call is direct. The struct only carries the
+  pointers; each call still runs its copy's statements on the same values. The
+  `objdump` check of step 7 is the evidence: a struct read in a function that is not
+  inlined (RL's row loop) keeps the indirect call, measured 13% slower per pixel.
+- Declarators in another order. A declaration that initialises none of its objects
+  gives each an indeterminate value until the copy assigns it; the order in which they
+  are declared changes no value the copy computes.
 - `refactor_guard.py --calls` shows each callee down by one call (now passed by name,
   not called), `method` up by its calls in the new function, and the new function (its
   definition and one call per copy); any other movement stops the step.
@@ -8128,7 +8148,13 @@ function. Calling the per-pixel function through a pointer that is not a designa
 rejected; the inline form measured 0.382 s to 0.377 s on the same command. The commits
 quote CPU medians of a `magick convert` command that also runs `-perceptible` and
 `-range-threshold` (`magick` itself lacks `-perceptible`). Added by Claude Code (Claude Opus 5.5) under the owner's
-approval of 2026-11-10 to evolve the recipes.
+approval of 2026-11-10 to evolve the recipes. Amended the same day (W16 lane b, second
+pass) from `enhance.c`'s six `Modulate` hue-space functions (`ModulateHCL` to
+`ModulateHSV`), which call a conversion from RGB and its inverse, both from
+`colorspace-private.h` or `gem.h`, and declare their three temporaries in different
+orders: the second role, header callees, the struct form (six parameters otherwise) and
+the declarator order. A probe: 7.72 to 9.02, *Code Duplication* gone, no finding on a
+new function, no indirect call in the object.
 
 ---
 
@@ -9063,3 +9089,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | RA | Extract Block Accumulating a Reduction Variable Through a Pointer: a block of a parallel loop body that uses at most two variables named in the pragma's `reduction(op:v)` clauses only by applying that operator (`v+=e;`, `v++;`) moves into a `static void` function taking `T *v` (uses `(*v)`), the caller passing `&v`, which inside the region is the thread's private copy; the pragma and clauses unchanged | `composite.c`'s `BlendRMSEResidual` (campaign A, W16 lane c): its channel and column loops add to `channel_residual` and `area` (`reduction(+:...)`), the file's only Deep, Nested Complexity; W15 asked for the ruling. A probe of both steps 3.46 to 3.64 and 3.66, no finding on a new function, a seamless-blend workload 1.77 s both ways (median of 9) | owner |
 | 2026-11-10 | AMEND | I | *Two levels of evidence*, *Unreached functions: Recipe I*: Recipe I may be applied to a function no case reaches, `Verified: guard`, with *Unreached functions: B and N* items 1, 2 and 4 as written and, for item 3, `tools/targets_fill_check.py` printing `OK` (members filled with the addresses of the variables of their own names, in order, or by the `const` initialiser; bindings by name; the removed lines under step 5's mechanical rewrite and the helper's body the same multiset; each exit back unchanged in the caller and as many `return(MagickFalse);` in the helper); a throwing exit moves only in step 8's form, left in the caller. Item 4 also admits a function that vanished because the shortened caller now inlines it, when the caller calls it and its text is unchanged (`tools/obj_modulo.sh`, also for B and N). The guard-verified sentence, I's *Evidence level* and AGENTS.md say so. The new tool and the `obj_modulo.sh` change are commits of their own | `segment.c`'s `GetImageDynamicThreshold` (campaign A, W16 lane d), reached by no case: its region loops write `cluster`, `head`, `red`, `green` and `blue` (I, not B or N); two I helpers probe 7.14 to 9.02, `MODULO-IDENTICAL` with `CountImagePixelsByRGB` and `FinishDynamicThreshold` now inlined into the shortened caller. Planted errors (fill from another variable, fill out of order, binding of another member, flipped comparison, missing `*`, duplicated statement, extra exit, a statement added elsewhere, a literal changed in a newly inlined function) are each caught | owner |
 | 2026-11-10 | AMEND | D | *Unreached functions*, *Object code that differs only in the caller*: when `obj_identical.sh` prints `DIFFERENT`, the replacement may still be made at the guard level when `tools/reuse_check.py` prints `OK` (the call the only added line; the removed block, rewritten as the call's arguments bind it, `&v` for a pointer parameter `p` as `(*p)`, is the helper's body line for line) and `tools/obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL`; inside a parallel loop the helper may write the shared `status` (or a PS step 2 scalar) through a pointer when the block meets PS steps 1 to 3 (a PS helper called again; PS *Careful*). *Two levels of evidence*, D's *Evidence level* and AGENTS.md say so; the tool is a commit of its own | `transform.c`'s `ExcerptImage` (campaign A, W16 lane d), reached by no case: its progress tail is `SetTransformProgress`'s body; the call gives a different `ExcerptImage` but every other function the same instructions; 8.95 to 9.09 in a probe. Planted errors (another tag, `excerpt_image` for `image`, a stray edit, the atomic pragma dropped) are each caught | owner |
+| 2026-11-10 | AMEND | CF | Steps 1, 2, 4, 5: a copy may call a function at a second role (a conversion and its inverse), each role its own method; a callee may be a function a header the file includes declares (`static inline` or exported; step 3 stays for functions of the file); when the parameters would be five or more, the methods and the first read variables go in one `const` struct of designators, declared at the top of the block that holds the call and bound first in the new function; comments and the order of declarators of a declaration that initialises none are ignored by the step 1 check. *Careful* gives the argument (the call is direct once inlined; `objdump` is the evidence). Still eight steps | `enhance.c`'s `ModulateHCL`, `ModulateHCLp`, `ModulateHSB`, `ModulateHSI`, `ModulateHSL` and `ModulateHSV` (campaign A, W16 lane b): the file's *Code Duplication* (ten functions); each calls `ConvertRGBTo<X>` and `Convert<X>ToRGB` from `colorspace-private.h` or `gem.h`, which step 2 refused, and the merged function needs six parameters. A probe: 7.72 to 9.02, the finding gone, no finding on a new function, no `call *` in `enhance.o` | owner |
