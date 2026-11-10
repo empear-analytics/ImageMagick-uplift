@@ -4538,6 +4538,44 @@ static MagickBooleanType XConfigureImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsNearTopLeftCorner(const int x,const int y,
+  const RectangleInfo rectangle)
+{
+  return(((x < (int) (rectangle.x+RoiDelta)) &&
+    (x > (int) (rectangle.x-RoiDelta)) &&
+    (y < (int) (rectangle.y+RoiDelta)) &&
+    (y > (int) (rectangle.y-RoiDelta))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsNearBottomLeftCorner(const int x,const int y,
+  const RectangleInfo rectangle)
+{
+  return(((x < (int) (rectangle.x+RoiDelta)) &&
+    (x > (int) (rectangle.x-RoiDelta)) &&
+    (y < (int) (rectangle.y+(int) rectangle.height+RoiDelta)) &&
+    (y > (int) (rectangle.y+(int) rectangle.height-RoiDelta))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsNearTopRightCorner(const int x,const int y,
+  const RectangleInfo rectangle)
+{
+  return(((x < (int) (rectangle.x+(int) rectangle.width+RoiDelta)) &&
+    (x > (int) (rectangle.x+(int) rectangle.width-RoiDelta)) &&
+    (y < (int) (rectangle.y+RoiDelta)) &&
+    (y > (int) (rectangle.y-RoiDelta))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsNearBottomRightCorner(const int x,const int y,
+  const RectangleInfo rectangle)
+{
+  return(((x < (int) (rectangle.x+(int) rectangle.width+RoiDelta)) &&
+    (x > (int) (rectangle.x+(int) rectangle.width-RoiDelta)) &&
+    (y < (int) (rectangle.y+(int) rectangle.height+RoiDelta)) &&
+    (y > (int) (rectangle.y+(int) rectangle.height-RoiDelta))) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -5036,38 +5074,26 @@ static MagickBooleanType XCropImage(Display *display,
             break;
           x=windows->image.x+event.xbutton.x;
           y=windows->image.y+event.xbutton.y;
-          if ((x < (int) (crop_info.x+RoiDelta)) &&
-              (x > (int) (crop_info.x-RoiDelta)) &&
-              (y < (int) (crop_info.y+RoiDelta)) &&
-              (y > (int) (crop_info.y-RoiDelta)))
+          if (IsNearTopLeftCorner(x,y,crop_info) != MagickFalse)
             {
               crop_info.x=crop_info.x+(ssize_t) crop_info.width;
               crop_info.y=crop_info.y+(ssize_t) crop_info.height;
               state|=UpdateConfigurationState;
               break;
             }
-          if ((x < (int) (crop_info.x+RoiDelta)) &&
-              (x > (int) (crop_info.x-RoiDelta)) &&
-              (y < (int) (crop_info.y+(int) crop_info.height+RoiDelta)) &&
-              (y > (int) (crop_info.y+(int) crop_info.height-RoiDelta)))
+          if (IsNearBottomLeftCorner(x,y,crop_info) != MagickFalse)
             {
               crop_info.x=(crop_info.x+(int) crop_info.width);
               state|=UpdateConfigurationState;
               break;
             }
-          if ((x < (int) (crop_info.x+(int) crop_info.width+RoiDelta)) &&
-              (x > (int) (crop_info.x+(int) crop_info.width-RoiDelta)) &&
-              (y < (int) (crop_info.y+RoiDelta)) &&
-              (y > (int) (crop_info.y-RoiDelta)))
+          if (IsNearTopRightCorner(x,y,crop_info) != MagickFalse)
             {
               crop_info.y=(crop_info.y+(ssize_t) crop_info.height);
               state|=UpdateConfigurationState;
               break;
             }
-          if ((x < (int) (crop_info.x+(int) crop_info.width+RoiDelta)) &&
-              (x > (int) (crop_info.x+(int) crop_info.width-RoiDelta)) &&
-              (y < (int) (crop_info.y+(int) crop_info.height+RoiDelta)) &&
-              (y > (int) (crop_info.y+(int) crop_info.height-RoiDelta)))
+          if (IsNearBottomRightCorner(x,y,crop_info) != MagickFalse)
             {
               state|=UpdateConfigurationState;
               break;
@@ -11760,38 +11786,26 @@ static MagickBooleanType XROIImage(Display *display,
             break;
           x=windows->image.x+event.xbutton.x;
           y=windows->image.y+event.xbutton.y;
-          if ((x < (int) (roi_info.x+RoiDelta)) &&
-              (x > (int) (roi_info.x-RoiDelta)) &&
-              (y < (int) (roi_info.y+RoiDelta)) &&
-              (y > (int) (roi_info.y-RoiDelta)))
+          if (IsNearTopLeftCorner(x,y,roi_info) != MagickFalse)
             {
               roi_info.x=roi_info.x+(int) roi_info.width;
               roi_info.y=roi_info.y+(int) roi_info.height;
               state|=UpdateConfigurationState;
               break;
             }
-          if ((x < (int) (roi_info.x+RoiDelta)) &&
-              (x > (int) (roi_info.x-RoiDelta)) &&
-              (y < (int) (roi_info.y+(int) roi_info.height+RoiDelta)) &&
-              (y > (int) (roi_info.y+(int) roi_info.height-RoiDelta)))
+          if (IsNearBottomLeftCorner(x,y,roi_info) != MagickFalse)
             {
               roi_info.x=roi_info.x+(int) roi_info.width;
               state|=UpdateConfigurationState;
               break;
             }
-          if ((x < (int) (roi_info.x+(int) roi_info.width+RoiDelta)) &&
-              (x > (int) (roi_info.x+(int) roi_info.width-RoiDelta)) &&
-              (y < (int) (roi_info.y+RoiDelta)) &&
-              (y > (int) (roi_info.y-RoiDelta)))
+          if (IsNearTopRightCorner(x,y,roi_info) != MagickFalse)
             {
               roi_info.y=roi_info.y+(int) roi_info.height;
               state|=UpdateConfigurationState;
               break;
             }
-          if ((x < (int) (roi_info.x+(int) roi_info.width+RoiDelta)) &&
-              (x > (int) (roi_info.x+(int) roi_info.width-RoiDelta)) &&
-              (y < (int) (roi_info.y+(int) roi_info.height+RoiDelta)) &&
-              (y > (int) (roi_info.y+(int) roi_info.height-RoiDelta)))
+          if (IsNearBottomRightCorner(x,y,roi_info) != MagickFalse)
             {
               state|=UpdateConfigurationState;
               break;
