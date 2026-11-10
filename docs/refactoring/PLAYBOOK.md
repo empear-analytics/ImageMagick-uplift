@@ -9286,6 +9286,8 @@ and you do not add one, record it here: the file, its score, and the smells left
 | `MagickCore/enhance-clahe.c` | 9.68 | Split off `enhance.c` (W14, 2026-11-05): the CLAHE family. W14 lane b (2026-11-05): E, Z, E step 7 tail, E on the redistribution loop; 8.71 to 9.68. Only the public `CLAHEImage` argument count (6) is left. | 2026-11-05, WSL (W14) |
 | `MagickCore/colorspace-generic-rgb.c` | 9.68 | Split off `colorspace-convert.c` (W14, 2026-11-05): `ConvertGenericToRGB` alone; only its public argument count (9) is left. | 2026-11-05, WSL (W14) |
 | `MagickCore/montage-info.c` | 10.0 | Split off `montage.c` (W14, 2026-11-05). | 2026-11-05, WSL (W14) |
+| `MagickCore/accelerate.c` | 2.79 | Wide build only (WIDE=1). W16 lane a (2026-11-10): P, CN, N and Y on the OpenCL host predicates and `ComputeEqualizeImage`, 2.06 to 2.79; wide catalogue 14,145 cases, 0 diverged. Left: Lines of Code (3,690; a split would move the file-level `#if defined(MAGICKCORE_OPENCL_SUPPORT)`), kernel-launch boilerplate reading 5-15 locals and leaving through `goto cleanup` (each extraction flat), Bumpy Road (ContrastStretch 14; unreached, so only E/G/P/CN), the wrapper and resize-filter clone families, 18 Excess Arguments. | 2026-11-10, WSL (W16) |
+| `MagickCore/animate.c` | 2.49 | Wide build only (WIDE=1). W16 lane a (2026-11-10): P and E on the colormap predicates of `XAnimateBackgroundImage`, `XAnimateImages` and `XSaveImage`, 1.77 to 2.49. Left: `XAnimateImages` (1,436-line Brain Method, depth 7, 42 bumps) and `XMagickCommand` (cc 44), interactive event code reached by about 30 cases. | 2026-11-10, WSL (W16) |
 
 ### Tool notes
 
