@@ -1525,6 +1525,38 @@ static void RelinquishEqualizeMemory(double *map,double *histogram,
     equalize_map=(double *) RelinquishMagickMemory(equalize_map);
 }
 
+typedef struct _EqualizeMemory
+{
+  double
+    **equalize_map,
+    **histogram,
+    **map;
+} EqualizeMemory;
+
+static MagickBooleanType AcquireEqualizeMemory(const Image *image,
+  const EqualizeMemory *targets,ExceptionInfo *exception)
+{
+  double
+    **const equalize_map = targets->equalize_map,
+    **const histogram = targets->histogram,
+    **const map = targets->map;
+
+  (*equalize_map)=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
+    sizeof(*(*equalize_map)));
+  (*histogram)=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
+    sizeof(*(*histogram)));
+  (*map)=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
+    sizeof(*(*map)));
+  if (IsEqualizeMemoryMissing((*equalize_map),(*histogram),(*map)) !=
+      MagickFalse)
+    {
+      RelinquishEqualizeMemory((*map),(*histogram),(*equalize_map));
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -1539,6 +1571,9 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
     *histogram,
     *map,
     white[2*CompositePixelChannel+1];
+
+  const EqualizeMemory
+    targets = { &equalize_map, &histogram, &map };
 
   EqualizeLevels
     levels;
@@ -1563,17 +1598,8 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
 #endif
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  equalize_map=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
-    sizeof(*equalize_map));
-  histogram=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
-    sizeof(*histogram));
-  map=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*sizeof(*map));
-  if (IsEqualizeMemoryMissing(equalize_map,histogram,map) != MagickFalse)
-    {
-      RelinquishEqualizeMemory(map,histogram,equalize_map);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
+  if (AcquireEqualizeMemory(image,&targets,exception) == MagickFalse)
+    return(MagickFalse);
   /*
     Form histogram.
   */
