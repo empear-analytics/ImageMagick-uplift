@@ -3222,6 +3222,9 @@ typedef struct _MorphologyKernelWalk
   const Image
     *image;
 
+  PixelTrait
+    morphology_traits;
+
   const KernelInfo
     *kernel;
 
@@ -3655,6 +3658,103 @@ static void ApplyMorphologyHitAndMiss(const MorphologyKernelWalk *walk,
   }
 }
 
+static void ApplyMorphologyMethod(const MorphologyKernelWalk *walk,
+  double *pixel,double *gamma,const Quantum *magick_restrict *quantum_pixels)
+{
+  const MorphologyMethod
+    method = walk->method;
+
+  const Image
+    *image = walk->image;
+
+  const PixelTrait
+    morphology_traits = walk->morphology_traits;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  switch (method)
+  {
+    case ConvolveMorphology:
+    {
+      /*
+         Weighted Average of pixels using reflected kernel
+
+         For correct working of this operation for asymmetrical kernels,
+         the kernel needs to be applied in its reflected form.  That is
+         its values needs to be reversed.
+
+         Correlation is actually the same as this but without reflecting
+         the kernel, and thus 'lower-level' that Convolution.  However as
+         Convolution is the more common method used, and it does not
+         really cost us much in terms of processing to use a reflected
+         kernel, so it is Convolution that is implemented.
+
+         Correlation will have its kernel reflected before calling this
+         function to do a Convolve.
+
+         For more details of Correlation vs Convolution see
+           http://www.cs.umd.edu/~djacobs/CMSC426/Convolution.pdf
+      */
+      k=(&kernel->values[kernel->width*kernel->height-1]);
+      if (((image->alpha_trait & BlendPixelTrait) == 0) ||
+          ((morphology_traits & BlendPixelTrait) == 0))
+        {
+          /*
+            No alpha blending.
+          */
+          (*pixel)=WalkReflectedKernel(walk,ConvolveChannelValue,k,(*pixel));
+          break;
+        }
+      /*
+        Alpha blending.
+      */
+      (*gamma)=0.0;
+      BlendReflectedKernel(walk,k,pixel,gamma);
+      break;
+    }
+    case ErodeMorphology:
+    {
+      /*
+        Minimum value within kernel neighbourhood.
+
+        The kernel is not reflected for this operation.  In normal
+        Greyscale Morphology, the kernel value should be added
+        to the real value, this is currently not done, due to the
+        nature of the boolean kernels being used.
+      */
+      (*pixel)=WalkErodeOrDilateKernel(walk,ForwardKernelWalk,
+        MinimizeChannelValue,(*pixel));
+      break;
+    }
+    case DilateMorphology:
+    {
+      /*
+         Maximum value within kernel neighbourhood.
+
+         For correct working of this operation for asymmetrical kernels,
+         the kernel needs to be applied in its reflected form.  That is
+         its values needs to be reversed.
+
+         In normal Greyscale Morphology, the kernel value should be
+         added to the real value, this is currently not done, due to the
+         nature of the boolean kernels being used.
+      */
+      (*pixel)=WalkErodeOrDilateKernel(walk,ReflectedKernelWalk,
+        MaximizeChannelValue,(*pixel));
+      break;
+    }
+    default:
+    {
+      ApplyMorphologyHitAndMiss(walk,quantum_pixels,pixel);
+      break;
+    }
+  }
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3962,9 +4062,6 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
           morphology_traits,
           traits;
 
-        const MagickRealType
-          *magick_restrict k;
-
         const Quantum
           *magick_restrict pixels,
           *magick_restrict quantum_pixels;
@@ -3989,6 +4086,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         minimum=(double) QuantumRange;
         walk.method=method;
         walk.image=image;
+        walk.morphology_traits=morphology_traits;
         walk.kernel=kernel;
         walk.p=p;
         walk.pixels=pixels;
@@ -3999,83 +4097,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         walk.i=i;
         pixel=GetMorphologyInitialPixel(&walk);
         gamma=1.0;
-        switch (method)
-        {
-          case ConvolveMorphology:
-          {
-            /*
-               Weighted Average of pixels using reflected kernel
-
-               For correct working of this operation for asymmetrical kernels,
-               the kernel needs to be applied in its reflected form.  That is
-               its values needs to be reversed.
-
-               Correlation is actually the same as this but without reflecting
-               the kernel, and thus 'lower-level' that Convolution.  However as
-               Convolution is the more common method used, and it does not
-               really cost us much in terms of processing to use a reflected
-               kernel, so it is Convolution that is implemented.
-
-               Correlation will have its kernel reflected before calling this
-               function to do a Convolve.
-
-               For more details of Correlation vs Convolution see
-                 http://www.cs.umd.edu/~djacobs/CMSC426/Convolution.pdf
-            */
-            k=(&kernel->values[kernel->width*kernel->height-1]);
-            if (((image->alpha_trait & BlendPixelTrait) == 0) ||
-                ((morphology_traits & BlendPixelTrait) == 0))
-              {
-                /*
-                  No alpha blending.
-                */
-                pixel=WalkReflectedKernel(&walk,ConvolveChannelValue,k,pixel);
-                break;
-              }
-            /*
-              Alpha blending.
-            */
-            gamma=0.0;
-            BlendReflectedKernel(&walk,k,&pixel,&gamma);
-            break;
-          }
-          case ErodeMorphology:
-          {
-            /*
-              Minimum value within kernel neighbourhood.
-
-              The kernel is not reflected for this operation.  In normal
-              Greyscale Morphology, the kernel value should be added
-              to the real value, this is currently not done, due to the
-              nature of the boolean kernels being used.
-            */
-            pixel=WalkErodeOrDilateKernel(&walk,ForwardKernelWalk,
-              MinimizeChannelValue,pixel);
-            break;
-          }
-          case DilateMorphology:
-          {
-            /*
-               Maximum value within kernel neighbourhood.
-
-               For correct working of this operation for asymmetrical kernels,
-               the kernel needs to be applied in its reflected form.  That is
-               its values needs to be reversed.
-
-               In normal Greyscale Morphology, the kernel value should be
-               added to the real value, this is currently not done, due to the
-               nature of the boolean kernels being used.
-            */
-            pixel=WalkErodeOrDilateKernel(&walk,ReflectedKernelWalk,
-              MaximizeChannelValue,pixel);
-            break;
-          }
-          default:
-          {
-            ApplyMorphologyHitAndMiss(&walk,&quantum_pixels,&pixel);
-            break;
-          }
-        }
+        ApplyMorphologyMethod(&walk,&pixel,&gamma,&quantum_pixels);
         if (quantum_pixels != (const Quantum *) NULL)
           {
             SetPixelChannel(morphology_image,channel,quantum_pixels[i],q);
