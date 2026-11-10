@@ -1800,6 +1800,16 @@ static MagickBooleanType RegisterCacheEvent(MagickCLCacheInfo info,
   return(MagickTrue);
 }
 
+static void RegisterOpenCLKernelEvent(CacheInfo *input_info,
+  CacheInfo *output_info,cl_event event)
+{
+  if (RegisterCacheEvent(input_info->opencl,event) != MagickFalse)
+    {
+      if (output_info != (CacheInfo *) NULL)
+        (void) RegisterCacheEvent(output_info->opencl,event);
+    }
+}
+
 MagickPrivate MagickBooleanType EnqueueOpenCLKernel(cl_command_queue queue,
   cl_kernel kernel,cl_uint work_dim,const size_t *offset,const size_t *gsize,
   const size_t *lsize,const Image *input_image,const Image *output_image,
@@ -1855,13 +1865,7 @@ MagickPrivate MagickBooleanType EnqueueOpenCLKernel(cl_command_queue queue,
   if (flush != MagickFalse)
     openCL_library->clFlush(queue);
   if (RecordProfileData(input_info->opencl->device,kernel,event) == MagickFalse)
-    {
-      if (RegisterCacheEvent(input_info->opencl,event) != MagickFalse)
-        {
-          if (output_info != (CacheInfo *) NULL)
-            (void) RegisterCacheEvent(output_info->opencl,event);
-        }
-    }
+    RegisterOpenCLKernelEvent(input_info,output_info,event);
   openCL_library->clReleaseEvent(event);
   return(MagickTrue);
 }
