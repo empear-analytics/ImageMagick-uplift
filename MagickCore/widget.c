@@ -7225,6 +7225,52 @@ static void ReleaseListBrowserCancel(const ListBrowserRelease *release,
     }
 }
 
+static XWidgetInfo MoveListBrowserSlider(XWidgetInfo slider_info,
+  const KeySym key_symbol,const unsigned int visible_entries,
+  const unsigned int entries)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Home:
+    case XK_KP_Home:
+    {
+      slider_info.id=0;
+      break;
+    }
+    case XK_Up:
+    case XK_KP_Up:
+    {
+      slider_info.id--;
+      break;
+    }
+    case XK_Down:
+    case XK_KP_Down:
+    {
+      slider_info.id++;
+      break;
+    }
+    case XK_Prior:
+    case XK_KP_Prior:
+    {
+      slider_info.id-=(int) visible_entries;
+      break;
+    }
+    case XK_Next:
+    case XK_KP_Next:
+    {
+      slider_info.id+=(int) visible_entries;
+      break;
+    }
+    case XK_End:
+    case XK_KP_End:
+    {
+      slider_info.id=(int) entries;
+      break;
+    }
+  }
+  return(slider_info);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7797,45 +7843,8 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             /*
               Move slider.
             */
-            switch ((int) key_symbol)
-            {
-              case XK_Home:
-              case XK_KP_Home:
-              {
-                slider_info.id=0;
-                break;
-              }
-              case XK_Up:
-              case XK_KP_Up:
-              {
-                slider_info.id--;
-                break;
-              }
-              case XK_Down:
-              case XK_KP_Down:
-              {
-                slider_info.id++;
-                break;
-              }
-              case XK_Prior:
-              case XK_KP_Prior:
-              {
-                slider_info.id-=(int) visible_entries;
-                break;
-              }
-              case XK_Next:
-              case XK_KP_Next:
-              {
-                slider_info.id+=(int) visible_entries;
-                break;
-              }
-              case XK_End:
-              case XK_KP_End:
-              {
-                slider_info.id=(int) entries;
-                break;
-              }
-            }
+            slider_info=MoveListBrowserSlider(slider_info,key_symbol,
+              visible_entries,entries);
             state|=RedrawListState;
             break;
           }
