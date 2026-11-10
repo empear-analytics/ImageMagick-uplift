@@ -377,14 +377,30 @@ static const char *GetOpenCLCacheDirectory()
   return(cache_directory);
 }
 
+static void EnableSameOpenCLDevices(MagickCLEnv clEnv,MagickCLDevice device,
+  const size_t i)
+{
+  size_t
+    j;
+
+  for (j = i+1; j < clEnv->number_devices; j++)
+  {
+    MagickCLDevice
+      other_device;
+
+    other_device=clEnv->devices[j];
+    if (IsSameOpenCLDevice(device,other_device))
+      other_device->enabled=MagickTrue;
+  }
+}
+
 static void SelectOpenCLDevice(MagickCLEnv clEnv,cl_device_type type)
 {
   MagickCLDevice
     device;
 
   size_t
-    i,
-    j;
+    i;
 
   (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
     "Selecting device for type: %d",(int) type);
@@ -400,15 +416,7 @@ static void SelectOpenCLDevice(MagickCLEnv clEnv,cl_device_type type)
     device->enabled=MagickTrue;
     (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
       "Selected device: %s",device->name);
-    for (j = i+1; j < clEnv->number_devices; j++)
-    {
-      MagickCLDevice
-        other_device;
-
-      other_device=clEnv->devices[j];
-      if (IsSameOpenCLDevice(device,other_device))
-        other_device->enabled=MagickTrue;
-    }
+    EnableSameOpenCLDevices(clEnv,device,i);
   }
 }
 
