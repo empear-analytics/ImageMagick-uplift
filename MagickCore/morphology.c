@@ -493,6 +493,14 @@ static GeometryInfo DefaultRectangleGeometry(const MagickStatusType flags,
   return(args);
 }
 
+static GeometryInfo DefaultShapeScale(const MagickStatusType flags,
+  GeometryInfo args)
+{
+  if ( (flags & HeightValue) == 0 )
+    args.sigma = 1.0;    /* Default scale = 1.0, zero is valid */
+  return(args);
+}
+
 static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
   const MagickStatusType flags,GeometryInfo args)
 {
@@ -508,8 +516,7 @@ static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
     case DiskKernel:
     case PlusKernel:
     case CrossKernel:
-      if ( (flags & HeightValue) == 0 )
-        args.sigma = 1.0;    /* Default scale = 1.0, zero is valid */
+      args=DefaultShapeScale(flags,args);
       break;
     case RingKernel:
       if ( (flags & XValue) == 0 )
