@@ -422,6 +422,16 @@ static void BlackThresholdPixel(const Image *image,const PixelInfo *threshold,
   }
 }
 
+static void BlackThresholdIntensity(const Image *image,
+  const PixelInfo *threshold,Quantum *magick_restrict q)
+{
+  double
+    pixel;
+
+  pixel=GetPixelIntensity(image,q);
+  BlackThresholdPixel(image,threshold,pixel,q);
+}
+
 static void BlackThresholdRow(const Image *image,const void *arguments,
   Quantum *magick_restrict q)
 {
@@ -433,11 +443,7 @@ static void BlackThresholdRow(const Image *image,const void *arguments,
 
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    double
-      pixel;
-
-    pixel=GetPixelIntensity(image,q);
-    BlackThresholdPixel(image,threshold,pixel,q);
+    BlackThresholdIntensity(image,threshold,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
