@@ -222,22 +222,26 @@ static TransformPacket *RelinquishTransformMap(TransformPacket *map)
   return(map);
 }
 
+static void ParseIlluminantArtifact(const char **artifact,
+  IlluminantType *illuminant)
+{
+  ssize_t
+    illuminant_type;
+
+  illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
+    *artifact);
+  if (illuminant_type < 0)
+    *illuminant=UndefinedIlluminant;
+  else
+    *illuminant=(IlluminantType) illuminant_type;
+}
+
 static void GetIlluminantArtifact(const Image *image,const char **artifact,
   IlluminantType *illuminant)
 {
   *artifact=GetImageArtifact(image,"color:illuminant");
   if (*artifact != (const char *) NULL)
-    {
-      ssize_t
-        illuminant_type;
-
-      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
-        *artifact);
-      if (illuminant_type < 0)
-        *illuminant=UndefinedIlluminant;
-      else
-        *illuminant=(IlluminantType) illuminant_type;
-    }
+    ParseIlluminantArtifact(artifact,illuminant);
 }
 
 static MagickBooleanType SyncImageToDirectClass(Image *image,
