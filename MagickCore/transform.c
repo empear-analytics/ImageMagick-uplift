@@ -945,6 +945,70 @@ static MagickBooleanType CropImageLine(const TransformLine *line,
 
 #define CropImageTag  "Crop/Image"
 
+typedef struct _CropRows
+{
+  const Image
+    *image;
+
+  Image
+    *crop_image;
+
+  CacheView
+    *image_view,
+    *crop_view;
+
+  ExceptionInfo
+    *exception;
+
+  RectangleInfo
+    page;
+} CropRows;
+
+static MagickBooleanType CropImageRows(const CropRows *rows,
+  MagickBooleanType status,MagickOffsetType progress)
+{
+  const Image
+    *const image = rows->image;
+
+  Image
+    *const crop_image = rows->crop_image;
+
+  CacheView
+    *const image_view = rows->image_view,
+    *const crop_view = rows->crop_view;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  const RectangleInfo
+    page = rows->page;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,crop_image,crop_image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) crop_image->rows; y++)
+  {
+    const TransformLine
+      line = { image, crop_image, image_view, crop_view, exception };
+
+    if (CropImageLine(&line,&page,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetTransformProgress(image,CropImageTag,progress,&status);
+      }
+  }
+  return(status);
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -961,12 +1025,12 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   MagickOffsetType
     progress;
 
+  CropRows
+    rows;
+
   RectangleInfo
     bounding_box,
     page;
-
-  ssize_t
-    y;
 
   /*
     Check crop geometry.
@@ -1000,26 +1064,13 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
   crop_view=AcquireAuthenticCacheView(crop_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,crop_image,crop_image->rows,2)
-#endif
-  for (y=0; y < (ssize_t) crop_image->rows; y++)
-  {
-    const TransformLine
-      line = { image, crop_image, image_view, crop_view, exception };
-
-    if (CropImageLine(&line,&page,y,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetTransformProgress(image,CropImageTag,progress,&status);
-      }
-  }
+  rows.image=image;
+  rows.crop_image=crop_image;
+  rows.image_view=image_view;
+  rows.crop_view=crop_view;
+  rows.exception=exception;
+  rows.page=page;
+  status=CropImageRows(&rows,status,progress);
   crop_view=DestroyCacheView(crop_view);
   image_view=DestroyCacheView(image_view);
   crop_image->type=image->type;
