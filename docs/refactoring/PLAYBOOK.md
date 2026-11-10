@@ -9111,6 +9111,9 @@ recipe turns control flow into data.
    from comments, one `switch (n)` followed by one `return(d);`. Membership form: the
    `switch` has exactly one group of labels `L1 ... Ln`, each an enumeration constant,
    whose body is `return(MagickTrue);`, and `default: break;`; `d` is `MagickFalse`.
+   The labels may instead all be character constants when `n` is a parameter of type
+   `char` (a predicate Recipe EC made), each the value of a member of the basic
+   character set (C11 5.2.1), so that it is representable in `char` and non-negative.
    Index form: the labels are the integer literals `0` to `k` in increasing order, one
    per case, each case's body is `return(vi);` of a constant `vi` (a string literal, a
    numeric literal or an enumeration constant), there is no `default:` or it is `break;`
@@ -9123,8 +9126,8 @@ recipe turns control flow into data.
    never compares, stores or writes through the pointer itself (check by `grep`), since
    two equal literals need not share one address.
 3. Directly above the function write a `static const` array with no size, named for what
-   it holds: in the membership form of `n`'s enumeration type with the labels `L1 ... Ln`
-   as its elements in the order of the `switch`; in the index form of the function's
+   it holds: in the membership form of `n`'s enumeration type (of `char` for character
+   labels) with the labels `L1 ... Ln` as its elements in the order of the `switch`; in the index form of the function's
    return type (for a pointer, `const char *const`), with `v0 ... vk` in label order.
    Each case's comment stays on its element's line, unchanged.
 4. Replace the `switch` by a lookup that reads the table and returns what the case
@@ -9137,7 +9140,7 @@ recipe turns control flow into data.
    the case labelled `i` returned, for every `i` from `0` to `k`, and that nothing else
    in the file changed.
 6. `refactor_guard.py`: membership form `OK` (enumeration constants are not literals to
-   it); index form `WARN` with exactly the label literals `0` to `k` each removed once and
+   it; character constants each move once, from a label to an element); index form `WARN` with exactly the label literals `0` to `k` each removed once and
    every value still present, nothing else. `--calls` moves nothing.
 
 **Before:**
@@ -9186,6 +9189,12 @@ static const char *poly_basis_str(ssize_t n)
   function returns `MagickFalse`. Each element has `n`'s own type, so `==` compares the
   values the `switch` compared. Reading a `const` table and comparing have no side
   effect; only the number of comparisons changes, which is speed (step 2).
+- Character labels. A `case` compares the promoted value of `n` with the constant
+  converted to the promoted type (C11 6.8.4.2p5); a character constant is an `int`
+  whose value, for a member of the basic character set, is non-negative and fits in
+  `char` (C11 6.2.5p3), so the element initialised from it holds the same value, and
+  `T[i] == n` promotes both `char` operands to `int` and compares the values the `case`
+  compared.
 - Index form. For `0 <= n <= k` the `switch` returns `vn`; the table's element `n` is
   `vn` (step 5), of the return type, so `T[n]` is the value the `return` converted.
   Otherwise the `switch` falls through to `return(d);`. The count `sizeof(T)/sizeof(*T)`
@@ -9209,7 +9218,11 @@ by script and step 2 by reading.
 **Provenance:** 2026-11-10, from `colorspace.c`'s `IsGenericColorspace` (the membership
 predicate W16 lane c made with Recipe LP, cc 30, the file's last finding but its length)
 and `distort.c`'s `poly_basis_str` (cc 22, a label run since W11; its SW split clones
-`poly_basis_fn`'s, 6.73), campaign A, W16 lane d. Earlier reports called a lookup table
+`poly_basis_fn`'s, 6.73), campaign A, W16 lane d. *Character labels*: 2026-11-10, from
+`opencl.c`'s `IsIllegalFileNameCharacter` (the ten-label predicate Recipe EC made from
+`CompileOpenCLKernel`'s device-name test, cc 13; campaign A, W16 lane a, wide build), 3.52
+to 3.62 in a probe, no finding left on the function; added under the owner's OK of
+2026-11-10 to evolve the recipes. Earlier reports called a lookup table
 the only fix and no recipe (M23, `option.c`'s `GetOptionInfo`). Probes: `colorspace.c`
 8.62 to 9.38, `distort.c` 7.15 to 7.60; both oracle 0 diverged. Added by Claude Code
 (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
@@ -9657,3 +9670,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | MT | Step 4: when the variables a copy reads are the members of a `const` struct local the caller declares with exactly those variables as its initialiser and never writes (Recipe E step 3's input form), the new function may take that struct by `const Struct *` beside `side`, binding the members it reads as `const` locals of their names (a struct-valued member copied as E step 3 copies it); *Careful* gives the argument. Still seven steps | `layer.c`'s `CompareImagesBounds` (campaign A, W16 lane c): its ascending and descending row scans read `alpha_image`, `beta_image`, `scan` and `exception`, the members of its `DifferingLineScan line`, which with `side` make five parameters; a probe 7.55 to 7.84, `CompareImagesBounds` leaving Bumpy Road and Complex Method, no finding on the new function | owner |
 | 2026-11-10 | NEW | TB | Replace a Label Run with a Constant Table: a `static` function whose body is one `switch` of labels that only return constants, and a closing `return(d);`, becomes a lookup in a new `static const` table directly above it: the membership form (one label group returning `MagickTrue`, `default: break;`) loops over a table of the labels; the index form (labels `0` to `k` in order, each returning a constant) returns `T[n]` when `(size_t) n` is below the count. No literal added; table checked by script against the labels and returns; guard `OK` (membership) or `WARN` with exactly the label literals (index); timing when called per pixel; string results only read as text | `colorspace.c`'s `IsGenericColorspace` (cc 30, the LP predicate) and `distort.c`'s `poly_basis_str` (cc 22), campaign A, W16 lane d: label runs no split can shorten without clones; probes 8.62 to 9.38 and 7.15 to 7.60, oracle 0 diverged | owner |
 | 2026-11-10 | NEW | EC | Name an Equality Chain as a Label Set: a controlling expression that is a chain of logical-or operators whose every operand compares one side-effect-free integer expression `e` with a different constant by `==` becomes `Name(e) != MagickFalse`, `Name` a `static inline` predicate of one `const T v` parameter whose body is `switch (v)` with the constants as labels in the chain's order, `return(MagickTrue);`, `default: break;`, and `return(MagickFalse);`. *Careful* gives the argument (C11 6.5.14, 6.8.4.2p5; duplicate labels do not compile); the new function is a label run (owner, 2026-11-07), which Recipe TB may later turn into a table | `opencl.c`'s `CompileOpenCLKernel` (campaign A, W16 lane a, wide build): its device-name test, ten `*ptr == c` operands, is the file's largest *Complex Conditional* (nine) and most of its cc 17. Recipe P leaves the chain in a predicate of cc 12 that is no label run (3.24 to 3.52 with that new finding); this recipe 3.24 to 3.52 with only the label run, 3.62 with TB after it | owner |
+| 2026-11-10 | AMEND | TB | Membership form, *character labels*: the labels may all be character constants of the basic character set when `n` is a `char` parameter (a predicate Recipe EC made); the table is then of `char`, and the guard sees each character constant move once (`OK`). *Careful* gives the argument (C11 6.8.4.2p5, 6.2.5p3: each value is non-negative and fits in `char`, so the element holds it and `==` compares the values the `case` compared). Still six steps | `opencl.c`'s `IsIllegalFileNameCharacter` (campaign A, W16 lane a, wide build), the ten-label predicate Recipe EC made from `CompileOpenCLKernel`'s device-name test (cc 13, a label run); a probe 3.52 to 3.62, no finding left on it | owner |
