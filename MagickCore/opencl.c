@@ -264,6 +264,20 @@ static inline void StopAccelerateTimer(AccelerateTimer *timer)
   timer->clocks+=n;
 }
 
+static MagickBooleanType CreateOpenCLCachePath(const char *path)
+{
+  MagickBooleanType
+    status;
+
+  struct stat
+    attributes;
+
+  status=GetPathAttributes(path,&attributes);
+  if (status == MagickFalse)
+    status=MagickCreateDirectory(path);
+  return(status);
+}
+
 static const char *GetOpenCLCacheDirectory()
 {
   if (cache_directory == (char *) NULL)
@@ -280,9 +294,6 @@ static const char *GetOpenCLCacheDirectory()
 
           MagickBooleanType
             status;
-
-          struct stat
-            attributes;
 
           temp=(char *) NULL;
           home=GetEnvironmentValue("MAGICK_OPENCL_CACHE_DIR");
@@ -303,9 +314,7 @@ static const char *GetOpenCLCacheDirectory()
             {
               /* first check if $HOME exists */
               (void) FormatLocaleString(path,MagickPathExtent,"%s",home);
-              status=GetPathAttributes(path,&attributes);
-              if (status == MagickFalse)
-                status=MagickCreateDirectory(path);
+              status=CreateOpenCLCachePath(path);
 
               /* first check if $HOME/ImageMagick exists */
               if (status != MagickFalse)
@@ -313,9 +322,7 @@ static const char *GetOpenCLCacheDirectory()
                   (void) FormatLocaleString(path,MagickPathExtent,
                     "%s%sImageMagick",home,DirectorySeparator);
 
-                  status=GetPathAttributes(path,&attributes);
-                  if (status == MagickFalse)
-                    status=MagickCreateDirectory(path);
+                  status=CreateOpenCLCachePath(path);
                 }
 
               if (status != MagickFalse)
@@ -333,9 +340,7 @@ static const char *GetOpenCLCacheDirectory()
                   /* first check if $HOME/.cache exists */
                   (void) FormatLocaleString(path,MagickPathExtent,"%s%s.cache",
                     home,DirectorySeparator);
-                  status=GetPathAttributes(path,&attributes);
-                  if (status == MagickFalse)
-                    status=MagickCreateDirectory(path);
+                  status=CreateOpenCLCachePath(path);
 
                   /* first check if $HOME/.cache/ImageMagick exists */
                   if (status != MagickFalse)
@@ -343,9 +348,7 @@ static const char *GetOpenCLCacheDirectory()
                       (void) FormatLocaleString(path,MagickPathExtent,
                         "%s%s.cache%sImageMagick",home,DirectorySeparator,
                         DirectorySeparator);
-                      status=GetPathAttributes(path,&attributes);
-                      if (status == MagickFalse)
-                        status=MagickCreateDirectory(path);
+                      status=CreateOpenCLCachePath(path);
                     }
 
                   if (status != MagickFalse)
