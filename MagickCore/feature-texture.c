@@ -296,6 +296,424 @@ static double GetFeatureNormalization(const Image *image,
   return(normalize);
 }
 
+static void AddFeatureStatistics(const Image *image,PixelInfo *target,
+  const PixelInfo *source)
+{
+  target->red+=source->red;
+  target->green+=source->green;
+  target->blue+=source->blue;
+  if (image->colorspace == CMYKColorspace)
+    target->black+=source->black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    target->alpha+=source->alpha;
+}
+
+static void SubtractFeatureEntropy(const Image *image,PixelInfo *entropy,
+  const PixelInfo *density)
+{
+  entropy->red-=(density->red*log2(density->red));
+  entropy->green-=(density->green*log2(density->green));
+  entropy->blue-=(density->blue*log2(density->blue));
+  if (image->colorspace == CMYKColorspace)
+    entropy->black-=(density->black*log2(density->black));
+  if (image->alpha_trait != UndefinedPixelTrait)
+    entropy->alpha-=(density->alpha*log2(density->alpha));
+}
+
+typedef struct _TextureDirection
+{
+  const Image
+    *image;
+
+  ChannelFeatures
+    *channel_features;
+
+  FeatureStatistics
+    **cooccurrence,
+    *density_x,
+    *density_xy,
+    *density_y,
+    **Q,
+    *sum;
+
+  unsigned int
+    number_grays;
+
+  ssize_t
+    i;
+} TextureDirection;
+
+typedef struct _TextureSlots
+{
+  PixelInfo
+    *correlation,
+    *entropy_x,
+    *entropy_xy,
+    *entropy_xy1,
+    *entropy_xy2,
+    *entropy_y,
+    *mean,
+    *sum_squares,
+    *variance;
+} TextureSlots;
+
+static void AccumulateMomentAndCorrelation(const TextureDirection *texture,
+  PixelInfo *correlation,const ssize_t x,const ssize_t y)
+{
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const sum = texture->sum;
+
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Angular second moment:  measure of homogeneity of the image.
+  */
+  channel_features[RedPixelChannel].angular_second_moment[i]+=
+    cooccurrence[x][y].direction[i].red*
+    cooccurrence[x][y].direction[i].red;
+  channel_features[GreenPixelChannel].angular_second_moment[i]+=
+    cooccurrence[x][y].direction[i].green*
+    cooccurrence[x][y].direction[i].green;
+  channel_features[BluePixelChannel].angular_second_moment[i]+=
+    cooccurrence[x][y].direction[i].blue*
+    cooccurrence[x][y].direction[i].blue;
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].angular_second_moment[i]+=
+      cooccurrence[x][y].direction[i].black*
+      cooccurrence[x][y].direction[i].black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].angular_second_moment[i]+=
+      cooccurrence[x][y].direction[i].alpha*
+      cooccurrence[x][y].direction[i].alpha;
+  /*
+    Correlation: measure of linear-dependencies in the image.
+  */
+  AddFeatureStatistics(image,&sum[y].direction[i],
+    &cooccurrence[x][y].direction[i]);
+  correlation->red+=x*y*cooccurrence[x][y].direction[i].red;
+  correlation->green+=x*y*
+    cooccurrence[x][y].direction[i].green;
+  correlation->blue+=x*y*
+    cooccurrence[x][y].direction[i].blue;
+  if (image->colorspace == CMYKColorspace)
+    correlation->black+=x*y*
+      cooccurrence[x][y].direction[i].black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    correlation->alpha+=x*y*
+      cooccurrence[x][y].direction[i].alpha;
+}
+
+static void AccumulateInverseDifferenceAndSum(const TextureDirection *texture,
+  const ssize_t x,const ssize_t y)
+{
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const density_xy = texture->density_xy;
+
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Inverse Difference Moment.
+  */
+  channel_features[RedPixelChannel].inverse_difference_moment[i]+=
+    cooccurrence[x][y].direction[i].red/((y-x)*(y-x)+1);
+  channel_features[GreenPixelChannel].inverse_difference_moment[i]+=
+    cooccurrence[x][y].direction[i].green/((y-x)*(y-x)+1);
+  channel_features[BluePixelChannel].inverse_difference_moment[i]+=
+    cooccurrence[x][y].direction[i].blue/((y-x)*(y-x)+1);
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].inverse_difference_moment[i]+=
+      cooccurrence[x][y].direction[i].black/((y-x)*(y-x)+1);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].inverse_difference_moment[i]+=
+      cooccurrence[x][y].direction[i].alpha/((y-x)*(y-x)+1);
+  /*
+    Sum average.
+  */
+  AddFeatureStatistics(image,&density_xy[y+x+2].direction[i],
+    &cooccurrence[x][y].direction[i]);
+}
+
+static void AccumulateEntropyAndDensities(const TextureDirection *texture,
+  const ssize_t x,const ssize_t y)
+{
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const density_x = texture->density_x,
+    *const density_y = texture->density_y;
+
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Entropy.
+  */
+  channel_features[RedPixelChannel].entropy[i]-=
+    cooccurrence[x][y].direction[i].red*
+    log2(cooccurrence[x][y].direction[i].red);
+  channel_features[GreenPixelChannel].entropy[i]-=
+    cooccurrence[x][y].direction[i].green*
+    log2(cooccurrence[x][y].direction[i].green);
+  channel_features[BluePixelChannel].entropy[i]-=
+    cooccurrence[x][y].direction[i].blue*
+    log2(cooccurrence[x][y].direction[i].blue);
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].entropy[i]-=
+      cooccurrence[x][y].direction[i].black*
+      log2(cooccurrence[x][y].direction[i].black);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].entropy[i]-=
+      cooccurrence[x][y].direction[i].alpha*
+      log2(cooccurrence[x][y].direction[i].alpha);
+  /*
+    Information Measures of Correlation.
+  */
+  density_x[x].direction[i].red+=cooccurrence[x][y].direction[i].red;
+  density_x[x].direction[i].green+=cooccurrence[x][y].direction[i].green;
+  density_x[x].direction[i].blue+=cooccurrence[x][y].direction[i].blue;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    density_x[x].direction[i].alpha+=
+      cooccurrence[x][y].direction[i].alpha;
+  if (image->colorspace == CMYKColorspace)
+    density_x[x].direction[i].black+=
+      cooccurrence[x][y].direction[i].black;
+  AddFeatureStatistics(image,&density_y[y].direction[i],
+    &cooccurrence[x][y].direction[i]);
+}
+
+static void AccumulateTextureMean(const TextureDirection *texture,
+  PixelInfo *mean,PixelInfo *sum_squares,const ssize_t y)
+{
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    *const sum = texture->sum;
+
+  const ssize_t
+    i = texture->i;
+
+  mean->red+=y*sum[y].direction[i].red;
+  sum_squares->red+=y*y*sum[y].direction[i].red;
+  mean->green+=y*sum[y].direction[i].green;
+  sum_squares->green+=y*y*sum[y].direction[i].green;
+  mean->blue+=y*sum[y].direction[i].blue;
+  sum_squares->blue+=y*y*sum[y].direction[i].blue;
+  if (image->colorspace == CMYKColorspace)
+    {
+      mean->black+=y*sum[y].direction[i].black;
+      sum_squares->black+=y*y*sum[y].direction[i].black;
+    }
+  if (image->alpha_trait != UndefinedPixelTrait)
+    {
+      mean->alpha+=y*sum[y].direction[i].alpha;
+      sum_squares->alpha+=y*y*sum[y].direction[i].alpha;
+    }
+}
+
+static void SetTextureCorrelation(const TextureDirection *texture,
+  const TextureSlots *slots)
+{
+  const PixelInfo
+    *const correlation = slots->correlation,
+    *const mean = slots->mean,
+    *const sum_squares = slots->sum_squares;
+
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Correlation: measure of linear-dependencies in the image.
+  */
+  channel_features[RedPixelChannel].correlation[i]=
+    (correlation->red-mean->red*
+    mean->red)/(sqrt(sum_squares->red-
+    (mean->red*mean->red))*sqrt(
+    sum_squares->red-(mean->red*
+    mean->red)));
+  channel_features[GreenPixelChannel].correlation[i]=
+    (correlation->green-mean->green*
+    mean->green)/(sqrt(sum_squares->green-
+    (mean->green*mean->green))*sqrt(
+    sum_squares->green-(mean->green*
+    mean->green)));
+  channel_features[BluePixelChannel].correlation[i]=
+    (correlation->blue-mean->blue*
+    mean->blue)/(sqrt(sum_squares->blue-
+    (mean->blue*mean->blue))*sqrt(
+    sum_squares->blue-(mean->blue*
+    mean->blue)));
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].correlation[i]=
+      (correlation->black-mean->black*
+      mean->black)/(sqrt(sum_squares->black-
+      (mean->black*mean->black))*sqrt(
+      sum_squares->black-(mean->black*
+      mean->black)));
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].correlation[i]=
+      (correlation->alpha-mean->alpha*
+      mean->alpha)/(sqrt(sum_squares->alpha-
+      (mean->alpha*mean->alpha))*sqrt(
+      sum_squares->alpha-(mean->alpha*
+      mean->alpha)));
+}
+
+static void ComputeTextureFeatures(const TextureDirection *texture,
+  const TextureSlots *slots)
+{
+  const unsigned int
+    number_grays = texture->number_grays;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) number_grays; y++)
+  {
+    ssize_t
+      x;
+
+    for (x=0; x < (ssize_t) number_grays; x++)
+    {
+      AccumulateMomentAndCorrelation(texture,slots->correlation,x,y);
+      AccumulateInverseDifferenceAndSum(texture,x,y);
+      AccumulateEntropyAndDensities(texture,x,y);
+    }
+    AccumulateTextureMean(texture,slots->mean,slots->sum_squares,y);
+  }
+  SetTextureCorrelation(texture,slots);
+}
+
+static void AccumulateSumEntropyAndVariance(const TextureDirection *texture,
+  const ssize_t x)
+{
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  FeatureStatistics
+    *const density_xy = texture->density_xy;
+
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Sum entropy.
+  */
+  channel_features[RedPixelChannel].sum_entropy[i]-=
+    density_xy[x].direction[i].red*
+    log2(density_xy[x].direction[i].red);
+  channel_features[GreenPixelChannel].sum_entropy[i]-=
+    density_xy[x].direction[i].green*
+    log2(density_xy[x].direction[i].green);
+  channel_features[BluePixelChannel].sum_entropy[i]-=
+    density_xy[x].direction[i].blue*
+    log2(density_xy[x].direction[i].blue);
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].sum_entropy[i]-=
+      density_xy[x].direction[i].black*
+      log2(density_xy[x].direction[i].black);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].sum_entropy[i]-=
+      density_xy[x].direction[i].alpha*
+      log2(density_xy[x].direction[i].alpha);
+  /*
+    Sum variance.
+  */
+  channel_features[RedPixelChannel].sum_variance[i]+=
+    (x-channel_features[RedPixelChannel].sum_entropy[i])*
+    (x-channel_features[RedPixelChannel].sum_entropy[i])*
+    density_xy[x].direction[i].red;
+  channel_features[GreenPixelChannel].sum_variance[i]+=
+    (x-channel_features[GreenPixelChannel].sum_entropy[i])*
+    (x-channel_features[GreenPixelChannel].sum_entropy[i])*
+    density_xy[x].direction[i].green;
+  channel_features[BluePixelChannel].sum_variance[i]+=
+    (x-channel_features[BluePixelChannel].sum_entropy[i])*
+    (x-channel_features[BluePixelChannel].sum_entropy[i])*
+    density_xy[x].direction[i].blue;
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].sum_variance[i]+=
+      (x-channel_features[BlackPixelChannel].sum_entropy[i])*
+      (x-channel_features[BlackPixelChannel].sum_entropy[i])*
+      density_xy[x].direction[i].black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].sum_variance[i]+=
+      (x-channel_features[AlphaPixelChannel].sum_entropy[i])*
+      (x-channel_features[AlphaPixelChannel].sum_entropy[i])*
+      density_xy[x].direction[i].alpha;
+}
+
+static void ComputeSumFeatures(const TextureDirection *texture)
+{
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  FeatureStatistics
+    *const density_xy = texture->density_xy;
+
+  const unsigned int
+    number_grays = texture->number_grays;
+
+  const ssize_t
+    i = texture->i;
+
+  ssize_t
+    x;
+
+  for (x=2; x < (ssize_t) (2*number_grays); x++)
+  {
+    /*
+      Sum average.
+    */
+    channel_features[RedPixelChannel].sum_average[i]+=
+      x*density_xy[x].direction[i].red;
+    channel_features[GreenPixelChannel].sum_average[i]+=
+      x*density_xy[x].direction[i].green;
+    channel_features[BluePixelChannel].sum_average[i]+=
+      x*density_xy[x].direction[i].blue;
+    if (image->colorspace == CMYKColorspace)
+      channel_features[BlackPixelChannel].sum_average[i]+=
+        x*density_xy[x].direction[i].black;
+    if (image->alpha_trait != UndefinedPixelTrait)
+      channel_features[AlphaPixelChannel].sum_average[i]+=
+        x*density_xy[x].direction[i].alpha;
+    AccumulateSumEntropyAndVariance(texture,x);
+  }
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -646,181 +1064,18 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 #endif
   for (i=0; i < 4; i++)
   {
-    ssize_t
-      y;
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
 
-    for (y=0; y < (ssize_t) number_grays; y++)
-    {
-      ssize_t
-        x;
+    const TextureSlots
+      slots = { &correlation.direction[i], &entropy_x.direction[i],
+        &entropy_xy.direction[i], &entropy_xy1.direction[i],
+        &entropy_xy2.direction[i], &entropy_y.direction[i],
+        &mean.direction[i], &sum_squares.direction[i],
+        &variance.direction[i] };
 
-      for (x=0; x < (ssize_t) number_grays; x++)
-      {
-        /*
-          Angular second moment:  measure of homogeneity of the image.
-        */
-        channel_features[RedPixelChannel].angular_second_moment[i]+=
-          cooccurrence[x][y].direction[i].red*
-          cooccurrence[x][y].direction[i].red;
-        channel_features[GreenPixelChannel].angular_second_moment[i]+=
-          cooccurrence[x][y].direction[i].green*
-          cooccurrence[x][y].direction[i].green;
-        channel_features[BluePixelChannel].angular_second_moment[i]+=
-          cooccurrence[x][y].direction[i].blue*
-          cooccurrence[x][y].direction[i].blue;
-        if (image->colorspace == CMYKColorspace)
-          channel_features[BlackPixelChannel].angular_second_moment[i]+=
-            cooccurrence[x][y].direction[i].black*
-            cooccurrence[x][y].direction[i].black;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          channel_features[AlphaPixelChannel].angular_second_moment[i]+=
-            cooccurrence[x][y].direction[i].alpha*
-            cooccurrence[x][y].direction[i].alpha;
-        /*
-          Correlation: measure of linear-dependencies in the image.
-        */
-        sum[y].direction[i].red+=cooccurrence[x][y].direction[i].red;
-        sum[y].direction[i].green+=cooccurrence[x][y].direction[i].green;
-        sum[y].direction[i].blue+=cooccurrence[x][y].direction[i].blue;
-        if (image->colorspace == CMYKColorspace)
-          sum[y].direction[i].black+=cooccurrence[x][y].direction[i].black;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          sum[y].direction[i].alpha+=cooccurrence[x][y].direction[i].alpha;
-        correlation.direction[i].red+=x*y*cooccurrence[x][y].direction[i].red;
-        correlation.direction[i].green+=x*y*
-          cooccurrence[x][y].direction[i].green;
-        correlation.direction[i].blue+=x*y*
-          cooccurrence[x][y].direction[i].blue;
-        if (image->colorspace == CMYKColorspace)
-          correlation.direction[i].black+=x*y*
-            cooccurrence[x][y].direction[i].black;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          correlation.direction[i].alpha+=x*y*
-            cooccurrence[x][y].direction[i].alpha;
-        /*
-          Inverse Difference Moment.
-        */
-        channel_features[RedPixelChannel].inverse_difference_moment[i]+=
-          cooccurrence[x][y].direction[i].red/((y-x)*(y-x)+1);
-        channel_features[GreenPixelChannel].inverse_difference_moment[i]+=
-          cooccurrence[x][y].direction[i].green/((y-x)*(y-x)+1);
-        channel_features[BluePixelChannel].inverse_difference_moment[i]+=
-          cooccurrence[x][y].direction[i].blue/((y-x)*(y-x)+1);
-        if (image->colorspace == CMYKColorspace)
-          channel_features[BlackPixelChannel].inverse_difference_moment[i]+=
-            cooccurrence[x][y].direction[i].black/((y-x)*(y-x)+1);
-        if (image->alpha_trait != UndefinedPixelTrait)
-          channel_features[AlphaPixelChannel].inverse_difference_moment[i]+=
-            cooccurrence[x][y].direction[i].alpha/((y-x)*(y-x)+1);
-        /*
-          Sum average.
-        */
-        density_xy[y+x+2].direction[i].red+=
-          cooccurrence[x][y].direction[i].red;
-        density_xy[y+x+2].direction[i].green+=
-          cooccurrence[x][y].direction[i].green;
-        density_xy[y+x+2].direction[i].blue+=
-          cooccurrence[x][y].direction[i].blue;
-        if (image->colorspace == CMYKColorspace)
-          density_xy[y+x+2].direction[i].black+=
-            cooccurrence[x][y].direction[i].black;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          density_xy[y+x+2].direction[i].alpha+=
-            cooccurrence[x][y].direction[i].alpha;
-        /*
-          Entropy.
-        */
-        channel_features[RedPixelChannel].entropy[i]-=
-          cooccurrence[x][y].direction[i].red*
-          log2(cooccurrence[x][y].direction[i].red);
-        channel_features[GreenPixelChannel].entropy[i]-=
-          cooccurrence[x][y].direction[i].green*
-          log2(cooccurrence[x][y].direction[i].green);
-        channel_features[BluePixelChannel].entropy[i]-=
-          cooccurrence[x][y].direction[i].blue*
-          log2(cooccurrence[x][y].direction[i].blue);
-        if (image->colorspace == CMYKColorspace)
-          channel_features[BlackPixelChannel].entropy[i]-=
-            cooccurrence[x][y].direction[i].black*
-            log2(cooccurrence[x][y].direction[i].black);
-        if (image->alpha_trait != UndefinedPixelTrait)
-          channel_features[AlphaPixelChannel].entropy[i]-=
-            cooccurrence[x][y].direction[i].alpha*
-            log2(cooccurrence[x][y].direction[i].alpha);
-        /*
-          Information Measures of Correlation.
-        */
-        density_x[x].direction[i].red+=cooccurrence[x][y].direction[i].red;
-        density_x[x].direction[i].green+=cooccurrence[x][y].direction[i].green;
-        density_x[x].direction[i].blue+=cooccurrence[x][y].direction[i].blue;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          density_x[x].direction[i].alpha+=
-            cooccurrence[x][y].direction[i].alpha;
-        if (image->colorspace == CMYKColorspace)
-          density_x[x].direction[i].black+=
-            cooccurrence[x][y].direction[i].black;
-        density_y[y].direction[i].red+=cooccurrence[x][y].direction[i].red;
-        density_y[y].direction[i].green+=cooccurrence[x][y].direction[i].green;
-        density_y[y].direction[i].blue+=cooccurrence[x][y].direction[i].blue;
-        if (image->colorspace == CMYKColorspace)
-          density_y[y].direction[i].black+=
-            cooccurrence[x][y].direction[i].black;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          density_y[y].direction[i].alpha+=
-            cooccurrence[x][y].direction[i].alpha;
-      }
-      mean.direction[i].red+=y*sum[y].direction[i].red;
-      sum_squares.direction[i].red+=y*y*sum[y].direction[i].red;
-      mean.direction[i].green+=y*sum[y].direction[i].green;
-      sum_squares.direction[i].green+=y*y*sum[y].direction[i].green;
-      mean.direction[i].blue+=y*sum[y].direction[i].blue;
-      sum_squares.direction[i].blue+=y*y*sum[y].direction[i].blue;
-      if (image->colorspace == CMYKColorspace)
-        {
-          mean.direction[i].black+=y*sum[y].direction[i].black;
-          sum_squares.direction[i].black+=y*y*sum[y].direction[i].black;
-        }
-      if (image->alpha_trait != UndefinedPixelTrait)
-        {
-          mean.direction[i].alpha+=y*sum[y].direction[i].alpha;
-          sum_squares.direction[i].alpha+=y*y*sum[y].direction[i].alpha;
-        }
-    }
-    /*
-      Correlation: measure of linear-dependencies in the image.
-    */
-    channel_features[RedPixelChannel].correlation[i]=
-      (correlation.direction[i].red-mean.direction[i].red*
-      mean.direction[i].red)/(sqrt(sum_squares.direction[i].red-
-      (mean.direction[i].red*mean.direction[i].red))*sqrt(
-      sum_squares.direction[i].red-(mean.direction[i].red*
-      mean.direction[i].red)));
-    channel_features[GreenPixelChannel].correlation[i]=
-      (correlation.direction[i].green-mean.direction[i].green*
-      mean.direction[i].green)/(sqrt(sum_squares.direction[i].green-
-      (mean.direction[i].green*mean.direction[i].green))*sqrt(
-      sum_squares.direction[i].green-(mean.direction[i].green*
-      mean.direction[i].green)));
-    channel_features[BluePixelChannel].correlation[i]=
-      (correlation.direction[i].blue-mean.direction[i].blue*
-      mean.direction[i].blue)/(sqrt(sum_squares.direction[i].blue-
-      (mean.direction[i].blue*mean.direction[i].blue))*sqrt(
-      sum_squares.direction[i].blue-(mean.direction[i].blue*
-      mean.direction[i].blue)));
-    if (image->colorspace == CMYKColorspace)
-      channel_features[BlackPixelChannel].correlation[i]=
-        (correlation.direction[i].black-mean.direction[i].black*
-        mean.direction[i].black)/(sqrt(sum_squares.direction[i].black-
-        (mean.direction[i].black*mean.direction[i].black))*sqrt(
-        sum_squares.direction[i].black-(mean.direction[i].black*
-        mean.direction[i].black)));
-    if (image->alpha_trait != UndefinedPixelTrait)
-      channel_features[AlphaPixelChannel].correlation[i]=
-        (correlation.direction[i].alpha-mean.direction[i].alpha*
-        mean.direction[i].alpha)/(sqrt(sum_squares.direction[i].alpha-
-        (mean.direction[i].alpha*mean.direction[i].alpha))*sqrt(
-        sum_squares.direction[i].alpha-(mean.direction[i].alpha*
-        mean.direction[i].alpha)));
+    ComputeTextureFeatures(&texture,&slots);
   }
   /*
     Compute more texture features.
@@ -831,72 +1086,11 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 #endif
   for (i=0; i < 4; i++)
   {
-    ssize_t
-      x;
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
 
-    for (x=2; x < (ssize_t) (2*number_grays); x++)
-    {
-      /*
-        Sum average.
-      */
-      channel_features[RedPixelChannel].sum_average[i]+=
-        x*density_xy[x].direction[i].red;
-      channel_features[GreenPixelChannel].sum_average[i]+=
-        x*density_xy[x].direction[i].green;
-      channel_features[BluePixelChannel].sum_average[i]+=
-        x*density_xy[x].direction[i].blue;
-      if (image->colorspace == CMYKColorspace)
-        channel_features[BlackPixelChannel].sum_average[i]+=
-          x*density_xy[x].direction[i].black;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        channel_features[AlphaPixelChannel].sum_average[i]+=
-          x*density_xy[x].direction[i].alpha;
-      /*
-        Sum entropy.
-      */
-      channel_features[RedPixelChannel].sum_entropy[i]-=
-        density_xy[x].direction[i].red*
-        log2(density_xy[x].direction[i].red);
-      channel_features[GreenPixelChannel].sum_entropy[i]-=
-        density_xy[x].direction[i].green*
-        log2(density_xy[x].direction[i].green);
-      channel_features[BluePixelChannel].sum_entropy[i]-=
-        density_xy[x].direction[i].blue*
-        log2(density_xy[x].direction[i].blue);
-      if (image->colorspace == CMYKColorspace)
-        channel_features[BlackPixelChannel].sum_entropy[i]-=
-          density_xy[x].direction[i].black*
-          log2(density_xy[x].direction[i].black);
-      if (image->alpha_trait != UndefinedPixelTrait)
-        channel_features[AlphaPixelChannel].sum_entropy[i]-=
-          density_xy[x].direction[i].alpha*
-          log2(density_xy[x].direction[i].alpha);
-      /*
-        Sum variance.
-      */
-      channel_features[RedPixelChannel].sum_variance[i]+=
-        (x-channel_features[RedPixelChannel].sum_entropy[i])*
-        (x-channel_features[RedPixelChannel].sum_entropy[i])*
-        density_xy[x].direction[i].red;
-      channel_features[GreenPixelChannel].sum_variance[i]+=
-        (x-channel_features[GreenPixelChannel].sum_entropy[i])*
-        (x-channel_features[GreenPixelChannel].sum_entropy[i])*
-        density_xy[x].direction[i].green;
-      channel_features[BluePixelChannel].sum_variance[i]+=
-        (x-channel_features[BluePixelChannel].sum_entropy[i])*
-        (x-channel_features[BluePixelChannel].sum_entropy[i])*
-        density_xy[x].direction[i].blue;
-      if (image->colorspace == CMYKColorspace)
-        channel_features[BlackPixelChannel].sum_variance[i]+=
-          (x-channel_features[BlackPixelChannel].sum_entropy[i])*
-          (x-channel_features[BlackPixelChannel].sum_entropy[i])*
-          density_xy[x].direction[i].black;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        channel_features[AlphaPixelChannel].sum_variance[i]+=
-          (x-channel_features[AlphaPixelChannel].sum_entropy[i])*
-          (x-channel_features[AlphaPixelChannel].sum_entropy[i])*
-          density_xy[x].direction[i].alpha;
-    }
+    ComputeSumFeatures(&texture);
   }
   /*
     Compute more texture features.
@@ -936,18 +1130,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         /*
           Sum average / Difference Variance.
         */
-        density_xy[MagickAbsoluteValue(y-x)].direction[i].red+=
-          cooccurrence[x][y].direction[i].red;
-        density_xy[MagickAbsoluteValue(y-x)].direction[i].green+=
-          cooccurrence[x][y].direction[i].green;
-        density_xy[MagickAbsoluteValue(y-x)].direction[i].blue+=
-          cooccurrence[x][y].direction[i].blue;
-        if (image->colorspace == CMYKColorspace)
-          density_xy[MagickAbsoluteValue(y-x)].direction[i].black+=
-            cooccurrence[x][y].direction[i].black;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          density_xy[MagickAbsoluteValue(y-x)].direction[i].alpha+=
-            cooccurrence[x][y].direction[i].alpha;
+        AddFeatureStatistics(image,
+          &density_xy[MagickAbsoluteValue(y-x)].direction[i],
+          &cooccurrence[x][y].direction[i]);
         /*
           Information Measures of Correlation.
         */
@@ -1030,13 +1215,8 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
       /*
         Difference variance.
       */
-      variance.direction[i].red+=density_xy[x].direction[i].red;
-      variance.direction[i].green+=density_xy[x].direction[i].green;
-      variance.direction[i].blue+=density_xy[x].direction[i].blue;
-      if (image->colorspace == CMYKColorspace)
-        variance.direction[i].black+=density_xy[x].direction[i].black;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        variance.direction[i].alpha+=density_xy[x].direction[i].alpha;
+      AddFeatureStatistics(image,&variance.direction[i],
+        &density_xy[x].direction[i]);
       sum_squares.direction[i].red+=density_xy[x].direction[i].red*
         density_xy[x].direction[i].red;
       sum_squares.direction[i].green+=density_xy[x].direction[i].green*
@@ -1072,30 +1252,10 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
       /*
         Information Measures of Correlation.
       */
-      entropy_x.direction[i].red-=(density_x[x].direction[i].red*
-        log2(density_x[x].direction[i].red));
-      entropy_x.direction[i].green-=(density_x[x].direction[i].green*
-        log2(density_x[x].direction[i].green));
-      entropy_x.direction[i].blue-=(density_x[x].direction[i].blue*
-        log2(density_x[x].direction[i].blue));
-      if (image->colorspace == CMYKColorspace)
-        entropy_x.direction[i].black-=(density_x[x].direction[i].black*
-          log2(density_x[x].direction[i].black));
-      if (image->alpha_trait != UndefinedPixelTrait)
-        entropy_x.direction[i].alpha-=(density_x[x].direction[i].alpha*
-          log2(density_x[x].direction[i].alpha));
-      entropy_y.direction[i].red-=(density_y[x].direction[i].red*
-        log2(density_y[x].direction[i].red));
-      entropy_y.direction[i].green-=(density_y[x].direction[i].green*
-        log2(density_y[x].direction[i].green));
-      entropy_y.direction[i].blue-=(density_y[x].direction[i].blue*
-        log2(density_y[x].direction[i].blue));
-      if (image->colorspace == CMYKColorspace)
-        entropy_y.direction[i].black-=(density_y[x].direction[i].black*
-          log2(density_y[x].direction[i].black));
-      if (image->alpha_trait != UndefinedPixelTrait)
-        entropy_y.direction[i].alpha-=(density_y[x].direction[i].alpha*
-          log2(density_y[x].direction[i].alpha));
+      SubtractFeatureEntropy(image,&entropy_x.direction[i],
+        &density_x[x].direction[i]);
+      SubtractFeatureEntropy(image,&entropy_y.direction[i],
+        &density_y[x].direction[i]);
     }
     /*
       Difference variance.
@@ -1198,14 +1358,8 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
           */
           if (((y-x) == z) || ((x-y) == z))
             {
-              pixel.direction[i].red+=cooccurrence[x][y].direction[i].red;
-              pixel.direction[i].green+=cooccurrence[x][y].direction[i].green;
-              pixel.direction[i].blue+=cooccurrence[x][y].direction[i].blue;
-              if (image->colorspace == CMYKColorspace)
-                pixel.direction[i].black+=cooccurrence[x][y].direction[i].black;
-              if (image->alpha_trait != UndefinedPixelTrait)
-                pixel.direction[i].alpha+=
-                  cooccurrence[x][y].direction[i].alpha;
+              AddFeatureStatistics(image,&pixel.direction[i],
+                &cooccurrence[x][y].direction[i]);
             }
           /*
             Maximum Correlation Coefficient.
