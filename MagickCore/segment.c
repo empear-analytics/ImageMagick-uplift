@@ -1623,15 +1623,77 @@ static Cluster *AppendCluster(Cluster *cluster)
   return(cluster);
 }
 
+typedef struct _DynamicThresholdTail
+{
+  Cluster
+    *head;
+
+  double
+    cluster_threshold;
+
+  PixelInfo
+    *pixel;
+} DynamicThresholdTail;
+
+static void FinishDynamicThreshold(const DynamicThresholdTail *tail,
+  ssize_t **histogram,short **extrema)
+{
+  Cluster
+    *head = tail->head;
+
+  const double
+    cluster_threshold = tail->cluster_threshold;
+
+  PixelInfo
+    *const pixel = tail->pixel;
+
+  Cluster
+    *cluster,
+    *last_cluster,
+    *next_cluster;
+
+  ssize_t
+    count;
+
+  count=0;
+  last_cluster=head;
+  next_cluster=head;
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
+  {
+    next_cluster=cluster->next;
+    if (IsClusterAboveThreshold(cluster,count,cluster_threshold) != MagickFalse)
+      {
+        /*
+          Initialize cluster.
+        */
+        InitializeCluster(cluster,count);
+        count++;
+        last_cluster=cluster;
+        continue;
+      }
+    /*
+      Delete cluster.
+    */
+    head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
+    cluster=(Cluster *) RelinquishMagickMemory(cluster);
+  }
+  ChooseDynamicThreshold(count,head,pixel);
+  /*
+    Relinquish resources.
+  */
+  RelinquishDynamicThresholdResources(head,histogram,extrema);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
 {
   Cluster
     *cluster,
-    *head,
-    *last_cluster,
-    *next_cluster;
+    *head;
+
+  DynamicThresholdTail
+    tail;
 
   ExtentPacket
     blue,
@@ -1736,33 +1798,10 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   /*
     Remove clusters that do not meet minimum cluster threshold.
   */
-  count=0;
-  last_cluster=head;
-  next_cluster=head;
-  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
-  {
-    next_cluster=cluster->next;
-    if (IsClusterAboveThreshold(cluster,count,cluster_threshold) != MagickFalse)
-      {
-        /*
-          Initialize cluster.
-        */
-        InitializeCluster(cluster,count);
-        count++;
-        last_cluster=cluster;
-        continue;
-      }
-    /*
-      Delete cluster.
-    */
-    head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
-    cluster=(Cluster *) RelinquishMagickMemory(cluster);
-  }
-  ChooseDynamicThreshold(count,head,pixel);
-  /*
-    Relinquish resources.
-  */
-  RelinquishDynamicThresholdResources(head,histogram,extrema);
+  tail.head=head;
+  tail.cluster_threshold=cluster_threshold;
+  tail.pixel=pixel;
+  FinishDynamicThreshold(&tail,histogram,extrema);
   return(MagickTrue);
 }
 
