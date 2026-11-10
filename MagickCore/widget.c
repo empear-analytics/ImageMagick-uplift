@@ -7107,6 +7107,53 @@ static int FindListBrowserCursor(XFontStruct *font_info,
   return(i);
 }
 
+typedef struct _ListBrowserClick
+{
+  Display
+    *display;
+
+  XWindowInfo
+    *window_info;
+
+  XEvent
+    event;
+
+  Time
+    click_time;
+} ListBrowserClick;
+
+static XWidgetInfo HighlightListBrowserReply(const ListBrowserClick *click,
+  char *primary_selection,XWidgetInfo reply_info)
+{
+  Display
+    *const display = click->display;
+
+  XWindowInfo
+    *const window_info = click->window_info;
+
+  const XEvent
+    event = click->event;
+
+  const Time
+    click_time = click->click_time;
+
+  if (event.xbutton.time > (click_time+(unsigned long) DoubleClick))
+    reply_info.highlight=MagickFalse;
+  else
+    {
+      /*
+        Become the XA_PRIMARY selection owner.
+      */
+      (void) CopyMagickString(primary_selection,reply_info.text,
+        MagickPathExtent);
+      (void) XSetSelectionOwner(display,XA_PRIMARY,window_info->id,
+        event.xbutton.time);
+      reply_info.highlight=XGetSelectionOwner(display,XA_PRIMARY) ==
+        window_info->id ? MagickTrue : MagickFalse;
+    }
+  return(reply_info);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -7528,26 +7575,21 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             static Time
               click_time;
 
+            ListBrowserClick
+              click;
+
             /*
               Move text cursor to position of button press.
             */
             x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
             i=FindListBrowserCursor(font_info,reply_info,x);
             reply_info.cursor=reply_info.marker+i-1;
-            if (event.xbutton.time > (click_time+(unsigned long) DoubleClick))
-              reply_info.highlight=MagickFalse;
-            else
-              {
-                /*
-                  Become the XA_PRIMARY selection owner.
-                */
-                (void) CopyMagickString(primary_selection,reply_info.text,
-                  MagickPathExtent);
-                (void) XSetSelectionOwner(display,XA_PRIMARY,window_info->id,
-                  event.xbutton.time);
-                reply_info.highlight=XGetSelectionOwner(display,XA_PRIMARY) ==
-                  window_info->id ? MagickTrue : MagickFalse;
-              }
+            click.display=display;
+            click.window_info=window_info;
+            click.event=event;
+            click.click_time=click_time;
+            reply_info=HighlightListBrowserReply(&click,primary_selection,
+              reply_info);
             XDrawMatteText(display,window_info,&reply_info);
             click_time=event.xbutton.time;
             break;
