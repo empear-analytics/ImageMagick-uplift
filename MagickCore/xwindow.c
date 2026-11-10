@@ -6029,6 +6029,9 @@ typedef struct _XImageRowSource
   Image
     *canvas;
 
+  unsigned long
+    *pixels;
+
   XStandardColormap
     *map_info;
 } XImageRowSource;
@@ -6113,6 +6116,38 @@ static unsigned char *XPackColormapped4BitRowLSB(const Image *canvas,
         nibble=0;
         break;
       }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackColormappedMultiByteRowLSB(
+  const XImageRowSource *source,const unsigned int bytes_per_pixel,
+  const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  int
+    k;
+
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)];
+    for (k=0; k < (int) bytes_per_pixel; k++)
+    {
+      *q++=(unsigned char) (pixel & 0xff);
+      pixel>>=8;
     }
     p+=(ptrdiff_t) GetPixelChannels(canvas);
   }
@@ -6317,6 +6352,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   x=0;
   canvas_view=AcquireVirtualCacheView(canvas,exception);
   row_source.canvas=canvas;
+  row_source.pixels=pixels;
   row_source.map_info=map_info;
   if (ximage->format == XYBitmap)
     {
@@ -6436,9 +6472,6 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
         }
         default:
         {
-          int
-            k;
-
           unsigned int
             bytes_per_pixel;
 
@@ -6452,16 +6485,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
               canvas->columns,1,exception);
             if (p == (const Quantum *) NULL)
               break;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)];
-              for (k=0; k < (int) bytes_per_pixel; k++)
-              {
-                *q++=(unsigned char) (pixel & 0xff);
-                pixel>>=8;
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
+            q=XPackColormappedMultiByteRowLSB(&row_source,bytes_per_pixel,p,q);
             q+=(ptrdiff_t) scanline_pad;
           }
           break;
