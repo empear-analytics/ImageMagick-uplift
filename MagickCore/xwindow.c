@@ -5873,6 +5873,12 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsGammaCorrected(void)
+{
+  return(((red_gamma != 1.0) || (green_gamma != 1.0) ||
+    (blue_gamma != 1.0)) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsRedHigh32BitMap(const XImage *ximage,
   const XStandardColormap *map_info)
 {
@@ -6320,8 +6326,7 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
                   canvas->columns,1,exception);
                 if (p == (const Quantum *) NULL)
                   break;
-                if ((red_gamma != 1.0) || (green_gamma != 1.0) ||
-                    (blue_gamma != 1.0))
+                if (IsGammaCorrected() != MagickFalse)
                   {
                     /*
                       Gamma correct canvas.
@@ -6361,8 +6366,7 @@ static void XMakeImageLSBFirst(const XResourceInfo *resource_info,
                     canvas->columns,1,exception);
                   if (p == (const Quantum *) NULL)
                     break;
-                  if ((red_gamma != 1.0) || (green_gamma != 1.0) ||
-                      (blue_gamma != 1.0))
+                  if (IsGammaCorrected() != MagickFalse)
                     {
                       /*
                         Gamma correct canvas.
