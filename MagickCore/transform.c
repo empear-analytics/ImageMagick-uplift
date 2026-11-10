@@ -1170,7 +1170,7 @@ MagickExport Image *ExcerptImage(const Image *image,
       geometry->width,1,exception);
     q=GetCacheViewAuthenticPixels(excerpt_view,0,y,excerpt_image->columns,1,
       exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsPixelRowMissing(p,q) != MagickFalse)
       {
         status=MagickFalse;
         continue;
