@@ -4282,6 +4282,23 @@ static void SetMorphologyKernelOffset(const MorphologyMethod method,
   }
 }
 
+static size_t *AcquireMorphologyChanges(void)
+{
+  size_t
+    *changes;
+
+  ssize_t
+    j;
+
+  changes=(size_t *) AcquireQuantumMemory(GetOpenMPMaximumThreads(),
+    sizeof(*changes));
+  if (changes == (size_t *) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    changes[j]=0;
+  return(changes);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4337,12 +4354,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   offset.y=0;
   SetMorphologyKernelOffset(method,kernel,&offset,exception);
   changed=0;
-  changes=(size_t *) AcquireQuantumMemory(GetOpenMPMaximumThreads(),
-    sizeof(*changes));
-  if (changes == (size_t *) NULL)
-    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
-    changes[j]=0;
+  changes=AcquireMorphologyChanges();
   if ((method == ConvolveMorphology) && (kernel->width == 1))
     {
       ssize_t
