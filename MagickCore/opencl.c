@@ -901,6 +901,34 @@ static void SetOpenCLBenchmarkNamePlatformAttribute(
   }
 }
 
+static void SetOpenCLBenchmarkAttribute(
+  MagickCLDeviceBenchmark *device_benchmark,char *keyword,char *token)
+{
+  switch (*keyword)
+  {
+    case 'M':
+    case 'm':
+    {
+      if (LocaleCompare((char *) keyword,"maxClockFrequency") == 0)
+        {
+          device_benchmark->max_clock_frequency=StringToInteger(token);
+          break;
+        }
+      if (LocaleCompare((char *) keyword,"maxComputeUnits") == 0)
+        {
+          device_benchmark->max_compute_units=StringToInteger(token);
+          break;
+        }
+      break;
+    }
+    default:
+    {
+      SetOpenCLBenchmarkNamePlatformAttribute(device_benchmark,keyword,token);
+      break;
+    }
+  }
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -999,29 +1027,7 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
       continue;
     (void) GetNextToken(q,&q,extent,token);
     (void) GetNextToken(q,&q,extent,token);
-    switch (*keyword)
-    {
-      case 'M':
-      case 'm':
-      {
-        if (LocaleCompare((char *) keyword,"maxClockFrequency") == 0)
-          {
-            device_benchmark->max_clock_frequency=StringToInteger(token);
-            break;
-          }
-        if (LocaleCompare((char *) keyword,"maxComputeUnits") == 0)
-          {
-            device_benchmark->max_compute_units=StringToInteger(token);
-            break;
-          }
-        break;
-      }
-      default:
-      {
-        SetOpenCLBenchmarkNamePlatformAttribute(device_benchmark,keyword,token);
-        break;
-      }
-    }
+    SetOpenCLBenchmarkAttribute(device_benchmark,keyword,token);
   }
   token=(char *) RelinquishMagickMemory(token);
   device_benchmark=RelinquishDeviceBenchmark(device_benchmark);
