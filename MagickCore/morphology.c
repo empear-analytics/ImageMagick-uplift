@@ -1918,7 +1918,7 @@ static KernelInfo *AcquireConvexHullKernel(KernelInfo *kernel,
   return(kernel);
 }
 
-static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
+static KernelInfo *AcquireCyclicSkeletonKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
   switch ( (int) args->rho ) {
@@ -1947,6 +1947,16 @@ static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
       kernel->next->type = type;
       ExpandRotateKernelInfo(kernel, 90.0); /* 4 rotations of the 2 kernels */
       break;
+   }
+  return(kernel);
+}
+
+static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch ( (int) args->rho ) {
+    default:
+      return(AcquireCyclicSkeletonKernel(kernel,type,args,exception));
     case 3:
       /* Dan Bloomberg Skeleton, from his paper on 3x3 thinning SE's
       ** "Connectivity-Preserving Morphological Image Transformations"
