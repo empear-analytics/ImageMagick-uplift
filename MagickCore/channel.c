@@ -727,13 +727,13 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
               return(destination_image);
             }
         destination_channel=(PixelChannel) i;
-        if (image->colorspace != UndefinedColorspace)
-          if (RegisterDestinationChannel(destination_image,destination_channel,
-                token,exception) == MagickFalse)
-            {
-              destination_image=DestroyImageList(destination_image);
-              return(destination_image);
-            }
+        if ((image->colorspace != UndefinedColorspace) &&
+            (RegisterDestinationChannel(destination_image,destination_channel,
+              token,exception) == MagickFalse))
+          {
+            destination_image=DestroyImageList(destination_image);
+            return(destination_image);
+          }
         channel_mask=AddChannelMaskOption(channel_mask,token);
         (void) GetNextToken(p,&p,MagickPathExtent,token);
         break;
