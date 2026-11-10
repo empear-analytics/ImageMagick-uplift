@@ -2486,44 +2486,41 @@ MagickPrivate MagickBooleanType TransformImage(Image **image,
 */
 #define TransposeImageTag  "Transpose/Image"
 
-MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
+typedef struct _TransposeRows
 {
-  CacheView
-    *image_view,
-    *transpose_view;
+  const Image
+    *image;
 
   Image
     *transpose_image;
 
-  MagickBooleanType
-    status;
+  CacheView
+    *image_view,
+    *transpose_view;
 
-  MagickOffsetType
-    progress;
+  ExceptionInfo
+    *exception;
+} TransposeRows;
 
-  RectangleInfo
-    page;
+static MagickBooleanType TransposeImageRows(const TransposeRows *rows,
+  MagickBooleanType status,MagickOffsetType progress)
+{
+  const Image
+    *const image = rows->image;
+
+  Image
+    *const transpose_image = rows->transpose_image;
+
+  CacheView
+    *const image_view = rows->image_view,
+    *const transpose_view = rows->transpose_view;
+
+  ExceptionInfo
+    *const exception = rows->exception;
 
   ssize_t
     y;
 
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  transpose_image=CloneImage(image,image->rows,image->columns,MagickTrue,
-    exception);
-  if (transpose_image == (Image *) NULL)
-    return((Image *) NULL);
-  /*
-    Transpose image.
-  */
-  status=MagickTrue;
-  progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  transpose_view=AcquireAuthenticCacheView(transpose_image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(progress,status) \
     magick_number_threads(image,transpose_image,image->rows,2)
@@ -2566,6 +2563,53 @@ MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
         SetTransformProgress(image,TransposeImageTag,progress,&status);
       }
   }
+  return(status);
+}
+
+MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view,
+    *transpose_view;
+
+  Image
+    *transpose_image;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  RectangleInfo
+    page;
+
+  TransposeRows
+    rows;
+
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  transpose_image=CloneImage(image,image->rows,image->columns,MagickTrue,
+    exception);
+  if (transpose_image == (Image *) NULL)
+    return((Image *) NULL);
+  /*
+    Transpose image.
+  */
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireVirtualCacheView(image,exception);
+  transpose_view=AcquireAuthenticCacheView(transpose_image,exception);
+  rows.image=image;
+  rows.transpose_image=transpose_image;
+  rows.image_view=image_view;
+  rows.transpose_view=transpose_view;
+  rows.exception=exception;
+  status=TransposeImageRows(&rows,status,progress);
   transpose_view=DestroyCacheView(transpose_view);
   image_view=DestroyCacheView(image_view);
   transpose_image->type=image->type;
