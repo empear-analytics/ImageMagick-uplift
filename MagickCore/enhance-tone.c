@@ -2330,9 +2330,29 @@ static size_t GetHaldLevel(const Image *hald_image)
 
 #define HaldClutImageTag  "Clut/Image"
 
-MagickExport MagickBooleanType HaldClutImage(Image *image,
-  const Image *hald_image,ExceptionInfo *exception)
+typedef struct _HaldClutPass
 {
+  Image
+    *image;
+
+  const Image
+    *hald_image;
+
+  ExceptionInfo
+    *exception;
+} HaldClutPass;
+
+static MagickBooleanType HaldClutImagePixels(const HaldClutPass *pass)
+{
+  Image
+    *const image = pass->image;
+
+  const Image
+    *const hald_image = pass->hald_image;
+
+  ExceptionInfo
+    *const exception = pass->exception;
+
   CacheView
     *hald_view,
     *image_view;
@@ -2356,17 +2376,6 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
   ssize_t
     y;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  assert(hald_image != (Image *) NULL);
-  assert(hald_image->signature == MagickCoreSignature);
-  if (PrepareHaldClutImage(image,hald_image,exception) == MagickFalse)
-    return(MagickFalse);
-  /*
-    Hald clut image.
-  */
   status=MagickTrue;
   progress=0;
   level=GetHaldLevel(hald_image);
@@ -2413,6 +2422,33 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
   }
   hald_view=DestroyCacheView(hald_view);
   image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport MagickBooleanType HaldClutImage(Image *image,
+  const Image *hald_image,ExceptionInfo *exception)
+{
+  HaldClutPass
+    pass;
+
+  MagickBooleanType
+    status;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  assert(hald_image != (Image *) NULL);
+  assert(hald_image->signature == MagickCoreSignature);
+  if (PrepareHaldClutImage(image,hald_image,exception) == MagickFalse)
+    return(MagickFalse);
+  /*
+    Hald clut image.
+  */
+  pass.image=image;
+  pass.hald_image=hald_image;
+  pass.exception=exception;
+  status=HaldClutImagePixels(&pass);
   return(status);
 }
 
