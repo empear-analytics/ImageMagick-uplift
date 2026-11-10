@@ -791,13 +791,7 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
     displacement=degrees*(double) (x-width/2.0);
     if (displacement == 0.0)
       continue;
-    if (displacement > 0.0)
-      direction=RIGHT;
-    else
-      {
-        displacement*=(-1.0);
-        direction=LEFT;
-      }
+    SelectShearDirection(&displacement,&direction);
     step=CastDoubleToSsizeT(floor((double) displacement));
     area=(double) (displacement-step);
     step++;
