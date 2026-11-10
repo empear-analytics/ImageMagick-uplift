@@ -1621,6 +1621,47 @@ static void RelinquishInverseFourierMemory(MemoryInfo *magnitude_info,
     inverse_info=RelinquishVirtualMemory(inverse_info);
 }
 
+typedef struct _InverseFourierMemory
+{
+  MemoryInfo
+    **magnitude_info,
+    **phase_info,
+    **inverse_info;
+} InverseFourierMemory;
+
+static MagickBooleanType AcquireInverseFourierMemory(
+  const FourierInfo *fourier_info,const InverseImagePair *images,
+  const InverseFourierMemory *targets,ExceptionInfo *exception)
+{
+  double
+    *inverse_pixels,
+    *magnitude_pixels,
+    *phase_pixels;
+
+  MemoryInfo
+    **const magnitude_info = targets->magnitude_info,
+    **const phase_info = targets->phase_info,
+    **const inverse_info = targets->inverse_info;
+
+  (*magnitude_info)=AcquireVirtualMemory(fourier_info->width,
+    fourier_info->height*sizeof(*magnitude_pixels));
+  (*phase_info)=AcquireVirtualMemory(fourier_info->width,fourier_info->height*
+    sizeof(*phase_pixels));
+  (*inverse_info)=AcquireVirtualMemory(fourier_info->width,
+    (fourier_info->height/2+1)*sizeof(*inverse_pixels));
+  if (IsFourierMemoryMissing((*magnitude_info),(*phase_info),
+      (*inverse_info)) != MagickFalse)
+    {
+      RelinquishInverseFourierMemory((*magnitude_info),(*phase_info),
+        (*inverse_info));
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",
+        images->magnitude_image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   const InverseImagePair *images,fftw_complex *fourier_pixels,
   ExceptionInfo *exception)
@@ -1644,6 +1685,9 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
     *magnitude_info,
     *phase_info;
 
+  const InverseFourierMemory
+    targets = { &magnitude_info, &phase_info, &inverse_info };
+
   ssize_t
     i,
     x,
@@ -1652,21 +1696,9 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   /*
     Inverse fourier - read image and break down into a double array.
   */
-  magnitude_info=AcquireVirtualMemory(fourier_info->width,fourier_info->height*
-    sizeof(*magnitude_pixels));
-  phase_info=AcquireVirtualMemory(fourier_info->width,fourier_info->height*
-    sizeof(*phase_pixels));
-  inverse_info=AcquireVirtualMemory(fourier_info->width,(fourier_info->height/2+
-    1)*sizeof(*inverse_pixels));
-  if (IsFourierMemoryMissing(magnitude_info,phase_info,inverse_info) !=
+  if (AcquireInverseFourierMemory(fourier_info,images,&targets,exception) ==
       MagickFalse)
-    {
-      RelinquishInverseFourierMemory(magnitude_info,phase_info,inverse_info);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",
-        images->magnitude_image->filename);
-      return(MagickFalse);
-    }
+    return(MagickFalse);
   magnitude_pixels=(double *) GetVirtualMemoryBlob(magnitude_info);
   phase_pixels=(double *) GetVirtualMemoryBlob(phase_info);
   inverse_pixels=(double *) GetVirtualMemoryBlob(inverse_info);
