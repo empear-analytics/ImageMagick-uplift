@@ -6464,6 +6464,19 @@ addresses of written variables, not copies of read-only values.
    members took the values the assignments gave them, member by member, so a swapped
    pair of same-typed members cannot slip through. Otherwise revert the step.
 7. One function's fills, however many, go in one commit (one recipe, one function).
+8. *Hoisted form.* A fill that does not follow its declaration (the struct is declared
+   among the function's declarations and filled further down, in a loop body or a
+   branch, directly before its one call) may become a `const` initialiser too, when
+   steps 1 to 3 hold for the run of assignments (every member once, in declaration
+   order; the struct used nowhere but as `&name` in that call, to a pointer-to-`const`
+   parameter) and each value is fixed where the declaration will stand: (a) every value
+   is `(&v)`, the address of a variable `v` the function declares at its top (not in a
+   block inside it): the declaration moves to the end of the function's declarations,
+   after every such `v`'s; (b) every value is a plain identifier that no statement
+   between the top of the innermost block holding the run and the run writes, or
+   passes by address (checked by reading, `#if` text included): the declaration moves
+   to the top of that block. The run of assignments goes; the call stays. Step 6 holds
+   unchanged: `obj_identical.sh` must print `IDENTICAL`, otherwise revert the step.
 
 **Before:**
 
@@ -6500,6 +6513,17 @@ addresses of written variables, not copies of read-only values.
   callee does not.
 - Identical object code under the oracle build's flags (step 6) proves it for this build
   on every input, reached or not.
+- Step 8. (a) An object's address is constant over its lifetime (C11 6.2.4p2), and a
+  variable declared at the function's top lives until the function returns: every
+  execution of the run stored the same addresses, which the initialiser now stores once,
+  and nothing writes the struct in between (it is `const`, and before it was assigned
+  only by the run). (b) A block's declarations are initialised each time execution
+  reaches them (C11 6.8p3), once per iteration of a loop whose body is the block or
+  holds it, as the run was executed; the identifiers hold at the top of the block the
+  values they hold at the run, since nothing between writes them or lets a callee write
+  them. In both forms the call reads the members it read before. The declaration moves
+  only past other declarations or to a block's top, so `-Wdeclaration-after-statement`
+  is met, and no preprocessor line moves.
 - The step shortens the function's text; it does not hide any of it: each value is
   still written, once, where it was written before, and a reader sees the members and
   their values side by side.
@@ -6511,6 +6535,14 @@ addresses of written variables, not copies of read-only values.
 `top_border` and `bottom_border` fills (twelve and eleven assignments) after Recipe PC
 and PS left the function in Large Method; a probe of both: 8.73 to 8.83 with `IDENTICAL`
 object code. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+*Hoisted form* (step 8): 2026-11-10, from `layer.c`'s `OptimizeLayerFrames` (campaign A,
+W16 lane b), whose `DuplicateFrameTargets targets` and `DisposeChoiceTargets
+choice_targets` (addresses of the function's locals, refilled on every frame) and
+`DuplicateFrameTrial trial` (six identifiers, filled after the previous-disposal trial
+in the loop's `else` block) were left by Recipe I as runs far from their
+declarations; a probe of all three 7.92 to 7.98 with `IDENTICAL` object code, the
+function 232 to 219 lines. Added by Claude Code (Claude Opus 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
 
 ---
 
@@ -10010,3 +10042,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | KT | Replace a Keyed Label Run with a Table Lookup: a `switch` on an integer whose groups each assign one variable from the same call with one constant argument, under sparse integer labels, with `default:` sharing one group (form A) or in a group of its own that leaves the function (form B), becomes a `static const` table of `{ key, constant }` elements (one shared `typedef struct`) and a lookup loop that ends on the matching element, or on the last element (form A, the `default:` group placed last) or past the table (form B, which then runs the `default:` body); table checked by script; guard `WARN` with `0` and `1` added once each (form A); string constants only read as text | `morphology.c`'s `AcquireThinSEKernel` (cc 25, 78 lines), `AcquireLaplacianKernel` (cc 11) and `AcquireLineJunctionsKernel` (cc 9), campaign A, W16 lane d: label runs that TB's forms refuse (the function goes on after the `switch`; sparse keys); probes: each leaves *Complex Method* with no new function, the file flat at 3.10 (17 to 14 *Complex Method* functions), Laplacian 68 reaching cases 0 diverged | owner |
 | 2026-11-10 | NEW | EC | Name an Equality Chain as a Label Set: a controlling expression that is a chain of logical-or operators whose every operand compares one side-effect-free integer expression `e` with a different constant by `==` becomes `Name(e) != MagickFalse`, `Name` a `static inline` predicate of one `const T v` parameter whose body is `switch (v)` with the constants as labels in the chain's order, `return(MagickTrue);`, `default: break;`, and `return(MagickFalse);`. *Careful* gives the argument (C11 6.5.14, 6.8.4.2p5; duplicate labels do not compile); the new function is a label run (owner, 2026-11-07), which Recipe TB may later turn into a table | `opencl.c`'s `CompileOpenCLKernel` (campaign A, W16 lane a, wide build): its device-name test, ten `*ptr == c` operands, is the file's largest *Complex Conditional* (nine) and most of its cc 17. Recipe P leaves the chain in a predicate of cc 12 that is no label run (3.24 to 3.52 with that new finding); this recipe 3.24 to 3.52 with only the label run, 3.62 with TB after it | owner |
 | 2026-11-10 | AMEND | TB | Membership form, *character labels*: the labels may all be character constants of the basic character set when `n` is a `char` parameter (a predicate Recipe EC made); the table is then of `char`, and the guard sees each character constant move once (`OK`, or `WARN` listing only the loop's `0` as added). *Careful* gives the argument (C11 6.8.4.2p5, 6.2.5p3: each value is non-negative and fits in `char`, so the element holds it and `==` compares the values the `case` compared). Still six steps | `opencl.c`'s `IsIllegalFileNameCharacter` (campaign A, W16 lane a, wide build), the ten-label predicate Recipe EC made from `CompileOpenCLKernel`'s device-name test (cc 13, a label run); a probe 3.52 to 3.62, no finding left on it | owner |
+| 2026-11-10 | AMEND | FI | Step 8, *hoisted form*: a member-by-member fill that stands far from its declaration (in a loop body or a branch, directly before its one call) becomes a `const` initialiser when every value is `(&v)` of a variable declared at the function's top (the declaration moves to the end of the function's declarations) or every value is an identifier nothing between the top of the innermost block holding the run and the run writes or passes by address (the declaration moves to that block's top); steps 1 to 3 hold for the run, step 6's `IDENTICAL` is still required. *Careful* gives the argument (C11 6.2.4p2: addresses are constant over the lifetime; C11 6.8p3: block declarations are initialised each time they are reached) | `layer.c`'s `OptimizeLayerFrames` (campaign A, W16 lane b): `targets`, `choice_targets` and `trial`, thirteen assignments refilled per frame; a probe 7.92 to 7.98, `obj_identical.sh` `IDENTICAL`, oracle 45 cases 0 diverged | owner |
