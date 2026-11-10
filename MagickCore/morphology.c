@@ -402,6 +402,18 @@ static MagickBooleanType IsKernelArrayReading(const KernelInfo *kernel,
     MagickTrue : MagickFalse);
 }
 
+static KernelInfo *FinishKernelArray(KernelInfo *kernel,
+  const MagickStatusType flags)
+{
+  /* check that we received at least one real (non-nan) value! */
+  if (kernel->minimum == MagickMaximumValue)
+    return(DestroyKernelInfo(kernel));
+
+  ExpandKernelByFlags(kernel,flags);
+
+  return(kernel);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -484,13 +496,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
     return(DestroyKernelInfo(kernel));
 #endif
 
-  /* check that we received at least one real (non-nan) value! */
-  if (kernel->minimum == MagickMaximumValue)
-    return(DestroyKernelInfo(kernel));
-
-  ExpandKernelByFlags(kernel,flags);
-
-  return(kernel);
+  return(FinishKernelArray(kernel,flags));
 }
 
 static GeometryInfo DefaultDistanceScale(const MagickStatusType flags,
