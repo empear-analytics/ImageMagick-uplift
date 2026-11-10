@@ -6125,15 +6125,32 @@ static Image *FinishFxImage (FxInfo * pfx, MagickBooleanType status,
 
 #define FxImageTag  "FxNew/Image"
 
-MagickExport Image *FxImage(const Image *image,const char *expression,
-  ExceptionInfo *exception)
+typedef struct _FxImageInputs
 {
-  CacheView
-    *fx_view,
-    *image_view;
+  const Image
+    *image;
 
   Image
     *fx_image;
+
+  FxInfo
+    *pfx;
+} FxImageInputs;
+
+static Image *ApplyFxImageRows (const FxImageInputs *fx_in)
+{
+  const Image
+    *const image = fx_in->image;
+
+  Image
+    *const fx_image = fx_in->fx_image;
+
+  FxInfo
+    *const pfx = fx_in->pfx;
+
+  CacheView
+    *fx_view,
+    *image_view;
 
   MagickBooleanType
     status;
@@ -6143,34 +6160,6 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
 
   ssize_t
     y;
-
-  FxInfo
-    *pfx;
-
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (expression == (const char *) NULL)
-    return(CloneImage(image,0,0,MagickTrue,exception));
-  fx_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (!fx_image) return NULL;
-  if (SetImageStorageClass(fx_image,DirectClass,exception) == MagickFalse) {
-    fx_image=DestroyImage(fx_image);
-    return NULL;
-  }
-
-  pfx = AcquireFxInfoPrivate (image, expression, MagickTrue, exception);
-
-  if (!pfx) {
-    fx_image=DestroyImage(fx_image);
-    return NULL;
-  }
-
-  assert (pfx->image != NULL);
-  assert (pfx->Images != NULL);
-  assert (pfx->Imgs != NULL);
-  assert (pfx->fxrts != NULL);
 
   status=MagickTrue;
   progress=0;
@@ -6205,4 +6194,47 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
   image_view = DestroyCacheView (image_view);
 
   return(FinishFxImage (pfx, status, fx_image));
+}
+
+MagickExport Image *FxImage(const Image *image,const char *expression,
+  ExceptionInfo *exception)
+{
+  Image
+    *fx_image;
+
+  FxInfo
+    *pfx;
+
+  FxImageInputs
+    fx_in;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (expression == (const char *) NULL)
+    return(CloneImage(image,0,0,MagickTrue,exception));
+  fx_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (!fx_image) return NULL;
+  if (SetImageStorageClass(fx_image,DirectClass,exception) == MagickFalse) {
+    fx_image=DestroyImage(fx_image);
+    return NULL;
+  }
+
+  pfx = AcquireFxInfoPrivate (image, expression, MagickTrue, exception);
+
+  if (!pfx) {
+    fx_image=DestroyImage(fx_image);
+    return NULL;
+  }
+
+  assert (pfx->image != NULL);
+  assert (pfx->Images != NULL);
+  assert (pfx->Imgs != NULL);
+  assert (pfx->fxrts != NULL);
+
+  fx_in.image=image;
+  fx_in.fx_image=fx_image;
+  fx_in.pfx=pfx;
+  return(ApplyFxImageRows (&fx_in));
 }
