@@ -9085,6 +9085,140 @@ evolve the recipes.
 
 ---
 
+## Recipe LS - Extract Linear Searches Over a Member Chosen by Its Offset
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method* on a function that holds several copies of one linear search,
+`u=0;` and then `while (a[u].m != e) u++;`, that differ in the member `m` they compare
+and in the value `e` they look for: `feature-texture.c`'s `GetImageFeatures`, whose
+co-occurrence build finds the red, green, blue, black and alpha gray levels of a pixel
+and of its neighbour in `grays[]` with ten such loops, two per channel, the black and
+alpha pairs at nesting depth 5. Moved one by one they become helpers that clone each
+other (a probe of five per-channel helpers: *Code Duplication*, 5.98 to 5.57).
+
+**Not covered by:** Recipe MA, whose differing member belongs to one lvalue `e.m` with
+the same base in every copy, so that the caller can pass `&e.m`; here the base `a[u]`
+moves with the counter the search advances, and no address exists before the search
+ends. Recipe D and SV, whose copies differ in one value, not in a member designator
+and a searched value; Recipe CF, whose copies differ in the function called; Recipe MT,
+which selects between the runs of two copies; Recipe E, which moves one copy (the clone
+above).
+
+**How:**
+
+1. Copies. Two or more searches in one function, each the statement `u=0;` and, later
+   in the same block, `while (a[u].m != e) u++;` (the loop's body the one statement
+   `u++;`), where `u` is a local of the caller of signed integer type whose address is
+   not taken, `a` a pointer to (or array of) a struct type `S` that nothing in the
+   search writes, `m` a member of `S`, and `e` an expression with no side effect that
+   reads nothing the loop writes. Between a copy's `u=0;` and its loop stand at most the
+   `v=0;` of a second copy that reads neither `u` nor anything the first loop writes
+   (the paired form `u=0; v=0; while (...u...) u++; while (...v...) v++;`). Any other
+   statement between them stops the step.
+2. Types. The members `m` of all copies have one declared type `T`, an integer type, and
+   every `e` has one type `E` (its declaration, or the return type of the function it
+   calls), checked by reading. A floating-point `T` or `E` stops the step.
+3. Write one `static inline` function directly above the caller, its counter of the type
+   of the copies' `u`, which it returns:
+   `static inline ssize_t FindName(const S *a,const size_t member,const E value)`, whose
+   body declares `u`, then `u=0;`, then
+   `while ((*(const T *) ((const char *) &a[u]+member)) != value)` and `u++;`, and
+   `return(u);`.
+4. Replace each copy by `u=FindName(a,offsetof(S,m),e);` where its loop stood, and remove
+   its `u=0;`. In the paired form the four statements become the two calls, in the order
+   of the loops. `offsetof` comes from `<stddef.h>`, which `studio.h` includes.
+5. All copies move in one commit (rule 1); the message lists each copy's member and
+   value.
+6. Check by script that each removed loop equals the new function's loop with
+   `(*(const T *) ((const char *) &a[u]+member))` written back as the copy's `a[u].m` and
+   `value` as its `e` (token for token, `a` and `u` renamed to the copy's names), and by
+   reading that every argument fills its parameter.
+7. Time it. The searches run per pixel: build the candidate and time `magick` on a
+   command that runs every copy, alternating the baseline and candidate binaries for at
+   least nine runs each, and quote both medians in the message; a candidate slower by
+   more than 3% stops the step.
+
+**Before:**
+
+```c
+        u=0;
+        v=0;
+        while (grays[u].red != ScaleQuantumToMap(GetPixelRed(image,p)))
+          u++;
+        while (grays[v].red != ScaleQuantumToMap(GetPixelRed(image,p+offset*(ssize_t) GetPixelChannels(image))))
+          v++;
+        cooccurrence[u][v].direction[i].red++;
+```
+
+**After:**
+
+```c
+static inline ssize_t FindFeatureGray(const PixelPacket *grays,
+  const size_t member,const unsigned int value)
+{
+  ssize_t
+    u;
+
+  u=0;
+  while ((*(const unsigned int *) ((const char *) &grays[u]+member)) != value)
+    u++;
+  return(u);
+}
+...
+        u=FindFeatureGray(grays,offsetof(PixelPacket,red),
+          ScaleQuantumToMap(GetPixelRed(image,p)));
+        v=FindFeatureGray(grays,offsetof(PixelPacket,red),
+          ScaleQuantumToMap(GetPixelRed(image,p+offset*(ssize_t) GetPixelChannels(image))));
+        cooccurrence[u][v].direction[i].red++;
+```
+
+**Careful:**
+
+- The member. `offsetof(S,m)` is the byte offset of `m` in `S` (C11 7.19p3). `(const
+  char *) &a[u]` addresses the first byte of the element, adding the offset stays
+  inside it, and converting the result to `const T *` gives a pointer to the member
+  object itself, aligned as the member is, which an lvalue of its declared type `T`
+  reads (C11 6.3.2.3p7, 6.5p7). The function's test therefore reads `a[u].m`, the
+  object the copy's test read, element after element in the same order.
+- The value. The copy evaluated `e` at every test of its loop, at least once, before the
+  first. `e` has no side effect and reads nothing the loop writes (the loop writes only
+  `u`, whose address is not taken), so every evaluation gave the same value; evaluated
+  once as the argument, into a parameter of its own type `E`, it is compared with the
+  member under the same usual arithmetic conversions of `T` and `E` as the copy's test.
+  It is evaluated on no path where the copy did not evaluate it (SV's member-access
+  value and macro value rest on the same argument). Integer types only (step 2): the
+  value of an integer expression does not depend on where it is held.
+- The counter. The function's `u` starts at 0 as the copy's did, advances under the same
+  test and stops at the same index; returned and assigned, the caller's `u` holds what
+  the loop left in it. In the paired form the second copy's `v=0;` now follows the first
+  search: nothing between the two places reads `v` (the first loop reads `u`, `a` and
+  `e`), and the second call assigns `v` whole, so no statement observes the change; both
+  are plain locals whose addresses are never taken. A search that finds nothing ran past
+  the array before and runs past it the same way now (report it, do not fix it).
+- Speed. The function is `static inline` and the offset a constant at each call; once
+  inlined each comparison is the copy's load at a constant offset, and the value is
+  loaded once instead of at each test. Uninlined, the test adds one addition. Step 7's
+  timing is the evidence.
+- `refactor_guard.py` reports no literal change; `--calls` moves only the new function
+  (its definition and one call per copy) and `offsetof` (one per copy); the callees in
+  each `e` keep their counts, each still evaluated in the argument. Anything else stops
+  the step.
+
+**Evidence level:** oracle (each copy reached by a case), with `refactor_guard.py
+--calls`, step 6 checked by script and by reading, and step 7's timing.
+
+**Provenance:** 2026-11-10, from `feature-texture.c`'s `GetImageFeatures` (campaign A,
+W16 lane c), whose sequential co-occurrence build held the file's *Deep, Nested
+Complexity* (depth 5, the black and alpha searches under their channel tests) after
+Recipe IS took the five direction loops out; the plateau row named it as what holds the
+file. A probe of the step: 5.98 to 6.14, no finding on the new function; of the chain it
+opens (Recipe N on the pixel loop, E on the normalisation, the release loops): 7.44.
+Features workload (`identify -verbose -features 1` on a 160x160 sRGBA and a 200x200
+CMYK image, one thread): 4.83 s to 4.57 s, medians of nine alternating runs. Added by
+Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -9403,3 +9537,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | TI | Merge Twin Functions into One Inlined Function: two `static` functions with one caller each, the same text but for whole-expression runs, become one `static inline` function taking a `const` struct (an enumeration selector first, then the copies' read-only parameters) and the pointers they write through or advance; a differing pair repeated at several positions that differ in one operand becomes one selector function; each call declares the struct with its own constant and calls the new function, and the copies leave the file; `nm` must show the new functions inlined, else they are declared `magick_attribute((__always_inline__))`; timed | `resize-image.c`'s `FilterHorizontalPixel` and `FilterVerticalPixel` (campaign A, W16 lane c): out of line the merged function diverged on 12 oracle cases (NaN payloads only) and was 21% and 26% slower; forced inline 0 diverged, within 3%; probes 8.78 to 9.10, then 9.38 with the channel body extracted, no finding on a new function | owner |
 | 2026-11-10 | NEW | MA | Extract Sibling Blocks Differing in the Member They Update: copies of one block (one of them possibly a one-caller helper's whole body) that differ in constants, in the side-effect-free operand of their leading test, and in the member designator of one lvalue `e.m` they read and assign become calls of one `static void` function taking the constants, the operand's value and `T *value` (`&e.m`), every `e.m` written `(*value)`; the one-caller helper leaves the file | `enhance-tone.c`'s `EqualizeColormap` (campaign A, W16 lane c): its four colormap blocks (`GetPixel<X>Traits`, `<X>PixelChannel`, `colormap[j].<x>`), the file's only Bumpy Road since W14; a probe 8.47 to 9.09, Bumpy Road and Overall Code Complexity gone, no finding on the new function, 4 reaching cases 0 diverged | owner |
 | 2026-11-10 | AMEND | MT | Step 4: when the variables a copy reads are the members of a `const` struct local the caller declares with exactly those variables as its initialiser and never writes (Recipe E step 3's input form), the new function may take that struct by `const Struct *` beside `side`, binding the members it reads as `const` locals of their names (a struct-valued member copied as E step 3 copies it); *Careful* gives the argument. Still seven steps | `layer.c`'s `CompareImagesBounds` (campaign A, W16 lane c): its ascending and descending row scans read `alpha_image`, `beta_image`, `scan` and `exception`, the members of its `DifferingLineScan line`, which with `side` make five parameters; a probe 7.55 to 7.84, `CompareImagesBounds` leaving Bumpy Road and Complex Method, no finding on the new function | owner |
+| 2026-11-10 | NEW | LS | Extract Linear Searches Over a Member Chosen by Its Offset: copies of `u=0; while (a[u].m != e) u++;` that differ in the integer member `m` and the side-effect-free integer value `e` (the paired form `u=0; v=0;` before two loops included) become `u=FindName(a,offsetof(S,m),e);` of one `static inline` function whose test reads `(*(const T *) ((const char *) &a[u]+member))` against `value`; *Careful* gives the argument (the member object read through its offset, the loop-invariant value evaluated once, the counter returned); checked by script, timed | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the ten gray-level searches of the sequential co-occurrence build, which held the file's depth 5; five per-channel helpers clone each other (5.98 to 5.57); a probe of this step 5.98 to 6.14, of the chain it opens 7.44; features workload 4.83 s to 4.57 s (medians of nine) | owner |
