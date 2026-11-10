@@ -424,7 +424,7 @@ typedef enum
   RIGHT
 } ShearDirection;
 
-typedef struct _XShearSpanInfo
+typedef struct _ShearTransfer
 {
   Image
     *image;
@@ -433,27 +433,33 @@ typedef struct _XShearSpanInfo
     background;
 
   size_t
-    width;
+    length;
 
   ssize_t
-    x_offset;
-} XShearSpanInfo;
+    offset;
 
-static void TransferXShearSpan(const XShearSpanInfo *span_info,
+  size_t
+    extent;
+} ShearTransfer;
+
+static void TransferShearSpan(const ShearTransfer *transfer,
   const ShearDirection direction,const double displacement,
   Quantum *magick_restrict p)
 {
   Image
-    *image = span_info->image;
+    *image = transfer->image;
 
   const PixelInfo
-    background = span_info->background;
+    background = transfer->background;
 
   const size_t
-    width = span_info->width;
+    length = transfer->length;
 
   const ssize_t
-    x_offset = span_info->x_offset;
+    offset = transfer->offset;
+
+  const size_t
+    extent = transfer->extent;
 
   double
     area;
@@ -485,9 +491,9 @@ static void TransferXShearSpan(const XShearSpanInfo *span_info,
       span.image=image;
       span.background=background;
       span.area=area;
-      span.length=width;
-      span.extent=image->columns;
-      span.offset=x_offset;
+      span.length=length;
+      span.extent=extent;
+      span.offset=offset;
       span.step=step;
       TransferPixelsForward(p,pixel,destination,&span);
       break;
@@ -500,14 +506,56 @@ static void TransferXShearSpan(const XShearSpanInfo *span_info,
       span.image=image;
       span.background=background;
       span.area=area;
-      span.length=width;
-      span.extent=image->columns;
-      span.offset=x_offset;
+      span.length=length;
+      span.extent=extent;
+      span.offset=offset;
       span.step=step;
       TransferPixelsBackward(p,pixel,destination,&span);
       break;
     }
   }
+}
+
+typedef struct _XShearSpanInfo
+{
+  Image
+    *image;
+
+  PixelInfo
+    background;
+
+  size_t
+    width;
+
+  ssize_t
+    x_offset;
+} XShearSpanInfo;
+
+static void TransferXShearSpan(const XShearSpanInfo *span_info,
+  const ShearDirection direction,const double displacement,
+  Quantum *magick_restrict p)
+{
+  Image
+    *image = span_info->image;
+
+  const PixelInfo
+    background = span_info->background;
+
+  const size_t
+    width = span_info->width;
+
+  const ssize_t
+    x_offset = span_info->x_offset;
+
+  ShearTransfer
+    transfer;
+
+  transfer.image=image;
+  transfer.background=background;
+  transfer.length=width;
+  transfer.offset=x_offset;
+  transfer.extent=image->columns;
+  TransferShearSpan(&transfer,direction,displacement,p);
 }
 
 typedef struct _XShearRow
@@ -758,13 +806,7 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
   for (x=0; x < (ssize_t) width; x++)
   {
     double
-      area,
       displacement;
-
-    PixelInfo
-      pixel,
-      source,
-      destination;
 
     Quantum
       *magick_restrict p;
@@ -772,11 +814,8 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
     ShearDirection
       direction;
 
-    ShearSpan
-      span;
-
-    ssize_t
-      step;
+    ShearTransfer
+      transfer;
 
     if (status == MagickFalse)
       continue;
@@ -792,45 +831,12 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
     if (displacement == 0.0)
       continue;
     SelectShearDirection(&displacement,&direction);
-    step=CastDoubleToSsizeT(floor((double) displacement));
-    area=(double) (displacement-step);
-    step++;
-    pixel=background;
-    GetPixelInfo(image,&source);
-    GetPixelInfo(image,&destination);
-    switch (direction)
-    {
-      case LEFT:
-      {
-        /*
-          Transfer pixels top-to-bottom.
-        */
-        span.image=image;
-        span.background=background;
-        span.area=area;
-        span.length=height;
-        span.extent=image->rows;
-        span.offset=y_offset;
-        span.step=step;
-        TransferPixelsForward(p,pixel,destination,&span);
-        break;
-      }
-      case RIGHT:
-      {
-        /*
-          Transfer pixels bottom-to-top.
-        */
-        span.image=image;
-        span.background=background;
-        span.area=area;
-        span.length=height;
-        span.extent=image->rows;
-        span.offset=y_offset;
-        span.step=step;
-        TransferPixelsBackward(p,pixel,destination,&span);
-        break;
-      }
-    }
+    transfer.image=image;
+    transfer.background=background;
+    transfer.length=height;
+    transfer.offset=y_offset;
+    transfer.extent=image->rows;
+    TransferShearSpan(&transfer,direction,displacement,p);
     SyncShearView(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
