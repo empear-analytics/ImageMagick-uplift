@@ -4311,6 +4311,46 @@ static void ImageStatResolutionToStdDev (const ImageStatInputs *attr, fxFltType 
   }
 }
 
+static void ImageStatPageHeightToRes (const ImageStatInputs *attr, fxFltType *ret)
+{
+  FxInfo
+    *const pfx = attr->pfx;
+
+  const ssize_t
+    ImgNum = attr->ImgNum;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aPageHt:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->page.height;
+      break;
+    case aPrintsize:
+      /* Do nothing */
+      break;
+    case aPrintsizeX:
+      (*ret) = (fxFltType) MagickSafeReciprocal (pfx->Images[ImgNum]->resolution.x)
+                        * pfx->Images[ImgNum]->columns;
+      break;
+    case aPrintsizeY:
+      (*ret) = (fxFltType) MagickSafeReciprocal (pfx->Images[ImgNum]->resolution.y)
+                        * pfx->Images[ImgNum]->rows;
+      break;
+    case aQuality:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->quality;
+      break;
+    case aRes:
+      /* Do nothing */
+      break;
+    default:
+      {
+        ImageStatResolutionToStdDev (attr, &(*ret));
+        break;
+      }
+  }
+}
+
 static inline fxFltType ImageStat (
   FxInfo * pfx, ssize_t ImgNum, PixelChannel channel, ImgAttrE ia)
 {
@@ -4380,29 +4420,9 @@ static inline fxFltType ImageStat (
     case aPageWid:
       ret = (fxFltType) pfx->Images[ImgNum]->page.width;
       break;
-    case aPageHt:
-      ret = (fxFltType) pfx->Images[ImgNum]->page.height;
-      break;
-    case aPrintsize:
-      /* Do nothing */
-      break;
-    case aPrintsizeX:
-      ret = (fxFltType) MagickSafeReciprocal (pfx->Images[ImgNum]->resolution.x)
-                        * pfx->Images[ImgNum]->columns;
-      break;
-    case aPrintsizeY:
-      ret = (fxFltType) MagickSafeReciprocal (pfx->Images[ImgNum]->resolution.y)
-                        * pfx->Images[ImgNum]->rows;
-      break;
-    case aQuality:
-      ret = (fxFltType) pfx->Images[ImgNum]->quality;
-      break;
-    case aRes:
-      /* Do nothing */
-      break;
     default:
       {
-        ImageStatResolutionToStdDev (&attr, &ret);
+        ImageStatPageHeightToRes (&attr, &ret);
         break;
       }
   }
