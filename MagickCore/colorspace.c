@@ -2673,6 +2673,44 @@ static void InitializeTosRGBMaps(const Image *image,
   }
 }
 
+static void TransformsRGBPixelRow(const TransformsRGBTables *tables,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const image = tables->image;
+
+  TransformPacket
+    *const x_map = tables->x_map,
+    *const y_map = tables->y_map,
+    *const z_map = tables->z_map;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    size_t
+      blue,
+      green,
+      red;
+
+    red=ScaleQuantumToMap(GetPixelRed(image,q));
+    green=ScaleQuantumToMap(GetPixelGreen(image,q));
+    blue=ScaleQuantumToMap(GetPixelBlue(image,q));
+    pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x;
+    pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y;
+    pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z;
+    pixel=ScaleTransformedPixel(image,YCCMap,pixel);
+    SetPixelRed(image,ClampToQuantum(pixel.red),q);
+    SetPixelGreen(image,ClampToQuantum(pixel.green),q);
+    SetPixelBlue(image,ClampToQuantum(pixel.blue),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType TransformsRGBPixels(
   const TransformsRGBTables *tables,MagickBooleanType status,
   MagickOffsetType progress)
@@ -2684,11 +2722,6 @@ static MagickBooleanType TransformsRGBPixels(
 
   Image
     *const image = tables->image;
-
-  TransformPacket
-    *const x_map = tables->x_map,
-    *const y_map = tables->y_map,
-    *const z_map = tables->z_map;
 
   CacheView
     *image_view;
@@ -2703,12 +2736,6 @@ static MagickBooleanType TransformsRGBPixels(
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    PixelInfo
-      pixel;
-
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
 
@@ -2717,25 +2744,7 @@ static MagickBooleanType TransformsRGBPixels(
 
     if (FetchColorspaceRow(&row,y,&q,&status) == MagickFalse)
       continue;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      size_t
-        blue,
-        green,
-        red;
-
-      red=ScaleQuantumToMap(GetPixelRed(image,q));
-      green=ScaleQuantumToMap(GetPixelGreen(image,q));
-      blue=ScaleQuantumToMap(GetPixelBlue(image,q));
-      pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x;
-      pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y;
-      pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z;
-      pixel=ScaleTransformedPixel(image,YCCMap,pixel);
-      SetPixelRed(image,ClampToQuantum(pixel.red),q);
-      SetPixelGreen(image,ClampToQuantum(pixel.green),q);
-      SetPixelBlue(image,ClampToQuantum(pixel.blue),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    TransformsRGBPixelRow(tables,q);
     SyncColorspaceRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
