@@ -4393,6 +4393,38 @@ static void ImageStatMinimaToPageWidth (const ImageStatInputs *attr, fxFltType *
   }
 }
 
+static void ImageStatMaximaToMedian (const ImageStatInputs *attr, fxFltType *ret)
+{
+  const PixelChannel
+    channel = attr->channel;
+
+  ChannelStatistics
+    *const cs = attr->cs;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aMaxima:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].maxima;
+      break;
+    case aMean:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].mean;
+      break;
+    case aMedian:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].median;
+      break;
+    default:
+      {
+        ImageStatMinimaToPageWidth (attr, &(*ret));
+        break;
+      }
+  }
+}
+
 static inline fxFltType ImageStat (
   FxInfo * pfx, ssize_t ImgNum, PixelChannel channel, ImgAttrE ia)
 {
@@ -4434,21 +4466,9 @@ static inline fxFltType ImageStat (
       if (HasChannelStatistics(cs,channel) != MagickFalse)
         ret = cs[channel].kurtosis;
       break;
-    case aMaxima:
-      if (HasChannelStatistics(cs,channel) != MagickFalse)
-        ret = cs[channel].maxima;
-      break;
-    case aMean:
-      if (HasChannelStatistics(cs,channel) != MagickFalse)
-        ret = cs[channel].mean;
-      break;
-    case aMedian:
-      if (HasChannelStatistics(cs,channel) != MagickFalse)
-        ret = cs[channel].median;
-      break;
     default:
       {
-        ImageStatMinimaToPageWidth (&attr, &ret);
+        ImageStatMaximaToMedian (&attr, &ret);
         break;
       }
   }
