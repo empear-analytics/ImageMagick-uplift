@@ -3527,6 +3527,36 @@ static void GetResourceFontNames(XrmDatabase database,const char *client_name,
     (char *) "fixed");
 }
 
+static void GetResourcePenColors(XrmDatabase database,const char *client_name,
+  XResourceInfo *resource_info)
+{
+  /*
+    Pen colour resources: pen1 to pen0.
+  */
+  resource_info->pen_colors[0]=XGetResourceClass(database,client_name,"pen1",
+    (char *) "black");
+  resource_info->pen_colors[1]=XGetResourceClass(database,client_name,"pen2",
+    (char *) "blue");
+  resource_info->pen_colors[2]=XGetResourceClass(database,client_name,"pen3",
+    (char *) "cyan");
+  resource_info->pen_colors[3]=XGetResourceClass(database,client_name,"pen4",
+    (char *) "green");
+  resource_info->pen_colors[4]=XGetResourceClass(database,client_name,"pen5",
+    (char *) "gray");
+  resource_info->pen_colors[5]=XGetResourceClass(database,client_name,"pen6",
+    (char *) "red");
+  resource_info->pen_colors[6]=XGetResourceClass(database,client_name,"pen7",
+    (char *) "magenta");
+  resource_info->pen_colors[7]=XGetResourceClass(database,client_name,"pen8",
+    (char *) "yellow");
+  resource_info->pen_colors[8]=XGetResourceClass(database,client_name,"pen9",
+    (char *) "white");
+  resource_info->pen_colors[9]=XGetResourceClass(database,client_name,"pen0",
+    (char *) "gray");
+  resource_info->pen_colors[10]=XGetResourceClass(database,client_name,"pen0",
+    (char *) "gray");
+}
+
 MagickExport void XGetResourceInfo(const ImageInfo *image_info,
   XrmDatabase database,const char *client_name,XResourceInfo *resource_info)
 {
@@ -3617,28 +3647,7 @@ MagickExport void XGetResourceInfo(const ImageInfo *image_info,
     "mattecolor",(char *) NULL);
   resource_info->name=ConstantString(XGetResourceClass(database,client_name,
     "name",(char *) NULL));
-  resource_info->pen_colors[0]=XGetResourceClass(database,client_name,"pen1",
-    (char *) "black");
-  resource_info->pen_colors[1]=XGetResourceClass(database,client_name,"pen2",
-    (char *) "blue");
-  resource_info->pen_colors[2]=XGetResourceClass(database,client_name,"pen3",
-    (char *) "cyan");
-  resource_info->pen_colors[3]=XGetResourceClass(database,client_name,"pen4",
-    (char *) "green");
-  resource_info->pen_colors[4]=XGetResourceClass(database,client_name,"pen5",
-    (char *) "gray");
-  resource_info->pen_colors[5]=XGetResourceClass(database,client_name,"pen6",
-    (char *) "red");
-  resource_info->pen_colors[6]=XGetResourceClass(database,client_name,"pen7",
-    (char *) "magenta");
-  resource_info->pen_colors[7]=XGetResourceClass(database,client_name,"pen8",
-    (char *) "yellow");
-  resource_info->pen_colors[8]=XGetResourceClass(database,client_name,"pen9",
-    (char *) "white");
-  resource_info->pen_colors[9]=XGetResourceClass(database,client_name,"pen0",
-    (char *) "gray");
-  resource_info->pen_colors[10]=XGetResourceClass(database,client_name,"pen0",
-    (char *) "gray");
+  GetResourcePenColors(database,client_name,resource_info);
   resource_value=XGetResourceClass(database,client_name,"pause",(char *) "0");
   resource_info->pause=(unsigned int) StringToUnsignedLong(resource_value);
   resource_value=XGetResourceClass(database,client_name,"quantum",(char *) "1");
