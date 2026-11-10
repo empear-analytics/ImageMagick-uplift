@@ -4363,13 +4363,62 @@ static MagickBooleanType GetExpressionOperator (FxInfo * pfx,
   return(MagickTrue);
 }
 
+typedef struct _OperandTargets
+{
+  MagickBooleanType
+    *UserSymbol,
+    *NewUserSymbol;
+
+  int
+    *UserSymNdx0;
+} OperandTargets;
+
+static MagickBooleanType GetExpressionOperand (FxInfo * pfx,
+  const MagickBooleanType Assign, MagickBooleanType * needPopAll,
+  const OperandTargets * targets)
+{
+  MagickBooleanType
+    *const UserSymbol = targets->UserSymbol,
+    *const NewUserSymbol = targets->NewUserSymbol;
+
+  int
+    *const UserSymNdx0 = targets->UserSymNdx0;
+
+  int UserSymNdx1;
+
+  const OperandSymbols
+    operand1 = { UserSymbol, NewUserSymbol, &UserSymNdx1, needPopAll };
+
+    if (!GetOperand (pfx, &operand1)) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Expected operand at", "'%s'",
+        SetShortExp(pfx));
+      return MagickFalse;
+    }
+    SkipSpaces (pfx);
+    if (*NewUserSymbol && !Assign) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "NewUserSymbol", "'%s' after non-assignment operator at '%s'",
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+    if (*UserSymbol && !*NewUserSymbol) {
+      (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx1);
+      UserSymNdx1 = NULL_ADDRESS;
+    }
+    *UserSymNdx0 = UserSymNdx1;
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
   /* There should be only one New per expression (oAssign), but can be many Old.
   */
   MagickBooleanType UserSymbol, NewUserSymbol;
-  int UserSymNdx0, UserSymNdx1;
+  int UserSymNdx0;
 
   MagickBooleanType
     Assign = MagickFalse,
@@ -4381,8 +4430,7 @@ static MagickBooleanType TranslateExpression (
   MagickBooleanType broke = MagickFalse;
 
   const OperandSymbols
-    operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll },
-    operand1 = { &UserSymbol, &NewUserSymbol, &UserSymNdx1, needPopAll };
+    operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll };
 
   ExpressionContext context;
 
@@ -4431,6 +4479,7 @@ static MagickBooleanType TranslateExpression (
   context.needPopAll=needPopAll;
   while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
     OperatorFlags flags;
+    OperandTargets operandTargets;
 
     flags.Assign=(&Assign);
     flags.Update=(&Update);
@@ -4483,26 +4532,12 @@ static MagickBooleanType TranslateExpression (
       return MagickFalse;
     }
 
-    if (!GetOperand (pfx, &operand1)) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Expected operand at", "'%s'",
-        SetShortExp(pfx));
+    operandTargets.UserSymbol=(&UserSymbol);
+    operandTargets.NewUserSymbol=(&NewUserSymbol);
+    operandTargets.UserSymNdx0=(&UserSymNdx0);
+    if (GetExpressionOperand (pfx, Assign, needPopAll, &operandTargets) ==
+        MagickFalse)
       return MagickFalse;
-    }
-    SkipSpaces (pfx);
-    if (NewUserSymbol && !Assign) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "NewUserSymbol", "'%s' after non-assignment operator at '%s'",
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
-    if (UserSymbol && !NewUserSymbol) {
-      (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx1);
-      UserSymNdx1 = NULL_ADDRESS;
-    }
-    UserSymNdx0 = UserSymNdx1;
   }
 
   if ((IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
