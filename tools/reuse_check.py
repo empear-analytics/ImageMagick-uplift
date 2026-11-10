@@ -21,6 +21,14 @@ existing `static` function of FILE. The script
     preprocessor line (no OpenMP pragma moves; an `#if` around the call would be a
     different step).
 
+A helper that returns the block's single output (Recipe E step 3, `v=Helper(v,...)`)
+is accepted when the call is the statement `v=HELPER(...);` with `v` a plain name
+passed as one of the arguments, and HELPER's body ends with `return(p);` for the
+parameter `p` that argument binds: that one line is the assignment back and is not
+compared. When the lines differ only in where they are broken (a wrapped expression
+broken at another token), the rewritten block and HELPER's body are compared as one
+token stream, in order, whitespace removed, and the script says so.
+
 It prints OK or FAIL with the line that broke the rule. Argument types against
 parameter types, and the OpenMP condition of the step, are checked by reading.
 """
@@ -141,19 +149,42 @@ def main(argv):
     for line in removed:
         if line.startswith("#"):
             problems.append(f"preprocessor line removed: {line}")
-    moved = Counter(rewrite(r, binds) for r in removed if not r.startswith("#"))
-    own = Counter(canonical(b.strip()) for b in body.splitlines()
-                  if b.strip() not in TRIVIAL)
-    for line, n in (moved - own).items():
-        problems.append(f"in the block, not in {helper} ({n}x): {line}")
-    for line, n in (own - moved).items():
-        problems.append(f"in {helper}, not in the block ({n}x): {line}")
+    body_lines = [canonical(b.strip()) for b in body.splitlines()
+                  if b.strip() not in TRIVIAL]
+    returned = re.match(r"^(\w+)=" + re.escape(helper) + r"\(", call)
+    note = ""
+    if returned:
+        target = returned.group(1)
+        bound = [p for a, p, ptr in binds if a == target and not ptr]
+        if not call.endswith(");") or not re.fullmatch(
+                r"\w+=" + re.escape(helper) + r"\(.*\);", call):
+            problems.append(f"the call is not the statement {target}={helper}(...);")
+        elif not bound:
+            problems.append(f"{target} is assigned but passed to no parameter")
+        elif not body_lines or body_lines[-1] != f"return({bound[0]});":
+            problems.append(f"{helper} does not end with return({bound[0]});")
+        else:
+            body_lines = body_lines[:-1]
+            note = f", return({bound[0]}) assigned back to {target}"
+    elif re.match(r"^\w+\s*=", call):
+        problems.append(f"the call assigns its result: {call}")
+    rewritten = [rewrite(r, binds) for r in removed if not r.startswith("#")]
+    moved = Counter(rewritten)
+    own = Counter(body_lines)
+    if moved != own and "".join("".join(rewritten).split()) == \
+            "".join("".join(body_lines).split()):
+        note += " (the same token stream, broken into lines differently)"
+    else:
+        for line, n in (moved - own).items():
+            problems.append(f"in the block, not in {helper} ({n}x): {line}")
+        for line, n in (own - moved).items():
+            problems.append(f"in {helper}, not in the block ({n}x): {line}")
     for line in problems:
         print("FAIL:", line)
     if problems:
         return 1
     print(f"OK {helper}: the block is its body under "
-          + ", ".join(f"{a} -> {p}" for a, p, _ in binds))
+          + ", ".join(f"{a} -> {p}" for a, p, _ in binds) + note)
     return 0
 
 
