@@ -681,6 +681,48 @@ static MagickBooleanType ParseChannelOperands(
   return(MagickTrue);
 }
 
+static MagickBooleanType ParseChannelDestination(
+  const ChannelFxDestination *parse,char *token,
+  const ChannelFxDestinationTargets *destination_targets)
+{
+  const ChannelFx
+    channel_op = parse->channel_op;
+
+  const Image
+    *const image = parse->image;
+
+  Image
+    *const destination_image = parse->destination_image;
+
+  ExceptionInfo
+    *const exception = parse->exception;
+
+  ChannelFxDestination
+    destination;
+
+  switch (channel_op)
+  {
+    case AssignChannelOp:
+    case ExchangeChannelOp:
+    case TransferChannelOp:
+    {
+      destination.channel_op=channel_op;
+      destination.image=image;
+      destination.destination_image=destination_image;
+      destination.exception=exception;
+      if (ParseChannelOperands(&destination,token,destination_targets) ==
+          MagickFalse)
+        {
+          return(MagickFalse);
+        }
+      break;
+    }
+    default:
+      break;
+  }
+  return(MagickTrue);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -748,7 +790,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
       i;
 
     ChannelFxDestination
-      destination;
+      parse;
 
     const ChannelFxDestinationTargets
       destination_targets = { &pixel, &i, &destination_channel, &channel_mask,
@@ -802,27 +844,16 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
         return(destination_image);
       }
     ParseChannelOperator(&channel_op,&p,token);
-    switch (channel_op)
-    {
-      case AssignChannelOp:
-      case ExchangeChannelOp:
-      case TransferChannelOp:
+    parse.channel_op=channel_op;
+    parse.image=image;
+    parse.destination_image=destination_image;
+    parse.exception=exception;
+    if (ParseChannelDestination(&parse,token,&destination_targets) ==
+        MagickFalse)
       {
-        destination.channel_op=channel_op;
-        destination.image=image;
-        destination.destination_image=destination_image;
-        destination.exception=exception;
-        if (ParseChannelOperands(&destination,token,&destination_targets) ==
-            MagickFalse)
-          {
-            destination_image=DestroyImageList(destination_image);
-            return(destination_image);
-          }
-        break;
+        destination_image=DestroyImageList(destination_image);
+        return(destination_image);
       }
-      default:
-        break;
-    }
     apply.destination_channel=destination_channel;
     apply.channel_op=channel_op;
     apply.source_image=source_image;
