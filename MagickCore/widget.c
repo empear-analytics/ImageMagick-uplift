@@ -1113,6 +1113,20 @@ static void XInsertWidgetText(XWidgetInfo *text_info,char *text)
     *text_info->cursor++=(*p++);
 }
 
+static void XEraseHighlightedText(XWidgetInfo *text_info)
+{
+  if (text_info->highlight)
+    {
+      /*
+        Erase the entire line of text.
+      */
+      *text_info->text='\0';
+      text_info->cursor=text_info->text;
+      text_info->marker=text_info->text;
+      text_info->highlight=MagickFalse;
+    }
+}
+
 static void XEditText(Display *display,XWidgetInfo *text_info,
   const KeySym key_symbol,char *text,const size_t state)
 {
@@ -1176,16 +1190,7 @@ static void XEditText(Display *display,XWidgetInfo *text_info,
         (void) XBell(display,0);
       else
         {
-          if (text_info->highlight)
-            {
-              /*
-                Erase the entire line of text.
-              */
-              *text_info->text='\0';
-              text_info->cursor=text_info->text;
-              text_info->marker=text_info->text;
-              text_info->highlight=MagickFalse;
-            }
+          XEraseHighlightedText(text_info);
           /*
             Insert a string into the text.
           */
