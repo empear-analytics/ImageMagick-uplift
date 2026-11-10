@@ -198,3 +198,12 @@ passes `(cl_int) image->rows` where other calls pass `(cl_uint)`; LocalContrast 
 The long compare.c chain was scored end to end before any commit; no legal plan whose helpers carry no finding rises
 above 2.97 (see its plateau row). Upstream: FUZZ, MSE and MEPP do not `memset` `similarity` while the other Get
 functions do; comment typos ("criss-correlation", "structual").
+
+## Lane b, sweep of the 9.0-9.99 files
+
+25 campaign A files between 9.0 and 9.99 were reviewed against today's recipes. Only transform.c had a step left
+(9.09 to 9.38, `ExcerptImage` at the unreached level). The others are held by public argument counts, Lines of Code,
+or blockers already measured: channel.c `ChannelFxImage` (two exit kinds no recipe takes together),
+colorspace-convert.c `ConvertRGBToGeneric` (per-pixel dispatch to callees of different signatures), resize-image.c
+`ResizeImage` (OpenCL `#if`), segment.c (see its row). Files held only by Lines of Code: colorspace.c, statistic.c,
+vision.c, transform.c (9.38 each).
