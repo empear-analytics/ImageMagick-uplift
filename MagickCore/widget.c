@@ -3703,6 +3703,40 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
 %    o reply: the response from the user is returned in this parameter.
 %
 */
+typedef struct _DialogRelease
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+} DialogRelease;
+
+static void ReleaseDialogAction(const DialogRelease *release,
+  XWidgetInfo *action_info,size_t *state)
+{
+  Display
+    *const display = release->display;
+
+  XWindows
+    *const windows = release->windows;
+
+  const XEvent
+    event = release->event;
+
+  if ((*action_info).raised == MagickFalse)
+    {
+      if ((event.xbutton.window == windows->widget.id) &&
+          (MatteIsActive((*action_info),event.xbutton)))
+        (*state)|=ExitState;
+      (*action_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,&(*action_info));
+    }
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -3969,16 +4003,15 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
+        DialogRelease
+          release;
+
         if (windows->widget.mapped == MagickFalse)
           break;
-        if (action_info.raised == MagickFalse)
-          {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(action_info,event.xbutton)))
-              state|=ExitState;
-            action_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-          }
+        release.display=display;
+        release.windows=windows;
+        release.event=event;
+        ReleaseDialogAction(&release,&action_info,&state);
         if (cancel_info.raised == MagickFalse)
           {
             if ((event.xbutton.window == windows->widget.id) &&
