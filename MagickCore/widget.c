@@ -8460,9 +8460,9 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       {
         if (windows->widget.mapped == MagickFalse)
           break;
-        if (event.xbutton.window == windows->command.id)
-          if ((state & InactiveWidgetState) == 0)
-            break;
+        if ((event.xbutton.window == windows->command.id) &&
+            ((state & InactiveWidgetState) == 0))
+          break;
         /*
           exit menu.
         */
@@ -8557,28 +8557,28 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
           Discard pending button motion events.
         */
         while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (submenu_info.active != 0)
-          if (event.xmotion.window == windows->command.id)
-            {
-              if ((state & InactiveWidgetState) == 0)
-                {
-                  if (MatteIsActive(submenu_info,event.xmotion) == MagickFalse)
-                    {
-                      selection_info.id=(~0);
-                      *item='\0';
-                      state|=ExitState;
-                      break;
-                    }
-                }
-              else
-                if (WindowIsActive(windows->command,event.xmotion))
+        if ((submenu_info.active != 0) &&
+            (event.xmotion.window == windows->command.id))
+          {
+            if ((state & InactiveWidgetState) == 0)
+              {
+                if (MatteIsActive(submenu_info,event.xmotion) == MagickFalse)
                   {
                     selection_info.id=(~0);
                     *item='\0';
                     state|=ExitState;
                     break;
                   }
-            }
+              }
+            else
+              if (WindowIsActive(windows->command,event.xmotion))
+                {
+                  selection_info.id=(~0);
+                  *item='\0';
+                  state|=ExitState;
+                  break;
+                }
+          }
         if (event.xmotion.window != windows->widget.id)
           break;
         if (state & InactiveWidgetState)
