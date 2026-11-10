@@ -3059,6 +3059,49 @@ static MagickBooleanType CloseFunction (FxInfo * pfx, const char chLimit,
   return(CompleteFunction (pfx, &completion));
 }
 
+static MagickBooleanType FinishFunctionArguments (FxInfo * pfx, int FndArgs,
+  char chLimit, const FunctionClosing *closing)
+{
+  const FunctionE
+    fe = closing->fe;
+
+  const char
+    *const funStr = closing->funStr;
+
+  const char
+    expChLimit = closing->expChLimit;
+
+  if (IsUnexpectedLimit(chLimit,expChLimit) != MagickFalse) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "For function", "'%s' expected '%c', found '%c' at '%s'",
+      funStr, expChLimit, chLimit ? chLimit : ' ', SetShortExp(pfx));
+    return MagickFalse;
+  }
+
+  if (IsDefaultArgsFunction(fe) != MagickFalse) {
+    FndArgs = AddDefaultArgs (pfx, fe, FndArgs);
+  }
+
+  if (FndArgs > Functions[fe-(int) FirstFunc].number_args)
+  {
+    return (ReportTooManyArgs (pfx, fe, funStr, FndArgs));
+  }
+  if (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "For function", "'%s' expected %i arguments, found too few (%i) at '%s'",
+      funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
+    return MagickFalse;
+  }
+  /* This is for "rand()" and similar. */
+  if ((IsNoArgsFunction(fe,FndArgs) != MagickFalse) &&
+      (ExpectNoArgsClose (pfx, expChLimit, &chLimit) == MagickFalse))
+    return MagickFalse;
+
+  return(CloseFunction (pfx, chLimit, closing));
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -3144,34 +3187,6 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       break;
     }
   } /* end while args of a function */
-  if (IsUnexpectedLimit(chLimit,expChLimit) != MagickFalse) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "For function", "'%s' expected '%c', found '%c' at '%s'",
-      funStr, expChLimit, chLimit ? chLimit : ' ', SetShortExp(pfx));
-    return MagickFalse;
-  }
-
-  if (IsDefaultArgsFunction(fe) != MagickFalse) {
-    FndArgs = AddDefaultArgs (pfx, fe, FndArgs);
-  }
-
-  if (FndArgs > Functions[fe-(int) FirstFunc].number_args)
-  {
-    return (ReportTooManyArgs (pfx, fe, funStr, FndArgs));
-  }
-  if (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "For function", "'%s' expected %i arguments, found too few (%i) at '%s'",
-      funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
-    return MagickFalse;
-  }
-  /* This is for "rand()" and similar. */
-  if ((IsNoArgsFunction(fe,FndArgs) != MagickFalse) &&
-      (ExpectNoArgsClose (pfx, expChLimit, &chLimit) == MagickFalse))
-    return MagickFalse;
-
   closing.fe=fe;
   closing.funStr=funStr;
   closing.ndx0=ndx0;
@@ -3185,7 +3200,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   closing.iaQual=iaQual;
   closing.pExpStart=pExpStart;
   closing.lenExp=lenExp;
-  return(CloseFunction (pfx, chLimit, &closing));
+  return(FinishFunctionArguments (pfx, FndArgs, chLimit, &closing));
 }
 
 static MagickBooleanType IsStealth (int op)
