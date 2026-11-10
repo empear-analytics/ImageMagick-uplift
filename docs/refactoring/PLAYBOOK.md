@@ -6550,6 +6550,30 @@ Recipe LB (a `break;`, not a `return`).
    and checks every argument against its parameter by reading. When a compiler warns that
    `returned` may be used uninitialised, the declaration gets `=MagickFalse` instead of
    a new statement.
+6. Three widenings of steps 1, 2 and 4 (2026-11-10), each optional:
+   (a) The caller may return another type `T` than `MagickBooleanType` (a length that is
+   `0` for "not this", `-1` for an error): each `R` is an expression of type `T`, the new
+   function takes `T *result` last, and the caller declares `T returned;`. The new
+   function still returns `MagickBooleanType`, the *did it return* flag.
+   (b) The block may write up to four plain locals of the caller that the caller reads
+   after it (Recipe O step 2, with its exception for an address the caller passes
+   elsewhere only to calls that keep no copy, such as `GetPixelInfo(image,&colour)`): each
+   goes as a pointer, written `*v` at every use as Recipe O step 5 says (`v.m` becomes
+   `(*v).m`; `&v` passed on to a callee becomes `v`). A local the block writes only on
+   paths that leave through `return(R);` (Recipe W step 3), such as
+   `dummy_exception = DestroyExceptionInfo (dummy_exception);` directly before a
+   `return`, goes by value like an input: the caller returns at once and never reads
+   its own copy again.
+   (c) When the inputs and pointers would give more than four parameters they go in a
+   `const` struct (Recipe N's member form: `T *const v = name->v;` per pointer, `T v =
+   name->v;` without `const` for a by-value input of (b) the block writes), filled
+   member by member directly before the call. A block holding the call of an earlier
+   helper of this step takes that helper's struct as one parameter and passes it on
+   unchanged (Recipe N step 2's pass-through); its own further inputs go in a second
+   `const` struct, so at most two structs and `T *result`. The earlier helper's fill
+   then moves with its call to directly before the new call, past statements that write
+   none of the members' values (check by reading: an address `&v` is fixed for the
+   caller's whole body).
 
 **Before:**
 
@@ -6602,6 +6626,22 @@ static MagickBooleanType TryLeadingOperand (FxInfo * pfx,
   *did it fall through*; the name says so (`Try...`), where V's helpers are `NotA...`.
 - A block with one return value is Recipe V, not this recipe; a block with a nested
   `if` that returns is fine, its `return`s are rewritten one for one.
+- Step 6 (a) changes only the type of the value that travels: `(*result)=R;` converts
+  `R` to `T` as `return(R);` did (C11 6.8.6.4p3 and 6.5.16.1p2 apply the same conversion
+  as if by assignment), and the caller returns the stored `T` unchanged.
+- Under step 6 (b) each pointer names the caller's local and nothing else names it while
+  the new function runs (Recipe O step 2), so every read sees, and every write lands in,
+  the object the block named, at the same point; on the fall-through path the caller
+  reads after the call what the block left there, as before. The by-value local of (b)
+  is written in the new function only on paths that set `(*result)` and return
+  `MagickTrue`, after which the caller returns without reading its own copy; on the
+  other paths the new function never writes it, so the copy and the caller's agree.
+- Under step 6 (c) a struct holds only values the caller had at the fill and addresses
+  of its locals; a member is read where the block read the variable, after nothing
+  between the fill and that read has written the variable (moving an earlier helper's
+  fill is allowed only past statements that write none of its members' values). A
+  `const` struct is not written by any helper, so passing it on hands the inner helper
+  exactly what its caller filled.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new function,
 nothing else moved), and steps 1 and 2 checked by reading.
@@ -6612,6 +6652,15 @@ block (`(`, unary prefix, `#`, a number or a property) and its function block re
 different values or falls through" plateau W09 recorded. A probe of both and the constant
 block (Recipe V): GetOperand leaves Bumpy Road Ahead, 3.35 to 3.37, no finding on a helper.
 Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+Step 6 (2026-11-10, W16 lane c, owner's OK to evolve the recipes): `fx.c`'s
+`GetConstantColour` (cc 17, `ssize_t`): its colour-function block returns `-1`, `lenfun`
+or `ReportColourSpaceWithoutArgs(...)`, writes `colour` through `QueryColorCompliance`
+(read after it on the `gray` path) and `*v0` to `*v2`, and destroys `dummy_exception`
+only before a `return`; the colour-space block around it returns `0` or what the inner
+block returned. Step 4 refused the `ssize_t` result, step 2 the written `colour`, and
+both blocks need six or more parameters. A probe of both: the function leaves Complex
+Method, fx.c 3.73 to 3.78 to 3.88, no finding on either helper. Added by Claude Code
+(Claude Opus 5.5).
 
 ---
 
@@ -10123,3 +10172,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | EC | Name an Equality Chain as a Label Set: a controlling expression that is a chain of logical-or operators whose every operand compares one side-effect-free integer expression `e` with a different constant by `==` becomes `Name(e) != MagickFalse`, `Name` a `static inline` predicate of one `const T v` parameter whose body is `switch (v)` with the constants as labels in the chain's order, `return(MagickTrue);`, `default: break;`, and `return(MagickFalse);`. *Careful* gives the argument (C11 6.5.14, 6.8.4.2p5; duplicate labels do not compile); the new function is a label run (owner, 2026-11-07), which Recipe TB may later turn into a table | `opencl.c`'s `CompileOpenCLKernel` (campaign A, W16 lane a, wide build): its device-name test, ten `*ptr == c` operands, is the file's largest *Complex Conditional* (nine) and most of its cc 17. Recipe P leaves the chain in a predicate of cc 12 that is no label run (3.24 to 3.52 with that new finding); this recipe 3.24 to 3.52 with only the label run, 3.62 with TB after it | owner |
 | 2026-11-10 | AMEND | TB | Membership form, *character labels*: the labels may all be character constants of the basic character set when `n` is a `char` parameter (a predicate Recipe EC made); the table is then of `char`, and the guard sees each character constant move once (`OK`, or `WARN` listing only the loop's `0` as added). *Careful* gives the argument (C11 6.8.4.2p5, 6.2.5p3: each value is non-negative and fits in `char`, so the element holds it and `==` compares the values the `case` compared). Still six steps | `opencl.c`'s `IsIllegalFileNameCharacter` (campaign A, W16 lane a, wide build), the ten-label predicate Recipe EC made from `CompileOpenCLKernel`'s device-name test (cc 13, a label run); a probe 3.52 to 3.62, no finding left on it | owner |
 | 2026-11-10 | NEW | EM | Replace an Equality Chain with a Membership Table: a `static` predicate whose body is `return((C) ? MagickTrue : MagickFalse);` with `C` a logical-or chain of `n == Li` (a parameter against distinct enumeration constants), alone, behind `a &&` (a side-effect-free comparison of another parameter), or before a last side-effect-free parenthesised operand `r`, becomes a loop over a new `static const` table of the constants in chain order (under `if (a)`, or followed by `return((r) ? MagickTrue : MagickFalse);`); table checked by script; guard `WARN` with `0` added once; timing when called per pixel | `fx.c`'s `IsPixelAccessFunction`, `IsUnqualifiedPixelFunction` and `IsChannelQualifiableOperator` (cc 9 each), campaign A, W16 lane c: logical-or chains that TB (no `switch`), LP and P refuse; probes: each leaves *Complex Method* with no new function, fx.c flat at 3.62, and 3.62 to 3.73 with the planned `FxImage` and `ImageStat` steps. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-10 | AMEND | RV | Step 6: (a) a caller returning another type `T` (`ssize_t`) passes `T *result` and declares `T returned;`; (b) the block may write up to four plain locals the caller reads after it, each as a pointer (Recipe O steps 2 and 5: `*v`, `(*v).m`, `&v` becomes `v`), and a local it writes only on returning paths (Recipe W step 3) goes by value; (c) more than four parameters go in a `const` input struct (Recipe N's member form), and a block holding an earlier helper's call passes that helper's struct on unchanged (N step 2 pass-through) beside a second struct of its own inputs, the earlier fill moving with the call past statements that write none of its members. *Careful* gives the argument | `fx.c`'s `GetConstantColour` (campaign A, W16 lane c): the colour-function block returns `-1`, `lenfun` or a call's value as `ssize_t`, writes `colour` (read after it on the `gray` path) and `*v0` to `*v2`, and destroys `dummy_exception` before returning; the colour-space block around it returns `0` or the inner value. A probe of both: Complex Method (cc 17) leaves, fx.c 3.73 to 3.78 to 3.88, no finding on either helper | owner |
