@@ -1839,6 +1839,36 @@ static void EqualizeColormapSync(Image *image,PixelPacket *equalize_map,
   }
 }
 
+static void IntegrateEqualizeHistogram(const Image *image,
+  const cl_uint4 *histogram,cl_float4 *map)
+{
+  cl_float4
+    intensity;
+
+  cl_uint
+    i;
+
+  (void) memset(&intensity,0,sizeof(intensity));
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    if ((image->channel_mask & SyncChannels) != 0)
+    {
+      intensity.x+=histogram[i].s[2];
+      map[i]=intensity;
+      continue;
+    }
+    if ((image->channel_mask & RedChannel) != 0)
+      intensity.x+=histogram[i].s[2];
+    if ((image->channel_mask & GreenChannel) != 0)
+      intensity.y+=histogram[i].s[1];
+    if ((image->channel_mask & BlueChannel) != 0)
+      intensity.z+=histogram[i].s[0];
+    if ((image->channel_mask & AlphaChannel) != 0)
+      intensity.w+=histogram[i].s[3];
+    map[i]=intensity;
+  }
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -1878,7 +1908,6 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   cl_float4
     white,
     black,
-    intensity,
     *map;
 
   HistogramBufferInfo
@@ -2023,25 +2052,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   /*
     Integrate the histogram to get the equalization map.
   */
-  (void) memset(&intensity,0,sizeof(intensity));
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    if ((image->channel_mask & SyncChannels) != 0)
-    {
-      intensity.x+=histogram[i].s[2];
-      map[i]=intensity;
-      continue;
-    }
-    if ((image->channel_mask & RedChannel) != 0)
-      intensity.x+=histogram[i].s[2];
-    if ((image->channel_mask & GreenChannel) != 0)
-      intensity.y+=histogram[i].s[1];
-    if ((image->channel_mask & BlueChannel) != 0)
-      intensity.z+=histogram[i].s[0];
-    if ((image->channel_mask & AlphaChannel) != 0)
-      intensity.w+=histogram[i].s[3];
-    map[i]=intensity;
-  }
+  IntegrateEqualizeHistogram(image,histogram,map);
   black=map[0];
   white=map[(int) MaxMap];
   (void) memset(equalize_map,0,(MaxMap+1)*sizeof(*equalize_map));
