@@ -4213,6 +4213,13 @@ static PixelChannel CheckStatisticsChannel (FxInfo * pfx, PixelChannel channel)
   return(channel);
 }
 
+static inline MagickBooleanType HasChannelStatistics(
+  const ChannelStatistics *cs,const PixelChannel channel)
+{
+  return(((cs != (ChannelStatistics *) NULL) && (channel >= 0)) ?
+    MagickTrue : MagickFalse);
+}
+
 static inline fxFltType ImageStat (
   FxInfo * pfx, ssize_t ImgNum, PixelChannel channel, ImgAttrE ia)
 {
@@ -4245,23 +4252,23 @@ static inline fxFltType ImageStat (
       ret = (fxFltType) GetBlobSize (pfx->image);
       break;
     case aKurtosis:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
         ret = cs[channel].kurtosis;
       break;
     case aMaxima:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
         ret = cs[channel].maxima;
       break;
     case aMean:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
         ret = cs[channel].mean;
       break;
     case aMedian:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
         ret = cs[channel].median;
       break;
     case aMinima:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
         ret = cs[channel].minima;
       break;
     case aPage:
@@ -4303,11 +4310,11 @@ static inline fxFltType ImageStat (
       ret = pfx->Images[ImgNum]->resolution.y;
       break;
     case aSkewness:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
         ret = cs[channel].skewness;
       break;
     case aStdDev:
-      if ((cs != (ChannelStatistics *) NULL) && (channel >= 0))
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
         ret = cs[channel].standard_deviation;
       break;
     case aH:
