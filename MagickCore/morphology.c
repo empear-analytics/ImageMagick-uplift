@@ -2107,6 +2107,20 @@ static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireNamedEdgeKernel(const KernelInfoType type,
+  const GeometryInfo *args,const char *kernel_array)
+{
+  KernelInfo
+    *kernel;
+
+  kernel=ParseKernelArray(kernel_array);
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->rho);
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2291,51 +2305,16 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     */
     case LaplacianKernel:
       return(AcquireLaplacianKernel(kernel,type,args));
-    case SobelKernel:
-      { /* Simple Sobel Kernel */
-        kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
+    case SobelKernel: /* Simple Sobel Kernel */
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,0,-1  2,0,-2  1,0,-1"));
     case RobertsKernel:
-      {
-        kernel=ParseKernelArray("3: 0,0,0  1,-1,0  0,0,0");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
+      return(AcquireNamedEdgeKernel(type,args,"3: 0,0,0  1,-1,0  0,0,0"));
     case PrewittKernel:
-      {
-        kernel=ParseKernelArray("3: 1,0,-1  1,0,-1  1,0,-1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,0,-1  1,0,-1  1,0,-1"));
     case CompassKernel:
-      {
-        kernel=ParseKernelArray("3: 1,1,-1  1,-2,-1  1,1,-1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,1,-1  1,-2,-1  1,1,-1"));
     case KirschKernel:
-      {
-        kernel=ParseKernelArray("3: 5,-3,-3  5,0,-3  5,-3,-3");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
+      return(AcquireNamedEdgeKernel(type,args,"3: 5,-3,-3  5,0,-3  5,-3,-3"));
     case FreiChenKernel:
       /* Direction is set to be left to right positive */
       /* http://www.math.tau.ac.il/~turkel/notes/edge_detectors.pdf -- RIGHT? */
