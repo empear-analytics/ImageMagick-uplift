@@ -4412,6 +4412,40 @@ static MagickBooleanType GetExpressionOperand (FxInfo * pfx,
   return(MagickTrue);
 }
 
+static MagickBooleanType TranslateAssignmentOperand (
+  const UserSymbolAssignment * assignment, int * UserSymNdx0,
+  MagickBooleanType * broke)
+{
+  FxInfo
+    *const pfx = assignment->pfx;
+
+  const MagickBooleanType
+    UserSymbol = assignment->UserSymbol,
+    Assign = assignment->Assign,
+    Update = assignment->Update;
+
+  (*broke)=MagickFalse;
+    if (TranslateAssignedExpression (assignment, broke) == MagickFalse)
+      return MagickFalse;
+    if ((*broke) != MagickFalse) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+    if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,*UserSymNdx0) !=
+        MagickFalse) {
+      ElementT * pel;
+      (void) AddAddressingElement (pfx, rCopyFrom, *UserSymNdx0);
+      *UserSymNdx0 = NULL_ADDRESS;
+      pel = &pfx->Elements[pfx->usedElements-1];
+      pel->do_push = MagickTrue;
+    }
+
+    if (UserSymbol) {
+      FlushUnaryPrefixOperators (pfx);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -4495,21 +4529,10 @@ static MagickBooleanType TranslateExpression (
     assignment.Assign=Assign;
     assignment.Update=Update;
     assignment.IncrDecr=IncrDecr;
-    if (TranslateAssignedExpression (&assignment, &broke) == MagickFalse)
+    if (TranslateAssignmentOperand (&assignment, &UserSymNdx0, &broke) ==
+        MagickFalse)
       return MagickFalse;
     if (broke != MagickFalse) break;
-    if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
-        MagickFalse) {
-      ElementT * pel;
-      (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx0);
-      UserSymNdx0 = NULL_ADDRESS;
-      pel = &pfx->Elements[pfx->usedElements-1];
-      pel->do_push = MagickTrue;
-    }
-
-    if (UserSymbol) {
-      FlushUnaryPrefixOperators (pfx);
-    }
 
     if (!ProcessTernaryOpr (pfx, &ternary)) return MagickFalse;
 
