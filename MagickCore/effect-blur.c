@@ -638,13 +638,88 @@ static MagickBooleanType BlurAdaptiveLine(const AdaptiveBlurLine *line,
   return(MagickTrue);
 }
 
-MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
-  const double sigma,ExceptionInfo *exception)
+typedef struct _AdaptiveBlur
 {
+  const Image
+    *image;
+
+  Image
+    *blur_image,
+    *edge_image;
+
+  double
+    **kernel;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
+} AdaptiveBlur;
+
+static MagickBooleanType BlurAdaptiveRows(const AdaptiveBlur *adaptive,
+  MagickBooleanType status,MagickOffsetType progress)
+{
+  const Image
+    *const image = adaptive->image;
+
+  Image
+    *const blur_image = adaptive->blur_image,
+    *const edge_image = adaptive->edge_image;
+
+  double
+    **const kernel = adaptive->kernel;
+
+  const size_t
+    width = adaptive->width;
+
+  ExceptionInfo
+    *const exception = adaptive->exception;
+
   CacheView
     *blur_view,
     *edge_view,
     *image_view;
+
+  ssize_t
+    y;
+
+  image_view=AcquireVirtualCacheView(image,exception);
+  edge_view=AcquireVirtualCacheView(edge_image,exception);
+  blur_view=AcquireAuthenticCacheView(blur_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,blur_image,blur_image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) blur_image->rows; y++)
+  {
+    const AdaptiveBlurLine
+      line = { image, blur_image, edge_image, image_view, edge_view, blur_view,
+        kernel, width, exception };
+
+    if (BlurAdaptiveLine(&line,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetBlurProgress(image,AdaptiveBlurImageTag,progress,&status);
+      }
+  }
+  blur_image->type=image->type;
+  blur_view=DestroyCacheView(blur_view);
+  edge_view=DestroyCacheView(edge_view);
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
+  const double sigma,ExceptionInfo *exception)
+{
+  AdaptiveBlur
+    adaptive;
 
   double
     **kernel;
@@ -664,9 +739,6 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
 
   size_t
     width;
-
-  ssize_t
-    y;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -710,34 +782,13 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   */
   status=MagickTrue;
   progress=0;
-  image_view=AcquireVirtualCacheView(image,exception);
-  edge_view=AcquireVirtualCacheView(edge_image,exception);
-  blur_view=AcquireAuthenticCacheView(blur_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,blur_image,blur_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) blur_image->rows; y++)
-  {
-    const AdaptiveBlurLine
-      line = { image, blur_image, edge_image, image_view, edge_view, blur_view,
-        kernel, width, exception };
-
-    if (BlurAdaptiveLine(&line,y,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetBlurProgress(image,AdaptiveBlurImageTag,progress,&status);
-      }
-  }
-  blur_image->type=image->type;
-  blur_view=DestroyCacheView(blur_view);
-  edge_view=DestroyCacheView(edge_view);
-  image_view=DestroyCacheView(image_view);
+  adaptive.image=image;
+  adaptive.blur_image=blur_image;
+  adaptive.edge_image=edge_image;
+  adaptive.kernel=kernel;
+  adaptive.width=width;
+  adaptive.exception=exception;
+  status=BlurAdaptiveRows(&adaptive,status,progress);
   edge_image=DestroyImage(edge_image);
   RelinquishAdaptiveKernelSet(kernel,width);
   return(ReleaseFailedImage(blur_image,status));
