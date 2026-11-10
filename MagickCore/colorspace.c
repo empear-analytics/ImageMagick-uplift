@@ -1368,42 +1368,47 @@ static MagickBooleanType sRGBTransformCMYKOrGray(
   return(sRGBTransformLogOrLinear(table,image,status,exception));
 }
 
+static const ColorspaceType
+  GenericColorspaces[] =
+  {
+    CMYColorspace,
+    Adobe98Colorspace,
+    CAT02LMSColorspace,
+    DisplayP3Colorspace,
+    HCLColorspace,
+    HCLpColorspace,
+    HSBColorspace,
+    HSIColorspace,
+    HSLColorspace,
+    HSVColorspace,
+    HWBColorspace,
+    JzazbzColorspace,
+    LabColorspace,
+    LCHColorspace,
+    LCHabColorspace,
+    LCHuvColorspace,
+    LMSColorspace,
+    LuvColorspace,
+    OklabColorspace,
+    OklchColorspace,
+    ProPhotoColorspace,
+    xyYColorspace,
+    XYZColorspace,
+    YCbCrColorspace,
+    YDbDrColorspace,
+    YIQColorspace,
+    YPbPrColorspace,
+    YUVColorspace
+  };
+
 static MagickBooleanType IsGenericColorspace(const ColorspaceType colorspace)
 {
-  switch (colorspace)
-  {
-    case CMYColorspace:
-    case Adobe98Colorspace:
-    case CAT02LMSColorspace:
-    case DisplayP3Colorspace:
-    case HCLColorspace:
-    case HCLpColorspace:
-    case HSBColorspace:
-    case HSIColorspace:
-    case HSLColorspace:
-    case HSVColorspace:
-    case HWBColorspace:
-    case JzazbzColorspace:
-    case LabColorspace:
-    case LCHColorspace:
-    case LCHabColorspace:
-    case LCHuvColorspace:
-    case LMSColorspace:
-    case LuvColorspace:
-    case OklabColorspace:
-    case OklchColorspace:
-    case ProPhotoColorspace:
-    case xyYColorspace:
-    case XYZColorspace:
-    case YCbCrColorspace:
-    case YDbDrColorspace:
-    case YIQColorspace:
-    case YPbPrColorspace:
-    case YUVColorspace:
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(GenericColorspaces)/sizeof(*GenericColorspaces)); i++)
+    if (GenericColorspaces[i] == colorspace)
       return(MagickTrue);
-    default:
-      break;
-  }
   return(MagickFalse);
 }
 
