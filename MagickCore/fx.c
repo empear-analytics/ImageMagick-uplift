@@ -6123,11 +6123,11 @@ static Image *FinishFxImage (FxInfo * pfx, MagickBooleanType status,
   return(fx_image);
 }
 
+#define FxImageTag  "FxNew/Image"
+
 MagickExport Image *FxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
-#define FxImageTag  "FxNew/Image"
-
   CacheView
     *fx_view,
     *image_view;
