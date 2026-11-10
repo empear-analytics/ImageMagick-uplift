@@ -1474,6 +1474,16 @@ static inline MagickBooleanType IsIllegalFileNameCharacter(const char c)
   return(MagickFalse);
 }
 
+static void ReplaceIllegalFileNameCharacters(char *ptr)
+{
+  while (*ptr != '\0')
+  {
+    if (IsIllegalFileNameCharacter(*ptr) != MagickFalse)
+      *ptr = '_';
+    ptr++;
+  }
+}
+
 static MagickBooleanType CompileOpenCLKernel(MagickCLDevice device,
   const char *kernel,const char *options,size_t signature,
   ExceptionInfo *exception)
@@ -1495,12 +1505,7 @@ static MagickBooleanType CompileOpenCLKernel(MagickCLDevice device,
   (void) CopyMagickString(deviceName,device->name,MagickPathExtent);
   ptr=deviceName;
   /* Strip out illegal characters for file names */
-  while (*ptr != '\0')
-  {
-    if (IsIllegalFileNameCharacter(*ptr) != MagickFalse)
-      *ptr = '_';
-    ptr++;
-  }
+  ReplaceIllegalFileNameCharacters(ptr);
   (void) FormatLocaleString(filename,MagickPathExtent,
     "%s%s%s_%s_%08x_%.17g.bin",GetOpenCLCacheDirectory(),
     DirectorySeparator,"magick_opencl",deviceName,(unsigned int) signature,
