@@ -907,6 +907,56 @@ static void AccumulateDifferenceVariance(const TextureDirection *texture,
       density_xy[x].direction[i].alpha;
 }
 
+static void AccumulateDifferenceEntropies(const TextureDirection *texture,
+  const TextureSlots *slots,const ssize_t x)
+{
+  PixelInfo
+    *const entropy_x = slots->entropy_x,
+    *const entropy_y = slots->entropy_y;
+
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  FeatureStatistics
+    *const density_x = texture->density_x,
+    *const density_xy = texture->density_xy,
+    *const density_y = texture->density_y;
+
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Difference entropy.
+  */
+  channel_features[RedPixelChannel].difference_entropy[i]-=
+    density_xy[x].direction[i].red*
+    log2(density_xy[x].direction[i].red);
+  channel_features[GreenPixelChannel].difference_entropy[i]-=
+    density_xy[x].direction[i].green*
+    log2(density_xy[x].direction[i].green);
+  channel_features[BluePixelChannel].difference_entropy[i]-=
+    density_xy[x].direction[i].blue*
+    log2(density_xy[x].direction[i].blue);
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].difference_entropy[i]-=
+      density_xy[x].direction[i].black*
+      log2(density_xy[x].direction[i].black);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].difference_entropy[i]-=
+      density_xy[x].direction[i].alpha*
+      log2(density_xy[x].direction[i].alpha);
+  /*
+    Information Measures of Correlation.
+  */
+  SubtractFeatureEntropy(image,entropy_x,
+    &density_x[x].direction[i]);
+  SubtractFeatureEntropy(image,entropy_y,
+    &density_y[x].direction[i]);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1335,33 +1385,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     for (x=0; x < (ssize_t) number_grays; x++)
     {
       AccumulateDifferenceVariance(&texture,&slots,x);
-      /*
-        Difference entropy.
-      */
-      channel_features[RedPixelChannel].difference_entropy[i]-=
-        density_xy[x].direction[i].red*
-        log2(density_xy[x].direction[i].red);
-      channel_features[GreenPixelChannel].difference_entropy[i]-=
-        density_xy[x].direction[i].green*
-        log2(density_xy[x].direction[i].green);
-      channel_features[BluePixelChannel].difference_entropy[i]-=
-        density_xy[x].direction[i].blue*
-        log2(density_xy[x].direction[i].blue);
-      if (image->colorspace == CMYKColorspace)
-        channel_features[BlackPixelChannel].difference_entropy[i]-=
-          density_xy[x].direction[i].black*
-          log2(density_xy[x].direction[i].black);
-      if (image->alpha_trait != UndefinedPixelTrait)
-        channel_features[AlphaPixelChannel].difference_entropy[i]-=
-          density_xy[x].direction[i].alpha*
-          log2(density_xy[x].direction[i].alpha);
-      /*
-        Information Measures of Correlation.
-      */
-      SubtractFeatureEntropy(image,&entropy_x.direction[i],
-        &density_x[x].direction[i]);
-      SubtractFeatureEntropy(image,&entropy_y.direction[i],
-        &density_y[x].direction[i]);
+      AccumulateDifferenceEntropies(&texture,&slots,x);
     }
     /*
       Difference variance.
