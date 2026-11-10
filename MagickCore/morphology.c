@@ -4069,6 +4069,102 @@ static void ReportMorphologyProgress(const Image *image,
     (*status)=MagickFalse;
 }
 
+typedef struct _MorphologyRowInput
+{
+  MorphologyMethod
+    method;
+
+  const Image
+    *image;
+
+  Image
+    *morphology_image;
+
+  const KernelInfo
+    *kernel;
+
+  double
+    bias;
+
+  CacheView
+    *image_view,
+    *morphology_view;
+
+  OffsetInfo
+    offset;
+
+  size_t
+    *changes,
+    width;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    y;
+
+  int
+    id;
+} MorphologyRowInput;
+
+static MagickBooleanType ProcessMorphologyRow(const MorphologyRowInput *input,
+  MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  ssize_t
+    center;
+
+  MorphologyRow
+    row;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(input->image_view,-input->offset.x,input->y-
+    input->offset.y,input->width,input->kernel->height,input->exception);
+  q=GetCacheViewAuthenticPixels(input->morphology_view,0,input->y,
+    input->morphology_image->columns,1,input->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  center=(ssize_t) ((ssize_t) GetPixelChannels(input->image)*(ssize_t)
+    input->width*input->offset.y+(ssize_t) GetPixelChannels(input->image)*
+    input->offset.x);
+  row.method=input->method;
+  row.image=input->image;
+  row.morphology_image=input->morphology_image;
+  row.kernel=input->kernel;
+  row.bias=input->bias;
+  row.changes=input->changes;
+  row.center=center;
+  row.id=input->id;
+  for (x=0; x < (ssize_t) input->image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(input->image); i++)
+    {
+      MorphologyRowChannel(&row,p,q,i);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(input->image);
+    q+=(ptrdiff_t) GetPixelChannels(input->morphology_image);
+  }
+  if (SyncCacheViewAuthenticPixels(input->morphology_view,input->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4246,56 +4342,12 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
     const int
       id = GetOpenMPThreadId();
 
-    const Quantum
-      *magick_restrict p;
+    const MorphologyRowInput
+      input = { method, image, morphology_image, kernel, bias, image_view,
+        morphology_view, offset, changes, width, exception, y, id };
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    ssize_t
-      center;
-
-    MorphologyRow
-      row;
-
-    if (status == MagickFalse)
+    if (ProcessMorphologyRow(&input,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,-offset.x,y-offset.y,width,
-      kernel->height,exception);
-    q=GetCacheViewAuthenticPixels(morphology_view,0,y,morphology_image->columns,
-      1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    center=(ssize_t) ((ssize_t) GetPixelChannels(image)*(ssize_t) width*
-      offset.y+(ssize_t) GetPixelChannels(image)*offset.x);
-    row.method=method;
-    row.image=image;
-    row.morphology_image=morphology_image;
-    row.kernel=kernel;
-    row.bias=bias;
-    row.changes=changes;
-    row.center=center;
-    row.id=id;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        MorphologyRowChannel(&row,p,q,i);
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(morphology_image);
-    }
-    if (SyncCacheViewAuthenticPixels(morphology_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
