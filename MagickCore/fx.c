@@ -2947,6 +2947,118 @@ static MagickBooleanType CompleteFunction (FxInfo * pfx,
   return MagickTrue;
 }
 
+typedef struct _FunctionClosing
+{
+  FunctionE
+    fe;
+
+  const char
+    *funStr;
+
+  int
+    ndx0,
+    ndx1,
+    ndx2,
+    ndx3;
+
+  char
+    expChLimit;
+
+  OperatorE
+    pushOp;
+
+  MagickBooleanType
+    coordQual;
+
+  PixelChannel
+    chQual;
+
+  ImgAttrE
+    iaQual;
+
+  char
+    *pExpStart;
+
+  size_t
+    lenExp;
+} FunctionClosing;
+
+static MagickBooleanType CloseFunction (FxInfo * pfx, const char chLimit,
+  const FunctionClosing *closing)
+{
+  FunctionE
+    fe = closing->fe;
+
+  const char
+    *funStr = closing->funStr;
+
+  const int
+    ndx0 = closing->ndx0,
+    ndx1 = closing->ndx1,
+    ndx2 = closing->ndx2,
+    ndx3 = closing->ndx3;
+
+  char
+    expChLimit = closing->expChLimit;
+
+  const OperatorE
+    pushOp = closing->pushOp;
+
+  MagickBooleanType
+    coordQual = closing->coordQual;
+
+  PixelChannel
+    chQual = closing->chQual;
+
+  ImgAttrE
+    iaQual = closing->iaQual;
+
+  char
+    *const pExpStart = closing->pExpStart;
+
+  const size_t
+    lenExp = closing->lenExp;
+
+  FunctionCompletion completion;
+
+  const FunctionQualifiers qualifiers = { &coordQual, &fe, &funStr, &chQual,
+    &expChLimit, &iaQual };
+
+  if (chLimit != expChLimit) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "For function", "'%s', arguments don't end with '%c' at '%s'",
+      funStr, expChLimit, SetShortExp(pfx));
+    return MagickFalse;
+  }
+  if (!PopOprOpenParen (pfx, pushOp)) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Bug: For function", "'%s' tos not '%s' at '%s'",
+      funStr, Operators[pushOp].str, SetShortExp(pfx));
+    return MagickFalse;
+  }
+
+  if (QualifyFunction (pfx, &qualifiers) == MagickFalse)
+    return MagickFalse;
+
+  if ((IsChannelQualifiedAttr(iaQual,chQual) != MagickFalse) &&
+      (!CheckAttrChannelQualifier (pfx, iaQual, chQual)))
+    return MagickFalse;
+
+  completion.fe=fe;
+  completion.ndx0=ndx0;
+  completion.ndx1=ndx1;
+  completion.ndx2=ndx2;
+  completion.ndx3=ndx3;
+  completion.expChLimit=expChLimit;
+  completion.chQual=chQual;
+  completion.iaQual=iaQual;
+  completion.pExpStart=pExpStart;
+  completion.lenExp=lenExp;
+  return(CompleteFunction (pfx, &completion));
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2971,10 +3083,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
   MagickBooleanType returned = MagickFalse;
 
-  FunctionCompletion completion;
-
-  const FunctionQualifiers qualifiers = { &coordQual, &fe, &funStr, &chQual,
-    &expChLimit, &iaQual };
+  FunctionClosing closing;
 
   const FunctionOpening opening = { &pushOp, &strLimit, &chLimit, &expChLimit,
     &nArgs };
@@ -3063,39 +3172,20 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       (ExpectNoArgsClose (pfx, expChLimit, &chLimit) == MagickFalse))
     return MagickFalse;
 
-  if (chLimit != expChLimit) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "For function", "'%s', arguments don't end with '%c' at '%s'",
-      funStr, expChLimit, SetShortExp(pfx));
-    return MagickFalse;
-  }
-  if (!PopOprOpenParen (pfx, pushOp)) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "Bug: For function", "'%s' tos not '%s' at '%s'",
-      funStr, Operators[pushOp].str, SetShortExp(pfx));
-    return MagickFalse;
-  }
-
-  if (QualifyFunction (pfx, &qualifiers) == MagickFalse)
-    return MagickFalse;
-
-  if ((IsChannelQualifiedAttr(iaQual,chQual) != MagickFalse) &&
-      (!CheckAttrChannelQualifier (pfx, iaQual, chQual)))
-    return MagickFalse;
-
-  completion.fe=fe;
-  completion.ndx0=ndx0;
-  completion.ndx1=ndx1;
-  completion.ndx2=ndx2;
-  completion.ndx3=ndx3;
-  completion.expChLimit=expChLimit;
-  completion.chQual=chQual;
-  completion.iaQual=iaQual;
-  completion.pExpStart=pExpStart;
-  completion.lenExp=lenExp;
-  return(CompleteFunction (pfx, &completion));
+  closing.fe=fe;
+  closing.funStr=funStr;
+  closing.ndx0=ndx0;
+  closing.ndx1=ndx1;
+  closing.ndx2=ndx2;
+  closing.ndx3=ndx3;
+  closing.expChLimit=expChLimit;
+  closing.pushOp=pushOp;
+  closing.coordQual=coordQual;
+  closing.chQual=chQual;
+  closing.iaQual=iaQual;
+  closing.pExpStart=pExpStart;
+  closing.lenExp=lenExp;
+  return(CloseFunction (pfx, chLimit, &closing));
 }
 
 static MagickBooleanType IsStealth (int op)
