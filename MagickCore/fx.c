@@ -2859,6 +2859,94 @@ static MagickBooleanType AddArgumentAddressing (
   return MagickTrue;
 }
 
+typedef struct _FunctionCompletion
+{
+  FunctionE
+    fe;
+
+  int
+    ndx0,
+    ndx1,
+    ndx2,
+    ndx3;
+
+  char
+    expChLimit;
+
+  PixelChannel
+    chQual;
+
+  ImgAttrE
+    iaQual;
+
+  char
+    *pExpStart;
+
+  size_t
+    lenExp;
+} FunctionCompletion;
+
+static MagickBooleanType CompleteFunction (FxInfo * pfx,
+  const FunctionCompletion *completion)
+{
+  FunctionE
+    fe = completion->fe;
+
+  const int
+    ndx0 = completion->ndx0,
+    ndx1 = completion->ndx1,
+    ndx2 = completion->ndx2,
+    ndx3 = completion->ndx3;
+
+  const char
+    expChLimit = completion->expChLimit;
+
+  const PixelChannel
+    chQual = completion->chQual;
+
+  const ImgAttrE
+    iaQual = completion->iaQual;
+
+  char
+    *const pExpStart = completion->pExpStart;
+
+  const size_t
+    lenExp = completion->lenExp;
+
+  if (fe==fWhile) {
+    pfx->Elements[ndx1].element_index = ndx2+1;
+  } else if (fe==fDo) {
+    pfx->Elements[ndx0].element_index = ndx1+1;
+    pfx->Elements[ndx1].element_index = ndx2+1;
+  } else if (fe==fFor) {
+    pfx->Elements[ndx2].element_index = ndx3;
+  } else if (fe==fIf) {
+    pfx->Elements[ndx1].element_index = ndx2 + 1;
+    pfx->Elements[ndx2].element_index = ndx3;
+  } else {
+    PixelAccessQualifiers access;
+
+    ApplyZeroUFunction (pfx, iaQual, &fe);
+    (void) AddElement (pfx, (fxFltType) 0, (int) fe);
+    access.fe=fe;
+    access.expChLimit=expChLimit;
+    access.chQual=chQual;
+    access.iaQual=iaQual;
+    ApplyPixelAccessQualifiers (&access, pfx);
+  }
+
+  if (pExpStart && lenExp) {
+    ElementT * pel = &pfx->Elements[pfx->usedElements-1];
+    pel->exp_start = pExpStart;
+    pel->exp_len = lenExp;
+  }
+
+  if (fe == fDebug)
+    pfx->ContainsDebug = MagickTrue;
+
+  return MagickTrue;
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2882,6 +2970,8 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   ImgAttrE iaQual = aNull;
 
   MagickBooleanType returned = MagickFalse;
+
+  FunctionCompletion completion;
 
   const FunctionQualifiers qualifiers = { &coordQual, &fe, &funStr, &chQual,
     &expChLimit, &iaQual };
@@ -2995,38 +3085,17 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       (!CheckAttrChannelQualifier (pfx, iaQual, chQual)))
     return MagickFalse;
 
-  if (fe==fWhile) {
-    pfx->Elements[ndx1].element_index = ndx2+1;
-  } else if (fe==fDo) {
-    pfx->Elements[ndx0].element_index = ndx1+1;
-    pfx->Elements[ndx1].element_index = ndx2+1;
-  } else if (fe==fFor) {
-    pfx->Elements[ndx2].element_index = ndx3;
-  } else if (fe==fIf) {
-    pfx->Elements[ndx1].element_index = ndx2 + 1;
-    pfx->Elements[ndx2].element_index = ndx3;
-  } else {
-    PixelAccessQualifiers access;
-
-    ApplyZeroUFunction (pfx, iaQual, &fe);
-    (void) AddElement (pfx, (fxFltType) 0, (int) fe);
-    access.fe=fe;
-    access.expChLimit=expChLimit;
-    access.chQual=chQual;
-    access.iaQual=iaQual;
-    ApplyPixelAccessQualifiers (&access, pfx);
-  }
-
-  if (pExpStart && lenExp) {
-    ElementT * pel = &pfx->Elements[pfx->usedElements-1];
-    pel->exp_start = pExpStart;
-    pel->exp_len = lenExp;
-  }
-
-  if (fe == fDebug)
-    pfx->ContainsDebug = MagickTrue;
-
-  return MagickTrue;
+  completion.fe=fe;
+  completion.ndx0=ndx0;
+  completion.ndx1=ndx1;
+  completion.ndx2=ndx2;
+  completion.ndx3=ndx3;
+  completion.expChLimit=expChLimit;
+  completion.chQual=chQual;
+  completion.iaQual=iaQual;
+  completion.pExpStart=pExpStart;
+  completion.lenExp=lenExp;
+  return(CompleteFunction (pfx, &completion));
 }
 
 static MagickBooleanType IsStealth (int op)
