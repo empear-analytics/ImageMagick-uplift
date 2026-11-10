@@ -383,3 +383,15 @@ function pointers would put an indirect call on a per-pixel path (as composite.c
 amendment** (ce647f64a): a struct the caller already fills for another static function's call may serve a later block
 when every variable the block reads is a member. **Upstream:** the parallel grays fill races (threads write equal values
 into shared `grays` entries); `p+=...;;` in the co-occurrence loop.
+
+## Lane d, morphology.c fourth leg: MorphologyPrimitive clean
+
+morphology.c 3.16 to 4.48 (23 refactor commits, every step but one H rising; helpers all inlined, no indirect calls,
+no forced-inline attribute). **Amendments** (59b543867): MT step 8 (copies reading a struct the caller already fills
+take `const Name *` beside `side`; a callee difference uses CF's `method`), CF step 4 (inputs through the shared
+struct), N step 4 (const locals or member form chosen member by member). Added after the owner's approval of the W16
+text; not yet confirmed. **Timing note:** step 11 (BlendKernelColumn) measured median +1.6%, minima +4% under load, with
+fewer instructions (318.12M to 317.78M); kept on instruction counts. **Upstream:** the vertical-convolve column path
+returns 0 rather than -1 on failure, so MorphologyApply misses a failed column pass; ErodeIntensity and DilateIntensity
+leave before `changes[id]++` and always report 0 changes; the DilateIntensity comment says the kernel is not reflected
+where the code reflects it.
