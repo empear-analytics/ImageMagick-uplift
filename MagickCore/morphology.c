@@ -2310,9 +2310,57 @@ static KernelInfo *AcquireLineOrThinningKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+typedef struct _BuiltInKernelInputs
+{
+  const GeometryInfo
+    *args;
+
+  double
+    nan;
+
+  ExceptionInfo
+    *exception;
+} BuiltInKernelInputs;
+
+static KernelInfo *AcquireHitAndMissKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  const double
+    nan = inputs->nan;
+
+  ExceptionInfo
+    *exception = inputs->exception;
+
+  switch(type) {
+      /*
+        HitAndMiss Kernels
+      */
+      case RingKernel:
+      case PeaksKernel:
+        return(AcquireRingKernel(kernel,type,args,nan));
+      case EdgesKernel:
+        return(AcquireEdgesKernel(kernel,type,exception));
+      case CornersKernel:
+        return(AcquireCornersKernel(type,exception));
+      case DiagonalsKernel:
+        return(AcquireDiagonalsKernel(kernel,type,args));
+      case LineEndsKernel:
+        return(AcquireLineEndsKernel(kernel,type,args,exception));
+    default:
+      return(AcquireLineOrThinningKernel(kernel,type,args,exception));
+  }
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
+  BuiltInKernelInputs
+    inputs;
+
   KernelInfo
     *kernel;
 
@@ -2523,22 +2571,11 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         return(AcquirePlusOrCrossKernel(kernel,args,nan,PlusKernelShape));
       case CrossKernel:
         return(AcquirePlusOrCrossKernel(kernel,args,nan,CrossKernelShape));
-      /*
-        HitAndMiss Kernels
-      */
-      case RingKernel:
-      case PeaksKernel:
-        return(AcquireRingKernel(kernel,type,args,nan));
-      case EdgesKernel:
-        return(AcquireEdgesKernel(kernel,type,exception));
-      case CornersKernel:
-        return(AcquireCornersKernel(type,exception));
-      case DiagonalsKernel:
-        return(AcquireDiagonalsKernel(kernel,type,args));
-      case LineEndsKernel:
-        return(AcquireLineEndsKernel(kernel,type,args,exception));
     default:
-      return(AcquireLineOrThinningKernel(kernel,type,args,exception));
+      inputs.args=args;
+      inputs.nan=nan;
+      inputs.exception=exception;
+      return(AcquireHitAndMissKernel(kernel,type,&inputs));
   }
   return(kernel);
 }
