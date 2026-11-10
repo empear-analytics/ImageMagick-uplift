@@ -1811,27 +1811,35 @@ static void FillLogTransformMapTop(ssize_t i,Quantum *logmap)
     logmap[i]=QuantumRange;
 }
 
-static void FillLogTransformMap(const LogTransformMap *log_map,
-  Quantum *logmap)
+static void FillLogTransformMapRamp(const LogTransformMap *log_map,
+  ssize_t i,Quantum *logmap)
 {
   const double
     black = log_map->black,
     density = log_map->density,
     film_gamma = log_map->film_gamma,
     gamma = log_map->gamma,
-    reference_black = log_map->reference_black,
     reference_white = log_map->reference_white;
+
+  for ( ; i < (ssize_t) (reference_white*MaxMap/MaximumLogarithmicColorspace); i++)
+    logmap[i]=ClampToQuantum((double) QuantumRange/(1.0-black)*
+      (pow(10.0,(MaximumLogarithmicColorspace*i/MaxMap-reference_white)*
+      (gamma/density)*0.002*MagickSafeReciprocal(film_gamma))-black));
+  FillLogTransformMapTop(i,logmap);
+}
+
+static void FillLogTransformMap(const LogTransformMap *log_map,
+  Quantum *logmap)
+{
+  const double
+    reference_black = log_map->reference_black;
 
   ssize_t
     i;
 
   for (i=0; i <= (ssize_t) (reference_black*MaxMap/MaximumLogarithmicColorspace); i++)
     logmap[i]=(Quantum) 0;
-  for ( ; i < (ssize_t) (reference_white*MaxMap/MaximumLogarithmicColorspace); i++)
-    logmap[i]=ClampToQuantum((double) QuantumRange/(1.0-black)*
-      (pow(10.0,(MaximumLogarithmicColorspace*i/MaxMap-reference_white)*
-      (gamma/density)*0.002*MagickSafeReciprocal(film_gamma))-black));
-  FillLogTransformMapTop(i,logmap);
+  FillLogTransformMapRamp(log_map,i,logmap);
 }
 
 typedef struct _ColorspaceLogRowInfo
