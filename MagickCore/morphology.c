@@ -4165,6 +4165,71 @@ static MagickBooleanType ProcessMorphologyRow(const MorphologyRowInput *input,
   return(MagickTrue);
 }
 
+typedef struct _MorphologyColumnFetch
+{
+  const Image
+    *image;
+
+  Image
+    *morphology_image;
+
+  const KernelInfo
+    *kernel;
+
+  CacheView
+    *image_view,
+    *morphology_view;
+
+  OffsetInfo
+    offset;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    x;
+} MorphologyColumnFetch;
+
+static MagickBooleanType FetchMorphologyColumn(
+  const MorphologyColumnFetch *fetch,const Quantum *magick_restrict *p,
+  Quantum *magick_restrict *q,MagickBooleanType *status)
+{
+  const Image
+    *image = fetch->image;
+
+  Image
+    *morphology_image = fetch->morphology_image;
+
+  const KernelInfo
+    *kernel = fetch->kernel;
+
+  CacheView
+    *image_view = fetch->image_view,
+    *morphology_view = fetch->morphology_view;
+
+  const OffsetInfo
+    offset = fetch->offset;
+
+  ExceptionInfo
+    *exception = fetch->exception;
+
+  const ssize_t
+    x = fetch->x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*p)=GetCacheViewVirtualPixels(image_view,x,-offset.y,1,image->rows+
+    kernel->height-1,exception);
+  (*q)=GetCacheViewAuthenticPixels(morphology_view,x,0,1,
+    morphology_image->rows,exception);
+  if (((*p) == (const Quantum *) NULL) || ((*q) == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4291,17 +4356,12 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         MorphologyColumn
           column;
 
-        if (status == MagickFalse)
+        const MorphologyColumnFetch
+          fetch = { image, morphology_image, kernel, image_view,
+            morphology_view, offset, exception, x };
+
+        if (FetchMorphologyColumn(&fetch,&p,&q,&status) == MagickFalse)
           continue;
-        p=GetCacheViewVirtualPixels(image_view,x,-offset.y,1,image->rows+
-          kernel->height-1,exception);
-        q=GetCacheViewAuthenticPixels(morphology_view,x,0,1,
-          morphology_image->rows,exception);
-        if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
         center=(ssize_t) GetPixelChannels(image)*offset.y;
         column.image=image;
         column.morphology_image=morphology_image;
