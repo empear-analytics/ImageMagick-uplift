@@ -1282,6 +1282,18 @@ static void ComputeContrastFeatures(const TextureDirection *texture)
   SetMaximumCorrelation(texture);
 }
 
+static inline ssize_t FindFeatureGray(const PixelPacket *grays,
+  const size_t member,const unsigned int value)
+{
+  ssize_t
+    u;
+
+  u=0;
+  while ((*(const unsigned int *) ((const char *) &grays[u]+member)) != value)
+    u++;
+  return(u);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1529,49 +1541,39 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
       for (i=0; i < 4; i++)
       {
         offset=GetFeatureAdjacencyOffset(image,distance,i);
-        u=0;
-        v=0;
-        while (grays[u].red != ScaleQuantumToMap(GetPixelRed(image,p)))
-          u++;
-        while (grays[v].red != ScaleQuantumToMap(GetPixelRed(image,p+offset*(ssize_t) GetPixelChannels(image))))
-          v++;
+        u=FindFeatureGray(grays,offsetof(PixelPacket,red),
+          ScaleQuantumToMap(GetPixelRed(image,p)));
+        v=FindFeatureGray(grays,offsetof(PixelPacket,red),
+          ScaleQuantumToMap(GetPixelRed(image,p+offset*(ssize_t) GetPixelChannels(image))));
         cooccurrence[u][v].direction[i].red++;
         cooccurrence[v][u].direction[i].red++;
-        u=0;
-        v=0;
-        while (grays[u].green != ScaleQuantumToMap(GetPixelGreen(image,p)))
-          u++;
-        while (grays[v].green != ScaleQuantumToMap(GetPixelGreen(image,p+offset*(ssize_t) GetPixelChannels(image))))
-          v++;
+        u=FindFeatureGray(grays,offsetof(PixelPacket,green),
+          ScaleQuantumToMap(GetPixelGreen(image,p)));
+        v=FindFeatureGray(grays,offsetof(PixelPacket,green),
+          ScaleQuantumToMap(GetPixelGreen(image,p+offset*(ssize_t) GetPixelChannels(image))));
         cooccurrence[u][v].direction[i].green++;
         cooccurrence[v][u].direction[i].green++;
-        u=0;
-        v=0;
-        while (grays[u].blue != ScaleQuantumToMap(GetPixelBlue(image,p)))
-          u++;
-        while (grays[v].blue != ScaleQuantumToMap(GetPixelBlue(image,p+offset*(ssize_t) GetPixelChannels(image))))
-          v++;
+        u=FindFeatureGray(grays,offsetof(PixelPacket,blue),
+          ScaleQuantumToMap(GetPixelBlue(image,p)));
+        v=FindFeatureGray(grays,offsetof(PixelPacket,blue),
+          ScaleQuantumToMap(GetPixelBlue(image,p+offset*(ssize_t) GetPixelChannels(image))));
         cooccurrence[u][v].direction[i].blue++;
         cooccurrence[v][u].direction[i].blue++;
         if (image->colorspace == CMYKColorspace)
           {
-            u=0;
-            v=0;
-            while (grays[u].black != ScaleQuantumToMap(GetPixelBlack(image,p)))
-              u++;
-            while (grays[v].black != ScaleQuantumToMap(GetPixelBlack(image,p+offset*(ssize_t) GetPixelChannels(image))))
-              v++;
+            u=FindFeatureGray(grays,offsetof(PixelPacket,black),
+              ScaleQuantumToMap(GetPixelBlack(image,p)));
+            v=FindFeatureGray(grays,offsetof(PixelPacket,black),
+              ScaleQuantumToMap(GetPixelBlack(image,p+offset*(ssize_t) GetPixelChannels(image))));
             cooccurrence[u][v].direction[i].black++;
             cooccurrence[v][u].direction[i].black++;
           }
         if (image->alpha_trait != UndefinedPixelTrait)
           {
-            u=0;
-            v=0;
-            while (grays[u].alpha != ScaleQuantumToMap(GetPixelAlpha(image,p)))
-              u++;
-            while (grays[v].alpha != ScaleQuantumToMap(GetPixelAlpha(image,p+offset*(ssize_t) GetPixelChannels(image))))
-              v++;
+            u=FindFeatureGray(grays,offsetof(PixelPacket,alpha),
+              ScaleQuantumToMap(GetPixelAlpha(image,p)));
+            v=FindFeatureGray(grays,offsetof(PixelPacket,alpha),
+              ScaleQuantumToMap(GetPixelAlpha(image,p+offset*(ssize_t) GetPixelChannels(image))));
             cooccurrence[u][v].direction[i].alpha++;
             cooccurrence[v][u].direction[i].alpha++;
           }
