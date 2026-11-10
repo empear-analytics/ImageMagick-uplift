@@ -4599,33 +4599,10 @@ static MagickBooleanType TranslateOperatorsAndOperands (
   return(MagickTrue);
 }
 
-static MagickBooleanType TranslateExpression (
-  FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
+static MagickBooleanType BeginExpression (FxInfo * pfx,
+  const char * strLimit, char * chLimit)
 {
-  /* There should be only one New per expression (oAssign), but can be many Old.
-  */
-  MagickBooleanType UserSymbol, NewUserSymbol;
-  int UserSymNdx0;
-
-  MagickBooleanType
-    Assign = MagickFalse,
-    Update = MagickFalse;
-
   int StartEleNdx;
-
-  const OperandSymbols
-    operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll };
-
-  ExpressionContext context;
-
-  TernaryT ternary;
-
-  const ExpressionTargets
-    targets = { &Assign, &Update, &UserSymNdx0, &ternary, &UserSymbol,
-      &NewUserSymbol };
-
-  ternary.addr_query = NULL_ADDRESS;
-  ternary.addr_colon = NULL_ADDRESS;
 
   if (pfx->teDepth >= MagickMaxRecursionDepth) {
     (void) ThrowMagickException(pfx->exception, GetMagickModule(), OptionError,
@@ -4655,6 +4632,37 @@ static MagickBooleanType TranslateExpression (
 
     return MagickFalse;
   }
+  return(MagickTrue);
+}
+
+static MagickBooleanType TranslateExpression (
+  FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
+{
+  /* There should be only one New per expression (oAssign), but can be many Old.
+  */
+  MagickBooleanType UserSymbol, NewUserSymbol;
+  int UserSymNdx0;
+
+  MagickBooleanType
+    Assign = MagickFalse,
+    Update = MagickFalse;
+
+  const OperandSymbols
+    operand0 = { &UserSymbol, &NewUserSymbol, &UserSymNdx0, needPopAll };
+
+  ExpressionContext context;
+
+  TernaryT ternary;
+
+  const ExpressionTargets
+    targets = { &Assign, &Update, &UserSymNdx0, &ternary, &UserSymbol,
+      &NewUserSymbol };
+
+  ternary.addr_query = NULL_ADDRESS;
+  ternary.addr_colon = NULL_ADDRESS;
+
+  if (BeginExpression (pfx, strLimit, chLimit) == MagickFalse)
+    return MagickFalse;
 
   if (!GetOperand (pfx, &operand0)) return MagickFalse;
   SkipSpaces (pfx);
