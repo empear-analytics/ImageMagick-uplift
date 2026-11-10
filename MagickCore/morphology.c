@@ -1834,12 +1834,44 @@ static KernelInfo *AcquireLineJunctionsKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static const char
+  *const ThickRidgeKernelArrays[] =
+  {
+    "4x3+1+1:0,1,1,- -,1,1,- -,1,1,0",
+    "4x3+2+1:0,1,1,- -,1,1,- -,1,1,0",
+    "4x3+1+1:-,1,1,0 -,1,1,- 0,1,1,-",
+    "4x3+2+1:-,1,1,0 -,1,1,- 0,1,1,-",
+    "3x4+1+1:0,-,- 1,1,1 1,1,1 -,-,0",
+    "3x4+1+2:0,-,- 1,1,1 1,1,1 -,-,0",
+    "3x4+1+1:-,-,0 1,1,1 1,1,1 0,-,-",
+    "3x4+1+2:-,-,0 1,1,1 1,1,1 0,-,-"
+  };
+
+static MagickBooleanType AppendThickRidgeKernels(KernelInfo *kernel,
+  const KernelInfoType type)
+{
+  KernelInfo
+    *new_kernel;
+
+  size_t
+    j;
+
+  for (j=0; j < (sizeof(ThickRidgeKernelArrays)/
+       sizeof(*ThickRidgeKernelArrays)); j++)
+  {
+    new_kernel=ParseKernelArray(ThickRidgeKernelArrays[j]);
+    if (new_kernel == (KernelInfo *) NULL)
+      return(MagickFalse);
+    new_kernel->type = type;
+    LastKernelInfo(kernel)->next = new_kernel;
+  }
+  return(MagickTrue);
+}
+
 static KernelInfo *AcquireRidgesKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
   /* Ridges - Ridge finding kernels */
-  KernelInfo
-    *new_kernel;
   switch ( (int) args->rho ) {
     case 1:
     default:
@@ -1859,46 +1891,8 @@ static KernelInfo *AcquireRidgesKernel(KernelInfo *kernel,
       /* Kernels to find a stepped 'thick' line, 4 rotates + mirrors */
       /* Unfortunately we can not yet rotate a non-square kernel */
       /* But then we can't flip a non-symmetrical kernel either */
-      new_kernel=ParseKernelArray("4x3+1+1:0,1,1,- -,1,1,- -,1,1,0");
-      if (new_kernel == (KernelInfo *) NULL)
+      if (AppendThickRidgeKernels(kernel,type) == MagickFalse)
         return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("4x3+2+1:0,1,1,- -,1,1,- -,1,1,0");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("4x3+1+1:-,1,1,0 -,1,1,- 0,1,1,-");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("4x3+2+1:-,1,1,0 -,1,1,- 0,1,1,-");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("3x4+1+1:0,-,- 1,1,1 1,1,1 -,-,0");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("3x4+1+2:0,-,- 1,1,1 1,1,1 -,-,0");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("3x4+1+1:-,-,0 1,1,1 1,1,1 0,-,-");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("3x4+1+2:-,-,0 1,1,1 1,1,1 0,-,-");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
       break;
   }
   return(kernel);
