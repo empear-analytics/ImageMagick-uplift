@@ -4058,6 +4058,17 @@ static void ConvolveMorphologyColumnPixels(const MorphologyColumn *column,
 
 #define MorphologyTag  "Morphology/Image"
 
+static void ReportMorphologyProgress(const Image *image,
+  const MagickOffsetType progress,const size_t span,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,MorphologyTag,progress,span);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4208,17 +4219,11 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
           status=MagickFalse;
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
-            MagickBooleanType
-              proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
             #pragma omp atomic
 #endif
             progress++;
-            proceed=SetImageProgress(image,MorphologyTag,progress,
-              image->columns);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
+            ReportMorphologyProgress(image,progress,image->columns,&status);
           }
       }
       morphology_image->type=image->type;
@@ -4293,16 +4298,11 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,MorphologyTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportMorphologyProgress(image,progress,image->rows,&status);
       }
   }
   morphology_view=DestroyCacheView(morphology_view);
