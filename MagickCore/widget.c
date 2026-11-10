@@ -3737,6 +3737,31 @@ static void ReleaseDialogAction(const DialogRelease *release,
     }
 }
 
+static void ReleaseDialogCancel(const DialogRelease *release,
+  const XWidgetInfo *reply_info,XWidgetInfo *cancel_info,size_t *state)
+{
+  Display
+    *const display = release->display;
+
+  XWindows
+    *const windows = release->windows;
+
+  const XEvent
+    event = release->event;
+
+  if ((*cancel_info).raised == MagickFalse)
+    {
+      if ((event.xbutton.window == windows->widget.id) &&
+          (MatteIsActive((*cancel_info),event.xbutton)))
+        {
+          *(*reply_info).text='\0';
+          (*state)|=ExitState;
+        }
+      (*cancel_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,&(*cancel_info));
+    }
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -4012,17 +4037,10 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
         release.windows=windows;
         release.event=event;
         ReleaseDialogAction(&release,&action_info,&state);
-        if (cancel_info.raised == MagickFalse)
-          {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(cancel_info,event.xbutton)))
-              {
-                *reply_info.text='\0';
-                state|=ExitState;
-              }
-            cancel_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-          }
+        release.display=display;
+        release.windows=windows;
+        release.event=event;
+        ReleaseDialogCancel(&release,&reply_info,&cancel_info,&state);
         break;
       }
       case ClientMessage:
