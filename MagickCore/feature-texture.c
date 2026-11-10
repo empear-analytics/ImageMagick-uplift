@@ -1173,6 +1173,40 @@ static void AccumulateCorrelationQAlpha(const TextureDirection *texture,
         density_y[x].direction[i].alpha;
 }
 
+static void AccumulateContrastRow(const TextureDirection *texture,
+  PixelInfo *pixel,const ssize_t y,const ssize_t z)
+{
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence;
+
+  const unsigned int
+    number_grays = texture->number_grays;
+
+  const ssize_t
+    i = texture->i;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) number_grays; x++)
+  {
+    /*
+      Contrast:  amount of local variations present in an image.
+    */
+    if (((y-x) == z) || ((x-y) == z))
+      {
+        AddFeatureStatistics(image,pixel,
+          &cooccurrence[x][y].direction[i]);
+      }
+    AccumulateCorrelationQ(texture,x,y,z);
+    AccumulateCorrelationQBlack(texture,x,y,z);
+    AccumulateCorrelationQAlpha(texture,x,y,z);
+  }
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1624,23 +1658,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
       (void) memset(&pixel,0,sizeof(pixel));
       for (y=0; y < (ssize_t) number_grays; y++)
       {
-        ssize_t
-          x;
-
-        for (x=0; x < (ssize_t) number_grays; x++)
-        {
-          /*
-            Contrast:  amount of local variations present in an image.
-          */
-          if (((y-x) == z) || ((x-y) == z))
-            {
-              AddFeatureStatistics(image,&pixel.direction[i],
-                &cooccurrence[x][y].direction[i]);
-            }
-          AccumulateCorrelationQ(&texture,x,y,z);
-          AccumulateCorrelationQBlack(&texture,x,y,z);
-          AccumulateCorrelationQAlpha(&texture,x,y,z);
-        }
+        AccumulateContrastRow(&texture,&pixel.direction[i],y,z);
       }
       channel_features[RedPixelChannel].contrast[i]+=z*z*
         pixel.direction[i].red;
