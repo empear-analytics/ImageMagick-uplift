@@ -2403,6 +2403,38 @@ static KernelInfo *AcquireAreaShapedKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireEdgeDetectionKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  ExceptionInfo
+    *exception = inputs->exception;
+
+  switch(type) {
+    case SobelKernel: /* Simple Sobel Kernel */
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,0,-1  2,0,-2  1,0,-1"));
+    case RobertsKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 0,0,0  1,-1,0  0,0,0"));
+    case PrewittKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,0,-1  1,0,-1  1,0,-1"));
+    case CompassKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,1,-1  1,-2,-1  1,1,-1"));
+    case KirschKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 5,-3,-3  5,0,-3  5,-3,-3"));
+    case FreiChenKernel:
+      /* Direction is set to be left to right positive */
+      /* http://www.math.tau.ac.il/~turkel/notes/edge_detectors.pdf -- RIGHT? */
+      /* http://ltswww.epfl.ch/~courstiv/exos_labos/sol3.pdf -- WRONG? */
+      return(AcquireFreiChenKernel(kernel,type,args,exception));
+
+    default:
+      return(AcquireAreaShapedKernel(kernel,type,inputs));
+  }
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2587,27 +2619,11 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     */
     case LaplacianKernel:
       return(AcquireLaplacianKernel(kernel,type,args));
-    case SobelKernel: /* Simple Sobel Kernel */
-      return(AcquireNamedEdgeKernel(type,args,"3: 1,0,-1  2,0,-2  1,0,-1"));
-    case RobertsKernel:
-      return(AcquireNamedEdgeKernel(type,args,"3: 0,0,0  1,-1,0  0,0,0"));
-    case PrewittKernel:
-      return(AcquireNamedEdgeKernel(type,args,"3: 1,0,-1  1,0,-1  1,0,-1"));
-    case CompassKernel:
-      return(AcquireNamedEdgeKernel(type,args,"3: 1,1,-1  1,-2,-1  1,1,-1"));
-    case KirschKernel:
-      return(AcquireNamedEdgeKernel(type,args,"3: 5,-3,-3  5,0,-3  5,-3,-3"));
-    case FreiChenKernel:
-      /* Direction is set to be left to right positive */
-      /* http://www.math.tau.ac.il/~turkel/notes/edge_detectors.pdf -- RIGHT? */
-      /* http://ltswww.epfl.ch/~courstiv/exos_labos/sol3.pdf -- WRONG? */
-      return(AcquireFreiChenKernel(kernel,type,args,exception));
-
     default:
       inputs.args=args;
       inputs.nan=nan;
       inputs.exception=exception;
-      return(AcquireAreaShapedKernel(kernel,type,&inputs));
+      return(AcquireEdgeDetectionKernel(kernel,type,&inputs));
   }
   return(kernel);
 }
