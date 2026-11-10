@@ -1351,6 +1351,14 @@ static void XScreenExpose(Display *display,XWindows *windows,XEvent *event)
     }
 }
 
+static void XScreenTrackWidgetMapping(XWindows *windows,const XEvent *event)
+{
+  if (event->type == MapNotify)
+    windows->widget.mapped=MagickTrue;
+  if (event->type == UnmapNotify)
+    windows->widget.mapped=MagickFalse;
+}
+
 static int XScreenEvent(Display *display,XEvent *event,char *data)
 {
   XWindows
@@ -1367,10 +1375,7 @@ static int XScreenEvent(Display *display,XEvent *event,char *data)
     }
   if (event->xany.window == windows->widget.id)
     {
-      if (event->type == MapNotify)
-        windows->widget.mapped=MagickTrue;
-      if (event->type == UnmapNotify)
-        windows->widget.mapped=MagickFalse;
+      XScreenTrackWidgetMapping(windows,event);
       return(MagickTrue);
     }
   switch (event->type)
