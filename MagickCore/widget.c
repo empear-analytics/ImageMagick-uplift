@@ -522,12 +522,26 @@ static void XScrollTextMarker(XFontStruct *font_info,XWidgetInfo *text_info,
   text_info->marker=(char *) text+i;
 }
 
-static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
-  XWidgetInfo *text_info)
+static void XSetVisibleTextMarker(XFontStruct *font_info,
+  XWidgetInfo *text_info,const unsigned int width)
 {
   const char
     *text;
 
+  if (text_info->cursor < text_info->marker)
+    text_info->marker=text_info->cursor;
+  else
+    {
+      text=text_info->marker;
+      if (XTextWidth(font_info,(char *) text,(int) (text_info->cursor-text)) >
+          (int) width)
+        XScrollTextMarker(font_info,text_info,width);
+    }
+}
+
+static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
+  XWidgetInfo *text_info)
+{
   int
     x,
     y;
@@ -575,15 +589,7 @@ static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
   /*
     Determine beginning of the visible text.
   */
-  if (text_info->cursor < text_info->marker)
-    text_info->marker=text_info->cursor;
-  else
-    {
-      text=text_info->marker;
-      if (XTextWidth(font_info,(char *) text,(int) (text_info->cursor-text)) >
-          (int) width)
-        XScrollTextMarker(font_info,text_info,width);
-    }
+  XSetVisibleTextMarker(font_info,text_info,width);
   /*
     Draw text and cursor.
   */
