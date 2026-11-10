@@ -2953,6 +2953,52 @@ static int ReleaseCommandSelection(const CommandWidgetEvent *command_event,int i
   return(id);
 }
 
+static int TrackCommandSelections(const CommandWidgetEvent *command_event,int id)
+{
+  Display
+    *const display = command_event->display;
+
+  XWindows
+    *const windows = command_event->windows;
+
+  XEvent
+    *const event = command_event->event;
+
+  const unsigned int
+    number_selections = command_event->number_selections;
+
+  int
+    i;
+
+  for (i=0; i < (int) number_selections; i++)
+  {
+    if (i >= (int) windows->command.data)
+      {
+        if (selection_info[i].raised ==
+            MatteIsActive(selection_info[i],event->xmotion))
+          {
+            /*
+              Button status changed.
+            */
+            selection_info[i].raised=!selection_info[i].raised;
+            XDrawBeveledButton(display,&windows->command,
+              &selection_info[i]);
+          }
+        continue;
+      }
+    if (MatteIsActive(selection_info[i],event->xmotion) == MagickFalse)
+      continue;
+    submenu_info=selection_info[i];
+    submenu_info.active=MagickTrue;
+    toggle_info.raised=MagickTrue;
+    toggle_info.y=submenu_info.y+(int) (submenu_info.height >> 1)-
+      (int) (toggle_info.height >> 1);
+    XDrawTriangleEast(display,&windows->command,&toggle_info);
+    id=i;
+  }
+  return(id);
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -3222,32 +3268,14 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
         */
         for ( ; ; )
         {
-          for (i=0; i < (int) number_selections; i++)
-          {
-            if (i >= (int) windows->command.data)
-              {
-                if (selection_info[i].raised ==
-                    MatteIsActive(selection_info[i],event->xmotion))
-                  {
-                    /*
-                      Button status changed.
-                    */
-                    selection_info[i].raised=!selection_info[i].raised;
-                    XDrawBeveledButton(display,&windows->command,
-                      &selection_info[i]);
-                  }
-                continue;
-              }
-            if (MatteIsActive(selection_info[i],event->xmotion) == MagickFalse)
-              continue;
-            submenu_info=selection_info[i];
-            submenu_info.active=MagickTrue;
-            toggle_info.raised=MagickTrue;
-            toggle_info.y=submenu_info.y+(int) (submenu_info.height >> 1)-
-              (int) (toggle_info.height >> 1);
-            XDrawTriangleEast(display,&windows->command,&toggle_info);
-            id=i;
-          }
+          CommandWidgetEvent
+            command_event;
+
+          command_event.display=display;
+          command_event.windows=windows;
+          command_event.event=event;
+          command_event.number_selections=number_selections;
+          id=TrackCommandSelections(&command_event,id);
           XDelay(display,SuspendTime);
           if (XCheckMaskEvent(display,ButtonMotionMask,event) == MagickFalse)
             break;
