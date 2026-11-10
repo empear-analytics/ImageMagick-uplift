@@ -12606,6 +12606,16 @@ static MagickBooleanType XRotateImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsPostscriptFormat(
+  const ImageInfo *image_info)
+{
+  return(((LocaleCompare(image_info->magick,"EPS") == 0) ||
+    (LocaleCompare(image_info->magick,"PDF") == 0) ||
+    (LocaleCompare(image_info->magick,"PS") == 0) ||
+    (LocaleCompare(image_info->magick,"PS2") == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType XSaveImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -12686,10 +12696,7 @@ static MagickBooleanType XSaveImage(Display *display,
       image->quality=StringToUnsignedLong(quality);
       image_info->interlace=status != 0 ? NoInterlace : PlaneInterlace;
     }
-  if ((LocaleCompare(image_info->magick,"EPS") == 0) ||
-      (LocaleCompare(image_info->magick,"PDF") == 0) ||
-      (LocaleCompare(image_info->magick,"PS") == 0) ||
-      (LocaleCompare(image_info->magick,"PS2") == 0))
+  if (IsPostscriptFormat(image_info) != MagickFalse)
     {
       char
         geometry[MagickPathExtent];
