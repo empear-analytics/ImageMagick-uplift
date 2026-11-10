@@ -2214,14 +2214,42 @@ static inline KernelInfo *AcquireManhattanOrEuclideanKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireOctagonalKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  const KernelRadius
+    radius = { 2.0, 5 };  /* default/minimum radius = 2 */
+
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  SetKernelRadius(kernel,args,&radius);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      {
+        double
+          r1 = MagickMax(fabs((double)u),fabs((double)v)),
+          r2 = floor((double)(labs((long)u)+labs((long)v)+1)/1.5);
+        kernel->positive_range += kernel->values[i] =
+                  args->sigma*MagickMax(r1,r2);
+      }
+  kernel->maximum = kernel->values[0];
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
   KernelInfo
     *kernel;
-
-  ssize_t
-    i;
 
   ssize_t
     u,
@@ -2470,27 +2498,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         return(AcquireManhattanOrEuclideanKernel(kernel,args,
           ManhattanKernelDistance));
       case OctagonalKernel:
-      {
-        const KernelRadius
-          radius = { 2.0, 5 };  /* default/minimum radius = 2 */
-
-        SetKernelRadius(kernel,args,&radius);
-
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-          for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-            {
-              double
-                r1 = MagickMax(fabs((double)u),fabs((double)v)),
-                r2 = floor((double)(labs((long)u)+labs((long)v)+1)/1.5);
-              kernel->positive_range += kernel->values[i] =
-                        args->sigma*MagickMax(r1,r2);
-            }
-        kernel->maximum = kernel->values[0];
-        break;
-      }
+        return(AcquireOctagonalKernel(kernel,args));
     case EuclideanKernel:
       return(AcquireManhattanOrEuclideanKernel(kernel,args,
         EuclideanKernelDistance));
