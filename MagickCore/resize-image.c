@@ -288,8 +288,9 @@ static inline ssize_t GetResizePixelOffset(const ResizePixelFilter *filter,
     (ssize_t) image->columns+position));
 }
 
-static magick_attribute((__always_inline__)) inline void FilterResizePixel(
-  const ResizePixelFilter *filter,const Quantum *p,Quantum *q)
+static magick_attribute((__always_inline__)) inline void FilterResizeChannel(
+  const ResizePixelFilter *filter,const ssize_t i,const Quantum *p,
+  Quantum *q)
 {
   const Image
     *const image = filter->image,
@@ -306,71 +307,78 @@ static magick_attribute((__always_inline__)) inline void FilterResizePixel(
   const double
     bisect = filter->bisect;
 
+  double
+    alpha,
+    gamma,
+    pixel;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    resize_traits,
+    traits;
+
+  ssize_t
+    j,
+    k;
+
+  channel=GetPixelChannelChannel(image,i);
+  traits=GetPixelChannelTraits(image,channel);
+  resize_traits=GetPixelChannelTraits(resize_image,channel);
+  if (IsResizeChannelUndefined(traits,resize_traits) != MagickFalse)
+    return;
+  if (IsResizeChannelCopied(resize_image,resize_traits,q) != MagickFalse)
+    {
+      j=(ssize_t) (MagickMin(MagickMax(bisect,(double) start),(double)
+        stop-1.0)+0.5);
+      k=GetResizePixelOffset(filter,j-start);
+      SetPixelChannel(resize_image,channel,
+        p[k*(ssize_t) GetPixelChannels(image)+i],q);
+      return;
+    }
+  pixel=0.0;
+  if ((resize_traits & BlendPixelTrait) == 0)
+    {
+      /*
+        No alpha blending.
+      */
+      for (j=0; j < n; j++)
+      {
+        k=GetResizePixelOffset(filter,j);
+        alpha=contribution[j].weight;
+        pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
+      }
+      SetPixelChannel(resize_image,channel,ClampToQuantum(pixel),q);
+      return;
+    }
+  /*
+    Alpha blending.
+  */
+  gamma=0.0;
+  for (j=0; j < n; j++)
+  {
+    k=GetResizePixelOffset(filter,j);
+    alpha=contribution[j].weight*QuantumScale*
+      (double) GetPixelAlpha(image,p+k*(ssize_t) GetPixelChannels(image));
+    pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
+    gamma+=alpha;
+  }
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(resize_image,channel,ClampToQuantum(gamma*pixel),q);
+}
+
+static magick_attribute((__always_inline__)) inline void FilterResizePixel(
+  const ResizePixelFilter *filter,const Quantum *p,Quantum *q)
+{
+  const Image
+    *const image = filter->image;
+
   ssize_t
     i;
 
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    double
-      alpha,
-      gamma,
-      pixel;
-
-    PixelChannel
-      channel;
-
-    PixelTrait
-      resize_traits,
-      traits;
-
-    ssize_t
-      j,
-      k;
-
-    channel=GetPixelChannelChannel(image,i);
-    traits=GetPixelChannelTraits(image,channel);
-    resize_traits=GetPixelChannelTraits(resize_image,channel);
-    if (IsResizeChannelUndefined(traits,resize_traits) != MagickFalse)
-      continue;
-    if (IsResizeChannelCopied(resize_image,resize_traits,q) != MagickFalse)
-      {
-        j=(ssize_t) (MagickMin(MagickMax(bisect,(double) start),(double)
-          stop-1.0)+0.5);
-        k=GetResizePixelOffset(filter,j-start);
-        SetPixelChannel(resize_image,channel,
-          p[k*(ssize_t) GetPixelChannels(image)+i],q);
-        continue;
-      }
-    pixel=0.0;
-    if ((resize_traits & BlendPixelTrait) == 0)
-      {
-        /*
-          No alpha blending.
-        */
-        for (j=0; j < n; j++)
-        {
-          k=GetResizePixelOffset(filter,j);
-          alpha=contribution[j].weight;
-          pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
-        }
-        SetPixelChannel(resize_image,channel,ClampToQuantum(pixel),q);
-        continue;
-      }
-    /*
-      Alpha blending.
-    */
-    gamma=0.0;
-    for (j=0; j < n; j++)
-    {
-      k=GetResizePixelOffset(filter,j);
-      alpha=contribution[j].weight*QuantumScale*
-        (double) GetPixelAlpha(image,p+k*(ssize_t) GetPixelChannels(image));
-      pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
-      gamma+=alpha;
-    }
-    gamma=MagickSafeReciprocal(gamma);
-    SetPixelChannel(resize_image,channel,ClampToQuantum(gamma*pixel),q);
-  }
+    FilterResizeChannel(filter,i,p,q);
 }
 
 static MagickBooleanType AcquireFilterContributions(const Image *image,
