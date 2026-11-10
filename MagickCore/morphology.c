@@ -5458,6 +5458,33 @@ static void AttemptKernelRotations(KernelInfo *kernel,double angle)
     angle=ReflectKernel(kernel,angle);
 }
 
+static MagickBooleanType IsRotationUselessKernel(const KernelInfoType type)
+{
+  switch (type)
+  {
+    /* These built-in kernels are cylindrical kernels, rotating is useless */
+    case GaussianKernel:
+    case DoGKernel:
+    case LoGKernel:
+    case DiskKernel:
+    case PeaksKernel:
+    case LaplacianKernel:
+    case ChebyshevKernel:
+    case ManhattanKernel:
+    case EuclideanKernel:
+    /* These may be rotatable at non-90 angles in the future */
+    /* but simply rotating them in multiples of 90 degrees is useless */
+    case SquareKernel:
+    case DiamondKernel:
+    case PlusKernel:
+    case CrossKernel:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -5478,27 +5505,9 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
     return;   /* Near zero angle - no change! - At least not at this time */
 
   /* Handle special cases */
+  if (IsRotationUselessKernel(kernel->type) != MagickFalse)
+    return;
   switch (kernel->type) {
-    /* These built-in kernels are cylindrical kernels, rotating is useless */
-    case GaussianKernel:
-    case DoGKernel:
-    case LoGKernel:
-    case DiskKernel:
-    case PeaksKernel:
-    case LaplacianKernel:
-    case ChebyshevKernel:
-    case ManhattanKernel:
-    case EuclideanKernel:
-      return;
-
-    /* These may be rotatable at non-90 angles in the future */
-    /* but simply rotating them in multiples of 90 degrees is useless */
-    case SquareKernel:
-    case DiamondKernel:
-    case PlusKernel:
-    case CrossKernel:
-      return;
-
     /* These only allows a +/-90 degree rotation (by transpose) */
     /* A 180 degree rotation is useless */
     case BlurKernel:
