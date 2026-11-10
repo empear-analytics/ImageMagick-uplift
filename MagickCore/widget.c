@@ -1369,24 +1369,23 @@ static int XScreenEvent(Display *display,XEvent *event,char *data)
           break;
         }
       if (event->xexpose.window == windows->magnify.id)
-        if (event->xexpose.count == 0)
-          if (windows->magnify.mapped)
-            {
-              ExceptionInfo
-                *exception;
-
-              exception=AcquireExceptionInfo();
-              XMakeMagnifyImage(display,windows,exception);
-              exception=DestroyExceptionInfo(exception);
-              break;
-            }
-      if (event->xexpose.window == windows->command.id)
-        if (event->xexpose.count == 0)
+        if ((event->xexpose.count == 0) && (windows->magnify.mapped))
           {
-            (void) XCommandWidget(display,windows,(const char *const *) NULL,
-              event);
+            ExceptionInfo
+              *exception;
+
+            exception=AcquireExceptionInfo();
+            XMakeMagnifyImage(display,windows,exception);
+            exception=DestroyExceptionInfo(exception);
             break;
           }
+      if ((event->xexpose.window == windows->command.id) &&
+          (event->xexpose.count == 0))
+        {
+          (void) XCommandWidget(display,windows,(const char *const *) NULL,
+            event);
+          break;
+        }
       break;
     }
     case FocusOut:
