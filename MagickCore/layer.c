@@ -1938,11 +1938,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     choice_targets.dup_image=(&dup_image);
     choice_targets.i=(&i);
     if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse)
-      {
-        bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-        disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-        return((Image *) NULL);
-      }
+      return(ReleaseFrameLists(bounds,disposals));
     assert(prev_image != (Image *) NULL);
     disposals[i]=disposals[i-1];
 #if DEBUG_OPT_FRAME
