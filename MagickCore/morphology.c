@@ -4299,6 +4299,124 @@ static size_t *AcquireMorphologyChanges(void)
   return(changes);
 }
 
+typedef struct _MorphologyPrimitiveSetup
+{
+  MorphologyMethod
+    method;
+
+  const Image
+    *image;
+
+  Image
+    *morphology_image;
+
+  const KernelInfo
+    *kernel;
+
+  double
+    bias;
+
+  CacheView
+    *image_view,
+    *morphology_view;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  OffsetInfo
+    offset;
+
+  size_t
+    changed,
+    *changes,
+    width;
+
+  ExceptionInfo
+    *exception;
+} MorphologyPrimitiveSetup;
+
+static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
+{
+  const MorphologyMethod
+    method = setup->method;
+
+  const Image
+    *image = setup->image;
+
+  Image
+    *morphology_image = setup->morphology_image;
+
+  const KernelInfo
+    *kernel = setup->kernel;
+
+  const double
+    bias = setup->bias;
+
+  CacheView
+    *image_view = setup->image_view,
+    *morphology_view = setup->morphology_view;
+
+  MagickBooleanType
+    status = setup->status;
+
+  MagickOffsetType
+    progress = setup->progress;
+
+  const OffsetInfo
+    offset = setup->offset;
+
+  size_t
+    changed = setup->changed,
+    *changes = setup->changes;
+
+  const size_t
+    width = setup->width;
+
+  ExceptionInfo
+    *exception = setup->exception;
+
+  ssize_t
+    j,
+    y;
+
+  /*
+    Normal handling of horizontal or rectangular kernels (row by row).
+  */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,morphology_image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    const MorphologyRowInput
+      input = { method, image, morphology_image, kernel, bias, image_view,
+        morphology_view, offset, changes, width, exception, y, id };
+
+    if (ProcessMorphologyRow(&input,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ReportMorphologyProgress(image,progress,image->rows,&status);
+      }
+  }
+  morphology_view=DestroyCacheView(morphology_view);
+  image_view=DestroyCacheView(image_view);
+  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    changed+=changes[j];
+  changes=(size_t *) RelinquishMagickMemory(changes);
+  return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4321,12 +4439,14 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   MagickOffsetType
     progress;
 
+  MorphologyPrimitiveSetup
+    setup;
+
   OffsetInfo
     offset;
 
   ssize_t
-    j,
-    y;
+    j;
 
   size_t
     changed,
@@ -4421,39 +4541,21 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
       changes=(size_t *) RelinquishMagickMemory(changes);
       return(status ? (ssize_t) (changed/GetImageChannels(image)) : 0);
     }
-  /*
-    Normal handling of horizontal or rectangular kernels (row by row).
-  */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,morphology_image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const int
-      id = GetOpenMPThreadId();
-
-    const MorphologyRowInput
-      input = { method, image, morphology_image, kernel, bias, image_view,
-        morphology_view, offset, changes, width, exception, y, id };
-
-    if (ProcessMorphologyRow(&input,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        ReportMorphologyProgress(image,progress,image->rows,&status);
-      }
-  }
-  morphology_view=DestroyCacheView(morphology_view);
-  image_view=DestroyCacheView(image_view);
-  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
-    changed+=changes[j];
-  changes=(size_t *) RelinquishMagickMemory(changes);
-  return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
+  setup.method=method;
+  setup.image=image;
+  setup.morphology_image=morphology_image;
+  setup.kernel=kernel;
+  setup.bias=bias;
+  setup.image_view=image_view;
+  setup.morphology_view=morphology_view;
+  setup.status=status;
+  setup.progress=progress;
+  setup.offset=offset;
+  setup.changed=changed;
+  setup.changes=changes;
+  setup.width=width;
+  setup.exception=exception;
+  return(MorphologyRows(&setup));
 }
 
 /*
