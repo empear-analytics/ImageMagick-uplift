@@ -1674,6 +1674,15 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    members its own text reads (each filled with the others, from the variable of its
    name), the block reads them as `name->member`, and each inner call passes `name`
    where it passed `&name`.
+   The statements of one function body are siblings in the same sense (2026-11-10): a
+   later block that holds an earlier sibling's call and runs to the end of the
+   function (Recipe E step 7's value form, each moved in its own commit) may take that
+   sibling's `const Name *name` and pass it on unchanged, when no statement of the later
+   block before the call writes a member's variable. The fill then moves with the call,
+   unchanged, to directly before the later block's call; the later block binds the
+   members it reads as step 4 does, and each variable it writes that is not a member
+   (step 2's read-then-written variable, which nothing after it reads) goes by value as
+   a parameter, at most four parameters in all.
    The same holds in a parallel loop body when the earlier sibling is a nested loop's
    whole body moved under Recipe PS step 7, its struct declared `const` with its
    initialiser among the body's declarations (PS step 6), and the later block is the
@@ -1816,6 +1825,13 @@ static void ThresholdWaveletLevel(float *pixels,
   last call. A pointer member the block writes through (`channel_sum`, under Recipe
   Q's read-only pointers) is read, not written: the new function reaches the same
   array through the same address the caller's `const` local held.
+- Under step 8's function-body form the fill runs earlier, before the later block's
+  statements, which write none of the members' variables (checked by reading every
+  path), so each member still holds at the inner call the value its variable holds
+  there, the value the earlier sibling read; the struct reaches the later block only
+  through a pointer to `const`, so nothing writes it in between. The variables the
+  later block writes go by value and are written in its copies, which hold what the
+  caller's would have held at the inner call.
 - A member bound to a non-`const` local (step 2's read-then-written variable) is
   Recipe E step 4's by-value input in another form: the local holds the value the
   variable held at the fill, which is its value at the call (nothing between them
@@ -1891,6 +1907,14 @@ struct of its own, the helper would bind sixteen locals and fill the row struct 
 from them (about 80 lines by count, *Large*); sharing it, the helper is 52 lines with
 no finding, 6.51 to 6.62. Added by Claude Code (Claude Opus
 5.5) under the mandate of 2026-10-24.
+Step 8's function-body form (2026-11-10, W16 lane c, owner's OK to evolve the recipes):
+`fx.c`'s `GetFunction`, whose tail (argument-count checks, then the closing checks and
+qualifiers, then the completion) moves outermost last as three E step 7 helpers. The
+argument-count block writes `FndArgs` and `chLimit` and holds the call of the closing
+helper, whose struct holds thirteen other variables; with a struct of its own it would
+bind them all and fill the inner struct again (*Large Method*, 72 lines, fx.c 3.99 to
+3.90 in a probe); passing the struct on, fx.c 3.99 to 4.04, no finding on any helper.
+Added by Claude Code (Claude Opus 5.5).
 
 ---
 
@@ -10173,3 +10197,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | TB | Membership form, *character labels*: the labels may all be character constants of the basic character set when `n` is a `char` parameter (a predicate Recipe EC made); the table is then of `char`, and the guard sees each character constant move once (`OK`, or `WARN` listing only the loop's `0` as added). *Careful* gives the argument (C11 6.8.4.2p5, 6.2.5p3: each value is non-negative and fits in `char`, so the element holds it and `==` compares the values the `case` compared). Still six steps | `opencl.c`'s `IsIllegalFileNameCharacter` (campaign A, W16 lane a, wide build), the ten-label predicate Recipe EC made from `CompileOpenCLKernel`'s device-name test (cc 13, a label run); a probe 3.52 to 3.62, no finding left on it | owner |
 | 2026-11-10 | NEW | EM | Replace an Equality Chain with a Membership Table: a `static` predicate whose body is `return((C) ? MagickTrue : MagickFalse);` with `C` a logical-or chain of `n == Li` (a parameter against distinct enumeration constants), alone, behind `a &&` (a side-effect-free comparison of another parameter), or before a last side-effect-free parenthesised operand `r`, becomes a loop over a new `static const` table of the constants in chain order (under `if (a)`, or followed by `return((r) ? MagickTrue : MagickFalse);`); table checked by script; guard `WARN` with `0` added once; timing when called per pixel | `fx.c`'s `IsPixelAccessFunction`, `IsUnqualifiedPixelFunction` and `IsChannelQualifiableOperator` (cc 9 each), campaign A, W16 lane c: logical-or chains that TB (no `switch`), LP and P refuse; probes: each leaves *Complex Method* with no new function, fx.c flat at 3.62, and 3.62 to 3.73 with the planned `FxImage` and `ImageStat` steps. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-10 | AMEND | RV | Step 6: (a) a caller returning another type `T` (`ssize_t`) passes `T *result` and declares `T returned;`; (b) the block may write up to four plain locals the caller reads after it, each as a pointer (Recipe O steps 2 and 5: `*v`, `(*v).m`, `&v` becomes `v`), and a local it writes only on returning paths (Recipe W step 3) goes by value; (c) more than four parameters go in a `const` input struct (Recipe N's member form), and a block holding an earlier helper's call passes that helper's struct on unchanged (N step 2 pass-through) beside a second struct of its own inputs, the earlier fill moving with the call past statements that write none of its members. *Careful* gives the argument | `fx.c`'s `GetConstantColour` (campaign A, W16 lane c): the colour-function block returns `-1`, `lenfun` or a call's value as `ssize_t`, writes `colour` (read after it on the `gray` path) and `*v0` to `*v2`, and destroys `dummy_exception` before returning; the colour-space block around it returns `0` or the inner value. A probe of both: Complex Method (cc 17) leaves, fx.c 3.73 to 3.78 to 3.88, no finding on either helper | owner |
+| 2026-11-10 | AMEND | N | Step 8: the statements of one function body are siblings as well: a later block that holds an earlier sibling's call and runs to the end of the function (E step 7's value form) may take that sibling's `const Name *name` and pass it on unchanged when none of its statements before the call writes a member's variable; the fill moves with the call to directly before the later block's call, and the variables the later block writes go by value (step 2's read-then-written form, nothing after reads them). *Careful* gives the argument | `fx.c`'s `GetFunction` (campaign A, W16 lane c): the argument-count tail writes `FndArgs` and `chLimit` and holds the call of the closing tail, whose struct holds thirteen variables; with its own struct the helper is a *Large Method* (72 lines, fx.c 3.99 to 3.90), passing the struct on 3.99 to 4.04 with no finding | owner |
