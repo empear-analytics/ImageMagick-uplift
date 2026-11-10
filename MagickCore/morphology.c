@@ -2146,6 +2146,40 @@ static void SetKernelRadius(KernelInfo *kernel,const GeometryInfo *args,
   kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
 }
 
+typedef enum
+{
+  PlusKernelShape,
+  CrossKernelShape
+} PlusKernelSide;
+
+static inline KernelInfo *AcquirePlusOrCrossKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan,const PlusKernelSide side)
+{
+  const KernelRadius
+    radius = { 1.0, 5 };  /* default radius 2 */
+
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  SetKernelRadius(kernel,args,&radius);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* set all kernel values along axises to given scale */
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      kernel->values[i] = ((side == PlusKernelShape) ? (u == 0 || v == 0) :
+        (u == v || u == -v)) ? args->sigma : nan;
+  kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
+  kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2359,41 +2393,9 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       case DiskKernel:
         return(AcquireDiskKernel(kernel,args,nan));
       case PlusKernel:
-        {
-          const KernelRadius
-            radius = { 1.0, 5 };  /* default radius 2 */
-
-          SetKernelRadius(kernel,args,&radius);
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          /* set all kernel values along axises to given scale */
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->values[i] = (u == 0 || v == 0) ? args->sigma : nan;
-          kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
-          kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
-          break;
-        }
+        return(AcquirePlusOrCrossKernel(kernel,args,nan,PlusKernelShape));
       case CrossKernel:
-        {
-          const KernelRadius
-            radius = { 1.0, 5 };  /* default radius 2 */
-
-          SetKernelRadius(kernel,args,&radius);
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          /* set all kernel values along axises to given scale */
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->values[i] = (u == v || u == -v) ? args->sigma : nan;
-          kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
-          kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
-          break;
-        }
+        return(AcquirePlusOrCrossKernel(kernel,args,nan,CrossKernelShape));
       /*
         HitAndMiss Kernels
       */
