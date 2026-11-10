@@ -663,12 +663,7 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
 
   /* global expand to rotated kernel list - only for single kernels */
   if ( kernel->next == (KernelInfo *) NULL ) {
-    if ( (flags & AreaValue) != 0 )         /* '@' symbol in kernel args */
-      ExpandRotateKernelInfo(kernel, 45.0);
-    else if ( (flags & GreaterValue) != 0 ) /* '>' symbol in kernel args */
-      ExpandRotateKernelInfo(kernel, 90.0);
-    else if ( (flags & LessValue) != 0 )    /* '<' symbol in kernel args */
-      ExpandMirrorKernelInfo(kernel);
+    ExpandKernelByFlags(kernel,flags);
   }
 
   return(kernel);
