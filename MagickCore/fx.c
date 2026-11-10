@@ -4446,6 +4446,66 @@ static MagickBooleanType TranslateAssignmentOperand (
   return(MagickTrue);
 }
 
+typedef struct _NextOperandTargets
+{
+  TernaryT
+    *ternary;
+
+  MagickBooleanType
+    *UserSymbol,
+    *NewUserSymbol;
+} NextOperandTargets;
+
+static MagickBooleanType PrepareNextOperand (
+  const ExpressionContext * context, const UserSymbolAssignment * assignment,
+  const NextOperandTargets * targets, MagickBooleanType * broke)
+{
+  FxInfo
+    *const pfx = assignment->pfx;
+
+  const char
+    *const strLimit = assignment->strLimit;
+
+  const MagickBooleanType
+    IncrDecr = assignment->IncrDecr;
+
+  TernaryT
+    *const ternary = targets->ternary;
+
+  MagickBooleanType
+    *const UserSymbol = targets->UserSymbol,
+    *const NewUserSymbol = targets->NewUserSymbol;
+
+  (*broke)=MagickFalse;
+    if (!ProcessTernaryOpr (pfx, ternary)) return MagickFalse;
+
+    if (TranslateTernaryElse (context, *ternary, broke) == MagickFalse)
+      return MagickFalse;
+    if ((*broke) != MagickFalse) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+
+    *UserSymbol = *NewUserSymbol = MagickFalse;
+
+    if (ExpectOperandAfterOperator (pfx, strLimit, IncrDecr, broke) ==
+        MagickFalse)
+      return MagickFalse;
+    if ((*broke) != MagickFalse) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+
+    if (IncrDecr) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "'++' and '--' must be the final operators in an expression at", "'%s'",
+        SetShortExp(pfx));
+      return MagickFalse;
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -4514,6 +4574,7 @@ static MagickBooleanType TranslateExpression (
   while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
     OperatorFlags flags;
     OperandTargets operandTargets;
+    NextOperandTargets nextTargets;
 
     flags.Assign=(&Assign);
     flags.Update=(&Update);
@@ -4534,26 +4595,13 @@ static MagickBooleanType TranslateExpression (
       return MagickFalse;
     if (broke != MagickFalse) break;
 
-    if (!ProcessTernaryOpr (pfx, &ternary)) return MagickFalse;
-
-    if (TranslateTernaryElse (&context, ternary, &broke) == MagickFalse)
-      return MagickFalse;
-    if (broke != MagickFalse) break;
-
-    UserSymbol = NewUserSymbol = MagickFalse;
-
-    if (ExpectOperandAfterOperator (pfx, strLimit, IncrDecr, &broke) ==
+    nextTargets.ternary=(&ternary);
+    nextTargets.UserSymbol=(&UserSymbol);
+    nextTargets.NewUserSymbol=(&NewUserSymbol);
+    if (PrepareNextOperand (&context, &assignment, &nextTargets, &broke) ==
         MagickFalse)
       return MagickFalse;
     if (broke != MagickFalse) break;
-
-    if (IncrDecr) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "'++' and '--' must be the final operators in an expression at", "'%s'",
-        SetShortExp(pfx));
-      return MagickFalse;
-    }
 
     operandTargets.UserSymbol=(&UserSymbol);
     operandTargets.NewUserSymbol=(&NewUserSymbol);
