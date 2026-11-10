@@ -4877,6 +4877,13 @@ MagickPrivate void XHighlightRectangle(Display *display,Window window,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsWindowTreeTop(const Status status,
+  const Window parent,const Window root)
+{
+  return(((status == False) || (parent == (Window) NULL) ||
+    (parent == root)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *XImportImage(const ImageInfo *image_info,
   XImportInfo *ximage_info,ExceptionInfo *exception)
 {
@@ -4987,8 +4994,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
             status=XQueryTree(display,target,&root,&parent,&children,&d);
             if ((status != False) && (children != (Window *) NULL))
               (void) XFree((char *) children);
-            if ((status == False) || (parent == (Window) NULL) ||
-                (parent == root))
+            if (IsWindowTreeTop(status,parent,root) != MagickFalse)
               break;
             target=parent;
           }
