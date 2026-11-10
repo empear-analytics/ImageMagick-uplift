@@ -187,19 +187,31 @@ static MagickBooleanType checkAccelerateConditionRGBA(const Image* image)
   return(MagickTrue);
 }
 
+static MagickBooleanType IsLumaIntensityMethod(
+  const PixelIntensityMethod method)
+{
+  return(((method == Rec601LumaPixelIntensityMethod) ||
+    (method == Rec709LumaPixelIntensityMethod)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType IsLuminanceIntensityMethod(
+  const PixelIntensityMethod method)
+{
+  return(((method == Rec601LuminancePixelIntensityMethod) ||
+    (method == Rec709LuminancePixelIntensityMethod)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType checkPixelIntensity(const Image *image,
   const PixelIntensityMethod method)
 {
   /* EncodePixelGamma and DecodePixelGamma are not supported */
-  if ((method == Rec601LumaPixelIntensityMethod) ||
-      (method == Rec709LumaPixelIntensityMethod))
+  if (IsLumaIntensityMethod(method) != MagickFalse)
     {
       if (image->colorspace == RGBColorspace)
         return(MagickFalse);
     }
 
-  if ((method == Rec601LuminancePixelIntensityMethod) ||
-      (method == Rec709LuminancePixelIntensityMethod))
+  if (IsLuminanceIntensityMethod(method) != MagickFalse)
     {
       if (image->colorspace == sRGBColorspace)
         return(MagickFalse);
