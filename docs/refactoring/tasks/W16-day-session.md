@@ -405,3 +405,22 @@ sites) when each function alone is flat rather than lower? (3) may kernel releas
 text as the helper's, differing only by the `(cl_kernel)` cast? **Upstream:** Despeckle overwrites `clStatus` from the
 `k==0` `clSetKernelArg` call on the next line, asserts `filteredImage != NULL` after `CloneImage`, and never checks
 `AcquireOpenCLKernel` for NULL.
+
+## Lane a, widget.c pass 4: Recipe CT
+
+widget.c 1.44 to 2.26 (46 refactor commits, 4 tool commits, wide build). The wide line coverage was regenerated in
+`~/im-w14a/build-oracle/oracle-wide.lcov` (`WIDE=1 python3 tools/oracle/linecov.py`, about 3 minutes) and every
+commit's evidence level comes from it. **Recipe CT** (80f0baadc): a `switch` case tail leaving by `break;` and writing
+two to six caller locals moves to a `static void` helper taking their addresses in one `const` targets struct; new
+`tools/case_tail_check.py` for its unreached level. **Amendments:** E step 4 (an array written only through calls that
+keep no copy), E step 3 (struct-pointer form for structs clang warns about), D object-code form (`v=Helper(...)`), I step
+1 (a block leaving the enclosing `switch` by `break;`). Tool changes: `obj_modulo.sh` compares %rip-relative function
+addresses by name; `reuse_check.py` and `targets_fill_check.py` widened; planted errors caught. Added after the owner's
+approval of the W16 text; not yet confirmed. **Owner questions:** (1) ff4c1349c is a Z step with one unreached line,
+committed `Verified: guard` with object code MODULO-IDENTICAL; Z has no unreached level: give it one? (2) is I step 2's
+"passes to every helper that writes any of them" limited to targets-struct helpers? (3) CT has no text on arrays; E
+step 4's clause was used by analogy. (4) -Wshadow: new parameters named `selection_info` shadow the file-scope pointer
+as the callers' locals already did; ci_linux_warnings does not compile widget.c (no X11 in its trees). (5) commits
+22cc19c36 and ab37ec7c5 briefly added a Complex Method helper that the next commit's SD split removed. **Upstream:**
+XFontBrowserWidget frees `font_info` without resetting it and later calls `XTextWidth(font_info,...)` (likely use after
+free); with `font_info` NULL the reply press uses a stale `i`; Dialog and Font leave `notify.send_event` unset.
