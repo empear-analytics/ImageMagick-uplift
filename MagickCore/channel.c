@@ -597,6 +597,90 @@ static ChannelType AddChannelMaskOption(ChannelType channel_mask,
   return(channel_mask);
 }
 
+typedef struct _ChannelFxDestination
+{
+  ChannelFx
+    channel_op;
+
+  const Image
+    *image;
+
+  Image
+    *destination_image;
+
+  ExceptionInfo
+    *exception;
+} ChannelFxDestination;
+
+typedef struct _ChannelFxDestinationTargets
+{
+  double
+    *pixel;
+
+  ssize_t
+    *i;
+
+  PixelChannel
+    *destination_channel;
+
+  ChannelType
+    *channel_mask;
+
+  const char
+    **p;
+} ChannelFxDestinationTargets;
+
+static MagickBooleanType ParseChannelOperands(
+  const ChannelFxDestination *destination,char *token,
+  const ChannelFxDestinationTargets *targets)
+{
+  const ChannelFx
+    channel_op = destination->channel_op;
+
+  const Image
+    *const image = destination->image;
+
+  Image
+    *const destination_image = destination->destination_image;
+
+  ExceptionInfo
+    *const exception = destination->exception;
+
+  double
+    *const pixel = targets->pixel;
+
+  ssize_t
+    *const i = targets->i;
+
+  PixelChannel
+    *const destination_channel = targets->destination_channel;
+
+  ChannelType
+    *const channel_mask = targets->channel_mask;
+
+  const char
+    **const p = targets->p;
+
+  if (channel_op == AssignChannelOp)
+    *pixel=StringToDoubleInterval(token,(double) QuantumRange+1.0);
+  else
+    if (ParseDestinationChannel(destination_image,token,i,
+          exception) == MagickFalse)
+      {
+        return(MagickFalse);
+      }
+  *destination_channel=(PixelChannel) *i;
+  if ((image->colorspace != UndefinedColorspace) &&
+      (RegisterDestinationChannel(destination_image,*destination_channel,
+        token,exception) == MagickFalse))
+    {
+      return(MagickFalse);
+    }
+  *channel_mask=AddChannelMaskOption(*channel_mask,token);
+  (void) GetNextToken(*p,p,MagickPathExtent,token);
+  return(MagickTrue);
+}
+
 MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ExceptionInfo *exception)
 {
@@ -663,6 +747,13 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
     ssize_t
       i;
 
+    ChannelFxDestination
+      destination;
+
+    const ChannelFxDestinationTargets
+      destination_targets = { &pixel, &i, &destination_channel, &channel_mask,
+        &p };
+
     /*
       Interpret channel expression.
     */
@@ -717,25 +808,16 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
       case ExchangeChannelOp:
       case TransferChannelOp:
       {
-        if (channel_op == AssignChannelOp)
-          pixel=StringToDoubleInterval(token,(double) QuantumRange+1.0);
-        else
-          if (ParseDestinationChannel(destination_image,token,&i,
-                exception) == MagickFalse)
-            {
-              destination_image=DestroyImageList(destination_image);
-              return(destination_image);
-            }
-        destination_channel=(PixelChannel) i;
-        if ((image->colorspace != UndefinedColorspace) &&
-            (RegisterDestinationChannel(destination_image,destination_channel,
-              token,exception) == MagickFalse))
+        destination.channel_op=channel_op;
+        destination.image=image;
+        destination.destination_image=destination_image;
+        destination.exception=exception;
+        if (ParseChannelOperands(&destination,token,&destination_targets) ==
+            MagickFalse)
           {
             destination_image=DestroyImageList(destination_image);
             return(destination_image);
           }
-        channel_mask=AddChannelMaskOption(channel_mask,token);
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
         break;
       }
       default:
