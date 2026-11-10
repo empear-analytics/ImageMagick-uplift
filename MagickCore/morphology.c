@@ -3214,6 +3214,73 @@ static double ConvolveChannelValue(const MagickRealType *magick_restrict k,
   return(pixel);
 }
 
+typedef struct _MorphologyKernelWalk
+{
+  const Image
+    *image;
+
+  const KernelInfo
+    *kernel;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  ssize_t
+    i;
+} MorphologyKernelWalk;
+
+typedef enum
+{
+  ForwardKernelWalk,
+  ReflectedKernelWalk
+} MorphologyKernelWalkSide;
+
+typedef double
+  (*MorphologyExtremumMethod)(const Quantum *magick_restrict,const ssize_t,
+    double);
+
+static inline double WalkErodeOrDilateKernel(const MorphologyKernelWalk *walk,
+  const MorphologyKernelWalkSide side,const MorphologyExtremumMethod method,
+  double pixel)
+{
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  ssize_t
+    u,
+    v;
+
+  k=((side == ForwardKernelWalk) ? kernel->values :
+    (&kernel->values[kernel->width*kernel->height-1]));
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      if (!IsNaN(*k) && ((side == ForwardKernelWalk) ? (*k >= 0.5) :
+          (*k > 0.5)))
+        {
+          pixel=method(pixels,i,pixel);
+        }
+      ((side == ForwardKernelWalk) ? k++ : k--);
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+  return(pixel);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3542,6 +3609,9 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         MorphologyKernelTap
           kernel_tap;
 
+        MorphologyKernelWalk
+          walk;
+
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
         morphology_traits=GetPixelChannelTraits(morphology_image,channel);
@@ -3557,6 +3627,10 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         quantum_pixels=(const Quantum *) NULL;
         maximum=0.0;
         minimum=(double) QuantumRange;
+        walk.image=image;
+        walk.kernel=kernel;
+        walk.pixels=pixels;
+        walk.i=i;
         switch (method)
         {
           case ConvolveMorphology:
@@ -3651,20 +3725,8 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
               to the real value, this is currently not done, due to the
               nature of the boolean kernels being used.
             */
-            k=kernel->values;
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k) && (*k >= 0.5))
-                  {
-                    pixel=MinimizeChannelValue(pixels,i,pixel);
-                  }
-                k++;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
+            pixel=WalkErodeOrDilateKernel(&walk,ForwardKernelWalk,
+              MinimizeChannelValue,pixel);
             break;
           }
           case DilateMorphology:
@@ -3680,20 +3742,8 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                added to the real value, this is currently not done, due to the
                nature of the boolean kernels being used.
             */
-            k=(&kernel->values[kernel->width*kernel->height-1]);
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k) && (*k > 0.5))
-                  {
-                    pixel=MaximizeChannelValue(pixels,i,pixel);
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
+            pixel=WalkErodeOrDilateKernel(&walk,ReflectedKernelWalk,
+              MaximizeChannelValue,pixel);
             break;
           }
           case HitAndMissMorphology:
