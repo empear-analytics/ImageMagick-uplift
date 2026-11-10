@@ -4213,11 +4213,56 @@ static PixelChannel CheckStatisticsChannel (FxInfo * pfx, PixelChannel channel)
   return(channel);
 }
 
+typedef struct _ImageStatInputs
+{
+  FxInfo
+    *pfx;
+
+  ssize_t
+    ImgNum;
+
+  ImgAttrE
+    ia;
+} ImageStatInputs;
+
 static inline MagickBooleanType HasChannelStatistics(
   const ChannelStatistics *cs,const PixelChannel channel)
 {
   return(((cs != (ChannelStatistics *) NULL) && (channel >= 0)) ?
     MagickTrue : MagickFalse);
+}
+
+static void ImageStatHToZ (const ImageStatInputs *attr, fxFltType *ret)
+{
+  FxInfo
+    *const pfx = attr->pfx;
+
+  const ssize_t
+    ImgNum = attr->ImgNum;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aH:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->rows;
+      break;
+    case aN:
+      (*ret) = (fxFltType) pfx->ImgListLen;
+      break;
+    case aT: /* image index in list */
+      (*ret) = (fxFltType) ImgNum;
+      break;
+    case aW:
+      (*ret) = (fxFltType) pfx->Images[ImgNum]->columns;
+      break;
+    case aZ:
+      (*ret) = (fxFltType) GetImageDepth (pfx->Images[ImgNum], pfx->exception);
+      break;
+    default:
+      (void) ThrowMagickException (pfx->exception,GetMagickModule(),OptionError,
+        "Unknown ia=","%i",ia);
+  }
 }
 
 static inline fxFltType ImageStat (
@@ -4226,6 +4271,7 @@ static inline fxFltType ImageStat (
   ChannelStatistics * cs = NULL;
   fxFltType ret = 0;
   MagickBooleanType NeedRelinq = MagickFalse;
+  ImageStatInputs attr;
 
   if (ImgNum < 0)
     {
@@ -4244,6 +4290,9 @@ static inline fxFltType ImageStat (
     NeedRelinq = MagickTrue;
   }
 
+  attr.pfx=pfx;
+  attr.ImgNum=ImgNum;
+  attr.ia=ia;
   switch (ia) {
     case aDepth:
       ret = (fxFltType) GetImageDepth (pfx->Images[ImgNum], pfx->exception);
@@ -4317,24 +4366,11 @@ static inline fxFltType ImageStat (
       if (HasChannelStatistics(cs,channel) != MagickFalse)
         ret = cs[channel].standard_deviation;
       break;
-    case aH:
-      ret = (fxFltType) pfx->Images[ImgNum]->rows;
-      break;
-    case aN:
-      ret = (fxFltType) pfx->ImgListLen;
-      break;
-    case aT: /* image index in list */
-      ret = (fxFltType) ImgNum;
-      break;
-    case aW:
-      ret = (fxFltType) pfx->Images[ImgNum]->columns;
-      break;
-    case aZ:
-      ret = (fxFltType) GetImageDepth (pfx->Images[ImgNum], pfx->exception);
-      break;
     default:
-      (void) ThrowMagickException (pfx->exception,GetMagickModule(),OptionError,
-        "Unknown ia=","%i",ia);
+      {
+        ImageStatHToZ (&attr, &ret);
+        break;
+      }
   }
   if (NeedRelinq) cs = (ChannelStatistics *)RelinquishMagickMemory (cs);
 
