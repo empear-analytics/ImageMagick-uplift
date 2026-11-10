@@ -9542,6 +9542,65 @@ MagickPrivate void XProgressMonitorWidget(Display *display,XWindows *windows,
 %    o textlist: This string list is displayed within the Text View widget.
 %
 */
+typedef struct _TextViewLines
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    **textlist;
+
+  unsigned int
+    lines,
+    visible_lines;
+
+  const XWidgetInfo
+    *list_info;
+
+  XWidgetInfo
+    slider_info;
+} TextViewLines;
+
+static void DrawTextViewLines(const TextViewLines *view,
+  XWidgetInfo *selection_info)
+{
+  Display
+    *const display = view->display;
+
+  XWindows
+    *const windows = view->windows;
+
+  const char
+    **const textlist = view->textlist;
+
+  const unsigned int
+    lines = view->lines,
+    visible_lines = view->visible_lines;
+
+  const XWidgetInfo
+    *const list_info = view->list_info;
+
+  const XWidgetInfo
+    slider_info = view->slider_info;
+
+  int
+    i;
+
+  for (i=0; i < (int) visible_lines; i++)
+  {
+    (*selection_info).raised=
+      (slider_info.id+i) != (*list_info).id ? MagickTrue : MagickFalse;
+    (*selection_info).text=(char *) NULL;
+    if ((slider_info.id+i) < (int) lines)
+      (*selection_info).text=(char *) textlist[slider_info.id+i];
+    XDrawWidgetText(display,&windows->widget,&(*selection_info));
+    (*selection_info).y+=(int) (*selection_info).height;
+  }
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -9786,6 +9845,9 @@ MagickPrivate void XTextViewWidget(Display *display,
             slider_info.min_y+1)/(int) lines;
         if (slider_info.id != selection_info.id)
           {
+            TextViewLines
+              view;
+
             /*
               Redraw scroll bar and text.
             */
@@ -9796,16 +9858,14 @@ MagickPrivate void XTextViewWidget(Display *display,
               text_info->fid);
             selection_info.id=slider_info.id;
             selection_info.y=list_info.y+(int) (height >> 3)+2;
-            for (i=0; i < (int) visible_lines; i++)
-            {
-              selection_info.raised=
-                (slider_info.id+i) != list_info.id ? MagickTrue : MagickFalse;
-              selection_info.text=(char *) NULL;
-              if ((slider_info.id+i) < (int) lines)
-                selection_info.text=(char *) textlist[slider_info.id+i];
-              XDrawWidgetText(display,&windows->widget,&selection_info);
-              selection_info.y+=(int) selection_info.height;
-            }
+            view.display=display;
+            view.windows=windows;
+            view.textlist=textlist;
+            view.lines=lines;
+            view.visible_lines=visible_lines;
+            view.list_info=(&list_info);
+            view.slider_info=slider_info;
+            DrawTextViewLines(&view,&selection_info);
             windows->widget.font_info=font_info;
             (void) XSetFont(display,windows->widget.annotate_context,
               font_info->fid);
