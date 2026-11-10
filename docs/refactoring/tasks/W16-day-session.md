@@ -217,3 +217,19 @@ see its plateau row). Added after the owner's approval of the W16 text; not yet 
 `#else` branch of an `#if 1` (Blur in `AcquireKernelBuiltIn`) as never-compiled as `#if 0`, so that the exception lets it
 move? **Notes:** the dead `#else` text of Blur names `i`, whose compiled declaration an E step removed (said in that
 commit); the unreachable `break;` after the No-Op default now sits in `AcquireDistanceKernel`.
+
+## Lane c, third round: feature-texture.c, Recipe LS, E step 3 amended
+
+**Recipe LS** (fdae9774e): copies of `u=0; while (a[u].m != e) u++;` differing in the integer member and value become
+`u=FindName(a,offsetof(S,m),e);`, a `static inline` finder reading the member through its offset. **For review:** the
+first `offsetof` form in the playbook. **E step 3 amendment** (b1dc4bc6f): an array element updated member by member
+outside every OpenMP region may be passed as `&e`. Both came after the owner's approval of the W16 text; not yet
+confirmed. feature-texture.c 5.98 to 7.39 (10 refactor commits). **Timing, for the owner:** for commit 13302b12e (E
+element form) the median CPU time read 4.8% to 64% slower in repeated runs under a load average of 10-16 from the
+other lanes (single runs 1.7 s to 9.7 s for one binary); minimum times were within 0.5%, valgrind instruction counts
+equal (4,869,065,359 to 4,868,105,857), `nm` shows the helper inlined, and the whole chain against de97078b7 times
+2.040 s to 2.040 s (instructions 4,904,726,881 to 4,871,441,653). The step was kept on that evidence; by the letter of
+the median rule it would not be. **Upstream (GetImageFeatures):** a failed co-occurrence build leaks Q, its rows,
+`sum` and the density arrays and reports a cache failure as MemoryAllocationFailed; the unwind `for (i--; ...)` skips
+the failing row index; `density_xy` is cleared twice with different lengths; a benign race writes equal values into
+`grays`; a gray-level search that finds nothing would run past `grays`.
