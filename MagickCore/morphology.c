@@ -1365,7 +1365,7 @@ static KernelInfo *AcquireFreiChenEdgeOrSetKernel(KernelInfo *kernel,
   return(RotateFreiChenKernel(kernel,args));
 }
 
-static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
+static KernelInfo *AcquireFreiChenEdgeBasisKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
   switch ( (int) args->rho ) {
@@ -1392,6 +1392,16 @@ static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
       CalcKernelMetaData(kernel);
       ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
       break;
+  }
+  return(RotateFreiChenKernel(kernel,args));
+}
+
+static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch ( (int) args->rho ) {
+    default:
+      return(AcquireFreiChenEdgeBasisKernel(kernel,type,args,exception));
     case 13:
       kernel=ParseKernelArray("3: 2,-1,0  -1,0,1  0,1,-2");
       if (kernel == (KernelInfo *) NULL)
