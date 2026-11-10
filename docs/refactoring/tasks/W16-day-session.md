@@ -68,3 +68,15 @@ functions (morphology, threshold, resize-image pixel functions, enhance-tone, ef
 (fourier, resample, attribute-depth), per-iteration array slots (feature-texture), OpenMP reduction variables written
 by a helper (composite), unreached functions needing B (paint, segment), and the parked chains (`w16-shear-enum`,
 `w14-fourier-ifdef`, `w14-fx-annealed`, `w14-tone-splits`).
+
+## Evolved recipes (owner OK, 2026-11-10): lane d
+
+**Recipe B and N amendment** (2f5e79de4): B and N may run on unreached functions when the guard is clean, a new
+`tools/struct_fill_check.py` checks the fill and the bindings, and a new `tools/obj_modulo.sh` shows every other
+function's object code unchanged (IDENTICAL or MODULO-IDENTICAL, addresses aside, the helper the only new function).
+Planted errors (a wrong binding, a wrong fill, a flipped comparison, a changed literal) were each caught. **For review:**
+the same commit also updates AGENTS.md's list of evidence levels and adds the two tools (tools would normally be a
+commit of their own). **Recipe LE** (368e86789): replace a function-local enum with a file-scope enum whose constants
+map one to one, values only compared or switched on, object code IDENTICAL. The parked branch `w16-shear-enum` is
+superseded and can be deleted. Note: N's *Careful* recommends the member form to avoid clones while the brief forbids
+changing forms to hide a clone; the lane did not use the member form.
