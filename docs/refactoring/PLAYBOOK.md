@@ -8749,6 +8749,137 @@ function; a seamless-blend workload 1.77 s both ways (median of 9). Added by Cla
 
 ---
 
+## Recipe TB - Replace a Label Run with a Constant Table
+
+**Use when:** CodeScene reports *Complex Method* on a function whose complexity is one
+`switch` of many labels in which every label only returns a constant, as two shapes do:
+a *membership* run, where one group of labels returns `MagickTrue` and `default:` breaks
+to `return(MagickFalse);` (`colorspace.c`'s `IsGenericColorspace`, the twenty-eight
+generic colourspaces Recipe LP named, cc 30); and an *index* run, where the labels are
+the integers `0`, `1`, ... `k` in order, each returning its own constant, and the
+function returns a default after the `switch` (`distort.c`'s `poly_basis_str`, the
+twenty-one polynomial term strings, cc 22). Since the owner's ruling of 2026-11-07 such
+a label run may stay a *Complex Method*; this recipe is for when it is the finding that
+holds the file.
+
+**Not covered by:** Recipe LP, which makes the membership function and leaves its labels
+a `switch`; Recipes SD, SR and SW, which split a label run into shorter runs that clone
+each other (`poly_basis_str` split along its order comments joined `poly_basis_fn`'s
+helpers in a *Code Duplication* group, W15); Recipe F, which moves an existing `static`
+table and never makes one; Recipe NS, which names one `?:` between two constants. No
+recipe turns control flow into data.
+
+**How:**
+
+1. The function is `static`, lies outside every OpenMP region, and its body is, apart
+   from comments, one `switch (n)` followed by one `return(d);`. Membership form: the
+   `switch` has exactly one group of labels `L1 ... Ln`, each an enumeration constant,
+   whose body is `return(MagickTrue);`, and `default: break;`; `d` is `MagickFalse`.
+   Index form: the labels are the integer literals `0` to `k` in increasing order, one
+   per case, each case's body is `return(vi);` of a constant `vi` (a string literal, a
+   numeric literal or an enumeration constant), there is no `default:` or it is `break;`
+   alone, and `n` is a parameter of an integer type no wider than `size_t`.
+   No `#if` line stands inside the `switch`.
+2. The function is not called per pixel or per channel (check its callers by reading);
+   otherwise time the step against the baseline as Recipe CF step 7 says (a slowdown
+   over 3% stops the step). Index form with string literals: every caller only reads
+   the characters of the returned string (an argument for `%s`, `strlen`, `strcmp`) and
+   never compares, stores or writes through the pointer itself (check by `grep`), since
+   two equal literals need not share one address.
+3. Directly above the function write a `static const` array with no size, named for what
+   it holds: in the membership form of `n`'s enumeration type with the labels `L1 ... Ln`
+   as its elements in the order of the `switch`; in the index form of the function's
+   return type (for a pointer, `const char *const`), with `v0 ... vk` in label order.
+   Each case's comment stays on its element's line, unchanged.
+4. Replace the `switch` by a lookup that reads the table and returns what the case
+   returned. Membership form: a local `size_t i;` and
+   `for (i=0; i < (sizeof(T)/sizeof(*T)); i++) if (T[i] == n) return(MagickTrue);`.
+   Index form: `if ((size_t) n < (sizeof(T)/sizeof(*T))) return(T[n]);`. The closing
+   `return(d);` and the function's other comments stay as they are. No literal is added.
+5. Check by script that the table holds exactly the labels in the membership form, each
+   once and in the `switch`'s order, or in the index form that element `i` is the value
+   the case labelled `i` returned, for every `i` from `0` to `k`, and that nothing else
+   in the file changed.
+6. `refactor_guard.py`: membership form `OK` (enumeration constants are not literals to
+   it); index form `WARN` with exactly the label literals `0` to `k` each removed once and
+   every value still present, nothing else. `--calls` moves nothing.
+
+**Before:**
+
+```c
+static const char *poly_basis_str(ssize_t n)
+{
+  /* return the result for this polynomial term */
+  switch(n) {
+    case  0:  return(""); /* constant */
+    case  1:  return("*ii");
+    ...
+    case 20:  return("*jj*jj*jj*jj*jj"); /* quintic   order = 5   terms = 21 */
+  }
+  return( "UNKNOWN" ); /* should never happen */
+}
+```
+
+**After:**
+
+```c
+static const char
+  *const PolyBasisStrings[] =
+  {
+    "", /* constant */
+    "*ii",
+    ...
+    "*jj*jj*jj*jj*jj" /* quintic   order = 5   terms = 21 */
+  };
+
+static const char *poly_basis_str(ssize_t n)
+{
+  /* return the result for this polynomial term */
+  if ((size_t) n < (sizeof(PolyBasisStrings)/sizeof(*PolyBasisStrings)))
+    return(PolyBasisStrings[n]);
+  return( "UNKNOWN" ); /* should never happen */
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same, membership form. The `switch` returns `MagickTrue`
+  exactly when `n` equals one of `L1 ... Ln`, and otherwise `MagickFalse`. The loop
+  compares `n` with every element in turn, which are the same constants (step 5), and
+  returns `MagickTrue` at the first equal one; when none is equal it ends and the
+  function returns `MagickFalse`. Each element has `n`'s own type, so `==` compares the
+  values the `switch` compared. Reading a `const` table and comparing have no side
+  effect; only the number of comparisons changes, which is speed (step 2).
+- Index form. For `0 <= n <= k` the `switch` returns `vn`; the table's element `n` is
+  `vn` (step 5), of the return type, so `T[n]` is the value the `return` converted.
+  Otherwise the `switch` falls through to `return(d);`. The count `sizeof(T)/sizeof(*T)`
+  is `k+1`, and `(size_t) n` is below it exactly when `0 <= n <= k`: a negative `n`
+  converts to `n` plus `SIZE_MAX+1` (C11 6.3.1.3p2), at least `SIZE_MAX/2+1` for a type
+  no wider than `size_t`, far above `k+1`, and a non-negative `n` keeps its value. So the
+  other `n` reach `return(d);` as before, and no element outside the table is read.
+- A string literal in the table is an array with the same characters as the literal the
+  case returned; a caller that reads the characters sees the same text. Whether two
+  equal literals share storage is unspecified either way, which is why step 2 refuses a
+  caller that compares the pointers.
+- The new table is data the function only reads: nothing writes it (it is `const`), it is
+  not visible outside the file (`static`), and no existing table changes (*Absolutely
+  forbidden*: touching a `static const` data table). Every label value and returned
+  constant is still written once, in the table, next to its comment.
+- The function keeps its name, parameters and return type for its callers.
+
+**Evidence level:** oracle (the cases that reach each caller), with steps 5 and 6 checked
+by script and step 2 by reading.
+
+**Provenance:** 2026-11-10, from `colorspace.c`'s `IsGenericColorspace` (the membership
+predicate W16 lane c made with Recipe LP, cc 30, the file's last finding but its length)
+and `distort.c`'s `poly_basis_str` (cc 22, a label run since W11; its SW split clones
+`poly_basis_fn`'s, 6.73), campaign A, W16 lane d. Earlier reports called a lookup table
+the only fix and no recipe (M23, `option.c`'s `GetOptionInfo`). Probes: `colorspace.c`
+8.62 to 9.38, `distort.c` 7.15 to 7.60; both oracle 0 diverged. Added by Claude Code
+(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -9063,3 +9194,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | NEW | RA | Extract Block Accumulating a Reduction Variable Through a Pointer: a block of a parallel loop body that uses at most two variables named in the pragma's `reduction(op:v)` clauses only by applying that operator (`v+=e;`, `v++;`) moves into a `static void` function taking `T *v` (uses `(*v)`), the caller passing `&v`, which inside the region is the thread's private copy; the pragma and clauses unchanged | `composite.c`'s `BlendRMSEResidual` (campaign A, W16 lane c): its channel and column loops add to `channel_residual` and `area` (`reduction(+:...)`), the file's only Deep, Nested Complexity; W15 asked for the ruling. A probe of both steps 3.46 to 3.64 and 3.66, no finding on a new function, a seamless-blend workload 1.77 s both ways (median of 9) | owner |
 | 2026-11-10 | AMEND | I | *Two levels of evidence*, *Unreached functions: Recipe I*: Recipe I may be applied to a function no case reaches, `Verified: guard`, with *Unreached functions: B and N* items 1, 2 and 4 as written and, for item 3, `tools/targets_fill_check.py` printing `OK` (members filled with the addresses of the variables of their own names, in order, or by the `const` initialiser; bindings by name; the removed lines under step 5's mechanical rewrite and the helper's body the same multiset; each exit back unchanged in the caller and as many `return(MagickFalse);` in the helper); a throwing exit moves only in step 8's form, left in the caller. Item 4 also admits a function that vanished because the shortened caller now inlines it, when the caller calls it and its text is unchanged (`tools/obj_modulo.sh`, also for B and N). The guard-verified sentence, I's *Evidence level* and AGENTS.md say so. The new tool and the `obj_modulo.sh` change are commits of their own | `segment.c`'s `GetImageDynamicThreshold` (campaign A, W16 lane d), reached by no case: its region loops write `cluster`, `head`, `red`, `green` and `blue` (I, not B or N); two I helpers probe 7.14 to 9.02, `MODULO-IDENTICAL` with `CountImagePixelsByRGB` and `FinishDynamicThreshold` now inlined into the shortened caller. Planted errors (fill from another variable, fill out of order, binding of another member, flipped comparison, missing `*`, duplicated statement, extra exit, a statement added elsewhere, a literal changed in a newly inlined function) are each caught | owner |
 | 2026-11-10 | AMEND | D | *Unreached functions*, *Object code that differs only in the caller*: when `obj_identical.sh` prints `DIFFERENT`, the replacement may still be made at the guard level when `tools/reuse_check.py` prints `OK` (the call the only added line; the removed block, rewritten as the call's arguments bind it, `&v` for a pointer parameter `p` as `(*p)`, is the helper's body line for line) and `tools/obj_modulo.sh` prints `IDENTICAL` or `MODULO-IDENTICAL`; inside a parallel loop the helper may write the shared `status` (or a PS step 2 scalar) through a pointer when the block meets PS steps 1 to 3 (a PS helper called again; PS *Careful*). *Two levels of evidence*, D's *Evidence level* and AGENTS.md say so; the tool is a commit of its own | `transform.c`'s `ExcerptImage` (campaign A, W16 lane d), reached by no case: its progress tail is `SetTransformProgress`'s body; the call gives a different `ExcerptImage` but every other function the same instructions; 8.95 to 9.09 in a probe. Planted errors (another tag, `excerpt_image` for `image`, a stray edit, the atomic pragma dropped) are each caught | owner |
+| 2026-11-10 | NEW | TB | Replace a Label Run with a Constant Table: a `static` function whose body is one `switch` of labels that only return constants, and a closing `return(d);`, becomes a lookup in a new `static const` table directly above it: the membership form (one label group returning `MagickTrue`, `default: break;`) loops over a table of the labels; the index form (labels `0` to `k` in order, each returning a constant) returns `T[n]` when `(size_t) n` is below the count. No literal added; table checked by script against the labels and returns; guard `OK` (membership) or `WARN` with exactly the label literals (index); timing when called per pixel; string results only read as text | `colorspace.c`'s `IsGenericColorspace` (cc 30, the LP predicate) and `distort.c`'s `poly_basis_str` (cc 22), campaign A, W16 lane d: label runs no split can shorten without clones; probes 8.62 to 9.38 and 7.15 to 7.60, oracle 0 diverged | owner |
