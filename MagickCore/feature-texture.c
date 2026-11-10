@@ -148,11 +148,28 @@ typedef struct _FeatureStatistics
     direction[4];  /* horizontal, vertical, left and right diagonals */
 } FeatureStatistics;
 
-static inline MagickBooleanType IsFeatureMemoryMissing(
-  FeatureStatistics **cooccurrence,FeatureStatistics *density_x,
-  FeatureStatistics *density_xy,FeatureStatistics *density_y,
-  FeatureStatistics **Q,FeatureStatistics *sum)
+typedef struct _FeatureBuffers
 {
+  FeatureStatistics
+    **cooccurrence,
+    *density_x,
+    *density_xy,
+    *density_y,
+    **Q,
+    *sum;
+} FeatureBuffers;
+
+static inline MagickBooleanType IsFeatureMemoryMissing(
+  const FeatureBuffers *buffers)
+{
+  FeatureStatistics
+    **const cooccurrence = buffers->cooccurrence,
+    *const density_x = buffers->density_x,
+    *const density_xy = buffers->density_xy,
+    *const density_y = buffers->density_y,
+    **const Q = buffers->Q,
+    *const sum = buffers->sum;
+
   return(((cooccurrence == (FeatureStatistics **) NULL) ||
     (density_x == (FeatureStatistics *) NULL) ||
     (density_xy == (FeatureStatistics *) NULL) ||
@@ -180,6 +197,13 @@ static unsigned int GetFeatureGrayLevels(const Image *image,
   return(number_grays);
 }
 
+static inline MagickBooleanType IsFeatureBlackGray(const Image *image,
+  const PixelPacket *grays,const ssize_t i)
+{
+  return(((image->colorspace == CMYKColorspace) && (grays[i].black != ~0U)) ?
+    MagickTrue : MagickFalse);
+}
+
 static PixelPacket CompactFeatureGrays(const Image *image,PixelPacket *grays)
 {
   PixelPacket
@@ -197,7 +221,7 @@ static PixelPacket CompactFeatureGrays(const Image *image,PixelPacket *grays)
       grays[gray.green++].green=grays[i].green;
     if (grays[i].blue != ~0U)
       grays[gray.blue++].blue=grays[i].blue;
-    if ((image->colorspace == CMYKColorspace) && (grays[i].black != ~0U))
+    if (IsFeatureBlackGray(image,grays,i) != MagickFalse)
       grays[gray.black++].black=grays[i].black;
     if ((image->alpha_trait != UndefinedPixelTrait) &&
         (grays[i].alpha != ~0U))
@@ -1282,6 +1306,203 @@ static void ComputeContrastFeatures(const TextureDirection *texture)
   SetMaximumCorrelation(texture);
 }
 
+static inline ssize_t FindFeatureGray(const PixelPacket *grays,
+  const size_t member,const unsigned int value)
+{
+  ssize_t
+    u;
+
+  u=0;
+  while ((*(const unsigned int *) ((const char *) &grays[u]+member)) != value)
+    u++;
+  return(u);
+}
+
+typedef struct _FeatureCooccurrence
+{
+  const Image
+    *image;
+
+  size_t
+    distance;
+
+  PixelPacket
+    *grays;
+
+  FeatureStatistics
+    **cooccurrence;
+} FeatureCooccurrence;
+
+static void CountFeatureCooccurrence(const FeatureCooccurrence *scan,
+  const Quantum *p)
+{
+  const Image
+    *const image = scan->image;
+
+  const size_t
+    distance = scan->distance;
+
+  PixelPacket
+    *const grays = scan->grays;
+
+  FeatureStatistics
+    **const cooccurrence = scan->cooccurrence;
+
+  ssize_t
+    i,
+    x;
+
+  ssize_t
+    offset,
+    u,
+    v;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    for (i=0; i < 4; i++)
+    {
+      offset=GetFeatureAdjacencyOffset(image,distance,i);
+      u=FindFeatureGray(grays,offsetof(PixelPacket,red),
+        ScaleQuantumToMap(GetPixelRed(image,p)));
+      v=FindFeatureGray(grays,offsetof(PixelPacket,red),
+        ScaleQuantumToMap(GetPixelRed(image,p+offset*(ssize_t) GetPixelChannels(image))));
+      cooccurrence[u][v].direction[i].red++;
+      cooccurrence[v][u].direction[i].red++;
+      u=FindFeatureGray(grays,offsetof(PixelPacket,green),
+        ScaleQuantumToMap(GetPixelGreen(image,p)));
+      v=FindFeatureGray(grays,offsetof(PixelPacket,green),
+        ScaleQuantumToMap(GetPixelGreen(image,p+offset*(ssize_t) GetPixelChannels(image))));
+      cooccurrence[u][v].direction[i].green++;
+      cooccurrence[v][u].direction[i].green++;
+      u=FindFeatureGray(grays,offsetof(PixelPacket,blue),
+        ScaleQuantumToMap(GetPixelBlue(image,p)));
+      v=FindFeatureGray(grays,offsetof(PixelPacket,blue),
+        ScaleQuantumToMap(GetPixelBlue(image,p+offset*(ssize_t) GetPixelChannels(image))));
+      cooccurrence[u][v].direction[i].blue++;
+      cooccurrence[v][u].direction[i].blue++;
+      if (image->colorspace == CMYKColorspace)
+        {
+          u=FindFeatureGray(grays,offsetof(PixelPacket,black),
+            ScaleQuantumToMap(GetPixelBlack(image,p)));
+          v=FindFeatureGray(grays,offsetof(PixelPacket,black),
+            ScaleQuantumToMap(GetPixelBlack(image,p+offset*(ssize_t) GetPixelChannels(image))));
+          cooccurrence[u][v].direction[i].black++;
+          cooccurrence[v][u].direction[i].black++;
+        }
+      if (image->alpha_trait != UndefinedPixelTrait)
+        {
+          u=FindFeatureGray(grays,offsetof(PixelPacket,alpha),
+            ScaleQuantumToMap(GetPixelAlpha(image,p)));
+          v=FindFeatureGray(grays,offsetof(PixelPacket,alpha),
+            ScaleQuantumToMap(GetPixelAlpha(image,p+offset*(ssize_t) GetPixelChannels(image))));
+          cooccurrence[u][v].direction[i].alpha++;
+          cooccurrence[v][u].direction[i].alpha++;
+        }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void NormalizeFeatureStatistics(const Image *image,
+  PixelInfo *statistics,const double normalize)
+{
+  statistics->red*=normalize;
+  statistics->green*=normalize;
+  statistics->blue*=normalize;
+  if (image->colorspace == CMYKColorspace)
+    statistics->black*=normalize;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    statistics->alpha*=normalize;
+}
+
+static void NormalizeFeatureCooccurrence(const Image *image,
+  const size_t distance,FeatureStatistics **cooccurrence,
+  const unsigned int number_grays)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < 4; i++)
+  {
+    double
+      normalize;
+
+    ssize_t
+      y;
+
+    normalize=GetFeatureNormalization(image,distance,i);
+    normalize=MagickSafeReciprocal(normalize);
+    for (y=0; y < (ssize_t) number_grays; y++)
+    {
+      ssize_t
+        x;
+
+      for (x=0; x < (ssize_t) number_grays; x++)
+        NormalizeFeatureStatistics(image,&cooccurrence[x][y].direction[i],
+          normalize);
+    }
+  }
+}
+
+static void InitializeFeatureGrays(PixelPacket *grays)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    grays[i].red=(~0U);
+    grays[i].green=(~0U);
+    grays[i].blue=(~0U);
+    grays[i].alpha=(~0U);
+    grays[i].black=(~0U);
+  }
+}
+
+static ssize_t AcquireFeatureRows(FeatureStatistics **cooccurrence,
+  FeatureStatistics **Q,const unsigned int number_grays)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_grays; i++)
+  {
+    cooccurrence[i]=(FeatureStatistics *) AcquireQuantumMemory(number_grays,
+      sizeof(**cooccurrence));
+    Q[i]=(FeatureStatistics *) AcquireQuantumMemory(number_grays,sizeof(**Q));
+    if ((cooccurrence[i] == (FeatureStatistics *) NULL) ||
+        (Q[i] == (FeatureStatistics *) NULL))
+      break;
+    (void) memset(cooccurrence[i],0,number_grays*
+      sizeof(**cooccurrence));
+    (void) memset(Q[i],0,number_grays*sizeof(**Q));
+  }
+  return(i);
+}
+
+static void RelinquishFeatureRows(FeatureStatistics **cooccurrence,
+  FeatureStatistics **Q,ssize_t i)
+{
+  for (i--; i >= 0; i--)
+  {
+    if (Q[i] != (FeatureStatistics *) NULL)
+      Q[i]=(FeatureStatistics *) RelinquishMagickMemory(Q[i]);
+    if (cooccurrence[i] != (FeatureStatistics *) NULL)
+      cooccurrence[i]=(FeatureStatistics *)
+        RelinquishMagickMemory(cooccurrence[i]);
+  }
+}
+
+static void RelinquishFeatureMatrix(FeatureStatistics **matrix,
+  const unsigned int number_grays)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_grays; i++)
+    matrix[i]=(FeatureStatistics *) RelinquishMagickMemory(matrix[i]);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1290,6 +1511,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 
   ChannelFeatures
     *channel_features;
+
+  FeatureBuffers
+    buffers;
 
   FeatureStatistics
     **cooccurrence,
@@ -1354,14 +1578,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
       return(channel_features);
     }
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    grays[i].red=(~0U);
-    grays[i].green=(~0U);
-    grays[i].blue=(~0U);
-    grays[i].alpha=(~0U);
-    grays[i].black=(~0U);
-  }
+  InitializeFeatureGrays(grays);
   status=MagickTrue;
   image_view=AcquireVirtualCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1424,8 +1641,13 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     2*sizeof(*density_y));
   Q=(FeatureStatistics **) AcquireQuantumMemory(number_grays,sizeof(*Q));
   sum=(FeatureStatistics *) AcquireQuantumMemory(number_grays,sizeof(*sum));
-  if (IsFeatureMemoryMissing(cooccurrence,density_x,density_xy,density_y,Q,
-        sum) != MagickFalse)
+  buffers.cooccurrence=cooccurrence;
+  buffers.density_x=density_x;
+  buffers.density_xy=density_xy;
+  buffers.density_y=density_y;
+  buffers.Q=Q;
+  buffers.sum=sum;
+  if (IsFeatureMemoryMissing(&buffers) != MagickFalse)
     {
       if (Q != (FeatureStatistics **) NULL)
         Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
@@ -1461,28 +1683,10 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   (void) memset(&entropy_xy2,0,sizeof(entropy_xy2));
   (void) memset(&entropy_y,0,sizeof(entropy_y));
   (void) memset(&variance,0,sizeof(variance));
-  for (i=0; i < (ssize_t) number_grays; i++)
-  {
-    cooccurrence[i]=(FeatureStatistics *) AcquireQuantumMemory(number_grays,
-      sizeof(**cooccurrence));
-    Q[i]=(FeatureStatistics *) AcquireQuantumMemory(number_grays,sizeof(**Q));
-    if ((cooccurrence[i] == (FeatureStatistics *) NULL) ||
-        (Q[i] == (FeatureStatistics *) NULL))
-      break;
-    (void) memset(cooccurrence[i],0,number_grays*
-      sizeof(**cooccurrence));
-    (void) memset(Q[i],0,number_grays*sizeof(**Q));
-  }
+  i=AcquireFeatureRows(cooccurrence,Q,number_grays);
   if (i < (ssize_t) number_grays)
     {
-      for (i--; i >= 0; i--)
-      {
-        if (Q[i] != (FeatureStatistics *) NULL)
-          Q[i]=(FeatureStatistics *) RelinquishMagickMemory(Q[i]);
-        if (cooccurrence[i] != (FeatureStatistics *) NULL)
-          cooccurrence[i]=(FeatureStatistics *)
-            RelinquishMagickMemory(cooccurrence[i]);
-      }
+      RelinquishFeatureRows(cooccurrence,Q,i);
       Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
       cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
       sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
@@ -1506,13 +1710,8 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
-    ssize_t
-      offset,
-      u,
-      v;
+    FeatureCooccurrence
+      scan;
 
     if (status == MagickFalse)
       continue;
@@ -1524,68 +1723,17 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         continue;
       }
     p+=(ptrdiff_t) distance*GetPixelChannels(image);;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      for (i=0; i < 4; i++)
-      {
-        offset=GetFeatureAdjacencyOffset(image,distance,i);
-        u=0;
-        v=0;
-        while (grays[u].red != ScaleQuantumToMap(GetPixelRed(image,p)))
-          u++;
-        while (grays[v].red != ScaleQuantumToMap(GetPixelRed(image,p+offset*(ssize_t) GetPixelChannels(image))))
-          v++;
-        cooccurrence[u][v].direction[i].red++;
-        cooccurrence[v][u].direction[i].red++;
-        u=0;
-        v=0;
-        while (grays[u].green != ScaleQuantumToMap(GetPixelGreen(image,p)))
-          u++;
-        while (grays[v].green != ScaleQuantumToMap(GetPixelGreen(image,p+offset*(ssize_t) GetPixelChannels(image))))
-          v++;
-        cooccurrence[u][v].direction[i].green++;
-        cooccurrence[v][u].direction[i].green++;
-        u=0;
-        v=0;
-        while (grays[u].blue != ScaleQuantumToMap(GetPixelBlue(image,p)))
-          u++;
-        while (grays[v].blue != ScaleQuantumToMap(GetPixelBlue(image,p+offset*(ssize_t) GetPixelChannels(image))))
-          v++;
-        cooccurrence[u][v].direction[i].blue++;
-        cooccurrence[v][u].direction[i].blue++;
-        if (image->colorspace == CMYKColorspace)
-          {
-            u=0;
-            v=0;
-            while (grays[u].black != ScaleQuantumToMap(GetPixelBlack(image,p)))
-              u++;
-            while (grays[v].black != ScaleQuantumToMap(GetPixelBlack(image,p+offset*(ssize_t) GetPixelChannels(image))))
-              v++;
-            cooccurrence[u][v].direction[i].black++;
-            cooccurrence[v][u].direction[i].black++;
-          }
-        if (image->alpha_trait != UndefinedPixelTrait)
-          {
-            u=0;
-            v=0;
-            while (grays[u].alpha != ScaleQuantumToMap(GetPixelAlpha(image,p)))
-              u++;
-            while (grays[v].alpha != ScaleQuantumToMap(GetPixelAlpha(image,p+offset*(ssize_t) GetPixelChannels(image))))
-              v++;
-            cooccurrence[u][v].direction[i].alpha++;
-            cooccurrence[v][u].direction[i].alpha++;
-          }
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    scan.image=image;
+    scan.distance=distance;
+    scan.grays=grays;
+    scan.cooccurrence=cooccurrence;
+    CountFeatureCooccurrence(&scan,p);
   }
   grays=(PixelPacket *) RelinquishMagickMemory(grays);
   image_view=DestroyCacheView(image_view);
   if (status == MagickFalse)
     {
-      for (i=0; i < (ssize_t) number_grays; i++)
-        cooccurrence[i]=(FeatureStatistics *)
-          RelinquishMagickMemory(cooccurrence[i]);
+      RelinquishFeatureMatrix(cooccurrence,number_grays);
       cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
       channel_features=(ChannelFeatures *) RelinquishMagickMemory(
         channel_features);
@@ -1596,33 +1744,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Normalize spatial dependence matrix.
   */
-  for (i=0; i < 4; i++)
-  {
-    double
-      normalize;
-
-    ssize_t
-      y;
-
-    normalize=GetFeatureNormalization(image,distance,i);
-    normalize=MagickSafeReciprocal(normalize);
-    for (y=0; y < (ssize_t) number_grays; y++)
-    {
-      ssize_t
-        x;
-
-      for (x=0; x < (ssize_t) number_grays; x++)
-      {
-        cooccurrence[x][y].direction[i].red*=normalize;
-        cooccurrence[x][y].direction[i].green*=normalize;
-        cooccurrence[x][y].direction[i].blue*=normalize;
-        if (image->colorspace == CMYKColorspace)
-          cooccurrence[x][y].direction[i].black*=normalize;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          cooccurrence[x][y].direction[i].alpha*=normalize;
-      }
-    }
-  }
+  NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
   /*
     Compute texture features.
   */
@@ -1725,15 +1847,12 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     Relinquish resources.
   */
   sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
-  for (i=0; i < (ssize_t) number_grays; i++)
-    Q[i]=(FeatureStatistics *) RelinquishMagickMemory(Q[i]);
+  RelinquishFeatureMatrix(Q,number_grays);
   Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
   density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
   density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
   density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
-  for (i=0; i < (ssize_t) number_grays; i++)
-    cooccurrence[i]=(FeatureStatistics *)
-      RelinquishMagickMemory(cooccurrence[i]);
+  RelinquishFeatureMatrix(cooccurrence,number_grays);
   cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
   return(channel_features);
 }
