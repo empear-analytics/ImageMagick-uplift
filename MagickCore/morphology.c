@@ -3216,6 +3216,9 @@ static double ConvolveChannelValue(const MagickRealType *magick_restrict k,
 
 typedef struct _MorphologyKernelWalk
 {
+  MorphologyMethod
+    method;
+
   const Image
     *image;
 
@@ -3223,9 +3226,14 @@ typedef struct _MorphologyKernelWalk
     *kernel;
 
   const Quantum
+    *magick_restrict p,
     *magick_restrict pixels;
 
+  double
+    bias;
+
   ssize_t
+    center,
     i;
 } MorphologyKernelWalk;
 
@@ -3469,6 +3477,46 @@ static void BlendReflectedKernel(const MorphologyKernelWalk *walk,
     }
     pixels+=(image->columns-1)*GetPixelChannels(image);
   }
+}
+
+static double GetMorphologyInitialPixel(const MorphologyKernelWalk *walk)
+{
+  const MorphologyMethod
+    method = walk->method;
+
+  const Quantum
+    *magick_restrict p = walk->p;
+
+  const double
+    bias = walk->bias;
+
+  const ssize_t
+    center = walk->center,
+    i = walk->i;
+
+  double
+    pixel;
+
+  switch (method)
+  {
+    case ConvolveMorphology:
+    {
+      pixel=bias;
+      break;
+    }
+    case DilateMorphology:
+    case ErodeIntensityMorphology:
+    {
+      pixel=0.0;
+      break;
+    }
+    default:
+    {
+      pixel=(double) p[center+i];
+      break;
+    }
+  }
+  return(pixel);
 }
 
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
@@ -3803,29 +3851,15 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         quantum_pixels=(const Quantum *) NULL;
         maximum=0.0;
         minimum=(double) QuantumRange;
+        walk.method=method;
         walk.image=image;
         walk.kernel=kernel;
+        walk.p=p;
         walk.pixels=pixels;
+        walk.bias=bias;
+        walk.center=center;
         walk.i=i;
-        switch (method)
-        {
-          case ConvolveMorphology:
-          {
-            pixel=bias;
-            break;
-          }
-          case DilateMorphology:
-          case ErodeIntensityMorphology:
-          {
-            pixel=0.0;
-            break;
-          }
-          default:
-          {
-            pixel=(double) p[center+i];
-            break;
-          }
-        }
+        pixel=GetMorphologyInitialPixel(&walk);
         gamma=1.0;
         switch (method)
         {
