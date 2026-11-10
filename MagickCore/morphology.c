@@ -389,6 +389,12 @@ static const char *FindKernelEnd(const char *kernel_string)
   return(end);
 }
 
+static MagickBooleanType IsKernelArrayTokenLeft(const char *token)
+{
+  return(( *token != '\0' && *token != ';' && *token != '\'' ) ? MagickTrue :
+    MagickFalse);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -454,7 +460,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
 
   /* sanity check -- no more values in kernel definition */
   (void) GetNextToken(p,&p,MagickPathExtent,token);
-  if ( *token != '\0' && *token != ';' && *token != '\'' )
+  if (IsKernelArrayTokenLeft(token) != MagickFalse)
     return(DestroyKernelInfo(kernel));
 
 #if 0
