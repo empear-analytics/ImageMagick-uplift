@@ -14180,6 +14180,20 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsDynamicVisualClass(const int v)
+{
+  switch (v)
+  {
+    case GrayScale:
+    case PseudoColor:
+    case DirectColor:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -16197,9 +16211,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
                   &display_image,exception);
           }
       }
-  if ((windows->visual_info->klass == GrayScale) ||
-      (windows->visual_info->klass == PseudoColor) ||
-      (windows->visual_info->klass == DirectColor))
+  if (IsDynamicVisualClass(windows->visual_info->klass) != MagickFalse)
     {
       /*
         Withdraw pan and Magnify window.
