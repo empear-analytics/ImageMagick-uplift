@@ -3978,6 +3978,25 @@ MagickPrivate MagickBooleanType XGetWindowColor(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _WindowInfo
+{
+  Window
+    window,
+    parent;
+
+  Visual
+    *visual;
+
+  Colormap
+    colormap;
+
+  XSegment
+    bounds;
+
+  RectangleInfo
+    crop_info;
+} WindowInfo;
+
 static Image *XGetWindowImage(Display *display,const Window window,
   const unsigned int borders,const unsigned int level,ExceptionInfo *exception)
 {
@@ -3992,25 +4011,6 @@ static Image *XGetWindowImage(Display *display,const Window window,
     struct _ColormapInfo
       *next;
   } ColormapInfo;
-
-  typedef struct _WindowInfo
-  {
-    Window
-      window,
-      parent;
-
-    Visual
-      *visual;
-
-    Colormap
-      colormap;
-
-    XSegment
-      bounds;
-
-    RectangleInfo
-      crop_info;
-  } WindowInfo;
 
   int
     display_height,
