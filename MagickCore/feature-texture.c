@@ -714,6 +714,49 @@ static void ComputeSumFeatures(const TextureDirection *texture)
   }
 }
 
+static void AccumulateVarianceAndDifference(const TextureDirection *texture,
+  const TextureSlots *slots,const ssize_t x,const ssize_t y)
+{
+  const PixelInfo
+    *const mean = slots->mean;
+
+  PixelInfo
+    *const variance = slots->variance;
+
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const density_xy = texture->density_xy;
+
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Sum of Squares: Variance
+  */
+  variance->red+=(y-mean->red+1)*
+    (y-mean->red+1)*cooccurrence[x][y].direction[i].red;
+  variance->green+=(y-mean->green+1)*
+    (y-mean->green+1)*cooccurrence[x][y].direction[i].green;
+  variance->blue+=(y-mean->blue+1)*
+    (y-mean->blue+1)*cooccurrence[x][y].direction[i].blue;
+  if (image->colorspace == CMYKColorspace)
+    variance->black+=(y-mean->black+1)*
+      (y-mean->black+1)*cooccurrence[x][y].direction[i].black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    variance->alpha+=(y-mean->alpha+1)*
+      (y-mean->alpha+1)*
+      cooccurrence[x][y].direction[i].alpha;
+  /*
+    Sum average / Difference Variance.
+  */
+  AddFeatureStatistics(image,
+    &density_xy[MagickAbsoluteValue(y-x)].direction[i],
+    &cooccurrence[x][y].direction[i]);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1101,6 +1144,17 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 #endif
   for (i=0; i < 4; i++)
   {
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
+
+    const TextureSlots
+      slots = { &correlation.direction[i], &entropy_x.direction[i],
+        &entropy_xy.direction[i], &entropy_xy1.direction[i],
+        &entropy_xy2.direction[i], &entropy_y.direction[i],
+        &mean.direction[i], &sum_squares.direction[i],
+        &variance.direction[i] };
+
     ssize_t
       y;
 
@@ -1111,28 +1165,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 
       for (x=0; x < (ssize_t) number_grays; x++)
       {
-        /*
-          Sum of Squares: Variance
-        */
-        variance.direction[i].red+=(y-mean.direction[i].red+1)*
-          (y-mean.direction[i].red+1)*cooccurrence[x][y].direction[i].red;
-        variance.direction[i].green+=(y-mean.direction[i].green+1)*
-          (y-mean.direction[i].green+1)*cooccurrence[x][y].direction[i].green;
-        variance.direction[i].blue+=(y-mean.direction[i].blue+1)*
-          (y-mean.direction[i].blue+1)*cooccurrence[x][y].direction[i].blue;
-        if (image->colorspace == CMYKColorspace)
-          variance.direction[i].black+=(y-mean.direction[i].black+1)*
-            (y-mean.direction[i].black+1)*cooccurrence[x][y].direction[i].black;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          variance.direction[i].alpha+=(y-mean.direction[i].alpha+1)*
-            (y-mean.direction[i].alpha+1)*
-            cooccurrence[x][y].direction[i].alpha;
-        /*
-          Sum average / Difference Variance.
-        */
-        AddFeatureStatistics(image,
-          &density_xy[MagickAbsoluteValue(y-x)].direction[i],
-          &cooccurrence[x][y].direction[i]);
+        AccumulateVarianceAndDifference(&texture,&slots,x,y);
         /*
           Information Measures of Correlation.
         */
