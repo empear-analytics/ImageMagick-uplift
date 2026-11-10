@@ -4576,6 +4576,13 @@ static inline MagickBooleanType IsNearBottomRightCorner(const int x,const int y,
     MagickFalse);
 }
 
+static inline MagickBooleanType IsSelectionMovedOrDone(
+  const RectangleInfo rectangle,const int x,const int y,const size_t state)
+{
+  return(((((int) rectangle.x != x) && ((int) rectangle.y != y)) ||
+    ((state & ExitState) != 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -4939,8 +4946,7 @@ static MagickBooleanType XCropImage(Display *display,
         default:
           break;
       }
-      if ((((int) crop_info.x != x) && ((int) crop_info.y != y)) ||
-          ((state & ExitState) != 0))
+      if (IsSelectionMovedOrDone(crop_info,x,y,state) != MagickFalse)
         {
           /*
             Check boundary conditions.
@@ -6178,8 +6184,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
       distance=(unsigned int)
         (((line_info.x2-line_info.x1+1)*(line_info.x2-line_info.x1+1))+
          ((line_info.y2-line_info.y1+1)*(line_info.y2-line_info.y1+1)));
-      if ((((int) rectangle_info.x != x) && ((int) rectangle_info.y != y)) ||
-          ((state & ExitState) != 0))
+      if (IsSelectionMovedOrDone(rectangle_info,x,y,state) != MagickFalse)
         {
           if (rectangle_info.x < 0)
             rectangle_info.x=0;
@@ -11580,8 +11585,7 @@ static MagickBooleanType XROIImage(Display *display,
         default:
           break;
       }
-      if ((((int) roi_info.x != x) && ((int) roi_info.y != y)) ||
-          ((state & ExitState) != 0))
+      if (IsSelectionMovedOrDone(roi_info,x,y,state) != MagickFalse)
         {
           /*
             Check boundary conditions.
