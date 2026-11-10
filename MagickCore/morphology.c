@@ -3431,6 +3431,46 @@ static inline double WalkReflectedKernel(const MorphologyKernelWalk *walk,
   return(pixel);
 }
 
+static void BlendReflectedKernel(const MorphologyKernelWalk *walk,
+  const MagickRealType *magick_restrict k,double *pixel,double *gamma)
+{
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  double
+    alpha;
+
+  ssize_t
+    u,
+    v;
+
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      if (!IsNaN(*k))
+        {
+          alpha=(double) (QuantumScale*(double)
+            GetPixelAlpha(image,pixels));
+          (*pixel)+=alpha*(*k)*(double) pixels[i];
+          (*gamma)+=alpha*(*k);
+        }
+      k--;
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3726,7 +3766,6 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
         double
-          alpha,
           gamma,
           maximum,
           minimum,
@@ -3745,12 +3784,6 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         const Quantum
           *magick_restrict pixels,
           *magick_restrict quantum_pixels;
-
-        ssize_t
-          u;
-
-        ssize_t
-          v;
 
         MorphologyKernelWalk
           walk;
@@ -3831,22 +3864,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
               Alpha blending.
             */
             gamma=0.0;
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k))
-                  {
-                    alpha=(double) (QuantumScale*(double)
-                      GetPixelAlpha(image,pixels));
-                    pixel+=alpha*(*k)*(double) pixels[i];
-                    gamma+=alpha*(*k);
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
+            BlendReflectedKernel(&walk,k,&pixel,&gamma);
             break;
           }
           case ErodeMorphology:
