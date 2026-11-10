@@ -395,6 +395,13 @@ static MagickBooleanType IsKernelArrayTokenLeft(const char *token)
     MagickFalse);
 }
 
+static MagickBooleanType IsKernelArrayReading(const KernelInfo *kernel,
+  const ssize_t i,const char *p,const char *end)
+{
+  return(((i < (ssize_t) (kernel->width*kernel->height)) && (p < end)) ?
+    MagickTrue : MagickFalse);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -452,7 +459,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   kernel->minimum=MagickMaximumValue;
   kernel->maximum=(-MagickMaximumValue);
   kernel->negative_range = kernel->positive_range = 0.0;
-  for (i=0; (i < (ssize_t) (kernel->width*kernel->height)) && (p < end); i++)
+  for (i=0; IsKernelArrayReading(kernel,i,p,end) != MagickFalse; i++)
   {
     p=ReadKernelArrayToken(p,token);
     SetKernelArrayValue(kernel,i,token,nan);
