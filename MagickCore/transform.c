@@ -1110,11 +1110,11 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+#define ExcerptImageTag  "Excerpt/Image"
+
 MagickExport Image *ExcerptImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
-#define ExcerptImageTag  "Excerpt/Image"
-
   CacheView
     *excerpt_view,
     *image_view;
