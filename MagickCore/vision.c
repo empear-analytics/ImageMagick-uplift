@@ -380,6 +380,86 @@ static void PerimeterThreshold(const Image *component_image,
   }
 }
 
+typedef struct _CCCircularityPass
+{
+  const Image
+    *component_image;
+
+  CCObjectInfo
+    *object;
+
+  ssize_t
+    metric_index,
+    i;
+
+  ExceptionInfo
+    *exception;
+} CCCircularityPass;
+
+static void MeasureObjectCircularity(const CCCircularityPass *circularity_pass,
+  MagickBooleanType *status)
+{
+  const Image
+    *const component_image = circularity_pass->component_image;
+
+  CCObjectInfo
+    *const object = circularity_pass->object;
+
+  const ssize_t
+    metric_index = circularity_pass->metric_index,
+    i = circularity_pass->i;
+
+  ExceptionInfo
+    *const exception = circularity_pass->exception;
+
+  CacheView
+    *component_view;
+
+  RectangleInfo
+    bounding_box;
+
+  size_t
+    pattern[4] = { 1, 0, 0, 0 };
+
+  ssize_t
+    y;
+
+  component_view=AcquireAuthenticCacheView(component_image,exception);
+  bounding_box=object[i].bounding_box;
+  for (y=(-1); y < (ssize_t) bounding_box.height; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      x;
+
+    p=GetCacheViewVirtualPixels(component_view,bounding_box.x-1,
+      bounding_box.y+y,bounding_box.width+2,2,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        (*status)=MagickFalse;
+        break;
+      }
+    for (x=(-1); x < (ssize_t) bounding_box.width; x++)
+    {
+      CCPerimeterPass
+        perimeter_pass;
+
+      perimeter_pass.component_image=component_image;
+      perimeter_pass.width=bounding_box.width;
+      perimeter_pass.i=i;
+      CountPerimeterPattern(&perimeter_pass,p,pattern);
+      p+=(ptrdiff_t) GetPixelChannels(component_image);
+    }
+  }
+  component_view=DestroyCacheView(component_view);
+  object[i].metric[metric_index]=ceil(MagickSQ1_2*pattern[1]+1.0*pattern[2]+
+    MagickSQ1_2*pattern[3]+MagickSQ2*pattern[0]-0.5);
+  object[i].metric[metric_index]=4.0*MagickPI*object[i].area/
+    (object[i].metric[metric_index]*object[i].metric[metric_index]);
+}
+
 static void CircularityThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -396,57 +476,16 @@ static void CircularityThreshold(const Image *component_image,
 #endif
   for (i=0; i < (ssize_t) component_image->colors; i++)
   {
-    CacheView
-      *component_view;
-
-    RectangleInfo
-      bounding_box;
-
-    size_t
-      pattern[4] = { 1, 0, 0, 0 };
-
-    ssize_t
-      y;
+    const CCCircularityPass
+      circularity_pass = { component_image, object, metric_index, i,
+        exception };
 
     /*
       Compute perimeter of each object.
     */
     if (status == MagickFalse)
       continue;
-    component_view=AcquireAuthenticCacheView(component_image,exception);
-    bounding_box=object[i].bounding_box;
-    for (y=(-1); y < (ssize_t) bounding_box.height; y++)
-    {
-      const Quantum
-        *magick_restrict p;
-
-      ssize_t
-        x;
-
-      p=GetCacheViewVirtualPixels(component_view,bounding_box.x-1,
-        bounding_box.y+y,bounding_box.width+2,2,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (x=(-1); x < (ssize_t) bounding_box.width; x++)
-      {
-        CCPerimeterPass
-          perimeter_pass;
-
-        perimeter_pass.component_image=component_image;
-        perimeter_pass.width=bounding_box.width;
-        perimeter_pass.i=i;
-        CountPerimeterPattern(&perimeter_pass,p,pattern);
-        p+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
-    }
-    component_view=DestroyCacheView(component_view);
-    object[i].metric[metric_index]=ceil(MagickSQ1_2*pattern[1]+1.0*pattern[2]+
-      MagickSQ1_2*pattern[3]+MagickSQ2*pattern[0]-0.5);
-    object[i].metric[metric_index]=4.0*MagickPI*object[i].area/
-      (object[i].metric[metric_index]*object[i].metric[metric_index]);
+    MeasureObjectCircularity(&circularity_pass,&status);
   }
 }
 
