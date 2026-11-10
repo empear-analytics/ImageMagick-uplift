@@ -2675,6 +2675,89 @@ static void RelinquishMotionTables(MagickRealType *kernel,OffsetInfo *offset)
 
 #define BlurImageTag  "Blur/Image"
 
+typedef struct _MotionBlur
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  MagickRealType
+    *kernel;
+
+  CacheView
+    *motion_view;
+
+  OffsetInfo
+    *offset;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
+
+  CacheView
+    *image_view,
+    *blur_view;
+} MotionBlur;
+
+static MagickBooleanType BlurMotionRows(const MotionBlur *motion,
+  MagickBooleanType status,MagickOffsetType progress)
+{
+  const Image
+    *const image = motion->image;
+
+  Image
+    *const blur_image = motion->blur_image;
+
+  MagickRealType
+    *const kernel = motion->kernel;
+
+  CacheView
+    *const motion_view = motion->motion_view;
+
+  OffsetInfo
+    *const offset = motion->offset;
+
+  const size_t
+    width = motion->width;
+
+  ExceptionInfo
+    *const exception = motion->exception;
+
+  CacheView
+    *const image_view = motion->image_view,
+    *const blur_view = motion->blur_view;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,blur_image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const MotionRow
+      row = { image, blur_image, kernel, motion_view, offset, width, y,
+        exception };
+
+    if (BlurMotionLine(&row,image_view,blur_view,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetBlurProgress(image,BlurImageTag,progress,&status);
+      }
+  }
+  return(status);
+}
+
 MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -2695,14 +2778,14 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   MagickRealType
     *kernel;
 
+  MotionBlur
+    motion;
+
   OffsetInfo
     *offset;
 
   size_t
     width;
-
-  ssize_t
-    y;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -2752,27 +2835,16 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   image_view=AcquireVirtualCacheView(image,exception);
   motion_view=AcquireVirtualCacheView(image,exception);
   blur_view=AcquireAuthenticCacheView(blur_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,blur_image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const MotionRow
-      row = { image, blur_image, kernel, motion_view, offset, width, y,
-        exception };
-
-    if (BlurMotionLine(&row,image_view,blur_view,&status) == MagickFalse)
-      continue;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetBlurProgress(image,BlurImageTag,progress,&status);
-      }
-  }
+  motion.image=image;
+  motion.blur_image=blur_image;
+  motion.kernel=kernel;
+  motion.motion_view=motion_view;
+  motion.offset=offset;
+  motion.width=width;
+  motion.exception=exception;
+  motion.image_view=image_view;
+  motion.blur_view=blur_view;
+  status=BlurMotionRows(&motion,status,progress);
   blur_view=DestroyCacheView(blur_view);
   motion_view=DestroyCacheView(motion_view);
   image_view=DestroyCacheView(image_view);
