@@ -792,6 +792,25 @@ static MagickBooleanType IsStretchDirectClass(const Image *image)
       (image->colorspace == CMYKColorspace))) ? MagickTrue : MagickFalse);
 }
 
+static cl_uint FindStretchBlackBin(const cl_uint4 *histogram,
+  const double black_point)
+{
+  cl_uint
+    i;
+
+  double
+    intensity;
+
+  intensity=0.0;
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    intensity+=histogram[i].s[2];
+    if (intensity > black_point)
+      break;
+  }
+  return(i);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const double black_point,const double white_point,
   ExceptionInfo *exception)
@@ -1003,13 +1022,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   white.x=MaxRange(QuantumRange);
   if ((image->channel_mask & RedChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.x=(cl_float) i;
     intensity=0.0;
     for (i=(ssize_t) MaxMap; i != 0; i--)
