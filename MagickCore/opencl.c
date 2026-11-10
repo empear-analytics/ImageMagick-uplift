@@ -2436,6 +2436,23 @@ static void SetOpenCLDeviceInfo(MagickCLDevice device,cl_context context,
     sizeof(cl_ulong),&device->local_memory_size,NULL);
 }
 
+static void CountOpenCLDevices(MagickCLEnv clEnv,cl_platform_id *platforms,
+  const cl_uint number_platforms)
+{
+  cl_uint
+    i,
+    number_devices;
+
+  for (i = 0; i < number_platforms; i++)
+  {
+    number_devices=GetOpenCLDeviceCount(clEnv,platforms[i]);
+    if (number_devices == 0)
+      platforms[i]=(cl_platform_id) NULL;
+    else
+      clEnv->number_devices+=number_devices;
+  }
+}
+
 static void LoadOpenCLDevices(MagickCLEnv clEnv)
 {
   cl_context_properties
@@ -2471,14 +2488,7 @@ static void LoadOpenCLDevices(MagickCLEnv clEnv)
        platforms=(cl_platform_id *) RelinquishMagickMemory(platforms);
        return;
     }
-  for (i = 0; i < number_platforms; i++)
-  {
-    number_devices=GetOpenCLDeviceCount(clEnv,platforms[i]);
-    if (number_devices == 0)
-      platforms[i]=(cl_platform_id) NULL;
-    else
-      clEnv->number_devices+=number_devices;
-  }
+  CountOpenCLDevices(clEnv,platforms,number_platforms);
   if (clEnv->number_devices == 0)
     {
       platforms=(cl_platform_id *) RelinquishMagickMemory(platforms);
