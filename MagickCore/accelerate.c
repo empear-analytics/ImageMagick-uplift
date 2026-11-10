@@ -180,6 +180,15 @@ static MagickBooleanType checkAccelerateCondition(const Image* image)
   return(MagickTrue);
 }
 
+static MagickBooleanType HasUndefinedRGBATraits(const Image *image)
+{
+  return(((GetPixelRedTraits(image) == UndefinedPixelTrait) ||
+      (GetPixelGreenTraits(image) == UndefinedPixelTrait) ||
+      (GetPixelBlueTraits(image) == UndefinedPixelTrait) ||
+      (GetPixelAlphaTraits(image) == UndefinedPixelTrait)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType checkAccelerateConditionRGBA(const Image* image)
 {
   if (checkAccelerateCondition(image) == MagickFalse)
@@ -189,10 +198,7 @@ static MagickBooleanType checkAccelerateConditionRGBA(const Image* image)
   if (image->number_channels != 4)
     return(MagickFalse);
 
-  if ((GetPixelRedTraits(image) == UndefinedPixelTrait) ||
-      (GetPixelGreenTraits(image) == UndefinedPixelTrait) ||
-      (GetPixelBlueTraits(image) == UndefinedPixelTrait) ||
-      (GetPixelAlphaTraits(image) == UndefinedPixelTrait))
+  if (HasUndefinedRGBATraits(image) != MagickFalse)
     return(MagickFalse);
 
   return(MagickTrue);
