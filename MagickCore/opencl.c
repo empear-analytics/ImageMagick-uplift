@@ -1525,17 +1525,30 @@ static MagickBooleanType CompileOpenCLKernel(MagickCLDevice device,
   return(MagickTrue);
 }
 
-static cl_event* CopyOpenCLEvents(MagickCLCacheInfo first,
-  MagickCLCacheInfo second,cl_uint *event_count)
+static void CopyOpenCLEventLists(cl_event *events,MagickCLCacheInfo first,
+  MagickCLCacheInfo second)
 {
-  cl_event
-    *events;
-
   size_t
     i;
 
   size_t
     j;
+
+  j=0;
+  for (i=0; i < first->event_count; i++, j++)
+    events[j]=first->events[i];
+  if (second != (MagickCLCacheInfo) NULL)
+    {
+      for (i=0; i < second->event_count; i++, j++)
+        events[j]=second->events[i];
+    }
+}
+
+static cl_event* CopyOpenCLEvents(MagickCLCacheInfo first,
+  MagickCLCacheInfo second,cl_uint *event_count)
+{
+  cl_event
+    *events;
 
   assert(first != (MagickCLCacheInfo) NULL);
   assert(event_count != (cl_uint *) NULL);
@@ -1552,16 +1565,7 @@ static cl_event* CopyOpenCLEvents(MagickCLCacheInfo first,
       if (events == (cl_event *) NULL)
         *event_count=0;
       else
-        {
-          j=0;
-          for (i=0; i < first->event_count; i++, j++)
-            events[j]=first->events[i];
-          if (second != (MagickCLCacheInfo) NULL)
-            {
-              for (i=0; i < second->event_count; i++, j++)
-                events[j]=second->events[i];
-            }
-        }
+        CopyOpenCLEventLists(events,first,second);
     }
   UnlockSemaphoreInfo(first->events_semaphore);
   if (second != (MagickCLCacheInfo) NULL)
