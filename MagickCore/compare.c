@@ -5219,9 +5219,6 @@ typedef struct _SimilarityCandidate
 static void SelectLowerSimilarity(const SimilarityCandidate *tile,
   SimilarityInfo *channel_info)
 {
-  const MetricType
-    metric = tile->metric;
-
   const double
     similarity = tile->similarity;
 
@@ -5229,18 +5226,11 @@ static void SelectLowerSimilarity(const SimilarityCandidate *tile,
     x = tile->x,
     y = tile->y;
 
-  switch (metric)
-  {
-    default:
-    {
-      if (similarity >= (*channel_info).similarity)
-        break;
-      (*channel_info).similarity=similarity;
-      (*channel_info).x=x;
-      (*channel_info).y=y;
-      break;
-    }
-  }
+  if (similarity >= (*channel_info).similarity)
+    return;
+  (*channel_info).similarity=similarity;
+  (*channel_info).x=x;
+  (*channel_info).y=y;
 }
 
 static void SelectBestSimilarity(const SimilarityCandidate *tile,
@@ -5461,14 +5451,7 @@ static MagickBooleanType ScanSimilarityRow(const SimilarityRow *row,
     tile.similarity=similarity;
     tile.x=x;
     tile.y=y;
-    switch (metric)
-    {
-      default:
-      {
-        SelectBestSimilarity(&tile,channel_info);
-        break;
-      }
-    }
+    SelectBestSimilarity(&tile,channel_info);
     channels.image=image;
     channels.similarity_image=similarity_image;
     channels.metric=metric;
