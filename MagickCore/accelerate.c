@@ -786,6 +786,12 @@ MagickPrivate MagickBooleanType AccelerateContrastImage(Image *image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+static MagickBooleanType IsStretchDirectClass(const Image *image)
+{
+  return((((image->channel_mask & AlphaChannel) != 0) || (((image->channel_mask & IndexChannel) != 0) &&
+      (image->colorspace == CMYKColorspace))) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const double black_point,const double white_point,
   ExceptionInfo *exception)
@@ -1144,8 +1150,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   /*
     Stretch the image.
   */
-  if (((image->channel_mask & AlphaChannel) != 0) || (((image->channel_mask & IndexChannel) != 0) &&
-      (image->colorspace == CMYKColorspace)))
+  if (IsStretchDirectClass(image) != MagickFalse)
     image->storage_class=DirectClass;
   if (image->storage_class == PseudoClass)
   {
