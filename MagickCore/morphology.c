@@ -3755,6 +3755,96 @@ static void ApplyMorphologyMethod(const MorphologyKernelWalk *walk,
   }
 }
 
+typedef struct _MorphologyRow
+{
+  MorphologyMethod
+    method;
+
+  const Image
+    *image;
+
+  Image
+    *morphology_image;
+
+  const KernelInfo
+    *kernel;
+
+  double
+    bias;
+
+  size_t
+    *changes;
+
+  ssize_t
+    center;
+
+  int
+    id;
+} MorphologyRow;
+
+static void MorphologyRowChannel(const MorphologyRow *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,const ssize_t i)
+{
+  double
+    gamma,
+    maximum,
+    minimum,
+    pixel;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    morphology_traits,
+    traits;
+
+  const Quantum
+    *magick_restrict pixels,
+    *magick_restrict quantum_pixels;
+
+  MorphologyKernelWalk
+    walk;
+
+  channel=GetPixelChannelChannel(row->image,i);
+  traits=GetPixelChannelTraits(row->image,channel);
+  morphology_traits=GetPixelChannelTraits(row->morphology_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (morphology_traits == UndefinedPixelTrait))
+    return;
+  if ((traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(row->morphology_image,channel,p[row->center+i],q);
+      return;
+    }
+  pixels=p;
+  quantum_pixels=(const Quantum *) NULL;
+  maximum=0.0;
+  minimum=(double) QuantumRange;
+  walk.method=row->method;
+  walk.image=row->image;
+  walk.morphology_traits=morphology_traits;
+  walk.kernel=row->kernel;
+  walk.p=p;
+  walk.pixels=pixels;
+  walk.bias=row->bias;
+  walk.maximum=maximum;
+  walk.minimum=minimum;
+  walk.center=row->center;
+  walk.i=i;
+  pixel=GetMorphologyInitialPixel(&walk);
+  gamma=1.0;
+  ApplyMorphologyMethod(&walk,&pixel,&gamma,&quantum_pixels);
+  if (quantum_pixels != (const Quantum *) NULL)
+    {
+      SetPixelChannel(row->morphology_image,channel,quantum_pixels[i],q);
+      return;
+    }
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(row->morphology_image,channel,ClampToQuantum(gamma*pixel),q);
+  if (fabs(pixel-(double) p[row->center+i]) >= MagickEpsilon)
+    row->changes[row->id]++;
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4029,6 +4119,9 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
     ssize_t
       center;
 
+    MorphologyRow
+      row;
+
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,-offset.x,y-offset.y,width,
@@ -4042,6 +4135,14 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
       }
     center=(ssize_t) ((ssize_t) GetPixelChannels(image)*(ssize_t) width*
       offset.y+(ssize_t) GetPixelChannels(image)*offset.x);
+    row.method=method;
+    row.image=image;
+    row.morphology_image=morphology_image;
+    row.kernel=kernel;
+    row.bias=bias;
+    row.changes=changes;
+    row.center=center;
+    row.id=id;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       ssize_t
@@ -4049,64 +4150,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
 
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
-        double
-          gamma,
-          maximum,
-          minimum,
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          morphology_traits,
-          traits;
-
-        const Quantum
-          *magick_restrict pixels,
-          *magick_restrict quantum_pixels;
-
-        MorphologyKernelWalk
-          walk;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        morphology_traits=GetPixelChannelTraits(morphology_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (morphology_traits == UndefinedPixelTrait))
-          continue;
-        if ((traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(morphology_image,channel,p[center+i],q);
-            continue;
-          }
-        pixels=p;
-        quantum_pixels=(const Quantum *) NULL;
-        maximum=0.0;
-        minimum=(double) QuantumRange;
-        walk.method=method;
-        walk.image=image;
-        walk.morphology_traits=morphology_traits;
-        walk.kernel=kernel;
-        walk.p=p;
-        walk.pixels=pixels;
-        walk.bias=bias;
-        walk.maximum=maximum;
-        walk.minimum=minimum;
-        walk.center=center;
-        walk.i=i;
-        pixel=GetMorphologyInitialPixel(&walk);
-        gamma=1.0;
-        ApplyMorphologyMethod(&walk,&pixel,&gamma,&quantum_pixels);
-        if (quantum_pixels != (const Quantum *) NULL)
-          {
-            SetPixelChannel(morphology_image,channel,quantum_pixels[i],q);
-            continue;
-          }
-        gamma=MagickSafeReciprocal(gamma);
-        SetPixelChannel(morphology_image,channel,ClampToQuantum(gamma*pixel),q);
-        if (fabs(pixel-(double) p[center+i]) >= MagickEpsilon)
-          changes[id]++;
+        MorphologyRowChannel(&row,p,q,i);
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(morphology_image);
