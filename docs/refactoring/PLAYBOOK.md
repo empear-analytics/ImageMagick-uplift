@@ -7396,6 +7396,294 @@ by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe LP - Name a Label Set as a Predicate
+
+**Use when:** CodeScene reports *Complex Method* and much of the function's complexity is
+one `switch` that holds a single group of many labels besides `default: break;`, whose
+body leaves the function on every path, as `colorspace.c`'s `sRGBTransformImage` does:
+twenty-eight colourspace labels select the generic conversion, `default:` breaks to the
+rest of the function. The label set may recur as the same single group in another
+function of the file (`GenericOrLogTosRGB`, the same twenty-eight labels), where it is a
+second *Complex Method*.
+
+**Not covered by:** Recipe P, which moves a boolean expression character for character;
+a `switch` is a statement, and its label test is no expression of the source. Recipe NS,
+which names a `?:` between two constants. Recipes SD, SR and SW, which move groups with
+their bodies: the new function keeps the labels and the body, so each site becomes its
+own label-run helper and two such helpers of one set of labels clone (and SW's step 3
+gives `sRGBTransformImage`'s helper five parameters). Recipe E step 7, which moves the
+whole `switch` with the tail of the function.
+
+**How:**
+
+1. The `switch (e)` has exactly two groups: one group `G` of labels `L1 ... Ln` with body
+   `B`, and `default:` with `break;` alone. `e` is a parameter, a local or a member access
+   (`image->colorspace`) of an enumeration type, with no call, assignment or increment.
+   `B` ends every path with `return(...)`; it holds no `break` of this `switch`, no
+   `continue`, `goto` or `case` label, and no `#pragma` or preprocessor line. The
+   `switch` lies outside every OpenMP region.
+2. Write a `static MagickBooleanType` function directly above the first function that
+   uses it, named for what the labels have in common, with one parameter of `e`'s
+   declared type, `const`: its body is `switch (<param>) { <L1 ... Ln, one per line, in
+   the first site's order> return(MagickTrue); default: break; } return(MagickFalse);`.
+3. Replace the `switch`, from `switch` to its closing brace, by
+   `if (<Name>(e) != MagickFalse)` followed by `B`. `B`'s text is unchanged except for its
+   indentation, which follows the file's style for the body of an `if` (a braced block
+   keeps its own lines; a single statement stands two columns deeper than the `if`).
+4. *Several sites.* The same function replaces another such `switch` whose label set
+   equals `L1 ... Ln` as a set (the order of labels does not matter: a `switch` selects by
+   value), each site meeting steps 1 and 3. A site in another function of the caller's is
+   its own commit.
+5. Check by script that each site's labels and the function's are the same set, each
+   label once, and that each `B` equals the original body but for indentation.
+
+**Before:**
+
+```c
+  switch (colorspace)
+  {
+    case CMYColorspace:
+    case Adobe98Colorspace:
+    ...
+    case YUVColorspace:
+    {
+      sRGBGenericInput
+        input;
+
+      input.colorspace=colorspace;
+      input.illuminant=illuminant;
+      return(sRGBToGeneric(&input,image,status,exception));
+    }
+    default:
+      break;
+  }
+  table.colorspace=colorspace;
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsGenericColorspace(const ColorspaceType colorspace)
+{
+  switch (colorspace)
+  {
+    case CMYColorspace:
+    case Adobe98Colorspace:
+    ...
+    case YUVColorspace:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+...
+  if (IsGenericColorspace(colorspace) != MagickFalse)
+    {
+      sRGBGenericInput
+        input;
+
+      input.colorspace=colorspace;
+      input.illuminant=illuminant;
+      return(sRGBToGeneric(&input,image,status,exception));
+    }
+  table.colorspace=colorspace;
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The original evaluates `e` once and runs `B` exactly when
+  `e` equals one of `L1 ... Ln`; otherwise `default:` breaks and control goes on after the
+  `switch`. The new function evaluates the same value once (step 1: `e` has no side
+  effect; its parameter has `e`'s own type, so passing converts nothing) and returns
+  `MagickTrue` exactly when the value equals one of the same labels (steps 4 and 5), so
+  `B` runs on the same inputs; otherwise control goes on after the `if`, where it went
+  after the `switch`. `B` leaves the function on every path (step 1), so nothing after the
+  `if` runs once it has run, as nothing after the `switch` did.
+- `B` holds no `break` of the `switch` (step 1), which inside an `if` would bind to an
+  enclosing loop or not compile.
+- The new function's `switch` keeps `default: break;`, so `-Wswitch` stays quiet; the
+  caller has no `switch` left to warn about. The new function is a label run: with more
+  than seven labels it is a *Complex Method* of its own, allowed for label-run helpers by
+  the owner's ruling of 2026-11-07, and it holds nothing but the labels.
+
+**Evidence level:** oracle (the cases that reach each caller), with `refactor_guard.py
+--calls` (`+2` for the new function, `+1` for each further site, nothing else moved) and
+step 5's script.
+
+**Provenance:** 2026-11-10, from `colorspace.c`'s `sRGBTransformImage` and
+`GenericOrLogTosRGB` (campaign A, W16 lane c): the same twenty-eight-label generic group,
+a *Complex Method* in each (cc 31 and 30), the last findings of the file but its length and
+mean complexity. W15 lane b measured the label run as an SW helper of `sRGBTransformImage`
+(7.46, five parameters by SW step 3). A probe of this recipe on both sites: 7.44 to 8.10
+(the first site alone 7.46), the one new function the only *Complex Method* left (cc 30, a
+label run). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe SC - Extract Sibling Blocks Differing in Several Constants
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on
+a function that holds two or more copies of one block, typically sibling `switch` cases,
+that are the same text except for two or more constants, as `quantize.c`'s `Riemersma`
+does: its four `level > 1` cases are the same seven calls (`Riemersma`, `RiemersmaDither`
+in turn, each but the first under `if (status != MagickFalse)`) on four gravity
+constants that differ from case to case. Moved one by one, the copies become helpers
+that differ only in those constants, which CodeScene reports as *Code Duplication*.
+
+**Not covered by:** Recipe SV, whose copies differ in exactly one value and whose
+*Careful* refuses two; Recipe TW, whose two copies stand in two functions and differ in
+at most one value; Recipe D, which needs a reported *Code Duplication* and passes the
+differing values as parameters (seven here with the four constants); Recipe E, which
+passes no constant, so each copy would be its own near-identical helper; Recipe SD and
+SW, which move groups of different cases, not copies of one.
+
+**How:**
+
+1. Each copy lies in the same function and meets Recipe E steps 1 and 3 to 7 and the
+   OpenMP rule above, with no `#pragma` line.
+2. The copies are the same token sequence once some constants are replaced by role
+   names, checked by script (whitespace and line breaks ignored; no variable renamed).
+   Each constant is a literal or an enumeration constant. A role may stand at several
+   positions when every copy has the same constant at all of them (Recipe D's *One value
+   at several positions*); two positions take two roles when any copy differs between
+   them. At least two roles differ between at least two copies.
+3. Write a `typedef struct` directly above the new function, one member per role, named
+   for the role and in the order of first use. A member's type is the type of every
+   object the role's constants are assigned to or parameter they are passed to in the
+   block (Recipe SV step 3; every position of a role must agree); used in an expression
+   or comparison, the constant's own type.
+4. The new function's parameters are the variables a copy reads (Recipe E step 3) and
+   `const Name *name`, at most four in all. It binds each member as a `const` local of
+   the member's name and type (Recipe N step 4), then holds the text of one copy with
+   each constant replaced by its role's name, nothing else changed. Recipe E step 7's
+   forms apply as for one block; a single output `v` the copy assigns whole before it
+   reads it is the new function's local and its return value (Recipe SV step 2), the
+   copy becoming `v=Helper(...);`.
+5. Replace every copy with a declaration `const Name name = { c1,...,ck };`, the copy's
+   constants in member order (Recipe FI's initialiser), at the top of the block that
+   holds the copy (the case's braced body), followed by the call passing `&name`.
+6. When the copies call the function that holds them (a recursion), the new function,
+   standing above that function, calls it before its definition: write a forward
+   declaration of it directly above the new function (and its struct), with the return
+   type and parameter types of its definition. A declaration that disagrees with the
+   definition is a compile error (conflicting types), so the build checks it.
+7. All copies of one function move in one commit. The message lists each copy's
+   constants.
+8. Check by script that each copy equals the new function's body with that copy's
+   constants substituted for the role names, and that each initialiser lists that copy's
+   constants in member order.
+
+**Before:**
+
+```c
+      case WestGravity:
+      {
+        status=Riemersma(curve,level-1,NorthGravity,exception);
+        if (status != MagickFalse)
+          status=RiemersmaDither(curve,EastGravity,exception);
+        if (status != MagickFalse)
+          status=Riemersma(curve,level-1,WestGravity,exception);
+        if (status != MagickFalse)
+          status=RiemersmaDither(curve,SouthGravity,exception);
+        if (status != MagickFalse)
+          status=Riemersma(curve,level-1,WestGravity,exception);
+        if (status != MagickFalse)
+          status=RiemersmaDither(curve,WestGravity,exception);
+        if (status != MagickFalse)
+          status=Riemersma(curve,level-1,SouthGravity,exception);
+        break;
+      }
+      case EastGravity:
+      {
+        status=Riemersma(curve,level-1,SouthGravity,exception);
+        ...
+```
+
+**After:**
+
+```c
+typedef struct _RiemersmaTurns
+{
+  unsigned int
+    enter,
+    step,
+    along,
+    leave;
+} RiemersmaTurns;
+
+static MagickBooleanType
+  Riemersma(const RiemersmaCurve *,const size_t,const unsigned int,
+    ExceptionInfo *);
+
+static MagickBooleanType RiemersmaSubCurves(const RiemersmaCurve *curve,
+  const size_t level,const RiemersmaTurns *turns,ExceptionInfo *exception)
+{
+  const unsigned int
+    enter = turns->enter,
+    step = turns->step,
+    along = turns->along,
+    leave = turns->leave;
+
+  MagickBooleanType
+    status;
+
+  status=Riemersma(curve,level-1,enter,exception);
+  if (status != MagickFalse)
+    status=RiemersmaDither(curve,step,exception);
+  ...
+  if (status != MagickFalse)
+    status=Riemersma(curve,level-1,leave,exception);
+  return(status);
+}
+...
+      case WestGravity:
+      {
+        const RiemersmaTurns
+          turns = { NorthGravity,EastGravity,WestGravity,SouthGravity };
+
+        status=RiemersmaSubCurves(curve,level,&turns,exception);
+        break;
+      }
+```
+
+**Careful:**
+
+- A constant has no side effect, so evaluating it in an initialiser before the block's
+  statements run, instead of where the copy used it, changes nothing; the statements run
+  in the same order on the same variables, each reading the role's member where the copy
+  read the constant.
+- The type rule of step 3 keeps the value: the constant is converted to the member's
+  type once, in the initialiser, where the copy converted it to the same type at the call
+  or assignment (an enumeration constant passed to an `unsigned int` parameter is
+  converted to `unsigned int` either way). A member of another type would round,
+  truncate or wrap.
+- The struct is a `const` local of the copy's block, alive for the whole call; the new
+  function reads it through a pointer to `const` and writes nothing through it.
+- A forward declaration (step 6) names the same function as the definition below it;
+  the calls in the new function reach that definition, as the copies' calls did. The
+  recursion gains one call level per step of the copy (the new function's frame), which
+  changes no value; say so in the commit when the recursion is deep.
+- `refactor_guard.py` reports the removed copies as deduplication (`WARN`, every value
+  still present), and `--calls` moves only the callees of the copies (each down by its
+  count in one copy times the number of copies less one, and up one for a forward
+  declaration of step 6) and the new function (its definition and one call per copy);
+  anything else stops the step.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` and steps 2 and 8 checked
+by script; each copy reached by a case.
+
+**Provenance:** 2026-11-10, from `quantize.c`'s `Riemersma` (campaign A, W16 lane c):
+cc 38, 109 lines, 2 bumps, the four `level > 1` cases seven calls on four gravity
+constants each, the two `level == 1` cases three calls on three. W14 lane b measured its
+level switch as case helpers: they clone (6.25). A probe of the chain (this recipe on the
+`level > 1` cases, then on the `level == 1` cases, then Recipe O on the `level == 1`
+switch): 7.80 to 8.34, 8.41 and 8.74, `Riemersma` leaving all three findings, no finding
+on a new function. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -7697,3 +7985,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-07 | AMEND | N | Step 2's pass-through form combines: the new function may take several names the caller binds `const` locals from (unchanged, in the caller's order) and, for variables computed in the caller's body that would take it past four parameters, one new struct by steps 3, 5 and 6; at most four parameters in all. *Careful* gives the argument | `composite.c`'s `CompositeImagePixel` (campaign A, W15): its channel loop reads 16 locals bound from `row` and 8 per-pixel values; the loop's colour `switch` reads from `row`, the per-pixel struct and 6 per-channel values. The three steps that use the form: 3.44 to 3.46 in a probe | mandate (2026-10-24) |
 | 2026-11-07 | AMEND | PS | Step 6: the helper may read the input struct as `name->member` at every use (Recipe N step 4's member form, as Q step 4 allows), the text then changing by that prefix too; a member a function-like macro names keeps its `const` local. When every member's value is a plain identifier that nothing in the loop body writes, the struct may be declared `const` with the values as its initialiser among the loop body's declarations (PC step 4's form). Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): its column loop body, fourteen inputs, as a step 7 nested-loop helper with `const` locals would be a *Large Method* (about 87 lines by count); in the member form 60 lines, no finding, 6.30 to 6.51 | mandate (2026-10-24) |
 | 2026-11-07 | AMEND | N | Step 8: the sibling and later-block forms also join a PS step 7 nested-loop helper and the parallel body's head moved by PC: the head takes the PS struct (declared `const` with its initialiser among the body's declarations, which stays), the typedef and initialiser gain the members the head reads, the head binds them as `const` locals (PC keeps its text), and the inner call passes `name`. Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): PC before the column body moves gives a *Complex* and *Large* helper (6.30 to 6.21); after it, with its own struct, about 80 lines; sharing the PS struct, 52 lines and no finding, 6.51 to 6.62 | mandate (2026-10-24) |
+| 2026-11-10 | NEW | LP | Name a Label Set as a Predicate: a `switch (e)` whose only groups are one run of labels with a body that returns on every path and `default: break;` becomes `if (<Pred>(e) != MagickFalse)` and the body; the new `static MagickBooleanType` function holds the labels (`return(MagickTrue)`, `default: break;`, `return(MagickFalse)`) and may replace further sites with the same label set | `colorspace.c`'s `sRGBTransformImage` and `GenericOrLogTosRGB` (campaign A, W16 lane c): the same 28-label generic group, cc 31 and 30; a probe of both sites 7.44 to 8.10 (the first alone 7.46), the predicate a label-run *Complex Method* (cc 30) under the ruling of 2026-11-07 | mandate (2026-10-24) |
+| 2026-11-10 | NEW | SC | Extract Sibling Blocks Differing in Several Constants: copies of one block in one function that differ in two or more literal or enumeration constants move into one function taking a `const` struct of the constants (one member per role, typed as Recipe SV step 3 types the value); each copy becomes the struct's initialiser and the call; a forward declaration of the caller when the copies recurse into it | `quantize.c`'s `Riemersma` (campaign A, W16 lane c): cc 38, 109 lines, its four `level > 1` cases seven calls on four gravity constants each, its two `level == 1` cases three calls on three; as case helpers they clone (6.25, W14 lane b). A probe of the chain (this recipe twice, then Recipe O on the `level == 1` switch): 7.80 to 8.34, 8.41 and 8.74, no finding on a new function | mandate (2026-10-24) |
