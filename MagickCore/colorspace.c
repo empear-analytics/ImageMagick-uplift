@@ -1476,7 +1476,7 @@ static ImageType SetGrayColorspaceGamma(Image *image,
   return(type);
 }
 
-MagickExport MagickBooleanType SetImageColorspace(Image *image,
+static MagickBooleanType ApplyImageColorspace(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
   ImageType
@@ -1485,14 +1485,6 @@ MagickExport MagickBooleanType SetImageColorspace(Image *image,
   MagickBooleanType
     status;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (image->colorspace == colorspace)
-    return(MagickTrue);
   image->colorspace=colorspace;
   image->rendering_intent=UndefinedIntent;
   image->gamma=1.000/2.200;
@@ -1508,6 +1500,20 @@ MagickExport MagickBooleanType SetImageColorspace(Image *image,
   status=SyncImagePixelCache(image,exception);
   image->type=type;
   return(status);
+}
+
+MagickExport MagickBooleanType SetImageColorspace(Image *image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (image->colorspace == colorspace)
+    return(MagickTrue);
+  return(ApplyImageColorspace(image,colorspace,exception));
 }
 
 /*
