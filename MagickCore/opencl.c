@@ -1120,6 +1120,17 @@ static void DestroyBenchmarkImages(Image *blurredImage,Image *unsharpedImage,
     DestroyImage(resizedImage);
 }
 
+static void WaitForOpenCLImageEvents(Image *resizedImage)
+{
+  CacheInfo
+    *cache_info;
+
+  cache_info=(CacheInfo *) resizedImage->cache;
+  if (cache_info->opencl != (MagickCLCacheInfo) NULL)
+    openCL_library->clWaitForEvents(cache_info->opencl->event_count,
+      cache_info->opencl->events);
+}
+
 static double RunOpenCLBenchmark(MagickBooleanType is_cpu)
 {
   AccelerateTimer
@@ -1168,15 +1179,7 @@ static double RunOpenCLBenchmark(MagickBooleanType is_cpu)
       are executed asynchronous.
     */
     if (is_cpu == MagickFalse)
-      {
-        CacheInfo
-          *cache_info;
-
-        cache_info=(CacheInfo *) resizedImage->cache;
-        if (cache_info->opencl != (MagickCLCacheInfo) NULL)
-          openCL_library->clWaitForEvents(cache_info->opencl->event_count,
-            cache_info->opencl->events);
-      }
+      WaitForOpenCLImageEvents(resizedImage);
 
     if (i > 0)
       StopAccelerateTimer(&timer);
