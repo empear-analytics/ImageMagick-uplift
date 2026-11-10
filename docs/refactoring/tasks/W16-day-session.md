@@ -268,3 +268,18 @@ merges twins calling library function pointers of different types? **Note:** com
 it. **Upstream:** `RunOpenCLBenchmark` never destroys its `exception` or `imageInfo`; `LoadOpenCLDeviceBenchmark` leaks
 the previous entry when a second `<device` arrives before `/>`; `RequestOpenCLDevice`'s single-device path never
 increments `requested`.
+
+## CI "Main" repaired for campaign A files
+
+CI's "Main" workflow had failed on main since about #86. Campaign A refactors had introduced MSVC errors (effect-blur.c
+C2440, shear-deskew.c C2664), `restrict`-qualifier discards that gcc and clang reject under `-Werror` (effect-blur.c,
+colorspace.c, quantize.c), unused parameters (colorspace.c, quantize-posterize.c), default-only switches (compare.c)
+and a shadowing local (fourier.c). Seven `fix` commits repair them, each with object code IDENTICAL, the guard passing,
+the oracle on the touched functions and Code Health unchanged. New `tools/ci_linux_warnings.sh` (2265bd949) builds four
+trees with CI's exact Linux flags (gcc and clang, without and with delegates) plus `-Wshadow`, discarded-qualifier
+warnings and a scan for default-only switches; `tools/ci_warnings.sh` runs it, so every lane's verify loop does. The
+merged W16 tree passes it on all 76 campaign A files. **For the campaign B side:** blob.c:3525-3526 and 4096 (unused
+parameters and variable; the Linux jobs' first stop), type.c:1222 and 1233 (discarded `const`, MSVC C2664), type.c:790,
+annotate.c, pixel-export.c and pixel-import.c (shadowing), utility.c:457 (implicit fallthrough), pixel-export.c:3412 and
+pixel-import.c:3574 (default-only switches), utility.c:229 and quantum-import.c:4788, 5235 (MSVC only). Not reproducible
+here: MSVC C4702 and Windows-only branches.
