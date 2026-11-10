@@ -502,6 +502,22 @@ static void SetAnnotateBoxPixel(const Image *annotate_image,
     SetPixelAlpha(annotate_image,TransparentAlpha,q);
 }
 
+static void SetAnnotatePenPixel(const Image *annotate_image,
+  const XPixelInfo *pixel,const XAnnotateInfo *annotate_info,Quantum *q)
+{
+  /*
+    Set this pixel to the pen color.
+  */
+  SetPixelRed(annotate_image,ScaleShortToQuantum(
+    pixel->pen_color.red),q);
+  SetPixelGreen(annotate_image,ScaleShortToQuantum(
+    pixel->pen_color.green),q);
+  SetPixelBlue(annotate_image,ScaleShortToQuantum(
+    pixel->pen_color.blue),q);
+  if (annotate_info->stencil == BackgroundStencil)
+    SetPixelAlpha(annotate_image,TransparentAlpha,q);
+}
+
 MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
   ExceptionInfo *exception)
@@ -621,19 +637,7 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
       if (XGetPixel(annotate_ximage,x,y) == 0)
         SetAnnotateBoxPixel(annotate_image,pixel,annotate_info,q);
       else
-        {
-          /*
-            Set this pixel to the pen color.
-          */
-          SetPixelRed(annotate_image,ScaleShortToQuantum(
-            pixel->pen_color.red),q);
-          SetPixelGreen(annotate_image,ScaleShortToQuantum(
-            pixel->pen_color.green),q);
-          SetPixelBlue(annotate_image,ScaleShortToQuantum(
-            pixel->pen_color.blue),q);
-          if (annotate_info->stencil == BackgroundStencil)
-            SetPixelAlpha(annotate_image,TransparentAlpha,q);
-        }
+        SetAnnotatePenPixel(annotate_image,pixel,annotate_info,q);
       q+=(ptrdiff_t) GetPixelChannels(annotate_image);
     }
     if (SyncCacheViewAuthenticPixels(annotate_view,exception) == MagickFalse)
