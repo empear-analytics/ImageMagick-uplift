@@ -295,3 +295,15 @@ Commit eedc41bae uses Recipe N for a tail reading three caller variables, below 
 **Upstream:** `ExecuteRPN`'s statistic cases test `channel > 0` where `ImageStat` tests `channel >= 0`; `aExtent` reads
 `img->extent` where `ImageStat` reads `GetBlobSize(pfx->image)` and ignores `ImgNum`; the "NoSuchImage" message prints a
 negative `ImgNum` through `%lu`.
+
+## Lane b, layer.c and distort.c: Recipe FI step 8
+
+**FI step 8** (6e7913783): a member-by-member fill far from its declaration may become a `const` initialiser when every
+value is the address of a top-of-function variable (declaration moves to the end of the declarations) or an
+identifier nothing writes between the innermost block's top and the fill (declaration moves to that block's top);
+object code must stay IDENTICAL. Added after the owner's approval of the W16 text; not yet confirmed. layer.c 7.84 to
+7.98; distort.c unchanged (its only rising step is too slow). **Owner questions:** (1) does the `#if 0` exception reach
+`#if M` when M is `#define`d 0 unconditionally in the same file (layer.c `DEBUG_OPT_FRAME`; an earlier commit,
+f4a8418dd of 2026-10-30, already moved two such blocks)? (2) may a label run whose labels all share the `default:`
+body lose its labels (distort.c `SetDistortNoBestFit`, +0.19)? **Note:** `poly_basis_dx` returns derivative terms
+without their power factors (`x*x` for the x cubed term); presumably the coefficients absorb them.
