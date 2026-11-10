@@ -1266,41 +1266,52 @@ static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+typedef struct _KeyedKernelArray
+{
+  int
+    key;
+
+  const char
+    *definition;
+} KeyedKernelArray;
+
+static const KeyedKernelArray
+  LaplacianKernelArrays[] =
+  {
+    { 1, "3: 0,-1,0  -1,4,-1  0,-1,0" }, /* laplacian diamond filter */
+    { 2, "3: -2,1,-2  1,4,1  -2,1,-2" },
+    { 3, "3: 1,-2,1  -2,4,-2  1,-2,1" },
+    /* a 5x5 laplacian */
+    { 5,
+      "5: -4,-1,0,-1,-4  -1,2,3,2,-1  0,3,4,3,0  -1,2,3,2,-1  -4,-1,0,-1,-4" },
+    /* a 7x7 laplacian */
+    { 7,
+      "7:-10,-5,-2,-1,-2,-5,-10 -5,0,3,4,3,0,-5 -2,3,6,7,6,3,-2 -1,4,7,8,7,4,-1 -2,3,6,7,6,3,-2 -5,0,3,4,3,0,-5 -10,-5,-2,-1,-2,-5,-10" },
+    /* a 5x5 LoG (sigma approx 1.4) */
+    { 15,
+      "5: 0,0,-1,0,0  0,-1,-2,-1,0  -1,-2,16,-2,-1  0,-1,-2,-1,0  0,0,-1,0,0" },
+    /* a 9x9 LoG (sigma approx 1.4) */
+    /* http://www.cscjournals.org/csc/manuscript/Journals/IJIP/volume3/Issue1/IJIP-15.pdf */
+    { 19,
+      "9: 0,-1,-1,-2,-2,-2,-1,-1,0  -1,-2,-4,-5,-5,-5,-4,-2,-1  -1,-4,-5,-3,-0,-3,-5,-4,-1  -2,-5,-3,12,24,12,-3,-5,-2  -2,-5,-0,24,40,24,-0,-5,-2  -2,-5,-3,12,24,12,-3,-5,-2  -1,-4,-5,-3,-0,-3,-5,-4,-1  -1,-2,-4,-5,-5,-5,-4,-2,-1  0,-1,-1,-2,-2,-2,-1,-1,0" },
+    /* laplacian square filter -- default */
+    { 0, "3: -1,-1,-1  -1,8,-1  -1,-1,-1" }
+  };
+
 static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
-  switch ( (int) args->rho ) {
-    case 0:
-    default: /* laplacian square filter -- default */
-      kernel=ParseKernelArray("3: -1,-1,-1  -1,8,-1  -1,-1,-1");
+  const int
+    key = (int) args->rho;
+
+  size_t
+    i;
+
+  for (i=0; i < ((sizeof(LaplacianKernelArrays)/
+       sizeof(*LaplacianKernelArrays))-1); i++)
+    if (LaplacianKernelArrays[i].key == key)
       break;
-    case 1:  /* laplacian diamond filter */
-      kernel=ParseKernelArray("3: 0,-1,0  -1,4,-1  0,-1,0");
-      break;
-    case 2:
-      kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
-      break;
-    case 3:
-      kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  1,-2,1");
-      break;
-    case 5:   /* a 5x5 laplacian */
-      kernel=ParseKernelArray(
-        "5: -4,-1,0,-1,-4  -1,2,3,2,-1  0,3,4,3,0  -1,2,3,2,-1  -4,-1,0,-1,-4");
-      break;
-    case 7:   /* a 7x7 laplacian */
-      kernel=ParseKernelArray(
-        "7:-10,-5,-2,-1,-2,-5,-10 -5,0,3,4,3,0,-5 -2,3,6,7,6,3,-2 -1,4,7,8,7,4,-1 -2,3,6,7,6,3,-2 -5,0,3,4,3,0,-5 -10,-5,-2,-1,-2,-5,-10" );
-      break;
-    case 15:  /* a 5x5 LoG (sigma approx 1.4) */
-      kernel=ParseKernelArray(
-        "5: 0,0,-1,0,0  0,-1,-2,-1,0  -1,-2,16,-2,-1  0,-1,-2,-1,0  0,0,-1,0,0");
-      break;
-    case 19:  /* a 9x9 LoG (sigma approx 1.4) */
-      /* http://www.cscjournals.org/csc/manuscript/Journals/IJIP/volume3/Issue1/IJIP-15.pdf */
-      kernel=ParseKernelArray(
-        "9: 0,-1,-1,-2,-2,-2,-1,-1,0  -1,-2,-4,-5,-5,-5,-4,-2,-1  -1,-4,-5,-3,-0,-3,-5,-4,-1  -2,-5,-3,12,24,12,-3,-5,-2  -2,-5,-0,24,40,24,-0,-5,-2  -2,-5,-3,12,24,12,-3,-5,-2  -1,-4,-5,-3,-0,-3,-5,-4,-1  -1,-2,-4,-5,-5,-5,-4,-2,-1  0,-1,-1,-2,-2,-2,-1,-1,0");
-      break;
-  }
+  kernel=ParseKernelArray(LaplacianKernelArrays[i].definition);
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
   kernel->type = type;
@@ -1671,36 +1682,40 @@ static KernelInfo *AcquireLineEndsKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static const KeyedKernelArray
+  LineJunctionsKernelArrays[] =
+  {
+    /* Y Junction */
+    { 1, "3: 1,-,1  -,1,-  -,1,-" },
+    /* Diagonal T Junctions */
+    { 2, "3: 1,-,-  -,1,-  1,-,1" },
+    /* Orthogonal T Junctions */
+    { 3, "3: -,-,-  1,1,1  -,1,-" },
+    /* Diagonal X Junctions */
+    { 4, "3: 1,-,1  -,1,-  1,-,1" },
+    /* Orthogonal X Junctions - minimal diamond kernel */
+    { 5, "3: -,1,-  1,1,1  -,1,-" }
+  };
+
 static KernelInfo *AcquireLineJunctionsKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
+  const int
+    key = (int) args->rho;
+
+  size_t
+    i;
+
   /* kernels for finding the junctions of multiple lines */
-  switch ( (int) args->rho ) {
-    case 0:
-    default:
-      /* set of kernels to find all line junctions */
-      return(AcquireKernelInfo("LineJunctions:1@;LineJunctions:2>",exception));
-    case 1:
-      /* Y Junction */
-      kernel=ParseKernelArray("3: 1,-,1  -,1,-  -,1,-");
+  for (i=0; i < (sizeof(LineJunctionsKernelArrays)/
+       sizeof(*LineJunctionsKernelArrays)); i++)
+    if (LineJunctionsKernelArrays[i].key == key)
       break;
-    case 2:
-      /* Diagonal T Junctions */
-      kernel=ParseKernelArray("3: 1,-,-  -,1,-  1,-,1");
-      break;
-    case 3:
-      /* Orthogonal T Junctions */
-      kernel=ParseKernelArray("3: -,-,-  1,1,1  -,1,-");
-      break;
-    case 4:
-      /* Diagonal X Junctions */
-      kernel=ParseKernelArray("3: 1,-,1  -,1,-  1,-,1");
-      break;
-    case 5:
-      /* Orthogonal X Junctions - minimal diamond kernel */
-      kernel=ParseKernelArray("3: -,1,-  1,1,1  -,1,-");
-      break;
-  }
+  if (i == (sizeof(LineJunctionsKernelArrays)/
+       sizeof(*LineJunctionsKernelArrays)))
+    /* set of kernels to find all line junctions */
+    return(AcquireKernelInfo("LineJunctions:1@;LineJunctions:2>",exception));
+  kernel=ParseKernelArray(LineJunctionsKernelArrays[i].definition);
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
   kernel->type = type;
@@ -1851,9 +1866,46 @@ static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static const KeyedKernelArray
+  ThinSEKernelArrays[] =
+  {
+    /* SE for 4-connected thinning */
+    { 41, "3: -,-,1  0,-,1  -,-,1" }, /* SE_4_1 */
+    { 42, "3: -,-,1  0,-,1  -,0,-" }, /* SE_4_2 */
+    { 43, "3: -,0,-  0,-,1  -,-,1" }, /* SE_4_3 */
+    { 44, "3: -,0,-  0,-,1  -,0,-" }, /* SE_4_4 */
+    { 45, "3: -,0,1  0,-,1  -,0,-" }, /* SE_4_5 */
+    { 46, "3: -,0,-  0,-,1  -,0,1" }, /* SE_4_6 */
+    { 47, "3: -,1,1  0,-,1  -,0,-" }, /* SE_4_7 */
+    { 48, "3: -,-,1  0,-,1  0,-,1" }, /* SE_4_8 */
+    { 49, "3: 0,-,1  0,-,1  -,-,1" }, /* SE_4_9 */
+    /* SE for 8-connected thinning - negatives of the above */
+    { 81, "3: -,1,-  0,-,1  -,1,-" }, /* SE_8_0 */
+    { 82, "3: -,1,-  0,-,1  0,-,-" }, /* SE_8_2 */
+    { 83, "3: 0,-,-  0,-,1  -,1,-" }, /* SE_8_3 */
+    { 84, "3: 0,-,-  0,-,1  0,-,-" }, /* SE_8_4 */
+    { 85, "3: 0,-,1  0,-,1  0,-,-" }, /* SE_8_5 */
+    { 86, "3: 0,-,-  0,-,1  0,-,1" }, /* SE_8_6 */
+    { 87, "3: -,1,-  0,-,1  0,0,-" }, /* SE_8_7 */
+    { 88, "3: -,1,-  0,-,1  0,1,-" }, /* SE_8_8 */
+    { 89, "3: 0,1,-  0,-,1  -,1,-" }, /* SE_8_9 */
+    /* Special combined SE kernels */
+    { 423, "3: -,-,1  0,-,-  -,0,-" }, /* SE_4_2 , SE_4_3 Combined Kernel */
+    { 823, "3: -,1,-  -,-,1  0,-,-" }, /* SE_8_2 , SE_8_3 Combined Kernel */
+    /* SE_48_1 - General Connected Corner Kernel */
+    { 481, "3: -,1,1  0,-,1  0,0,-" },
+    { 482, "3: 0,-,1  0,-,1  0,-,1" } /* SE_48_2 - General Edge Kernel */
+  };
+
 static KernelInfo *AcquireThinSEKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
+  const int
+    key = (int) args->rho;
+
+  size_t
+    i;
+
   /* Special kernels for general thinning, while preserving connections
   ** "Connectivity-Preserving Morphological Image Transformations"
   ** by Dan S. Bloomberg, available on Leptonica, Selected Papers,
@@ -1864,78 +1916,11 @@ static KernelInfo *AcquireThinSEKernel(KernelInfo *kernel,
   ** Note kernels do not specify the origin pixel, allowing them
   ** to be used for both thickening and thinning operations.
   */
-  switch ( (int) args->rho ) {
-    /* SE for 4-connected thinning */
-    case 41: /* SE_4_1 */
-      kernel=ParseKernelArray("3: -,-,1  0,-,1  -,-,1");
+  for (i=0; i < ((sizeof(ThinSEKernelArrays)/
+       sizeof(*ThinSEKernelArrays))-1); i++)
+    if (ThinSEKernelArrays[i].key == key)
       break;
-    case 42: /* SE_4_2 */
-      kernel=ParseKernelArray("3: -,-,1  0,-,1  -,0,-");
-      break;
-    case 43: /* SE_4_3 */
-      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,-,1");
-      break;
-    case 44: /* SE_4_4 */
-      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,0,-");
-      break;
-    case 45: /* SE_4_5 */
-      kernel=ParseKernelArray("3: -,0,1  0,-,1  -,0,-");
-      break;
-    case 46: /* SE_4_6 */
-      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,0,1");
-      break;
-    case 47: /* SE_4_7 */
-      kernel=ParseKernelArray("3: -,1,1  0,-,1  -,0,-");
-      break;
-    case 48: /* SE_4_8 */
-      kernel=ParseKernelArray("3: -,-,1  0,-,1  0,-,1");
-      break;
-    case 49: /* SE_4_9 */
-      kernel=ParseKernelArray("3: 0,-,1  0,-,1  -,-,1");
-      break;
-    /* SE for 8-connected thinning - negatives of the above */
-    case 81: /* SE_8_0 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  -,1,-");
-      break;
-    case 82: /* SE_8_2 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,-,-");
-      break;
-    case 83: /* SE_8_3 */
-      kernel=ParseKernelArray("3: 0,-,-  0,-,1  -,1,-");
-      break;
-    case 84: /* SE_8_4 */
-      kernel=ParseKernelArray("3: 0,-,-  0,-,1  0,-,-");
-      break;
-    case 85: /* SE_8_5 */
-      kernel=ParseKernelArray("3: 0,-,1  0,-,1  0,-,-");
-      break;
-    case 86: /* SE_8_6 */
-      kernel=ParseKernelArray("3: 0,-,-  0,-,1  0,-,1");
-      break;
-    case 87: /* SE_8_7 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,0,-");
-      break;
-    case 88: /* SE_8_8 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,1,-");
-      break;
-    case 89: /* SE_8_9 */
-      kernel=ParseKernelArray("3: 0,1,-  0,-,1  -,1,-");
-      break;
-    /* Special combined SE kernels */
-    case 423: /* SE_4_2 , SE_4_3 Combined Kernel */
-      kernel=ParseKernelArray("3: -,-,1  0,-,-  -,0,-");
-      break;
-    case 823: /* SE_8_2 , SE_8_3 Combined Kernel */
-      kernel=ParseKernelArray("3: -,1,-  -,-,1  0,-,-");
-      break;
-    case 481: /* SE_48_1 - General Connected Corner Kernel */
-      kernel=ParseKernelArray("3: -,1,1  0,-,1  0,0,-");
-      break;
-    default:
-    case 482: /* SE_48_2 - General Edge Kernel */
-      kernel=ParseKernelArray("3: 0,-,1  0,-,1  0,-,1");
-      break;
-  }
+  kernel=ParseKernelArray(ThinSEKernelArrays[i].definition);
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
   kernel->type = type;
