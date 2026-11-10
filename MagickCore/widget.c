@@ -9619,6 +9619,107 @@ static XWidgetInfo PlaceTextViewExpose(XWidgetInfo expose_info,
   return(expose_info);
 }
 
+typedef struct _TextViewTargets
+{
+  XWidgetInfo
+    *list_info,
+    *selection_info;
+
+  size_t
+    *state;
+} TextViewTargets;
+
+typedef struct _TextViewPress
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    **textlist;
+
+  unsigned int
+    lines,
+    height;
+
+  XEvent
+    event;
+
+  XWidgetInfo
+    slider_info;
+} TextViewPress;
+
+static void SelectTextViewLine(const TextViewPress *press,
+  char *primary_selection,const TextViewTargets *targets)
+{
+  Display
+    *const display = press->display;
+
+  XWindows
+    *const windows = press->windows;
+
+  const char
+    **const textlist = press->textlist;
+
+  const unsigned int
+    lines = press->lines,
+    height = press->height;
+
+  const XEvent
+    event = press->event;
+
+  const XWidgetInfo
+    slider_info = press->slider_info;
+
+  XWidgetInfo
+    *const list_info = targets->list_info,
+    *const selection_info = targets->selection_info;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    id;
+
+  static Time
+    click_time;
+
+  /*
+    User pressed list matte.
+  */
+  id=slider_info.id+(event.xbutton.y-((*list_info).y+(int)
+    (height >> 1))+1)/(int) (*selection_info).height;
+  if (id >= (int) lines)
+    return;
+  if (id != (*list_info).id)
+    {
+      (*list_info).id=id;
+      click_time=event.xbutton.time;
+      return;
+    }
+  (*list_info).id=id;
+  if (event.xbutton.time >= (click_time+(unsigned long) DoubleClick))
+    {
+      click_time=event.xbutton.time;
+      return;
+    }
+  click_time=event.xbutton.time;
+  /*
+    Become the XA_PRIMARY selection owner.
+  */
+  (void) CopyMagickString(primary_selection,textlist[(*list_info).id],
+    MagickPathExtent);
+  (void) XSetSelectionOwner(display,XA_PRIMARY,windows->widget.id,
+    event.xbutton.time);
+  if (XGetSelectionOwner(display,XA_PRIMARY) != windows->widget.id)
+    return;
+  (*selection_info).id=(~0);
+  (*list_info).id=id;
+  (*state)|=RedrawListState;
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -9670,6 +9771,9 @@ MagickPrivate void XTextViewWidget(Display *display,
 
   XWindowChanges
     window_changes;
+
+  const TextViewTargets
+    targets = { &list_info, &selection_info, &state };
 
   /*
     Convert text string to a text list.
@@ -9991,44 +10095,17 @@ MagickPrivate void XTextViewWidget(Display *display,
           }
         if (MatteIsActive(list_info,event.xbutton))
           {
-            int
-              id;
+            TextViewPress
+              press;
 
-            static Time
-              click_time;
-
-            /*
-              User pressed list matte.
-            */
-            id=slider_info.id+(event.xbutton.y-(list_info.y+(int)
-              (height >> 1))+1)/(int) selection_info.height;
-            if (id >= (int) lines)
-              break;
-            if (id != list_info.id)
-              {
-                list_info.id=id;
-                click_time=event.xbutton.time;
-                break;
-              }
-            list_info.id=id;
-            if (event.xbutton.time >= (click_time+(unsigned long) DoubleClick))
-              {
-                click_time=event.xbutton.time;
-                break;
-              }
-            click_time=event.xbutton.time;
-            /*
-              Become the XA_PRIMARY selection owner.
-            */
-            (void) CopyMagickString(primary_selection,textlist[list_info.id],
-              MagickPathExtent);
-            (void) XSetSelectionOwner(display,XA_PRIMARY,windows->widget.id,
-              event.xbutton.time);
-            if (XGetSelectionOwner(display,XA_PRIMARY) != windows->widget.id)
-              break;
-            selection_info.id=(~0);
-            list_info.id=id;
-            state|=RedrawListState;
+            press.display=display;
+            press.windows=windows;
+            press.textlist=textlist;
+            press.lines=lines;
+            press.height=height;
+            press.event=event;
+            press.slider_info=slider_info;
+            SelectTextViewLine(&press,primary_selection,&targets);
             break;
           }
         break;
