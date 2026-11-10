@@ -175,3 +175,20 @@ family-only `static const` tables and a numeric top-of-file macro (colorspace.c 
 **Upstream:** montage.c `MontageImageList` dereferences a NULL `image` in `ThrowImageException` after a failed
 `CloneImage`, and reads `image` after `DestroyImage` on the `AcquireMontageStrings` failure; magnify.c
 `SelectMagnifyMethod` switches on the case-sensitive first character before a case-insensitive `LocaleCompare`.
+
+## Lane a, second round: the wide-build files
+
+accelerate.c 2.06 to 2.79 and animate.c 1.77 to 2.49 (12 refactor commits, recipes P, CN, N, Y and E; no new
+recipe), each step built and checked with `WIDE=1` (build, ci_warnings, guard, `--function` on the wide catalogue);
+whole wide catalogue 14,145 cases and narrow 15,900 cases, 0 diverged, on the lane branch. **Tool fix** (c4335c3bb):
+`obj_identical.sh` and `obj_modulo.sh` printed `IDENTICAL` for any edit to accelerate.c because the narrow build
+compiles nothing of it; they now take `WIDE=1` and print `NOTHING COMPILED` (exit 2) for an empty object.
+**For the owner:** every edit is inside branches the wide build compiles (`MAGICKCORE_OPENCL_SUPPORT`,
+`MAGICKCORE_X11_DELEGATE`), which AGENTS.md permits ("a branch this build does not compile" is what is forbidden);
+no `#if`, `#else` or `#ifdef RECREATEBUFFER` block was moved or edited. Please confirm that the playbook's
+*Preprocessor branches* text is read that way for the six wide-build files, and say whether a split of accelerate.c
+may carry its file-level `#if` into the new file. **Upstream (accelerate.c):** ContrastStretch and Equalize throw after
+acquiring the OpenCL device and queue (leak) and may call `DestroyCacheView` on a NULL view; ContrastStretch searches
+all four channels with `histogram[i].s[2]`; Despeckle does not check its HullPass kernels for NULL; ComputeResizeImage
+passes `(cl_int) image->rows` where other calls pass `(cl_uint)`; LocalContrast sets the `cl_int` `iRadius` with
+`sizeof(unsigned int)`.
