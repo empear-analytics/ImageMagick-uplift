@@ -1866,9 +1866,46 @@ static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static const KeyedKernelArray
+  ThinSEKernelArrays[] =
+  {
+    /* SE for 4-connected thinning */
+    { 41, "3: -,-,1  0,-,1  -,-,1" }, /* SE_4_1 */
+    { 42, "3: -,-,1  0,-,1  -,0,-" }, /* SE_4_2 */
+    { 43, "3: -,0,-  0,-,1  -,-,1" }, /* SE_4_3 */
+    { 44, "3: -,0,-  0,-,1  -,0,-" }, /* SE_4_4 */
+    { 45, "3: -,0,1  0,-,1  -,0,-" }, /* SE_4_5 */
+    { 46, "3: -,0,-  0,-,1  -,0,1" }, /* SE_4_6 */
+    { 47, "3: -,1,1  0,-,1  -,0,-" }, /* SE_4_7 */
+    { 48, "3: -,-,1  0,-,1  0,-,1" }, /* SE_4_8 */
+    { 49, "3: 0,-,1  0,-,1  -,-,1" }, /* SE_4_9 */
+    /* SE for 8-connected thinning - negatives of the above */
+    { 81, "3: -,1,-  0,-,1  -,1,-" }, /* SE_8_0 */
+    { 82, "3: -,1,-  0,-,1  0,-,-" }, /* SE_8_2 */
+    { 83, "3: 0,-,-  0,-,1  -,1,-" }, /* SE_8_3 */
+    { 84, "3: 0,-,-  0,-,1  0,-,-" }, /* SE_8_4 */
+    { 85, "3: 0,-,1  0,-,1  0,-,-" }, /* SE_8_5 */
+    { 86, "3: 0,-,-  0,-,1  0,-,1" }, /* SE_8_6 */
+    { 87, "3: -,1,-  0,-,1  0,0,-" }, /* SE_8_7 */
+    { 88, "3: -,1,-  0,-,1  0,1,-" }, /* SE_8_8 */
+    { 89, "3: 0,1,-  0,-,1  -,1,-" }, /* SE_8_9 */
+    /* Special combined SE kernels */
+    { 423, "3: -,-,1  0,-,-  -,0,-" }, /* SE_4_2 , SE_4_3 Combined Kernel */
+    { 823, "3: -,1,-  -,-,1  0,-,-" }, /* SE_8_2 , SE_8_3 Combined Kernel */
+    /* SE_48_1 - General Connected Corner Kernel */
+    { 481, "3: -,1,1  0,-,1  0,0,-" },
+    { 482, "3: 0,-,1  0,-,1  0,-,1" } /* SE_48_2 - General Edge Kernel */
+  };
+
 static KernelInfo *AcquireThinSEKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
+  const int
+    key = (int) args->rho;
+
+  size_t
+    i;
+
   /* Special kernels for general thinning, while preserving connections
   ** "Connectivity-Preserving Morphological Image Transformations"
   ** by Dan S. Bloomberg, available on Leptonica, Selected Papers,
@@ -1879,78 +1916,11 @@ static KernelInfo *AcquireThinSEKernel(KernelInfo *kernel,
   ** Note kernels do not specify the origin pixel, allowing them
   ** to be used for both thickening and thinning operations.
   */
-  switch ( (int) args->rho ) {
-    /* SE for 4-connected thinning */
-    case 41: /* SE_4_1 */
-      kernel=ParseKernelArray("3: -,-,1  0,-,1  -,-,1");
+  for (i=0; i < ((sizeof(ThinSEKernelArrays)/
+       sizeof(*ThinSEKernelArrays))-1); i++)
+    if (ThinSEKernelArrays[i].key == key)
       break;
-    case 42: /* SE_4_2 */
-      kernel=ParseKernelArray("3: -,-,1  0,-,1  -,0,-");
-      break;
-    case 43: /* SE_4_3 */
-      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,-,1");
-      break;
-    case 44: /* SE_4_4 */
-      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,0,-");
-      break;
-    case 45: /* SE_4_5 */
-      kernel=ParseKernelArray("3: -,0,1  0,-,1  -,0,-");
-      break;
-    case 46: /* SE_4_6 */
-      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,0,1");
-      break;
-    case 47: /* SE_4_7 */
-      kernel=ParseKernelArray("3: -,1,1  0,-,1  -,0,-");
-      break;
-    case 48: /* SE_4_8 */
-      kernel=ParseKernelArray("3: -,-,1  0,-,1  0,-,1");
-      break;
-    case 49: /* SE_4_9 */
-      kernel=ParseKernelArray("3: 0,-,1  0,-,1  -,-,1");
-      break;
-    /* SE for 8-connected thinning - negatives of the above */
-    case 81: /* SE_8_0 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  -,1,-");
-      break;
-    case 82: /* SE_8_2 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,-,-");
-      break;
-    case 83: /* SE_8_3 */
-      kernel=ParseKernelArray("3: 0,-,-  0,-,1  -,1,-");
-      break;
-    case 84: /* SE_8_4 */
-      kernel=ParseKernelArray("3: 0,-,-  0,-,1  0,-,-");
-      break;
-    case 85: /* SE_8_5 */
-      kernel=ParseKernelArray("3: 0,-,1  0,-,1  0,-,-");
-      break;
-    case 86: /* SE_8_6 */
-      kernel=ParseKernelArray("3: 0,-,-  0,-,1  0,-,1");
-      break;
-    case 87: /* SE_8_7 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,0,-");
-      break;
-    case 88: /* SE_8_8 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,1,-");
-      break;
-    case 89: /* SE_8_9 */
-      kernel=ParseKernelArray("3: 0,1,-  0,-,1  -,1,-");
-      break;
-    /* Special combined SE kernels */
-    case 423: /* SE_4_2 , SE_4_3 Combined Kernel */
-      kernel=ParseKernelArray("3: -,-,1  0,-,-  -,0,-");
-      break;
-    case 823: /* SE_8_2 , SE_8_3 Combined Kernel */
-      kernel=ParseKernelArray("3: -,1,-  -,-,1  0,-,-");
-      break;
-    case 481: /* SE_48_1 - General Connected Corner Kernel */
-      kernel=ParseKernelArray("3: -,1,1  0,-,1  0,0,-");
-      break;
-    default:
-    case 482: /* SE_48_2 - General Edge Kernel */
-      kernel=ParseKernelArray("3: 0,-,1  0,-,1  0,-,1");
-      break;
-  }
+  kernel=ParseKernelArray(ThinSEKernelArrays[i].definition);
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
   kernel->type = type;
