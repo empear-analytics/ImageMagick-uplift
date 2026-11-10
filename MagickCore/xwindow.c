@@ -229,8 +229,7 @@ static MagickBooleanType
 
 static void
   XMakeImageLSBFirst(const MakeImageContext *,Image *,XImage *,XImage *),
-  XMakeImageMSBFirst(const XResourceInfo *,const XWindowInfo *,Image *,
-    XImage *,XImage *,ExceptionInfo *);
+  XMakeImageMSBFirst(const MakeImageContext *,Image *,XImage *,XImage *);
 
 static Window
   XSelectWindow(Display *,RectangleInfo *);
@@ -5864,8 +5863,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       if (IsLSBFirstXImage(ximage) != MagickFalse)
         XMakeImageLSBFirst(&make_context,window->image,ximage,matte_image);
       else
-        XMakeImageMSBFirst(resource_info,window,window->image,ximage,
-          matte_image,exception);
+        XMakeImageMSBFirst(&make_context,window->image,ximage,matte_image);
     }
   if (window->matte_image != (XImage *) NULL)
     {
@@ -6601,10 +6599,18 @@ static inline MagickBooleanType IsImmutableAlphaImage(const XWindowInfo *window,
     (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
-static void XMakeImageMSBFirst(const XResourceInfo *resource_info,
-  const XWindowInfo *window,Image *image,XImage *ximage,XImage *matte_image,
-  ExceptionInfo *exception)
+static void XMakeImageMSBFirst(const MakeImageContext *make_context,
+  Image *image,XImage *ximage,XImage *matte_image)
 {
+  const XResourceInfo
+    *const resource_info = make_context->resource_info;
+
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
   CacheView
     *canvas_view;
 
