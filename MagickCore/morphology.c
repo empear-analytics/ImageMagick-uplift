@@ -4030,6 +4030,32 @@ static void ConvolveMorphologyColumnChannel(const MorphologyColumn *column,
     pixel),q);
 }
 
+static void ConvolveMorphologyColumnPixels(const MorphologyColumn *column,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *image = column->image;
+
+  Image
+    *morphology_image = column->morphology_image;
+
+  ssize_t
+    r;
+
+  for (r=0; r < (ssize_t) image->rows; r++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      ConvolveMorphologyColumnChannel(column,p,q,i);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(morphology_image);
+  }
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -4153,8 +4179,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
           *magick_restrict q;
 
         ssize_t
-          center,
-          r;
+          center;
 
         MorphologyColumn
           column;
@@ -4178,18 +4203,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         column.changes=changes;
         column.center=center;
         column.id=id;
-        for (r=0; r < (ssize_t) image->rows; r++)
-        {
-          ssize_t
-            i;
-
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            ConvolveMorphologyColumnChannel(&column,p,q,i);
-          }
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(morphology_image);
-        }
+        ConvolveMorphologyColumnPixels(&column,p,q);
         if (SyncCacheViewAuthenticPixels(morphology_view,exception) == MagickFalse)
           status=MagickFalse;
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
