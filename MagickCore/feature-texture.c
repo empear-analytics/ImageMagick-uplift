@@ -1037,6 +1037,62 @@ static void SetSecondMeasureOfCorrelation(const TextureDirection *texture,
       entropy_xy->alpha)))));
 }
 
+static void ComputeDifferenceFeatures(const TextureDirection *texture,
+  const TextureSlots *slots)
+{
+  const PixelInfo
+    *const sum_squares = slots->sum_squares,
+    *const variance = slots->variance;
+
+  const Image
+    *const image = texture->image;
+
+  ChannelFeatures
+    *const channel_features = texture->channel_features;
+
+  const unsigned int
+    number_grays = texture->number_grays;
+
+  const ssize_t
+    i = texture->i;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) number_grays; x++)
+  {
+    AccumulateDifferenceVariance(texture,slots,x);
+    AccumulateDifferenceEntropies(texture,slots,x);
+  }
+  /*
+    Difference variance.
+  */
+  channel_features[RedPixelChannel].difference_variance[i]=
+    (((double) number_grays*number_grays*sum_squares->red)-
+    (variance->red*variance->red))/
+    ((double) number_grays*number_grays*number_grays*number_grays);
+  channel_features[GreenPixelChannel].difference_variance[i]=
+    (((double) number_grays*number_grays*sum_squares->green)-
+    (variance->green*variance->green))/
+    ((double) number_grays*number_grays*number_grays*number_grays);
+  channel_features[BluePixelChannel].difference_variance[i]=
+    (((double) number_grays*number_grays*sum_squares->blue)-
+    (variance->blue*variance->blue))/
+    ((double) number_grays*number_grays*number_grays*number_grays);
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].difference_variance[i]=
+      (((double) number_grays*number_grays*sum_squares->black)-
+      (variance->black*variance->black))/
+      ((double) number_grays*number_grays*number_grays*number_grays);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].difference_variance[i]=
+      (((double) number_grays*number_grays*sum_squares->alpha)-
+      (variance->alpha*variance->alpha))/
+      ((double) number_grays*number_grays*number_grays*number_grays);
+  SetFirstMeasureOfCorrelation(texture,slots);
+  SetSecondMeasureOfCorrelation(texture,slots);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1459,41 +1515,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         &mean.direction[i], &sum_squares.direction[i],
         &variance.direction[i] };
 
-    ssize_t
-      x;
-
-    for (x=0; x < (ssize_t) number_grays; x++)
-    {
-      AccumulateDifferenceVariance(&texture,&slots,x);
-      AccumulateDifferenceEntropies(&texture,&slots,x);
-    }
-    /*
-      Difference variance.
-    */
-    channel_features[RedPixelChannel].difference_variance[i]=
-      (((double) number_grays*number_grays*sum_squares.direction[i].red)-
-      (variance.direction[i].red*variance.direction[i].red))/
-      ((double) number_grays*number_grays*number_grays*number_grays);
-    channel_features[GreenPixelChannel].difference_variance[i]=
-      (((double) number_grays*number_grays*sum_squares.direction[i].green)-
-      (variance.direction[i].green*variance.direction[i].green))/
-      ((double) number_grays*number_grays*number_grays*number_grays);
-    channel_features[BluePixelChannel].difference_variance[i]=
-      (((double) number_grays*number_grays*sum_squares.direction[i].blue)-
-      (variance.direction[i].blue*variance.direction[i].blue))/
-      ((double) number_grays*number_grays*number_grays*number_grays);
-    if (image->colorspace == CMYKColorspace)
-      channel_features[BlackPixelChannel].difference_variance[i]=
-        (((double) number_grays*number_grays*sum_squares.direction[i].black)-
-        (variance.direction[i].black*variance.direction[i].black))/
-        ((double) number_grays*number_grays*number_grays*number_grays);
-    if (image->alpha_trait != UndefinedPixelTrait)
-      channel_features[AlphaPixelChannel].difference_variance[i]=
-        (((double) number_grays*number_grays*sum_squares.direction[i].alpha)-
-        (variance.direction[i].alpha*variance.direction[i].alpha))/
-        ((double) number_grays*number_grays*number_grays*number_grays);
-    SetFirstMeasureOfCorrelation(&texture,&slots);
-    SetSecondMeasureOfCorrelation(&texture,&slots);
+    ComputeDifferenceFeatures(&texture,&slots);
   }
   /*
     Compute more texture features.
