@@ -835,6 +835,25 @@ static MagickCLDeviceBenchmark *EndOpenCLDeviceBenchmark(MagickCLEnv clEnv,
   return(device_benchmark);
 }
 
+static void SetOpenCLBenchmarkVendorVersionAttribute(
+  MagickCLDeviceBenchmark *device_benchmark,char *keyword,char *token)
+{
+  switch (*keyword)
+  {
+    case 'V':
+    case 'v':
+    {
+      if (LocaleCompare((char *) keyword,"vendor") == 0)
+        device_benchmark->vendor_name=ConstantString(token);
+      if (LocaleCompare((char *) keyword,"version") == 0)
+        device_benchmark->version=ConstantString(token);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -971,17 +990,11 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
           device_benchmark->score=StringToDouble(token,(char **) NULL);
         break;
       }
-      case 'V':
-      case 'v':
+      default:
       {
-        if (LocaleCompare((char *) keyword,"vendor") == 0)
-          device_benchmark->vendor_name=ConstantString(token);
-        if (LocaleCompare((char *) keyword,"version") == 0)
-          device_benchmark->version=ConstantString(token);
+        SetOpenCLBenchmarkVendorVersionAttribute(device_benchmark,keyword,token);
         break;
       }
-      default:
-        break;
     }
   }
   token=(char *) RelinquishMagickMemory(token);
