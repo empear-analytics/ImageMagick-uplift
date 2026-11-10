@@ -2204,6 +2204,16 @@ MagickExport MagickBooleanType GetOpenCLEnabled(void)
 %    o length: the number of profiles records.
 */
 
+static void CountKernelProfileRecords(const MagickCLDevice device,
+  size_t *length)
+{
+  *length=0;
+  LockSemaphoreInfo(device->lock);
+  while (device->profile_records[*length] != (KernelProfileRecord) NULL)
+    *length=*length+1;
+  UnlockSemaphoreInfo(device->lock);
+}
+
 MagickExport const KernelProfileRecord *GetOpenCLKernelProfileRecords(
   const MagickCLDevice device,size_t *length)
 {
@@ -2215,13 +2225,7 @@ MagickExport const KernelProfileRecord *GetOpenCLKernelProfileRecords(
     return((const KernelProfileRecord *) NULL);
   }
   if (length != (size_t *) NULL)
-    {
-      *length=0;
-      LockSemaphoreInfo(device->lock);
-      while (device->profile_records[*length] != (KernelProfileRecord) NULL)
-        *length=*length+1;
-      UnlockSemaphoreInfo(device->lock);
-    }
+    CountKernelProfileRecords(device,length);
   return(device->profile_records);
 }
 
