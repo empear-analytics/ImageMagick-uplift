@@ -307,3 +307,17 @@ object code must stay IDENTICAL. Added after the owner's approval of the W16 tex
 f4a8418dd of 2026-10-30, already moved two such blocks)? (2) may a label run whose labels all share the `default:`
 body lose its labels (distort.c `SetDistortNoBestFit`, +0.19)? **Note:** `poly_basis_dx` returns derivative terms
 without their power factors (`x*x` for the x cubed term); presumably the coefficients absorb them.
+
+## Lane d, morphology.c third leg: Recipes PL and RT, and an oracle gap
+
+**Recipe PL** (524c7a893): `switch` groups whose whole body is the same leaving statement peel into an LP-form predicate
+tested before the `switch`. **Recipe RT** (8036abb58): three or more adjacent copies differing in one constant, each
+leaving through the same `return(R);`, become a helper looping over a `static const` table. Added after the owner's
+approval of the W16 text; not yet confirmed. morphology.c 3.10 to 3.16 (30 steps; step 1 a temporary drop with
+`--no-verify` inside the measured plan). **Oracle gap:** a generator bug in the lane's first pass produced an empty TB
+table, so `IsRotationUselessKernel` always returned false, and the oracle still passed all 1,557 RotateKernelInfo cases
+(rotating a symmetric kernel changes no checked output). The lane caught it by script, reset its unpushed branch and
+redid steps 5-30; the main session checked the merged table against the original 13 labels. The early return in
+`RotateKernelInfo` needs a case that detects its removal (for the harness owner). **Owner questions:** FreiChen's basis
+groups: allow a table-driven merge, or leave it at cc 16? **Upstream:** `ScaleKernelInfo`'s negative-factor swap sets
+`kernel->minimum = 1;` where `= t` looks intended (now in `ApplyKernelScaling`, moved verbatim).
