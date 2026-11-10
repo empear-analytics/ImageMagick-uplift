@@ -1464,6 +1464,18 @@ static void SetPerceptualChromaticity(Image *image)
   image->chromaticity.white_point.z=0.3583;
 }
 
+static ImageType SetGrayColorspaceGamma(Image *image,
+  const ColorspaceType colorspace)
+{
+  ImageType
+    type;
+
+  if (colorspace == LinearGRAYColorspace)
+    image->gamma=1.000;
+  type=GrayscaleType;
+  return(type);
+}
+
 MagickExport MagickBooleanType SetImageColorspace(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1487,11 +1499,7 @@ MagickExport MagickBooleanType SetImageColorspace(Image *image,
   (void) memset(&image->chromaticity,0,sizeof(image->chromaticity));
   type=image->type;
   if (IsGrayColorspace(colorspace) != MagickFalse)
-    {
-      if (colorspace == LinearGRAYColorspace)
-        image->gamma=1.000;
-      type=GrayscaleType;
-    }
+    type=SetGrayColorspaceGamma(image,colorspace);
   else
     if (IsLinearGammaColorspace(colorspace) != MagickFalse)
       image->gamma=1.000;
