@@ -5458,30 +5458,36 @@ static void AttemptKernelRotations(KernelInfo *kernel,double angle)
     angle=ReflectKernel(kernel,angle);
 }
 
-static MagickBooleanType IsRotationUselessKernel(const KernelInfoType type)
-{
-  switch (type)
+static const KernelInfoType
+  RotationUselessKernels[] =
   {
     /* These built-in kernels are cylindrical kernels, rotating is useless */
-    case GaussianKernel:
-    case DoGKernel:
-    case LoGKernel:
-    case DiskKernel:
-    case PeaksKernel:
-    case LaplacianKernel:
-    case ChebyshevKernel:
-    case ManhattanKernel:
-    case EuclideanKernel:
+    GaussianKernel,
+    DoGKernel,
+    LoGKernel,
+    DiskKernel,
+    PeaksKernel,
+    LaplacianKernel,
+    ChebyshevKernel,
+    ManhattanKernel,
+    EuclideanKernel,
     /* These may be rotatable at non-90 angles in the future */
     /* but simply rotating them in multiples of 90 degrees is useless */
-    case SquareKernel:
-    case DiamondKernel:
-    case PlusKernel:
-    case CrossKernel:
+    SquareKernel,
+    DiamondKernel,
+    PlusKernel,
+    CrossKernel
+  };
+
+static MagickBooleanType IsRotationUselessKernel(const KernelInfoType type)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(RotationUselessKernels)/
+       sizeof(*RotationUselessKernels)); i++)
+    if (RotationUselessKernels[i] == type)
       return(MagickTrue);
-    default:
-      break;
-  }
   return(MagickFalse);
 }
 
