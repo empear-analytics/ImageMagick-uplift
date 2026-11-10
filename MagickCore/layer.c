@@ -1674,17 +1674,8 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   DisposeChoice
     choice;
 
-  DisposeChoiceTargets
-    choice_targets;
-
   DisposeType
     *disposals;
-
-  DuplicateFrameTargets
-    targets;
-
-  DuplicateFrameTrial
-    trial;
 
   Image
     *prev_image,
@@ -1704,6 +1695,12 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
 
   ssize_t
     i;
+
+  const DisposeChoiceTargets
+    choice_targets = { &bgnd_image, &prev_image, &dup_image, &i };
+
+  const DuplicateFrameTargets
+    targets = { &dup_image, &dup_bounds, &cleared };
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1811,6 +1808,9 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     }
     else
       {
+        const DuplicateFrameTrial
+          trial = { add_frames, curr, bounds, disposals, i, exception };
+
         /*
           Compare a none disposal against a previous disposal
         */
@@ -1841,15 +1841,6 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
           This method will always clear all the pixels that need to be cleared.
         */
         dup_bounds.width=dup_bounds.height=0; /* no dup, no pixel added */
-        trial.add_frames=add_frames;
-        trial.curr=curr;
-        trial.bounds=bounds;
-        trial.disposals=disposals;
-        trial.i=i;
-        trial.exception=exception;
-        targets.dup_image=(&dup_image);
-        targets.dup_bounds=(&dup_bounds);
-        targets.cleared=(&cleared);
         if (TryDuplicateFrame(&trial,&targets) == MagickFalse)
           return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
         /*
@@ -1941,10 +1932,6 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     choice.bounds=bounds;
     choice.disposals=disposals;
     choice.dup_bounds=dup_bounds;
-    choice_targets.bgnd_image=(&bgnd_image);
-    choice_targets.prev_image=(&prev_image);
-    choice_targets.dup_image=(&dup_image);
-    choice_targets.i=(&i);
     if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse)
       return(ReleaseFrameLists(bounds,disposals));
     assert(prev_image != (Image *) NULL);
