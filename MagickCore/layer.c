@@ -1646,6 +1646,15 @@ static Image *ReleaseFrameLists(RectangleInfo *bounds,
   return((Image *) NULL);
 }
 
+static Image *ReleaseFrameListsAndPrevious(RectangleInfo *bounds,
+  DisposeType *disposals,Image *prev_image)
+{
+  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+  disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+  prev_image=DestroyImage(prev_image);
+  return((Image *) NULL);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1832,12 +1841,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
         targets.dup_bounds=(&dup_bounds);
         targets.cleared=(&cleared);
         if (TryDuplicateFrame(&trial,&targets) == MagickFalse)
-          {
-            bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-            disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-            prev_image=DestroyImage(prev_image);
-            return((Image *) NULL);
-          }
+          return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
         /*
           Now compare against a simple background disposal
         */
