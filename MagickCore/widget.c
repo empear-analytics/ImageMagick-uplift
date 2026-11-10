@@ -522,12 +522,26 @@ static void XScrollTextMarker(XFontStruct *font_info,XWidgetInfo *text_info,
   text_info->marker=(char *) text+i;
 }
 
-static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
-  XWidgetInfo *text_info)
+static void XSetVisibleTextMarker(XFontStruct *font_info,
+  XWidgetInfo *text_info,const unsigned int width)
 {
   const char
     *text;
 
+  if (text_info->cursor < text_info->marker)
+    text_info->marker=text_info->cursor;
+  else
+    {
+      text=text_info->marker;
+      if (XTextWidth(font_info,(char *) text,(int) (text_info->cursor-text)) >
+          (int) width)
+        XScrollTextMarker(font_info,text_info,width);
+    }
+}
+
+static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
+  XWidgetInfo *text_info)
+{
   int
     x,
     y;
@@ -575,15 +589,7 @@ static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
   /*
     Determine beginning of the visible text.
   */
-  if (text_info->cursor < text_info->marker)
-    text_info->marker=text_info->cursor;
-  else
-    {
-      text=text_info->marker;
-      if (XTextWidth(font_info,(char *) text,(int) (text_info->cursor-text)) >
-          (int) width)
-        XScrollTextMarker(font_info,text_info,width);
-    }
+  XSetVisibleTextMarker(font_info,text_info,width);
   /*
     Draw text and cursor.
   */
@@ -646,6 +652,26 @@ static void XDrawMatteText(Display *display,const XWindowInfo *window_info,
 %      contains the extents of the triangle.
 %
 */
+static void XDrawTriangleEastLabel(Display *display,
+  const XWindowInfo *window_info,const XWidgetInfo *triangle_info)
+{
+  int
+    x1,
+    y1;
+
+  XFontStruct
+    *font_info;
+
+  font_info=window_info->font_info;
+  XSetTextColor(display,window_info,MagickTrue);
+  x1=triangle_info->x+(int) triangle_info->width+(int)
+    triangle_info->bevel_width+(QuantumMargin >> 1);
+  y1=triangle_info->y+(((int) triangle_info->height-(int)
+    (font_info->ascent+font_info->descent)) >> 1)+(int) font_info->ascent;
+  (void) XDrawString(display,window_info->id,window_info->widget_context,x1,y1,
+    triangle_info->text,Extent(triangle_info->text));
+}
+
 static void XDrawTriangleEast(Display *display,const XWindowInfo *window_info,
   const XWidgetInfo *triangle_info)
 {
@@ -659,9 +685,6 @@ static void XDrawTriangleEast(Display *display,const XWindowInfo *window_info,
 
   unsigned int
     bevel_width;
-
-  XFontStruct
-    *font_info;
 
   XPoint
     points[4];
@@ -732,14 +755,7 @@ static void XDrawTriangleEast(Display *display,const XWindowInfo *window_info,
   /*
     Write label to right of triangle.
   */
-  font_info=window_info->font_info;
-  XSetTextColor(display,window_info,MagickTrue);
-  x1=triangle_info->x+(int) triangle_info->width+(int)
-    triangle_info->bevel_width+(QuantumMargin >> 1);
-  y1=triangle_info->y+(((int) triangle_info->height-(int)
-    (font_info->ascent+font_info->descent)) >> 1)+(int) font_info->ascent;
-  (void) XDrawString(display,window_info->id,window_info->widget_context,x1,y1,
-    triangle_info->text,Extent(triangle_info->text));
+  XDrawTriangleEastLabel(display,window_info,triangle_info);
 }
 
 /*
@@ -1092,6 +1108,60 @@ static void XDrawWidgetText(Display *display,const XWindowInfo *window_info,
 %      control character or not.
 %
 */
+static void XInsertWidgetText(XWidgetInfo *text_info,char *text)
+{
+  char
+    *p,
+    *q;
+
+  int
+    i;
+
+  q=text_info->text+Extent(text_info->text)+strlen(text);
+  for (i=0; i <= Extent(text_info->cursor); i++)
+  {
+    if ((q-Extent(text)) > text_info->text)
+      *q=(*(q-Extent(text)));
+    q--;
+  }
+  p=text;
+  for (i=0; i < Extent(text); i++)
+    *text_info->cursor++=(*p++);
+}
+
+static void XEraseHighlightedText(XWidgetInfo *text_info)
+{
+  if (text_info->highlight)
+    {
+      /*
+        Erase the entire line of text.
+      */
+      *text_info->text='\0';
+      text_info->cursor=text_info->text;
+      text_info->marker=text_info->text;
+      text_info->highlight=MagickFalse;
+    }
+}
+
+static void XEditTextInsertKey(Display *display,XWidgetInfo *text_info,
+  char *text,const size_t state)
+{
+  if (state & ControlState)
+    return;
+  if (*text == '\0')
+    return;
+  if ((Extent(text_info->text)+1) >= (int) MagickPathExtent)
+    (void) XBell(display,0);
+  else
+    {
+      XEraseHighlightedText(text_info);
+      /*
+        Insert a string into the text.
+      */
+      XInsertWidgetText(text_info,text);
+    }
+}
+
 static void XEditText(Display *display,XWidgetInfo *text_info,
   const KeySym key_symbol,char *text,const size_t state)
 {
@@ -1147,45 +1217,7 @@ static void XEditText(Display *display,XWidgetInfo *text_info,
     }
     default:
     {
-      char
-        *p,
-        *q;
-
-      int
-        i;
-
-      if (state & ControlState)
-        break;
-      if (*text == '\0')
-        break;
-      if ((Extent(text_info->text)+1) >= (int) MagickPathExtent)
-        (void) XBell(display,0);
-      else
-        {
-          if (text_info->highlight)
-            {
-              /*
-                Erase the entire line of text.
-              */
-              *text_info->text='\0';
-              text_info->cursor=text_info->text;
-              text_info->marker=text_info->text;
-              text_info->highlight=MagickFalse;
-            }
-          /*
-            Insert a string into the text.
-          */
-          q=text_info->text+Extent(text_info->text)+strlen(text);
-          for (i=0; i <= Extent(text_info->cursor); i++)
-          {
-            if ((q-Extent(text)) > text_info->text)
-              *q=(*(q-Extent(text)));
-            q--;
-          }
-          p=text;
-          for (i=0; i < Extent(text); i++)
-            *text_info->cursor++=(*p++);
-        }
+      XEditTextInsertKey(display,text_info,text,state);
       break;
     }
   }
@@ -1324,6 +1356,54 @@ static void XHighlightWidget(Display *display,const XWindowInfo *window_info,
 extern "C" {
 #endif
 
+static void XScreenExpose(Display *display,XWindows *windows,XEvent *event)
+{
+  if (event->xexpose.window == windows->image.id)
+    {
+      XRefreshWindow(display,&windows->image,event);
+      return;
+    }
+  if (event->xexpose.window == windows->magnify.id)
+    if ((event->xexpose.count == 0) && (windows->magnify.mapped))
+      {
+        ExceptionInfo
+          *exception;
+
+        exception=AcquireExceptionInfo();
+        XMakeMagnifyImage(display,windows,exception);
+        exception=DestroyExceptionInfo(exception);
+        return;
+      }
+  if ((event->xexpose.window == windows->command.id) &&
+      (event->xexpose.count == 0))
+    {
+      (void) XCommandWidget(display,windows,(const char *const *) NULL,
+        event);
+      return;
+    }
+}
+
+static void XScreenTrackWidgetMapping(XWindows *windows,const XEvent *event)
+{
+  if (event->type == MapNotify)
+    windows->widget.mapped=MagickTrue;
+  if (event->type == UnmapNotify)
+    windows->widget.mapped=MagickFalse;
+}
+
+static void XScreenConvertAltButton(XEvent *event)
+{
+  if ((event->xbutton.button == Button3) &&
+      (event->xbutton.state & Mod1Mask))
+    {
+      /*
+        Convert Alt-Button3 to Button2.
+      */
+      event->xbutton.button=Button2;
+      event->xbutton.state&=(unsigned int) (~Mod1Mask);
+    }
+}
+
 static int XScreenEvent(Display *display,XEvent *event,char *data)
 {
   XWindows
@@ -1340,53 +1420,19 @@ static int XScreenEvent(Display *display,XEvent *event,char *data)
     }
   if (event->xany.window == windows->widget.id)
     {
-      if (event->type == MapNotify)
-        windows->widget.mapped=MagickTrue;
-      if (event->type == UnmapNotify)
-        windows->widget.mapped=MagickFalse;
+      XScreenTrackWidgetMapping(windows,event);
       return(MagickTrue);
     }
   switch (event->type)
   {
     case ButtonPress:
     {
-      if ((event->xbutton.button == Button3) &&
-          (event->xbutton.state & Mod1Mask))
-        {
-          /*
-            Convert Alt-Button3 to Button2.
-          */
-          event->xbutton.button=Button2;
-          event->xbutton.state&=(unsigned int) (~Mod1Mask);
-        }
+      XScreenConvertAltButton(event);
       return(MagickTrue);
     }
     case Expose:
     {
-      if (event->xexpose.window == windows->image.id)
-        {
-          XRefreshWindow(display,&windows->image,event);
-          break;
-        }
-      if (event->xexpose.window == windows->magnify.id)
-        if (event->xexpose.count == 0)
-          if (windows->magnify.mapped)
-            {
-              ExceptionInfo
-                *exception;
-
-              exception=AcquireExceptionInfo();
-              XMakeMagnifyImage(display,windows,exception);
-              exception=DestroyExceptionInfo(exception);
-              break;
-            }
-      if (event->xexpose.window == windows->command.id)
-        if (event->xexpose.count == 0)
-          {
-            (void) XCommandWidget(display,windows,(const char *const *) NULL,
-              event);
-            break;
-          }
+      XScreenExpose(display,windows,event);
       break;
     }
     case FocusOut:
