@@ -943,11 +943,11 @@ static MagickBooleanType CropImageLine(const TransformLine *line,
   return(MagickTrue);
 }
 
+#define CropImageTag  "Crop/Image"
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
-#define CropImageTag  "Crop/Image"
-
   CacheView
     *crop_view,
     *image_view;
