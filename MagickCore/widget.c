@@ -9144,9 +9144,9 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
           break;
         if (dismiss_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(dismiss_info,event.xbutton))
-                state|=ExitState;
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(dismiss_info,event.xbutton)))
+              state|=ExitState;
             dismiss_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&dismiss_info);
           }
