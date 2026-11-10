@@ -395,3 +395,13 @@ fewer instructions (318.12M to 317.78M); kept on instruction counts. **Upstream:
 returns 0 rather than -1 on failure, so MorphologyApply misses a failed column pass; ErodeIntensity and DilateIntensity
 leave before `changes[id]++` and always report 0 changes; the DilateIntensity comment says the kernel is not reflected
 where the code reflects it.
+
+## Lane c, accelerate.c (wide build)
+
+accelerate.c 2.79 to 2.90 (9 refactor commits, existing recipes). **Owner questions:** (1) Recipe P on
+`AccelerateGrayscaleImage`'s traits test gives 2.97 and removes Complex Conditional, but the function joins the wrapper
+clone group (10 to 11 functions): allowed? (2) one D-set commit for the release helpers (25 `cl_mem` and 12 `cl_kernel`
+sites) when each function alone is flat rather than lower? (3) may kernel releases written `!=NULL` count as the same
+text as the helper's, differing only by the `(cl_kernel)` cast? **Upstream:** Despeckle overwrites `clStatus` from the
+`k==0` `clSetKernelArg` call on the next line, asserts `filteredImage != NULL` after `CloneImage`, and never checks
+`AcquireOpenCLKernel` for NULL.
