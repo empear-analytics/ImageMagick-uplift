@@ -2335,6 +2335,47 @@ static void RiemersmaVerticalUnitCurve(const RiemersmaCurve *curve,
   }
 }
 
+typedef struct _RiemersmaTurns
+{
+  unsigned int
+    enter,
+    step,
+    along,
+    leave;
+} RiemersmaTurns;
+
+static MagickBooleanType
+  Riemersma(const RiemersmaCurve *,const size_t,const unsigned int,
+    ExceptionInfo *);
+
+static MagickBooleanType RiemersmaSubCurves(const RiemersmaCurve *curve,
+  const size_t level,const RiemersmaTurns *turns,ExceptionInfo *exception)
+{
+  const unsigned int
+    enter = turns->enter,
+    step = turns->step,
+    along = turns->along,
+    leave = turns->leave;
+
+  MagickBooleanType
+    status;
+
+  status=Riemersma(curve,level-1,enter,exception);
+  if (status != MagickFalse)
+    status=RiemersmaDither(curve,step,exception);
+  if (status != MagickFalse)
+    status=Riemersma(curve,level-1,along,exception);
+  if (status != MagickFalse)
+    status=RiemersmaDither(curve,leave,exception);
+  if (status != MagickFalse)
+    status=Riemersma(curve,level-1,along,exception);
+  if (status != MagickFalse)
+    status=RiemersmaDither(curve,along,exception);
+  if (status != MagickFalse)
+    status=Riemersma(curve,level-1,leave,exception);
+  return(status);
+}
+
 static MagickBooleanType Riemersma(const RiemersmaCurve *curve,
   const size_t level,const unsigned int direction,ExceptionInfo *exception)
 {
@@ -2374,70 +2415,34 @@ static MagickBooleanType Riemersma(const RiemersmaCurve *curve,
     {
       case WestGravity:
       {
-        status=Riemersma(curve,level-1,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,EastGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,WestGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,WestGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,WestGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,SouthGravity,exception);
+        const RiemersmaTurns
+          turns = { NorthGravity,EastGravity,WestGravity,SouthGravity };
+
+        status=RiemersmaSubCurves(curve,level,&turns,exception);
         break;
       }
       case EastGravity:
       {
-        status=Riemersma(curve,level-1,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,WestGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,EastGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,EastGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,EastGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,NorthGravity,exception);
+        const RiemersmaTurns
+          turns = { SouthGravity,WestGravity,EastGravity,NorthGravity };
+
+        status=RiemersmaSubCurves(curve,level,&turns,exception);
         break;
       }
       case NorthGravity:
       {
-        status=Riemersma(curve,level-1,WestGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,EastGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,EastGravity,exception);
+        const RiemersmaTurns
+          turns = { WestGravity,SouthGravity,NorthGravity,EastGravity };
+
+        status=RiemersmaSubCurves(curve,level,&turns,exception);
         break;
       }
       case SouthGravity:
       {
-        status=Riemersma(curve,level-1,EastGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,WestGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,WestGravity,exception);
+        const RiemersmaTurns
+          turns = { EastGravity,NorthGravity,SouthGravity,WestGravity };
+
+        status=RiemersmaSubCurves(curve,level,&turns,exception);
         break;
       }
       default:
