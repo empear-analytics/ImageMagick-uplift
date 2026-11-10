@@ -1702,6 +1702,18 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    reads as step 4 does (a member the block reads and then writes, and that nothing
    after the block reads, as step 2's read-then-written local without `const`); no
    typedef, local or fill is added, and the call passes `&name` as the earlier one does.
+   Sibling blocks need not be the cases of one `switch` (2026-11-10): blocks of one
+   function that all lie after one point of it (the cases of two `switch` statements
+   in the branches of an `if`, the branches of an `if` chain inside a case, a loop
+   nested in such a case), each moved under this recipe in its own commit, may share
+   one `Name` and one local on the same terms. The local is declared among the
+   function's declarations and filled once, by step 6's assignments, at that point;
+   nothing on any path from the fill to any of the calls writes a member's variable,
+   checked by reading every path, the code that stays in the caller included. The
+   typedef and the fill hold the union of the groups moved so far, in one order (a
+   later commit adds a member and its assignment). A block that later moves around
+   such a call (the case holding a row loop whose column loop moved first) takes the
+   same `const Name *name` and passes it on, as the loop-body paragraph above says.
 
 **Before:**
 
@@ -1933,6 +1945,15 @@ helper, whose struct holds thirteen other variables; with a struct of its own it
 bind them all and fill the inner struct again (*Large Method*, 72 lines, fx.c 3.99 to
 3.90 in a probe); passing the struct on, fx.c 3.99 to 4.04, no finding on any helper.
 Added by Claude Code (Claude Opus 5.5).
+Step 8's siblings across one function (2026-11-10, W16 lane b, owner's OK to evolve the
+recipes): `xwindow.c`'s `XMakeImageLSBFirst` and `XMakeImageMSBFirst`, whose pixel
+conversions sit in the cases of two `switch` statements (colour-mapped and
+continuous-tone) and in an `if` chain inside the second one's `default:`. Their column
+loops (canvas, colormap or pixel table, bytes per pixel, `p`, `q`: five inputs) and then
+the whole cases move as helpers reading one `XImageRowSource` filled once after the
+cache view is acquired; a struct per switch, or per row filled inside each row loop,
+would repeat the typedef or put eight assignments on every row. A probe of both chains:
+xwindow.c 1.57 to 1.64, no finding on any helper. Added by Claude Code (Claude Opus 5.5).
 
 ---
 
@@ -10559,3 +10580,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | N | Step 8: the statements of one function body are siblings as well: a later block that holds an earlier sibling's call and runs to the end of the function (E step 7's value form) may take that sibling's `const Name *name` and pass it on unchanged when none of its statements before the call writes a member's variable; the fill moves with the call to directly before the later block's call, and the variables the later block writes go by value (step 2's read-then-written form, nothing after reads them). *Careful* gives the argument | `fx.c`'s `GetFunction` (campaign A, W16 lane c): the argument-count tail writes `FndArgs` and `chLimit` and holds the call of the closing tail, whose struct holds thirteen variables; with its own struct the helper is a *Large Method* (72 lines, fx.c 3.99 to 3.90), passing the struct on 3.99 to 4.04 with no finding | owner |
 | 2026-11-10 | AMEND | BR | Step 8: a block writing two to four variables the caller reads after it passes their addresses in one `const` targets struct (Recipe LB step 8's form, each variable meeting Recipe I step 2); its inputs may come from at most two `const` structs the caller already fills (an earlier sibling helper's struct filled earlier in the same iteration with no member's variable written since, Recipe N step 8; and a struct the block passes by address to a callee, as a pointer, `&context` becoming `context`); input structs, targets, then `broke`, at most four parameters. *Careful* gives the argument | `fx.c`'s `TranslateExpression` (campaign A, W16 lane c): the operator loop's run from the ternary to the `++`/`--` check leaves through `break;` and `return MagickFalse;` and writes `ternary`, `UserSymbol` and `NewUserSymbol`; step 2 allowed one. A probe: 4.33 to 4.37 for the step, and the whole chain takes `TranslateExpression` out of *Complex Method* and *Large Method*, 4.21 to 4.61, no finding on any new function | owner |
 | 2026-11-10 | AMEND | N | Step 8: a struct the caller already fills for the call of another `static` function (a Recipe B bundle or another N helper) may serve a later block of the same function that reads only its members and runs only after that call (its `if` tests the call, or it follows it in the same block), nothing on any path from the fill to the new call writing a member's variable; the new function takes that `const Name *name` (read-then-written members as step 2's non-`const` locals), no typedef, local or fill added. *Careful* gives the argument. Still eight steps | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the failed-allocation release of the six buffers (six `if (b != NULL) b=Relinquish...(b);`) reads exactly the members of the `FeatureBuffers buffers` that Recipe B made for `IsFeatureMemoryMissing`, whose `if` guards it; a struct of its own would repeat the typedef and the six-line fill. A probe 7.46 to 7.51, `GetImageFeatures` cc 29 to 23, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-10 | AMEND | N | Step 8: sibling blocks need not be the cases of one `switch`: blocks of one function that all lie after one point of it (cases of two `switch` statements, branches of an `if` chain inside a case, a loop nested in such a case), each moved in its own commit, may share one `Name` and one local declared among the function's declarations and filled once at that point, when nothing on any path from the fill to any call writes a member's variable (checked by reading every path); typedef and fill hold the union of the groups moved so far; a block later moved around such a call passes the same `const Name *name` on. Still eight steps | `xwindow.c`'s `XMakeImageLSBFirst`/`XMakeImageMSBFirst` (campaign A, W16 lane b): column loops with five inputs and then the whole conversion cases of two `switch` statements and an `if` chain read one `XImageRowSource` filled after the cache view is acquired; a struct per switch or a per-row fill would repeat the typedef or put eight assignments on every row. A probe of both chains: 1.57 to 1.64, no finding on any helper. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
