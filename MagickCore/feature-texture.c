@@ -1125,6 +1125,29 @@ static void AccumulateCorrelationQ(const TextureDirection *texture,
       density_x[z].direction[i].blue/density_y[x].direction[i].blue;
 }
 
+static void AccumulateCorrelationQBlack(const TextureDirection *texture,
+  const ssize_t x,const ssize_t y,const ssize_t z)
+{
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const density_x = texture->density_x,
+    *const density_y = texture->density_y,
+    **const Q = texture->Q;
+
+  const ssize_t
+    i = texture->i;
+
+  if (image->colorspace == CMYKColorspace)
+    if ((fabs(density_x[z].direction[i].black) > MagickEpsilon) &&
+        (fabs(density_y[x].direction[i].black) > MagickEpsilon))
+      Q[z][y].direction[i].black+=cooccurrence[z][x].direction[i].black*
+        cooccurrence[y][x].direction[i].black/
+        density_x[z].direction[i].black/density_y[x].direction[i].black;
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1590,12 +1613,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
                 &cooccurrence[x][y].direction[i]);
             }
           AccumulateCorrelationQ(&texture,x,y,z);
-          if (image->colorspace == CMYKColorspace)
-            if ((fabs(density_x[z].direction[i].black) > MagickEpsilon) &&
-                (fabs(density_y[x].direction[i].black) > MagickEpsilon))
-              Q[z][y].direction[i].black+=cooccurrence[z][x].direction[i].black*
-                cooccurrence[y][x].direction[i].black/
-                density_x[z].direction[i].black/density_y[x].direction[i].black;
+          AccumulateCorrelationQBlack(&texture,x,y,z);
           if (image->alpha_trait != UndefinedPixelTrait)
             if ((fabs(density_x[z].direction[i].alpha) > MagickEpsilon) &&
                 (fabs(density_y[x].direction[i].alpha) > MagickEpsilon))
