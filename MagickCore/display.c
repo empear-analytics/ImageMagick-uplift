@@ -5446,6 +5446,14 @@ static inline MagickBooleanType IsBoxedElement(const ElementType v)
   return(MagickFalse);
 }
 
+static inline MagickBooleanType IsElementComplete(const ElementType element,
+  const unsigned int distance)
+{
+  return((((element != PolygonElement) &&
+    (element != FillPolygonElement)) || (distance <= 9)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -6151,8 +6159,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
           rectangle_info.y=(ssize_t) event.xbutton.y;
           coordinate_info[number_coordinates].x=event.xbutton.x;
           coordinate_info[number_coordinates].y=event.xbutton.y;
-          if (((element != PolygonElement) &&
-               (element != FillPolygonElement)) || (distance <= 9))
+          if (IsElementComplete(element,distance) != MagickFalse)
             {
               state|=ExitState;
               break;
