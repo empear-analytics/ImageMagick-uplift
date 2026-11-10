@@ -2122,10 +2122,22 @@ static inline MagickBooleanType IsHslChannelQualifier(const PixelChannel chQual)
     chQual == LIGHT_CHANNEL) ? MagickTrue : MagickFalse);
 }
 
+static const FunctionE
+  PixelAccessFunctions[] =
+  {
+    fP, fU, fU0, fUP,
+    fV, fVP, fS, fSP
+  };
+
 static inline MagickBooleanType IsPixelAccessFunction(const FunctionE fe)
 {
-  return((fe == fP || fe == fU  || fe == fU0 || fe == fUP ||
-    fe == fV || fe == fVP || fe == fS || fe == fSP) ? MagickTrue : MagickFalse);
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(PixelAccessFunctions)/sizeof(*PixelAccessFunctions)); i++)
+    if (PixelAccessFunctions[i] == fe)
+      return(MagickTrue);
+  return(MagickFalse);
 }
 
 static inline MagickBooleanType IsQualifiedCoordFunction(const ImgAttrE iaQual,
