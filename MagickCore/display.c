@@ -7154,6 +7154,24 @@ static DisplayCommand XImageWindowCommand(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsImageWindowUncropped(
+  const XWindows *windows,Image **image)
+{
+  return(((windows->image.crop_geometry == (char *) NULL) &&
+    ((int) (*image)->columns == windows->image.ximage->width) &&
+    ((int) (*image)->rows == windows->image.ximage->height)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsImageWindowOriginalSize(
+  const XWindows *windows,Image **image)
+{
+  return(((windows->image.width == (unsigned int) (*image)->columns) &&
+    (windows->image.height == (unsigned int) (*image)->rows) &&
+    (windows->image.crop_geometry == (char *) NULL)) ? MagickTrue :
+    MagickFalse);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -7481,9 +7499,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       char
         image_geometry[MagickPathExtent];
 
-      if ((windows->image.crop_geometry == (char *) NULL) &&
-          ((int) (*image)->columns == windows->image.ximage->width) &&
-          ((int) (*image)->rows == windows->image.ximage->height))
+      if (IsImageWindowUncropped(windows,image) != MagickFalse)
         break;
       /*
         Apply size transforms to image.
@@ -7516,9 +7532,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       /*
         Restore Image window to its original size.
       */
-      if ((windows->image.width == (unsigned int) (*image)->columns) &&
-          (windows->image.height == (unsigned int) (*image)->rows) &&
-          (windows->image.crop_geometry == (char *) NULL))
+      if (IsImageWindowOriginalSize(windows,image) != MagickFalse)
         {
           (void) XBell(display,0);
           break;
