@@ -811,6 +811,13 @@ static void SetOpenCLBenchmarkScore(MagickCLEnv clEnv,
     }
 }
 
+static int CloseDoctypeBracket(int bracket_depth)
+{
+  if (bracket_depth > 0)
+    bracket_depth--;
+  return(bracket_depth);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -865,10 +872,7 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
                   bracket_depth++;
                 else
                   if (*q == ']')
-                    {
-                      if (bracket_depth > 0)
-                        bracket_depth--;
-                    }
+                    bracket_depth=CloseDoctypeBracket(bracket_depth);
                   else
                     if ((*q == '>') && (bracket_depth == 0))
                       {
