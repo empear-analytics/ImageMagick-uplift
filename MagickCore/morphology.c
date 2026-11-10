@@ -5788,38 +5788,11 @@ static double GetKernelNormalizeScale(const KernelInfo *kernel)
   return(pos_scale);
 }
 
-MagickExport void ScaleKernelInfo(KernelInfo *kernel,
-  const double scaling_factor,const GeometryFlags normalize_flags)
+static void ApplyKernelScaling(KernelInfo *kernel,
+  const double scaling_factor,const double pos_scale,const double neg_scale)
 {
-  double
-    pos_scale,
-    neg_scale;
-
   ssize_t
     i;
-
-  /* do the other kernels in a multi-kernel list first */
-  if ( kernel->next != (KernelInfo *) NULL)
-    ScaleKernelInfo(kernel->next, scaling_factor, normalize_flags);
-
-  /* Normalization of Kernel */
-  pos_scale = 1.0;
-  if ( (normalize_flags&NormalizeValue) != 0 ) {
-    pos_scale = GetKernelNormalizeScale(kernel);
-  }
-  /* Force kernel into a normalized zero-summing kernel */
-  if ( (normalize_flags&CorrelateNormalizeValue) != 0 ) {
-    pos_scale = ( fabs(kernel->positive_range) >= MagickEpsilon )
-                 ? kernel->positive_range : 1.0;
-    neg_scale = ( fabs(kernel->negative_range) >= MagickEpsilon )
-                 ? -kernel->negative_range : 1.0;
-  }
-  else
-    neg_scale = pos_scale;
-
-  /* finalize scaling_factor for positive and negative components */
-  pos_scale = scaling_factor/pos_scale;
-  neg_scale = scaling_factor/neg_scale;
 
   for (i=0; i < (ssize_t) (kernel->width*kernel->height); i++)
     if (!IsNaN(kernel->values[i]))
@@ -5844,6 +5817,39 @@ MagickExport void ScaleKernelInfo(KernelInfo *kernel,
   }
 
   return;
+}
+
+MagickExport void ScaleKernelInfo(KernelInfo *kernel,
+  const double scaling_factor,const GeometryFlags normalize_flags)
+{
+  double
+    pos_scale,
+    neg_scale;
+
+  /* do the other kernels in a multi-kernel list first */
+  if ( kernel->next != (KernelInfo *) NULL)
+    ScaleKernelInfo(kernel->next, scaling_factor, normalize_flags);
+
+  /* Normalization of Kernel */
+  pos_scale = 1.0;
+  if ( (normalize_flags&NormalizeValue) != 0 ) {
+    pos_scale = GetKernelNormalizeScale(kernel);
+  }
+  /* Force kernel into a normalized zero-summing kernel */
+  if ( (normalize_flags&CorrelateNormalizeValue) != 0 ) {
+    pos_scale = ( fabs(kernel->positive_range) >= MagickEpsilon )
+                 ? kernel->positive_range : 1.0;
+    neg_scale = ( fabs(kernel->negative_range) >= MagickEpsilon )
+                 ? -kernel->negative_range : 1.0;
+  }
+  else
+    neg_scale = pos_scale;
+
+  /* finalize scaling_factor for positive and negative components */
+  pos_scale = scaling_factor/pos_scale;
+  neg_scale = scaling_factor/neg_scale;
+
+  ApplyKernelScaling(kernel,scaling_factor,pos_scale,neg_scale);
 }
 
 /*
