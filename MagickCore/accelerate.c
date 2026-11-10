@@ -439,6 +439,12 @@ cleanup:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+static void ReleaseOpenCLBuffer(cl_mem buffer)
+{
+  if (buffer != (cl_mem) NULL)
+    ReleaseOpenCLMemObject(buffer);
+}
+
 static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
   const double radius,const double sigma,ExceptionInfo *exception)
 {
@@ -599,8 +605,7 @@ static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
 
 cleanup:
 
-  if (imageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageBuffer);
+  ReleaseOpenCLBuffer(imageBuffer);
   if (filteredImageBuffer != (cl_mem) NULL)
     ReleaseOpenCLMemObject(filteredImageBuffer);
   if (tempImageBuffer != (cl_mem) NULL)
