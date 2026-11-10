@@ -1447,6 +1447,23 @@ static inline MagickBooleanType IsLinearGammaColorspace(
     MagickTrue : MagickFalse);
 }
 
+static void SetPerceptualChromaticity(Image *image)
+{
+  image->rendering_intent=PerceptualIntent;
+  image->chromaticity.red_primary.x=0.6400;
+  image->chromaticity.red_primary.y=0.3300;
+  image->chromaticity.red_primary.z=0.0300;
+  image->chromaticity.green_primary.x=0.3000;
+  image->chromaticity.green_primary.y=0.6000;
+  image->chromaticity.green_primary.z=0.1000;
+  image->chromaticity.blue_primary.x=0.1500;
+  image->chromaticity.blue_primary.y=0.0600;
+  image->chromaticity.blue_primary.z=0.7900;
+  image->chromaticity.white_point.x=0.3127;
+  image->chromaticity.white_point.y=0.3290;
+  image->chromaticity.white_point.z=0.3583;
+}
+
 MagickExport MagickBooleanType SetImageColorspace(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1479,21 +1496,7 @@ MagickExport MagickBooleanType SetImageColorspace(Image *image,
     if (IsLinearGammaColorspace(colorspace) != MagickFalse)
       image->gamma=1.000;
     else
-      {
-        image->rendering_intent=PerceptualIntent;
-        image->chromaticity.red_primary.x=0.6400;
-        image->chromaticity.red_primary.y=0.3300;
-        image->chromaticity.red_primary.z=0.0300;
-        image->chromaticity.green_primary.x=0.3000;
-        image->chromaticity.green_primary.y=0.6000;
-        image->chromaticity.green_primary.z=0.1000;
-        image->chromaticity.blue_primary.x=0.1500;
-        image->chromaticity.blue_primary.y=0.0600;
-        image->chromaticity.blue_primary.z=0.7900;
-        image->chromaticity.white_point.x=0.3127;
-        image->chromaticity.white_point.y=0.3290;
-        image->chromaticity.white_point.z=0.3583;
-      }
+      SetPerceptualChromaticity(image);
   status=SyncImagePixelCache(image,exception);
   image->type=type;
   return(status);
