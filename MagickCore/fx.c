@@ -4425,6 +4425,30 @@ static void ImageStatMaximaToMedian (const ImageStatInputs *attr, fxFltType *ret
   }
 }
 
+static void ImageStatKurtosis (const ImageStatInputs *attr, fxFltType *ret)
+{
+  const PixelChannel
+    channel = attr->channel;
+
+  ChannelStatistics
+    *const cs = attr->cs;
+
+  const ImgAttrE
+    ia = attr->ia;
+
+  switch (ia) {
+    case aKurtosis:
+      if (HasChannelStatistics(cs,channel) != MagickFalse)
+        (*ret) = cs[channel].kurtosis;
+      break;
+    default:
+      {
+        ImageStatMaximaToMedian (attr, &(*ret));
+        break;
+      }
+  }
+}
+
 static inline fxFltType ImageStat (
   FxInfo * pfx, ssize_t ImgNum, PixelChannel channel, ImgAttrE ia)
 {
@@ -4462,13 +4486,9 @@ static inline fxFltType ImageStat (
     case aExtent:
       ret = (fxFltType) GetBlobSize (pfx->image);
       break;
-    case aKurtosis:
-      if (HasChannelStatistics(cs,channel) != MagickFalse)
-        ret = cs[channel].kurtosis;
-      break;
     default:
       {
-        ImageStatMaximaToMedian (&attr, &ret);
+        ImageStatKurtosis (&attr, &ret);
         break;
       }
   }
