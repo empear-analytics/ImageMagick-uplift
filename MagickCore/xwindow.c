@@ -6024,6 +6024,26 @@ static inline MagickBooleanType IsMutableAlphaImage(const XWindowInfo *window,
     (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
+static unsigned char *XPackGammaBGRARowLSB(const Image *canvas,const Quantum *p,
+  unsigned char *q)
+{
+  int
+    x;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    *q++=ScaleQuantumToChar(XBlueGamma(
+      GetPixelBlue(canvas,p)));
+    *q++=ScaleQuantumToChar(XGreenGamma(
+      GetPixelGreen(canvas,p)));
+    *q++=ScaleQuantumToChar(XRedGamma(
+      GetPixelRed(canvas,p)));
+    *q++=0;
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -6464,17 +6484,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
                     /*
                       Gamma correct canvas.
                     */
-                    for (x=(int) canvas->columns-1; x >= 0; x--)
-                    {
-                      *q++=ScaleQuantumToChar(XBlueGamma(
-                        GetPixelBlue(canvas,p)));
-                      *q++=ScaleQuantumToChar(XGreenGamma(
-                        GetPixelGreen(canvas,p)));
-                      *q++=ScaleQuantumToChar(XRedGamma(
-                        GetPixelRed(canvas,p)));
-                      *q++=0;
-                      p+=(ptrdiff_t) GetPixelChannels(canvas);
-                    }
+                    q=XPackGammaBGRARowLSB(canvas,p,q);
                     continue;
                   }
                 for (x=(int) canvas->columns-1; x >= 0; x--)
