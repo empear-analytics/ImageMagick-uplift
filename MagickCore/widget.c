@@ -5470,6 +5470,12 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 extern "C" {
 #endif
 
+static inline MagickBooleanType IsSameFontCharacter(const char *p,const char *q)
+{
+  return(((*p != '\0') && (*q != '\0') && (*p == *q)) ? MagickTrue :
+    MagickFalse);
+}
+
 static int FontCompare(const void *x,const void *y)
 {
   char
@@ -5478,7 +5484,7 @@ static int FontCompare(const void *x,const void *y)
 
   p=(char *) *((char **) x);
   q=(char *) *((char **) y);
-  while ((*p != '\0') && (*q != '\0') && (*p == *q))
+  while (IsSameFontCharacter(p,q) != MagickFalse)
   {
     p++;
     q++;
