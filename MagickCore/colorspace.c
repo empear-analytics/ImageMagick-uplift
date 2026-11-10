@@ -2738,6 +2738,29 @@ static MagickBooleanType TransformsRGBPixels(
   return(status);
 }
 
+static void TransformsRGBByClass(const Image *image,
+  const TransformsRGBTables *tables,MagickBooleanType status,
+  MagickOffsetType progress)
+{
+  switch (image->storage_class)
+  {
+    case DirectClass:
+    default:
+    {
+      /*
+        Convert DirectClass image.
+      */
+      status=TransformsRGBPixels(tables,status,progress);
+      break;
+    }
+    case PseudoClass:
+    {
+      TransformsRGBColormap(tables,status);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType TransformsRGBByTables(Image *image,
   MagickBooleanType status,MagickOffsetType progress,
   ExceptionInfo *exception)
@@ -2776,23 +2799,7 @@ static MagickBooleanType TransformsRGBByTables(Image *image,
   tables.y_map=y_map;
   tables.z_map=z_map;
   tables.exception=exception;
-  switch (image->storage_class)
-  {
-    case DirectClass:
-    default:
-    {
-      /*
-        Convert DirectClass image.
-      */
-      status=TransformsRGBPixels(&tables,status,progress);
-      break;
-    }
-    case PseudoClass:
-    {
-      TransformsRGBColormap(&tables,status);
-      break;
-    }
-  }
+  TransformsRGBByClass(image,&tables,status,progress);
   /*
     Relinquish resources.
   */
