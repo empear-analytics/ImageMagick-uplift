@@ -5358,8 +5358,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         status=XGetWindowProperty(display,event.xselection.requestor,
           event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
           &format,&length,&after,&data);
-        if ((status != Success) || (type != XA_STRING) || (format == 32) ||
-            (length == 0))
+        if (IsUnusableSelection(status,type,format,length) != MagickFalse)
           break;
         if ((Extent(reply_info.text)+(int) length) >= (MagickPathExtent-1))
           (void) XBell(display,0);
