@@ -986,7 +986,9 @@ over the pair.
 and the block that would fix it is a self-contained selection (a `switch` or an `if`
 chain) or loop that sets several of the caller's local variables together, such as a
 method pointer with its magnification and window width, or a scan that leaves its
-cursor and the pixel it found. Steps 1 to 6 do not depend on the block's kind.
+cursor and the pixel it found, or a straight run of assignments that sets several of
+them together (a set of buffer allocations, step 7). Steps 1 to 7 do not depend on the
+block's kind.
 
 **Not covered by:** Recipe E, whose step 4 refuses a block that writes more than one
 outer variable; Recipe P, which moves an expression, not statements; Recipe D, which
@@ -1040,6 +1042,21 @@ needs two copies of the block.
    else.
 6. Call it where the block stood, passing `&v` for each written variable, in the order
    of the parameters. Check every argument against its parameter by reading.
+7. Five or six written variables (2026-11-11). When the block writes five or six
+   variables of the caller (each meeting step 2), or fewer whose pointers would bring
+   step 6's call to five or more arguments, their addresses go in one `const` struct,
+   Recipe Z step 7's form: a `typedef struct` directly above the new function with one
+   pointer member per written variable, named as the variable, of the pointer type step
+   4 would give its parameter, in the order the block first writes them, holding
+   addresses only. The function takes its by-value inputs (at most three) and then
+   `const Targets *targets` last, binds each member once at the top of its body (`T
+   *const v = targets->v;`) and writes `(*v)` as step 5 says, `sizeof(*v)` becoming
+   `sizeof(*(*v))`. The caller declares the struct `const` among the declarations at the
+   top of its body, once, with the addresses as the initialiser (`const Targets targets
+   = { &a, &b, &c, &d, &e };`), and the call passes `&targets`. The struct is read by
+   nothing but that call (Recipe I step 2's exception), so while the new function runs
+   each member is the only pointer to its variable in use, as step 2 requires of a
+   single out-parameter.
 
 **Before:**
 
@@ -10798,13 +10815,19 @@ how an existing fill is rewritten. Recipe H, which moves preprocessor lines.
 3. `name` appears nowhere in the function but in its declaration, the run, and once as
    `&name` in that call, passed to a parameter of type pointer-to-`const` (FI step 3).
    The call is one expression statement ending in `;` (`F(...,&name,...);` or
-   `v=F(...,&name,...);`), the run and the call stand in the same compound statement,
-   and neither is the unbraced body of an `if`, `else` or loop, nor carries a label.
+   `v=F(...,&name,...);`), or the whole controlling expression of an `if` statement
+   with no `else`, compared with a constant (`if (F(...,&name,...) == MagickFalse)
+   S`), whose body `S` does not name `name` (2026-11-11); the run and the call stand in
+   the same compound statement, and neither is the unbraced body of an `if`, `else` or
+   loop, nor carries a label.
 4. Delete the declaration of `name` (with the blank line after it; a type line left with
    no name under it goes too). Replace the run and the call by a compound statement at
    the run's indentation: `{`, then `const Name name = { e1, e2, ... };` as FI step 4
    writes it (the values in declaration order, wrapped at 79 columns), a blank line, the
-   call unchanged but indented two more columns, and `}`.
+   call unchanged but indented two more columns, and `}`. A call that is an `if`'s
+   condition (step 3) takes the whole `if` statement, its body included, with it.
+   The body may leave through `return`, `break` or `continue`: leaving the compound
+   statement ends the struct's lifetime, which nothing reads after the call.
 5. Inside a `#pragma omp parallel` body the compound statement stays where the run stood,
    in the body: each thread initialises its own (FI step 5). No `#pragma` or
    preprocessor line lies inside the run or the call, and none moves.
@@ -11255,3 +11278,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | N | Step 2: an array the block names only as an argument of calls (contents written, if at all, only through calls that keep no copy: Recipe E step 4's array clause) may be one of the group, as a member of the pointer type it converts to (`char *`, or `const char *` when only read), filled `name.a=a;`; Recipes Y, Z, LB and CT, which take N's input struct, read it the same way | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Back and Reset releases and its list update copy between the `static` `glob_pattern` and the local `back_pattern`, `reset_pattern` and `reply` arrays; with each array a parameter the helpers take five to seven, and N's step 3 (the variable's exact type) refused an array member | owner |
 | 2026-11-11 | AMEND | W | Step 8: in a `void` caller the block's exits are `return;`; the helper returns `MagickFalse` there and the caller writes `if (Helper(...) == MagickFalse) return;`; a local written only on the returning paths goes by value (step 3 unchanged) | `opencl.c`'s `LoadOpenCLDevices` (campaign A, W17 lane c, wide build): the `clEnv->contexts` allocation releases `devices` and `platforms` and leaves through `return;` on failure; W step 1 asked for `return(R);`, which a `void` function cannot write. Probe: the function leaves *Large Method*, 5.43 to 5.47 | owner |
 | 2026-11-11 | AMEND | D | *A case tail, a returned local, a split selection*: forms (b), *Unreached functions* and *Object code that differs only in the caller* may reuse a Recipe CT helper for a case tail (lost `break;`s are its `return;`s, the call before the case's `break;`, CT's `const` targets initialiser binding each member to `&v` by position), a helper that returns a local of its own (`v=Helper(...);`, `v` passed to no parameter, written by the block before any read), and an existing one-`switch` helper as SD's new function for the last groups of a `switch` with no `default:`; `tools/reuse_check.py` checks each | `widget.c`'s `XColorBrowserWidget` (campaign A, W17 lane a): its list press is `SelectFontBrowserEntry`'s body as a case tail, its reply cursor search is `FindListBrowserCursor`'s body returning the helper's own `i`, and its key slider's Prior, Next and End groups are `MoveFontBrowserSliderByPage`'s `switch`; without the forms each would be a new near-copy of an existing helper (the key slider moved whole by Recipe E measured cc 13, a *Complex Method*) | owner |
+| 2026-11-11 | AMEND | FB | Steps 3 and 4: the one call may be the whole condition of an `if` with no `else`, compared with a constant, whose body does not name the struct (`if (F(...,&name,...) == MagickFalse) return(...);`); the whole `if` statement moves into the compound statement, its body leaving through `return`, `break` or `continue` as before. Still seven steps | `layer.c`'s `OptimizeLayerFrames` (campaign A, W17 lane d): its `choice` fill (four members) stands directly before `if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse) return(...)`, which step 3 refused as not an expression statement. The step frees the two lines that Recipe B's `entry` declaration for `IsBetterFrameBounds` adds, so the function's *Large Method* count does not grow; object code IDENTICAL | owner |
+| 2026-11-11 | AMEND | O | *Use when*: the block may also be a straight run of assignments setting several locals together. Step 7 (new): five or six written variables, or fewer whose pointers would give five or more arguments, pass by one `const` struct of addresses declared at the top of the caller (Recipe Z step 7's form), bound to `T *const v` locals, `(*v)` at every use. Seven steps | `feature-texture.c`'s `GetImageFeatures` (campaign A, W17 lane d): its six buffer allocations (`cooccurrence`, `density_x`, `density_xy`, `density_y`, `Q`, `sum`, reading `number_grays`) lie outside every OpenMP region and write six locals; E step 4 refuses them, Q and K need a function with no OpenMP region, Z needs a selection, I and V an exit. Probe: 7.60 to 7.63, no new finding | owner |

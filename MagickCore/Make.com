@@ -90,6 +90,7 @@ $call Make image.c
 $call Make image-filename.c
 $call Make image-view.c
 $call Make layer.c
+$call Make layer-composite.c
 $call Make layer-merge.c
 $call Make list.c
 $call Make locale.c
