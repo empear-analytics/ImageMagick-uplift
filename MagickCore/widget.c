@@ -2468,6 +2468,9 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             static Time
               click_time;
 
+            ListBrowserClick
+              click;
+
             /*
               Move text cursor to position of button press.
             */
@@ -2476,20 +2479,12 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
               if (XTextWidth(font_info,reply_info.marker,i) > x)
                 break;
             reply_info.cursor=reply_info.marker+i-1;
-            if (event.xbutton.time > (click_time+(unsigned long) DoubleClick))
-              reply_info.highlight=MagickFalse;
-            else
-              {
-                /*
-                  Become the XA_PRIMARY selection owner.
-                */
-                (void) CopyMagickString(primary_selection,reply_info.text,
-                  MagickPathExtent);
-                (void) XSetSelectionOwner(display,XA_PRIMARY,windows->widget.id,
-                  event.xbutton.time);
-                reply_info.highlight=XGetSelectionOwner(display,XA_PRIMARY) ==
-                  windows->widget.id ? MagickTrue : MagickFalse;
-              }
+            click.display=display;
+            click.window_info=(&windows->widget);
+            click.event=event;
+            click.click_time=click_time;
+            reply_info=HighlightListBrowserReply(&click,primary_selection,
+              reply_info);
             XDrawMatteText(display,&windows->widget,&reply_info);
             click_time=event.xbutton.time;
             break;
