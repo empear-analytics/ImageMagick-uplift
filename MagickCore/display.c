@@ -12213,6 +12213,56 @@ static void XROIButtonPress(const CropEventInput *event_input,
   XCropButtonRelease(event_input,crop_info);
 }
 
+typedef struct _ROIApplyInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const XEvent
+    *event;
+
+  const char
+    *const *ApplyMenu;
+} ROIApplyInput;
+
+static void XROIButtonRelease(const ROIApplyInput *apply_input,
+  const ROITargets *targets)
+{
+  Display
+    *const display = apply_input->display;
+
+  XWindows
+    *const windows = apply_input->windows;
+
+  const XEvent
+    *const event = apply_input->event;
+
+  const char
+    *const *const ApplyMenu = apply_input->ApplyMenu;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    User has committed to region of interest rectangle.
+  */
+  (*roi_info).x=(ssize_t) windows->image.x+(*event).xbutton.x;
+  (*roi_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
+  XSetCursorState(display,windows,MagickFalse);
+  (*state)|=ExitState;
+  if (LocaleCompare(windows->command.name,"Apply") == 0)
+    return;
+  (void) CloneString(&windows->command.name,"Apply");
+  windows->command.data=ApplyMenus;
+  (void) XCommandWidget(display,windows,ApplyMenu,(XEvent *) NULL);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12669,18 +12719,14 @@ static MagickBooleanType XROIImage(Display *display,
         }
         case ButtonRelease:
         {
-          /*
-            User has committed to region of interest rectangle.
-          */
-          roi_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-          roi_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-          XSetCursorState(display,windows,MagickFalse);
-          state|=ExitState;
-          if (LocaleCompare(windows->command.name,"Apply") == 0)
-            break;
-          (void) CloneString(&windows->command.name,"Apply");
-          windows->command.data=ApplyMenus;
-          (void) XCommandWidget(display,windows,ApplyMenu,(XEvent *) NULL);
+          ROIApplyInput
+            apply_input;
+
+          apply_input.display=display;
+          apply_input.windows=windows;
+          apply_input.event=(&event);
+          apply_input.ApplyMenu=ApplyMenu;
+          XROIButtonRelease(&apply_input,&targets);
           break;
         }
         case Expose:
