@@ -3610,6 +3610,67 @@ static MagickBooleanType XColorDirectPixels(
   return(MagickTrue);
 }
 
+static MagickBooleanType XColorEditPixels(
+  const ColorEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  const PaintMethod
+    method = pixel_input->method;
+
+  const XColor
+    color = pixel_input->color;
+
+  switch (method)
+  {
+    default:
+    {
+      if (XColorDirectPixels(pixel_input) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+    case ReplaceMethod:
+    {
+      PixelInfo
+        target;
+
+      XReplaceColorInput
+        replace;
+
+      /*
+        Update color information using replace algorithm.
+      */
+      (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
+        x_offset,(ssize_t) y_offset,&target,exception);
+      replace.image=image;
+      replace.image_view=image_view;
+      replace.target=target;
+      replace.color=color;
+      replace.exception=exception;
+      XReplaceImageColor(&replace);
+      break;
+    }
+    case FloodfillMethod:
+    case FillToBorderMethod:
+    {
+      XColorFloodfill(pixel_input);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 typedef struct _ColorBorderTargets
 {
   XColor
@@ -4123,42 +4184,8 @@ static MagickBooleanType XColorEditImage(Display *display,
         pixel_input.color=color;
         pixel_input.border_color=border_color;
         pixel_input.pen_id=pen_id;
-        switch (method)
-        {
-          default:
-          {
-            if (XColorDirectPixels(&pixel_input) == MagickFalse)
-              return(MagickFalse);
-            break;
-          }
-          case ReplaceMethod:
-          {
-            PixelInfo
-              target;
-
-            XReplaceColorInput
-              replace;
-
-            /*
-              Update color information using replace algorithm.
-            */
-            (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
-              x_offset,(ssize_t) y_offset,&target,exception);
-            replace.image=image;
-            replace.image_view=image_view;
-            replace.target=target;
-            replace.color=color;
-            replace.exception=exception;
-            XReplaceImageColor(&replace);
-            break;
-          }
-          case FloodfillMethod:
-          case FillToBorderMethod:
-          {
-            XColorFloodfill(&pixel_input);
-            break;
-          }
-        }
+        if (XColorEditPixels(&pixel_input) == MagickFalse)
+          return(MagickFalse);
         image_view=DestroyCacheView(image_view);
         state&=(~0x0080U);
       }
