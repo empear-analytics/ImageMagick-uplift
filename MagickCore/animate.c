@@ -2090,6 +2090,37 @@ static void XAdvanceSceneForward(const AnimationSceneStep *scene_step,
     XWrapSceneForward(scene_step,targets);
 }
 
+static void XAdvanceScene(const AnimationSceneStep *scene_step,
+  const AnimationSceneTargets *targets)
+{
+  const ssize_t
+    first_scene = scene_step->first_scene;
+
+  ssize_t
+    *const scene = targets->scene;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  if ((*state) & ForwardAnimationState)
+    {
+      /*
+        Forward animation:  increment scene number.
+      */
+      XAdvanceSceneForward(scene_step,targets);
+    }
+  else
+    {
+      /*
+        Reverse animation:  decrement scene number.
+      */
+      if ((*scene) > first_scene)
+        (*scene)--;
+      else
+        XWrapSceneReverse(scene_step,targets);
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2905,31 +2936,10 @@ MagickExport Image *XAnimateImages(Display *display,
         delay=1000*image->delay/(size_t) MagickMax(image->ticks_per_second,
           1L);
         XDelay(display,resource_info->delay*(delay == 0 ? 10 : delay));
-        if (state & ForwardAnimationState)
-          {
-            /*
-              Forward animation:  increment scene number.
-            */
-            scene_step.number_scenes=number_scenes;
-            scene_step.image_list=image_list;
-            scene_step.first_scene=first_scene;
-            XAdvanceSceneForward(&scene_step,&scene_targets);
-          }
-        else
-          {
-            /*
-              Reverse animation:  decrement scene number.
-            */
-            if (scene > first_scene)
-              scene--;
-            else
-              {
-                scene_step.number_scenes=number_scenes;
-                scene_step.image_list=image_list;
-                scene_step.first_scene=first_scene;
-                XWrapSceneReverse(&scene_step,&scene_targets);
-              }
-          }
+        scene_step.number_scenes=number_scenes;
+        scene_step.image_list=image_list;
+        scene_step.first_scene=first_scene;
+        XAdvanceScene(&scene_step,&scene_targets);
         scene=MagickMax(scene,0);
         image=image_list[scene];
         if ((image != (Image *) NULL) && (image->start_loop != 0))
