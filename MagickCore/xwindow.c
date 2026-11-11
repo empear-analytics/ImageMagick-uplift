@@ -7787,6 +7787,45 @@ static void XPackRedHigh32BitMSB(const XImageRowSource *source,
   }
 }
 
+static void XPackBlueHigh32BitMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 32 bit continuous-tone X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    if (IsGammaCorrected() != MagickFalse)
+      {
+        /*
+          Gamma correct canvas.
+        */
+        q=XPackGammaABGRRowMSB(canvas,p,q);
+        continue;
+      }
+    q=XPackABGRRowMSB(canvas,p,q);
+  }
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7988,27 +8027,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
             XPackRedHigh32BitMSB(&row_source,q);
           else
             if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
-              {
-                /*
-                  Convert to 32 bit continuous-tone X canvas.
-                */
-                for (y=0; y < (int) canvas->rows; y++)
-                {
-                  p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-                    canvas->columns,1,exception);
-                  if (p == (const Quantum *) NULL)
-                    break;
-                  if (IsGammaCorrected() != MagickFalse)
-                    {
-                      /*
-                        Gamma correct canvas.
-                      */
-                      q=XPackGammaABGRRowMSB(canvas,p,q);
-                      continue;
-                    }
-                  q=XPackABGRRowMSB(canvas,p,q);
-                }
-              }
+              XPackBlueHigh32BitMSB(&row_source,q);
             else
               {
                 unsigned int
