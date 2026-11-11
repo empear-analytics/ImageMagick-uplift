@@ -3110,6 +3110,80 @@ static void XHandleUnmapNotify(const AnimateEventContext *event_context,
   XUnmapPanelWindows(display,windows,event);
 }
 
+static void XHandleMapNotify(const AnimateEventContext *event_context,
+  const XEvent event,const AnimateCommandTargets *targets)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  Image
+    **const image = targets->image;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  Image
+    **const nexus = targets->nexus;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),"Map Notify: 0x%lx",
+      event.xmap.window);
+  if (event.xmap.window == windows->backdrop.id)
+    {
+      (void) XSetInputFocus(display,event.xmap.window,RevertToParent,
+        CurrentTime);
+      windows->backdrop.mapped=MagickTrue;
+      return;
+    }
+  if (event.xmap.window == windows->image.id)
+    {
+      AnimateImageWindow
+        image_window;
+
+      image_window.display=display;
+      image_window.resource_info=resource_info;
+      image_window.windows=windows;
+      image_window.map_info=event_context->map_info;
+      image_window.image_list=event_context->image_list;
+      image_window.display_image=event_context->display_image;
+      image_window.exception=event_context->exception;
+      XMapAnimateImageWindow(&image_window,nexus,image,state);
+      return;
+    }
+  if (event.xmap.window == windows->info.id)
+    {
+      windows->info.mapped=MagickTrue;
+      return;
+    }
+  if (event.xmap.window == windows->icon.id)
+    {
+      /*
+        Create an icon image.
+      */
+      XMakeStandardColormap(display,event_context->icon_visual,
+        event_context->icon_resources,event_context->display_image,
+        event_context->icon_map,event_context->icon_pixel,
+        event_context->exception);
+      (void) XMakeImage(display,event_context->icon_resources,&windows->icon,
+        event_context->display_image,windows->icon.width,windows->icon.height,
+        event_context->exception);
+      (void) XSetWindowBackgroundPixmap(display,windows->icon.id,
+        windows->icon.pixmap);
+      (void) XClearWindow(display,windows->icon.id);
+      (void) XWithdrawWindow(display,windows->info.id,
+        windows->info.screen);
+      windows->icon.mapped=MagickTrue;
+      return;
+    }
+  XMapPanelWindows(windows,event);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4156,55 +4230,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case MapNotify:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),"Map Notify: 0x%lx",
-            event.xmap.window);
-        if (event.xmap.window == windows->backdrop.id)
-          {
-            (void) XSetInputFocus(display,event.xmap.window,RevertToParent,
-              CurrentTime);
-            windows->backdrop.mapped=MagickTrue;
-            break;
-          }
-        if (event.xmap.window == windows->image.id)
-          {
-            AnimateImageWindow
-              image_window;
-
-            image_window.display=display;
-            image_window.resource_info=resource_info;
-            image_window.windows=windows;
-            image_window.map_info=map_info;
-            image_window.image_list=image_list;
-            image_window.display_image=display_image;
-            image_window.exception=exception;
-            XMapAnimateImageWindow(&image_window,&nexus,&image,&state);
-            break;
-          }
-        if (event.xmap.window == windows->info.id)
-          {
-            windows->info.mapped=MagickTrue;
-            break;
-          }
-        if (event.xmap.window == windows->icon.id)
-          {
-            /*
-              Create an icon image.
-            */
-            XMakeStandardColormap(display,icon_visual,icon_resources,
-              display_image,icon_map,icon_pixel,exception);
-            (void) XMakeImage(display,icon_resources,&windows->icon,
-              display_image,windows->icon.width,windows->icon.height,
-              exception);
-            (void) XSetWindowBackgroundPixmap(display,windows->icon.id,
-              windows->icon.pixmap);
-            (void) XClearWindow(display,windows->icon.id);
-            (void) XWithdrawWindow(display,windows->info.id,
-              windows->info.screen);
-            windows->icon.mapped=MagickTrue;
-            break;
-          }
-        XMapPanelWindows(windows,event);
+        XHandleMapNotify(&event_context,event,&command_targets);
         break;
       }
       case MappingNotify:
