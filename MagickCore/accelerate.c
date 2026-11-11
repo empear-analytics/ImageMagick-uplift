@@ -2634,6 +2634,79 @@ MagickPrivate MagickBooleanType AccelerateGrayscaleImage(Image* image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _LocalContrastLaunchInfo
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_kernel
+    blurRowKernel;
+
+  const Image
+    *image;
+
+  unsigned int
+    passes;
+} LocalContrastLaunchInfo;
+
+static MagickBooleanType LaunchLocalContrastBlurRow(
+  const LocalContrastLaunchInfo *info,ExceptionInfo *exception)
+{
+  const Image
+    *const image = info->image;
+
+  const MagickCLDevice
+    device = info->device;
+
+  const MagickCLEnv
+    clEnv = info->clEnv;
+
+  const cl_command_queue
+    queue = info->queue;
+
+  const cl_kernel
+    blurRowKernel = info->blurRowKernel;
+
+  const unsigned int
+    passes = info->passes;
+
+  cl_event
+    event;
+
+  cl_int
+    clStatus;
+
+  int x;
+  for (x = 0; x < (int) passes; ++x) {
+    size_t gsize[2];
+    size_t wsize[2];
+    size_t goffset[2];
+
+    gsize[0] = 256;
+    gsize[1] = (image->rows + passes - 1) / passes;
+    wsize[0] = 256;
+    wsize[1] = 1;
+    goffset[0] = 0;
+    goffset[1] = x * gsize[1];
+
+    clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, blurRowKernel, 2, goffset, gsize, wsize, 0, NULL, &event);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+      return(MagickFalse);
+    }
+    clEnv->library->clFlush(queue);
+    RecordProfileData(device,blurRowKernel,event);
+  }
+  return(MagickTrue);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -2835,28 +2908,11 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
 
     /* launch the kernel */
     {
-      int x;
-      for (x = 0; x < (int) passes; ++x) {
-        size_t gsize[2];
-        size_t wsize[2];
-        size_t goffset[2];
+      const LocalContrastLaunchInfo
+        info = { clEnv, device, queue, blurRowKernel, image, passes };
 
-        gsize[0] = 256;
-        gsize[1] = (image->rows + passes - 1) / passes;
-        wsize[0] = 256;
-        wsize[1] = 1;
-        goffset[0] = 0;
-        goffset[1] = x * gsize[1];
-
-        clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, blurRowKernel, 2, goffset, gsize, wsize, 0, NULL, &event);
-        if (clStatus != CL_SUCCESS)
-        {
-          (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-          goto cleanup;
-        }
-        clEnv->library->clFlush(queue);
-        RecordProfileData(device,blurRowKernel,event);
-      }
+      if (LaunchLocalContrastBlurRow(&info,exception) == MagickFalse)
+        goto cleanup;
     }
 
     {
