@@ -8665,6 +8665,15 @@ way clones the first.
    expression, a `for` clause, an initialiser or a whole argument, with no declaration and
    no unbalanced parenthesis or brace. A run that differs only in the function called is
    Recipe CF's; others need this recipe.
+   Copies in a function with no OpenMP parallel region (2026-11-11) may also differ by a
+   statement that stands in one copy only: one expression statement, or a run of them,
+   between two statements both copies hold, with no declaration and no `continue`,
+   `break`, `return` or `goto`. They may hold an orphaned `#pragma omp atomic`
+   construct (Recipe RP step 1's form), the same text at the same position in both,
+   which moves whole and unchanged (Recipe N step 1's last form). And each may be the
+   head of a sequential loop's body, the statements after the body's declarations up to
+   a tail both copies hold and keep (Recipe PC step 1's shape outside a parallel
+   region), every `continue;` in it continuing that loop.
 2. The selector. Write `typedef enum { NameA, NameB } NameSide;` directly above the new
    function, one constant per copy, named for what that copy does (`BlackStretchLevel`,
    `WhiteStretchLevel`).
@@ -8687,13 +8696,26 @@ way clones the first.
    member's name and type, a struct-valued member copied as E step 3 copies it. Its body
    is a copy's text with every differing pair
    written `((side == NameA) ? runA : runB)`, each run verbatim, nothing else changed.
+   A statement in one copy only (step 1) is written `if (side == NameB) S`, a run of
+   them in braces, `NameB` the constant of the copy that holds it. A differing pair
+   that is the selector constants themselves, each copy's own (in the initialiser of a
+   struct the copy passes on), is written `side`. A loop head (step 1) moves to a
+   function returning `MagickBooleanType` in Recipe PC step 3's form: each `continue;`
+   becomes `return(MagickFalse);`, the function ends with `return(MagickTrue);`,
+   `status` is written `(*status)`, and the copy becomes `if (Name(...) ==
+   MagickFalse) continue;` before the tail.
 5. Replace each copy by a call that passes its own enumeration constant (directly, or in
    the initialiser of the `const` struct declared at the top of the block that holds the
    call), never a variable or a computed value, and each variable in the position of its
    parameter. A copy that was a function's whole body becomes that call, and the function
    keeps its name and parameters for its own callers.
 6. Both copies move in one commit (rule 1). When a copy runs per pixel or per channel,
-   time it as Recipe CF step 7 says (a slowdown over 3% stops the step).
+   time it as Recipe CF step 7 says (a slowdown over 3% stops the step). When that
+   slowdown comes from the new function staying out of line, called per pixel from two
+   places, and the blocks that hold the two calls are themselves copies under this
+   recipe (the loops around them), both pairs merge in one commit, the inner function
+   above the outer, which then calls it once; the commit's timing is the step's, and
+   the message names both pairs and the timing of the inner pair alone.
 7. Check by script that folding every `((side == C) ? a : b)` of the new function to the
    run of the copy's constant `C` gives exactly that copy's token sequence (after the
    renaming of step 1 and with the struct's bindings removed), and by reading that every
@@ -8844,6 +8866,16 @@ static ssize_t FindStretchBlackLevel(const Image *image,
   O's argument); the role's address in the selector struct is the copy's own
   variable's, so each copy's writes land where they landed before.
 
+- Step 1's sequential forms (2026-11-11). A statement in one copy only runs under
+  `if (side == NameB)` exactly where, and only when, it ran in that copy; the test
+  reads a `const` local and has no side effect, and the other copy's calls run nothing
+  in its place. An orphaned `#pragma omp atomic` in a function with no parallel region
+  binds to no region and shares nothing, so moving the construct whole changes no
+  thread's view (Recipe RP *Careful*). A loop head returns `MagickFalse` exactly
+  where the copy continued, so the caller's `continue;` skips the same tail (Recipe PC
+  *Careful*, which holds a fortiori with one thread). Step 6's nested pair changes no
+  text beyond what each pair's own step writes.
+
 **Evidence level:** oracle (each copy reached by a case), with `refactor_guard.py
 --calls`, steps 1 and 7 checked by script, step 3 by reading, and step 6's timing when a
 copy runs per pixel.
@@ -8860,7 +8892,17 @@ its kernel walks: the Erode/Dilate walks as one helper with a `?:` on the callee
 cc 9 *Complex Method* (W16 lane b's probe), with the callee as a designator cc 8; the
 ErodeIntensity/DilateIntensity walks write `quantum_pixels`, `pixel` and their own
 extremum. Probes: 3.16 to 3.22 and 3.28, no finding on a new function, no indirect call
-in the object, timing within 1%.
+in the object, timing within 1%. Step 1's sequential forms, the one-copy statement, the
+selector pair and the loop head of step 4, and step 6's nested pair (2026-11-11, W17
+lane d) from `morphology.c`'s `MorphologyPrimitiveDirect`, whose forward and reverse
+passes (sequential: two views of one image) differ in the loops' direction, two fetch
+arguments and the reverse pass's two pointer moves to the row's end, and hold the
+orphaned progress atomic. The merged channel function, called per channel from both
+pixel loops, stayed out of line (Voronoi median +4.1% to +5.9%) until the pixel loops
+merged too (-3.4%). Probes: 4.82 to 5.27 (the nested pair), 5.35 (the heads), 5.60 (the
+passes), the file's stub ceiling for the function; no finding on a new function, no
+*Code Duplication*. Added by Claude Code (Claude Opus 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
 
 ---
 
@@ -11040,3 +11082,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | I | Step 8: the macro left in the caller may also be one of MagickCore's own throw macros (`ThrowImageException`, `ThrowBinaryException`), whose expansion is a `ThrowMagickException` with `GetMagickModule()` and `return(c);` of one constant; `GetMagickModule()` keeps naming the caller, and a variable the expansion reads that the block writes (`image`) is a written variable of step 2 | `montage.c`'s `MontageImageList` (campaign A, W17 lane d): its tile loop leaves through `ThrowImageException` when `CloneImage` fails; E step 6 would move the throw into a helper of another return type (the macro returns `(Image *) NULL`) and change the module it names; with the macro left in the caller the loop moves under I with `image`, `progress_monitor` and `tiles` as targets | owner |
 | 2026-11-11 | AMEND | FI | Step 2: a value may also be a member read through a parameter of the function declared pointer-to-`const` (`p->m`, `p->m.n`): no side effect, and the run writes only the struct local, whose address nothing holds before the call | `montage.c`'s `PlaceMontageTile` (campaign A, W17 lane d): its `tile_info` (15 members), `extent` and `frame` fills copy members of `const MontageTilePlacement *placement`; with `gravity_info` (Recipe FB) they free the 18 lines `MontageImageList`'s next-page step needs under *Lines of Code in a Single File*: a probe of the four plus that step, 9.03 to 9.11, `IDENTICAL` object code for the fills | owner |
 | 2026-11-11 | AMEND | FB | Step 2: the same member reads as FI step 2 (as amended the same day) | Same session: `PlaceMontageTile`'s `gravity_info`, declared at the top and filled after `image` is reassigned, from six members of `placement` and `image` | owner |
+| 2026-11-11 | AMEND | MT | Steps 1, 4 and 6: copies in a function with no parallel region may differ by a statement in one copy only (written `if (side == NameB) S`), may hold an orphaned `#pragma omp atomic` construct moving whole, and may be sequential loop heads (moved in Recipe PC step 3's form); a pair of selector constants is written `side`; a nested pair (copies whose enclosing loops are copies too) merges in one commit when the inner function alone stays out of line and slows the step | `morphology.c`'s `MorphologyPrimitiveDirect` (campaign A, W17 lane d): the forward and reverse passes; the merged channel function alone timed +4.1% to +5.9% on Voronoi, with the pixel loops merged -3.4%; probes 4.82 to 5.27, 5.35 and 5.60 | owner |
