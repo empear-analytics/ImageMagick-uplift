@@ -4778,6 +4778,94 @@ static OffsetInfo GetDirectKernelOffset(const MorphologyMethod method,
   return(offset);
 }
 
+typedef struct _MorphologyDirectScan
+{
+  MorphologyMethod
+    method;
+
+  OffsetInfo
+    offset;
+} MorphologyDirectScan;
+
+static double ForwardDirectChannelValue(const MorphologyDirectScan *scan,
+  const MorphologyDirectPixel *input,const Quantum *magick_restrict pixels,
+  double pixel)
+{
+  Image
+    *const image = input->image;
+
+  const KernelInfo
+    *const kernel = input->kernel;
+
+  Quantum
+    *const q = input->q;
+
+  const ssize_t
+    x = input->x,
+    i = input->i;
+
+  const MorphologyMethod
+    method = scan->method;
+
+  const OffsetInfo
+    offset = scan->offset;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  MorphologyDirectPixel
+    row;
+
+  MorphologyKernelRows
+    rows;
+
+  ssize_t
+    v;
+
+  switch (method)
+  {
+    case DistanceMorphology:
+    {
+      k=(&kernel->values[kernel->width*kernel->height-1]);
+      for (v=0; v <= offset.y; v++)
+      {
+        rows.image=image;
+        rows.kernel=kernel;
+        rows.i=i;
+        MinimizeKernelRowDistance(&rows,&pixel,&k,&pixels);
+      }
+      row.image=image;
+      row.kernel=kernel;
+      row.q=q;
+      row.x=x;
+      row.i=i;
+      pixel=MinimizeLeadingRowDistance(&row,offset,pixel);
+      break;
+    }
+    case VoronoiMorphology:
+    {
+      k=(&kernel->values[kernel->width*kernel->height-1]);
+      for (v=0; v < offset.y; v++)
+      {
+        rows.image=image;
+        rows.kernel=kernel;
+        rows.i=i;
+        MinimizeKernelRowDistance(&rows,&pixel,&k,&pixels);
+      }
+      row.image=image;
+      row.kernel=kernel;
+      row.q=q;
+      row.x=x;
+      row.i=i;
+      pixel=MinimizeLeadingRowDistance(&row,offset,pixel);
+      break;
+    }
+    default:
+      break;
+  }
+  return(pixel);
+}
+
 static ssize_t MorphologyPrimitiveDirect(Image *image,
   const MorphologyMethod method,const KernelInfo *kernel,
   ExceptionInfo *exception)
@@ -4820,6 +4908,9 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
   width=image->columns+kernel->width-1;
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    const MorphologyDirectScan
+      scan = { method, offset };
+
     const Quantum
       *magick_restrict p;
 
@@ -4855,6 +4946,9 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
 
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
+        const MorphologyDirectPixel
+          input = { image, kernel, q, x, i };
+
         double
           pixel;
 
@@ -4864,20 +4958,8 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
         PixelTrait
           traits;
 
-        const MagickRealType
-          *magick_restrict k;
-
         const Quantum
           *magick_restrict pixels;
-
-        MorphologyDirectPixel
-          row;
-
-        MorphologyKernelRows
-          rows;
-
-        ssize_t
-          v;
 
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
@@ -4887,47 +4969,7 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
           continue;
         pixels=p;
         pixel=(double) QuantumRange;
-        switch (method)
-        {
-          case DistanceMorphology:
-          {
-            k=(&kernel->values[kernel->width*kernel->height-1]);
-            for (v=0; v <= offset.y; v++)
-            {
-              rows.image=image;
-              rows.kernel=kernel;
-              rows.i=i;
-              MinimizeKernelRowDistance(&rows,&pixel,&k,&pixels);
-            }
-            row.image=image;
-            row.kernel=kernel;
-            row.q=q;
-            row.x=x;
-            row.i=i;
-            pixel=MinimizeLeadingRowDistance(&row,offset,pixel);
-            break;
-          }
-          case VoronoiMorphology:
-          {
-            k=(&kernel->values[kernel->width*kernel->height-1]);
-            for (v=0; v < offset.y; v++)
-            {
-              rows.image=image;
-              rows.kernel=kernel;
-              rows.i=i;
-              MinimizeKernelRowDistance(&rows,&pixel,&k,&pixels);
-            }
-            row.image=image;
-            row.kernel=kernel;
-            row.q=q;
-            row.x=x;
-            row.i=i;
-            pixel=MinimizeLeadingRowDistance(&row,offset,pixel);
-            break;
-          }
-          default:
-            break;
-        }
+        pixel=ForwardDirectChannelValue(&scan,&input,pixels,pixel);
         if (fabs(pixel-(double) q[i]) > MagickEpsilon)
           changed++;
         q[i]=ClampToQuantum(pixel);
