@@ -1649,6 +1649,16 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
 2. List the variables the block only reads. Choose a group of them that are scalars or
    pointers, none written anywhere in the block, so the new function keeps at most four
    parameters: the struct and what the block writes through (a pixel buffer, say).
+   An array of the caller (a local, or a function-local `static` no statement
+   writes) that the block uses only as `v[e]` read, or passes whole to a callee's
+   pointer parameter, never under `sizeof` or `&` or in any other expression, may be
+   one of the group (2026-11-11): its member is a pointer to its element type, the
+   element's qualifiers kept (`const char *const CommandMenu[]` gives `const char
+   *const *CommandMenu`), filled `name.v=v;` and bound or written as step 4 says.
+   The array's name in the fill converts to the address of its first element, as it
+   did at each use (C11 6.3.2.1p3), and `v[e]` is `*(v+e)` through either (Recipe
+   AR's argument): each subscript reads the same element and each callee receives the
+   same address.
    A plain struct value (a `PixelInfo`, `PointInfo` or `RectangleInfo` local or
    parameter; not an array, an array of structs, or a pointer's target) may be one of
    the group when, checked by reading: (a) every member of it is set on every path to
@@ -10895,3 +10905,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | N | *Unreached functions: B and N*, item 3 (as amended earlier today): `sibling_fill_check.py`'s move check may also list a declarator of the caller that leaves because nothing left in the caller names the variable (Recipe E step 4; `-Wunused-variable` would fail CI otherwise), named in the commit message | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W17 lane b): with its continuous-tone multi-byte column loop moved, nothing in the caller reads `pixel`, and the check lists the `pixel,` declarator that left | owner |
 | 2026-11-11 | AMEND | B, N, I | *Unreached functions: B and N*, item 4: `tools/obj_modulo.sh` leaves the trailing run of alignment padding after each function's last instruction (the nop family, `int3`) out of the comparison; padding inside a function stays compared. The tool change is a commit of its own | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W17 lane b): its blue-high branch moved to an out-of-line N helper, and the only difference in the 64 other functions was one `nopw` added after `XDitherImage`'s last instruction (the next function's boundary moved). A planted loop-bound change in `XDitherImage` is still reported `DIFFERENT` | owner |
 | 2026-11-11 | AMEND | Z | Step 7: the `const` targets struct also serves two to four written variables when one pointer per variable would bring step 6's call to five or more arguments, Recipe Q step 8's condition; the step and its argument are unchanged (each member is the address of the variable of its name, bound once, written `(*v)`) | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its play step advances `scene`, `iterations`, `state` and `pause` together while reading `number_scenes`, `image_list` and `first_scene`; the input struct and four pointers would be five arguments, which step 6 refuses, though the same block writing a fifth variable would pass | owner |
+| 2026-11-11 | AMEND | N | Step 2: an array of the caller (a local, or a function-local `static` nothing writes) that the block only subscripts or passes whole to a pointer parameter may be a member, of pointer-to-element type with the element's qualifiers, filled `name.v=v;`; the name converts to the address of its first element at the fill as at each use (C11 6.3.2.1p3), Recipe AR's argument for a read-only array | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its Image-window button branch and its command-menu block read the menu tables `CommandMenu`, `Menus` and `Commands` (local and `static const` arrays) with the window state; N's *Careful* kept arrays out of the struct only because they are not values a copy can take | owner |
