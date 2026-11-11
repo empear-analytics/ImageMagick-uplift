@@ -5760,6 +5760,18 @@ static void ReportCompoundDifference(const MagickBooleanType verbose,
       MagickMorphologyOptions, method) );
 }
 
+static size_t GetMorphologyKernelLimit(const Image *image,
+  const ssize_t iterations)
+{
+  size_t
+    kernel_limit;
+
+  kernel_limit = (size_t) iterations;
+  if ( iterations < 0 )  /* negative interactions = infinite (well almost) */
+     kernel_limit = image->columns>image->rows ? image->columns : image->rows;
+  return(kernel_limit);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -5817,9 +5829,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   if ( iterations == 0 )
     return((Image *) NULL);   /* null operation - nothing to do! */
 
-  kernel_limit = (size_t) iterations;
-  if ( iterations < 0 )  /* negative interactions = infinite (well almost) */
-     kernel_limit = image->columns>image->rows ? image->columns : image->rows;
+  kernel_limit=GetMorphologyKernelLimit(image,iterations);
 
   verbose = IsStringTrue(GetImageArtifact(image,"debug"));
 
