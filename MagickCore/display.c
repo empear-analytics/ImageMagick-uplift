@@ -3435,6 +3435,9 @@ static void
   XSelectFuzzFactor(const EditMenuInput *,const char *const *,char *,
     Image **);
 
+static void
+  XDiscardMagnifyKeys(Display *,XWindows *,XEvent *);
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3756,14 +3759,7 @@ static MagickBooleanType XColorEditImage(Display *display,
         KeySym
           key_symbol;
 
-        if (event.xkey.window == windows->magnify.id)
-          {
-            Window
-              window;
-
-            window=windows->magnify.id;
-            while (XCheckWindowEvent(display,window,KeyPressMask,&event)) ;
-          }
+        XDiscardMagnifyKeys(display,windows,&event);
         if (event.xkey.window != windows->image.id)
           break;
         /*
