@@ -4303,6 +4303,40 @@ static void XInitializeWindowColors(const WindowInfo *window_info,
     XInitializeDirectColors(window_info,id,number_colors,colors);
 }
 
+static void XImportTrueColorRows(const XDirectRowSource *source)
+{
+  Image
+    *const composite_image = source->composite_image;
+
+  CacheView
+    *const composite_view = source->composite_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  int
+    y;
+
+  Quantum
+    *magick_restrict q;
+
+  Status
+    status;
+
+  for (y=0; y < (int) composite_image->rows; y++)
+  {
+    q=QueueCacheViewAuthenticPixels(composite_view,0,(ssize_t) y,
+      composite_image->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    XImportTrueColorPixels(source,y,q);
+    status=SyncCacheViewAuthenticPixels(composite_view,exception)
+      == MagickFalse ? 0 : 1;
+    if (status == MagickFalse)
+      break;
+  }
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4485,17 +4519,11 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
         *composite_image,
         *image;
 
-      int
-        y;
-
       MagickBooleanType
         import;
 
       int
         j;
-
-      Quantum
-        *magick_restrict q;
 
       unsigned int
         number_colors;
@@ -4662,18 +4690,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
                 (window_info[id].visual->klass == DirectColor))
               XImportDirectColorRows(&direct_source);
             else
-              for (y=0; y < (int) composite_image->rows; y++)
-              {
-                q=QueueCacheViewAuthenticPixels(composite_view,0,(ssize_t) y,
-                  composite_image->columns,1,exception);
-                if (q == (Quantum *) NULL)
-                  break;
-                XImportTrueColorPixels(&direct_source,y,q);
-                status=SyncCacheViewAuthenticPixels(composite_view,exception)
-                  == MagickFalse ? 0 : 1;
-                if (status == MagickFalse)
-                  break;
-              }
+              XImportTrueColorRows(&direct_source);
             break;
           }
           case PseudoClass:
