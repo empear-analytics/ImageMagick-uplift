@@ -5752,22 +5752,10 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
                 slider_info.id++;
                 break;
               }
-              case XK_Prior:
-              case XK_KP_Prior:
+              default:
               {
-                slider_info.id-=(int) visible_files;
-                break;
-              }
-              case XK_Next:
-              case XK_KP_Next:
-              {
-                slider_info.id+=(int) visible_files;
-                break;
-              }
-              case XK_End:
-              case XK_KP_End:
-              {
-                slider_info.id=(int) files;
+                MoveFontBrowserSliderByPage(key_symbol,visible_files,
+                  (int) files,&slider_info);
                 break;
               }
             }
