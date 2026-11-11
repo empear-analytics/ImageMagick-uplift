@@ -201,6 +201,11 @@ def main(argv):
                           if l.strip() not in TRIVIAL)
     outside = Counter(added)
     outside.subtract(whole_lines)
+    # the typedefs' own lines (an `int` member, say) are added text of the step, not an
+    # alignment of the diff: they must not cancel a removed line of the block
+    outside.subtract(Counter(l.strip() for l in
+                             (targets_typedef + "\n" + input_typedef).splitlines()
+                             if l.strip() not in TRIVIAL))
     removed_c = Counter(removed)
     for line in list(removed_c):
         same = min(removed_c[line], max(outside[line], 0))
