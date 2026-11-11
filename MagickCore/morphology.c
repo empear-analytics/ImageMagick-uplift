@@ -5096,6 +5096,37 @@ static inline MagickBooleanType MorphologyDirectScanRow(
   return(MagickTrue);
 }
 
+static inline MagickOffsetType MorphologyDirectPass(
+  const MorphologyDirectScan *scan,MagickOffsetType progress,size_t *changed,
+  MagickBooleanType *status)
+{
+  const DirectScanSide
+    side = scan->side;
+
+  Image
+    *const image = scan->image;
+
+  ssize_t
+    y;
+
+  for (y=((side == ForwardDirectScan) ? 0 : (ssize_t) image->rows-1);
+       ((side == ForwardDirectScan) ? y < (ssize_t) image->rows : y >= 0);
+       ((side == ForwardDirectScan) ? y++ : y--))
+  {
+    if (MorphologyDirectScanRow(scan,y,changed,status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ReportMorphologyProgress(image,progress,2*image->rows,status);
+      }
+  }
+  return(progress);
+}
+
 static ssize_t MorphologyPrimitiveDirect(Image *image,
   const MorphologyMethod method,const KernelInfo *kernel,
   ExceptionInfo *exception)
@@ -5116,9 +5147,6 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
   size_t
     width,
     changed;
-
-  ssize_t
-    y;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -5141,27 +5169,15 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
       scan = { ForwardDirectScan, image, method, kernel, offset, image_view,
         morphology_view, width, exception };
 
-    for (y=0; y < (ssize_t) image->rows; y++)
-    {
-      /*
-        Read virtual pixels, and authentic pixels, from the same image!  We read
-        using virtual to get virtual pixel handling, but write back into the same
-        image.
+    /*
+      Read virtual pixels, and authentic pixels, from the same image!  We read
+      using virtual to get virtual pixel handling, but write back into the same
+      image.
 
-        Only top half of kernel is processed as we do a single pass downward
-        through the image iterating the distance function as we go.
-      */
-      if (MorphologyDirectScanRow(&scan,y,&changed,&status) == MagickFalse)
-        continue;
-      if (image->progress_monitor != (MagickProgressMonitor) NULL)
-        {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-          #pragma omp atomic
-#endif
-          progress++;
-          ReportMorphologyProgress(image,progress,2*image->rows,&status);
-        }
-    }
+      Only top half of kernel is processed as we do a single pass downward
+      through the image iterating the distance function as we go.
+    */
+    progress=MorphologyDirectPass(&scan,progress,&changed,&status);
   }
   morphology_view=DestroyCacheView(morphology_view);
   image_view=DestroyCacheView(image_view);
@@ -5175,26 +5191,14 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
       scan = { ReverseDirectScan, image, method, kernel, offset, image_view,
         morphology_view, width, exception };
 
-    for (y=(ssize_t) image->rows-1; y >= 0; y--)
-    {
-      /*
-         Read virtual pixels, and authentic pixels, from the same image.  We
-         read using virtual to get virtual pixel handling, but write back
-         into the same image.
+    /*
+       Read virtual pixels, and authentic pixels, from the same image.  We
+       read using virtual to get virtual pixel handling, but write back
+       into the same image.
 
-         Only the bottom half of the kernel is processed as we up the image.
-      */
-      if (MorphologyDirectScanRow(&scan,y,&changed,&status) == MagickFalse)
-        continue;
-      if (image->progress_monitor != (MagickProgressMonitor) NULL)
-        {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-          #pragma omp atomic
-#endif
-          progress++;
-          ReportMorphologyProgress(image,progress,2*image->rows,&status);
-        }
-    }
+       Only the bottom half of the kernel is processed as we up the image.
+    */
+    progress=MorphologyDirectPass(&scan,progress,&changed,&status);
   }
   morphology_view=DestroyCacheView(morphology_view);
   image_view=DestroyCacheView(image_view);
