@@ -15,30 +15,42 @@ FILE's include block. Register NEW with tools/register_source.py.
 
 Also moved: a forward declaration of a moved static, and a typedef struct elsewhere
 in FILE that only the family uses. --copy-macro NAME (repeatable) defines a one-line
-`#define NAME "literal"` of the kept part again in NEW (Recipe S step 2).
+`#define NAME "literal"` of the kept part again in NEW (Recipe S step 2). A file-scope
+`static const` table between the moved functions moves with them, and a one-line
+`#define` of the original that only the family uses moves to NEW (step 2 as amended
+2026-11-11), each refused when the kept part names it; a two-line forward declaration
+of a moved static at the top of FILE moves to NEW. A trailing run of conditional lines
+in FILE's include block that holds every macro the block defines (a delegate's headers)
+is left out of NEW's copy when the family names none of those macros. A file-level
+`#if defined(...)` ... `#else` ... `#endif` block that holds whole functions of the family
+(a delegate's code and its stub of the same public function) moves whole, its directives
+included, when its `#endif` follows the family's last function; a function defined in both
+branches calls what either definition calls (owner, 2026-11-11).
 """
 import collections, glob, os, re, sys
+
+def banner_art(f):
+    """The five letter rows of the banner at the head of F, padded to one width, or []."""
+    head = open(f, errors="replace").read().split("\n")[:20]
+    rows = [l[1:-1] for l in head if re.fullmatch(r"%.{77}%", l) and l.strip("% ")]
+    art = [r for r in rows if re.fullmatch(r"[A-Z ]+", r)]
+    width = max([len(r) for r in art] + [0])
+    return [r.ljust(width) for r in art] if len(art) == 5 else []
+
+def letter_spans(art):
+    """The (start, end) columns of each letter that the rows ART draw, blank columns between."""
+    mask = "".join("x" if "".join(column).strip() else " " for column in zip(*art))
+    return [m.span() for m in re.finditer(r"x+", mask)]
 
 def harvest_glyphs():
     """The 5-row banner letters, as the MagickCore file headers draw them."""
     g = collections.defaultdict(collections.Counter)
     for f in glob.glob("MagickCore/*.c"):
-        H = open(f, errors="replace").read().split("\n")[:20]
-        rows = [l[1:-1] for l in H if l.startswith("%") and l.endswith("%") and len(l) == 79 and l.strip("% ")]
-        art = [r for r in rows if re.fullmatch(r"[A-Z ]+", r)]
-        if len(art) != 5: continue
+        art = banner_art(f)
         word = re.sub(r"[^A-Z]", "", f.split("/")[-1][:-2].upper())
-        w = max(len(r) for r in art); art = [r.ljust(w) for r in art]
-        blank = [all(r[c] == " " for r in art) for c in range(w)]
-        segs = []; c = 0
-        while c < w:
-            if blank[c]: c += 1; continue
-            d = c
-            while d < w and not blank[d]: d += 1
-            segs.append((c, d)); c = d
-        if len(segs) != len(word): continue
-        for ch, (a, b) in zip(word, segs):
-            g[ch][tuple(r[a:b] for r in art)] += 1
+        segs = letter_spans(art)
+        if art and len(segs) == len(word):
+            for ch, (a, b) in zip(word, segs): g[ch][tuple(r[a:b] for r in art)] += 1
     return {ch: list(c.most_common(1)[0][0]) for ch, c in g.items()}
 
 def conditional_start(L, end):
@@ -68,6 +80,44 @@ def typedef_names(L, starts):
         while not re.match(r"^} \w+;$", L[n]): n += 1
         names.append(L[n][2:-1])
     return names
+
+def static_table(L, n):
+    """(last line, name) of a file-scope `static const` table declared from L[n], else None."""
+    if not re.match(r"^static const\b[^(]*$", L[n]): return None
+    e = next(k for k in range(n, len(L)) if re.match(r"^[^{]*;\s*$|^\s*\};\s*$", L[k]))
+    decl = " ".join(x.strip() for x in L[n:e + 1]).split("=")[0].strip()
+    return e, re.findall(r"(\w+)\s*(?:\[[^\]]*\])?$", decl)[0]
+
+def family_only_define(lines, name):
+    """The one-line `#define NAME ...` of LINES when no other line of LINES names NAME, else None."""
+    named = [l for l in lines if re.search(r"\b%s\b" % name, l)]
+    one_line = [l for l in named if re.match(r"^#define\s+%s\b.*[^\\\s]\s*$" % name, l)]
+    return named[0] if named == one_line[:1] else None
+
+def drop_empty_banner(lines, banner):
+    """Remove a `/* banner */` comment block of LINES that has nothing but blank lines under it."""
+    text = re.sub(r"(?m)^/\*\n  %s\n\*/\n[\n\f]*(?=/\*)" % re.escape(banner), "", "\n".join(lines), count=1)
+    lines[:] = text.split("\n")
+
+def take_forward_declarations(lines, statics):
+    """Remove from LINES the two-line forward declarations `static T` / `  Name(...);` of STATICS; return them."""
+    text = "\n".join(lines)
+    found = re.findall(r"(?m)^(static [\w \*]+\n  (\w+)\(.*\);)\n", text)
+    taken = [decl for decl, name in found if name in statics]
+    for decl in taken: text = text.replace(decl + "\n", "", 1)
+    lines[:] = text.split("\n")
+    return taken
+
+def relocate_declarations(lines, statics, macros):
+    """Take the forward declarations of STATICS out of LINES, and the banners the moves leave empty."""
+    if macros: drop_empty_banner(lines, "Define declarations.")
+    forward = take_forward_declarations(lines, statics)
+    if forward: drop_empty_banner(lines, "Forward declarations.")
+    return forward
+
+def declaration_block(title, items, sep="\n"):
+    """A `/* title */` block of ITEMS for the new file's head, or nothing when ITEMS is empty."""
+    return "/*\n  %s\n*/\n" % title + sep.join(items) + "\n\n" if items else ""
 
 def brace_delta(line):
     """Opening minus closing braces on LINE, outside string and character literals and comments."""
@@ -107,7 +157,9 @@ while i < len(L):
     i += 1
 names = {d[0] for d in defs}
 # a name that only a comment mentions ("Contrast limited ...") is not a call
-body = {d[0]: re.sub(r"/\*.*?\*/", "", "\n".join(L[d[1]:d[2] + 1]), flags=re.S) for d in defs}
+# a function defined once in each branch of an #if/#else (a delegate's code and its stub) calls what either one calls
+body = collections.defaultdict(str)
+for d in defs: body[d[0]] += re.sub(r"/\*.*?\*/", "", "\n".join(L[d[1]:d[2] + 1]), flags=re.S) + "\n"
 calls = {n: {x for x in names if x != n and re.search(r"\b%s\b" % re.escape(x), body[n])} for n in names}
 static = {d[0] for d in defs if d[3]}
 reach = set(roots); st = list(roots)
@@ -130,7 +182,7 @@ for k in idx:
     if runs and k == runs[-1][-1] + 1: runs[-1].append(k)
     else: runs.append([k])
 spans = [(d[1], d[2]) for d in order if d[0] in moved]
-cuts = []; typedefs = []
+cuts = []; typedefs = []; tables = []
 for run in runs:
     first, last = order[run[0]], order[run[-1]]
     # start: the comment directly above the first function
@@ -154,7 +206,7 @@ for run in runs:
         if u is None: break
         a = u
     b = last[2] + 1
-    incomment = False; intype = False; bad = []; depth = 0; inner = []; inproto = False
+    incomment = False; intype = False; bad = []; depth = 0; inner = []; inproto = False; table_end = -1
     for n in range(a, b):
         if any(s <= n <= e for s, e in spans): continue
         t = L[n].strip()
@@ -165,6 +217,10 @@ for run in runs:
             inproto = not t.endswith(";"); continue
         if intype:
             intype = not re.match(r"^} \w+;$", L[n]); continue
+        if n <= table_end: continue
+        table = static_table(L, n)
+        if table:
+            table_end = table[0]; tables.append(table[1]); continue
         if re.match(r"^typedef struct( _\w+)?$", L[n]):
             intype = True; inner.append(n); continue
         if t.startswith("#define") or (n > 0 and L[n - 1].rstrip().endswith("\\")):
@@ -178,6 +234,8 @@ for run in runs:
         if re.match(r"#\s*(else|elif)\b", t) and depth > 0: continue
         if re.match(r"#\s*endif\b", t) and depth > 0: depth -= 1; continue
         if t: bad.append((n + 1, t))
+    # a file-level #if opened in the region whose #endif follows its last function moves whole, #endif included
+    while depth and b < len(L) and re.match(r"#\s*endif\b", L[b].strip()): depth -= 1; b += 1
     if depth: bad.append(("unbalanced conditional", depth))
     typedefs.extend(typedef_names(L, inner))
     if bad: sys.exit("refused: top-level code in the region: %s" % bad[:5])
@@ -191,17 +249,21 @@ for a, b in reversed(cuts):
     while 1 < a < len(rest_lines) and rest_lines[a - 1] == "" and rest_lines[a] == "" and rest_lines[a - 2] == "":
         del rest_lines[a]
 rest = "\n".join(rest_lines)
-for tname in typedefs:
-    if re.search(r"\b%s\b" % tname, rest): sys.exit("refused: type %s moves with the region but the kept part uses it" % tname)
+for tname in typedefs + tables:
+    if re.search(r"\b%s\b" % tname, rest): sys.exit("refused: %s moves with the region but the kept part uses it" % tname)
 defined = lambda text: set(re.findall(r"^\s*#\s*define\s+(\w+)", text, re.M))
-macro_lines = []
+macro_lines = []; moved_macros = []
 for mname in defined(rest):
     if not re.search(r"\b%s\b" % mname, region): continue
     dl = [l for l in rest_lines if re.match(r"^#define\s+%s\b" % mname, l)]
     if mname in copy_macros and len(dl) == 1 and re.fullmatch(r'#define\s+%s\s+"[^"\\]*"' % mname, dl[0]) \
         and not re.search(r"^\s*#\s*define\s+%s\b" % mname, region, re.M):
         macro_lines.append(dl[0]); continue
-    sys.exit("refused: macro %s used in the region" % mname)
+    only = family_only_define(rest_lines, mname)
+    if only is None: sys.exit("refused: macro %s used in the region" % mname)
+    moved_macros.append(only); rest_lines.remove(only)
+forward = relocate_declarations(rest_lines, moved & static, moved_macros)
+rest = "\n".join(rest_lines)
 for mname in defined(region):
     if re.search(r"\b%s\b" % mname, rest): sys.exit("refused: macro %s used outside" % mname)
 # a typedef elsewhere in the original that only the region uses moves with it
@@ -233,6 +295,11 @@ for k, line in enumerate(rest_lines):
     e = k
     while e < len(rest_lines) and ";" not in rest_lines[e] and "=" not in rest_lines[e]: e += 1
     decl = " ".join(rest_lines[k:e + 1]).split("=")[0]
+    if rest_lines[k + 1:k + 2] == ["{"]:
+        # `static struct` / `{` members `}` declarator: the variable is named after the closing brace
+        e = next(x for x in range(k, len(rest_lines)) if rest_lines[x].startswith("}"))
+        decl = rest_lines[e][1:].split("=")[0]
+    elif "(" in decl: continue  # a forward declaration of functions (`static double` / `  I0(double x),`)
     for vname in re.findall(r"(\w+)\s*(?:\[[^\]]*\])?\s*(?:,|;|$)", decl.strip()):
         if re.search(r"\b%s\b" % vname, region): sys.exit("refused: file-scope variable %s defined outside the region and used in it" % vname)
 # a non-static function the region calls must be declared in a header
@@ -267,12 +334,30 @@ inc_b = max(k for k in range(len(L)) if L[k].startswith("#include") and k < firs
 # carry a trailing #endif etc. that closes a conditional include
 while L[inc_b + 1].startswith("#"): inc_b += 1
 if defined("\n".join(L[inc_a:inc_b + 1])):
-    sys.exit("refused: the include block defines macros %s; both files would define them" % sorted(defined("\n".join(L[inc_a:inc_b + 1]))))
-extra = ""
-if moved_types:
-    extra += "/*\n  Typedef declarations.\n*/\n" + "\n\n".join(moved_types) + "\n\n"
-if macro_lines:
-    extra += "/*\n  Define declarations.\n*/\n" + "\n".join(macro_lines) + "\n\n"
+    # a trailing run of conditional lines (a delegate's headers and its macros) that only the kept part needs is
+    # left out of the new file's include block (Recipe S step 2, 2026-11-11): every #define of the block stands in
+    # that run, the run is preprocessor lines only and balanced, and the region names none of its macros
+    last = inc_a; depth = 0
+    for k in range(inc_a, inc_b + 1):
+        w = L[k].strip()
+        if re.match(r"#\s*(if|ifdef|ifndef)\b", w): depth += 1
+        elif re.match(r"#\s*endif\b", w): depth -= 1
+        elif depth == 0 and w.startswith("#include"): last = k
+    tail = L[last + 1:inc_b + 1]
+    tail_macros = defined("\n".join(tail))
+    code = re.sub(r'"(?:\\.|[^"\\])*"', '""', re.sub(r"/\*.*?\*/", "", region, flags=re.S))
+    named = sorted(m for m in tail_macros if re.search(r"\b%s\b" % m, code))
+    tail_ok = all(t.strip().startswith("#") for t in tail if t.strip()) and \
+        not defined("\n".join(L[inc_a:last + 1])) and not named
+    if not tail_ok:
+        sys.exit("refused: the include block defines macros %s; both files would define them%s" %
+            (sorted(defined("\n".join(L[inc_a:inc_b + 1]))), " (the region names %s)" % named if named else ""))
+    print("include block: the conditional lines %d-%d (macros %s) stay in the original only" %
+        (last + 2, inc_b + 1, sorted(tail_macros)))
+    inc_b = last
+extra = declaration_block("Typedef declarations.", moved_types, "\n\n") + \
+    declaration_block("Define declarations.", moved_macros + macro_lines) + \
+    declaration_block("Forward declarations.", forward)
 text = "\n".join(hdr) + "\n\n" + "\n".join(L[inc_a:inc_b + 1]) + "\n\n" + extra + region + "\n"
 dst_new = os.path.join(out, os.path.basename(new)) if out else new
 dst_old = os.path.join(out, os.path.basename(path)) if out else path

@@ -27,6 +27,11 @@ Recipe CT gives:
     the same multiset, indentation and a declarator's trailing `,` or `;` aside, the
     bindings and their type lines apart. Lines the diff shows as removed and added
     unchanged outside HELPER (an alignment of the diff, not a change) cancel out;
+  - a temporary (Recipe CT step 2, Recipe E step 4): a declaration in HELPER, a type
+    line and `name;`, that no removed line accounts for is accepted when the removed
+    lines use the name and the caller still declares it under the same type line
+    (the caller keeps its declaration because it uses the name elsewhere, as a loop
+    counter); whether the block writes it before reading it is checked by reading;
   - nothing else is added: every other added line outside HELPER's body belongs to a
     typedef, HELPER's signature, the targets declaration, LOCAL's declaration, its fill
     or the call.
@@ -156,6 +161,69 @@ def canonical(line, names):
     return line.rstrip(",;")
 
 
+def caller_body(text, helper, whole):
+    """The body of the function that calls HELPER (the text outside HELPER's definition,
+    from the `{` that opens the enclosing function to its closing `}`)."""
+    outside = text.replace(whole, "")
+    call = re.search(r"^\s+" + re.escape(helper) + r"\(", outside, re.M)
+    if not call:
+        return ""
+    start = outside.rfind("\n{\n", 0, call.start())
+    return outside[start:outside.find("\n}\n", call.start())]
+
+
+def declaration_pairs(moved):
+    """(name, type line) of each declaration `type` / `name;` among HELPER's lines."""
+    pairs = []
+    for k in range(1, len(moved)):
+        m = re.fullmatch(r"(\w+);", moved[k])
+        if m and not re.search(r"[=;(,]", moved[k - 1]):
+            pairs.append((m.group(1), moved[k - 1]))
+    return pairs
+
+
+def declares(body, name, type_line):
+    """Whether BODY declares NAME under TYPE_LINE (alone or in a list of names)."""
+    pattern = (r"^\s*" + re.escape(type_line) + r"\s*\n(?:\s*[^;\n]*,\s*\n)*\s*" + name +
+               r"\s*[,;]")
+    return re.search(pattern, body, re.M) is not None
+
+
+def uses(lines, name):
+    return any(re.search(r"(?<![\w.>])" + name + r"\b", line) for line in lines)
+
+
+def kept_temporaries(caller, moved, removed, extra):
+    """Recipe CT step 2's temporaries whose caller declaration stays: a declaration in
+    the helper (a type line, then `name;`) that the removed lines do not account for,
+    of a name the removed lines use, which the caller still declares with the same
+    type line (kept because the caller uses the name elsewhere). Returns
+    [(name, type line)]. Whether the block writes the name before it reads it, and the
+    caller does not read the value afterwards, is checked by reading (Recipe E step
+    4)."""
+    found = []
+    for name, type_line in declaration_pairs(moved):
+        if min(extra[name], extra[type_line]) <= 0:
+            continue
+        if uses(removed, name) and declares(caller, name, type_line):
+            found.append((name, type_line))
+    return found
+
+
+def unexplained(extra, temporaries, helper):
+    """The problems left by HELPER's lines the removed lines do not account for."""
+    for name, type_line in temporaries:
+        extra[name] -= 1
+        extra[type_line] -= 1
+    return [f"in {helper} but not removed ({n}x): {line}"
+            for line, n in extra.items() if n > 0]
+
+
+def temporaries_note(temporaries, helper):
+    return "".join(f"; temporary {name} ({type_line}) declared in {helper}, its "
+                   f"declaration kept in the caller" for name, type_line in temporaries)
+
+
 def diff_lines(path):
     diff = subprocess.run(["git", "diff", "-U0", "HEAD", "--", path],
                           capture_output=True, text=True, check=True).stdout
@@ -201,6 +269,11 @@ def main(argv):
                           if l.strip() not in TRIVIAL)
     outside = Counter(added)
     outside.subtract(whole_lines)
+    # the typedefs' own lines (an `int` member, say) are added text of the step, not an
+    # alignment of the diff: they must not cancel a removed line of the block
+    outside.subtract(Counter(l.strip() for l in
+                             (targets_typedef + "\n" + input_typedef).splitlines()
+                             if l.strip() not in TRIVIAL))
     removed_c = Counter(removed)
     for line in list(removed_c):
         same = min(removed_c[line], max(outside[line], 0))
@@ -213,8 +286,9 @@ def main(argv):
     have = Counter(canonical(b, bound_t) for b in moved)
     for line, n in (want - have).items():
         problems.append(f"removed but not moved ({n}x): {line}")
-    for line, n in (have - want).items():
-        problems.append(f"in {helper} but not removed ({n}x): {line}")
+    extra = have - want
+    temporaries = kept_temporaries(caller_body(text, helper, whole), moved, removed, extra)
+    problems += unexplained(extra, temporaries, helper)
     # what else was added outside the helper
     allowed = {l.strip() for l in (targets_typedef + "\n" + input_typedef).splitlines()}
     allowed |= {s for s in (input_type, local and local + ";") if s}
@@ -237,6 +311,7 @@ def main(argv):
     print(f"OK {targets_type}: binds {', '.join(bound_t)}"
           + (f"; {input_type}: {len(input_names)} members, fill and bindings by name"
              if input_type else "")
+          + temporaries_note(temporaries, helper)
           + "; rewrite and position checked")
     return 0
 

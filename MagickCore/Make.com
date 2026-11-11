@@ -31,6 +31,7 @@ $call Make attribute.c
 $call Make attribute-hull.c
 $call Make attribute-bounds.c
 $call Make attribute-depth.c
+$call Make attribute-depth-measure.c
 $call Make blob.c
 $call Make cache.c
 $call Make cache-view.c
@@ -44,9 +45,11 @@ $call Make color.c
 $call Make color-equivalent.c
 $call Make colormap.c
 $call Make colorspace.c
+$call Make colorspace-transform.c
 $call Make colorspace-convert.c
 $call Make colorspace-generic-rgb.c
 $call Make compare.c
+$call Make compare-similarity.c
 $call Make composite.c
 $call Make compress.c
 $call Make configure.c
@@ -63,6 +66,7 @@ $call Make distort-resize.c
 $call Make distribute-cache.c
 $call Make draw.c
 $call Make effect.c
+$call Make effect-filter.c
 $call Make effect-preview.c
 $call Make effect-blur.c
 $call Make enhance.c
@@ -73,6 +77,7 @@ $call Make exception.c
 $call Make feature.c
 $call Make feature-texture.c
 $call Make fourier.c
+$call Make fourier-complex.c
 $call Make fx.c
 $call Make gem.c
 $call Make geometry.c
@@ -85,6 +90,7 @@ $call Make image.c
 $call Make image-filename.c
 $call Make image-view.c
 $call Make layer.c
+$call Make layer-composite.c
 $call Make layer-merge.c
 $call Make list.c
 $call Make locale.c
@@ -122,6 +128,7 @@ $call Make random.c
 $call Make registry.c
 $call Make resample.c
 $call Make resize.c
+$call Make resize-rescale.c
 $call Make resize-sample.c
 $call Make resize-scale.c
 $call Make resize-image.c
