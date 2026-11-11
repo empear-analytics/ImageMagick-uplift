@@ -2566,10 +2566,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             if ((event.xbutton.window == windows->widget.id) &&
                 (MatteIsActive(action_info,event.xbutton)))
               {
-                if (*reply_info.text == '\0')
-                  (void) XBell(display,0);
-                else
-                  state|=ExitState;
+                state=ConfirmListBrowserReply(display,reply_info,state);
               }
             action_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&action_info);
