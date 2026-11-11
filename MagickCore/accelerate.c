@@ -856,6 +856,13 @@ static cl_uint FindStretchWhiteBin(const Image *image,
   return(i);
 }
 
+static MagickBooleanType StretchesRedChannel(const Image *image,
+  const cl_float4 black,const cl_float4 white)
+{
+  return((((image->channel_mask & RedChannel) != 0) &&
+    (black.x != white.x)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const double black_point,const double white_point,
   ExceptionInfo *exception)
@@ -1165,8 +1172,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
        */
     for (i=0; i < (cl_uint) image->colors; i++)
     {
-      if (((image->channel_mask & RedChannel) != 0) &&
-          (black.x != white.x))
+      if (StretchesRedChannel(image,black,white) != MagickFalse)
         image->colormap[i].red=stretch_map[
           ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
       if (((image->channel_mask & GreenChannel) != 0) &&
