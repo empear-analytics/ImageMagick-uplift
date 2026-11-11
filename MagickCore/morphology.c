@@ -4929,16 +4929,11 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,MorphologyTag,progress,2*image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportMorphologyProgress(image,progress,2*image->rows,&status);
       }
   }
   morphology_view=DestroyCacheView(morphology_view);
@@ -5061,16 +5056,11 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,MorphologyTag,progress,2*image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportMorphologyProgress(image,progress,2*image->rows,&status);
       }
   }
   morphology_view=DestroyCacheView(morphology_view);
