@@ -368,116 +368,343 @@ MagickExport MagickBooleanType AnimateImages(const ImageInfo *image_info,
 %
 %
 */
-static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
-  XWindows *windows,const AnimateCommand animate_command,Image **image,
-  MagickStatusType *state,ExceptionInfo *exception)
+static void XConfirmAnimateExit(Display *display,
+  XResourceInfo *resource_info,XWindows *windows)
 {
-  Image
-    *nexus;
+  int
+    status;
 
-  MagickBooleanType
-    proceed;
+  /*
+    Confirm program exit.
+  */
+  status=XConfirmWidget(display,windows,"Do you really want to exit",
+    resource_info->client_name);
+  if (status != 0)
+    XClientMessage(display,windows->image.id,windows->im_protocols,
+      windows->im_exit,CurrentTime);
+}
+
+static void XRemoteBrowseDocumentation(Display *display,XWindows *windows,
+  Window mozilla_window)
+{
+  Atom
+    mozilla_atom;
+
+  char
+    command[MagickPathExtent];
+
+  /*
+    Display documentation using Netscape remote control.
+  */
+  (void) FormatLocaleString(command,MagickPathExtent,
+    "openurl(%s,new-tab)",MagickAuthoritativeURL);
+  mozilla_atom=XInternAtom(display,"_MOZILLA_COMMAND",MagickFalse);
+  (void) XChangeProperty(display,mozilla_window,mozilla_atom,
+    XA_STRING,8,PropModeReplace,(unsigned char *) command,
+    (int) strlen(command));
+  XSetCursorState(display,windows,MagickFalse);
+}
+
+typedef struct _AnimateCommandTile
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  MagickStatusType
+    *state;
+
+  ExceptionInfo
+    *exception;
+} AnimateCommandTile;
+
+static void XVersionQuitCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  switch (animate_command)
+  {
+    case VersionCommand:
+    {
+      XNoticeWidget(display,windows,GetMagickVersion((size_t *) NULL),
+        GetMagickCopyright());
+      break;
+    }
+    case QuitCommand:
+    {
+      /*
+        exit program
+      */
+      if (resource_info->confirm_exit == MagickFalse)
+        XClientMessage(display,windows->image.id,windows->im_protocols,
+          windows->im_exit,CurrentTime);
+      else
+        XConfirmAnimateExit(display,resource_info,windows);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void XInfoHelpCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  Image
+    **const image = tile->image;
+
+  ExceptionInfo
+    *const exception = tile->exception;
 
   MagickStatusType
     status;
 
+  switch (animate_command)
+  {
+    case InfoCommand:
+    {
+      XDisplayImageInfo(display,resource_info,windows,(Image *) NULL,*image,
+        exception);
+      break;
+    }
+    case HelpCommand:
+    {
+      /*
+        User requested help.
+      */
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Animate",AnimateHelp);
+      break;
+    }
+    case BrowseDocumentationCommand:
+    {
+      Atom
+        mozilla_atom;
+
+      Window
+        mozilla_window,
+        root_window;
+
+      /*
+        Browse the ImageMagick documentation.
+      */
+      root_window=XRootWindow(display,XDefaultScreen(display));
+      mozilla_atom=XInternAtom(display,"_MOZILLA_VERSION",MagickFalse);
+      mozilla_window=XWindowByProperty(display,root_window,mozilla_atom);
+      if (mozilla_window != (Window) NULL)
+        {
+          XRemoteBrowseDocumentation(display,windows,mozilla_window);
+          break;
+        }
+      XSetCursorState(display,windows,MagickTrue);
+      XCheckRefreshWindows(display,windows);
+      status=InvokeDelegate(resource_info->image_info,*image,"browse",
+        (char *) NULL,exception);
+      if (status == MagickFalse)
+        XNoticeWidget(display,windows,"Unable to browse documentation",
+          (char *) NULL);
+      XDelay(display,1500);
+      XSetCursorState(display,windows,MagickFalse);
+      break;
+    }
+    default:
+    {
+      XVersionQuitCommand(tile,animate_command);
+      break;
+    }
+  }
+}
+
+static void XSpeedDirectionCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  MagickStatusType
+    *const state = tile->state;
+
+  switch (animate_command)
+  {
+    case SlowerCommand:
+    {
+      resource_info->delay++;
+      break;
+    }
+    case FasterCommand:
+    {
+      if (resource_info->delay == 0)
+        break;
+      resource_info->delay--;
+      break;
+    }
+    case ForwardCommand:
+    {
+      *state=ForwardAnimationState;
+      *state&=(~AutoReverseAnimationState);
+      break;
+    }
+    case ReverseCommand:
+    {
+      *state&=(~ForwardAnimationState);
+      *state&=(~AutoReverseAnimationState);
+      break;
+    }
+    default:
+    {
+      XInfoHelpCommand(tile,animate_command);
+      break;
+    }
+  }
+}
+
+static void XRepeatSaveCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  Image
+    **const image = tile->image;
+
+  MagickStatusType
+    *const state = tile->state;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  MagickStatusType
+    status;
+
+  switch (animate_command)
+  {
+    case RepeatCommand:
+    {
+      *state|=RepeatAnimationState;
+      *state&=(~AutoReverseAnimationState);
+      *state|=PlayAnimationState;
+      break;
+    }
+    case AutoReverseCommand:
+    {
+      *state|=AutoReverseAnimationState;
+      *state&=(~RepeatAnimationState);
+      *state|=PlayAnimationState;
+      break;
+    }
+    case SaveCommand:
+    {
+      /*
+        Save image.
+      */
+      status=XSaveImage(display,resource_info,windows,*image,exception);
+      if (status == MagickFalse)
+        {
+          char
+            message[MagickPathExtent];
+
+          (void) FormatLocaleString(message,MagickPathExtent,"%s:%s",
+            exception->reason != (char *) NULL ? exception->reason : "",
+            exception->description != (char *) NULL ? exception->description :
+            "");
+          XNoticeWidget(display,windows,"Unable to save file:",message);
+          break;
+        }
+      break;
+    }
+    default:
+    {
+      XSpeedDirectionCommand(tile,animate_command);
+      break;
+    }
+  }
+}
+
+static void XStepCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  MagickStatusType
+    *const state = tile->state;
+
+  switch (animate_command)
+  {
+    case StepCommand:
+    case StepBackwardCommand:
+    case StepForwardCommand:
+    {
+      *state|=StepAnimationState;
+      *state&=(~PlayAnimationState);
+      if (animate_command == StepBackwardCommand)
+        *state&=(~ForwardAnimationState);
+      if (animate_command == StepForwardCommand)
+        *state|=ForwardAnimationState;
+      break;
+    }
+    default:
+    {
+      XRepeatSaveCommand(tile,animate_command);
+      break;
+    }
+  }
+}
+
+static void XPlayCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  Image
+    **const image = tile->image;
+
+  MagickStatusType
+    *const state = tile->state;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
   XTextProperty
     window_name;
 
-  /*
-    Process user command.
-  */
-  nexus=NewImageList();
   switch (animate_command)
   {
-    case OpenCommand:
-    {
-      char
-        **filelist;
-
-      Image
-        *images,
-        *next;
-
-      ImageInfo
-        *read_info;
-
-      int
-        number_files;
-
-      int
-        i;
-
-      static char
-        filenames[MagickPathExtent] = "*";
-
-      if (resource_info->immutable != MagickFalse)
-        break;
-      /*
-        Request file name from user.
-      */
-      XFileBrowserWidget(display,windows,"Animate",filenames);
-      if (*filenames == '\0')
-        return((Image *) NULL);
-      /*
-        Expand the filenames.
-      */
-      filelist=(char **) AcquireMagickMemory(sizeof(char *));
-      if (filelist == (char **) NULL)
-        {
-          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-            filenames);
-          return((Image *) NULL);
-        }
-      number_files=1;
-      filelist[0]=filenames;
-      status=ExpandFilenames(&number_files,&filelist);
-      if ((status == MagickFalse) || (number_files == 0))
-        {
-          for (i=0; i < number_files; i++)
-            filelist[i]=DestroyString(filelist[i]);
-          filelist=(char **) RelinquishMagickMemory(filelist);
-          if (number_files == 0)
-            {
-              ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
-              return((Image *) NULL);
-            }
-          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-            filenames);
-          return((Image *) NULL);
-        }
-      read_info=CloneImageInfo(resource_info->image_info);
-      images=NewImageList();
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      for (i=0; i < number_files; i++)
-      {
-        (void) CopyMagickString(read_info->filename,filelist[i],MagickPathExtent);
-        filelist[i]=DestroyString(filelist[i]);
-        *read_info->magick='\0';
-        next=ReadImage(read_info,exception);
-        CatchException(exception);
-        if (next != (Image *) NULL)
-          AppendImageToList(&images,next);
-        if (number_files <= 5)
-          continue;
-        proceed=SetImageProgress(images,LoadImageTag,i,(MagickSizeType)
-          number_files);
-        if (proceed == MagickFalse)
-          break;
-      }
-      filelist=(char **) RelinquishMagickMemory(filelist);
-      read_info=DestroyImageInfo(read_info);
-      if (images == (Image *) NULL)
-        {
-          XSetCursorState(display,windows,MagickFalse);
-          ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
-          return((Image *) NULL);
-        }
-      nexus=GetFirstImageInList(images);
-      *state|=ExitState;
-      break;
-    }
     case PlayCommand:
     {
       char
@@ -513,166 +740,168 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       (void) XFree((void *) window_name.value);
       break;
     }
-    case StepCommand:
-    case StepBackwardCommand:
-    case StepForwardCommand:
+    default:
     {
-      *state|=StepAnimationState;
-      *state&=(~PlayAnimationState);
-      if (animate_command == StepBackwardCommand)
-        *state&=(~ForwardAnimationState);
-      if (animate_command == StepForwardCommand)
-        *state|=ForwardAnimationState;
+      XStepCommand(tile,animate_command);
       break;
     }
-    case RepeatCommand:
-    {
-      *state|=RepeatAnimationState;
-      *state&=(~AutoReverseAnimationState);
-      *state|=PlayAnimationState;
-      break;
-    }
-    case AutoReverseCommand:
-    {
-      *state|=AutoReverseAnimationState;
-      *state&=(~RepeatAnimationState);
-      *state|=PlayAnimationState;
-      break;
-    }
-    case SaveCommand:
-    {
-      /*
-        Save image.
-      */
-      status=XSaveImage(display,resource_info,windows,*image,exception);
-      if (status == MagickFalse)
-        {
-          char
-            message[MagickPathExtent];
+  }
+}
 
-          (void) FormatLocaleString(message,MagickPathExtent,"%s:%s",
-            exception->reason != (char *) NULL ? exception->reason : "",
-            exception->description != (char *) NULL ? exception->description :
-            "");
-          XNoticeWidget(display,windows,"Unable to save file:",message);
-          break;
-        }
+static Image *XReadImageFileList(const AnimateCommandTile *tile,
+  char **filelist,const int number_files)
+{
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  Image
+    *images,
+    *next;
+
+  ImageInfo
+    *read_info;
+
+  int
+    i;
+
+  MagickBooleanType
+    proceed;
+
+  read_info=CloneImageInfo(resource_info->image_info);
+  images=NewImageList();
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  for (i=0; i < number_files; i++)
+  {
+    (void) CopyMagickString(read_info->filename,filelist[i],MagickPathExtent);
+    filelist[i]=DestroyString(filelist[i]);
+    *read_info->magick='\0';
+    next=ReadImage(read_info,exception);
+    CatchException(exception);
+    if (next != (Image *) NULL)
+      AppendImageToList(&images,next);
+    if (number_files <= 5)
+      continue;
+    proceed=SetImageProgress(images,LoadImageTag,i,(MagickSizeType)
+      number_files);
+    if (proceed == MagickFalse)
       break;
-    }
-    case SlowerCommand:
+  }
+  filelist=(char **) RelinquishMagickMemory(filelist);
+  read_info=DestroyImageInfo(read_info);
+  return(images);
+}
+
+static void XDestroyFileList(char **filelist,const int number_files)
+{
+  int
+    i;
+
+  for (i=0; i < number_files; i++)
+    filelist[i]=DestroyString(filelist[i]);
+  filelist=(char **) RelinquishMagickMemory(filelist);
+}
+
+static void XDestroyFailedFileList(const MagickStatusType status,
+  char **filelist,const int number_files)
+{
+  if ((status == MagickFalse) || (number_files == 0))
     {
-      resource_info->delay++;
-      break;
+      XDestroyFileList(filelist,number_files);
     }
-    case FasterCommand:
+}
+
+static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
+  XWindows *windows,const AnimateCommand animate_command,Image **image,
+  MagickStatusType *state,ExceptionInfo *exception)
+{
+  Image
+    *nexus;
+
+  MagickStatusType
+    status;
+
+  const AnimateCommandTile
+    tile = { display, resource_info, windows, image, state, exception };
+
+  /*
+    Process user command.
+  */
+  nexus=NewImageList();
+  switch (animate_command)
+  {
+    case OpenCommand:
     {
-      if (resource_info->delay == 0)
+      char
+        **filelist;
+
+      Image
+        *images;
+
+      int
+        number_files;
+
+      static char
+        filenames[MagickPathExtent] = "*";
+
+      if (resource_info->immutable != MagickFalse)
         break;
-      resource_info->delay--;
-      break;
-    }
-    case ForwardCommand:
-    {
-      *state=ForwardAnimationState;
-      *state&=(~AutoReverseAnimationState);
-      break;
-    }
-    case ReverseCommand:
-    {
-      *state&=(~ForwardAnimationState);
-      *state&=(~AutoReverseAnimationState);
-      break;
-    }
-    case InfoCommand:
-    {
-      XDisplayImageInfo(display,resource_info,windows,(Image *) NULL,*image,
-        exception);
-      break;
-    }
-    case HelpCommand:
-    {
       /*
-        User requested help.
+        Request file name from user.
       */
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Animate",AnimateHelp);
-      break;
-    }
-    case BrowseDocumentationCommand:
-    {
-      Atom
-        mozilla_atom;
-
-      Window
-        mozilla_window,
-        root_window;
-
+      XFileBrowserWidget(display,windows,"Animate",filenames);
+      if (*filenames == '\0')
+        return((Image *) NULL);
       /*
-        Browse the ImageMagick documentation.
+        Expand the filenames.
       */
-      root_window=XRootWindow(display,XDefaultScreen(display));
-      mozilla_atom=XInternAtom(display,"_MOZILLA_VERSION",MagickFalse);
-      mozilla_window=XWindowByProperty(display,root_window,mozilla_atom);
-      if (mozilla_window != (Window) NULL)
+      filelist=(char **) AcquireMagickMemory(sizeof(char *));
+      if (filelist == (char **) NULL)
         {
-          char
-            command[MagickPathExtent];
-
-          /*
-            Display documentation using Netscape remote control.
-          */
-          (void) FormatLocaleString(command,MagickPathExtent,
-            "openurl(%s,new-tab)",MagickAuthoritativeURL);
-          mozilla_atom=XInternAtom(display,"_MOZILLA_COMMAND",MagickFalse);
-          (void) XChangeProperty(display,mozilla_window,mozilla_atom,
-            XA_STRING,8,PropModeReplace,(unsigned char *) command,
-            (int) strlen(command));
-          XSetCursorState(display,windows,MagickFalse);
-          break;
+          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+            filenames);
+          return((Image *) NULL);
         }
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      status=InvokeDelegate(resource_info->image_info,*image,"browse",
-        (char *) NULL,exception);
+      number_files=1;
+      filelist[0]=filenames;
+      status=ExpandFilenames(&number_files,&filelist);
+      XDestroyFailedFileList(status,filelist,number_files);
+      if (number_files == 0)
+        {
+          ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
+          return((Image *) NULL);
+        }
       if (status == MagickFalse)
-        XNoticeWidget(display,windows,"Unable to browse documentation",
-          (char *) NULL);
-      XDelay(display,1500);
-      XSetCursorState(display,windows,MagickFalse);
-      break;
-    }
-    case VersionCommand:
-    {
-      XNoticeWidget(display,windows,GetMagickVersion((size_t *) NULL),
-        GetMagickCopyright());
-      break;
-    }
-    case QuitCommand:
-    {
-      /*
-        exit program
-      */
-      if (resource_info->confirm_exit == MagickFalse)
-        XClientMessage(display,windows->image.id,windows->im_protocols,
-          windows->im_exit,CurrentTime);
-      else
         {
-          int
-            status;
-
-          /*
-            Confirm program exit.
-          */
-          status=XConfirmWidget(display,windows,"Do you really want to exit",
-            resource_info->client_name);
-          if (status != 0)
-            XClientMessage(display,windows->image.id,windows->im_protocols,
-              windows->im_exit,CurrentTime);
+          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+            filenames);
+          return((Image *) NULL);
         }
+      images=XReadImageFileList(&tile,filelist,number_files);
+      if (images == (Image *) NULL)
+        {
+          XSetCursorState(display,windows,MagickFalse);
+          ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
+          return((Image *) NULL);
+        }
+      nexus=GetFirstImageInList(images);
+      *state|=ExitState;
       break;
     }
     default:
+    {
+      XPlayCommand(&tile,animate_command);
       break;
+    }
   }
   return(nexus);
 }

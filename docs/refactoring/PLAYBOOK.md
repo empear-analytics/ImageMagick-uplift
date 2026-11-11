@@ -11002,6 +11002,129 @@ to evolve the recipes.
 
 ---
 
+## Recipe UX - Unnest an Exit Implied by Its Guard
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*), and the
+bump is a failure guard whose condition is `(A) || (B)` and whose body, after some clean-up,
+tests `B` again to choose between two exits: `if ((A) || (B)) { S; if (B) { X } Y }`, where
+`X` and `Y` each end by leaving (`return`, `break`, `continue` or `goto`). The typical case
+is `animate.c`'s Open command: `ExpandFilenames` failed or found no file; the file list is
+released, then one exception is thrown when no file was found and another otherwise, each
+followed by `return`. The two exits must stay in the function (a macro that records
+`GetMagickModule()`, say), so no extraction can take the nested `if` away.
+
+**Not covered by:** Recipe CN, whose outer `if` holds the inner one and nothing else;
+Recipe EI, which needs an `else` block of exiting `if` statements; Recipe G, which inverts
+an outermost condition and returns early, and has no clean-up to run first; Recipes E, W,
+RV and BR, which move the block into a helper, taking the exits (and any `__func__` or
+`__LINE__` a macro in them records) out of the function; Recipe P, which names an
+expression but leaves the nesting.
+
+**How:**
+
+1. Find `if ((A) || (B)) { S if (B) X Y }` outside every OpenMP region. The controlling
+   expression is one `||` of exactly two operands, each written in parentheses; the inner
+   `if` has no `else`, and its condition is `B`'s text inside the parentheses, character
+   for character. `S` is a run of statements (or empty) that contains no label and leaves
+   on no path: no `return`, `goto`, and no `break` or `continue` that leaves it. `X` and
+   `Y` each end in `return`, `break`, `continue` or `goto` on every path; `Y` is the rest of
+   the outer body after the inner `if`.
+2. `A` and `B` have no side effect and read only local variables and parameters of the
+   function: comparisons and logical operators over identifiers and literals, no call,
+   assignment, increment, `volatile` object or macro with a side effect.
+3. `S` writes no variable that `A` or `B` reads: not by assignment, increment or `&v`
+   passed to a callee, and no pointer to such a variable is held anywhere `S` can reach (a
+   callee that once received `&v` and kept no copy, such as `ExpandFilenames(&number_files,
+   ...)`, does not count). Check by reading every statement of `S` and every earlier use of
+   `&v` in the function.
+4. Rewrite the statement as three statements at the outer `if`'s indentation:
+   `if ((A) || (B)) { S }`, the outer condition and `S` unchanged; then `if (B) X`, moved
+   out unchanged, re-indented one level up; then `if (A) { Y }`, a new `if` whose condition
+   is `A`'s text inside the parentheses, character for character, and whose braced body is
+   `Y`, re-indented. When `S` is empty, the first statement is omitted.
+5. Nothing else changes. `refactor_guard.py` may see the literals of `A` once more (a
+   WARN whose counts only rose, every value present; it counts distinct values, so a
+   literal already in the file, such as `0`, leaves it at PASS); name any rise in the
+   commit message. `--calls` sees no change when `A` holds no call (step 2).
+
+**Before:**
+
+```c
+      status=ExpandFilenames(&number_files,&filelist);
+      if ((status == MagickFalse) || (number_files == 0))
+        {
+          for (i=0; i < number_files; i++)
+            filelist[i]=DestroyString(filelist[i]);
+          filelist=(char **) RelinquishMagickMemory(filelist);
+          if (number_files == 0)
+            {
+              ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
+              return((Image *) NULL);
+            }
+          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+            filenames);
+          return((Image *) NULL);
+        }
+```
+
+**After:**
+
+```c
+      status=ExpandFilenames(&number_files,&filelist);
+      if ((status == MagickFalse) || (number_files == 0))
+        {
+          for (i=0; i < number_files; i++)
+            filelist[i]=DestroyString(filelist[i]);
+          filelist=(char **) RelinquishMagickMemory(filelist);
+        }
+      if (number_files == 0)
+        {
+          ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
+          return((Image *) NULL);
+        }
+      if (status == MagickFalse)
+        {
+          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+            filenames);
+          return((Image *) NULL);
+        }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, path by path. `A` and `B` hold the same values at all
+  three tests: they read only locals that `S` does not write (step 3) and nothing else runs
+  between the tests. If `B` holds, the original ran `S` and then `X`, which leaves; the new
+  code runs `S` (the outer condition holds), then `X`, which leaves the same way. If `A`
+  holds and `B` does not, the original ran `S`, skipped `X` and ran `Y`, which leaves; the
+  new code runs `S`, skips `X`, and runs `Y` under `if (A)`. If neither holds, the original
+  ran nothing and went on; the new code skips all three and goes on. Each path runs the
+  same statements in the same order.
+- The only new work is a second and third evaluation of `A` and `B`, which step 2 makes
+  reads of locals with no side effect; `||` and the new `if` evaluate them left to right
+  as before, so no call is made a different number of times.
+- `X` and `Y` must leave on every path: if `X` could fall through, the original went on
+  after the outer `if` while the new code would test `A` and maybe run `Y` as well.
+- The exits stay in the function, at their own statements: a macro that records the
+  function name and line (`ThrowXWindowException` passes `GetMagickModule()` to
+  `ThrowMagickException`) reports the same function, as it would not after an
+  extraction; the line numbers move, as after any edit above them.
+- The step removes one level of nesting and adds one decision (cyclomatic complexity
+  `+1`), so it pays only where the bump or the depth is the finding that matters, or
+  where a later step (Recipe E on `if ((A) || (B)) { S }`) takes the first statement out.
+
+**Evidence level:** oracle, with steps 1 to 3 checked by reading; `refactor_guard.py`
+PASS, or WARN with only `A`'s literals risen; `--calls` unchanged.
+
+**Provenance:** 2026-11-11, from `animate.c`'s `XMagickCommand` (campaign A, W17 lane c,
+wide build): after Recipe SD splits its 19-label switch, the Open group's failure guard
+is what keeps the function on *Bumpy Road Ahead* (2 bumps); its two
+`ThrowXWindowException` exits record `GetMagickModule()` and stay. A probe of the chain: `XMagickCommand` leaves *Bumpy Road
+Ahead* and *Large Method*, 3.48 to 3.67 with the XSaveImage steps. Added by Claude Code
+(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -11383,3 +11506,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | OC | Step 4: the variables a block only reads may go in one `const` input struct (Recipe N steps 2 to 6, its array, struct-value and read-then-written forms) for any block of step 1, not only step 6's whole loop body, when they would take the helper to five or more parameters; the helper takes `const Name *` first, then the written variables by pointer, at most four in all | `display.c`'s `XRotateImage` (campaign A, W17 lane b, wide build): its Command widget block (`id=XCommandWidget(...); if (id < 0) continue; ... switch (RotateCommands[id]) {...} ...; continue;`) holds two of the function's depth-4 statements, writes `state` and the static `direction` and reads nine variables (the display, the menus and tables, the event, the pen targets); OC step 2 capped the helper at four by-value inputs | owner |
 | 2026-11-11 | AMEND | I | Step 2: a Recipe CT step 3 targets struct counts among the other helpers' targets structs that may hold a written variable's address (it is Recipe Q step 8's `const` form); and such a `const` struct may also be read by the fill of the new function's input struct, copied whole into a member that the new function binds and passes, as `&t`, unchanged to the other helper's call (Recipe N step 2's struct value; the copy holds the same addresses). *Careful* is CT's: the two pointers to one local are not used while the other call runs | `widget.c`'s `XFileBrowserWidget` (campaign A, W17 lane a): its special button release writes `state` and `special_info`, leaves the `switch` through `break;` after `SelectFileBrowserFormat(...,&format_targets)` (a CT helper), and is the function's last depth-4 site; `state`'s and `special_info`'s addresses are in CT targets structs, which step 2 did not list. Probe: the function leaves *Deep, Nested Complexity*, 2.92 (unchanged at two decimals), no finding on the helper | owner |
 | 2026-11-11 | AMEND | CT | Step 2 (and O step 2 by reference): a block-scope `static` of structure type (not an array of structures), its address taken only in the targets initialiser, may be a written variable on the scalar static's terms; its member is a pointer to the structure, `v.m` becomes `(*v).m` and `&v` becomes `v`. *Careful* adds the argument (one object at one address, `(*v).m` is the member, nothing copied, a callee filling the structure through the pointer fills the static) | `display.c`'s `XMatteEditImage` (campaign A, W17 lane b, wide build): its Border Color case tail ends the case through `break;` from a depth-5 `if (*color_name == '\0')` and writes the function's `static XColor border_color` through `XParseColor(...,&border_color)`; CT step 2 admitted only arithmetic, enumeration and pointer statics. The case is one of the four whose move takes the function to depth 3 (probe: display.c 1.33 to 1.41, the function out of *Deep, Nested Complexity* and *Brain Method*, no finding on the helpers) | owner |
+| 2026-11-11 | NEW | UX | Unnest an Exit Implied by Its Guard: a guard on the disjunction of `A` and `B` whose body runs a clean-up `S`, then exits through `X` when `B` holds and through `Y` otherwise, becomes three statements: the guard holding `S` alone, `if (B) X`, and `if (A) { Y }`; `A` and `B` are side-effect-free reads of locals that `S` does not write | `animate.c`'s `XMagickCommand` (campaign A, W17 lane c, wide build): the Open command's failure guard releases the file list and then throws one of two `ThrowXWindowException`s, which record `GetMagickModule()` and must stay in the function; the nested test is the function's last bump after the SD splits. Probe of the chain: `XMagickCommand` leaves Bumpy Road Ahead and Large Method, 3.48 to 3.67 with the XSaveImage steps | owner |
+| 2026-11-11 | WORDING | UX | Step 5 and *Evidence level*: `refactor_guard.py` counts distinct values, so repeating `A` may leave it at PASS; a WARN is expected only when a literal of `A` is new to the count | The first use (`XMagickCommand`, `status == MagickFalse`) printed PASS, not the WARN the text predicted | owner |
