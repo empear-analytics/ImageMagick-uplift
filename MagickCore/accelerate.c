@@ -884,6 +884,29 @@ static MagickBooleanType StretchesAlphaChannel(const Image *image,
     (black.w != white.w)) ? MagickTrue : MagickFalse);
 }
 
+static void StretchColormap(Image *image,PixelPacket *stretch_map,
+  const cl_float4 black,const cl_float4 white)
+{
+  cl_uint
+    i;
+
+  for (i=0; i < (cl_uint) image->colors; i++)
+  {
+    if (StretchesRedChannel(image,black,white) != MagickFalse)
+      image->colormap[i].red=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
+    if (StretchesGreenChannel(image,black,white) != MagickFalse)
+      image->colormap[i].green=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
+    if (StretchesBlueChannel(image,black,white) != MagickFalse)
+      image->colormap[i].blue=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
+    if (StretchesAlphaChannel(image,black,white) != MagickFalse)
+      image->colormap[i].alpha=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
+  }
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const double black_point,const double white_point,
   ExceptionInfo *exception)
@@ -1191,21 +1214,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
     /*
        Stretch colormap.
        */
-    for (i=0; i < (cl_uint) image->colors; i++)
-    {
-      if (StretchesRedChannel(image,black,white) != MagickFalse)
-        image->colormap[i].red=stretch_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
-      if (StretchesGreenChannel(image,black,white) != MagickFalse)
-        image->colormap[i].green=stretch_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
-      if (StretchesBlueChannel(image,black,white) != MagickFalse)
-        image->colormap[i].blue=stretch_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
-      if (StretchesAlphaChannel(image,black,white) != MagickFalse)
-        image->colormap[i].alpha=stretch_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
-    }
+    StretchColormap(image,stretch_map,black,white);
   }
 
   /*
