@@ -155,6 +155,21 @@ typedef struct _HorizontalFilterPass
     *magick_restrict progress;
 } HorizontalFilterPass;
 
+typedef struct _VerticalFilterPass
+{
+  const ResizeFilter
+    *magick_restrict resize_filter;
+
+  double
+    y_factor;
+
+  MagickSizeType
+    span;
+
+  MagickOffsetType
+    *magick_restrict progress;
+} VerticalFilterPass;
+
 static void RelinquishContributionRows(ContributionInfo **contribution)
 {
   ssize_t
@@ -797,11 +812,9 @@ static MagickBooleanType FilterVerticalRows(const VerticalFilterRow *filter,
   return(status);
 }
 
-static MagickBooleanType VerticalFilter(
-  const ResizeFilter *magick_restrict resize_filter,
+static MagickBooleanType VerticalFilter(const VerticalFilterPass *pass,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
-  const double y_factor,const MagickSizeType span,
-  MagickOffsetType *magick_restrict progress,ExceptionInfo *exception)
+  ExceptionInfo *exception)
 {
   CacheView
     *image_view,
@@ -823,8 +836,8 @@ static MagickBooleanType VerticalFilter(
   /*
     Apply filter to resize vertically from image to resize image.
   */
-  scale=MagickMax(1.0/y_factor+MagickEpsilon,1.0);
-  support=scale*GetResizeFilterSupport(resize_filter);
+  scale=MagickMax(1.0/pass->y_factor+MagickEpsilon,1.0);
+  support=scale*GetResizeFilterSupport(pass->resize_filter);
   if (SetFilterStorageClass(image,resize_image,support,exception) == MagickFalse)
     return(MagickFalse);
   ClampFilterSupport(&support,&scale);
@@ -835,17 +848,17 @@ static MagickBooleanType VerticalFilter(
   scale=MagickSafeReciprocal(scale);
   image_view=AcquireVirtualCacheView(image,exception);
   resize_view=AcquireAuthenticCacheView(resize_image,exception);
-  filter.resize_filter=resize_filter;
+  filter.resize_filter=pass->resize_filter;
   filter.image=image;
   filter.resize_image=resize_image;
   filter.image_view=image_view;
   filter.resize_view=resize_view;
   filter.contributions=contributions;
-  filter.y_factor=y_factor;
+  filter.y_factor=pass->y_factor;
   filter.scale=scale;
   filter.support=support;
   filter.exception=exception;
-  status=FilterVerticalRows(&filter,span,progress,status);
+  status=FilterVerticalRows(&filter,pass->span,pass->progress,status);
   return(DestroyFilterResources(image_view,resize_view,contributions,status));
 }
 
@@ -974,6 +987,9 @@ static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
   HorizontalFilterPass
     horizontal;
 
+  VerticalFilterPass
+    vertical;
+
   filter_image=CloneFilterImage(pass,exception);
   if (filter_image == (Image *) NULL)
     return(MagickFalse);
@@ -989,14 +1005,21 @@ static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
       horizontal.span=span;
       horizontal.progress=(&offset);
       *status=HorizontalFilter(&horizontal,image,filter_image,exception);
-      *status&=(MagickStatusType) VerticalFilter(resize_filter,filter_image,
-        resize_image,y_factor,span,&offset,exception);
+      vertical.resize_filter=resize_filter;
+      vertical.y_factor=y_factor;
+      vertical.span=span;
+      vertical.progress=(&offset);
+      *status&=(MagickStatusType) VerticalFilter(&vertical,filter_image,
+        resize_image,exception);
     }
   else
     {
       span=(MagickSizeType) (filter_image->rows+columns);
-      *status=VerticalFilter(resize_filter,image,filter_image,y_factor,span,
-        &offset,exception);
+      vertical.resize_filter=resize_filter;
+      vertical.y_factor=y_factor;
+      vertical.span=span;
+      vertical.progress=(&offset);
+      *status=VerticalFilter(&vertical,image,filter_image,exception);
       horizontal.resize_filter=resize_filter;
       horizontal.x_factor=x_factor;
       horizontal.span=span;
