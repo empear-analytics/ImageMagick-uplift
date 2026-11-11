@@ -1815,6 +1815,9 @@ static int
 static XWidgetInfo
   PageListBrowserSlider(XWidgetInfo,const XEvent,const unsigned int);
 
+static void
+  MatchFontBrowserReply(const FontBrowserMatch *,XWidgetInfo *,int *);
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2226,16 +2229,17 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
     if (state & JumpListState)
       {
+        FontBrowserMatch
+          match;
+
         /*
           Jump scroll to match user color.
         */
         list_info.id=(~0);
-        for (i=0; i < (int) colors; i++)
-          if (LocaleCompare(colorlist[i],reply) >= 0)
-            {
-              list_info.id=LocaleCompare(colorlist[i],reply) == 0 ? i : ~0;
-              break;
-            }
+        match.fontlist=colorlist;
+        match.fonts=(int) colors;
+        match.reply=reply;
+        MatchFontBrowserReply(&match,&list_info,&i);
         if ((i < slider_info.id) ||
             (i >= (int) (slider_info.id+(int) visible_colors)))
           slider_info.id=i-(int) (visible_colors >> 1);
