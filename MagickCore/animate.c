@@ -415,6 +415,12 @@ typedef struct _AnimateCommandTile
 
   XWindows
     *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
 } AnimateCommandTile;
 
 static void XVersionQuitCommand(const AnimateCommandTile *tile,
@@ -454,6 +460,83 @@ static void XVersionQuitCommand(const AnimateCommandTile *tile,
   }
 }
 
+static void XInfoHelpCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  Image
+    **const image = tile->image;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  MagickStatusType
+    status;
+
+  switch (animate_command)
+  {
+    case InfoCommand:
+    {
+      XDisplayImageInfo(display,resource_info,windows,(Image *) NULL,*image,
+        exception);
+      break;
+    }
+    case HelpCommand:
+    {
+      /*
+        User requested help.
+      */
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Animate",AnimateHelp);
+      break;
+    }
+    case BrowseDocumentationCommand:
+    {
+      Atom
+        mozilla_atom;
+
+      Window
+        mozilla_window,
+        root_window;
+
+      /*
+        Browse the ImageMagick documentation.
+      */
+      root_window=XRootWindow(display,XDefaultScreen(display));
+      mozilla_atom=XInternAtom(display,"_MOZILLA_VERSION",MagickFalse);
+      mozilla_window=XWindowByProperty(display,root_window,mozilla_atom);
+      if (mozilla_window != (Window) NULL)
+        {
+          XRemoteBrowseDocumentation(display,windows,mozilla_window);
+          break;
+        }
+      XSetCursorState(display,windows,MagickTrue);
+      XCheckRefreshWindows(display,windows);
+      status=InvokeDelegate(resource_info->image_info,*image,"browse",
+        (char *) NULL,exception);
+      if (status == MagickFalse)
+        XNoticeWidget(display,windows,"Unable to browse documentation",
+          (char *) NULL);
+      XDelay(display,1500);
+      XSetCursorState(display,windows,MagickFalse);
+      break;
+    }
+    default:
+    {
+      XVersionQuitCommand(tile,animate_command);
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
@@ -480,6 +563,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   tile.display=display;
   tile.resource_info=resource_info;
   tile.windows=windows;
+  tile.image=image;
+  tile.exception=exception;
   switch (animate_command)
   {
     case OpenCommand:
@@ -675,55 +760,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       *state&=(~AutoReverseAnimationState);
       break;
     }
-    case InfoCommand:
-    {
-      XDisplayImageInfo(display,resource_info,windows,(Image *) NULL,*image,
-        exception);
-      break;
-    }
-    case HelpCommand:
-    {
-      /*
-        User requested help.
-      */
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Animate",AnimateHelp);
-      break;
-    }
-    case BrowseDocumentationCommand:
-    {
-      Atom
-        mozilla_atom;
-
-      Window
-        mozilla_window,
-        root_window;
-
-      /*
-        Browse the ImageMagick documentation.
-      */
-      root_window=XRootWindow(display,XDefaultScreen(display));
-      mozilla_atom=XInternAtom(display,"_MOZILLA_VERSION",MagickFalse);
-      mozilla_window=XWindowByProperty(display,root_window,mozilla_atom);
-      if (mozilla_window != (Window) NULL)
-        {
-          XRemoteBrowseDocumentation(display,windows,mozilla_window);
-          break;
-        }
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      status=InvokeDelegate(resource_info->image_info,*image,"browse",
-        (char *) NULL,exception);
-      if (status == MagickFalse)
-        XNoticeWidget(display,windows,"Unable to browse documentation",
-          (char *) NULL);
-      XDelay(display,1500);
-      XSetCursorState(display,windows,MagickFalse);
-      break;
-    }
     default:
     {
-      XVersionQuitCommand(&tile,animate_command);
+      XInfoHelpCommand(&tile,animate_command);
       break;
     }
   }
