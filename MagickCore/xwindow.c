@@ -9222,6 +9222,21 @@ static void XStoreImageColors(const XVisualInfo *visual_info,
   }
 }
 
+static void XApplyGrayVisual(const XVisualInfo *visual_info,
+  XColor *color)
+{
+  unsigned short
+    gray_value;
+
+  if (visual_info->klass != PseudoColor)
+    {
+      gray_value=(unsigned short) XPixelIntensity(color);
+      (*color).red=gray_value;
+      (*color).green=gray_value;
+      (*color).blue=gray_value;
+    }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9238,9 +9253,6 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   size_t
     number_colors,
     retain_colors;
-
-  unsigned short
-    gray_value;
 
   XColor
     color,
@@ -9470,13 +9482,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
               ScaleQuantumToShort(XGreenGamma(image->colormap[index].green));
             color.blue=
               ScaleQuantumToShort(XBlueGamma(image->colormap[index].blue));
-            if (visual_info->klass != PseudoColor)
-              {
-                gray_value=(unsigned short) XPixelIntensity(&color);
-                color.red=gray_value;
-                color.green=gray_value;
-                color.blue=gray_value;
-              }
+            XApplyGrayVisual(visual_info,&color);
             status=XAllocColor(display,colormap,&color);
             if (status == False)
               break;
@@ -9507,13 +9513,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
               XGreenGamma(image->colormap[index].green));
             color.blue=ScaleQuantumToShort(
               XBlueGamma(image->colormap[index].blue));
-            if (visual_info->klass != PseudoColor)
-              {
-                gray_value=(unsigned short) XPixelIntensity(&color);
-                color.red=gray_value;
-                color.green=gray_value;
-                color.blue=gray_value;
-              }
+            XApplyGrayVisual(visual_info,&color);
             XBestPixel(display,colormap,server_colors,(unsigned int)
               visual_info->colormap_size,&color);
             pixel->pixels[index]=color.pixel;
