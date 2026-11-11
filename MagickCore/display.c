@@ -1793,6 +1793,9 @@ typedef struct _AnnotateTargets
 
   XEvent
     *text_event;
+
+  size_t
+    *state;
 } AnnotateTargets;
 
 static void XGoToPreviousTextLine(const AnnotateTargets *targets)
@@ -2434,6 +2437,67 @@ static MagickBooleanType XTypeTextKey(const AnnotateTextInput *text_input,
   return(MagickTrue);
 }
 
+static MagickBooleanType XAnnotateKeyPress(
+  const AnnotateTextInput *text_input,const AnnotateTargets *targets,
+  KeySym key_symbol)
+{
+  Display
+    *const display = text_input->display;
+
+  XWindows
+    *const windows = text_input->windows;
+
+  XFontStruct
+    *const font_info = text_input->font_info;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  XEvent
+    *const text_event = targets->text_event;
+
+  size_t
+    *const state = targets->state;
+
+  switch ((int) key_symbol)
+  {
+    case XK_BackSpace:
+    {
+      XEraseTextCharacter(display,windows,font_info,targets);
+      break;
+    }
+    case XK_bracketleft:
+    {
+      key_symbol=XK_Escape;
+      break;
+    }
+    case DeleteCommand:
+    {
+      XEraseTextLine(display,windows,font_info,targets);
+      break;
+    }
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Finished annotating.
+      */
+      (*annotate_info)->width=(unsigned int) XTextWidth(font_info,
+        (*annotate_info)->text,(int) strlen((*annotate_info)->text));
+      XRefreshWindow(display,&windows->image,text_event);
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+    {
+      if (XTypeTextKey(text_input,targets,key_symbol) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -2532,7 +2596,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     text_event;
 
   const AnnotateTargets
-    targets = { &annotate_info, &p, &x, &y, &text_event };
+    targets = { &annotate_info, &p, &x, &y, &text_event, &state };
 
   const AnnotateRotateTargets
     rotate_targets = { &degrees };
@@ -2923,42 +2987,8 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         text_input.font_info=font_info;
         text_input.command=command;
         text_input.state=state;
-        switch ((int) key_symbol)
-        {
-          case XK_BackSpace:
-          {
-            XEraseTextCharacter(display,windows,font_info,&targets);
-            break;
-          }
-          case XK_bracketleft:
-          {
-            key_symbol=XK_Escape;
-            break;
-          }
-          case DeleteCommand:
-          {
-            XEraseTextLine(display,windows,font_info,&targets);
-            break;
-          }
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Finished annotating.
-            */
-            annotate_info->width=(unsigned int) XTextWidth(font_info,
-              annotate_info->text,(int) strlen(annotate_info->text));
-            XRefreshWindow(display,&windows->image,&text_event);
-            state|=ExitState;
-            break;
-          }
-          default:
-          {
-            if (XTypeTextKey(&text_input,&targets,key_symbol) == MagickFalse)
-              return(MagickFalse);
-            break;
-          }
-        }
+        if (XAnnotateKeyPress(&text_input,&targets,key_symbol) == MagickFalse)
+          return(MagickFalse);
         break;
       }
       case KeyRelease:
