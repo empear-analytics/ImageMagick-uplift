@@ -5440,15 +5440,12 @@ static void CopyTextureRow(Image *image,Image *texture_image,
   }
 }
 
-MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
+static MagickBooleanType CopyTextureImage(Image *image,Image *texture_image,
   ExceptionInfo *exception)
 {
   CacheView
     *image_view,
     *texture_view;
-
-  Image
-    *texture_image;
 
   MagickBooleanType
     status;
@@ -5456,23 +5453,6 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ssize_t
     y;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  if (texture == (const Image *) NULL)
-    return(MagickFalse);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    return(MagickFalse);
-  texture_image=CloneImage(texture,0,0,MagickTrue,exception);
-  if (texture_image == (const Image *) NULL)
-    return(MagickFalse);
-  (void) TransformImageColorspace(texture_image,image->colorspace,exception);
-  (void) SetImageVirtualPixelMethod(texture_image,TileVirtualPixelMethod,
-    exception);
-  status=MagickTrue;
-  if (IsTextureComposited(image,texture_image) != MagickFalse)
-    return(TileTextureImage(image,texture_image,status,exception));
   /*
     Tile texture onto the image background (optimized).
   */
@@ -5511,4 +5491,33 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   image_view=DestroyCacheView(image_view);
   texture_image=DestroyImage(texture_image);
   return(status);
+}
+
+MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
+  ExceptionInfo *exception)
+{
+  Image
+    *texture_image;
+
+  MagickBooleanType
+    status;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  if (texture == (const Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  texture_image=CloneImage(texture,0,0,MagickTrue,exception);
+  if (texture_image == (const Image *) NULL)
+    return(MagickFalse);
+  (void) TransformImageColorspace(texture_image,image->colorspace,exception);
+  (void) SetImageVirtualPixelMethod(texture_image,TileVirtualPixelMethod,
+    exception);
+  status=MagickTrue;
+  if (IsTextureComposited(image,texture_image) != MagickFalse)
+    return(TileTextureImage(image,texture_image,status,exception));
+  return(CopyTextureImage(image,texture_image,exception));
 }
