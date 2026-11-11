@@ -4778,10 +4778,25 @@ static OffsetInfo GetDirectKernelOffset(const MorphologyMethod method,
   return(offset);
 }
 
+typedef enum
+{
+  ForwardDirectScan,
+  ReverseDirectScan
+} DirectScanSide;
+
 typedef struct _MorphologyDirectScan
 {
+  DirectScanSide
+    side;
+
+  Image
+    *image;
+
   MorphologyMethod
     method;
+
+  const KernelInfo
+    *kernel;
 
   OffsetInfo
     offset;
@@ -4936,6 +4951,86 @@ static double ReverseDirectChannelValue(const MorphologyDirectScan *scan,
   return(pixel);
 }
 
+static inline void MorphologyDirectChannel(const MorphologyDirectScan *scan,
+  const MorphologyDirectPixel *input,const Quantum *magick_restrict p,
+  size_t *changed)
+{
+  const DirectScanSide
+    side = scan->side;
+
+  Image
+    *const image = input->image;
+
+  Quantum
+    *const q = input->q;
+
+  const ssize_t
+    i = input->i;
+
+  double
+    pixel;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    traits;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  channel=GetPixelChannelChannel(image,i);
+  traits=GetPixelChannelTraits(image,channel);
+  if (traits == UndefinedPixelTrait)
+    return;
+  if ((traits & CopyPixelTrait) != 0)
+    return;
+  pixels=p;
+  pixel=(double) QuantumRange;
+  pixel=((side == ForwardDirectScan) ?
+    ForwardDirectChannelValue(scan,input,pixels,pixel) :
+    ReverseDirectChannelValue(scan,input,pixels,pixel));
+  if (fabs(pixel-(double) q[i]) > MagickEpsilon)
+    (*changed)++;
+  q[i]=ClampToQuantum(pixel);
+}
+
+static inline void MorphologyDirectPixels(const MorphologyDirectScan *scan,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,size_t *changed)
+{
+  const DirectScanSide
+    side = scan->side;
+
+  Image
+    *const image = scan->image;
+
+  const KernelInfo
+    *const kernel = scan->kernel;
+
+  ssize_t
+    x;
+
+  for (x=((side == ForwardDirectScan) ? 0 : (ssize_t) image->columns-1);
+       ((side == ForwardDirectScan) ? x < (ssize_t) image->columns : x >= 0);
+       ((side == ForwardDirectScan) ? x++ : x--))
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      const MorphologyDirectPixel
+        input = { image, kernel, q, x, i };
+
+      MorphologyDirectChannel(scan,&input,p,changed);
+    }
+    ((side == ForwardDirectScan) ? (p+=(ptrdiff_t) GetPixelChannels(image)) :
+      (p-=(ptrdiff_t)GetPixelChannels(image)));
+    ((side == ForwardDirectScan) ? (q+=(ptrdiff_t) GetPixelChannels(image)) :
+      (q-=GetPixelChannels(image)));
+  }
+}
+
 static ssize_t MorphologyPrimitiveDirect(Image *image,
   const MorphologyMethod method,const KernelInfo *kernel,
   ExceptionInfo *exception)
@@ -4979,16 +5074,13 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
   for (y=0; y < (ssize_t) image->rows; y++)
   {
     const MorphologyDirectScan
-      scan = { method, offset };
+      scan = { ForwardDirectScan, image, method, kernel, offset };
 
     const Quantum
       *magick_restrict p;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     /*
       Read virtual pixels, and authentic pixels, from the same image!  We read
@@ -5009,44 +5101,7 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        const MorphologyDirectPixel
-          input = { image, kernel, q, x, i };
-
-        double
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          traits;
-
-        const Quantum
-          *magick_restrict pixels;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        if ((traits & CopyPixelTrait) != 0)
-          continue;
-        pixels=p;
-        pixel=(double) QuantumRange;
-        pixel=ForwardDirectChannelValue(&scan,&input,pixels,pixel);
-        if (fabs(pixel-(double) q[i]) > MagickEpsilon)
-          changed++;
-        q[i]=ClampToQuantum(pixel);
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    MorphologyDirectPixels(&scan,p,q,&changed);
     if (SyncCacheViewAuthenticPixels(morphology_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -5068,16 +5123,13 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
   for (y=(ssize_t) image->rows-1; y >= 0; y--)
   {
     const MorphologyDirectScan
-      scan = { method, offset };
+      scan = { ReverseDirectScan, image, method, kernel, offset };
 
     const Quantum
       *magick_restrict p;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     /*
        Read virtual pixels, and authentic pixels, from the same image.  We
@@ -5099,44 +5151,7 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
       }
     p+=(ptrdiff_t) (image->columns-1)*GetPixelChannels(image);
     q+=(ptrdiff_t) (image->columns-1)*GetPixelChannels(image);
-    for (x=(ssize_t) image->columns-1; x >= 0; x--)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        const MorphologyDirectPixel
-          input = { image, kernel, q, x, i };
-
-        double
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          traits;
-
-        const Quantum
-          *magick_restrict pixels;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        if ((traits & CopyPixelTrait) != 0)
-          continue;
-        pixels=p;
-        pixel=(double) QuantumRange;
-        pixel=ReverseDirectChannelValue(&scan,&input,pixels,pixel);
-        if (fabs(pixel-(double) q[i]) > MagickEpsilon)
-          changed++;
-        q[i]=ClampToQuantum(pixel);
-      }
-      p-=(ptrdiff_t)GetPixelChannels(image);
-      q-=GetPixelChannels(image);
-    }
+    MorphologyDirectPixels(&scan,p,q,&changed);
     if (SyncCacheViewAuthenticPixels(morphology_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
