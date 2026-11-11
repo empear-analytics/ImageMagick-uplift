@@ -795,6 +795,18 @@ static MagickBooleanType XNextBackgroundEvent(Display *display,XEvent *event)
   return(MagickTrue);
 }
 
+static void XSortSceneList(Image **image_list,const size_t number_scenes)
+{
+  ssize_t
+    scene;
+
+  for (scene=0; scene < (ssize_t) number_scenes; scene++)
+    if (image_list[scene]->scene == 0)
+      break;
+  if (scene == (ssize_t) number_scenes)
+    qsort((void *) image_list,number_scenes,sizeof(Image *),SceneCompare);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -2530,11 +2542,7 @@ MagickExport Image *XAnimateImages(Display *display,
   if (image_list == (Image **) NULL)
     ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
       images->filename);
-  for (scene=0; scene < (ssize_t) number_scenes; scene++)
-    if (image_list[scene]->scene == 0)
-      break;
-  if (scene == (ssize_t) number_scenes)
-    qsort((void *) image_list,number_scenes,sizeof(Image *),SceneCompare);
+  XSortSceneList(image_list,number_scenes);
   /*
     Initialize Standard Colormap.
   */
