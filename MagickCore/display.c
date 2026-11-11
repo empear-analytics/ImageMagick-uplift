@@ -12521,6 +12521,59 @@ static void XRotateKeyPress(const RotateKeyInput *key_input,
   }
 }
 
+typedef struct _RotateInfoInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    *text;
+
+  ModeType
+    direction;
+
+  double
+    degrees;
+
+  XSegment
+    rotate_info;
+} RotateInfoInput;
+
+static void XShowRotateInfo(const RotateInfoInput *show)
+{
+  Display
+    *const display = show->display;
+
+  XWindows
+    *const windows = show->windows;
+
+  char
+    *const text = show->text;
+
+  const ModeType
+    direction = show->direction;
+
+  const double
+    degrees = show->degrees;
+
+  const XSegment
+    rotate_info = show->rotate_info;
+
+  /*
+    Display info and draw rotation line.
+  */
+  if (windows->info.mapped == MagickFalse)
+    (void) XMapWindow(display,windows->info.id);
+  (void) FormatLocaleString(text,MagickPathExtent," %g",
+    direction == VerticalRotateCommand ? degrees-90.0 : degrees);
+  XInfoWidget(display,windows,text);
+  XHighlightLine(display,windows->image.id,
+    windows->image.highlight_context,&rotate_info);
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -12690,16 +12743,16 @@ static MagickBooleanType XRotateImage(Display *display,
       {
         if (distance > 9)
           {
-            /*
-              Display info and draw rotation line.
-            */
-            if (windows->info.mapped == MagickFalse)
-              (void) XMapWindow(display,windows->info.id);
-            (void) FormatLocaleString(text,MagickPathExtent," %g",
-              direction == VerticalRotateCommand ? degrees-90.0 : degrees);
-            XInfoWidget(display,windows,text);
-            XHighlightLine(display,windows->image.id,
-              windows->image.highlight_context,&rotate_info);
+            RotateInfoInput
+              show;
+
+            show.display=display;
+            show.windows=windows;
+            show.text=text;
+            show.direction=direction;
+            show.degrees=degrees;
+            show.rotate_info=rotate_info;
+            XShowRotateInfo(&show);
           }
         else
           if (windows->info.mapped != MagickFalse)
