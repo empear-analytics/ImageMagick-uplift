@@ -756,6 +756,34 @@ static ssize_t FindColormapDifference(const Image *next,const Image *images)
   return(i);
 }
 
+static void XRemapBackgroundImages(Image *images,
+  const XVisualInfo *visual_info,const XResourceInfo resources,
+  ExceptionInfo *exception)
+{
+  Image
+    *next;
+
+  ssize_t
+    i;
+
+  /*
+    Determine if the sequence of images has the identical colormap.
+  */
+  for (next=images; next != (Image *) NULL; )
+  {
+    next->alpha_trait=UndefinedPixelTrait;
+    if (IsColormapMismatch(next,images,visual_info) != MagickFalse)
+      break;
+    i=FindColormapDifference(next,images);
+    if (i < (ssize_t) images->colors)
+      break;
+    next=GetNextImageInList(next);
+  }
+  if (next != (Image *) NULL)
+    (void) RemapImages(resources.quantize_info,images,(Image *) NULL,
+      exception);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -897,27 +925,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   if (resources.map_type == (char *) NULL)
     if ((visual_info->klass != TrueColor) &&
         (visual_info->klass != DirectColor))
-      {
-        Image
-          *next;
-
-        /*
-          Determine if the sequence of images has the identical colormap.
-        */
-        for (next=images; next != (Image *) NULL; )
-        {
-          next->alpha_trait=UndefinedPixelTrait;
-          if (IsColormapMismatch(next,images,visual_info) != MagickFalse)
-            break;
-          i=FindColormapDifference(next,images);
-          if (i < (ssize_t) images->colors)
-            break;
-          next=GetNextImageInList(next);
-        }
-        if (next != (Image *) NULL)
-          (void) RemapImages(resources.quantize_info,images,(Image *) NULL,
-            exception);
-      }
+      XRemapBackgroundImages(images,visual_info,resources,exception);
   /*
     Sort images by increasing scene number.
   */
