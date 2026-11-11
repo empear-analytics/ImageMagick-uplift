@@ -5038,6 +5038,44 @@ static size_t ReleaseFileBrowserCancel(const FileBrowserCancel *cancel,
   return(state);
 }
 
+typedef struct _FileBrowserPaths
+{
+  char
+    *glob_pattern,
+    *working_path,
+    *reply;
+} FileBrowserPaths;
+
+static size_t ReadFileBrowserPath(const FileBrowserPaths *paths,
+  const XWidgetInfo reply_info,size_t state)
+{
+  char
+    *const glob_pattern = paths->glob_pattern,
+    *const working_path = paths->working_path,
+    *const reply = paths->reply;
+
+  /*
+    Read new directory or glob pattern.
+  */
+  if (*reply_info.text == '\0')
+    return(state);
+  if (IsGlob(reply_info.text))
+    (void) CopyMagickString(glob_pattern,reply_info.text,
+      MagickPathExtent);
+  else
+    {
+      (void) ConcatenateMagickString(working_path,DirectorySeparator,
+        MagickPathExtent);
+      (void) ConcatenateMagickString(working_path,reply_info.text,
+        MagickPathExtent);
+      if (*working_path == '~')
+        ExpandFilename(working_path);
+      *reply='\0';
+    }
+  state|=UpdateListState;
+  return(state);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -5893,25 +5931,13 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
           }
         if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
           {
-            /*
-              Read new directory or glob pattern.
-            */
-            if (*reply_info.text == '\0')
-              break;
-            if (IsGlob(reply_info.text))
-              (void) CopyMagickString(glob_pattern,reply_info.text,
-                MagickPathExtent);
-            else
-              {
-                (void) ConcatenateMagickString(working_path,DirectorySeparator,
-                  MagickPathExtent);
-                (void) ConcatenateMagickString(working_path,reply_info.text,
-                  MagickPathExtent);
-                if (*working_path == '~')
-                  ExpandFilename(working_path);
-                *reply='\0';
-              }
-            state|=UpdateListState;
+            FileBrowserPaths
+              paths;
+
+            paths.glob_pattern=glob_pattern;
+            paths.working_path=working_path;
+            paths.reply=reply;
+            state=ReadFileBrowserPath(&paths,reply_info,state);
             break;
           }
         if (key_symbol == XK_Control_L)
