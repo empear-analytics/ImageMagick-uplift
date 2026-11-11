@@ -780,17 +780,11 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   (void) GetNextToken(p,&p,MagickPathExtent,token);
   while (*token != '\0')
   {
-    ChannelFxApply
-      apply;
-
     const ChannelFxTargets
       targets = { &destination_image, &channels };
 
     ssize_t
       i;
-
-    ChannelFxDestination
-      parse;
 
     const ChannelFxDestinationTargets
       destination_targets = { &pixel, &i, &destination_channel, &channel_mask,
@@ -844,24 +838,25 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
         return(destination_image);
       }
     ParseChannelOperator(&channel_op,&p,token);
-    parse.channel_op=channel_op;
-    parse.image=image;
-    parse.destination_image=destination_image;
-    parse.exception=exception;
-    if (ParseChannelDestination(&parse,token,&destination_targets) ==
-        MagickFalse)
-      {
-        destination_image=DestroyImageList(destination_image);
-        return(destination_image);
-      }
-    apply.destination_channel=destination_channel;
-    apply.channel_op=channel_op;
-    apply.source_image=source_image;
-    apply.source_channel=source_channel;
-    apply.pixel=pixel;
-    apply.exception=exception;
-    if (ApplyChannelOperation(&apply,&targets) == MagickFalse)
-      break;
+    {
+      const ChannelFxDestination
+        parse = { channel_op, image, destination_image, exception };
+
+      if (ParseChannelDestination(&parse,token,&destination_targets) ==
+          MagickFalse)
+        {
+          destination_image=DestroyImageList(destination_image);
+          return(destination_image);
+        }
+    }
+    {
+      const ChannelFxApply
+        apply = { destination_channel, channel_op, source_image,
+          source_channel, pixel, exception };
+
+      if (ApplyChannelOperation(&apply,&targets) == MagickFalse)
+        break;
+    }
     AdvanceDestinationChannel(channel_op,&channel_mask,&destination_channel);
     if (SetChannelFxProgress(source_image,p,expression) == MagickFalse)
       break;
