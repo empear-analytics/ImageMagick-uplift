@@ -1969,10 +1969,10 @@ MagickExport Image *XAnimateImages(Display *display,
     */
     windows->image.pixmap=(Pixmap) NULL;
     windows->image.matte_pixmap=(Pixmap) NULL;
-    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
-      if (image_list[scene]->storage_class == PseudoClass)
-        XGetPixelInfo(display,visual_info,map_info,resource_info,
-          image_list[scene],windows->image.pixel_info);
+    if ((IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse) &&
+        (image_list[scene]->storage_class == PseudoClass))
+      XGetPixelInfo(display,visual_info,map_info,resource_info,
+        image_list[scene],windows->image.pixel_info);
     columns=(unsigned int) image_list[scene]->columns;
     rows=(unsigned int) image_list[scene]->rows;
     if ((image_list[scene]->columns != columns) ||
@@ -2056,162 +2056,162 @@ MagickExport Image *XAnimateImages(Display *display,
     &state,exception);
   do
   {
-    if (XEventsQueued(display,QueuedAfterFlush) == 0)
-      if ((state & PlayAnimationState) || (state & StepAnimationState))
-        {
-          MagickBooleanType
-            pause;
+    if ((XEventsQueued(display,QueuedAfterFlush) == 0) &&
+        ((state & PlayAnimationState) || (state & StepAnimationState)))
+      {
+        MagickBooleanType
+          pause;
 
-          pause=MagickFalse;
-          delay=1000*image->delay/(size_t) MagickMax(image->ticks_per_second,
-            1L);
-          XDelay(display,resource_info->delay*(delay == 0 ? 10 : delay));
-          if (state & ForwardAnimationState)
-            {
-              /*
-                Forward animation:  increment scene number.
-              */
-              if (scene < ((ssize_t) number_scenes-1))
-                scene++;
-              else
-                {
-                  iterations++;
-                  if (iterations == (ssize_t) image_list[0]->iterations)
-                    {
-                      iterations=0;
-                      state|=ExitState;
-                    }
-                  if ((state & AutoReverseAnimationState) != 0)
-                    {
-                      state&=(~ForwardAnimationState);
-                      scene--;
-                    }
-                  else
-                    {
-                      if ((state & RepeatAnimationState) == 0)
-                        state&=(~PlayAnimationState);
-                      scene=first_scene;
-                      pause=MagickTrue;
-                    }
-                }
-            }
-          else
-            {
-              /*
-                Reverse animation:  decrement scene number.
-              */
-              if (scene > first_scene)
-                scene--;
-              else
-                {
-                  iterations++;
-                  if (iterations == (ssize_t) image_list[0]->iterations)
-                    {
-                      iterations=0;
-                      state&=(~RepeatAnimationState);
-                    }
-                  if (state & AutoReverseAnimationState)
-                    {
-                      state|=ForwardAnimationState;
-                      scene=first_scene;
-                      pause=MagickTrue;
-                    }
-                  else
-                    {
-                      if ((state & RepeatAnimationState) == MagickFalse)
-                        state&=(~PlayAnimationState);
-                      scene=(ssize_t) number_scenes-1;
-                    }
-                }
-            }
-          scene=MagickMax(scene,0);
-          image=image_list[scene];
-          if ((image != (Image *) NULL) && (image->start_loop != 0))
-            first_scene=scene;
-          if ((state & StepAnimationState) ||
-              (resource_info->title != (char *) NULL))
-            {
-              char
-                name[MagickPathExtent];
+        pause=MagickFalse;
+        delay=1000*image->delay/(size_t) MagickMax(image->ticks_per_second,
+          1L);
+        XDelay(display,resource_info->delay*(delay == 0 ? 10 : delay));
+        if (state & ForwardAnimationState)
+          {
+            /*
+              Forward animation:  increment scene number.
+            */
+            if (scene < ((ssize_t) number_scenes-1))
+              scene++;
+            else
+              {
+                iterations++;
+                if (iterations == (ssize_t) image_list[0]->iterations)
+                  {
+                    iterations=0;
+                    state|=ExitState;
+                  }
+                if ((state & AutoReverseAnimationState) != 0)
+                  {
+                    state&=(~ForwardAnimationState);
+                    scene--;
+                  }
+                else
+                  {
+                    if ((state & RepeatAnimationState) == 0)
+                      state&=(~PlayAnimationState);
+                    scene=first_scene;
+                    pause=MagickTrue;
+                  }
+              }
+          }
+        else
+          {
+            /*
+              Reverse animation:  decrement scene number.
+            */
+            if (scene > first_scene)
+              scene--;
+            else
+              {
+                iterations++;
+                if (iterations == (ssize_t) image_list[0]->iterations)
+                  {
+                    iterations=0;
+                    state&=(~RepeatAnimationState);
+                  }
+                if (state & AutoReverseAnimationState)
+                  {
+                    state|=ForwardAnimationState;
+                    scene=first_scene;
+                    pause=MagickTrue;
+                  }
+                else
+                  {
+                    if ((state & RepeatAnimationState) == MagickFalse)
+                      state&=(~PlayAnimationState);
+                    scene=(ssize_t) number_scenes-1;
+                  }
+              }
+          }
+        scene=MagickMax(scene,0);
+        image=image_list[scene];
+        if ((image != (Image *) NULL) && (image->start_loop != 0))
+          first_scene=scene;
+        if ((state & StepAnimationState) ||
+            (resource_info->title != (char *) NULL))
+          {
+            char
+              name[MagickPathExtent];
 
-              /*
-                Update window title.
-              */
-              p=image_list[scene]->filename+
-                strlen(image_list[scene]->filename)-1;
-              while ((p > image_list[scene]->filename) && (*(p-1) != '/'))
-                p--;
-              (void) FormatLocaleString(name,MagickPathExtent,
-                "%s: %s[%.17g of %.17g]",MagickPackageName,p,(double)
-                scene+1,(double) number_scenes);
-              (void) CloneString(&windows->image.name,name);
-              if (resource_info->title != (char *) NULL)
-                {
-                  char
-                    *title;
+            /*
+              Update window title.
+            */
+            p=image_list[scene]->filename+
+              strlen(image_list[scene]->filename)-1;
+            while ((p > image_list[scene]->filename) && (*(p-1) != '/'))
+              p--;
+            (void) FormatLocaleString(name,MagickPathExtent,
+              "%s: %s[%.17g of %.17g]",MagickPackageName,p,(double)
+              scene+1,(double) number_scenes);
+            (void) CloneString(&windows->image.name,name);
+            if (resource_info->title != (char *) NULL)
+              {
+                char
+                  *title;
 
-                  title=InterpretImageProperties(resource_info->image_info,
-                    image,resource_info->title,exception);
-                  (void) CloneString(&windows->image.name,title);
-                  title=DestroyString(title);
-                }
-              status=XStringListToTextProperty(&windows->image.name,1,
-                &window_name);
-              if (status != Success)
-                {
-                  XSetWMName(display,windows->image.id,&window_name);
-                  (void) XFree((void *) window_name.value);
-                }
-            }
-          /*
-            Copy X pixmap to Image window.
-          */
-          XGetPixelInfo(display,visual_info,map_info,resource_info,
-            image_list[scene],windows->image.pixel_info);
-          if (image != (Image *) NULL)
-            {
-              windows->image.ximage->width=(int) image->columns;
-              windows->image.ximage->height=(int) image->rows;
-            }
-          windows->image.pixmap=windows->image.pixmaps[scene];
-          windows->image.matte_pixmap=windows->image.matte_pixmaps[scene];
-          event.xexpose.x=0;
-          event.xexpose.y=0;
-          event.xexpose.width=(int) image->columns;
-          event.xexpose.height=(int) image->rows;
-          if ((state & ExitState) == 0)
-            {
-              XRefreshWindow(display,&windows->image,&event);
-              (void) XSync(display,MagickFalse);
-            }
-          state&=(~StepAnimationState);
-          if (pause != MagickFalse)
-            for (i=0; i < (ssize_t) resource_info->pause; i++)
-            {
-              int
-                status;
+                title=InterpretImageProperties(resource_info->image_info,
+                  image,resource_info->title,exception);
+                (void) CloneString(&windows->image.name,title);
+                title=DestroyString(title);
+              }
+            status=XStringListToTextProperty(&windows->image.name,1,
+              &window_name);
+            if (status != Success)
+              {
+                XSetWMName(display,windows->image.id,&window_name);
+                (void) XFree((void *) window_name.value);
+              }
+          }
+        /*
+          Copy X pixmap to Image window.
+        */
+        XGetPixelInfo(display,visual_info,map_info,resource_info,
+          image_list[scene],windows->image.pixel_info);
+        if (image != (Image *) NULL)
+          {
+            windows->image.ximage->width=(int) image->columns;
+            windows->image.ximage->height=(int) image->rows;
+          }
+        windows->image.pixmap=windows->image.pixmaps[scene];
+        windows->image.matte_pixmap=windows->image.matte_pixmaps[scene];
+        event.xexpose.x=0;
+        event.xexpose.y=0;
+        event.xexpose.width=(int) image->columns;
+        event.xexpose.height=(int) image->rows;
+        if ((state & ExitState) == 0)
+          {
+            XRefreshWindow(display,&windows->image,&event);
+            (void) XSync(display,MagickFalse);
+          }
+        state&=(~StepAnimationState);
+        if (pause != MagickFalse)
+          for (i=0; i < (ssize_t) resource_info->pause; i++)
+          {
+            int
+              status;
 
-              status=XCheckTypedWindowEvent(display,windows->image.id,KeyPress,
-                &event);
-              if (status != 0)
-                {
-                  int
-                    length;
+            status=XCheckTypedWindowEvent(display,windows->image.id,KeyPress,
+              &event);
+            if (status != 0)
+              {
+                int
+                  length;
 
-                  length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
-                    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-                  *(command+length)='\0';
-                  if ((key_symbol == XK_q) || (key_symbol == XK_Escape))
-                    {
-                      XClientMessage(display,windows->image.id,
-                        windows->im_protocols,windows->im_exit,CurrentTime);
-                      break;
-                    }
-                }
-              MagickDelay(1000);
-            }
-          continue;
-        }
+                length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
+                  sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+                *(command+length)='\0';
+                if ((key_symbol == XK_q) || (key_symbol == XK_Escape))
+                  {
+                    XClientMessage(display,windows->image.id,
+                      windows->im_protocols,windows->im_exit,CurrentTime);
+                    break;
+                  }
+              }
+            MagickDelay(1000);
+          }
+        continue;
+      }
     /*
       Handle a window event.
     */
@@ -2452,33 +2452,33 @@ MagickExport Image *XAnimateImages(Display *display,
                 /*
                   Position the transient windows relative of the Image window.
                 */
-                if (windows->command.geometry == (char *) NULL)
-                  if (windows->command.mapped == MagickFalse)
-                    {
-                        windows->command.x=event.xconfigure.x-
-                          (int) windows->command.width-25;
-                        windows->command.y=event.xconfigure.y;
-                        XConstrainWindowPosition(display,&windows->command);
-                        window_changes.x=windows->command.x;
-                        window_changes.y=windows->command.y;
-                        (void) XReconfigureWMWindow(display,windows->command.id,
-                          windows->command.screen,(unsigned int) (CWX | CWY),
-                          &window_changes);
-                    }
-                if (windows->widget.geometry == (char *) NULL)
-                  if (windows->widget.mapped == MagickFalse)
-                    {
-                      windows->widget.x=
-                        event.xconfigure.x+event.xconfigure.width/10;
-                      windows->widget.y=
-                        event.xconfigure.y+event.xconfigure.height/10;
-                      XConstrainWindowPosition(display,&windows->widget);
-                      window_changes.x=windows->widget.x;
-                      window_changes.y=windows->widget.y;
-                      (void) XReconfigureWMWindow(display,windows->widget.id,
-                        windows->widget.screen,(unsigned int) (CWX | CWY),
+                if ((windows->command.geometry == (char *) NULL) &&
+                    (windows->command.mapped == MagickFalse))
+                  {
+                      windows->command.x=event.xconfigure.x-
+                        (int) windows->command.width-25;
+                      windows->command.y=event.xconfigure.y;
+                      XConstrainWindowPosition(display,&windows->command);
+                      window_changes.x=windows->command.x;
+                      window_changes.y=windows->command.y;
+                      (void) XReconfigureWMWindow(display,windows->command.id,
+                        windows->command.screen,(unsigned int) (CWX | CWY),
                         &window_changes);
-                    }
+                  }
+                if ((windows->widget.geometry == (char *) NULL) &&
+                    (windows->widget.mapped == MagickFalse))
+                  {
+                    windows->widget.x=
+                      event.xconfigure.x+event.xconfigure.width/10;
+                    windows->widget.y=
+                      event.xconfigure.y+event.xconfigure.height/10;
+                    XConstrainWindowPosition(display,&windows->widget);
+                    window_changes.x=windows->widget.x;
+                    window_changes.y=windows->widget.y;
+                    (void) XReconfigureWMWindow(display,windows->widget.id,
+                      windows->widget.screen,(unsigned int) (CWX | CWY),
+                      &window_changes);
+                  }
               }
             /*
               Image window has a new configuration.
@@ -2518,9 +2518,10 @@ MagickExport Image *XAnimateImages(Display *display,
         /*
           Selectively install colormap.
         */
-        if (map_info->colormap != XDefaultColormap(display,visual_info->screen))
-          if (event.xcrossing.mode != NotifyUngrab)
-            XInstallColormap(display,map_info->colormap);
+        if ((map_info->colormap !=
+             XDefaultColormap(display,visual_info->screen)) &&
+            (event.xcrossing.mode != NotifyUngrab))
+          XInstallColormap(display,map_info->colormap);
         break;
       }
       case Expose:
@@ -2540,12 +2541,12 @@ MagickExport Image *XAnimateImages(Display *display,
             XRefreshWindow(display,&windows->image,&event);
             break;
           }
-        if (event.xexpose.window == windows->icon.id)
-          if (event.xexpose.count == 0)
-            {
-              XRefreshWindow(display,&windows->icon,&event);
-              break;
-            }
+        if ((event.xexpose.window == windows->icon.id) &&
+            (event.xexpose.count == 0))
+          {
+            XRefreshWindow(display,&windows->icon,&event);
+            break;
+          }
         break;
       }
       case KeyPress:
@@ -2638,9 +2639,10 @@ MagickExport Image *XAnimateImages(Display *display,
         /*
           Selectively uninstall colormap.
         */
-        if (map_info->colormap != XDefaultColormap(display,visual_info->screen))
-          if (event.xcrossing.mode != NotifyUngrab)
-            XUninstallColormap(display,map_info->colormap);
+        if ((map_info->colormap !=
+             XDefaultColormap(display,visual_info->screen)) &&
+            (event.xcrossing.mode != NotifyUngrab))
+          XUninstallColormap(display,map_info->colormap);
         break;
       }
       case MapNotify:
@@ -2841,17 +2843,17 @@ MagickExport Image *XAnimateImages(Display *display,
         (void) XWithdrawWindow(display,windows->command.id,
           windows->command.screen);
     }
-  if (resource_info->backdrop == MagickFalse)
-    if (windows->backdrop.mapped)
-      {
-        (void) XWithdrawWindow(display,windows->backdrop.id,\
-          windows->backdrop.screen);
-        (void) XDestroyWindow(display,windows->backdrop.id);
-        windows->backdrop.id=(Window) NULL;
-        (void) XWithdrawWindow(display,windows->image.id,windows->image.screen);
-        (void) XDestroyWindow(display,windows->image.id);
-        windows->image.id=(Window) NULL;
-      }
+  if ((resource_info->backdrop == MagickFalse) &&
+      (windows->backdrop.mapped))
+    {
+      (void) XWithdrawWindow(display,windows->backdrop.id,\
+        windows->backdrop.screen);
+      (void) XDestroyWindow(display,windows->backdrop.id);
+      windows->backdrop.id=(Window) NULL;
+      (void) XWithdrawWindow(display,windows->image.id,windows->image.screen);
+      (void) XDestroyWindow(display,windows->image.id);
+      windows->image.id=(Window) NULL;
+    }
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   for (scene=1; scene < (ssize_t) number_scenes; scene++)
