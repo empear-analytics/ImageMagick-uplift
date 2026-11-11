@@ -2406,6 +2406,34 @@ static KeySym XModifyKeySymbol(const size_t state,KeySym key_symbol)
   return(key_symbol);
 }
 
+static MagickBooleanType XTypeTextKey(const AnnotateTextInput *text_input,
+  const AnnotateTargets *targets,const KeySym key_symbol)
+{
+  XWindows
+    *const windows = text_input->windows;
+
+  XFontStruct
+    *const font_info = text_input->font_info;
+
+  switch ((int) key_symbol)
+  {
+    default:
+    {
+      if (XInsertTextCharacter(text_input,targets) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+    case XK_Return:
+    case XK_KP_Enter:
+    {
+      if (XAdvanceTextLine(windows,font_info,targets) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -2871,6 +2899,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       }
       case KeyPress:
       {
+        AnnotateTextInput
+          text_input;
+
         int
           length;
 
@@ -2886,6 +2917,12 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
             ((event.xkey.state & Mod1Mask) != 0))
           state|=ModifierState;
         key_symbol=XModifyKeySymbol(state,key_symbol);
+        text_input.display=display;
+        text_input.windows=windows;
+        text_input.annotate_context=annotate_context;
+        text_input.font_info=font_info;
+        text_input.command=command;
+        text_input.state=state;
         switch ((int) key_symbol)
         {
           case XK_BackSpace:
@@ -2917,23 +2954,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
           }
           default:
           {
-            AnnotateTextInput
-              text_input;
-
-            text_input.display=display;
-            text_input.windows=windows;
-            text_input.annotate_context=annotate_context;
-            text_input.font_info=font_info;
-            text_input.command=command;
-            text_input.state=state;
-            if (XInsertTextCharacter(&text_input,&targets) == MagickFalse)
-              return(MagickFalse);
-            break;
-          }
-          case XK_Return:
-          case XK_KP_Enter:
-          {
-            if (XAdvanceTextLine(windows,font_info,&targets) == MagickFalse)
+            if (XTypeTextKey(&text_input,&targets,key_symbol) == MagickFalse)
               return(MagickFalse);
             break;
           }
