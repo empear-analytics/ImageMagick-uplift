@@ -6162,6 +6162,54 @@ static void ReleaseMorphologyApply(const MorphologyApplyRelease *release)
     reflected_kernel = DestroyKernelInfo(reflected_kernel);
 }
 
+typedef struct _MorphologyIteratedLimits
+{
+  size_t
+    *method_limit;
+
+  MagickBooleanType
+    *special;
+
+  CompositeOperator
+    *rslt_compose;
+
+  size_t
+    *kernel_limit;
+} MorphologyIteratedLimits;
+
+static void SetIteratedMorphologyLimits(const MorphologyMethod method,
+  const MorphologyIteratedLimits *limits)
+{
+  size_t
+    *const method_limit = limits->method_limit;
+
+  MagickBooleanType
+    *const special = limits->special;
+
+  CompositeOperator
+    *const rslt_compose = limits->rslt_compose;
+
+  size_t
+    *const kernel_limit = limits->kernel_limit;
+
+  switch( method ) {
+    case HitAndMissMorphology:
+      (*rslt_compose) = LightenCompositeOp;  /* Union of multi-kernel results */
+      magick_fallthrough;
+    case ThinningMorphology:
+    case ThickenMorphology:
+      (*method_limit) = (*kernel_limit);  /* iterate the whole method */
+      (*kernel_limit) = 1;             /* do not do kernel iteration  */
+      break;
+    case DistanceMorphology:
+    case VoronoiMorphology:
+      (*special) = MagickTrue;         /* use special direct primitive */
+      break;
+    default:
+      break;
+  }
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -6194,6 +6242,9 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
   char
     v_info[MagickPathExtent];
+
+  const MorphologyIteratedLimits
+    limits = { &method_limit, &special, &rslt_compose, &kernel_limit };
 
   const MorphologyApplyTargets
     targets = { &curr_image, &rslt_image, &save_image, &work_image, &count };
@@ -6242,19 +6293,8 @@ MagickPrivate Image *MorphologyApply(const Image *image,
     case EdgeMorphology:
       stage_limit = 2;
       break;
-    case HitAndMissMorphology:
-      rslt_compose = LightenCompositeOp;  /* Union of multi-kernel results */
-      magick_fallthrough;
-    case ThinningMorphology:
-    case ThickenMorphology:
-      method_limit = kernel_limit;  /* iterate the whole method */
-      kernel_limit = 1;             /* do not do kernel iteration  */
-      break;
-    case DistanceMorphology:
-    case VoronoiMorphology:
-      special = MagickTrue;         /* use special direct primitive */
-      break;
     default:
+      SetIteratedMorphologyLimits(method,&limits);
       break;
   }
 
