@@ -9047,6 +9047,86 @@ static void XFillColorRamp(const XStandardColormap *map_info,
   }
 }
 
+typedef struct _XBestPixelSource
+{
+  Display
+    *display;
+
+  Colormap
+    colormap;
+
+  XColor
+    *colors;
+
+  size_t
+    number_colors;
+
+  Image
+    *image;
+} XBestPixelSource;
+
+static void XSetVisualPixels(const XBestPixelSource *source,
+  XPixelInfo *pixel)
+{
+  Display
+    *const display = source->display;
+
+  const Colormap
+    colormap = source->colormap;
+
+  XColor
+    *const colors = source->colors;
+
+  const size_t
+    number_colors = source->number_colors;
+
+  Image
+    *const image = source->image;
+
+  ssize_t
+    i;
+
+  /*
+    Set foreground, background, border, etc. pixels.
+  */
+  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+    &pixel->foreground_color);
+  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+    &pixel->background_color);
+  if (pixel->background_color.pixel == pixel->foreground_color.pixel)
+    {
+      /*
+        Foreground and background colors must differ.
+      */
+      pixel->background_color.red=(~pixel->foreground_color.red);
+      pixel->background_color.green=
+        (~pixel->foreground_color.green);
+      pixel->background_color.blue=
+        (~pixel->foreground_color.blue);
+      XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+        &pixel->background_color);
+    }
+  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+    &pixel->border_color);
+  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+    &pixel->matte_color);
+  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+    &pixel->highlight_color);
+  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+    &pixel->shadow_color);
+  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+    &pixel->depth_color);
+  XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+    &pixel->trough_color);
+  for (i=0; i < MaxNumberPens; i++)
+  {
+    XBestPixel(display,colormap,colors,(unsigned int) number_colors,
+      &pixel->pen_colors[i]);
+    pixel->pixels[(ssize_t) image->colors+i]=pixel->pen_colors[i].pixel;
+  }
+  pixel->colors=(ssize_t) (image->colors+MaxNumberPens);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9498,45 +9578,15 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   if ((visual_info->klass != DirectColor) &&
       (visual_info->klass != TrueColor))
     {
-      /*
-        Set foreground, background, border, etc. pixels.
-      */
-      XBestPixel(display,colormap,colors,(unsigned int) number_colors,
-        &pixel->foreground_color);
-      XBestPixel(display,colormap,colors,(unsigned int) number_colors,
-        &pixel->background_color);
-      if (pixel->background_color.pixel == pixel->foreground_color.pixel)
-        {
-          /*
-            Foreground and background colors must differ.
-          */
-          pixel->background_color.red=(~pixel->foreground_color.red);
-          pixel->background_color.green=
-            (~pixel->foreground_color.green);
-          pixel->background_color.blue=
-            (~pixel->foreground_color.blue);
-          XBestPixel(display,colormap,colors,(unsigned int) number_colors,
-            &pixel->background_color);
-        }
-      XBestPixel(display,colormap,colors,(unsigned int) number_colors,
-        &pixel->border_color);
-      XBestPixel(display,colormap,colors,(unsigned int) number_colors,
-        &pixel->matte_color);
-      XBestPixel(display,colormap,colors,(unsigned int) number_colors,
-        &pixel->highlight_color);
-      XBestPixel(display,colormap,colors,(unsigned int) number_colors,
-        &pixel->shadow_color);
-      XBestPixel(display,colormap,colors,(unsigned int) number_colors,
-        &pixel->depth_color);
-      XBestPixel(display,colormap,colors,(unsigned int) number_colors,
-        &pixel->trough_color);
-      for (i=0; i < MaxNumberPens; i++)
-      {
-        XBestPixel(display,colormap,colors,(unsigned int) number_colors,
-          &pixel->pen_colors[i]);
-        pixel->pixels[(ssize_t) image->colors+i]=pixel->pen_colors[i].pixel;
-      }
-      pixel->colors=(ssize_t) (image->colors+MaxNumberPens);
+      XBestPixelSource
+        best_source;
+
+      best_source.display=display;
+      best_source.colormap=colormap;
+      best_source.colors=colors;
+      best_source.number_colors=number_colors;
+      best_source.image=image;
+      XSetVisualPixels(&best_source,pixel);
     }
   colors=(XColor *) RelinquishMagickMemory(colors);
   if ((GetLogEventMask() & X11Event) != 0)
