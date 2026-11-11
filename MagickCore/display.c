@@ -12914,6 +12914,7 @@ static MagickBooleanType XROIImage(Display *display,
       event_input.windows=windows;
       event_input.event=(&event);
       event_input.highlight_info=highlight_info;
+      event_input.text=text;
       switch (event.type)
       {
         case ButtonPress:
@@ -12928,18 +12929,7 @@ static MagickBooleanType XROIImage(Display *display,
         }
         case Expose:
         {
-          if (event.xexpose.window == windows->image.id)
-            if (event.xexpose.count == 0)
-              {
-                event.xexpose.x=(int) highlight_info.x;
-                event.xexpose.y=(int) highlight_info.y;
-                event.xexpose.width=(int) highlight_info.width;
-                event.xexpose.height=(int) highlight_info.height;
-                XRefreshWindow(display,&windows->image,&event);
-              }
-          if (event.xexpose.window == windows->info.id)
-            if (event.xexpose.count == 0)
-              XInfoWidget(display,windows,text);
+          XCropExpose(&event_input,&event);
           break;
         }
         case KeyPress:
