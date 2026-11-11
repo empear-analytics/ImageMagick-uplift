@@ -4280,6 +4280,26 @@ static void XChangeToImageDirectory(const Image *image,char *filename,
       "UnableToOpenFile","%s",path);
 }
 
+static void XRequestPageGeometry(Display *display,XWindows *windows,
+  ImageInfo *image_info)
+{
+  char
+    geometry[MagickPathExtent];
+
+  /*
+    Request page geometry from user.
+  */
+  (void) CopyMagickString(geometry,PSPageGeometry,MagickPathExtent);
+  if (LocaleCompare(image_info->magick,"PDF") == 0)
+    (void) CopyMagickString(geometry,PSPageGeometry,MagickPathExtent);
+  if (image_info->page != (char *) NULL)
+    (void) CopyMagickString(geometry,image_info->page,MagickPathExtent);
+  XListBrowserWidget(display,windows,&windows->widget,PageSizes,"Select",
+    "Select page geometry:",geometry);
+  if (*geometry != '\0')
+    image_info->page=GetPageGeometry(geometry);
+}
+
 static MagickBooleanType XSaveImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -4342,23 +4362,7 @@ static MagickBooleanType XSaveImage(Display *display,
         PlaneInterlace;
     }
   if (IsPostscriptFormat(image_info) != MagickFalse)
-    {
-      char
-        geometry[MagickPathExtent];
-
-      /*
-        Request page geometry from user.
-      */
-      (void) CopyMagickString(geometry,PSPageGeometry,MagickPathExtent);
-      if (LocaleCompare(image_info->magick,"PDF") == 0)
-        (void) CopyMagickString(geometry,PSPageGeometry,MagickPathExtent);
-      if (image_info->page != (char *) NULL)
-        (void) CopyMagickString(geometry,image_info->page,MagickPathExtent);
-      XListBrowserWidget(display,windows,&windows->widget,PageSizes,"Select",
-        "Select page geometry:",geometry);
-      if (*geometry != '\0')
-        image_info->page=GetPageGeometry(geometry);
-    }
+    XRequestPageGeometry(display,windows,image_info);
   /*
     Write image.
   */
