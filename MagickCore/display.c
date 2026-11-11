@@ -13216,6 +13216,74 @@ static inline MagickBooleanType IsTileNameCharacter(const char *q)
   return(((*q != '\xff') && (*q != '\0')) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _XTileFillInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  int
+    x_offset,
+    y_offset;
+
+  unsigned int
+    height,
+    width;
+
+  PixelInfo
+    pixel;
+
+  ExceptionInfo
+    *exception;
+} XTileFillInfo;
+
+static void XFillMissingTile(const XTileFillInfo *fill)
+{
+  Image
+    *const image = fill->image;
+
+  CacheView
+    *const image_view = fill->image_view;
+
+  const int
+    x_offset = fill->x_offset,
+    y_offset = fill->y_offset;
+
+  const unsigned int
+    height = fill->height,
+    width = fill->width;
+
+  const PixelInfo
+    pixel = fill->pixel;
+
+  ExceptionInfo
+    *const exception = fill->exception;
+
+  int
+    i,
+    j;
+
+  Quantum
+    *s;
+
+  for (i=0; i < (int) height; i++)
+  {
+    s=GetCacheViewAuthenticPixels(image_view,(ssize_t) x_offset,(ssize_t)
+      y_offset+i,width,1,exception);
+    if (s == (Quantum *) NULL)
+      break;
+    for (j=0; j < (int) width; j++)
+    {
+      SetPixelViaPixelInfo(image,&pixel,s);
+      s+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+}
+
 static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XWindows *windows,Image *image,XEvent *event,ExceptionInfo *exception)
 {
@@ -13403,12 +13471,6 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
       PixelInfo
         pixel;
 
-      int
-        j;
-
-      Quantum
-        *s;
-
       /*
         Ensure all the images exist.
       */
@@ -13418,6 +13480,9 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
       {
         CacheView
           *image_view;
+
+        XTileFillInfo
+          fill;
 
         q=p;
         while ((IsTileNameCharacter(q) != MagickFalse) &&
@@ -13439,20 +13504,15 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
           y);
         image_view=AcquireAuthenticCacheView(image,exception);
         (void) GetOneCacheViewVirtualPixelInfo(image_view,0,0,&pixel,exception);
-        for (i=0; i < (int) height; i++)
-        {
-          s=GetCacheViewAuthenticPixels(image_view,(ssize_t) x_offset,(ssize_t)
-            y_offset+i,width,1,exception);
-          if (s == (Quantum *) NULL)
-            break;
-          for (j=0; j < (int) width; j++)
-          {
-            SetPixelViaPixelInfo(image,&pixel,s);
-            s+=(ptrdiff_t) GetPixelChannels(image);
-          }
-          if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-            break;
-        }
+        fill.image=image;
+        fill.image_view=image_view;
+        fill.x_offset=x_offset;
+        fill.y_offset=y_offset;
+        fill.height=height;
+        fill.width=width;
+        fill.pixel=pixel;
+        fill.exception=exception;
+        XFillMissingTile(&fill);
         image_view=DestroyCacheView(image_view);
         tile++;
       }
