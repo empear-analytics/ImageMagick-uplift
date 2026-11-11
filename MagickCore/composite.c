@@ -2159,6 +2159,29 @@ typedef struct _VirtualCompositeInputs
     clamp;
 } VirtualCompositeInputs;
 
+static void SetVirtualDissolvePixel(const VirtualCompositeInputs *composite,
+  const PixelChannel channel,const Quantum *source,MagickRealType *pixel)
+{
+  switch (composite->compose)
+  {
+    case BlendCompositeOp:
+    case DissolveCompositeOp:
+    {
+      if (channel == AlphaPixelChannel)
+        (*pixel)=composite->canvas_dissolve*(double) GetPixelAlpha(
+          composite->source_image,source);
+      else
+        (*pixel)=(MagickRealType) source[channel];
+      break;
+    }
+    default:
+    {
+      (*pixel)=(MagickRealType) source[channel];
+      break;
+    }
+  }
+}
+
 static inline void SetVirtualCompositeChannels(
   const VirtualCompositeInputs *composite,const Quantum *source,
   Quantum *magick_restrict q)
@@ -2206,19 +2229,9 @@ static inline void SetVirtualCompositeChannels(
           pixel=0.0;
         break;
       }
-      case BlendCompositeOp:
-      case DissolveCompositeOp:
-      {
-        if (channel == AlphaPixelChannel)
-          pixel=composite->canvas_dissolve*(double) GetPixelAlpha(
-            composite->source_image,source);
-        else
-          pixel=(MagickRealType) source[channel];
-        break;
-      }
       default:
       {
-        pixel=(MagickRealType) source[channel];
+        SetVirtualDissolvePixel(composite,channel,source,&pixel);
         break;
       }
     }
