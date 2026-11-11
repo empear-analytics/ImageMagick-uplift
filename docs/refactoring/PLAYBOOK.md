@@ -2750,7 +2750,13 @@ Q and U, whose first step refuses a block containing `goto`.
    block, only as an argument of calls that keep no copy of it (`GetProperty`'s `text`,
    whose address goes to `GetPropertySeconds`, which reads and replaces `*text` and
    stores no pointer; checked by reading the callee) still qualifies, as in Recipe O
-   step 2.
+   step 2. `v` may also be an array of the caller's, declared `T v[N]` in its body, that
+   the block only indexes, `v[e]` read or assigned, and passes whole to no callee
+   (2026-11-12): it goes as a pointer parameter `T *v`, as Recipe E step 3 passes an
+   accumulator array, and every `v[e]` stays as written in the new function (step 4's
+   `*v` is for a scalar). The array's name is the address of its first element (C11
+   6.3.2.1p3), so `v[e]` names the same element; the caller passes the name, and an
+   array is never assigned or reseated as a whole.
 3. Cut the block into a new `static MagickBooleanType` function directly above the
    caller. Each `goto L;` becomes `return(MagickFalse);`, one for one, and the function
    ends with `return(MagickTrue);`. Nothing else in the text changes.
@@ -3025,7 +3031,8 @@ a finding.
    as Recipe N step 2 allows), at most four parameters in all. At the top of its
    body declare one `const` local per member, as Recipe N step 4 does (or write
    `name->member` at every use, its member form), then the variables of step 2. In the
-   text write `*v` for every use of `v`, reads included (Recipe V step 4); each `goto L;`
+   text write `*v` for every use of `v`, reads included (Recipe V step 4; an array `v`
+   keeps `v[e]` as written, Recipe V step 2); each `goto L;`
    or `return(c);` becomes `return(MagickFalse);`, one for one; the function ends with
    `return(MagickTrue);`. Nothing else in the text changes.
    A variable of the caller that the block reads on entry and then writes, and that the
@@ -11848,3 +11855,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | N | Step 2's array clause: a caller array the block assigns whole to a pointer member of a struct it fills (`s.m=v;`) may join the input group, as one it passes whole to a callee's pointer parameter may; *Careful* in the step gives the argument (array-to-pointer conversion is the same in an assignment as in an argument, C11 6.3.2.1p3 and 6.5.16.1p1; the member holds the address the block stored) | `animate.c`'s `XAnimateImages` (campaign A, W18 lane c, wide build): the ClientMessage case fills `window_colormaps.magick_windows=magick_windows;` (a function-static array) and the ButtonPress case `command_window.CommandMenu=CommandMenu;` (a const local array) before passing the struct to a helper; N step 2 listed only subscripts and call arguments. Probe: stubbing both cases takes `XAnimateImages` out of two nested-conditional chunks, animate.c 4.06 to 4.18 | owner |
 | 2026-11-11 | AMEND | CT | Step 4: the helper takes the input struct that the caller's sibling blocks share under Recipe N step 8 (filled once before them) in place of an input struct of its own, binding the members its block reads as N step 4 does; the written variables still go by the targets struct | `animate.c`'s `XAnimateImages` (campaign A, W18 lane c, wide build): the event switch's cases MapNotify, PropertyNotify and KeyPress write `nexus`, `image` and `state` (the existing `AnimateCommandTargets`) and read the display, windows, resource info, exception and more, which Unmap, Expose and ClientMessage tails read as well; one `AnimateEventContext` filled once before the `do` loop serves all of them. Added after the first three uses, which cite N step 8 and CT step 4 together | owner |
 | 2026-11-12 | NEW | SG | Spread an Enclosing Guard over the Tests Inside It: `if (G) { if (A1) X1 else if (A2) X2 ... }` becomes the chain of `((G) && (Ak))` tests, and `if (G) { S if (B) T }` becomes `if (G) S` and `if ((G) && (B)) T`, for a side-effect-free `G` (in the second form, one that `S` does not write); `tools/guard_spread_check.py` checks the rewrite token by token | `accelerate.c`'s `ComputeContrastStretchImage` (campaign A, W18 lane a, wide build), which no case reaches: four per-channel stretch-map blocks (shape a) and the histogram unmap (shape b) are five of its six bumps; Recipe CN refuses (statements before the nested test, or an else chain), moving them gives four helpers that clone each other (probe 3.08 to 3.01), and the unmap's `goto` and throw cannot move at the unreached level. Probe: 3.08 to 3.15, bumps 5 to 1 | owner |
+| 2026-11-12 | AMEND | V, Y | V step 2 (and Y step 4's `*v`): the one written variable `v` may be an array of the caller's that the block only indexes (`v[e]`, read or assigned) and passes whole to no callee; it goes as a pointer parameter `T *v`, as Recipe E step 3 passes an accumulator array, and `v[e]` stays as written in the new function (the array's name is the address of its first element, C11 6.3.2.1p3, so `v[e]` is the same element) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W18 lane a, wide build): the loop that creates the two temporary buffers, `for (k = 0; k < 2; k++) { tempImageBuffer[k] = clCreateBuffer(...); if (clStatus != CL_SUCCESS) { throw; goto cleanup; } }`, is one of its three bumps; it writes the array `tempImageBuffer` element by element and leaves through `goto cleanup;`, which Recipe V step 2 (a plain local) and Recipe I step 2 (no array) refuse, and Recipe AR refuses a `goto`. The function leaves Bumpy Road Ahead (bumps 2 to 1, after the cleanup loop left) | owner |
