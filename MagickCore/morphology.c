@@ -6123,27 +6123,16 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
     kernel_number = 0;
     while ( norm_kernel != NULL ) {
+      const MorphologyStages
+        stages = { image, method, norm_kernel, rflt_kernel, bias, verbose,
+          method_loop, kernel_number, stage_limit, kernel_limit, v_info,
+          exception };
+
       MorphologyCompoundFinish
         finish;
 
       MorphologyKernelResult
         kernel_result;
-
-      MorphologyStages
-        stages;
-
-      stages.image=image;
-      stages.method=method;
-      stages.norm_kernel=norm_kernel;
-      stages.rflt_kernel=rflt_kernel;
-      stages.bias=bias;
-      stages.verbose=verbose;
-      stages.method_loop=method_loop;
-      stages.kernel_number=kernel_number;
-      stages.stage_limit=stage_limit;
-      stages.kernel_limit=kernel_limit;
-      stages.v_info=v_info;
-      stages.exception=exception;
 
       /* Loop 3: Compound Morphology Staging - Select Primitive to apply */
       if (ApplyMorphologyStages(&stages,&stage_targets) == MagickFalse)
