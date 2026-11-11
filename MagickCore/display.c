@@ -2314,6 +2314,81 @@ static MagickBooleanType XAdvanceTextLine(XWindows *windows,
   return(MagickTrue);
 }
 
+typedef struct _AnnotateTextInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  GC
+    annotate_context;
+
+  XFontStruct
+    *font_info;
+
+  char
+    *command;
+
+  size_t
+    state;
+} AnnotateTextInput;
+
+static MagickBooleanType XInsertTextCharacter(
+  const AnnotateTextInput *text_input,const AnnotateTargets *targets)
+{
+  Display
+    *const display = text_input->display;
+
+  XWindows
+    *const windows = text_input->windows;
+
+  const GC
+    annotate_context = text_input->annotate_context;
+
+  XFontStruct
+    *const font_info = text_input->font_info;
+
+  char
+    *const command = text_input->command;
+
+  const size_t
+    state = text_input->state;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  /*
+    Draw a single character on the Image window.
+  */
+  if ((state & ModifierState) != 0)
+    return(MagickTrue);
+  if (*command == '\0')
+    return(MagickTrue);
+  *(*p)=(*command);
+  if ((*annotate_info)->stencil == ForegroundStencil)
+    (void) XDrawString(display,windows->image.id,annotate_context,
+      (*x),(*y),(*p),1);
+  else
+    (void) XDrawImageString(display,windows->image.id,
+      annotate_context,(*x),(*y),(*p),1);
+  (*x)+=XTextWidth(font_info,(*p),1);
+  (*p)++;
+  if (((*x)+font_info->max_bounds.width) < (int) windows->image.width)
+    return(MagickTrue);
+  if (XAdvanceTextLine(windows,font_info,targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -2836,25 +2911,16 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
           }
           default:
           {
-            /*
-              Draw a single character on the Image window.
-            */
-            if ((state & ModifierState) != 0)
-              break;
-            if (*command == '\0')
-              break;
-            *p=(*command);
-            if (annotate_info->stencil == ForegroundStencil)
-              (void) XDrawString(display,windows->image.id,annotate_context,
-                x,y,p,1);
-            else
-              (void) XDrawImageString(display,windows->image.id,
-                annotate_context,x,y,p,1);
-            x+=XTextWidth(font_info,p,1);
-            p++;
-            if ((x+font_info->max_bounds.width) < (int) windows->image.width)
-              break;
-            if (XAdvanceTextLine(windows,font_info,&targets) == MagickFalse)
+            AnnotateTextInput
+              text_input;
+
+            text_input.display=display;
+            text_input.windows=windows;
+            text_input.annotate_context=annotate_context;
+            text_input.font_info=font_info;
+            text_input.command=command;
+            text_input.state=state;
+            if (XInsertTextCharacter(&text_input,&targets) == MagickFalse)
               return(MagickFalse);
             break;
           }
