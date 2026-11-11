@@ -439,6 +439,18 @@ cleanup:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+static void ReleaseOpenCLBuffer(cl_mem buffer)
+{
+  if (buffer != (cl_mem) NULL)
+    ReleaseOpenCLMemObject(buffer);
+}
+
+static void ReleaseKernel(cl_kernel kernel)
+{
+  if (kernel != (cl_kernel) NULL)
+    ReleaseOpenCLKernel(kernel);
+}
+
 static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
   const double radius,const double sigma,ExceptionInfo *exception)
 {
@@ -599,16 +611,14 @@ static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
 
 cleanup:
 
-  if (imageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageBuffer);
+  ReleaseOpenCLBuffer(imageBuffer);
   if (filteredImageBuffer != (cl_mem) NULL)
     ReleaseOpenCLMemObject(filteredImageBuffer);
   if (tempImageBuffer != (cl_mem) NULL)
     ReleaseOpenCLMemObject(tempImageBuffer);
   if (imageKernelBuffer != (cl_mem) NULL)
     ReleaseOpenCLMemObject(imageKernelBuffer);
-  if (blurRowKernel != (cl_kernel) NULL)
-    ReleaseOpenCLKernel(blurRowKernel);
+  ReleaseKernel(blurRowKernel);
   if (blurColumnKernel != (cl_kernel) NULL)
     ReleaseOpenCLKernel(blurColumnKernel);
   if (queue != (cl_command_queue) NULL)
@@ -792,6 +802,60 @@ static MagickBooleanType IsStretchDirectClass(const Image *image)
       (image->colorspace == CMYKColorspace))) ? MagickTrue : MagickFalse);
 }
 
+static cl_mem_flags GetInputBufferFlags(const void *inputPixels)
+{
+  cl_mem_flags
+    mem_flags;
+
+  if (ALIGNED(inputPixels,CLPixelPacket))
+  {
+    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
+  }
+  else
+  {
+    mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
+  }
+  return(mem_flags);
+}
+
+static cl_uint FindStretchBlackBin(const cl_uint4 *histogram,
+  const double black_point)
+{
+  cl_uint
+    i;
+
+  double
+    intensity;
+
+  intensity=0.0;
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    intensity+=histogram[i].s[2];
+    if (intensity > black_point)
+      break;
+  }
+  return(i);
+}
+
+static cl_uint FindStretchWhiteBin(const Image *image,
+  const cl_uint4 *histogram,const double white_point)
+{
+  cl_uint
+    i;
+
+  double
+    intensity;
+
+  intensity=0.0;
+  for (i=(ssize_t) MaxMap; i != 0; i--)
+  {
+    intensity+=histogram[i].s[2];
+    if (intensity > ((double) image->columns*image->rows-white_point))
+      break;
+  }
+  return(i);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const double black_point,const double white_point,
   ExceptionInfo *exception)
@@ -829,9 +893,6 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
 
   cl_uint4
     *histogram;
-
-  double
-    intensity;
 
   cl_float4
     black,
@@ -918,14 +979,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   /* If the host pointer is aligned to the size of CLPixelPacket,
      then use the host buffer directly from the GPU; otherwise,
      create a buffer on the GPU and copy the data over */
-  if (ALIGNED(inputPixels,CLPixelPacket))
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
-  }
+  mem_flags=GetInputBufferFlags(inputPixels);
   /* create a CL buffer from image pixel buffer */
   length = image->columns * image->rows;
   imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
@@ -1003,84 +1057,36 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   white.x=MaxRange(QuantumRange);
   if ((image->channel_mask & RedChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.x=(cl_float) i;
-    intensity=0.0;
-    for (i=(ssize_t) MaxMap; i != 0; i--)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    i=FindStretchWhiteBin(image,histogram,white_point);
     white.x=(cl_float) i;
   }
   black.y=0.0;
   white.y=MaxRange(QuantumRange);
   if ((image->channel_mask & GreenChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.y=(cl_float) i;
-    intensity=0.0;
-    for (i=(ssize_t) MaxMap; i != 0; i--)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    i=FindStretchWhiteBin(image,histogram,white_point);
     white.y=(cl_float) i;
   }
   black.z=0.0;
   white.z=MaxRange(QuantumRange);
   if ((image->channel_mask & BlueChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.z=(cl_float) i;
-    intensity=0.0;
-    for (i=(ssize_t) MaxMap; i != 0; i--)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    i=FindStretchWhiteBin(image,histogram,white_point);
     white.z=(cl_float) i;
   }
   black.w=0.0;
   white.w=MaxRange(QuantumRange);
   if ((image->channel_mask & AlphaChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.w=(cl_float) i;
-    intensity=0.0;
-    for (i=(ssize_t) MaxMap; i != 0; i--)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    i=FindStretchWhiteBin(image,histogram,white_point);
     white.w=(cl_float) i;
   }
 
@@ -1852,6 +1858,36 @@ static void EqualizeColormapSync(Image *image,PixelPacket *equalize_map,
   }
 }
 
+static void IntegrateEqualizeHistogram(const Image *image,
+  const cl_uint4 *histogram,cl_float4 *map)
+{
+  cl_float4
+    intensity;
+
+  cl_uint
+    i;
+
+  (void) memset(&intensity,0,sizeof(intensity));
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    if ((image->channel_mask & SyncChannels) != 0)
+    {
+      intensity.x+=histogram[i].s[2];
+      map[i]=intensity;
+      continue;
+    }
+    if ((image->channel_mask & RedChannel) != 0)
+      intensity.x+=histogram[i].s[2];
+    if ((image->channel_mask & GreenChannel) != 0)
+      intensity.y+=histogram[i].s[1];
+    if ((image->channel_mask & BlueChannel) != 0)
+      intensity.z+=histogram[i].s[0];
+    if ((image->channel_mask & AlphaChannel) != 0)
+      intensity.w+=histogram[i].s[3];
+    map[i]=intensity;
+  }
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -1891,7 +1927,6 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   cl_float4
     white,
     black,
-    intensity,
     *map;
 
   HistogramBufferInfo
@@ -1967,14 +2002,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   /* If the host pointer is aligned to the size of CLPixelPacket,
      then use the host buffer directly from the GPU; otherwise,
      create a buffer on the GPU and copy the data over */
-  if (ALIGNED(inputPixels,CLPixelPacket))
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
-  }
+  mem_flags=GetInputBufferFlags(inputPixels);
   /* create a CL buffer from image pixel buffer */
   length = image->columns * image->rows;
   imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
@@ -2036,25 +2064,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   /*
     Integrate the histogram to get the equalization map.
   */
-  (void) memset(&intensity,0,sizeof(intensity));
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    if ((image->channel_mask & SyncChannels) != 0)
-    {
-      intensity.x+=histogram[i].s[2];
-      map[i]=intensity;
-      continue;
-    }
-    if ((image->channel_mask & RedChannel) != 0)
-      intensity.x+=histogram[i].s[2];
-    if ((image->channel_mask & GreenChannel) != 0)
-      intensity.y+=histogram[i].s[1];
-    if ((image->channel_mask & BlueChannel) != 0)
-      intensity.z+=histogram[i].s[0];
-    if ((image->channel_mask & AlphaChannel) != 0)
-      intensity.w+=histogram[i].s[3];
-    map[i]=intensity;
-  }
+  IntegrateEqualizeHistogram(image,histogram,map);
   black=map[0];
   white=map[(int) MaxMap];
   (void) memset(equalize_map,0,(MaxMap+1)*sizeof(*equalize_map));

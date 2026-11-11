@@ -383,3 +383,57 @@ function pointers would put an indirect call on a per-pixel path (as composite.c
 amendment** (ce647f64a): a struct the caller already fills for another static function's call may serve a later block
 when every variable the block reads is a member. **Upstream:** the parallel grays fill races (threads write equal values
 into shared `grays` entries); `p+=...;;` in the co-occurrence loop.
+
+## Lane d, morphology.c fourth leg: MorphologyPrimitive clean
+
+morphology.c 3.16 to 4.48 (23 refactor commits, every step but one H rising; helpers all inlined, no indirect calls,
+no forced-inline attribute). **Amendments** (59b543867): MT step 8 (copies reading a struct the caller already fills
+take `const Name *` beside `side`; a callee difference uses CF's `method`), CF step 4 (inputs through the shared
+struct), N step 4 (const locals or member form chosen member by member). Added after the owner's approval of the W16
+text; not yet confirmed. **Timing note:** step 11 (BlendKernelColumn) measured median +1.6%, minima +4% under load, with
+fewer instructions (318.12M to 317.78M); kept on instruction counts. **Upstream:** the vertical-convolve column path
+returns 0 rather than -1 on failure, so MorphologyApply misses a failed column pass; ErodeIntensity and DilateIntensity
+leave before `changes[id]++` and always report 0 changes; the DilateIntensity comment says the kernel is not reflected
+where the code reflects it.
+
+## Lane c, accelerate.c (wide build)
+
+accelerate.c 2.79 to 2.90 (9 refactor commits, existing recipes). **Owner questions:** (1) Recipe P on
+`AccelerateGrayscaleImage`'s traits test gives 2.97 and removes Complex Conditional, but the function joins the wrapper
+clone group (10 to 11 functions): allowed? (2) one D-set commit for the release helpers (25 `cl_mem` and 12 `cl_kernel`
+sites) when each function alone is flat rather than lower? (3) may kernel releases written `!=NULL` count as the same
+text as the helper's, differing only by the `(cl_kernel)` cast? **Upstream:** Despeckle overwrites `clStatus` from the
+`k==0` `clSetKernelArg` call on the next line, asserts `filteredImage != NULL` after `CloneImage`, and never checks
+`AcquireOpenCLKernel` for NULL.
+
+## Lane a, widget.c pass 4: Recipe CT
+
+widget.c 1.44 to 2.26 (46 refactor commits, 4 tool commits, wide build). The wide line coverage was regenerated in
+`~/im-w14a/build-oracle/oracle-wide.lcov` (`WIDE=1 python3 tools/oracle/linecov.py`, about 3 minutes) and every
+commit's evidence level comes from it. **Recipe CT** (80f0baadc): a `switch` case tail leaving by `break;` and writing
+two to six caller locals moves to a `static void` helper taking their addresses in one `const` targets struct; new
+`tools/case_tail_check.py` for its unreached level. **Amendments:** E step 4 (an array written only through calls that
+keep no copy), E step 3 (struct-pointer form for structs clang warns about), D object-code form (`v=Helper(...)`), I step
+1 (a block leaving the enclosing `switch` by `break;`). Tool changes: `obj_modulo.sh` compares %rip-relative function
+addresses by name; `reuse_check.py` and `targets_fill_check.py` widened; planted errors caught. Added after the owner's
+approval of the W16 text; not yet confirmed. **Owner questions:** (1) ff4c1349c is a Z step with one unreached line,
+committed `Verified: guard` with object code MODULO-IDENTICAL; Z has no unreached level: give it one? (2) is I step 2's
+"passes to every helper that writes any of them" limited to targets-struct helpers? (3) CT has no text on arrays; E
+step 4's clause was used by analogy. (4) -Wshadow: new parameters named `selection_info` shadow the file-scope pointer
+as the callers' locals already did; ci_linux_warnings does not compile widget.c (no X11 in its trees). (5) commits
+22cc19c36 and ab37ec7c5 briefly added a Complex Method helper that the next commit's SD split removed. **Upstream:**
+XFontBrowserWidget frees `font_info` without resetting it and later calls `XTextWidth(font_info,...)` (likely use after
+free); with `font_info` NULL the reply press uses a stale `i`; Dialog and Font leave `notify.send_event` unset.
+
+## Closing the W16 PR (2026-11-11)
+
+The four lanes stopped on 2026-11-10 at the weekly usage limit. **Not in this PR:** lane b's second xwindow.c leg (23
+commits on `campaign/W16-b`, including an N amendment and `tools/sibling_fill_check.py`) and lane c's display.c start
+(10 commits on `campaign/W16-c`, including a P amendment); neither finished its measured plan or its whole wide
+catalogue run, so both wait on their branches for the next batch. Lanes a (widget.c browsers) and d
+(MorphologyPrimitiveDirect) left nothing committed. **CI on the PR (run 42856917927):** the Windows jobs flagged MSVC
+C4702 at five `return(kernel);` lines after Recipe ST's helper switches in morphology.c, where every group returns;
+a `fix` commit drops them (object code IDENTICAL). Recipe ST's text should say that the caller's closing return does
+not follow into a helper whose every group returns (for the owner). The remaining CI failures are campaign B files:
+blob.c (Linux, first stop), type.c C2664, annotate.c, pixel-export.c, pixel-import.c, quantum-import.c (Windows);
+MacOS arm64 failed in its set-up step.
