@@ -15220,20 +15220,20 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
                     Determine if image file was modified.
                   */
                   status=GetPathAttributes(display_image->filename,&attributes);
-                  if (status != MagickFalse)
-                    if (update_time != attributes.st_mtime)
-                      {
-                        /*
-                          Redisplay image.
-                        */
-                        (void) FormatLocaleString(
-                          resource_info->image_info->filename,MagickPathExtent,
-                          "%s:%s",display_image->magick,
-                          display_image->filename);
-                        nexus=ReadImage(resource_info->image_info,exception);
-                        if (nexus != (Image *) NULL)
-                          *state|=NextImageState | ExitState;
-                      }
+                  if ((status != MagickFalse) &&
+                      (update_time != attributes.st_mtime))
+                    {
+                      /*
+                        Redisplay image.
+                      */
+                      (void) FormatLocaleString(
+                        resource_info->image_info->filename,MagickPathExtent,
+                        "%s:%s",display_image->magick,
+                        display_image->filename);
+                      nexus=ReadImage(resource_info->image_info,exception);
+                      if (nexus != (Image *) NULL)
+                        *state|=NextImageState | ExitState;
+                    }
                   delay=display_image->delay/(size_t) MagickMax(
                     display_image->ticks_per_second,1L);
                   timer=GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1;
