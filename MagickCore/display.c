@@ -3903,6 +3903,18 @@ static MagickBooleanType XColorEditImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _ComposeMenuInfo
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  int
+    id;
+} ComposeMenuInfo;
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -10683,18 +10695,6 @@ static void XPanImage(Display *display,XWindows *windows,XEvent *event,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-typedef struct _ComposeMenuInfo
-{
-  Display
-    *display;
-
-  XWindows
-    *windows;
-
-  int
-    id;
-} ComposeMenuInfo;
-
 static CompositeOperator XSelectPasteOperator(const ComposeMenuInfo *menu_info,
   const char *const *PasteMenu,CompositeOperator compose)
 {
