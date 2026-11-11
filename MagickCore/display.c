@@ -3431,6 +3431,10 @@ typedef struct _PaintMethodTargets
 static void
   XSelectPaintMethod(const EditMenuInput *,const PaintMethodTargets *);
 
+static void
+  XSelectFuzzFactor(const EditMenuInput *,const char *const *,char *,
+    Image **);
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3477,7 +3481,6 @@ static MagickBooleanType XColorEditImage(Display *display,
     cursor;
 
   int
-    entry,
     id,
     x,
     x_offset,
@@ -3674,27 +3677,12 @@ static MagickBooleanType XColorEditImage(Display *display,
             static char
               fuzz[MagickPathExtent];
 
-            /*
-              Select a command from the pop-up menu.
-            */
-            entry=XMenuWidget(display,windows,ColorEditMenu[id],FuzzMenu,
-              command);
-            if (entry < 0)
-              break;
-            if (entry != 5)
-              {
-                (*image)->fuzz=StringToDoubleInterval(FuzzMenu[entry],(double)
-                  QuantumRange+1.0);
-                break;
-              }
-            (void) (void) CopyMagickString(fuzz,"20%",MagickPathExtent);
-            (void) XDialogWidget(display,windows,"Ok",
-              "Enter fuzz factor (0.0 - 99.9%):",fuzz);
-            if (*fuzz == '\0')
-              break;
-            (void) ConcatenateMagickString(fuzz,"%",MagickPathExtent);
-            (*image)->fuzz=StringToDoubleInterval(fuzz,(double) QuantumRange+
-              1.0);
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=ColorEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,image);
             break;
           }
           case ColorEditUndoCommand:
