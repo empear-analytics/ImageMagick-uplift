@@ -784,6 +784,17 @@ static void XRemapBackgroundImages(Image *images,
       exception);
 }
 
+static MagickBooleanType XNextBackgroundEvent(Display *display,XEvent *event)
+{
+  if (XEventsQueued(display,QueuedAfterFlush) > 0)
+    {
+      (void) XNextEvent(display,event);
+      if ((*event).type == DestroyNotify)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1172,12 +1183,8 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   {
     for (scene=0; scene < (int) number_scenes; scene++)
     {
-      if (XEventsQueued(display,QueuedAfterFlush) > 0)
-        {
-          (void) XNextEvent(display,&event);
-          if (event.type == DestroyNotify)
-            break;
-        }
+      if (XNextBackgroundEvent(display,&event) == MagickFalse)
+        break;
       window_info.pixmap=window_info.pixmaps[scene];
       window_info.matte_pixmap=window_info.matte_pixmaps[scene];
       (void) XSetWindowBackgroundPixmap(display,window_info.id,
