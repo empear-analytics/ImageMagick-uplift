@@ -10807,7 +10807,12 @@ whole groups and keeps their nesting in the new function.
    the top of its body, with the addresses as its initialiser (`const T targets = { &a,
    &b, ... };`). A later block of the same function whose written variables are among
    its members takes the same struct instead of a new one and binds only the members
-   it writes; a variable outside the struct cannot be added to it later.
+   it writes. A variable outside the struct may be added to it by a later block
+   (2026-11-11): the typedef gains one pointer member after the existing ones, the
+   initialiser one address in the same place, and nothing else of the earlier helpers
+   changes, since each binds its members by name and uses none it does not write
+   (`widget.c`'s `MenuTargets`, which `EnterMenuSelection` and `MoveMenuSelection` bind
+   by name, gains `state`).
 4. Cut the block into a new `static void` function directly above the caller. It takes
    the variables the block only reads by value, or in one `const` input struct filled
    as Recipe Y steps 3 to 5 say (Recipe N step 2's conditions for struct values and its
@@ -10922,6 +10927,11 @@ static void SelectListBrowserEntry(const ListBrowserPress *press,
   value whose address the block passes on must go only to `const` parameters of
   callees that keep no copy (Recipe N step 2 (b)); a callee that writes through its
   pointer (`XDrawMatteText` moves `marker`) makes that variable a written one.
+- A member added later (step 3) changes no earlier helper: the typedef gains a pointer
+  member at its end, the initialiser one address, and a helper that does not bind the new
+  member never reads it, so every access it makes is to the objects its own members name.
+  The new address is of a distinct local, so no two members alias; the struct is still
+  filled with addresses only and read by calls that do not overlap.
 - `(*v).m` is `v->m`; the parenthesised form keeps the text a one-for-one substitution
   that step 8's script can check. Re-wrap a line the prefix pushes past 80 columns.
 - An initialiser of addresses of automatic variables needs C99, as Recipe I step 2's
@@ -11726,3 +11736,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | NEW | HT | Hoist the Exit Test Common to a Selection's Branches: in `if (C) P else Q` where `P` ends in `if (V == F) return(V);` and `Q` holds the same test followed by statements `Z` that run only when it passed, `Q` becomes a `static MagickBooleanType` helper returning `V`, the selection assigns `V` from it, and the test is written once after the selection; `tools/tail_hoist_check.py` checks the rewrite token by token | `quantize.c`'s `KmeansImage` (campaign A, W18 lane d): the two seeding branches each hold a nested `if (status == MagickFalse) return(status);`, the function's two bumps; Recipe W refuses (its `R` is a variable), nothing else reaches the shape. Probe: quantize.c 8.74 to 8.81, no finding on the helper | owner |
 | 2026-11-11 | AMEND | N | Step 2's array clause: a caller array the block assigns whole to a pointer member of a struct it fills (`s.m=v;`) may join the input group, as one it passes whole to a callee's pointer parameter may; *Careful* in the step gives the argument (array-to-pointer conversion is the same in an assignment as in an argument, C11 6.3.2.1p3 and 6.5.16.1p1; the member holds the address the block stored) | `animate.c`'s `XAnimateImages` (campaign A, W18 lane c, wide build): the ClientMessage case fills `window_colormaps.magick_windows=magick_windows;` (a function-static array) and the ButtonPress case `command_window.CommandMenu=CommandMenu;` (a const local array) before passing the struct to a helper; N step 2 listed only subscripts and call arguments. Probe: stubbing both cases takes `XAnimateImages` out of two nested-conditional chunks, animate.c 4.06 to 4.18 | owner |
 | 2026-11-11 | AMEND | CT | Step 4: the helper takes the input struct that the caller's sibling blocks share under Recipe N step 8 (filled once before them) in place of an input struct of its own, binding the members its block reads as N step 4 does; the written variables still go by the targets struct | `animate.c`'s `XAnimateImages` (campaign A, W18 lane c, wide build): the event switch's cases MapNotify, PropertyNotify and KeyPress write `nexus`, `image` and `state` (the existing `AnimateCommandTargets`) and read the display, windows, resource info, exception and more, which Unmap, Expose and ClientMessage tails read as well; one `AnimateEventContext` filled once before the `do` loop serves all of them. Added after the first three uses, which cite N step 8 and CT step 4 together | owner |
+| 2026-11-11 | AMEND | CT | Step 3: a variable outside the targets struct may be added to it by a later block (a pointer member after the existing ones, one address in the initialiser); the earlier helpers, which bind their members by name, are unchanged | `widget.c`'s `XMenuWidget` (campaign A, W18 lane c, wide build): `EnterMenuSelection` and `MoveMenuSelection` take `MenuTargets` (selection_info, highlight_info), and the event cases that call them through `&targets` also write `state`; one struct holding all three serves every case, where two would need the cases to pass both | owner |
