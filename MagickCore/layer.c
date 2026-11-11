@@ -1665,6 +1665,18 @@ static Image *ReleaseFrameListsAndImages(RectangleInfo *bounds,
   return((Image *) NULL);
 }
 
+static RectangleInfo *AcquireFrameBounds(const Image *curr,
+  const MagickBooleanType add_frames)
+{
+  RectangleInfo
+    *bounds;
+
+  bounds=(RectangleInfo *) AcquireQuantumMemory((size_t)
+    GetImageListLength(curr),(add_frames != MagickFalse ? 2UL : 1UL)*
+    sizeof(*bounds));
+  return(bounds);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1731,9 +1743,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     Allocate memory (times 2 if we allow the use of frame duplications)
   */
   curr=GetFirstImageInList(image);
-  bounds=(RectangleInfo *) AcquireQuantumMemory((size_t)
-    GetImageListLength(curr),(add_frames != MagickFalse ? 2UL : 1UL)*
-    sizeof(*bounds));
+  bounds=AcquireFrameBounds(curr,add_frames);
   if (bounds == (RectangleInfo *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   disposals=(DisposeType *) AcquireQuantumMemory((size_t)
