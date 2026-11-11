@@ -1085,13 +1085,11 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
 
   /* unmap, don't block gpu to use this buffer again.  */
   if (ALIGNED(histogram,cl_uint4))
-  {
     clStatus = clEnv->library->clEnqueueUnmapMemObject(queue, histogramBuffer, histogram, 0, NULL, NULL);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
-      goto cleanup;
-    }
+  if ((ALIGNED(histogram,cl_uint4)) && (clStatus != CL_SUCCESS))
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
+    goto cleanup;
   }
 
   /* recreate input buffer later, in case image updated */
