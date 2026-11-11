@@ -348,6 +348,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/version.h \
   MagickCore/version-private.h \
   MagickCore/visual-effects.c \
+  MagickCore/visual-effects-pixel.c \
   MagickCore/visual-effects-wavelet.c \
   MagickCore/visual-effects-plasma.c \
   MagickCore/visual-effects-stegano.c \
