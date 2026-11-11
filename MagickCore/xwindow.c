@@ -9127,6 +9127,69 @@ static void XSetVisualPixels(const XBestPixelSource *source,
   pixel->colors=(ssize_t) (image->colors+MaxNumberPens);
 }
 
+typedef struct _XStaticColorSource
+{
+  Display
+    *display;
+
+  XVisualInfo
+    *visual_info;
+
+  Image
+    *image;
+} XStaticColorSource;
+
+static Colormap XAllocStaticColors(const XStaticColorSource *source,
+  Colormap colormap,XPixelInfo *pixel,XColor *colors)
+{
+  Display
+    *const display = source->display;
+
+  XVisualInfo
+    *const visual_info = source->visual_info;
+
+  Image
+    *const image = source->image;
+
+  ssize_t
+    i;
+
+  Status
+    status;
+
+  XColor
+    color,
+    *p;
+
+  unsigned short
+    gray_value;
+
+  p=colors;
+  color.flags=(char) (DoRed | DoGreen | DoBlue);
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    color.red=ScaleQuantumToShort(XRedGamma(image->colormap[i].red));
+    color.green=ScaleQuantumToShort(XGreenGamma(image->colormap[i].green));
+    color.blue=ScaleQuantumToShort(XBlueGamma(image->colormap[i].blue));
+    if (visual_info->klass != StaticColor)
+      {
+        gray_value=(unsigned short) XPixelIntensity(&color);
+        color.red=gray_value;
+        color.green=gray_value;
+        color.blue=gray_value;
+      }
+    status=XAllocColor(display,colormap,&color);
+    if (status == False)
+      {
+        colormap=XCopyColormapAndFree(display,colormap);
+        (void) XAllocColor(display,colormap,&color);
+      }
+    pixel->pixels[i]=color.pixel;
+    *p++=color;
+  }
+  return(colormap);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9258,6 +9321,9 @@ MagickPrivate void XMakeStandardColormap(Display *display,
     case StaticGray:
     case StaticColor:
     {
+      XStaticColorSource
+        static_source;
+
       /*
         Define Standard Colormap for StaticGray or StaticColor visual.
       */
@@ -9267,29 +9333,10 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       if (colors == (XColor *) NULL)
         ThrowXWindowFatalException(ResourceLimitFatalError,
           "UnableToCreateColormap",image->filename);
-      p=colors;
-      color.flags=(char) (DoRed | DoGreen | DoBlue);
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        color.red=ScaleQuantumToShort(XRedGamma(image->colormap[i].red));
-        color.green=ScaleQuantumToShort(XGreenGamma(image->colormap[i].green));
-        color.blue=ScaleQuantumToShort(XBlueGamma(image->colormap[i].blue));
-        if (visual_info->klass != StaticColor)
-          {
-            gray_value=(unsigned short) XPixelIntensity(&color);
-            color.red=gray_value;
-            color.green=gray_value;
-            color.blue=gray_value;
-          }
-        status=XAllocColor(display,colormap,&color);
-        if (status == False)
-          {
-            colormap=XCopyColormapAndFree(display,colormap);
-            (void) XAllocColor(display,colormap,&color);
-          }
-        pixel->pixels[i]=color.pixel;
-        *p++=color;
-      }
+      static_source.display=display;
+      static_source.visual_info=visual_info;
+      static_source.image=image;
+      colormap=XAllocStaticColors(&static_source,colormap,pixel,colors);
       break;
     }
     case GrayScale:
