@@ -1391,6 +1391,67 @@ static void XReleaseIconColormap(const AnimateIconColormaps *icon_colormaps)
   windows->icon.mapped=MagickFalse;
 }
 
+typedef struct _AnimateImageWindow
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  XStandardColormap
+    *map_info;
+
+  Image
+    **image_list;
+
+  Image
+    *display_image;
+
+  ExceptionInfo
+    *exception;
+} AnimateImageWindow;
+
+static void XMapAnimateImageWindow(const AnimateImageWindow *image_window,
+  Image **nexus,Image **image,MagickStatusType *state)
+{
+  Display
+    *const display = image_window->display;
+
+  XResourceInfo
+    *const resource_info = image_window->resource_info;
+
+  XWindows
+    *const windows = image_window->windows;
+
+  XStandardColormap
+    *const map_info = image_window->map_info;
+
+  Image
+    **const image_list = image_window->image_list;
+
+  Image
+    *const display_image = image_window->display_image;
+
+  ExceptionInfo
+    *const exception = image_window->exception;
+
+  if (windows->backdrop.id != (Window) NULL)
+    (void) XInstallColormap(display,map_info->colormap);
+  if (LocaleCompare(image_list[0]->magick,"LOGO") == 0)
+    {
+      if (LocaleCompare(display_image->filename,"LOGO") == 0)
+        (*nexus)=XMagickCommand(display,resource_info,windows,
+          OpenCommand,&(*image),&(*state),exception);
+      else
+        (*state)|=ExitState;
+    }
+  windows->image.mapped=MagickTrue;
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2757,17 +2818,17 @@ MagickExport Image *XAnimateImages(Display *display,
           }
         if (event.xmap.window == windows->image.id)
           {
-            if (windows->backdrop.id != (Window) NULL)
-              (void) XInstallColormap(display,map_info->colormap);
-            if (LocaleCompare(image_list[0]->magick,"LOGO") == 0)
-              {
-                if (LocaleCompare(display_image->filename,"LOGO") == 0)
-                  nexus=XMagickCommand(display,resource_info,windows,
-                    OpenCommand,&image,&state,exception);
-                else
-                  state|=ExitState;
-              }
-            windows->image.mapped=MagickTrue;
+            AnimateImageWindow
+              image_window;
+
+            image_window.display=display;
+            image_window.resource_info=resource_info;
+            image_window.windows=windows;
+            image_window.map_info=map_info;
+            image_window.image_list=image_list;
+            image_window.display_image=display_image;
+            image_window.exception=exception;
+            XMapAnimateImageWindow(&image_window,&nexus,&image,&state);
             break;
           }
         if (event.xmap.window == windows->info.id)
