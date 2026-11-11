@@ -9461,6 +9461,121 @@ static size_t XRetainServerColors(const XServerColorSource *server_source,
   return(number_colors);
 }
 
+typedef struct _XSharedColormapSource
+{
+  Display
+    *display;
+
+  XVisualInfo
+    *visual_info;
+
+  Colormap
+    colormap;
+
+  Image
+    *image;
+
+  XPixelInfo
+    *pixel;
+
+  XColor
+    *colors;
+
+  DiversityPacket
+    *diversity;
+
+  ExceptionInfo
+    *exception;
+} XSharedColormapSource;
+
+static size_t XAllocSharedColors(const XSharedColormapSource *shared_source,
+  size_t number_colors)
+{
+  Display
+    *const display = shared_source->display;
+
+  XVisualInfo
+    *const visual_info = shared_source->visual_info;
+
+  const Colormap
+    colormap = shared_source->colormap;
+
+  Image
+    *const image = shared_source->image;
+
+  DiversityPacket
+    *const diversity = shared_source->diversity;
+
+  ssize_t
+    i;
+
+  Status
+    status;
+
+  unsigned short
+    index;
+
+  XColor
+    color,
+    *p,
+    *server_colors;
+
+  XServerColorSource
+    server_source;
+
+  XRankColorDiversity(image,diversity,shared_source->exception);
+  /*
+    Allocate colors.
+  */
+  p=shared_source->colors;
+  color.flags=(char) (DoRed | DoGreen | DoBlue);
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    index=diversity[i].index;
+    color.red=
+      ScaleQuantumToShort(XRedGamma(image->colormap[index].red));
+    color.green=
+      ScaleQuantumToShort(XGreenGamma(image->colormap[index].green));
+    color.blue=
+      ScaleQuantumToShort(XBlueGamma(image->colormap[index].blue));
+    XApplyGrayVisual(visual_info,&color);
+    status=XAllocColor(display,colormap,&color);
+    if (status == False)
+      break;
+    shared_source->pixel->pixels[index]=color.pixel;
+    *p++=color;
+  }
+  /*
+    Read X server colormap.
+  */
+  server_colors=XQueryServerColors(display,colormap,visual_info,image);
+  /*
+    Select remaining colors from X server colormap.
+  */
+  for (; i < (ssize_t) image->colors; i++)
+  {
+    index=diversity[i].index;
+    color.red=ScaleQuantumToShort(
+      XRedGamma(image->colormap[index].red));
+    color.green=ScaleQuantumToShort(
+      XGreenGamma(image->colormap[index].green));
+    color.blue=ScaleQuantumToShort(
+      XBlueGamma(image->colormap[index].blue));
+    XApplyGrayVisual(visual_info,&color);
+    XBestPixel(display,colormap,server_colors,(unsigned int)
+      visual_info->colormap_size,&color);
+    shared_source->pixel->pixels[index]=color.pixel;
+    *p++=color;
+  }
+  server_source.image=image;
+  server_source.visual_info=visual_info;
+  server_source.server_colors=server_colors;
+  server_source.p=p;
+  number_colors=XRetainServerColors(&server_source,number_colors);
+  server_colors=(XColor *) RelinquishMagickMemory(server_colors);
+  return(number_colors);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9647,14 +9762,8 @@ MagickPrivate void XMakeStandardColormap(Display *display,
           DiversityPacket
             *diversity;
 
-          unsigned short
-            index;
-
-          XColor
-            *server_colors;
-
-          XServerColorSource
-            server_source;
+          XSharedColormapSource
+            shared_source;
 
           /*
             Define Standard colormap for shared GrayScale or PseudoColor visual.
@@ -9664,56 +9773,15 @@ MagickPrivate void XMakeStandardColormap(Display *display,
           if (diversity == (DiversityPacket *) NULL)
             ThrowXWindowFatalException(ResourceLimitFatalError,
               "UnableToCreateColormap",image->filename);
-          XRankColorDiversity(image,diversity,exception);
-          /*
-            Allocate colors.
-          */
-          p=colors;
-          color.flags=(char) (DoRed | DoGreen | DoBlue);
-          for (i=0; i < (ssize_t) image->colors; i++)
-          {
-            index=diversity[i].index;
-            color.red=
-              ScaleQuantumToShort(XRedGamma(image->colormap[index].red));
-            color.green=
-              ScaleQuantumToShort(XGreenGamma(image->colormap[index].green));
-            color.blue=
-              ScaleQuantumToShort(XBlueGamma(image->colormap[index].blue));
-            XApplyGrayVisual(visual_info,&color);
-            status=XAllocColor(display,colormap,&color);
-            if (status == False)
-              break;
-            pixel->pixels[index]=color.pixel;
-            *p++=color;
-          }
-          /*
-            Read X server colormap.
-          */
-          server_colors=XQueryServerColors(display,colormap,visual_info,image);
-          /*
-            Select remaining colors from X server colormap.
-          */
-          for (; i < (ssize_t) image->colors; i++)
-          {
-            index=diversity[i].index;
-            color.red=ScaleQuantumToShort(
-              XRedGamma(image->colormap[index].red));
-            color.green=ScaleQuantumToShort(
-              XGreenGamma(image->colormap[index].green));
-            color.blue=ScaleQuantumToShort(
-              XBlueGamma(image->colormap[index].blue));
-            XApplyGrayVisual(visual_info,&color);
-            XBestPixel(display,colormap,server_colors,(unsigned int)
-              visual_info->colormap_size,&color);
-            pixel->pixels[index]=color.pixel;
-            *p++=color;
-          }
-          server_source.image=image;
-          server_source.visual_info=visual_info;
-          server_source.server_colors=server_colors;
-          server_source.p=p;
-          number_colors=XRetainServerColors(&server_source,number_colors);
-          server_colors=(XColor *) RelinquishMagickMemory(server_colors);
+          shared_source.display=display;
+          shared_source.visual_info=visual_info;
+          shared_source.colormap=colormap;
+          shared_source.image=image;
+          shared_source.pixel=pixel;
+          shared_source.colors=colors;
+          shared_source.diversity=diversity;
+          shared_source.exception=exception;
+          number_colors=XAllocSharedColors(&shared_source,number_colors);
           diversity=(DiversityPacket *) RelinquishMagickMemory(diversity);
           break;
         }
