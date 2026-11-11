@@ -1818,6 +1818,9 @@ static XWidgetInfo
 static void
   MatchFontBrowserReply(const FontBrowserMatch *,XWidgetInfo *,int *);
 
+static void
+  DrawFontBrowserNames(const FontBrowserNames *,XWidgetInfo *,int *);
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2262,21 +2265,22 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             slider_info.min_y+1)/(int) colors;
         if (slider_info.id != selection_info.id)
           {
+            FontBrowserNames
+              names;
+
             /*
               Redraw scroll bar and file names.
             */
             selection_info.id=slider_info.id;
             selection_info.y=list_info.y+(int) (height >> 3)+2;
-            for (i=0; i < (int) visible_colors; i++)
-            {
-              selection_info.raised=(slider_info.id+i) != list_info.id ?
-                MagickTrue : MagickFalse;
-              selection_info.text=(char *) NULL;
-              if ((slider_info.id+i) < (int) colors)
-                selection_info.text=colorlist[slider_info.id+i];
-              XDrawWidgetText(display,&windows->widget,&selection_info);
-              selection_info.y+=(int) selection_info.height;
-            }
+            names.display=display;
+            names.windows=windows;
+            names.fontlist=colorlist;
+            names.fonts=(int) colors;
+            names.visible_fonts=visible_colors;
+            names.list_info=list_info;
+            names.slider_info=slider_info;
+            DrawFontBrowserNames(&names,&selection_info,&i);
             /*
               Update slider.
             */
