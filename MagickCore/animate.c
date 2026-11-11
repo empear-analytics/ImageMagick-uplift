@@ -3040,6 +3040,9 @@ typedef struct _AnimateEventContext
 
   XPixelInfo
     *icon_pixel;
+
+  const char
+    *const *CommandMenu;
 } AnimateEventContext;
 
 static void XHandleUnmapNotify(const AnimateEventContext *event_context,
@@ -3466,6 +3469,56 @@ static void XHandleExpose(const AnimateEventContext *event_context,
       event.xexpose.width,event.xexpose.height,event.xexpose.x,
       event.xexpose.y);
   XRepaintExposedWindows(display,windows,scene,event);
+}
+
+static void XHandleButtonPress(const AnimateEventContext *event_context,
+  const AnimateCommandTargets *targets)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  XEvent
+    *const event = targets->event;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Button Press: 0x%lx %u +%d+%d",(*event).xbutton.window,
+      (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
+  if (((*event).xbutton.button == Button3) &&
+      ((*event).xbutton.state & Mod1Mask))
+    {
+      /*
+        Convert Alt-Button3 to Button2.
+      */
+      (*event).xbutton.button=Button2;
+      (*event).xbutton.state&=(~(unsigned int) Mod1Mask);
+    }
+  if ((*event).xbutton.window == windows->backdrop.id)
+    {
+      (void) XSetInputFocus(display,(*event).xbutton.window,RevertToParent,
+        (*event).xbutton.time);
+      return;
+    }
+  if ((*event).xbutton.window == windows->image.id)
+    {
+      AnimateCommandWindow
+        command_window;
+
+      command_window.display=display;
+      command_window.resource_info=resource_info;
+      command_window.windows=windows;
+      command_window.CommandMenu=event_context->CommandMenu;
+      (*state)=XPressImageWindow(&command_window,(*state));
+    }
 }
 
 MagickExport Image *XAnimateImages(Display *display,
@@ -4186,6 +4239,7 @@ MagickExport Image *XAnimateImages(Display *display,
   event_context.icon_visual=icon_visual;
   event_context.icon_map=icon_map;
   event_context.icon_pixel=icon_pixel;
+  event_context.CommandMenu=CommandMenu;
   (void) XMagickCommand(display,resource_info,windows,PlayCommand,&images,
     &state,exception);
   do
@@ -4277,36 +4331,7 @@ MagickExport Image *XAnimateImages(Display *display,
     {
       case ButtonPress:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Press: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
-        if ((event.xbutton.button == Button3) &&
-            (event.xbutton.state & Mod1Mask))
-          {
-            /*
-              Convert Alt-Button3 to Button2.
-            */
-            event.xbutton.button=Button2;
-            event.xbutton.state&=(~(unsigned int) Mod1Mask);
-          }
-        if (event.xbutton.window == windows->backdrop.id)
-          {
-            (void) XSetInputFocus(display,event.xbutton.window,RevertToParent,
-              event.xbutton.time);
-            break;
-          }
-        if (event.xbutton.window == windows->image.id)
-          {
-            AnimateCommandWindow
-              command_window;
-
-            command_window.display=display;
-            command_window.resource_info=resource_info;
-            command_window.windows=windows;
-            command_window.CommandMenu=CommandMenu;
-            state=XPressImageWindow(&command_window,state);
-          }
+        XHandleButtonPress(&event_context,&command_targets);
         break;
       }
       case ButtonRelease:
