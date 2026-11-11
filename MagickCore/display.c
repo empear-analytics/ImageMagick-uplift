@@ -13806,37 +13806,36 @@ static Image *XVisualDirectoryImage(Display *display,
     *read_info->magick='\0';
     next_image=ReadImage(read_info,exception);
     CatchException(exception);
-    if (next_image != (Image *) NULL)
+    if (next_image == (Image *) NULL)
+      continue;
+    (void) DeleteImageProperty(next_image,"label");
+    (void) SetImageProperty(next_image,"label",InterpretImageProperties(
+      read_info,next_image,DefaultTileLabel,exception),exception);
+    (void) ParseRegionGeometry(next_image,read_info->size,&geometry,
+      exception);
+    thumbnail_image=ThumbnailImage(next_image,geometry.width,
+      geometry.height,exception);
+    if (thumbnail_image != (Image *) NULL)
       {
-        (void) DeleteImageProperty(next_image,"label");
-        (void) SetImageProperty(next_image,"label",InterpretImageProperties(
-          read_info,next_image,DefaultTileLabel,exception),exception);
-        (void) ParseRegionGeometry(next_image,read_info->size,&geometry,
-          exception);
-        thumbnail_image=ThumbnailImage(next_image,geometry.width,
-          geometry.height,exception);
-        if (thumbnail_image != (Image *) NULL)
-          {
-            next_image=DestroyImage(next_image);
-            next_image=thumbnail_image;
-          }
-        if (backdrop)
-          {
-            (void) XDisplayBackgroundImage(display,&background_resources,
-              next_image,exception);
-            XSetCursorState(display,windows,MagickTrue);
-          }
-        AppendImageToList(&images,next_image);
-        if (images->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            MagickBooleanType
-              proceed;
+        next_image=DestroyImage(next_image);
+        next_image=thumbnail_image;
+      }
+    if (backdrop)
+      {
+        (void) XDisplayBackgroundImage(display,&background_resources,
+          next_image,exception);
+        XSetCursorState(display,windows,MagickTrue);
+      }
+    AppendImageToList(&images,next_image);
+    if (images->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+        MagickBooleanType
+          proceed;
 
-            proceed=SetImageProgress(images,LoadImageTag,(MagickOffsetType) i,
-              (MagickSizeType) number_files);
-            if (proceed == MagickFalse)
-              break;
-          }
+        proceed=SetImageProgress(images,LoadImageTag,(MagickOffsetType) i,
+          (MagickSizeType) number_files);
+        if (proceed == MagickFalse)
+          break;
       }
   }
   filelist=(char **) RelinquishMagickMemory(filelist);
