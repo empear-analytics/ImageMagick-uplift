@@ -16,6 +16,8 @@ function whose guard is one of the GUARDs it requires the body to be
   (b) statements S followed by one `if (B) T` with no `else`: the expected rewrite is
       `if (G) S` (S in braces when it is more than one statement, or one compound
       statement) followed by `if ((G) && (B)) T`;
+  (c) the same S and `if (B) T` with an `else E` after the braces: the expected rewrite
+      is `if (G) { S } else E` followed by `if ((G) && (B)) T`;
 
 and prints OK when the rewritten old text equals the new text, or FAIL with the first
 token where they differ. A guard of the old function that has no such body is left as it
@@ -105,6 +107,26 @@ def split_chain(toks):
             return None
 
 
+def spread_with_else(toks, g, body, e):
+    """Shape (c): `if (G) { S if (B) T } else E`; returns (new tokens, next index) or None."""
+    j = 0
+    starts = []
+    while j < len(body):
+        starts.append(j)
+        j = stmt_end(body, j)
+    last = starts[-1] if starts else None
+    if last is None or len(starts) < 2 or body[last] != 'if':
+        return None
+    c2 = match(body, last + 1, '(', ')')
+    if stmt_end(body, c2 + 1) != len(body):
+        return None
+    end_e = stmt_end(toks, e + 2)
+    s, b, t = body[:last], body[last + 2:c2], body[c2 + 1:]
+    out = ['if', '('] + g + [')', '{'] + s + ['}', 'else'] + toks[e + 2:end_e]
+    out += ['if', '(', '('] + g + [')', '&&', '('] + b + [')', ')'] + t
+    return out, end_e
+
+
 def rewrite(toks, guards):
     out = []
     i = 0
@@ -116,8 +138,13 @@ def rewrite(toks, guards):
                 e = match(toks, c + 1, '{', '}')
                 body = toks[c + 2:e]
                 if e + 1 < len(toks) and toks[e + 1] == 'else':
-                    out.extend(toks[i:e + 1])
-                    i = e + 1
+                    r = spread_with_else(toks, g, body, e)
+                    if r is not None:
+                        out.extend(r[0])
+                        i = r[1]
+                    else:
+                        out.extend(toks[i:e + 1])
+                        i = e + 1
                     continue
                 # (a) one chain
                 ch = split_chain(body) if body and body[0] == 'if' and stmt_end(body, 0) == len(body) else None
