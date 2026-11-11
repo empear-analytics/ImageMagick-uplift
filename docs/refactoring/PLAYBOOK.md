@@ -11151,6 +11151,116 @@ Ahead* and *Large Method*, 3.48 to 3.67 with the XSaveImage steps. Added by Clau
 
 ---
 
+## Recipe FT - Replace a Fall-Through into a Call by the Call
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Brain Method*, *Bumpy Road
+Ahead* or *Large Method*, and the case that would be moved (Recipe CT, E step 7, O or Z)
+ends by falling through, `magick_fallthrough;`, into a case whose whole body is one call
+of a `static void` helper and the closing `break;`, as the corner tests of `display.c`'s
+`XCropImage` and `XROIImage` do: the ButtonPress case tests the button, the window and
+the four corners, leaves the `switch` through `break;` from each, and otherwise falls
+into the ButtonRelease case, which is `XCropButtonRelease(&event_input,crop_info);
+break;` once Recipe N has moved its body.
+
+**Not covered by:** Recipe CT step 1, whose block runs nothing but the closing `break;`
+after it, so a case that falls into another is refused; Recipe SD step 1, which moves a
+chain of fall-through groups whole into one function that keeps their nesting and their
+cyclomatic complexity (here 12); Recipe E step 7, whose `break;` forms need the case to
+end in `break;`.
+
+**How:**
+
+1. The `switch` lies outside every OpenMP region and the two cases hold no `#` line. The
+   case `A` ends, on the paths that do not leave it earlier, with `magick_fallthrough;`
+   (nothing after it in the group), and the next case `B` is directly below it. `B`'s
+   whole body, after an earlier step of this catalogue (Recipe N, CT or E step 7), is
+   one expression statement `Q(a1,...,an);` followed by `break;`, `Q` a `static void`
+   function; `B` declares nothing and runs nothing else.
+2. Every name in the arguments `a1,...,an` is declared outside both cases (in a block that
+   encloses the `switch`), so it means the same object in `A` as in `B`. Nothing runs
+   between the end of `A`'s group and `B`'s call (`B`'s label is the next thing and `B`
+   declares nothing), so the call placed in `A` reads the values the fall-through
+   carried (checked by reading).
+3. In `A` replace `magick_fallthrough;` by the call `Q(a1,...,an);` copied from `B`,
+   character for character, followed by `break;`. `B` stays as it is, entered by its own
+   label.
+4. Check by reading that `A` now ends in `break;` on every path and `B` is untouched; the
+   next step is the Recipe that moves `A` (CT, whose helper then holds the call).
+
+**Before:**
+
+```c
+        case ButtonPress:
+        {
+          if (event.xbutton.button != Button1)
+            break;
+          ...
+          if (IsNearBottomRightCorner(x,y,crop_info) != MagickFalse)
+            {
+              state|=UpdateConfigurationState;
+              break;
+            }
+          magick_fallthrough;
+        }
+        case ButtonRelease:
+        {
+          XCropButtonRelease(&event_input,crop_info);
+          break;
+        }
+```
+
+**After:**
+
+```c
+        case ButtonPress:
+        {
+          if (event.xbutton.button != Button1)
+            break;
+          ...
+          if (IsNearBottomRightCorner(x,y,crop_info) != MagickFalse)
+            {
+              state|=UpdateConfigurationState;
+              break;
+            }
+          XCropButtonRelease(&event_input,crop_info);
+          break;
+        }
+        case ButtonRelease:
+        {
+          XCropButtonRelease(&event_input,crop_info);
+          break;
+        }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A fall-through enters `B` at once: the first statement of
+  `B`'s body is the call, evaluated with the values of the variables at that point, then
+  `break;` leaves the `switch`. After, the paths of `A` that reached `magick_fallthrough;`
+  run the same call with the same arguments at the same point and break; the paths that
+  left `A` earlier are untouched, and a dispatch on `B`'s label still runs `B`'s body.
+  Nothing ran between the end of `A` and the call in the original (step 1), and nothing
+  runs between them now.
+- The call appears twice in the text: `refactor_guard.py --calls` reports `+1` for `Q`
+  (the one added call), which is this recipe's expected movement and nothing else.
+- Removing `magick_fallthrough;` removes a `-Wimplicit-fallthrough` annotation the case no
+  longer needs, as `A` now ends in `break;`.
+- Step 2 is about scope, not values: arguments such as `&event_input` and `crop_info` name
+  objects declared in the loop body or the function, outside the `switch`; a call whose
+  argument is a local of `B`'s own block (declared inside it) is refused.
+
+**Evidence level:** oracle (the fall-through path is the one most cases take), with
+`refactor_guard.py --calls` (`+1` for `Q`) and steps 1 and 2 checked by reading.
+
+**Provenance:** 2026-11-11, from `display.c`'s `XCropImage` (campaign A, W18 lane b, wide
+build): its ButtonPress case ends `magick_fallthrough;` into ButtonRelease, so CT step 1
+refuses it and its four corner tests keep the function at depth 4; SD would hold twelve
+decisions in one helper. A probe of the chain (Recipe N on ButtonRelease, this recipe,
+CT on ButtonPress): the cases leave the depth-4 sites. Added by Claude Code (Claude
+Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -11535,3 +11645,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | NEW | UX | Unnest an Exit Implied by Its Guard: a guard on the disjunction of `A` and `B` whose body runs a clean-up `S`, then exits through `X` when `B` holds and through `Y` otherwise, becomes three statements: the guard holding `S` alone, `if (B) X`, and `if (A) { Y }`; `A` and `B` are side-effect-free reads of locals that `S` does not write | `animate.c`'s `XMagickCommand` (campaign A, W17 lane c, wide build): the Open command's failure guard releases the file list and then throws one of two `ThrowXWindowException`s, which record `GetMagickModule()` and must stay in the function; the nested test is the function's last bump after the SD splits. Probe of the chain: `XMagickCommand` leaves Bumpy Road Ahead and Large Method, 3.48 to 3.67 with the XSaveImage steps | owner |
 | 2026-11-11 | WORDING | UX | Step 5 and *Evidence level*: `refactor_guard.py` counts distinct values, so repeating `A` may leave it at PASS; a WARN is expected only when a literal of `A` is new to the count | The first use (`XMagickCommand`, `status == MagickFalse`) printed PASS, not the WARN the text predicted | owner |
 | 2026-11-11 | AMEND | D | A cast of a call to the exact type its function is declared to return (`(char **) GetCommandOptions(...)`) and a `(void)` cast of a `(void)` cast (`(void) (void) CopyMagickString(...)`) are not differing values; the script removes them before comparing and the helper is written without them (C11 6.5.4p5, 6.3.2.2) | `display.c`'s `XColorEditImage` (campaign A, W18 lane b, wide build): its Method and Fuzz cases equal `XSelectPaintMethod` and `XSelectFuzzFactor`, which `XMatteEditImage` already calls, but for those two spellings; reuse removes two of the function's depth-4 sites and is one step of the chain that takes it out of *Brain Method* (probe: display.c 1.41 to 1.49) | owner |
+| 2026-11-11 | NEW | FT | Replace a Fall-Through into a Call by the Call: a case ending `magick_fallthrough;` into a case whose whole body is a call of a `static void` helper and `break;` gets that call and a `break;` in place of the fall-through, so that Recipe CT (whose step 1 needs the case to end in `break;`) can move it | `display.c`'s `XCropImage` and `XROIImage` (campaign A, W18 lane b, wide build): the ButtonPress case (button, window and four corner tests, each leaving through `break;`) falls into ButtonRelease; CT refuses it and SD would carry twelve decisions into one helper. Probe of the XCropImage chain: see its commits | owner |
