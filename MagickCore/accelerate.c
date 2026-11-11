@@ -1387,6 +1387,54 @@ MagickPrivate MagickBooleanType AccelerateContrastStretchImage(
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _TempBufferInfo
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+} TempBufferInfo;
+
+static MagickBooleanType CreateTempImageBuffers(const TempBufferInfo *info,
+  cl_mem *tempImageBuffer,ExceptionInfo *exception)
+{
+  const MagickCLDevice
+    device = info->device;
+
+  const MagickCLEnv
+    clEnv = info->clEnv;
+
+  const cl_mem_flags
+    mem_flags = info->mem_flags;
+
+  const size_t
+    length = info->length;
+
+  cl_int
+    clStatus;
+
+  int
+    k;
+
+  for (k = 0; k < 2; k++)
+  {
+    tempImageBuffer[k] = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), NULL, &clStatus);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
 static void ReleaseTempImageBuffers(MagickCLEnv clEnv,cl_mem *tempImageBuffer)
 {
   int
@@ -1507,14 +1555,12 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
 
   mem_flags = CL_MEM_READ_WRITE;
   length = image->columns * image->rows;
-  for (k = 0; k < 2; k++)
   {
-    tempImageBuffer[k] = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), NULL, &clStatus);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    const TempBufferInfo
+      info = { clEnv, device, mem_flags, length };
+
+    if (CreateTempImageBuffers(&info,tempImageBuffer,exception) == MagickFalse)
       goto cleanup;
-    }
   }
 
   filteredImage = CloneImage(image,0,0,MagickTrue,exception);
