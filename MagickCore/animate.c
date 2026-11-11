@@ -3058,6 +3058,9 @@ typedef struct _AnimateEventContext
 
   size_t
     number_windows;
+
+  size_t
+    number_scenes;
 } AnimateEventContext;
 
 static void XHandleUnmapNotify(const AnimateEventContext *event_context,
@@ -3667,6 +3670,84 @@ static void XLogSceneImage(Image **image_list,const ssize_t scene,
       (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
         image_list[scene]->magick);
     }
+}
+
+static void XCreateSceneWindows(const AnimateEventContext *event_context,
+  const Image *images,XEvent *event)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  XVisualInfo
+    *const visual_info = event_context->visual_info;
+
+  XStandardColormap
+    *const map_info = event_context->map_info;
+
+  Image
+    **const image_list = event_context->image_list;
+
+  ExceptionInfo
+    *const exception = event_context->exception;
+
+  const size_t
+    number_scenes = event_context->number_scenes;
+
+  int
+    status;
+
+  ssize_t
+    scene;
+
+  for (scene=0; scene < (ssize_t) number_scenes; scene++)
+  {
+    AnimateSceneWindow
+      scene_window;
+
+    unsigned int
+      columns,
+      rows;
+
+    /*
+      Create X image.
+    */
+    windows->image.pixmap=(Pixmap) NULL;
+    windows->image.matte_pixmap=(Pixmap) NULL;
+    if ((IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse) &&
+        (image_list[scene]->storage_class == PseudoClass))
+      XGetPixelInfo(display,visual_info,map_info,resource_info,
+        image_list[scene],windows->image.pixel_info);
+    columns=(unsigned int) image_list[scene]->columns;
+    rows=(unsigned int) image_list[scene]->rows;
+    if ((image_list[scene]->columns != columns) ||
+        (image_list[scene]->rows != rows))
+      ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+        image_list[scene]->filename);
+    status=XMakeImage(display,resource_info,&windows->image,image_list[scene],
+      columns,rows,exception) == MagickFalse ? 0 : 1;
+    if (status == MagickFalse)
+      ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+        images->filename);
+    XLogSceneImage(image_list,scene,columns,rows);
+    /*
+      Window name is the base of the filename.
+    */
+    scene_window.display=display;
+    scene_window.resource_info=resource_info;
+    scene_window.windows=windows;
+    scene_window.image_list=image_list;
+    scene_window.number_scenes=number_scenes;
+    scene_window.exception=exception;
+    scene_window.scene=scene;
+    XNameSceneWindow(&scene_window);
+    XStoreSceneWindow(&scene_window,event);
+  }
 }
 
 MagickExport Image *XAnimateImages(Display *display,
@@ -4302,61 +4383,6 @@ MagickExport Image *XAnimateImages(Display *display,
       (windows->backdrop.id != (Window) NULL))
     (void) XMapWindow(display,windows->image.id);
   XSetCursorState(display,windows,MagickTrue);
-  for (scene=0; scene < (ssize_t) number_scenes; scene++)
-  {
-    AnimateSceneWindow
-      scene_window;
-
-    unsigned int
-      columns,
-      rows;
-
-    /*
-      Create X image.
-    */
-    windows->image.pixmap=(Pixmap) NULL;
-    windows->image.matte_pixmap=(Pixmap) NULL;
-    if ((IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse) &&
-        (image_list[scene]->storage_class == PseudoClass))
-      XGetPixelInfo(display,visual_info,map_info,resource_info,
-        image_list[scene],windows->image.pixel_info);
-    columns=(unsigned int) image_list[scene]->columns;
-    rows=(unsigned int) image_list[scene]->rows;
-    if ((image_list[scene]->columns != columns) ||
-        (image_list[scene]->rows != rows))
-      ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-        image_list[scene]->filename);
-    status=XMakeImage(display,resource_info,&windows->image,image_list[scene],
-      columns,rows,exception) == MagickFalse ? 0 : 1;
-    if (status == MagickFalse)
-      ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-        images->filename);
-    XLogSceneImage(image_list,scene,columns,rows);
-    /*
-      Window name is the base of the filename.
-    */
-    scene_window.display=display;
-    scene_window.resource_info=resource_info;
-    scene_window.windows=windows;
-    scene_window.image_list=image_list;
-    scene_window.number_scenes=number_scenes;
-    scene_window.exception=exception;
-    scene_window.scene=scene;
-    XNameSceneWindow(&scene_window);
-    XStoreSceneWindow(&scene_window,&event);
-  }
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->command.mapped)
-    (void) XMapRaised(display,windows->command.id);
-  /*
-    Respond to events.
-  */
-  nexus=NewImageList();
-  scene=0;
-  first_scene=0;
-  iterations=0;
-  image=image_list[0];
-  state=(MagickStatusType) (ForwardAnimationState | RepeatAnimationState);
   event_context.display=display;
   event_context.resource_info=resource_info;
   event_context.windows=windows;
@@ -4375,6 +4401,20 @@ MagickExport Image *XAnimateImages(Display *display,
   event_context.root_window=root_window;
   event_context.magick_windows=magick_windows;
   event_context.number_windows=number_windows;
+  event_context.number_scenes=number_scenes;
+  XCreateSceneWindows(&event_context,images,&event);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->command.mapped)
+    (void) XMapRaised(display,windows->command.id);
+  /*
+    Respond to events.
+  */
+  nexus=NewImageList();
+  scene=0;
+  first_scene=0;
+  iterations=0;
+  image=image_list[0];
+  state=(MagickStatusType) (ForwardAnimationState | RepeatAnimationState);
   (void) XMagickCommand(display,resource_info,windows,PlayCommand,&images,
     &state,exception);
   do
