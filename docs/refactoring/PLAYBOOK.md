@@ -11348,7 +11348,8 @@ Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 **Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*), and the
 bump is an `if (G) { ... }` whose braces hold nothing but nested tests, in one of two
 shapes: (a) a chain of exclusive branches `if (A1) X1 else if (A2) X2 ... else if (An) Xn`
-with no final `else`, or (b) statements `S` and then one `if (B) T`. The typical case is
+with no final `else`, (b) statements `S` and then one `if (B) T`, or (c) shape (b) with an
+`else E` after the braces. The typical case is
 `accelerate.c`'s `ComputeContrastStretchImage`: four per-channel blocks `if
 ((image->channel_mask & RedChannel) != 0) { if (i < (cl_uint) black.x) ... else if ... }`
 in the stretch-map loop (shape a), and the histogram unmap `if (ALIGNED(histogram,cl_uint4))
@@ -11370,17 +11371,21 @@ Recipe G, which inverts an outermost condition into an early exit.
    declaration, no label and no `#pragma` or preprocessor line, and either (a) exactly one
    statement, an `if`/`else if` chain of two or more tests whose last branch has no `else`,
    or (b) two or more statements, the last of which is one `if (B) T` without `else`
-   (`S` is the statements before it). The `Xk` and `T` are any statements, exits included.
+   (`S` is the statements before it), or (c) shape (b) with an `else E` after the braces
+   (2026-11-12; the `if (G)` has no `else` in (a) and (b)). The `Xk`, `T` and `E` are any
+   statements, exits included.
 2. `G` has no side effect: no call (a macro is read through its definition, `ALIGNED` is a
    comparison of its argument), assignment, increment or `volatile` object. In (a) every
    `Ak` has none either, and in (b) `S` writes no object `G` reads (not by assignment,
    increment or `&v` passed to a callee, and no pointer to such an object is held anywhere
-   `S` can reach). Check by reading each statement of `S`.
+   `S` can reach); in (c) `E` writes none either. Check by reading each statement of `S`
+   and `E`.
 3. Rewrite (a) as `if ((G) && (A1)) X1 else if ((G) && (A2)) X2 ... else if ((G) && (An)) Xn`:
    each test is `G` and the old test, each in its own parentheses, in that order; the outer
    braces go and each `Xk` stays unchanged, re-indented one level less. Rewrite (b) as `if
    (G) S` (`S` in braces unless it is one non-compound statement), then `if ((G) && (B)) T`,
-   `G`, `B`, `S` and `T` copied character for character. Wrap at 80 columns.
+   `G`, `B`, `S` and `T` copied character for character. Rewrite (c) as `if (G) { S } else
+   E` and then `if ((G) && (B)) T`, `E` unchanged. Wrap at 80 columns.
 4. Every such guard of one function may go in one commit (one recipe, one function).
 5. Run `python3 tools/guard_spread_check.py <file> <Function> <G> [<G> ...]` (each `G` the
    text between the parentheses of its `if`): it applies steps 1 and 3 to the old function
@@ -11437,8 +11442,10 @@ Recipe G, which inverts an outermost condition into an early exit.
   evaluation, so it cannot change; the `Ak` have no side effect either, so repeating `G`
   between them reorders nothing.
 - Shape (b), path by path. `G` false: the original ran nothing; the new `if (G) S` and the
-  guarded test do nothing. `G` true: the original ran `S` and then tested `B`; the new code
-  runs `S`, then evaluates `G` again and `B`. `S` writes nothing `G` reads (step 2), so `G`
+  guarded test do nothing (in (c) the original ran `E` and the new code runs `E` and then
+  finds `G` false again, `E` having written nothing `G` reads). `G` true: the original ran
+  `S` and then tested `B`; the new code runs `S`, skips `E`, then evaluates `G` again and
+  `B`. `S` writes nothing `G` reads (step 2), so `G`
   is still true, and `B` is evaluated after `S` as before, once; `T` runs exactly then. A
   `S` that leaves (a `return` or `goto`) leaves from the same statement in both.
 - What the step removes is one level of nesting; it adds one `&&` per test (cyclomatic
@@ -11459,8 +11466,11 @@ and 2 checked by reading.
 W18 lane a, wide build): four per-channel stretch-map blocks and the histogram unmap are five
 of its six bumps; it has no caller in the tree, so no case reaches it, and four per-channel
 helpers clone each other (probe 3.08 to 3.01). A probe of the step: spreading the four guards
-takes the score from 3.08 to 3.13 and the unmap guard to 3.15 (bumps 5 to 2 to 1). Added by Claude Code (Claude Sonnet 5.5)
-under the owner's OK of 2026-11-10 to evolve the recipes.
+takes the score from 3.08 to 3.13 and the unmap guard to 3.15 (bumps 5 to 2 to 1). Shape
+(c): `ComputeResizeImage`'s two arms, `if (xFactor > yFactor) {...} else {...}`, each end in
+nested exit tests; the first arm, as a helper call whose result is tested last, is
+`if (G) { fills; if (call == MagickFalse) goto cleanup; } else E` (3.17 to 3.19). Added by
+Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -11856,3 +11866,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | CT | Step 4: the helper takes the input struct that the caller's sibling blocks share under Recipe N step 8 (filled once before them) in place of an input struct of its own, binding the members its block reads as N step 4 does; the written variables still go by the targets struct | `animate.c`'s `XAnimateImages` (campaign A, W18 lane c, wide build): the event switch's cases MapNotify, PropertyNotify and KeyPress write `nexus`, `image` and `state` (the existing `AnimateCommandTargets`) and read the display, windows, resource info, exception and more, which Unmap, Expose and ClientMessage tails read as well; one `AnimateEventContext` filled once before the `do` loop serves all of them. Added after the first three uses, which cite N step 8 and CT step 4 together | owner |
 | 2026-11-12 | NEW | SG | Spread an Enclosing Guard over the Tests Inside It: `if (G) { if (A1) X1 else if (A2) X2 ... }` becomes the chain of `((G) && (Ak))` tests, and `if (G) { S if (B) T }` becomes `if (G) S` and `if ((G) && (B)) T`, for a side-effect-free `G` (in the second form, one that `S` does not write); `tools/guard_spread_check.py` checks the rewrite token by token | `accelerate.c`'s `ComputeContrastStretchImage` (campaign A, W18 lane a, wide build), which no case reaches: four per-channel stretch-map blocks (shape a) and the histogram unmap (shape b) are five of its six bumps; Recipe CN refuses (statements before the nested test, or an else chain), moving them gives four helpers that clone each other (probe 3.08 to 3.01), and the unmap's `goto` and throw cannot move at the unreached level. Probe: 3.08 to 3.15, bumps 5 to 1 | owner |
 | 2026-11-12 | AMEND | V, Y | V step 2 (and Y step 4's `*v`): the one written variable `v` may be an array of the caller's that the block only indexes (`v[e]`, read or assigned) and passes whole to no callee; it goes as a pointer parameter `T *v`, as Recipe E step 3 passes an accumulator array, and `v[e]` stays as written in the new function (the array's name is the address of its first element, C11 6.3.2.1p3, so `v[e]` is the same element) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W18 lane a, wide build): the loop that creates the two temporary buffers, `for (k = 0; k < 2; k++) { tempImageBuffer[k] = clCreateBuffer(...); if (clStatus != CL_SUCCESS) { throw; goto cleanup; } }`, is one of its three bumps; it writes the array `tempImageBuffer` element by element and leaves through `goto cleanup;`, which Recipe V step 2 (a plain local) and Recipe I step 2 (no array) refuse, and Recipe AR refuses a `goto`. The function leaves Bumpy Road Ahead (bumps 2 to 1, after the cleanup loop left) | owner |
+| 2026-11-12 | AMEND | SG | Shape (c): `if (G) { S if (B) T } else E` becomes `if (G) { S } else E` and `if ((G) && (B)) T`, when `G` has no side effect and neither `S` nor `E` writes anything `G` reads (`E` runs only when `G` was false, and `G` is evaluated again after it); `tools/guard_spread_check.py` checks it as well | `accelerate.c`'s `ComputeResizeImage` (campaign A, W18 lane a, wide build): after its first arm becomes a helper call, `if (xFactor > yFactor) { fills; if (call == MagickFalse) goto cleanup; } else {...}` keeps the exit test nested in the arm, Recipe I and Recipe E cannot take an exit test out of the arm, and the selection's two arms are the function's last two bumps. A probe: the function leaves Bumpy Road Ahead, so does the file, accelerate.c 3.17 to 3.19 | owner |
