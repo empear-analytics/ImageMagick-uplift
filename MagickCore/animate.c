@@ -4315,6 +4315,19 @@ static void XSetJPEGQuality(Image *image,ImageInfo *image_info,
     PlaneInterlace;
 }
 
+static MagickStatusType XWriteSavedImages(ImageInfo *image_info,
+  Image *image,char *filename,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  image=GetFirstImageInList(image);
+  status=WriteImages(image_info,image,filename,exception);
+  if (status != MagickFalse)
+    image->taint=MagickFalse;
+  return(status);
+}
+
 static MagickBooleanType XSaveImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -4378,10 +4391,7 @@ static MagickBooleanType XSaveImage(Display *display,
   /*
     Write image.
   */
-  image=GetFirstImageInList(image);
-  status=WriteImages(image_info,image,filename,exception);
-  if (status != MagickFalse)
-    image->taint=MagickFalse;
+  status=XWriteSavedImages(image_info,image,filename,exception);
   image_info=DestroyImageInfo(image_info);
   XSetCursorState(display,windows,MagickFalse);
   return(status != 0 ? MagickTrue : MagickFalse);
