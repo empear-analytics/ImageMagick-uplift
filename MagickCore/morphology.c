@@ -4750,6 +4750,34 @@ static double MinimizeTrailingRowsDistance(const MorphologyKernelRows *rows,
   return(pixel);
 }
 
+static OffsetInfo GetDirectKernelOffset(const MorphologyMethod method,
+  const KernelInfo *kernel)
+{
+  OffsetInfo
+    offset;
+
+  switch(method)
+  {
+    case DistanceMorphology:
+    case VoronoiMorphology:
+    {
+      /*
+        Kernel reflected about origin.
+      */
+      offset.x=(ssize_t) kernel->width-kernel->x-1;
+      offset.y=(ssize_t) kernel->height-kernel->y-1;
+      break;
+    }
+    default:
+    {
+      offset.x=kernel->x;
+      offset.y=kernel->y;
+      break;
+    }
+  }
+  return(offset);
+}
+
 static ssize_t MorphologyPrimitiveDirect(Image *image,
   const MorphologyMethod method,const KernelInfo *kernel,
   ExceptionInfo *exception)
@@ -4783,25 +4811,7 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
   status=MagickTrue;
   changed=0;
   progress=0;
-  switch(method)
-  {
-    case DistanceMorphology:
-    case VoronoiMorphology:
-    {
-      /*
-        Kernel reflected about origin.
-      */
-      offset.x=(ssize_t) kernel->width-kernel->x-1;
-      offset.y=(ssize_t) kernel->height-kernel->y-1;
-      break;
-    }
-    default:
-    {
-      offset.x=kernel->x;
-      offset.y=kernel->y;
-      break;
-    }
-  }
+  offset=GetDirectKernelOffset(method,kernel);
   /*
     Two views into same image, do not thread.
   */
