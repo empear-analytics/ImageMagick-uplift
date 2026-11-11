@@ -1674,6 +1674,42 @@ static MagickBooleanType FetchFeatureGrayRow(const FeatureGrayRow *row,
   return(MagickTrue);
 }
 
+typedef struct _FeatureBufferTargets
+{
+  FeatureStatistics
+    ***cooccurrence,
+    **density_x,
+    **density_xy,
+    **density_y,
+    ***Q,
+    **sum;
+} FeatureBufferTargets;
+
+static void AcquireFeatureBuffers(const unsigned int number_grays,
+  const FeatureBufferTargets *targets)
+{
+  FeatureStatistics
+    ***const cooccurrence = targets->cooccurrence,
+    **const density_x = targets->density_x,
+    **const density_xy = targets->density_xy,
+    **const density_y = targets->density_y,
+    ***const Q = targets->Q,
+    **const sum = targets->sum;
+
+  (*cooccurrence)=(FeatureStatistics **) AcquireQuantumMemory(number_grays,
+    sizeof(*(*cooccurrence)));
+  (*density_x)=(FeatureStatistics *) AcquireQuantumMemory(number_grays+1,
+    2*sizeof(*(*density_x)));
+  (*density_xy)=(FeatureStatistics *) AcquireQuantumMemory(number_grays+1,
+    2*sizeof(*(*density_xy)));
+  (*density_y)=(FeatureStatistics *) AcquireQuantumMemory(number_grays+1,
+    2*sizeof(*(*density_y)));
+  (*Q)=(FeatureStatistics **) AcquireQuantumMemory(number_grays,
+    sizeof(*(*Q)));
+  (*sum)=(FeatureStatistics *) AcquireQuantumMemory(number_grays,
+    sizeof(*(*sum)));
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1722,6 +1758,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 
   unsigned int
     number_grays;
+
+  const FeatureBufferTargets
+    targets = { &cooccurrence, &density_x, &density_xy, &density_y, &Q, &sum };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1800,16 +1839,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     Allocate spatial dependence matrix.
   */
   number_grays=GetFeatureGrayLevels(image,gray);
-  cooccurrence=(FeatureStatistics **) AcquireQuantumMemory(number_grays,
-    sizeof(*cooccurrence));
-  density_x=(FeatureStatistics *) AcquireQuantumMemory(number_grays+1,
-    2*sizeof(*density_x));
-  density_xy=(FeatureStatistics *) AcquireQuantumMemory(number_grays+1,
-    2*sizeof(*density_xy));
-  density_y=(FeatureStatistics *) AcquireQuantumMemory(number_grays+1,
-    2*sizeof(*density_y));
-  Q=(FeatureStatistics **) AcquireQuantumMemory(number_grays,sizeof(*Q));
-  sum=(FeatureStatistics *) AcquireQuantumMemory(number_grays,sizeof(*sum));
+  AcquireFeatureBuffers(number_grays,&targets);
   buffers.cooccurrence=cooccurrence;
   buffers.density_x=density_x;
   buffers.density_xy=density_xy;
