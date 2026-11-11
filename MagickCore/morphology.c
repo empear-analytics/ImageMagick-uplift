@@ -6121,6 +6121,47 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
   return(MagickTrue);
 }
 
+typedef struct _MorphologyApplyRelease
+{
+  const Image
+    *image;
+
+  Image
+    *curr_image,
+    *rslt_image,
+    *work_image,
+    *save_image;
+
+  KernelInfo
+    *reflected_kernel;
+} MorphologyApplyRelease;
+
+static void ReleaseMorphologyApply(const MorphologyApplyRelease *release)
+{
+  const Image
+    *const image = release->image;
+
+  Image
+    *curr_image = release->curr_image,
+    *const rslt_image = release->rslt_image,
+    *work_image = release->work_image,
+    *save_image = release->save_image;
+
+  KernelInfo
+    *reflected_kernel = release->reflected_kernel;
+
+  if ( curr_image == rslt_image || curr_image == image )
+    curr_image = (Image *) NULL;
+  if ( curr_image != (Image *) NULL )
+    curr_image = DestroyImage(curr_image);
+  if ( work_image != (Image *) NULL )
+    work_image = DestroyImage(work_image);
+  if ( save_image != (Image *) NULL )
+    save_image = DestroyImage(save_image);
+  if ( reflected_kernel != (KernelInfo *) NULL )
+    reflected_kernel = DestroyKernelInfo(reflected_kernel);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -6260,16 +6301,13 @@ error_cleanup:
   if ( rslt_image != (Image *) NULL )
     rslt_image = DestroyImage(rslt_image);
 exit_cleanup:
-  if ( curr_image == rslt_image || curr_image == image )
-    curr_image = (Image *) NULL;
-  if ( curr_image != (Image *) NULL )
-    curr_image = DestroyImage(curr_image);
-  if ( work_image != (Image *) NULL )
-    work_image = DestroyImage(work_image);
-  if ( save_image != (Image *) NULL )
-    save_image = DestroyImage(save_image);
-  if ( reflected_kernel != (KernelInfo *) NULL )
-    reflected_kernel = DestroyKernelInfo(reflected_kernel);
+  {
+    const MorphologyApplyRelease
+      release = { image, curr_image, rslt_image, work_image, save_image,
+        reflected_kernel };
+
+    ReleaseMorphologyApply(&release);
+  }
   return(rslt_image);
 }
 
