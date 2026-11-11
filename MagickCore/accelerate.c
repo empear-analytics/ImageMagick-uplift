@@ -4398,8 +4398,6 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
     info.yFactor=yFactor;
     targets.tempImageBuffer=(&tempImageBuffer);
     targets.outputReady=(&outputReady);
-    if (ResizeHorizontalThenVertical(&info,exception,&targets) == MagickFalse)
-      goto cleanup;
   }
   else
   {
@@ -4429,6 +4427,9 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
     if (outputReady == MagickFalse)
       goto cleanup;
   }
+  if ((xFactor > yFactor) &&
+      (ResizeHorizontalThenVertical(&info,exception,&targets) == MagickFalse))
+    goto cleanup;
 
 cleanup:
 
