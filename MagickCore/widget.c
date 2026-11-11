@@ -5864,6 +5864,9 @@ static void SelectFontBrowserEntry(const FontBrowserPress *press,
   (*state)|=RedrawListState;
 }
 
+static XWidgetInfo
+  ApplyListBrowserControlKey(XWidgetInfo,const KeySym,const size_t);
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6793,24 +6796,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
             state|=ControlState;
             break;
           }
-        if (state & ControlState)
-          switch ((int) key_symbol)
-          {
-            case XK_u:
-            case XK_U:
-            {
-              /*
-                Erase the entire line of text.
-              */
-              *reply_info.text='\0';
-              reply_info.cursor=reply_info.text;
-              reply_info.marker=reply_info.text;
-              reply_info.highlight=MagickFalse;
-              break;
-            }
-            default:
-              break;
-          }
+        reply_info=ApplyListBrowserControlKey(reply_info,key_symbol,state);
         XEditText(display,&reply_info,key_symbol,command,state);
         XDrawMatteText(display,&windows->widget,&reply_info);
         state|=JumpListState;
