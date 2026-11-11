@@ -5182,6 +5182,37 @@ typedef struct _CropTargets
     *state;
 } CropTargets;
 
+static void XCropMotion(const CropEventInput *event_input,
+  const CropTargets *targets)
+{
+  Display
+    *const display = event_input->display;
+
+  XWindows
+    *const windows = event_input->windows;
+
+  const XEvent
+    *const event = event_input->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  if ((*event).xmotion.window != windows->image.id)
+    return;
+  /*
+    Map and unmap Info widget as text cursor crosses its boundaries.
+  */
+  (*x)=(*event).xmotion.x;
+  (*y)=(*event).xmotion.y;
+  XTrackInfoWidget(display,windows,(*x),(*y));
+  (*crop_info).x=(ssize_t) windows->image.x+(*event).xmotion.x;
+  (*crop_info).y=(ssize_t) windows->image.y+(*event).xmotion.y;
+}
+
 static void XCropExpose(const CropEventInput *event_input,XEvent *event)
 {
   Display
@@ -5752,16 +5783,7 @@ static MagickBooleanType XCropImage(Display *display,
           break;
         case MotionNotify:
         {
-          if (event.xmotion.window != windows->image.id)
-            break;
-          /*
-            Map and unmap Info widget as text cursor crosses its boundaries.
-          */
-          x=event.xmotion.x;
-          y=event.xmotion.y;
-          XTrackInfoWidget(display,windows,x,y);
-          crop_info.x=(ssize_t) windows->image.x+event.xmotion.x;
-          crop_info.y=(ssize_t) windows->image.y+event.xmotion.y;
+          XCropMotion(&event_input,&targets);
           break;
         }
         case SelectionRequest:
