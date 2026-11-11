@@ -2259,6 +2259,23 @@ static void XWithdrawColormapWindows(Display *display,XWindows *windows)
     }
 }
 
+static void XFreeScenePixmaps(Display *display,XWindows *windows,
+  const size_t number_scenes)
+{
+  ssize_t
+    scene;
+
+  for (scene=1; scene < (ssize_t) number_scenes; scene++)
+  {
+    if (windows->image.pixmaps[scene] != (Pixmap) NULL)
+      (void) XFreePixmap(display,windows->image.pixmaps[scene]);
+    windows->image.pixmaps[scene]=(Pixmap) NULL;
+    if (windows->image.matte_pixmaps[scene] != (Pixmap) NULL)
+      (void) XFreePixmap(display,windows->image.matte_pixmaps[scene]);
+    windows->image.matte_pixmaps[scene]=(Pixmap) NULL;
+  }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3615,15 +3632,7 @@ MagickExport Image *XAnimateImages(Display *display,
     }
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
-  for (scene=1; scene < (ssize_t) number_scenes; scene++)
-  {
-    if (windows->image.pixmaps[scene] != (Pixmap) NULL)
-      (void) XFreePixmap(display,windows->image.pixmaps[scene]);
-    windows->image.pixmaps[scene]=(Pixmap) NULL;
-    if (windows->image.matte_pixmaps[scene] != (Pixmap) NULL)
-      (void) XFreePixmap(display,windows->image.matte_pixmaps[scene]);
-    windows->image.matte_pixmaps[scene]=(Pixmap) NULL;
-  }
+  XFreeScenePixmaps(display,windows,number_scenes);
   XSetCursorState(display,windows,MagickFalse);
   windows->image.pixmaps=(Pixmap *)
     RelinquishMagickMemory(windows->image.pixmaps);
