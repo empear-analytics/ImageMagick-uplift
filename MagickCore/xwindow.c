@@ -7361,6 +7361,24 @@ static unsigned char *XPackContinuous4BitRowMSB(const Image *canvas,
   return(q);
 }
 
+static unsigned char *XPackContinuous8BitRowMSB(const Image *canvas,
+  XStandardColormap *map_info,const Quantum *p,unsigned char *q)
+{
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    pixel=XGammaPixel(canvas,map_info,p);
+    *q++=(unsigned char) pixel;
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7652,12 +7670,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
               canvas->columns,1,exception);
             if (p == (const Quantum *) NULL)
               break;
-            for (x=(int) canvas->columns-1; x >= 0; x--)
-            {
-              pixel=XGammaPixel(canvas,map_info,p);
-              *q++=(unsigned char) pixel;
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
+            q=XPackContinuous8BitRowMSB(canvas,map_info,p,q);
             q+=(ptrdiff_t) scanline_pad;
           }
           break;
