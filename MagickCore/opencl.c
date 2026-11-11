@@ -2402,6 +2402,78 @@ static inline MagickBooleanType IsOpenCLDeviceSkipped(
     (device->program != (cl_program) NULL)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _OpenCLDeviceCompile
+{
+  MagickCLEnv
+    clEnv;
+
+  char
+    *accelerateKernelsBuffer;
+
+  const char
+    *options;
+
+  size_t
+    signature;
+
+  ExceptionInfo
+    *exception;
+} OpenCLDeviceCompile;
+
+static MagickBooleanType CompileOpenCLDevices(
+  const OpenCLDeviceCompile *compile)
+{
+  const MagickCLEnv
+    clEnv = compile->clEnv;
+
+  char
+    *const accelerateKernelsBuffer = compile->accelerateKernelsBuffer;
+
+  const char
+    *const options = compile->options;
+
+  const size_t
+    signature = compile->signature;
+
+  ExceptionInfo
+    *const exception = compile->exception;
+
+  MagickBooleanType
+    status;
+
+  size_t
+    i;
+
+  status=MagickTrue;
+  for (i = 0; i < clEnv->number_devices; i++)
+  {
+    MagickCLDevice
+      device;
+
+    size_t
+      device_signature;
+
+    device=clEnv->devices[i];
+    if (IsOpenCLDeviceSkipped(device) != MagickFalse)
+      continue;
+
+    LockSemaphoreInfo(device->lock);
+    if (device->program != (cl_program) NULL)
+    {
+      UnlockSemaphoreInfo(device->lock);
+      continue;
+    }
+    device_signature=signature;
+    device_signature^=StringSignature(device->platform_name);
+    status=CompileOpenCLKernel(device,accelerateKernelsBuffer,options,
+      device_signature,exception);
+    UnlockSemaphoreInfo(device->lock);
+    if (status == MagickFalse)
+      break;
+  }
+  return(status);
+}
+
 static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2411,6 +2483,9 @@ static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
 
   MagickBooleanType
     status;
+
+  OpenCLDeviceCompile
+    compile;
 
   size_t
     i;
@@ -2442,33 +2517,12 @@ static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
     strlen(accelerateKernels2)+1,"%s%s",accelerateKernels,accelerateKernels2);
   signature^=StringSignature(accelerateKernelsBuffer);
 
-  status=MagickTrue;
-  for (i = 0; i < clEnv->number_devices; i++)
-  {
-    MagickCLDevice
-      device;
-
-    size_t
-      device_signature;
-
-    device=clEnv->devices[i];
-    if (IsOpenCLDeviceSkipped(device) != MagickFalse)
-      continue;
-
-    LockSemaphoreInfo(device->lock);
-    if (device->program != (cl_program) NULL)
-    {
-      UnlockSemaphoreInfo(device->lock);
-      continue;
-    }
-    device_signature=signature;
-    device_signature^=StringSignature(device->platform_name);
-    status=CompileOpenCLKernel(device,accelerateKernelsBuffer,options,
-      device_signature,exception);
-    UnlockSemaphoreInfo(device->lock);
-    if (status == MagickFalse)
-      break;
-  }
+  compile.clEnv=clEnv;
+  compile.accelerateKernelsBuffer=accelerateKernelsBuffer;
+  compile.options=options;
+  compile.signature=signature;
+  compile.exception=exception;
+  status=CompileOpenCLDevices(&compile);
   accelerateKernelsBuffer=(char *) RelinquishMagickMemory(
     accelerateKernelsBuffer);
   return(status);
