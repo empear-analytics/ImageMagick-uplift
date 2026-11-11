@@ -332,3 +332,21 @@ nine-label `IsVirtualCanvasOperator`. Possible upstream: `BlendDivergentImage` l
 `dy_divergent` convolve fails; `SaliencyBlendImage` leaks `divergent_image` on the residual-clone and kernel
 failure paths; both blend loops `break` when cloning the residual fails and then `DestroyImage(NULL)` asserts;
 CompositeOverImage sets `status`/`progress` twice and fills two unread `PixelInfo`s.
+
+## Lane d, fourth round: the split files (merged)
+
+- **fourier-complex.c 9.50 -> 10.0**: c5b5995c8 H (`ComplexImageTag` moved above ComplexImages, pp_identical
+  IDENTICAL; flat, making room for the next step); 4380838ec N step 1 with E step 7 (everything from the cache-view
+  acquisitions to `return(FinishComplexImages(...))` into `ApplyComplexImageRows`, the whole parallel loop and its
+  pragma unchanged; 12 inputs filled in member order before the call; ComplexImages leaves Large Method; 18 cases,
+  once per image, no timing needed). A first probe that left the return behind left `complex_images` named only by
+  the pragma (-Wunused-variable without OpenMP), so the return moved with the tail.
+- visual-effects-pixel.c 9.09, three flat B steps each leaving Excess Number of Function Arguments: 5d9a9dccd
+  `AddNoisePixelChannels` 7 -> 4 (42 cases; +0.6% median of 11 alternating runs, an earlier 9 gave +2.0%),
+  ed402c3f1 `MorphPixelChannels` 6 -> 3 (3 cases; +0.2%), eafe821b1 `AnnotatePolaroidCaption` 6 -> 4 (5 cases).
+  B on `TintPixel` rejected (clones `SepiaToneImageRow`, 8.28).
+- Plateaus: resize-rescale.c 9.68 (public argument counts only), colorspace-transform.c 9.38 (Lines of Code only;
+  one family), effect-filter.c 9.09 (Lines of Code and public argument counts; shared statics refuse every split),
+  attribute-depth.c and attribute-depth-measure.c 8.16 (every finding inside the `#if !defined(HDRI)` branch),
+  feature.c 9.09 (three natural algorithm families share `SetFeatureProgress`; **for the owner:** a split needs the
+  helper copied into each file or a ruling), enhance.c 9.09.
