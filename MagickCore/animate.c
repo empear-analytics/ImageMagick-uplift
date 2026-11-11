@@ -2575,6 +2575,97 @@ static void XClearMagickWindowIds(XWindowInfo **magick_windows,
     magick_windows[i]->id=(Window) NULL;
 }
 
+typedef struct _AnimateCommandWidget
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  ExceptionInfo
+    *exception;
+
+  const char
+    *const *CommandMenu;
+
+  const AnimateCommand
+    *CommandMenus;
+
+  const char
+    *const **Menus;
+
+  const AnimateCommand
+    **Commands;
+
+  char
+    *command;
+} AnimateCommandWidget;
+
+typedef struct _AnimateCommandTargets
+{
+  XEvent
+    *event;
+
+  Image
+    **image;
+
+  MagickStatusType
+    *state;
+
+  Image
+    **nexus;
+} AnimateCommandTargets;
+
+static void XRunCommandWidget(const AnimateCommandWidget *command_widget,
+  const AnimateCommandTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  Image
+    **const image = targets->image;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  Image
+    **const nexus = targets->nexus;
+
+  AnimateCommand
+    animate_command;
+
+  AnimateMenuSelection
+    menu_selection;
+
+  int
+    id;
+
+  id=XCommandWidget(command_widget->display,command_widget->windows,
+    command_widget->CommandMenu,&(*event));
+  if (id < 0)
+    return;
+  (void) CopyMagickString(command_widget->command,
+    command_widget->CommandMenu[id],MagickPathExtent);
+  animate_command=command_widget->CommandMenus[id];
+  menu_selection.display=command_widget->display;
+  menu_selection.windows=command_widget->windows;
+  menu_selection.CommandMenu=command_widget->CommandMenu;
+  menu_selection.Menus=command_widget->Menus;
+  menu_selection.Commands=command_widget->Commands;
+  menu_selection.id=id;
+  if (XSelectMenuCommand(&menu_selection,command_widget->command,
+      &animate_command) == MagickFalse)
+    return;
+  if (animate_command != NullCommand)
+    (*nexus)=XMagickCommand(command_widget->display,
+      command_widget->resource_info,command_widget->windows,animate_command,
+      &(*image),&(*state),command_widget->exception);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2768,6 +2859,9 @@ MagickExport Image *XAnimateImages(Display *display,
 
   AnimateSceneList
     scene_list;
+
+  const AnimateCommandTargets
+    command_targets = { &event, &image, &state, &nexus };
 
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
@@ -3350,32 +3444,22 @@ MagickExport Image *XAnimateImages(Display *display,
         MagickTrue : MagickFalse;
     if (event.xany.window == windows->command.id)
       {
-        AnimateMenuSelection
-          menu_selection;
-
-        int
-          id;
+        AnimateCommandWidget
+          command_widget;
 
         /*
           Select a command from the Command widget.
         */
-        id=XCommandWidget(display,windows,CommandMenu,&event);
-        if (id < 0)
-          continue;
-        (void) CopyMagickString(command,CommandMenu[id],MagickPathExtent);
-        animate_command=CommandMenus[id];
-        menu_selection.display=display;
-        menu_selection.windows=windows;
-        menu_selection.CommandMenu=CommandMenu;
-        menu_selection.Menus=Menus;
-        menu_selection.Commands=Commands;
-        menu_selection.id=id;
-        if (XSelectMenuCommand(&menu_selection,command,&animate_command) ==
-            MagickFalse)
-          continue;
-        if (animate_command != NullCommand)
-          nexus=XMagickCommand(display,resource_info,windows,animate_command,
-            &image,&state,exception);
+        command_widget.display=display;
+        command_widget.resource_info=resource_info;
+        command_widget.windows=windows;
+        command_widget.exception=exception;
+        command_widget.CommandMenu=CommandMenu;
+        command_widget.CommandMenus=CommandMenus;
+        command_widget.Menus=Menus;
+        command_widget.Commands=Commands;
+        command_widget.command=command;
+        XRunCommandWidget(&command_widget,&command_targets);
         continue;
       }
     switch (event.type)
