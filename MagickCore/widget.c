@@ -9925,6 +9925,50 @@ static void HandleMenuEvent(const MenuEventContext *context,const XEvent event,
   }
 }
 
+static int CloseMenuWidget(const MenuEventContext *context,
+  const MenuTargets *targets,Cursor cursor)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const selections = context->selections;
+
+  const unsigned int
+    number_selections = context->number_selections;
+
+  char
+    *const item = context->item;
+
+  XWidgetInfo
+    *const selection_info = targets->selection_info;
+
+  XSetWindowAttributes
+    window_attributes;
+
+  (void) XFreeCursor(display,cursor);
+  window_attributes.override_redirect=MagickFalse;
+  (void) XChangeWindowAttributes(display,windows->widget.id,
+    (size_t) CWOverrideRedirect,&window_attributes);
+  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
+  XCheckRefreshWindows(display,windows);
+  if (submenu_info.active != 0)
+    {
+      submenu_info.active=MagickFalse;
+      toggle_info.raised=MagickFalse;
+      XDrawTriangleEast(display,&windows->command,&toggle_info);
+    }
+  if (((*selection_info).id < 0) ||
+    ((*selection_info).id >= (int) number_selections))
+    return(~0);
+  (void) CopyMagickString(item,selections[(*selection_info).id],
+    MagickPathExtent);
+  return((*selection_info).id);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9951,9 +9995,6 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
 
   XFontStruct
     *font_info;
-
-  XSetWindowAttributes
-    window_attributes;
 
   XWidgetInfo
     highlight_info,
@@ -10046,22 +10087,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
     (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
     HandleMenuEvent(&event_context,event,&targets);
   } while ((state & ExitState) == 0);
-  (void) XFreeCursor(display,cursor);
-  window_attributes.override_redirect=MagickFalse;
-  (void) XChangeWindowAttributes(display,windows->widget.id,
-    (size_t) CWOverrideRedirect,&window_attributes);
-  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
-  XCheckRefreshWindows(display,windows);
-  if (submenu_info.active != 0)
-    {
-      submenu_info.active=MagickFalse;
-      toggle_info.raised=MagickFalse;
-      XDrawTriangleEast(display,&windows->command,&toggle_info);
-    }
-  if ((selection_info.id < 0) || (selection_info.id >= (int) number_selections))
-    return(~0);
-  (void) CopyMagickString(item,selections[selection_info.id],MagickPathExtent);
-  return(selection_info.id);
+  return(CloseMenuWidget(&event_context,&targets,cursor));
 }
 
 /*
