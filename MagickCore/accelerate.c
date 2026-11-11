@@ -1154,54 +1154,54 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   (void) memset(stretch_map,0,(MaxMap+1)*sizeof(*stretch_map));
   for (i=0; i <= (ssize_t) MaxMap; i++)
   {
-    if ((image->channel_mask & RedChannel) != 0)
-    {
-      if (i < (cl_uint) black.x)
-        stretch_map[i].red=0;
+    if (((image->channel_mask & RedChannel) != 0) &&
+        (i < (cl_uint) black.x))
+      stretch_map[i].red=0;
+    else
+      if (((image->channel_mask & RedChannel) != 0) &&
+          (i > (cl_uint) white.x))
+        stretch_map[i].red=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.x)
-          stretch_map[i].red=(unsigned int) QuantumRange;
-        else
-          if (black.x != white.x)
-            stretch_map[i].red=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.x)/(white.x-black.x)));
-    }
-    if ((image->channel_mask & GreenChannel) != 0)
-    {
-      if (i < (cl_uint) black.y)
-        stretch_map[i].green=0;
+        if (((image->channel_mask & RedChannel) != 0) &&
+            (black.x != white.x))
+          stretch_map[i].red=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.x)/(white.x-black.x)));
+    if (((image->channel_mask & GreenChannel) != 0) &&
+        (i < (cl_uint) black.y))
+      stretch_map[i].green=0;
+    else
+      if (((image->channel_mask & GreenChannel) != 0) &&
+          (i > (cl_uint) white.y))
+        stretch_map[i].green=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.y)
-          stretch_map[i].green=(unsigned int) QuantumRange;
-        else
-          if (black.y != white.y)
-            stretch_map[i].green=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.y)/(white.y-black.y)));
-    }
-    if ((image->channel_mask & BlueChannel) != 0)
-    {
-      if (i < (cl_uint) black.z)
-        stretch_map[i].blue=0;
+        if (((image->channel_mask & GreenChannel) != 0) &&
+            (black.y != white.y))
+          stretch_map[i].green=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.y)/(white.y-black.y)));
+    if (((image->channel_mask & BlueChannel) != 0) &&
+        (i < (cl_uint) black.z))
+      stretch_map[i].blue=0;
+    else
+      if (((image->channel_mask & BlueChannel) != 0) &&
+          (i > (cl_uint) white.z))
+        stretch_map[i].blue=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.z)
-          stretch_map[i].blue=(unsigned int) QuantumRange;
-        else
-          if (black.z != white.z)
-            stretch_map[i].blue=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.z)/(white.z-black.z)));
-    }
-    if ((image->channel_mask & AlphaChannel) != 0)
-    {
-      if (i < (cl_uint) black.w)
-        stretch_map[i].alpha=0;
+        if (((image->channel_mask & BlueChannel) != 0) &&
+            (black.z != white.z))
+          stretch_map[i].blue=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.z)/(white.z-black.z)));
+    if (((image->channel_mask & AlphaChannel) != 0) &&
+        (i < (cl_uint) black.w))
+      stretch_map[i].alpha=0;
+    else
+      if (((image->channel_mask & AlphaChannel) != 0) &&
+          (i > (cl_uint) white.w))
+        stretch_map[i].alpha=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.w)
-          stretch_map[i].alpha=(unsigned int) QuantumRange;
-        else
-          if (black.w != white.w)
-            stretch_map[i].alpha=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.w)/(white.w-black.w)));
-    }
+        if (((image->channel_mask & AlphaChannel) != 0) &&
+            (black.w != white.w))
+          stretch_map[i].alpha=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.w)/(white.w-black.w)));
   }
 
   /*
