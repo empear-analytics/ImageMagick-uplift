@@ -74,3 +74,60 @@ tail" recipe: not taken yet). Possible upstream: `ChannelFxImage` leaks the dest
 - Probes passed to lane d: colorspace-convert.c ConvertRGBToGeneric as a three-helper SD chain scores 7.78 or 8.28
   against 9.08 (Code Duplication); threshold.c B on `RangeThresholdValue`/`RangeThresholdChannels` is flat at 9.09.
 - Possible upstream: `poly_basis_dy` calls `poly_basis_dx(n-1)` ("weird but true"). Gate: 15,900 cases, 0 diverged.
+
+## Lane d, second round: quantize.c 8.74 -> 8.81 with new Recipe HT; the 9.09 files plateau (merged)
+
+- **Recipe HT, Hoist the Exit Test Common to a Selection's Branches** (9713e5807, Decided by `owner` under the
+  2026-11-10 OK; own commit before first use). Shape: in `if (C) P else Q`, `P` ends in `T` = `if (V == F)
+  return(V);` and `Q` holds the same test followed by statements `Z` that run only when it passed. Steps 1-5: `V` is a
+  local `MagickBooleanType`, `F` a constant, no `#pragma` or preprocessor line outside OpenMP; `Q = Q0 T Z` with `Q0`
+  assigning `V` before reading it, `T` once at top level, `Z` non-empty and not writing `V`; no label, `goto`, leaving
+  `break`/`continue`, and no `return` in `Q0` or `Z`; `Q` cut into a `static MagickBooleanType` helper (at most four
+  parameters named as the caller's variables) that declares `V`, holds `Q` unchanged and ends `return(V);`; the
+  selection becomes `if (C) P0 else V=Helper(args);` with `T` written once after it. Behaviour: `P` runs `P0` then `T`
+  in the same order; when `T` fires in `Q` the helper returns the same `V` and `Z` ran in neither version; when it does
+  not, `Z` runs, does not write `V`, and the hoisted test does not fire. Proof: new `tools/tail_hoist_check.py FILE
+  CALLER HELPER [REV]` compares the old and new caller token by token (a write to `V` in `Z` prints FAIL); object code
+  is not identical (register allocation only, measured), so the proof is the token check, reading steps 1-3, the
+  oracle and `refactor_guard --calls`. It merges two copies of an exit test into one (like Recipe D) and deletes no
+  logic; flagged for the owner with the twin-fold question.
+- **quantize.c 8.74 -> 8.81:** a76798f30 HT `KmeansImage` (`SeedKmeansFromColorList`, no finding; leaves Bumpy Road
+  Ahead; 22 cases, 0 diverged; four cases reach `SeedKmeansFromColors`). Plateau: 126 functions (split_source.py
+  refuses every family) and the public 5-argument `KmeansImage`.
+- **colorspace-convert.c 9.08:** `ConvertRGBToGeneric` (cc 20, 113 lines) is the only real finding (a stub scores 9.68);
+  label-run helpers clone each other (7.71 / 8.28), TB/KT need constant cases (these are calls with different
+  signatures), function-pointer tables are not allowed.
+- **effect-blur.c, enhance-tone.c, enhance.c, threshold.c (9.09):** Lines of Code (2,624 / 1,956 / 1,242 / 1,531) plus
+  argument counts including public functions; split_source.py dry runs on every public root: effect-blur refused by
+  shared `SetBlurProgress`/`ReleaseFailedImage`/`MagickSigma`; enhance-tone and threshold by shared row helpers, the
+  `ThresholdMap` type and macros; enhance.c's Modulate family by the tool's refusal of function-pointer typedefs; the
+  enhance.c splits the tool does accept leave the kept file at 9.09 and 1,081 lines. HT may fit other if/else exit
+  tests; not searched for.
+
+## Lane c, second round: animate.c 3.53 -> 4.40, opencl.c 5.47 -> 5.80 (wide build, merged)
+
+34 commits; each ran `verify_wt` (oracle on the function, guard, calls, CI warnings); whole wide catalogue 14,145
+cases, 0 diverged (one load-sensitive case settled). **XSaveImage** (no case enters it; `Verified: guard`; last
+round's chain redone one step at a time): 45a1b57ac E 3.55, 1b8ce9461 E 3.57, 4ea86f63d P 3.58, 4f1c23581 E 3.59, then
+3.60 and 3.67 (leaves Complex Method). **XAnimateImages** (30 cases; partial evidence, the lcov cannot show which
+events they raise; cc 150 -> 78, bumps 9 -> 6): E 8257d72af (ConfigureNotify) 3.70, 16f4c8a3a (DestroyNotify) 3.71,
+71807eb55 (Expose tail) 3.73, 440243d1a (UnmapNotify tail) 3.76, 6abf357a1 (MapNotify tail) 3.79; N e825fb233
+(shared `AnimateEventContext`) 3.82, a76fcea1a (ClientMessage tail) 3.98; CT 2ddd15c46 (MapNotify) 3.90, f995187f9
+(PropertyNotify) 3.95, 9f79370dd (KeyPress) 4.11, e1f294e87 (ButtonPress) 4.19, 826f5b94e (ClientMessage) 4.25; SD
+34025cbda 4.02 and 0b1602237 4.06 (key-symbol switch; an E on the whole switch gave a cc-12 helper, 3.97); small
+bodies 3b85cc0db, 56935dd28 (flat), 1e8976b99 4.12, 8f5f63fea 4.14, 2162357ff 4.15, bf7b06987 4.26; setup 23eed7e2c
+4.28, 8d81d1ece 4.30, aaa2f877c (XCreateSceneWindows loop, the fill moved up before the loop) 4.37, a91babc45
+(XEnterWorkingDirectory) 4.40. **opencl.c:** b561b7d37 N `HasOpenCLDevices` 5.62 (leaves Complex Method); 6591df72d E
+`GetOpenCLCacheDirectory` tail 5.63 (`#if WINDOWS` block untouched); 09cd0e787 I `LoadOpenCLDevices` (void caller,
+four exits) 5.80 (targets_fill_check FAILs only on `return;`, a diff-alignment artifact, explained in the message).
+Recipe text (Decided by `owner`): 79f3520c1 N step 2 (an array assigned whole to a pointer member of a struct the
+block fills, `s.m=v;`, may join the input group; C11 6.3.2.1p3, 6.5.16.1p1), 75355d861 CT step 4 (the helper takes the
+input struct the caller's sibling blocks share under N step 8). **Message slip:** the CT amendment came after its first
+three uses (their messages cite N step 8 and CT step 4 together). Moved `ThrowXWindow`/`LogMagickEvent` calls now name
+the helper in `GetMagickModule()`; all are unreached or debug-only. Not per-pixel, so no timing.
+Plateau: XAnimateBackgroundImage (bumps 9, cc 57; function-statics whose address is also passed to many callees, and
+`ThrowXWindowFatalException` blocks; its block stubs score 4.28-4.37 but no recipe admits a static struct whose
+address is also passed to calls), a LeaveNotify helper clones Enter (3.94), XSaveImage keeps 2 bumps (returns inside
+unreached blocks), XAnimateImages cc 78 and about 780 lines in setup blocks naming statics or throw macros,
+XMagickCommand cc 9 and 7 arguments; opencl.c: LoadOpenCLDeviceBenchmark, GetOpenCLCacheDirectory (`#if` block), three
+twin groups (owner CF question), EnqueueOpenCLKernel (10 arguments).
