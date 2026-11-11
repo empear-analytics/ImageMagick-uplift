@@ -405,6 +405,55 @@ static void XRemoteBrowseDocumentation(Display *display,XWindows *windows,
   XSetCursorState(display,windows,MagickFalse);
 }
 
+typedef struct _AnimateCommandTile
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+} AnimateCommandTile;
+
+static void XVersionQuitCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  switch (animate_command)
+  {
+    case VersionCommand:
+    {
+      XNoticeWidget(display,windows,GetMagickVersion((size_t *) NULL),
+        GetMagickCopyright());
+      break;
+    }
+    case QuitCommand:
+    {
+      /*
+        exit program
+      */
+      if (resource_info->confirm_exit == MagickFalse)
+        XClientMessage(display,windows->image.id,windows->im_protocols,
+          windows->im_exit,CurrentTime);
+      else
+        XConfirmAnimateExit(display,resource_info,windows);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
@@ -421,10 +470,16 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XTextProperty
     window_name;
 
+  AnimateCommandTile
+    tile;
+
   /*
     Process user command.
   */
   nexus=NewImageList();
+  tile.display=display;
+  tile.resource_info=resource_info;
+  tile.windows=windows;
   switch (animate_command)
   {
     case OpenCommand:
@@ -666,26 +721,11 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XSetCursorState(display,windows,MagickFalse);
       break;
     }
-    case VersionCommand:
-    {
-      XNoticeWidget(display,windows,GetMagickVersion((size_t *) NULL),
-        GetMagickCopyright());
-      break;
-    }
-    case QuitCommand:
-    {
-      /*
-        exit program
-      */
-      if (resource_info->confirm_exit == MagickFalse)
-        XClientMessage(display,windows->image.id,windows->im_protocols,
-          windows->im_exit,CurrentTime);
-      else
-        XConfirmAnimateExit(display,resource_info,windows);
-      break;
-    }
     default:
+    {
+      XVersionQuitCommand(&tile,animate_command);
       break;
+    }
   }
   return(nexus);
 }
