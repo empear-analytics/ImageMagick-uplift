@@ -122,6 +122,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colorspace.h \
   MagickCore/colorspace-private.h \
   MagickCore/compare.c \
+  MagickCore/compare-similarity.c \
   MagickCore/compare.h \
   MagickCore/compare-private.h \
   MagickCore/composite.c \
