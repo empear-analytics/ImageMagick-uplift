@@ -10206,6 +10206,43 @@ static void XMatteFloodfill(const MatteEditPixelInput *pixel_input)
   draw_info=DestroyDrawInfo(draw_info);
 }
 
+static MagickBooleanType XMatteEditPixels(
+  const MatteEditPixelInput pixel_input,const PaintMethod method,
+  Image **image,ExceptionInfo *exception)
+{
+  switch (method)
+  {
+    case PointMethod:
+    default:
+    {
+      XMattePoint(&pixel_input);
+      break;
+    }
+    case ReplaceMethod:
+    {
+      XMatteReplace(&pixel_input);
+      break;
+    }
+    case FloodfillMethod:
+    case FillToBorderMethod:
+    {
+      XMatteFloodfill(&pixel_input);
+      break;
+    }
+    case ResetMethod:
+    {
+      /*
+        Update matte information using reset algorithm.
+      */
+      if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+      XMatteReset(&pixel_input);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -10620,36 +10657,8 @@ static MagickBooleanType XMatteEditImage(Display *display,
         pixel_input.resource_info=resource_info;
         pixel_input.method=method;
         pixel_input.border_color=border_color;
-        switch (method)
-        {
-          case PointMethod:
-          default:
-          {
-            XMattePoint(&pixel_input);
-            break;
-          }
-          case ReplaceMethod:
-          {
-            XMatteReplace(&pixel_input);
-            break;
-          }
-          case FloodfillMethod:
-          case FillToBorderMethod:
-          {
-            XMatteFloodfill(&pixel_input);
-            break;
-          }
-          case ResetMethod:
-          {
-            /*
-              Update matte information using reset algorithm.
-            */
-            if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
-              return(MagickFalse);
-            XMatteReset(&pixel_input);
-            break;
-          }
-        }
+        if (XMatteEditPixels(pixel_input,method,image,exception) == MagickFalse)
+          return(MagickFalse);
         image_view=DestroyCacheView(image_view);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
