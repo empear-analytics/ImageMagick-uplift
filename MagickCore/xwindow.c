@@ -11221,9 +11221,9 @@ MagickPrivate Window XWindowByName(Display *display,const Window root_window,
   assert(name != (char *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",name);
-  if (XGetWMName(display,root_window,&window_name) != 0)
-    if (LocaleCompare((char *) window_name.value,name) == 0)
-      return(root_window);
+  if ((XGetWMName(display,root_window,&window_name) != 0) &&
+      (LocaleCompare((char *) window_name.value,name) == 0))
+    return(root_window);
   status=XQueryTree(display,root_window,&child,&child,&children,
     &number_children);
   if (status == False)
