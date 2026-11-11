@@ -384,6 +384,27 @@ static void XConfirmAnimateExit(Display *display,
       windows->im_exit,CurrentTime);
 }
 
+static void XRemoteBrowseDocumentation(Display *display,XWindows *windows,
+  Window mozilla_window)
+{
+  Atom
+    mozilla_atom;
+
+  char
+    command[MagickPathExtent];
+
+  /*
+    Display documentation using Netscape remote control.
+  */
+  (void) FormatLocaleString(command,MagickPathExtent,
+    "openurl(%s,new-tab)",MagickAuthoritativeURL);
+  mozilla_atom=XInternAtom(display,"_MOZILLA_COMMAND",MagickFalse);
+  (void) XChangeProperty(display,mozilla_window,mozilla_atom,
+    XA_STRING,8,PropModeReplace,(unsigned char *) command,
+    (int) strlen(command));
+  XSetCursorState(display,windows,MagickFalse);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
@@ -631,19 +652,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       mozilla_window=XWindowByProperty(display,root_window,mozilla_atom);
       if (mozilla_window != (Window) NULL)
         {
-          char
-            command[MagickPathExtent];
-
-          /*
-            Display documentation using Netscape remote control.
-          */
-          (void) FormatLocaleString(command,MagickPathExtent,
-            "openurl(%s,new-tab)",MagickAuthoritativeURL);
-          mozilla_atom=XInternAtom(display,"_MOZILLA_COMMAND",MagickFalse);
-          (void) XChangeProperty(display,mozilla_window,mozilla_atom,
-            XA_STRING,8,PropModeReplace,(unsigned char *) command,
-            (int) strlen(command));
-          XSetCursorState(display,windows,MagickFalse);
+          XRemoteBrowseDocumentation(display,windows,mozilla_window);
           break;
         }
       XSetCursorState(display,windows,MagickTrue);
