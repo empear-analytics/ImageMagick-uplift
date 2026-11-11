@@ -3184,6 +3184,65 @@ static void XHandleMapNotify(const AnimateEventContext *event_context,
   XMapPanelWindows(windows,event);
 }
 
+static void XHandlePropertyNotify(const AnimateEventContext *event_context,
+  const XEvent event,const AnimateCommandTargets *targets)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  ExceptionInfo
+    *const exception = event_context->exception;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  Image
+    **const nexus = targets->nexus;
+
+  Atom
+    type;
+
+  int
+    format,
+    status;
+
+  unsigned char
+    *data;
+
+  unsigned long
+    after,
+    length;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Property Notify: 0x%lx 0x%lx %d",(unsigned long)
+      event.xproperty.window,(unsigned long) event.xproperty.atom,
+      event.xproperty.state);
+  if (event.xproperty.atom != windows->im_remote_command)
+    return;
+  /*
+    Display image named by the remote command protocol.
+  */
+  status=XGetWindowProperty(display,event.xproperty.window,
+    event.xproperty.atom,0L,(long) MagickPathExtent,MagickFalse,(Atom)
+    AnyPropertyType,&type,&format,&length,&after,&data);
+  if ((status != Success) || (length == 0))
+    return;
+  (void) CopyMagickString(resource_info->image_info->filename,
+    (char *) data,MagickPathExtent);
+  (*nexus)=ReadImage(resource_info->image_info,exception);
+  CatchException(exception);
+  if ((*nexus) != (Image *) NULL)
+    (*state)|=ExitState;
+  (void) XFree((void *) data);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4242,42 +4301,7 @@ MagickExport Image *XAnimateImages(Display *display,
         break;
       case PropertyNotify:
       {
-        Atom
-          type;
-
-        int
-          format,
-          status;
-
-        unsigned char
-          *data;
-
-        unsigned long
-          after,
-          length;
-
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Property Notify: 0x%lx 0x%lx %d",(unsigned long)
-            event.xproperty.window,(unsigned long) event.xproperty.atom,
-            event.xproperty.state);
-        if (event.xproperty.atom != windows->im_remote_command)
-          break;
-        /*
-          Display image named by the remote command protocol.
-        */
-        status=XGetWindowProperty(display,event.xproperty.window,
-          event.xproperty.atom,0L,(long) MagickPathExtent,MagickFalse,(Atom)
-          AnyPropertyType,&type,&format,&length,&after,&data);
-        if ((status != Success) || (length == 0))
-          break;
-        (void) CopyMagickString(resource_info->image_info->filename,
-          (char *) data,MagickPathExtent);
-        nexus=ReadImage(resource_info->image_info,exception);
-        CatchException(exception);
-        if (nexus != (Image *) NULL)
-          state|=ExitState;
-        (void) XFree((void *) data);
+        XHandlePropertyNotify(&event_context,event,&command_targets);
         break;
       }
       case ReparentNotify:
