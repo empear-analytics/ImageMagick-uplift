@@ -6017,6 +6017,32 @@ static size_t ReadFontBrowserPattern(const XWidgetInfo reply_info,
   return(state);
 }
 
+static void MoveFontBrowserSliderByPage(const KeySym key_symbol,
+  const unsigned int visible_fonts,const int fonts,XWidgetInfo *slider_info)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Prior:
+    case XK_KP_Prior:
+    {
+      (*slider_info).id-=(int) visible_fonts;
+      break;
+    }
+    case XK_Next:
+    case XK_KP_Next:
+    {
+      (*slider_info).id+=(int) visible_fonts;
+      break;
+    }
+    case XK_End:
+    case XK_KP_End:
+    {
+      (*slider_info).id=fonts;
+      break;
+    }
+  }
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6873,22 +6899,10 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
                 slider_info.id++;
                 break;
               }
-              case XK_Prior:
-              case XK_KP_Prior:
+              default:
               {
-                slider_info.id-=(int) visible_fonts;
-                break;
-              }
-              case XK_Next:
-              case XK_KP_Next:
-              {
-                slider_info.id+=(int) visible_fonts;
-                break;
-              }
-              case XK_End:
-              case XK_KP_End:
-              {
-                slider_info.id=fonts;
+                MoveFontBrowserSliderByPage(key_symbol,visible_fonts,fonts,
+                  &slider_info);
                 break;
               }
             }
