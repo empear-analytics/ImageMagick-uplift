@@ -1647,6 +1647,112 @@ static void XUpdateWindowColormaps(
     (void) XInstallColormap(display,map_info->colormap);
 }
 
+typedef struct _AnimateDropSource
+{
+  Display
+    *display;
+
+  Window
+    root_window;
+
+  XResourceInfo
+    *resource_info;
+
+  ExceptionInfo
+    *exception;
+
+  XEvent
+    event;
+} AnimateDropSource;
+
+typedef struct _AnimateDropTargets
+{
+  Image
+    **nexus;
+
+  MagickStatusType
+    *state;
+} AnimateDropTargets;
+
+static MagickBooleanType XReadDroppedImage(
+  const AnimateDropSource *drop_source,const AnimateDropTargets *targets)
+{
+  Display
+    *const display = drop_source->display;
+
+  const Window
+    root_window = drop_source->root_window;
+
+  XResourceInfo
+    *const resource_info = drop_source->resource_info;
+
+  ExceptionInfo
+    *const exception = drop_source->exception;
+
+  const XEvent
+    event = drop_source->event;
+
+  Image
+    **const nexus = targets->nexus;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  Atom
+    selection,
+    type;
+
+  int
+    format,
+    status;
+
+  unsigned char
+    *data;
+
+  unsigned long
+    after,
+    length;
+
+  /*
+    Display image named by the Drag-and-Drop selection.
+  */
+  if ((*event.xclient.data.l != 2) && (*event.xclient.data.l != 128))
+    return(MagickFalse);
+  selection=XInternAtom(display,"DndSelection",MagickFalse);
+  status=XGetWindowProperty(display,root_window,selection,0L,2047L,
+    MagickFalse,(Atom) AnyPropertyType,&type,&format,&length,&after,
+    &data);
+  if ((status != Success) || (length == 0))
+    return(MagickFalse);
+  if (*event.xclient.data.l == 2)
+    {
+      /*
+        Offix DND.
+      */
+      (void) CopyMagickString(resource_info->image_info->filename,
+        (char *) data,MagickPathExtent);
+    }
+  else
+    {
+      /*
+        XDND.
+      */
+      if (LocaleNCompare((char *) data,"file:",5) != 0)
+        {
+          (void) XFree((void *) data);
+          return(MagickFalse);
+        }
+      (void) CopyMagickString(resource_info->image_info->filename,
+        ((char *) data)+5,MagickPathExtent);
+    }
+  *nexus=ReadImage(resource_info->image_info,exception);
+  CatchException(exception);
+  if (*nexus != (Image *) NULL)
+    *state|=ExitState;
+  (void) XFree((void *) data);
+  return(MagickTrue);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2714,58 +2820,21 @@ MagickExport Image *XAnimateImages(Display *display,
           }
         if (event.xclient.message_type == windows->dnd_protocols)
           {
-            Atom
-              selection,
-              type;
+            AnimateDropSource
+              drop_source;
 
-            int
-              format,
-              status;
+            AnimateDropTargets
+              targets;
 
-            unsigned char
-              *data;
-
-            unsigned long
-              after,
-              length;
-
-            /*
-              Display image named by the Drag-and-Drop selection.
-            */
-            if ((*event.xclient.data.l != 2) && (*event.xclient.data.l != 128))
+            drop_source.display=display;
+            drop_source.root_window=root_window;
+            drop_source.resource_info=resource_info;
+            drop_source.exception=exception;
+            drop_source.event=event;
+            targets.nexus=(&nexus);
+            targets.state=(&state);
+            if (XReadDroppedImage(&drop_source,&targets) == MagickFalse)
               break;
-            selection=XInternAtom(display,"DndSelection",MagickFalse);
-            status=XGetWindowProperty(display,root_window,selection,0L,2047L,
-              MagickFalse,(Atom) AnyPropertyType,&type,&format,&length,&after,
-              &data);
-            if ((status != Success) || (length == 0))
-              break;
-            if (*event.xclient.data.l == 2)
-              {
-                /*
-                  Offix DND.
-                */
-                (void) CopyMagickString(resource_info->image_info->filename,
-                  (char *) data,MagickPathExtent);
-              }
-            else
-              {
-                /*
-                  XDND.
-                */
-                if (LocaleNCompare((char *) data,"file:",5) != 0)
-                  {
-                    (void) XFree((void *) data);
-                    break;
-                  }
-                (void) CopyMagickString(resource_info->image_info->filename,
-                  ((char *) data)+5,MagickPathExtent);
-              }
-            nexus=ReadImage(resource_info->image_info,exception);
-            CatchException(exception);
-            if (nexus != (Image *) NULL)
-              state|=ExitState;
-            (void) XFree((void *) data);
             break;
           }
         /*
