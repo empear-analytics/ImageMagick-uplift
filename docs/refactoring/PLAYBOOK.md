@@ -810,7 +810,12 @@ is worth it.
    longer defining it. A forward declaration of a moved `static` at the top of the
    original goes to the new file's *Forward declarations* block, and a *Define* or
    *Forward declarations* comment left with nothing under it goes too. A table or macro
-   that the kept part also names still refuses the split.
+   that the kept part also names still refuses the split. The new file's include block
+   is the original's, with one exception (2026-11-11): a run of conditional lines at
+   its end, after the last unconditional `#include`, that holds every `#define` of the
+   block (a delegate's headers and the macros it supplies, as `fourier.c`'s FFTW and
+   `complex.h` block) is left out of the copy when no line of the family, comments and
+   strings aside, names one of those macros. The original keeps the run unchanged.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -828,6 +833,14 @@ is worth it.
   expands to the same tokens in the one file that uses it, and the kept file used none.
   `refactor_guard.py --combined` therefore counts every literal once, as before; say in
   the message which tables and macros moved.
+- An include run left out under step 2 is neither moved nor edited: the original keeps
+  it, uncompiled branches included, as it stood. The family compiles without it, so it
+  needs nothing the run declares: a call of a function only a dropped header declares
+  is an implicit declaration, which the build refuses, and an identifier only it
+  defines does not compile. The family names none of the run's own macros (the tool
+  checks), so every token of the moved text expands as before; check by compiling both
+  objects that each moved function's instructions are unchanged, and say so in the
+  message.
 - The pre-commit gate requires a new file to score 10.0, which a split-off family never
   does: it carries the original's findings with it. Commit after the gate has reported
   only that failure (its check that the original does not lose health has then passed),
@@ -10832,3 +10845,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | D | *Object code that differs only in the caller*: `reuse_check.py` (7394f75a1) also takes a helper returning the block's single output, called as the statement `v=Helper(...);` with `v` passed to a by-value parameter `p`, whose closing `return(p);` (the assignment back) is left out of the comparison, and compares a block whose lines break an expression at other tokens as one token stream | `widget.c`'s `XTextViewWidget` (campaign A, W16 lane a): its slider tracking and page press are `XListBrowserWidget`'s, which Recipe E made into `TrackListBrowserSlider` and `PageListBrowserSlider` (`slider_info=...(slider_info,...)`); the tracking lies on lines no case reaches and wraps its last expression at another token, so the check refused both; reusing them (instead of two look-alike helpers) is the step that measured 1.74 to 1.89 | owner |
 | 2026-11-10 | AMEND | I | Step 1: a block inside a `switch` case may leave only through `break;` statements that end that `switch` (the innermost `switch` or loop around it): each becomes `return(MagickFalse);` and the caller writes `if (Helper(...,&targets) == MagickFalse) break;` where the block stood, inside the same `switch`; the unreached level holds as written, `tools/targets_fill_check.py` counting `break;` as an exit (7c4c8a433) | `widget.c`'s `XMenuWidget` (campaign A, W16 lane a): its submenu test in the pointer-motion case sets `selection_info.id`, clears `*item` and sets ExitState, then leaves the `switch` by `break;` from two branches of nesting 5, on lines no case reaches; Recipe CT needs the case's tail, LB a loop, and I, V, Y and W a `return` or `goto` exit; with it the XMenuWidget chain measured 1.89 to 2.13 | owner |
 | 2026-11-11 | AMEND | S | Step 2: a file-scope `static const` table standing between the moved functions, and a one-line `#define` of the original that only the family uses, move with the family (the table verbatim where it stands, the macro to the new file's *Define declarations* block) instead of refusing it; a forward declaration of a moved `static` at the top of the original goes to a *Forward declarations* block of the new file, and a *Define* or *Forward declarations* comment left empty goes too; *Careful*: why the moved data and macro cannot change what either object computes. `tools/split_source.py` does all three and refuses a table or macro the kept part names; its output for earlier splits is unchanged (effect.c, visual-effects.c, transform.c, vision.c, enhance.c dry runs compared byte for byte) | `colorspace.c` (campaign A, W17 lane a): the TransformImageColorspace family (with SetImageColorspace, which shares four statics with it) uses the `GenericColorspaces[]` and `YCCMap` tables between its functions and the top-of-file `MaximumLogarithmicColorspace`; the split was refused for those alone (W16 owner question), and measures colorspace.c 9.38 to 10.0 with the new file at 9.38 | owner |
+| 2026-11-11 | AMEND | S | Step 2: a run of conditional lines at the end of the original's include block, after its last unconditional `#include`, that holds every `#define` of the block (a delegate's headers and macros) is left out of the new file's copy when no line of the family, comments and strings aside, names one of those macros; the original keeps the run unchanged; *Careful*: why the family cannot need what the run declares (the build refuses an implicit declaration or an unknown identifier) and the instruction check. `tools/split_source.py` does it and prints the run it left out; its output for splits it accepted before is unchanged (layer.c, effect.c, transform.c and feature.c dry runs compared byte for byte) | `fourier.c` (campaign A, W17 lane a): the `ComplexImages` family (14 functions, its own row and operand types, no FFTW call) was refused only because the include block ends in the `MAGICKCORE_FFTW_DELEGATE`/`ENABLE_FFTW_DELEGATE` run that defines `cabs`, `carg`, `cimag` and `creal`, which the family never names; the split measures fourier.c 7.22 to 7.59, the new file 9.50 | owner |
