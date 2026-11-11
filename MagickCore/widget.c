@@ -1669,6 +1669,142 @@ static MagickBooleanType IsUnusableSelection(const Status status,const Atom type
     (length == 0)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _ListBrowserClick
+{
+  Display
+    *display;
+
+  XWindowInfo
+    *window_info;
+
+  XEvent
+    event;
+
+  Time
+    click_time;
+} ListBrowserClick;
+
+typedef struct _ListBrowserRelease
+{
+  Display
+    *display;
+
+  XWindowInfo
+    *window_info;
+
+  XEvent
+    event;
+} ListBrowserRelease;
+
+typedef struct _FontBrowserTargets
+{
+  XWidgetInfo
+    *reply_info;
+
+  size_t
+    *state;
+
+  XWidgetInfo
+    *selection_info,
+    *list_info;
+} FontBrowserTargets;
+
+typedef struct _FontBrowserPress
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    **fontlist;
+
+  int
+    fonts;
+
+  unsigned int
+    height;
+
+  XEvent
+    event;
+
+  XWidgetInfo
+    slider_info;
+} FontBrowserPress;
+
+typedef struct _FontBrowserNames
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    **fontlist;
+
+  int
+    fonts;
+
+  unsigned int
+    visible_fonts;
+
+  XWidgetInfo
+    list_info,
+    slider_info;
+} FontBrowserNames;
+
+typedef struct _FontBrowserMatch
+{
+  char
+    **fontlist;
+
+  int
+    fonts;
+
+  char
+    *reply;
+} FontBrowserMatch;
+
+typedef struct _FontBrowserBack
+{
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  XWidgetInfo
+    back_info;
+
+  char
+    *glob_pattern;
+
+  const char
+    *back_pattern;
+} FontBrowserBack;
+
+static XWidgetInfo
+  ApplyListBrowserControlKey(XWidgetInfo,const KeySym,const size_t);
+
+static size_t
+  ConfirmListBrowserReply(Display *,const XWidgetInfo,size_t);
+
+static void
+  ReleaseListBrowserAction(const ListBrowserRelease *,const XWidgetInfo,
+    XWidgetInfo *,size_t *);
+
+static void
+  ReleaseListBrowserCancel(const ListBrowserRelease *,const XWidgetInfo,
+    XWidgetInfo *,size_t *);
+
+static XWidgetInfo
+  HighlightListBrowserReply(const ListBrowserClick *,char *,XWidgetInfo);
+
+static XWidgetInfo
+  PlaceTextViewExpose(XWidgetInfo,const XWidgetInfo);
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -5766,43 +5902,6 @@ static int FontCompare(const void *x,const void *y)
 }
 #endif
 
-typedef struct _FontBrowserTargets
-{
-  XWidgetInfo
-    *reply_info;
-
-  size_t
-    *state;
-
-  XWidgetInfo
-    *selection_info,
-    *list_info;
-} FontBrowserTargets;
-
-typedef struct _FontBrowserPress
-{
-  Display
-    *display;
-
-  XWindows
-    *windows;
-
-  char
-    **fontlist;
-
-  int
-    fonts;
-
-  unsigned int
-    height;
-
-  XEvent
-    event;
-
-  XWidgetInfo
-    slider_info;
-} FontBrowserPress;
-
 static void SelectFontBrowserEntry(const FontBrowserPress *press,
   char *glob_pattern,const FontBrowserTargets *targets)
 {
@@ -5864,50 +5963,6 @@ static void SelectFontBrowserEntry(const FontBrowserPress *press,
   (*state)|=RedrawListState;
 }
 
-static XWidgetInfo
-  ApplyListBrowserControlKey(XWidgetInfo,const KeySym,const size_t);
-
-static size_t
-  ConfirmListBrowserReply(Display *,const XWidgetInfo,size_t);
-
-typedef struct _ListBrowserClick
-{
-  Display
-    *display;
-
-  XWindowInfo
-    *window_info;
-
-  XEvent
-    event;
-
-  Time
-    click_time;
-} ListBrowserClick;
-
-typedef struct _ListBrowserRelease
-{
-  Display
-    *display;
-
-  XWindowInfo
-    *window_info;
-
-  XEvent
-    event;
-} ListBrowserRelease;
-
-static void
-  ReleaseListBrowserAction(const ListBrowserRelease *,const XWidgetInfo,
-    XWidgetInfo *,size_t *);
-
-static void
-  ReleaseListBrowserCancel(const ListBrowserRelease *,const XWidgetInfo,
-    XWidgetInfo *,size_t *);
-
-static XWidgetInfo
-  HighlightListBrowserReply(const ListBrowserClick *,char *,XWidgetInfo);
-
 static int FindFontBrowserCursor(XFontStruct *font_info,
   const XWidgetInfo reply_info,const int x,int i)
 {
@@ -5917,31 +5972,6 @@ static int FindFontBrowserCursor(XFontStruct *font_info,
         break;
   return(i);
 }
-
-static XWidgetInfo
-  PlaceTextViewExpose(XWidgetInfo,const XWidgetInfo);
-
-typedef struct _FontBrowserNames
-{
-  Display
-    *display;
-
-  XWindows
-    *windows;
-
-  char
-    **fontlist;
-
-  int
-    fonts;
-
-  unsigned int
-    visible_fonts;
-
-  XWidgetInfo
-    list_info,
-    slider_info;
-} FontBrowserNames;
 
 static void DrawFontBrowserNames(const FontBrowserNames *names,
   XWidgetInfo *selection_info,int *i)
@@ -6076,24 +6106,6 @@ static XWidgetInfo MoveFontBrowserSlider(XWidgetInfo slider_info,
   return(slider_info);
 }
 
-typedef struct _FontBrowserBack
-{
-  XWindows
-    *windows;
-
-  XEvent
-    event;
-
-  XWidgetInfo
-    back_info;
-
-  char
-    *glob_pattern;
-
-  const char
-    *back_pattern;
-} FontBrowserBack;
-
 static size_t ReleaseFontBrowserBack(const FontBrowserBack *back,
   size_t state)
 {
@@ -6169,18 +6181,6 @@ static size_t ReleaseFontBrowserReset(const FontBrowserReset *reset,
     }
   return(state);
 }
-
-typedef struct _FontBrowserMatch
-{
-  char
-    **fontlist;
-
-  int
-    fonts;
-
-  char
-    *reply;
-} FontBrowserMatch;
 
 static void MatchFontBrowserReply(const FontBrowserMatch *match,
   XWidgetInfo *list_info,int *i)
