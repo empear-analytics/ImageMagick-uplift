@@ -3407,6 +3407,14 @@ static void XHandleKeyPress(const AnimateEventContext *event_context,
       animate_command,image,state,exception);
 }
 
+static void XLogButtonRelease(XResourceInfo *resource_info,const XEvent event)
+{
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Button Release: 0x%lx %u +%d+%d",event.xbutton.window,
+      event.xbutton.button,event.xbutton.x,event.xbutton.y);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4253,10 +4261,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case ButtonRelease:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Release: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
+        XLogButtonRelease(resource_info,event);
         break;
       }
       case ClientMessage:
