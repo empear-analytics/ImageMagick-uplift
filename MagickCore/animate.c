@@ -2276,6 +2276,78 @@ static void XFreeScenePixmaps(Display *display,XWindows *windows,
   }
 }
 
+typedef struct _AnimateX11Resources
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  XVisualInfo
+    *visual_info;
+
+  XStandardColormap
+    *map_info;
+
+  XPixelInfo
+    *pixel;
+
+  XVisualInfo
+    *icon_visual;
+
+  XStandardColormap
+    *icon_map;
+
+  XPixelInfo
+    *icon_pixel;
+} AnimateX11Resources;
+
+static void XReleaseAnimateResources(
+  const AnimateX11Resources *x11_resources)
+{
+  Display
+    *const display = x11_resources->display;
+
+  XResourceInfo
+    *const resource_info = x11_resources->resource_info;
+
+  XWindows
+    *const windows = x11_resources->windows;
+
+  XVisualInfo
+    *const visual_info = x11_resources->visual_info;
+
+  XStandardColormap
+    *const map_info = x11_resources->map_info;
+
+  XPixelInfo
+    *const pixel = x11_resources->pixel;
+
+  XVisualInfo
+    *const icon_visual = x11_resources->icon_visual;
+
+  XStandardColormap
+    *const icon_map = x11_resources->icon_map;
+
+  XPixelInfo
+    *const icon_pixel = x11_resources->icon_pixel;
+
+  /*
+    Free X resources.
+  */
+  if (windows->image.mapped != MagickFalse)
+    (void) XWithdrawWindow(display,windows->image.id,windows->image.screen);
+  XDelay(display,SuspendTime);
+  (void) XFreeStandardColormap(display,icon_visual,icon_map,icon_pixel);
+  if (resource_info->map_type == (char *) NULL)
+    (void) XFreeStandardColormap(display,visual_info,map_info,pixel);
+  DestroyXResources();
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3640,16 +3712,19 @@ MagickExport Image *XAnimateImages(Display *display,
     RelinquishMagickMemory(windows->image.matte_pixmaps);
   if (nexus == (Image *) NULL)
     {
-      /*
-        Free X resources.
-      */
-      if (windows->image.mapped != MagickFalse)
-        (void) XWithdrawWindow(display,windows->image.id,windows->image.screen);
-      XDelay(display,SuspendTime);
-      (void) XFreeStandardColormap(display,icon_visual,icon_map,icon_pixel);
-      if (resource_info->map_type == (char *) NULL)
-        (void) XFreeStandardColormap(display,visual_info,map_info,pixel);
-      DestroyXResources();
+      AnimateX11Resources
+        x11_resources;
+
+      x11_resources.display=display;
+      x11_resources.resource_info=resource_info;
+      x11_resources.windows=windows;
+      x11_resources.visual_info=visual_info;
+      x11_resources.map_info=map_info;
+      x11_resources.pixel=pixel;
+      x11_resources.icon_visual=icon_visual;
+      x11_resources.icon_map=icon_map;
+      x11_resources.icon_pixel=icon_pixel;
+      XReleaseAnimateResources(&x11_resources);
     }
   (void) XSync(display,MagickFalse);
   /*
