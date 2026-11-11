@@ -4286,6 +4286,23 @@ static void XImportTrueColorPixels(const XDirectRowSource *source,
   }
 }
 
+static void XInitializeWindowColors(const WindowInfo *window_info,
+  const int id,const unsigned int number_colors,XColor *colors)
+{
+  int
+    i;
+
+  if ((window_info[id].visual->klass != DirectColor) &&
+      (window_info[id].visual->klass != TrueColor))
+    for (i=0; i < (int) number_colors; i++)
+    {
+      colors[i].pixel=(size_t) i;
+      colors[i].pad='\0';
+    }
+  else
+    XInitializeDirectColors(window_info,id,number_colors,colors);
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4553,15 +4570,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
                     XDestroyImage(ximage);
                     return((Image *) NULL);
                   }
-                if ((window_info[id].visual->klass != DirectColor) &&
-                    (window_info[id].visual->klass != TrueColor))
-                  for (i=0; i < (int) number_colors; i++)
-                  {
-                    colors[i].pixel=(size_t) i;
-                    colors[i].pad='\0';
-                  }
-                else
-                  XInitializeDirectColors(window_info,id,number_colors,colors);
+                XInitializeWindowColors(window_info,id,number_colors,colors);
                 (void) XQueryColors(display,window_info[id].colormap,colors,
                   (int) number_colors);
                 /*
