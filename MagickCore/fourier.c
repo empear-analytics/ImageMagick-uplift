@@ -1212,6 +1212,14 @@ static MagickBooleanType CheckFourierMemory(const MemoryInfo *source_info,
   return(MagickTrue);
 }
 
+static void LoadFourierSourcePixels(const FourierInfo *fourier_info,
+  const Image *image,double *source_pixels,ExceptionInfo *exception)
+{
+  memset(source_pixels,0,fourier_info->width*fourier_info->height*
+    sizeof(*source_pixels));
+  GetFourierChannelPixels(fourier_info,image,source_pixels,exception);
+}
+
 static void SetForwardFourierRectangular(const FourierInfo *fourier_info,
   const ForwardFourierPlanes *planes,const fftw_complex *forward_pixels,
   ssize_t i)
@@ -1285,9 +1293,7 @@ static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
   if (CheckFourierMemory(source_info,image,exception) == MagickFalse)
     return(MagickFalse);
   source_pixels=(double *) GetVirtualMemoryBlob(source_info);
-  memset(source_pixels,0,fourier_info->width*fourier_info->height*
-    sizeof(*source_pixels));
-  GetFourierChannelPixels(fourier_info,image,source_pixels,exception);
+  LoadFourierSourcePixels(fourier_info,image,source_pixels,exception);
   forward_info=AcquireVirtualMemory(fourier_info->width,(fourier_info->height/2+
     1)*sizeof(*forward_pixels));
   if (forward_info == (MemoryInfo *) NULL)
