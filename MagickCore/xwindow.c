@@ -4240,6 +4240,52 @@ static void XImportDirectColorRows(const XDirectRowSource *source)
   }
 }
 
+static void XImportTrueColorPixels(const XDirectRowSource *source,
+  const int y,Quantum *magick_restrict q)
+{
+  Image
+    *const composite_image = source->composite_image;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const size_t
+    blue_mask = source->blue_mask,
+    blue_shift = source->blue_shift,
+    green_mask = source->green_mask,
+    green_shift = source->green_shift,
+    red_mask = source->red_mask,
+    red_shift = source->red_shift;
+
+  int
+    x;
+
+  size_t
+    color,
+    pixel;
+
+  for (x=0; x < (int) composite_image->columns; x++)
+  {
+    pixel=XGetPixel(ximage,x,y);
+    color=(pixel >> red_shift) & red_mask;
+    if (red_mask != 0)
+      color=(65535UL*color)/red_mask;
+    SetPixelRed(composite_image,ScaleShortToQuantum(
+      (unsigned short) color),q);
+    color=(pixel >> green_shift) & green_mask;
+    if (green_mask != 0)
+      color=(65535UL*color)/green_mask;
+    SetPixelGreen(composite_image,ScaleShortToQuantum(
+      (unsigned short) color),q);
+    color=(pixel >> blue_shift) & blue_mask;
+    if (blue_mask != 0)
+      color=(65535UL*color)/blue_mask;
+    SetPixelBlue(composite_image,ScaleShortToQuantum(
+      (unsigned short) color),q);
+    q+=(ptrdiff_t) GetPixelChannels(composite_image);
+  }
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4429,14 +4475,10 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
         import;
 
       int
-        j,
-        x;
+        j;
 
       Quantum
         *magick_restrict q;
-
-      size_t
-        pixel;
 
       unsigned int
         number_colors;
@@ -4559,9 +4601,6 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
           default:
           {
             size_t
-              color;
-
-            size_t
               blue_mask,
               blue_shift,
               green_mask,
@@ -4620,26 +4659,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
                   composite_image->columns,1,exception);
                 if (q == (Quantum *) NULL)
                   break;
-                for (x=0; x < (int) composite_image->columns; x++)
-                {
-                  pixel=XGetPixel(ximage,x,y);
-                  color=(pixel >> red_shift) & red_mask;
-                  if (red_mask != 0)
-                    color=(65535UL*color)/red_mask;
-                  SetPixelRed(composite_image,ScaleShortToQuantum(
-                    (unsigned short) color),q);
-                  color=(pixel >> green_shift) & green_mask;
-                  if (green_mask != 0)
-                    color=(65535UL*color)/green_mask;
-                  SetPixelGreen(composite_image,ScaleShortToQuantum(
-                    (unsigned short) color),q);
-                  color=(pixel >> blue_shift) & blue_mask;
-                  if (blue_mask != 0)
-                    color=(65535UL*color)/blue_mask;
-                  SetPixelBlue(composite_image,ScaleShortToQuantum(
-                    (unsigned short) color),q);
-                  q+=(ptrdiff_t) GetPixelChannels(composite_image);
-                }
+                XImportTrueColorPixels(&direct_source,y,q);
                 status=SyncCacheViewAuthenticPixels(composite_view,exception)
                   == MagickFalse ? 0 : 1;
                 if (status == MagickFalse)
