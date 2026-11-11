@@ -6548,7 +6548,11 @@ addresses of written variables, not copies of read-only values.
 2. Every `e` is a plain identifier or a literal: no call, member access, cast, increment,
    assignment or macro with a side effect. Each identifier is declared before the
    struct's declaration (a parameter, a local of an enclosing block, or an earlier
-   declaration of the same block), so the initialiser may name it.
+   declaration of the same block), so the initialiser may name it. A read of a member
+   through a parameter of the function declared pointer-to-`const` (`p->m`, or
+   `p->m.n` of a struct-valued member; 2026-11-11) is admitted as well: it has no side
+   effect, and the run writes nothing it reads, since the run writes only `name`, a
+   local whose address nothing holds before the call (step 3).
 3. The struct is only read after the fill: it appears afterwards only as `&name` passed to
    a parameter of type pointer-to-`const`, or in `name.m` reads. Nothing writes it or a
    member of it.
@@ -10518,7 +10522,8 @@ how an existing fill is rewritten. Recipe H, which moves preprocessor lines.
    order (checked by script against the typedef), and the statement directly after the
    run is the one call that uses `name`.
 2. Every `e` is a plain identifier or a literal (FI step 2): no call, member access,
-   cast, increment, assignment or macro with a side effect.
+   cast, increment, assignment or macro with a side effect; or a member read through a
+   pointer-to-`const` parameter of the function, as FI step 2 admits it.
 3. `name` appears nowhere in the function but in its declaration, the run, and once as
    `&name` in that call, passed to a parameter of type pointer-to-`const` (FI step 3).
    The call is one expression statement ending in `;` (`F(...,&name,...);` or
@@ -10958,3 +10963,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | Z | Step 5: when every member's variable is a plain identifier, the input struct may be filled in Recipe FB's form, a compound statement `{ const Name name = { ... }; Helper(&name,...); }` where the block stood, in place of a declaration at the block's top and a run of assignments | `montage.c`'s `MontageImageList` (campaign A, W17 lane d): its tile loop's row wrap (writes `x_offset`, `y_offset`, `max_height`; nine inputs) as a Z helper with step 5's assignments scores 8.86 to 8.85 (the function grows 198 to 201 lines while cc falls 19 to 16); in FB's form 8.88 | owner |
 | 2026-11-11 | AMEND | Y | Step 5: the same FB form for the input struct, the compound statement holding `if (Helper(&name,...) == MagickFalse)` and its unchanged exit; Recipe I's input struct (its step 4, Y steps 3 to 5) takes it too | Same session: the tile loop of `MontageImageList` reads nineteen inputs, whose assignment fill would cost the lines the file has left under *Lines of Code in a Single File* | owner |
 | 2026-11-11 | AMEND | I | Step 8: the macro left in the caller may also be one of MagickCore's own throw macros (`ThrowImageException`, `ThrowBinaryException`), whose expansion is a `ThrowMagickException` with `GetMagickModule()` and `return(c);` of one constant; `GetMagickModule()` keeps naming the caller, and a variable the expansion reads that the block writes (`image`) is a written variable of step 2 | `montage.c`'s `MontageImageList` (campaign A, W17 lane d): its tile loop leaves through `ThrowImageException` when `CloneImage` fails; E step 6 would move the throw into a helper of another return type (the macro returns `(Image *) NULL`) and change the module it names; with the macro left in the caller the loop moves under I with `image`, `progress_monitor` and `tiles` as targets | owner |
+| 2026-11-11 | AMEND | FI | Step 2: a value may also be a member read through a parameter of the function declared pointer-to-`const` (`p->m`, `p->m.n`): no side effect, and the run writes only the struct local, whose address nothing holds before the call | `montage.c`'s `PlaceMontageTile` (campaign A, W17 lane d): its `tile_info` (15 members), `extent` and `frame` fills copy members of `const MontageTilePlacement *placement`; with `gravity_info` (Recipe FB) they free the 18 lines `MontageImageList`'s next-page step needs under *Lines of Code in a Single File*: a probe of the four plus that step, 9.03 to 9.11, `IDENTICAL` object code for the fills | owner |
+| 2026-11-11 | AMEND | FB | Step 2: the same member reads as FI step 2 (as amended the same day) | Same session: `PlaceMontageTile`'s `gravity_info`, declared at the top and filled after `image` is reassigned, from six members of `placement` and `image` | owner |
