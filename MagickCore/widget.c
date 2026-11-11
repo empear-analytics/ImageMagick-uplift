@@ -6122,6 +6122,54 @@ static size_t ReleaseFontBrowserBack(const FontBrowserBack *back,
   return(state);
 }
 
+typedef struct _FontBrowserReset
+{
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  XWidgetInfo
+    reset_info;
+
+  char
+    *back_pattern,
+    *glob_pattern;
+
+  const char
+    *reset_pattern;
+} FontBrowserReset;
+
+static size_t ReleaseFontBrowserReset(const FontBrowserReset *reset,
+  size_t state)
+{
+  XWindows
+    *const windows = reset->windows;
+
+  const XEvent
+    event = reset->event;
+
+  const XWidgetInfo
+    reset_info = reset->reset_info;
+
+  char
+    *const back_pattern = reset->back_pattern,
+    *const glob_pattern = reset->glob_pattern;
+
+  const char
+    *const reset_pattern = reset->reset_pattern;
+
+  if ((event.xbutton.window == windows->widget.id) &&
+      (MatteIsActive(reset_info,event.xbutton)))
+    {
+      (void) CopyMagickString(back_pattern,glob_pattern,MagickPathExtent);
+      (void) CopyMagickString(glob_pattern,reset_pattern,MagickPathExtent);
+      state|=UpdateListState;
+    }
+  return(state);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6860,13 +6908,16 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
           }
         if (reset_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(reset_info,event.xbutton)))
-              {
-                (void) CopyMagickString(back_pattern,glob_pattern,MagickPathExtent);
-                (void) CopyMagickString(glob_pattern,reset_pattern,MagickPathExtent);
-                state|=UpdateListState;
-              }
+            FontBrowserReset
+              reset;
+
+            reset.windows=windows;
+            reset.event=event;
+            reset.reset_info=reset_info;
+            reset.back_pattern=back_pattern;
+            reset.glob_pattern=glob_pattern;
+            reset.reset_pattern=reset_pattern;
+            state=ReleaseFontBrowserReset(&reset,state);
             reset_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&reset_info);
           }
