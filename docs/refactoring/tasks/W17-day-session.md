@@ -310,3 +310,25 @@ opencl.c step from the pre-existing `StopAccelerateTimer` warning (line 257, unc
 (lane a's LB break-form question), the uncompiled `#if WINDOWS` block in GetOpenCLCacheDirectory, five-argument
 helpers, the CF/function-pointer question. Whole catalogues on the lane: 15,900 and 14,145 cases, 1 diverged each
 (`infra/0fd402f13a` load timeout).
+
+## Lane b, third round: composite.c 3.66 -> 3.69 (merged)
+
+91e783d56 N step 1 `CopyTextureImage` (TextureImage leaves Complex Method, 9 cases); 6dce66669 E `GetCompositeClamp`
+and b877bf869 PC `CompositeOverRowHead` (CompositeOverImage leaves Complex and Large Method, 567 cases);
+SetVirtualCompositeChannels (21 cases): 9082cb1f2 B `VirtualCompositeInputs` (7 -> 3 arguments), 45ed667ab SD,
+5254a4b74 SD step 6 (cc 24 -> 17), 49f60de32 E step 7 `GetVirtualCanvasPixel` 3.69 (Bumpy Road now only in
+CompositeImage). All flat steps but the last; no helper finding, no Code Duplication. Timing: wall clock too noisy
+(load about 11), so callgrind instruction counts against d38e0c1b3: fewer everywhere (Over -1.1%; In -0.16%, Clear
+-0.14%, Dissolve -0.12%, Multiply -0.26% on the virtual-pixel paths).
+
+Plateau 3.69 under the current rulings (padded-stub probes): the gain comes only when many functions are clean
+together (CompositeImage with Saliency, Seamless, Divergent, SetVirtual, Over, Texture, Pixel, Channels: 4.16).
+**For the owner:** (1) a Copy/Intensity merge (CF cannot: different row-callee types and fills), about +0.1 to
++0.15; (2) letting I or ST carry nine targets, or a block tail, so CompositeImage's setup switch (writes nine
+caller variables) can leave, about +0.25; (3) hoisting `FreeDivergentResources` with Recipe H for what it measures
+alone (CodeScene counts the macro's eight `if`s in BlendDivergentImage). split_source.py refuses both public roots
+(shared `SyncCompositeRow`). Ready but zero gain now: an LP amendment for two `break;` groups plus TB on a
+nine-label `IsVirtualCanvasOperator`. Possible upstream: `BlendDivergentImage` leaks `dx_divergent` when the
+`dy_divergent` convolve fails; `SaliencyBlendImage` leaks `divergent_image` on the residual-clone and kernel
+failure paths; both blend loops `break` when cloning the residual fails and then `DestroyImage(NULL)` asserts;
+CompositeOverImage sets `status`/`progress` twice and fills two unread `PixelInfo`s.
