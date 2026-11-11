@@ -6043,6 +6043,39 @@ static void MoveFontBrowserSliderByPage(const KeySym key_symbol,
   }
 }
 
+static XWidgetInfo MoveFontBrowserSlider(XWidgetInfo slider_info,
+  const KeySym key_symbol,const unsigned int visible_fonts,const int fonts)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Home:
+    case XK_KP_Home:
+    {
+      slider_info.id=0;
+      break;
+    }
+    case XK_Up:
+    case XK_KP_Up:
+    {
+      slider_info.id--;
+      break;
+    }
+    case XK_Down:
+    case XK_KP_Down:
+    {
+      slider_info.id++;
+      break;
+    }
+    default:
+    {
+      MoveFontBrowserSliderByPage(key_symbol,visible_fonts,fonts,
+        &slider_info);
+      break;
+    }
+  }
+  return(slider_info);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6879,33 +6912,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
             /*
               Move slider.
             */
-            switch ((int) key_symbol)
-            {
-              case XK_Home:
-              case XK_KP_Home:
-              {
-                slider_info.id=0;
-                break;
-              }
-              case XK_Up:
-              case XK_KP_Up:
-              {
-                slider_info.id--;
-                break;
-              }
-              case XK_Down:
-              case XK_KP_Down:
-              {
-                slider_info.id++;
-                break;
-              }
-              default:
-              {
-                MoveFontBrowserSliderByPage(key_symbol,visible_fonts,fonts,
-                  &slider_info);
-                break;
-              }
-            }
+            slider_info=MoveFontBrowserSlider(slider_info,key_symbol,
+              visible_fonts,fonts);
             state|=RedrawListState;
             break;
           }
