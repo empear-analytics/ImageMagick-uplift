@@ -146,3 +146,46 @@ not, effect.c's split is reverted and the attribute-depth.c split dropped.
 Possible upstream: feature-texture.c `GetImageFeatures` leaks `density_x`, `density_xy`, `density_y`, `Q` and
 `sum` when `FillFeatureCooccurrence` fails; its parallel grays fill writes the shared `grays[]` from several
 threads (a race, every write storing the same value).
+
+## Owner ruling (2026-11-11): splits may move a compiled-elsewhere branch whole
+
+The owner answered "Yes, allow it" to the question above. Recorded in f9589c422: AGENTS.md's second
+exception, the playbook's *Preprocessor branches* section and a Recipe S row; new
+`tools/split_branch_check.py` compiles the original at the split's parent and the new file with a build's flags
+(`cand-wide`, `ci-gcc-min`, `ci-gcc-dlg`) and prints `IDENTICAL-MODULO-LAYOUT` only when every function the new
+file defines differs at most in `__LINE__` immediates, `.rodata` references, constant-pool label numbers and
+rip-relative offsets (a planted one-constant change prints DIFFERENT). effect.c's split stands (wide build: 40
+`__LINE__` immediates, 76 labels). The attribute-depth.c split is merged (e38bd8ebd): `attribute-depth.c`
+7.56 -> 8.16, `attribute-depth-measure.c` 8.16; `split_branch_check.py` in ci-gcc-min and ci-gcc-dlg:
+IDENTICAL-MODULO-LAYOUT (6 `.rodata` references, 5 `__LINE__` immediates, 1 rip-relative offset). Gate:
+15,900 cases, 0 diverged (`infra/0fd402f13a` load timeout, passed on rerun).
+
+## Lane c, second round: animate.c 2.49 -> 3.35, opencl.c 5.03 -> 5.27 (wide build, merged)
+
+animate.c, 25 refactor commits. `XAnimateBackgroundImage`: 87cc80834 E (flat), 513e342ff LB 2.59 (leaves Deep
+Nesting). `XAnimateImages` (30 cases): every statement above depth 3 went into a helper; raising steps 36941f57c
+E 2.65 (after 4afb47b2c D, flat), 1e0d6d9ba N 2.71, 030d72d4c N 2.77, 01421bbf1 P 2.90, 6a4402a7c D 3.35 (reuses
+`XFocusBackdropImage`; leaves Brain Method and Deep Nesting); flat plan steps e35ba63ee CN, c7272670c,
+62c30529c, d5567bf9f, 7d682080e E, 51f38b5a4, 858de5eed, 82d8d50d3, dddf26448, 24012b30b Z, 749f09c70,
+a24867657 N, d02830403 H (pp check against the wide build: IDENTICAL), f1f0cda1b LB, 66112b45f, 58d44db8f,
+e1ffaebdf I. **Correction:** e35ba63ee (CN) gave `XAnimateImages` a Complex Conditional finding at a flat score
+and its message does not say so; 01421bbf1 (P) removes it and says so. 4afb47b2c (D) is the one step with
+DIFFERENT object code (`FindColormapDifference` no longer inlined into `XAnimateBackgroundImage`); it rests on a
+text check and the oracle.
+
+opencl.c: c3ff375d9 E `RecordProfileData` 5.22 (leaves Large Method); 2e14e50ba N `LoadOpenCLDevices` 5.27
+(leaves Bumpy Road, 253 cases). Rejected: BenchmarkOpenCLDevices' score loop (5.11, a Code Duplication twin of
+`EnableSameOpenCLDevices`). Stopped early to save context; `LoadOpenCLDevices`' platform loop is next.
+
+Recipe text (Decided by `owner`, 2026-11-10 OK): ef17bfab2 Z step 7 (five or six caller variables, or two to
+four whose pointers would bring the call to five or more arguments, go by one `const` struct of addresses);
+64ab6430e and 793736b19 N step 2 (a caller array used only as `v[e]` reads or passed whole to a pointer
+parameter may join the group as a pointer member).
+
+Whole wide catalogue on the lane: 14,145 cases, 1 diverged (`infra/0fd402f13a`, times out on the baseline).
+
+For the owner: `tools/pp_identical.sh` uses the narrow build, so it proves nothing for wide-build files (lane c
+ran a copy pointed at `cand-wide`); `tools/ci_warnings.sh` fails on opencl.c before any change
+(`-Wdeclaration-after-statement` in the `#else` of `StopAccelerateTimer`, which no recipe may edit).
+Possible upstream: animate.c's scene loops pick `TrueColorType` when `alpha_trait == BlendPixelTrait`, while
+`XAnimateBackgroundImage`'s later `display_image` call uses `!=` for the same choice.
