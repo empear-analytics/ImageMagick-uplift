@@ -4998,6 +4998,12 @@ static void XShowCropHelp(Display *display,XResourceInfo *resource_info,
   }
 }
 
+static void XMapInfoWidget(Display *display,XWindows *windows)
+{
+  if (windows->info.mapped == MagickFalse)
+    (void) XMapWindow(display,windows->info.id);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -5260,8 +5266,7 @@ static MagickBooleanType XCropImage(Display *display,
           /*
             Display info and draw cropping rectangle.
           */
-          if (windows->info.mapped == MagickFalse)
-            (void) XMapWindow(display,windows->info.id);
+          XMapInfoWidget(display,windows);
           (void) FormatLocaleString(text,MagickPathExtent,
             " %.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
             crop_info.height,(double) crop_info.x,(double) crop_info.y);
