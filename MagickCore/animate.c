@@ -3750,6 +3750,28 @@ static void XCreateSceneWindows(const AnimateEventContext *event_context,
   }
 }
 
+static WarningHandler XEnterWorkingDirectory(XResourceInfo *resource_info,
+  char *working_directory,ExceptionInfo *exception)
+{
+  WarningHandler
+    warning_handler;
+
+  int
+    status;
+
+  if (*working_directory == '\0')
+    (void) CopyMagickString(working_directory,".",MagickPathExtent);
+  status=chdir(working_directory);
+  if (status == -1)
+    (void) ThrowMagickException(exception,GetMagickModule(),FileOpenError,
+      "UnableToOpenFile","%s",working_directory);
+  warning_handler=resource_info->display_warnings ?
+    SetErrorHandler(XWarning) : SetErrorHandler((ErrorHandler) NULL);
+  warning_handler=resource_info->display_warnings ?
+    SetWarningHandler(XWarning) : SetWarningHandler((WarningHandler) NULL);
+  return(warning_handler);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3955,19 +3977,8 @@ MagickExport Image *XAnimateImages(Display *display,
   windows=XSetWindows((XWindows *) ~0);
   if (windows != (XWindows *) NULL)
     {
-      int
-        status;
-
-      if (*working_directory == '\0')
-        (void) CopyMagickString(working_directory,".",MagickPathExtent);
-      status=chdir(working_directory);
-      if (status == -1)
-        (void) ThrowMagickException(exception,GetMagickModule(),FileOpenError,
-          "UnableToOpenFile","%s",working_directory);
-      warning_handler=resource_info->display_warnings ?
-        SetErrorHandler(XWarning) : SetErrorHandler((ErrorHandler) NULL);
-      warning_handler=resource_info->display_warnings ?
-        SetWarningHandler(XWarning) : SetWarningHandler((WarningHandler) NULL);
+      warning_handler=XEnterWorkingDirectory(resource_info,working_directory,
+        exception);
     }
   else
     {
