@@ -12675,6 +12675,122 @@ static void XROIKeyPress(const ROIKeyInput *key_input,XEvent *event,
     (*event).xkey.time);
 }
 
+typedef struct _ROICommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  RectangleInfo
+    highlight_info;
+
+  const char
+    *const *ApplyMenu;
+
+  const DisplayCommand
+    *ApplyCommands;
+
+  const char
+    *const **Menus;
+
+  const DisplayCommand
+    **Commands;
+} ROICommandInput;
+
+static void XROICommand(const ROICommandInput *command_input,XEvent *event,
+  DisplayCommand *display_command,size_t *state)
+{
+  Display
+    *const display = command_input->display;
+
+  XResourceInfo
+    *const resource_info = command_input->resource_info;
+
+  XWindows
+    *const windows = command_input->windows;
+
+  const RectangleInfo
+    highlight_info = command_input->highlight_info;
+
+  const char
+    *const *const ApplyMenu = command_input->ApplyMenu;
+
+  const DisplayCommand
+    *const ApplyCommands = command_input->ApplyCommands;
+
+  const char
+    *const **const Menus = command_input->Menus;
+
+  const DisplayCommand
+    **const Commands = command_input->Commands;
+
+  char
+    command[MagickPathExtent];
+
+  int
+    entry,
+    id;
+
+  /*
+    Select a command from the Command widget.
+  */
+  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+  (*display_command)=NullCommand;
+  id=XCommandWidget(display,windows,ApplyMenu,event);
+  if (id >= 0)
+    {
+      (void) CopyMagickString(command,ApplyMenu[id],MagickPathExtent);
+      (*display_command)=ApplyCommands[id];
+      if (id < ApplyMenus)
+        {
+          ROIMenuEntry
+            menu_entry;
+
+          /*
+            Select a command from a pop-up menu.
+          */
+          entry=XMenuWidget(display,windows,ApplyMenu[id],
+            (const char **) Menus[id],command);
+          menu_entry.Menus=Menus;
+          menu_entry.Commands=Commands;
+          menu_entry.id=id;
+          menu_entry.entry=entry;
+          (*display_command)=XSelectROIMenuEntry(&menu_entry,command,
+            (*display_command));
+        }
+    }
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  if ((*display_command) == HelpCommand)
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Region of Interest",ImageROIHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      return;
+    }
+  if ((*display_command) == QuitCommand)
+    {
+      /*
+        exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      return;
+    }
+  if ((*display_command) != NullCommand)
+    (*state)|=UpdateRegionState;
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12897,7 +13013,6 @@ static MagickBooleanType XROIImage(Display *display,
     cursor;
 
   int
-    entry,
     id,
     x,
     y;
@@ -13197,59 +13312,18 @@ static MagickBooleanType XROIImage(Display *display,
       XScreenEvent(display,windows,&event,exception);
       if (event.xany.window == windows->command.id)
         {
-          /*
-            Select a command from the Command widget.
-          */
-          (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-          display_command=NullCommand;
-          id=XCommandWidget(display,windows,ApplyMenu,&event);
-          if (id >= 0)
-            {
-              (void) CopyMagickString(command,ApplyMenu[id],MagickPathExtent);
-              display_command=ApplyCommands[id];
-              if (id < ApplyMenus)
-                {
-                  ROIMenuEntry
-                    menu_entry;
+          ROICommandInput
+            command_input;
 
-                  /*
-                    Select a command from a pop-up menu.
-                  */
-                  entry=XMenuWidget(display,windows,ApplyMenu[id],
-                    (const char **) Menus[id],command);
-                  menu_entry.Menus=Menus;
-                  menu_entry.Commands=Commands;
-                  menu_entry.id=id;
-                  menu_entry.entry=entry;
-                  display_command=XSelectROIMenuEntry(&menu_entry,command,
-                    display_command);
-                }
-            }
-          (void) XSetFunction(display,windows->image.highlight_context,
-            GXinvert);
-          XHighlightRectangle(display,windows->image.id,
-            windows->image.highlight_context,&highlight_info);
-          if (display_command == HelpCommand)
-            {
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXcopy);
-              XTextViewHelp(display,resource_info,windows,MagickFalse,
-                "Help Viewer - Region of Interest",ImageROIHelp);
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXinvert);
-              continue;
-            }
-          if (display_command == QuitCommand)
-            {
-              /*
-                exit.
-              */
-              state|=EscapeState;
-              state|=ExitState;
-              continue;
-            }
-          if (display_command != NullCommand)
-            state|=UpdateRegionState;
+          command_input.display=display;
+          command_input.resource_info=resource_info;
+          command_input.windows=windows;
+          command_input.highlight_info=highlight_info;
+          command_input.ApplyMenu=ApplyMenu;
+          command_input.ApplyCommands=ApplyCommands;
+          command_input.Menus=Menus;
+          command_input.Commands=Commands;
+          XROICommand(&command_input,&event,&display_command,&state);
           continue;
         }
       XHighlightRectangle(display,windows->image.id,
