@@ -9894,6 +9894,71 @@ static void XDiscardMagnifyKeys(Display *display,XWindows *windows,
     }
 }
 
+typedef struct _EditMenuInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *MatteEditMenu;
+
+  int
+    id;
+
+  char
+    *command;
+} EditMenuInput;
+
+typedef struct _PaintMethodTargets
+{
+  PaintMethod
+    *method;
+} PaintMethodTargets;
+
+static void XSelectPaintMethod(const EditMenuInput *menu,
+  const PaintMethodTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const MatteEditMenu = menu->MatteEditMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  PaintMethod
+    *const method = targets->method;
+
+  char
+    **methods;
+
+  int
+    entry;
+
+  /*
+    Select a method from the pop-up menu.
+  */
+  methods=GetCommandOptions(MagickMethodOptions);
+  if (methods == (char **) NULL)
+    return;
+  entry=XMenuWidget(display,windows,MatteEditMenu[id],
+    (const char **) methods,command);
+  if (entry >= 0)
+    (*method)=(PaintMethod) ParseCommandOption(MagickMethodOptions,
+      MagickFalse,methods[entry]);
+  methods=DestroyStringList(methods);
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -9963,6 +10028,9 @@ static MagickBooleanType XMatteEditImage(Display *display,
   XEvent
     event;
 
+  const PaintMethodTargets
+    method_targets = { &method };
+
   /*
     Map Command widget.
   */
@@ -10002,6 +10070,9 @@ static MagickBooleanType XMatteEditImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     if (event.xany.window == windows->command.id)
       {
+        EditMenuInput
+          menu_input;
+
         /*
           Select a command from the Command widget.
         */
@@ -10015,21 +10086,12 @@ static MagickBooleanType XMatteEditImage(Display *display,
         {
           case MatteEditMethod:
           {
-            char
-              **methods;
-
-            /*
-              Select a method from the pop-up menu.
-            */
-            methods=GetCommandOptions(MagickMethodOptions);
-            if (methods == (char **) NULL)
-              break;
-            entry=XMenuWidget(display,windows,MatteEditMenu[id],
-              (const char **) methods,command);
-            if (entry >= 0)
-              method=(PaintMethod) ParseCommandOption(MagickMethodOptions,
-                MagickFalse,methods[entry]);
-            methods=DestroyStringList(methods);
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=MatteEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectPaintMethod(&menu_input,&method_targets);
             break;
           }
           case MatteEditBorderCommand:
