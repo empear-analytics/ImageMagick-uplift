@@ -2435,6 +2435,79 @@ static void XCenterImageOnBackdrop(Display *display,XWindows *windows,
     ((int) windows->image.height/2);
 }
 
+typedef struct _AnimateSceneWindow
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image_list;
+
+  size_t
+    number_scenes;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    scene;
+} AnimateSceneWindow;
+
+static void XNameSceneWindow(const AnimateSceneWindow *scene_window)
+{
+  XResourceInfo
+    *const resource_info = scene_window->resource_info;
+
+  XWindows
+    *const windows = scene_window->windows;
+
+  Image
+    **const image_list = scene_window->image_list;
+
+  const size_t
+    number_scenes = scene_window->number_scenes;
+
+  ExceptionInfo
+    *const exception = scene_window->exception;
+
+  const ssize_t
+    scene = scene_window->scene;
+
+  char
+    *p;
+
+  if (resource_info->title != (char *) NULL)
+    {
+      char
+        *title;
+
+      title=InterpretImageProperties(resource_info->image_info,
+        image_list[scene],resource_info->title,exception);
+      (void) CloneString(&windows->image.name,title);
+      title=DestroyString(title);
+    }
+  else
+    {
+      char
+        window_name[MagickPathExtent];
+
+      p=image_list[scene]->magick_filename+
+        strlen(image_list[scene]->magick_filename)-1;
+      while ((p > image_list[scene]->magick_filename) && (*(p-1) != '/'))
+        p--;
+      (void) FormatLocaleString(window_name,MagickPathExtent,
+        "%s: %s[%.17g of %.17g]",MagickPackageName,p,(double) scene+1,
+        (double) number_scenes);
+      (void) CloneString(&windows->image.name,window_name);
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2541,7 +2614,6 @@ MagickExport Image *XAnimateImages(Display *display,
     command[MagickPathExtent],
     *directory,
     geometry[MagickPathExtent],
-    *p,
     resource_name[MagickPathExtent];
 
   Image
@@ -3096,6 +3168,9 @@ MagickExport Image *XAnimateImages(Display *display,
   XSetCursorState(display,windows,MagickTrue);
   for (scene=0; scene < (ssize_t) number_scenes; scene++)
   {
+    AnimateSceneWindow
+      scene_window;
+
     unsigned int
       columns,
       rows;
@@ -3134,30 +3209,14 @@ MagickExport Image *XAnimateImages(Display *display,
     /*
       Window name is the base of the filename.
     */
-    if (resource_info->title != (char *) NULL)
-      {
-        char
-          *title;
-
-        title=InterpretImageProperties(resource_info->image_info,
-          image_list[scene],resource_info->title,exception);
-        (void) CloneString(&windows->image.name,title);
-        title=DestroyString(title);
-      }
-    else
-      {
-        char
-          window_name[MagickPathExtent];
-
-        p=image_list[scene]->magick_filename+
-          strlen(image_list[scene]->magick_filename)-1;
-        while ((p > image_list[scene]->magick_filename) && (*(p-1) != '/'))
-          p--;
-        (void) FormatLocaleString(window_name,MagickPathExtent,
-          "%s: %s[%.17g of %.17g]",MagickPackageName,p,(double) scene+1,
-          (double) number_scenes);
-        (void) CloneString(&windows->image.name,window_name);
-      }
+    scene_window.display=display;
+    scene_window.resource_info=resource_info;
+    scene_window.windows=windows;
+    scene_window.image_list=image_list;
+    scene_window.number_scenes=number_scenes;
+    scene_window.exception=exception;
+    scene_window.scene=scene;
+    XNameSceneWindow(&scene_window);
     status=XStringListToTextProperty(&windows->image.name,1,&window_name);
     if (status != Success)
       {
