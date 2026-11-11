@@ -5182,6 +5182,39 @@ typedef struct _CropTargets
     *state;
 } CropTargets;
 
+static void XCropSelectionRequest(XEvent *event,const RectangleInfo crop_info,
+  char *text)
+{
+  XSelectionEvent
+    notify;
+
+  XSelectionRequestEvent
+    *request;
+
+  /*
+    Set primary selection.
+  */
+  (void) FormatLocaleString(text,MagickPathExtent,
+    "%.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
+    crop_info.height,(double) crop_info.x,(double) crop_info.y);
+  request=(&((*event).xselectionrequest));
+  (void) XChangeProperty(request->display,request->requestor,
+    request->property,request->target,8,PropModeReplace,
+    (unsigned char *) text,(int) strlen(text));
+  notify.type=SelectionNotify;
+  notify.display=request->display;
+  notify.requestor=request->requestor;
+  notify.selection=request->selection;
+  notify.target=request->target;
+  notify.time=request->time;
+  if (request->property == None)
+    notify.property=request->target;
+  else
+    notify.property=request->property;
+  (void) XSendEvent(request->display,request->requestor,False,0,
+    (XEvent *) &notify);
+}
+
 static void XCropMotion(const CropEventInput *event_input,
   const CropTargets *targets)
 {
@@ -5788,34 +5821,7 @@ static MagickBooleanType XCropImage(Display *display,
         }
         case SelectionRequest:
         {
-          XSelectionEvent
-            notify;
-
-          XSelectionRequestEvent
-            *request;
-
-          /*
-            Set primary selection.
-          */
-          (void) FormatLocaleString(text,MagickPathExtent,
-            "%.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
-            crop_info.height,(double) crop_info.x,(double) crop_info.y);
-          request=(&(event.xselectionrequest));
-          (void) XChangeProperty(request->display,request->requestor,
-            request->property,request->target,8,PropModeReplace,
-            (unsigned char *) text,(int) strlen(text));
-          notify.type=SelectionNotify;
-          notify.display=request->display;
-          notify.requestor=request->requestor;
-          notify.selection=request->selection;
-          notify.target=request->target;
-          notify.time=request->time;
-          if (request->property == None)
-            notify.property=request->target;
-          else
-            notify.property=request->property;
-          (void) XSendEvent(request->display,request->requestor,False,0,
-            (XEvent *) &notify);
+          XCropSelectionRequest(&event,crop_info,text);
         }
         default:
           break;
