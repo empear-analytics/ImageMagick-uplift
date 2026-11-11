@@ -1819,6 +1819,44 @@ static MagickBooleanType XHandleDropProtocol(
   return(MagickTrue);
 }
 
+static void XPauseAnimation(Display *display,XResourceInfo *resource_info,
+  XWindows *windows,XEvent *event)
+{
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) resource_info->pause; i++)
+  {
+    int
+      status;
+
+    status=XCheckTypedWindowEvent(display,windows->image.id,KeyPress,
+      event);
+    if (status != 0)
+      {
+        int
+          length;
+
+        length=XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+        *(command+length)='\0';
+        if ((key_symbol == XK_q) || (key_symbol == XK_Escape))
+          {
+            XClientMessage(display,windows->image.id,
+              windows->im_protocols,windows->im_exit,CurrentTime);
+            break;
+          }
+      }
+    MagickDelay(1000);
+  }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2745,30 +2783,7 @@ MagickExport Image *XAnimateImages(Display *display,
           }
         state&=(~StepAnimationState);
         if (pause != MagickFalse)
-          for (i=0; i < (ssize_t) resource_info->pause; i++)
-          {
-            int
-              status;
-
-            status=XCheckTypedWindowEvent(display,windows->image.id,KeyPress,
-              &event);
-            if (status != 0)
-              {
-                int
-                  length;
-
-                length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
-                  sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-                *(command+length)='\0';
-                if ((key_symbol == XK_q) || (key_symbol == XK_Escape))
-                  {
-                    XClientMessage(display,windows->image.id,
-                      windows->im_protocols,windows->im_exit,CurrentTime);
-                    break;
-                  }
-              }
-            MagickDelay(1000);
-          }
+          XPauseAnimation(display,resource_info,windows,&event);
         continue;
       }
     /*
