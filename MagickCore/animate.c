@@ -3243,6 +3243,42 @@ static void XHandlePropertyNotify(const AnimateEventContext *event_context,
   (void) XFree((void *) data);
 }
 
+static MagickStatusType XHandleDeleteMessage(
+  const AnimateEventContext *event_context,const XEvent event,
+  MagickStatusType state)
+{
+  Display
+    *const display = event_context->display;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  XVisualInfo
+    *const visual_info = event_context->visual_info;
+
+  /*
+    If client window delete message, exit.
+  */
+  if (event.xclient.message_type != windows->wm_protocols)
+    return(state);
+  if (*event.xclient.data.l == (long) windows->wm_take_focus)
+    {
+      (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
+        (Time) event.xclient.data.l[1]);
+      return(state);
+    }
+  if (*event.xclient.data.l != (long) windows->wm_delete_window)
+    return(state);
+  (void) XWithdrawWindow(display,event.xclient.window,
+    visual_info->screen);
+  if (event.xclient.window == windows->image.id)
+    {
+      state|=ExitState;
+      return(state);
+    }
+  return(state);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4140,26 +4176,7 @@ MagickExport Image *XAnimateImages(Display *display,
         targets.state=(&state);
         if (XHandleDropProtocol(&drop_source,&targets) == MagickFalse)
           break;
-        /*
-          If client window delete message, exit.
-        */
-        if (event.xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event.xclient.data.l == (long) windows->wm_take_focus)
-          {
-            (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
-              (Time) event.xclient.data.l[1]);
-            break;
-          }
-        if (*event.xclient.data.l != (long) windows->wm_delete_window)
-          break;
-        (void) XWithdrawWindow(display,event.xclient.window,
-          visual_info->screen);
-        if (event.xclient.window == windows->image.id)
-          {
-            state|=ExitState;
-            break;
-          }
+        state=XHandleDeleteMessage(&event_context,event,state);
         break;
       }
       case ConfigureNotify:
