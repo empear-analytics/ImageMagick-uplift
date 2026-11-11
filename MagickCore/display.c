@@ -1790,6 +1790,9 @@ typedef struct _AnnotateTargets
   int
     *x,
     *y;
+
+  XEvent
+    *text_event;
 } AnnotateTargets;
 
 static void XGoToPreviousTextLine(const AnnotateTargets *targets)
@@ -2196,6 +2199,42 @@ static void XRedrawTextLines(Display *display,XWindows *windows,
   }
 }
 
+static void XEraseTextCharacter(Display *display,XWindows *windows,
+  XFontStruct *font_info,const AnnotateTargets *targets)
+{
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  XEvent
+    *const text_event = targets->text_event;
+
+  /*
+    Erase one character.
+  */
+  if ((*p) == (*annotate_info)->text)
+    {
+      if ((*annotate_info)->previous == (XAnnotateInfo *) NULL)
+        return;
+      else
+        {
+          XGoToPreviousTextLine(targets);
+          return;
+        }
+    }
+  (*p)--;
+  (*x)-=XTextWidth(font_info,(*p),1);
+  (*text_event).xexpose.x=(*x);
+  (*text_event).xexpose.y=(*y)-font_info->max_bounds.ascent;
+  XRefreshWindow(display,&windows->image,text_event);
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -2294,7 +2333,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     text_event;
 
   const AnnotateTargets
-    targets = { &annotate_info, &p, &x, &y };
+    targets = { &annotate_info, &p, &x, &y, &text_event };
 
   const AnnotateRotateTargets
     rotate_targets = { &degrees };
@@ -2691,24 +2730,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         {
           case XK_BackSpace:
           {
-            /*
-              Erase one character.
-            */
-            if (p == annotate_info->text)
-              {
-                if (annotate_info->previous == (XAnnotateInfo *) NULL)
-                  break;
-                else
-                  {
-                    XGoToPreviousTextLine(&targets);
-                    break;
-                  }
-              }
-            p--;
-            x-=XTextWidth(font_info,p,1);
-            text_event.xexpose.x=x;
-            text_event.xexpose.y=y-font_info->max_bounds.ascent;
-            XRefreshWindow(display,&windows->image,&text_event);
+            XEraseTextCharacter(display,windows,font_info,&targets);
             break;
           }
           case XK_bracketleft:
