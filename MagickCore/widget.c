@@ -1383,12 +1383,12 @@ static void XScreenExpose(Display *display,XWindows *windows,XEvent *event)
     }
 }
 
-static void XScreenTrackWidgetMapping(XWindows *windows,const XEvent *event)
+static void XScreenTrackMapping(const XEvent *event,MagickBooleanType *mapped)
 {
   if (event->type == MapNotify)
-    windows->widget.mapped=MagickTrue;
+    (*mapped)=MagickTrue;
   if (event->type == UnmapNotify)
-    windows->widget.mapped=MagickFalse;
+    (*mapped)=MagickFalse;
 }
 
 static void XScreenConvertAltButton(XEvent *event)
@@ -1412,15 +1412,12 @@ static int XScreenEvent(Display *display,XEvent *event,char *data)
   windows=(XWindows *) data;
   if (event->xany.window == windows->popup.id)
     {
-      if (event->type == MapNotify)
-        windows->popup.mapped=MagickTrue;
-      if (event->type == UnmapNotify)
-        windows->popup.mapped=MagickFalse;
+      XScreenTrackMapping(event,&windows->popup.mapped);
       return(MagickTrue);
     }
   if (event->xany.window == windows->widget.id)
     {
-      XScreenTrackWidgetMapping(windows,event);
+      XScreenTrackMapping(event,&windows->widget.mapped);
       return(MagickTrue);
     }
   switch (event->type)
