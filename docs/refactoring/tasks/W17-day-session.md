@@ -189,3 +189,27 @@ ran a copy pointed at `cand-wide`); `tools/ci_warnings.sh` fails on opencl.c bef
 (`-Wdeclaration-after-statement` in the `#else` of `StopAccelerateTimer`, which no recipe may edit).
 Possible upstream: animate.c's scene loops pick `TrueColorType` when `alpha_trait == BlendPixelTrait`, while
 `XAnimateBackgroundImage`'s later `display_image` call uses `!=` for the same choice.
+
+## Lane b, second round: xwindow.c 1.64 -> 1.83 (wide build, merged)
+
+`XGetWindowImage` (173 cases): aac32e9bf E, 8ca036aab E, f74f6a315 N (`XDirectRowSource`), flat; 9c843791f N
+1.70 (nesting 7 -> 6); 79aa878a5 E flat; 601701e77 N (struct passed on, N step 8) 1.73 (nesting 6 -> 5).
+`XMakeStandardColormap` (514 cases): 22071e2f2, 3ac1d2e44, be905a450 E, 100ce6216 E (`Verified: guard`, lines
+unreached), a929bbc62 N, 2c920507c N, 1a4740387 E (flat plan steps), 8a2273ae3 D (two identical grayscale blocks
+to `XApplyGrayVisual`) 1.77, bumps 17 -> 9. 2b3d14d2a E `XBestFont` 1.80 (leaves Deep Nesting; 366 cases);
+d032daa75 O `XImportImage` 1.83 (leaves Deep Nesting); flat steps that each leave a category: 804bcb0fd E
+`XBestFont`, 18570fea7 CN `XWindowByName` (IDENTICAL), d4f1840fd E `XFreeStandardColormap`, 8f04789b8 E
+`XWindowByProperty` (unreached, `Verified: guard`). No new helper finding, no Code Duplication, no new recipe text.
+Whole wide catalogue: 14,145 cases, 1 diverged (`infra/0fd402f13a` timeout, 0 on rerun).
+
+Note on the check: `verify_wt.sh` prints VERIFY FAILED on xwindow.c even at the starting tip, from two
+`ci_warnings.sh` diagnostics already there (`map_list` maybe uninitialised in `XBestVisualInfo`; a sign-compare on
+`index < image->colors`, now inside `XCountRowDiversity`); the lane passed a step only with no new warning and the
+guard, call guard, ci_linux_warnings and oracle all passing.
+
+Plateau: `XMakeMagnifyImage` (nesting 8 in the LSB/MSB bitmap loops writing `byte`, `q_bit`, `q` together: only Q
+fits, not allowed on unreached lines; the twins would clone); `XMakeImage`, `DestroyXResources`,
+`XBestVisualInfo` keep their depth inside `#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)`/`#if !defined(PRE_R4_ICCCM)`
+code; `XGetWindowImage` probes to depth 4 are flat; `XDitherImage` (function-static tables and 2D maps).
+Possible upstream: `XMakeMagnifyImage`'s bitmap cases advance `q+=scanline_pad` inside the column loop rather than
+once per row; `XMakeStandardColormap` never sets `pad` in the copied `XColor`s.
