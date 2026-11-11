@@ -5575,13 +5575,15 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
           }
         if (home_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(home_info,event.xbutton)))
-              {
-                (void) CopyMagickString(working_path,home_directory,
-                  MagickPathExtent);
-                state|=UpdateListState;
-              }
+            FontBrowserBack
+              back;
+
+            back.windows=windows;
+            back.event=event;
+            back.back_info=home_info;
+            back.glob_pattern=working_path;
+            back.back_pattern=home_directory;
+            state=ReleaseFontBrowserBack(&back,state);
             home_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&home_info);
           }
