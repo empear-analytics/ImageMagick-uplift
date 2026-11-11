@@ -2244,6 +2244,21 @@ static void XRemapColormapMismatch(XResourceInfo *resource_info,
       }
 }
 
+static void XWithdrawColormapWindows(Display *display,XWindows *windows)
+{
+  if (IsColormapVisual(windows->visual_info) != MagickFalse)
+    {
+      /*
+        Withdraw windows.
+      */
+      if (windows->info.mapped)
+        (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+      if (windows->command.mapped)
+        (void) XWithdrawWindow(display,windows->command.id,
+          windows->command.screen);
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3586,17 +3601,7 @@ MagickExport Image *XAnimateImages(Display *display,
   while (!(state & ExitState));
   image_list=(Image **) RelinquishMagickMemory(image_list);
   images=DestroyImageList(images);
-  if (IsColormapVisual(windows->visual_info) != MagickFalse)
-    {
-      /*
-        Withdraw windows.
-      */
-      if (windows->info.mapped)
-        (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-      if (windows->command.mapped)
-        (void) XWithdrawWindow(display,windows->command.id,
-          windows->command.screen);
-    }
+  XWithdrawColormapWindows(display,windows);
   if ((resource_info->backdrop == MagickFalse) &&
       (windows->backdrop.mapped))
     {
