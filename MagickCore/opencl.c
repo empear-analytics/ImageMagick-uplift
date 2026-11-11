@@ -956,6 +956,12 @@ static inline MagickBooleanType IsDoctypeQuote(const char *q)
   return(((*q == '"') || (*q == '\'')) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsDoctypeEnd(const char *q,
+  const int bracket_depth)
+{
+  return(((*q == '>') && (bracket_depth == 0)) ? MagickTrue : MagickFalse);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -1009,7 +1015,7 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
                   if (*q == ']')
                     bracket_depth=CloseDoctypeBracket(bracket_depth);
                   else
-                    if ((*q == '>') && (bracket_depth == 0))
+                    if (IsDoctypeEnd(q,bracket_depth) != MagickFalse)
                       {
                         q++;   /* consume final '>' */
                         break;
