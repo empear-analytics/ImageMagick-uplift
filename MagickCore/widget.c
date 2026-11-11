@@ -5732,33 +5732,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
             /*
               Move slider.
             */
-            switch ((int) key_symbol)
-            {
-              case XK_Home:
-              case XK_KP_Home:
-              {
-                slider_info.id=0;
-                break;
-              }
-              case XK_Up:
-              case XK_KP_Up:
-              {
-                slider_info.id--;
-                break;
-              }
-              case XK_Down:
-              case XK_KP_Down:
-              {
-                slider_info.id++;
-                break;
-              }
-              default:
-              {
-                MoveFontBrowserSliderByPage(key_symbol,visible_files,
-                  (int) files,&slider_info);
-                break;
-              }
-            }
+            slider_info=MoveFontBrowserSlider(slider_info,key_symbol,
+              visible_files,(int) files);
             state|=RedrawListState;
             break;
           }
