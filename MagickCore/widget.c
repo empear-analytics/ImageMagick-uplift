@@ -10134,14 +10134,14 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
 %    o window: Specifies a pointer to a XWindows structure.
 %
 */
-MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
-  XResourceInfo *resource_info,XWindows *windows)
-{
 #define ApplyButtonText  "Apply"
 #define CacheButtonText  "%lu mega-bytes of memory in the undo edit cache   "
 #define CancelButtonText  "Cancel"
 #define NumberPreferences  8
 
+MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
+  XResourceInfo *resource_info,XWindows *windows)
+{
   static const char
     *Preferences[] =
     {
