@@ -1622,6 +1622,33 @@ static void RelinquishAcquiredFeatureBuffers(const FeatureBuffers *buffers)
   density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
 }
 
+typedef struct _FeatureGrayRow
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} FeatureGrayRow;
+
+static MagickBooleanType FetchFeatureGrayRow(const FeatureGrayRow *row,
+  const ssize_t r,const Quantum *magick_restrict *p,MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*p)=GetCacheViewVirtualPixels(row->image_view,0,r,row->image->columns,1,
+    row->exception);
+  if ((*p) == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1715,14 +1742,11 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     ssize_t
       x;
 
-    if (status == MagickFalse)
+    const FeatureGrayRow
+      row = { image, image_view, exception };
+
+    if (FetchFeatureGrayRow(&row,r,&p,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,r,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       grays[ScaleQuantumToMap(GetPixelRed(image,p))].red=
