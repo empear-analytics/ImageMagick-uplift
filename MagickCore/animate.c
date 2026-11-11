@@ -2121,6 +2121,14 @@ static void XAdvanceScene(const AnimationSceneStep *scene_step,
     }
 }
 
+static ssize_t XLoopStartScene(const Image *image,const ssize_t scene,
+  ssize_t first_scene)
+{
+  if ((image != (Image *) NULL) && (image->start_loop != 0))
+    first_scene=scene;
+  return(first_scene);
+}
+
 static void XRemapColormapMismatch(XResourceInfo *resource_info,
   XVisualInfo *visual_info,Image *images,ExceptionInfo *exception)
 {
@@ -2948,8 +2956,7 @@ MagickExport Image *XAnimateImages(Display *display,
         XAdvanceScene(&scene_step,&scene_targets);
         scene=MagickMax(scene,0);
         image=image_list[scene];
-        if ((image != (Image *) NULL) && (image->start_loop != 0))
-          first_scene=scene;
+        first_scene=XLoopStartScene(image,scene,first_scene);
         animation_title.display=display;
         animation_title.resource_info=resource_info;
         animation_title.windows=windows;
