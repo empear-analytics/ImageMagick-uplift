@@ -3448,6 +3448,26 @@ static void XHandleKeyRelease(XResourceInfo *resource_info,XEvent event)
       "Key release: 0x%lx (%c)",(unsigned long) key_symbol,*command);
 }
 
+static void XHandleExpose(const AnimateEventContext *event_context,
+  const XEvent event,const ssize_t scene)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Expose: 0x%lx %dx%d+%d+%d",event.xexpose.window,
+      event.xexpose.width,event.xexpose.height,event.xexpose.x,
+      event.xexpose.y);
+  XRepaintExposedWindows(display,windows,scene,event);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4362,12 +4382,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case Expose:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Expose: 0x%lx %dx%d+%d+%d",event.xexpose.window,
-            event.xexpose.width,event.xexpose.height,event.xexpose.x,
-            event.xexpose.y);
-        XRepaintExposedWindows(display,windows,scene,event);
+        XHandleExpose(&event_context,event,scene);
         break;
       }
       case KeyPress:
