@@ -2831,6 +2831,14 @@ static MagickBooleanType XBackgroundImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ModeType XSelectChopDirection(const int id,
+  const ModeType *DirectionCommands,ModeType direction)
+{
+  if (id >= 0)
+    direction=DirectionCommands[id];
+  return(direction);
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -2950,8 +2958,7 @@ static MagickBooleanType XChopImage(Display *display,
               Select a command from the pop-up menu.
             */
             id=XMenuWidget(display,windows,ChopMenu[id],Directions,command);
-            if (id >= 0)
-              direction=DirectionCommands[id];
+            direction=XSelectChopDirection(id,DirectionCommands,direction);
             break;
           }
           case ChopHelpCommand:
