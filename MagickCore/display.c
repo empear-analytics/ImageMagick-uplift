@@ -6736,6 +6736,13 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XClampTrimTopQuantum(XResourceInfo *resource_info,
+  const RectangleInfo crop_info)
+{
+  if (resource_info->quantum >= (int) crop_info.height)
+    resource_info->quantum=(int) crop_info.height-1;
+}
+
 static DisplayCommand XImageWindowCommand(Display *display,
   XResourceInfo *resource_info,XWindows *windows,const MagickStatusType state,
   KeySym key_symbol,Image **image,ExceptionInfo *exception)
@@ -7049,8 +7056,7 @@ static DisplayCommand XImageWindowCommand(Display *display,
           crop_info.height=(size_t) windows->image.ximage->height;
           if ((key_symbol == XK_Up) || (key_symbol == XK_KP_Up))
             {
-              if (resource_info->quantum >= (int) crop_info.height)
-                resource_info->quantum=(int) crop_info.height-1;
+              XClampTrimTopQuantum(resource_info,crop_info);
               crop_info.height-=(size_t) resource_info->quantum;
             }
           if ((key_symbol == XK_Down) || (key_symbol == XK_KP_Down))
