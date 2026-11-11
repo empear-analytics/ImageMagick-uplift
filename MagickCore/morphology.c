@@ -5909,6 +5909,79 @@ static Image *FinishCompoundMorphology(const MorphologyCompoundFinish *finish,
   return(save_image);
 }
 
+typedef struct _MorphologyKernelResult
+{
+  const KernelInfo
+    *kernel;
+
+  CompositeOperator
+    rslt_compose;
+
+  MagickBooleanType
+    verbose;
+
+  KernelInfo
+    *this_kernel;
+
+  const Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} MorphologyKernelResult;
+
+static void CollectKernelResult(const MorphologyKernelResult *result,
+  Image **rslt_image,Image **curr_image)
+{
+  const KernelInfo
+    *const kernel = result->kernel;
+
+  const CompositeOperator
+    rslt_compose = result->rslt_compose;
+
+  const MagickBooleanType
+    verbose = result->verbose;
+
+  KernelInfo
+    *const this_kernel = result->this_kernel;
+
+  const Image
+    *const image = result->image;
+
+  ExceptionInfo
+    *const exception = result->exception;
+
+  MorphologyKernelCompose
+    kernel_compose;
+
+  if ( kernel->next == (KernelInfo *) NULL )
+    (*rslt_image) = (*curr_image);   /* just return the resulting image */
+  else if ( rslt_compose == NoCompositeOp )
+    { ReportKernelIteration(verbose,this_kernel);
+      (*rslt_image) = (*curr_image); /* return result, and re-iterate */
+    }
+  else if ( (*rslt_image) == (Image *) NULL)
+    { ReportSaveForCompose(verbose);
+      (*rslt_image) = (*curr_image);
+      (*curr_image) = (Image *) image;  /* continue with original image */
+    }
+  else
+    { /* Add the new 'current' result to the composition
+      **
+      ** The removal of any 'Sync' channel flag in the Image Composition
+      ** below ensures the mathematical compose method is applied in a
+      ** purely mathematical way, and only to the selected channels.
+      ** IE: Turn off SVG composition 'alpha blending'.
+      */
+      kernel_compose.verbose=verbose;
+      kernel_compose.rslt_compose=rslt_compose;
+      kernel_compose.rslt_image=(*rslt_image);
+      kernel_compose.image=image;
+      kernel_compose.exception=exception;
+      (*curr_image)=ComposeKernelResult(&kernel_compose,(*curr_image));
+    }
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -6050,11 +6123,11 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
     kernel_number = 0;
     while ( norm_kernel != NULL ) {
-      MorphologyKernelCompose
-        kernel_compose;
-
       MorphologyCompoundFinish
         finish;
+
+      MorphologyKernelResult
+        kernel_result;
 
       MorphologyStages
         stages;
@@ -6091,32 +6164,13 @@ MagickPrivate Image *MorphologyApply(const Image *image,
       save_image=FinishCompoundMorphology(&finish,save_image);
 
       /* multi-kernel handling:  re-iterate, or compose results */
-      if ( kernel->next == (KernelInfo *) NULL )
-        rslt_image = curr_image;   /* just return the resulting image */
-      else if ( rslt_compose == NoCompositeOp )
-        { ReportKernelIteration(verbose,this_kernel);
-          rslt_image = curr_image; /* return result, and re-iterate */
-        }
-      else if ( rslt_image == (Image *) NULL)
-        { ReportSaveForCompose(verbose);
-          rslt_image = curr_image;
-          curr_image = (Image *) image;  /* continue with original image */
-        }
-      else
-        { /* Add the new 'current' result to the composition
-          **
-          ** The removal of any 'Sync' channel flag in the Image Composition
-          ** below ensures the mathematical compose method is applied in a
-          ** purely mathematical way, and only to the selected channels.
-          ** IE: Turn off SVG composition 'alpha blending'.
-          */
-          kernel_compose.verbose=verbose;
-          kernel_compose.rslt_compose=rslt_compose;
-          kernel_compose.rslt_image=rslt_image;
-          kernel_compose.image=image;
-          kernel_compose.exception=exception;
-          curr_image=ComposeKernelResult(&kernel_compose,curr_image);
-        }
+      kernel_result.kernel=kernel;
+      kernel_result.rslt_compose=rslt_compose;
+      kernel_result.verbose=verbose;
+      kernel_result.this_kernel=this_kernel;
+      kernel_result.image=image;
+      kernel_result.exception=exception;
+      CollectKernelResult(&kernel_result,&rslt_image,&curr_image);
       if (verbose != MagickFalse)
         (void) FormatLocaleFile(stderr, "\n");
 
