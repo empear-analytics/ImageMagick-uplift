@@ -12624,35 +12624,7 @@ static MagickBooleanType XROIImage(Display *display,
           break;
       }
       if (IsSelectionMovedOrDone(roi_info,x,y,state) != MagickFalse)
-        {
-          /*
-            Check boundary conditions.
-          */
-          if (roi_info.x < 0)
-            roi_info.x=0;
-          else
-            if (roi_info.x > (ssize_t) windows->image.ximage->width)
-              roi_info.x=(ssize_t) windows->image.ximage->width;
-          if ((int) roi_info.x < x)
-            roi_info.width=(unsigned int) (x-roi_info.x);
-          else
-            {
-              roi_info.width=(unsigned int) (roi_info.x-x);
-              roi_info.x=(ssize_t) x;
-            }
-          if (roi_info.y < 0)
-            roi_info.y=0;
-          else
-            if (roi_info.y > (ssize_t) windows->image.ximage->height)
-              roi_info.y=(ssize_t) windows->image.ximage->height;
-          if ((int) roi_info.y < y)
-            roi_info.height=(unsigned int) (y-roi_info.y);
-          else
-            {
-              roi_info.height=(unsigned int) (roi_info.y-y);
-              roi_info.y=(ssize_t) y;
-            }
-        }
+        XCheckSelectionBounds(windows,x,y,&roi_info);
     } while ((state & ExitState) == 0);
     /*
       Wait for user to grab a corner of the rectangle or press return.
