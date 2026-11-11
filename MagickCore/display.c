@@ -5143,6 +5143,12 @@ typedef struct _CropEventInput
 
   const char
     *text;
+
+  XResourceInfo
+    *resource_info;
+
+  ClipboardMode
+    mode;
 } CropEventInput;
 
 static void XCropButtonRelease(const CropEventInput *event_input,
@@ -5354,6 +5360,47 @@ static void XCropKeyHelp(Display *display,XResourceInfo *resource_info,
   }
   (void) XSetFunction(display,windows->image.highlight_context,
     GXinvert);
+}
+
+static void XCropDownHelpKey(const CropEventInput *event_input,
+  const CropTargets *targets,const KeySym key_symbol)
+{
+  Display
+    *const display = event_input->display;
+
+  XWindows
+    *const windows = event_input->windows;
+
+  XResourceInfo
+    *const resource_info = event_input->resource_info;
+
+  const ClipboardMode
+    mode = event_input->mode;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Prior:
+    case XK_Down:
+    case XK_KP_Down:
+    {
+      (*crop_info).y++;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XCropKeyHelp(display,resource_info,windows,mode);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
 }
 
 static MagickBooleanType XCropImage(Display *display,
@@ -5728,6 +5775,8 @@ static MagickBooleanType XCropImage(Display *display,
       event_input.event=(&event);
       event_input.highlight_info=highlight_info;
       event_input.text=text;
+      event_input.resource_info=resource_info;
+      event_input.mode=mode;
       switch (event.type)
       {
         case ButtonPress:
@@ -5795,22 +5844,9 @@ static MagickBooleanType XCropImage(Display *display,
               crop_info.x++;
               break;
             }
-            case XK_Prior:
-            case XK_Down:
-            case XK_KP_Down:
-            {
-              crop_info.y++;
-              break;
-            }
-            case XK_F1:
-            case XK_Help:
-            {
-              XCropKeyHelp(display,resource_info,windows,mode);
-              break;
-            }
             default:
             {
-              (void) XBell(display,0);
+              XCropDownHelpKey(&event_input,&targets,key_symbol);
               break;
             }
           }
