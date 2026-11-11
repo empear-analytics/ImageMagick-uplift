@@ -834,7 +834,12 @@ is worth it.
    longer defining it. A forward declaration of a moved `static` at the top of the
    original goes to the new file's *Forward declarations* block, and a *Define* or
    *Forward declarations* comment left with nothing under it goes too. A table or macro
-   that the kept part also names still refuses the split.
+   that the kept part also names still refuses the split. The new file's include block
+   is the original's, with one exception (2026-11-11): a run of conditional lines at
+   its end, after the last unconditional `#include`, that holds every `#define` of the
+   block (a delegate's headers and the macros it supplies, as `fourier.c`'s FFTW and
+   `complex.h` block) is left out of the copy when no line of the family, comments and
+   strings aside, names one of those macros. The original keeps the run unchanged.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -852,6 +857,14 @@ is worth it.
   expands to the same tokens in the one file that uses it, and the kept file used none.
   `refactor_guard.py --combined` therefore counts every literal once, as before; say in
   the message which tables and macros moved.
+- An include run left out under step 2 is neither moved nor edited: the original keeps
+  it, uncompiled branches included, as it stood. The family compiles without it, so it
+  needs nothing the run declares: a call of a function only a dropped header declares
+  is an implicit declaration, which the build refuses, and an identifier only it
+  defines does not compile. The family names none of the run's own macros (the tool
+  checks), so every token of the moved text expands as before; check by compiling both
+  objects that each moved function's instructions are unchanged, and say so in the
+  message.
 - The pre-commit gate requires a new file to score 10.0, which a split-off family never
   does: it carries the original's findings with it. Commit after the gate has reported
   only that failure (its check that the original does not lose health has then passed),
@@ -11040,3 +11053,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | I | Step 8: the macro left in the caller may also be one of MagickCore's own throw macros (`ThrowImageException`, `ThrowBinaryException`), whose expansion is a `ThrowMagickException` with `GetMagickModule()` and `return(c);` of one constant; `GetMagickModule()` keeps naming the caller, and a variable the expansion reads that the block writes (`image`) is a written variable of step 2 | `montage.c`'s `MontageImageList` (campaign A, W17 lane d): its tile loop leaves through `ThrowImageException` when `CloneImage` fails; E step 6 would move the throw into a helper of another return type (the macro returns `(Image *) NULL`) and change the module it names; with the macro left in the caller the loop moves under I with `image`, `progress_monitor` and `tiles` as targets | owner |
 | 2026-11-11 | AMEND | FI | Step 2: a value may also be a member read through a parameter of the function declared pointer-to-`const` (`p->m`, `p->m.n`): no side effect, and the run writes only the struct local, whose address nothing holds before the call | `montage.c`'s `PlaceMontageTile` (campaign A, W17 lane d): its `tile_info` (15 members), `extent` and `frame` fills copy members of `const MontageTilePlacement *placement`; with `gravity_info` (Recipe FB) they free the 18 lines `MontageImageList`'s next-page step needs under *Lines of Code in a Single File*: a probe of the four plus that step, 9.03 to 9.11, `IDENTICAL` object code for the fills | owner |
 | 2026-11-11 | AMEND | FB | Step 2: the same member reads as FI step 2 (as amended the same day) | Same session: `PlaceMontageTile`'s `gravity_info`, declared at the top and filled after `image` is reassigned, from six members of `placement` and `image` | owner |
+| 2026-11-11 | AMEND | S | Step 2: a run of conditional lines at the end of the original's include block, after its last unconditional `#include`, that holds every `#define` of the block (a delegate's headers and macros) is left out of the new file's copy when no line of the family, comments and strings aside, names one of those macros; the original keeps the run unchanged; *Careful*: why the family cannot need what the run declares (the build refuses an implicit declaration or an unknown identifier) and the instruction check. `tools/split_source.py` does it and prints the run it left out; its output for splits it accepted before is unchanged (layer.c, effect.c, transform.c and feature.c dry runs compared byte for byte) | `fourier.c` (campaign A, W17 lane a): the `ComplexImages` family (14 functions, its own row and operand types, no FFTW call) was refused only because the include block ends in the `MAGICKCORE_FFTW_DELEGATE`/`ENABLE_FFTW_DELEGATE` run that defines `cabs`, `carg`, `cimag` and `creal`, which the family never names; the split measures fourier.c 7.22 to 7.59, the new file 9.50 | owner |

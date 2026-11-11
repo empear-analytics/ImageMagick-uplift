@@ -171,6 +171,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/feature-texture.c \
   MagickCore/feature.h \
   MagickCore/fourier.c \
+  MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
   MagickCore/fx.c \
   MagickCore/fx.h \

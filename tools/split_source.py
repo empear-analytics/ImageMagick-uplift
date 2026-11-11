@@ -19,7 +19,9 @@ in FILE that only the family uses. --copy-macro NAME (repeatable) defines a one-
 `static const` table between the moved functions moves with them, and a one-line
 `#define` of the original that only the family uses moves to NEW (step 2 as amended
 2026-11-11), each refused when the kept part names it; a two-line forward declaration
-of a moved static at the top of FILE moves to NEW.
+of a moved static at the top of FILE moves to NEW. A trailing run of conditional lines
+in FILE's include block that holds every macro the block defines (a delegate's headers)
+is left out of NEW's copy when the family names none of those macros.
 """
 import collections, glob, os, re, sys
 
@@ -319,7 +321,27 @@ inc_b = max(k for k in range(len(L)) if L[k].startswith("#include") and k < firs
 # carry a trailing #endif etc. that closes a conditional include
 while L[inc_b + 1].startswith("#"): inc_b += 1
 if defined("\n".join(L[inc_a:inc_b + 1])):
-    sys.exit("refused: the include block defines macros %s; both files would define them" % sorted(defined("\n".join(L[inc_a:inc_b + 1]))))
+    # a trailing run of conditional lines (a delegate's headers and its macros) that only the kept part needs is
+    # left out of the new file's include block (Recipe S step 2, 2026-11-11): every #define of the block stands in
+    # that run, the run is preprocessor lines only and balanced, and the region names none of its macros
+    last = inc_a; depth = 0
+    for k in range(inc_a, inc_b + 1):
+        w = L[k].strip()
+        if re.match(r"#\s*(if|ifdef|ifndef)\b", w): depth += 1
+        elif re.match(r"#\s*endif\b", w): depth -= 1
+        elif depth == 0 and w.startswith("#include"): last = k
+    tail = L[last + 1:inc_b + 1]
+    tail_macros = defined("\n".join(tail))
+    code = re.sub(r'"(?:\\.|[^"\\])*"', '""', re.sub(r"/\*.*?\*/", "", region, flags=re.S))
+    named = sorted(m for m in tail_macros if re.search(r"\b%s\b" % m, code))
+    tail_ok = all(t.strip().startswith("#") for t in tail if t.strip()) and \
+        not defined("\n".join(L[inc_a:last + 1])) and not named
+    if not tail_ok:
+        sys.exit("refused: the include block defines macros %s; both files would define them%s" %
+            (sorted(defined("\n".join(L[inc_a:inc_b + 1]))), " (the region names %s)" % named if named else ""))
+    print("include block: the conditional lines %d-%d (macros %s) stay in the original only" %
+        (last + 2, inc_b + 1, sorted(tail_macros)))
+    inc_b = last
 extra = declaration_block("Typedef declarations.", moved_types, "\n\n") + \
     declaration_block("Define declarations.", moved_macros + macro_lines) + \
     declaration_block("Forward declarations.", forward)
