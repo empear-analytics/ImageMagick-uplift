@@ -5115,6 +5115,34 @@ static inline MagickBooleanType IsWindowTreeTop(const Status status,
     (parent == root)) ? MagickTrue : MagickFalse);
 }
 
+static void XFindFrameWindow(Display *display,Window *root,Window *target)
+{
+  Status
+    status;
+
+  unsigned int
+    d;
+
+  Window
+    *children;
+
+  for ( ; ; )
+  {
+    Window
+      parent;
+
+    /*
+      Find window manager frame.
+    */
+    status=XQueryTree(display,*target,root,&parent,&children,&d);
+    if ((status != False) && (children != (Window *) NULL))
+      (void) XFree((char *) children);
+    if (IsWindowTreeTop(status,parent,*root) != MagickFalse)
+      break;
+    *target=parent;
+  }
+}
+
 MagickExport Image *XImportImage(const ImageInfo *image_info,
   XImportInfo *ximage_info,ExceptionInfo *exception)
 {
@@ -5217,21 +5245,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
       status=XGetGeometry(display,target,&root,&x,&x,&d,&d,&d,&d);
       if (status != False)
         {
-          for ( ; ; )
-          {
-            Window
-              parent;
-
-            /*
-              Find window manager frame.
-            */
-            status=XQueryTree(display,target,&root,&parent,&children,&d);
-            if ((status != False) && (children != (Window *) NULL))
-              (void) XFree((char *) children);
-            if (IsWindowTreeTop(status,parent,root) != MagickFalse)
-              break;
-            target=parent;
-          }
+          XFindFrameWindow(display,&root,&target);
           /*
             Get client window.
           */
