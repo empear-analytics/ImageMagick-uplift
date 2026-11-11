@@ -951,6 +951,11 @@ static int EndDoctypeQuote(const char *q,int quote)
   return(quote);
 }
 
+static inline MagickBooleanType IsDoctypeQuote(const char *q)
+{
+  return(((*q == '"') || (*q == '\'')) ? MagickTrue : MagickFalse);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -995,7 +1000,7 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
             quote=EndDoctypeQuote(q,quote);
           else
             {
-              if ((*q == '"') || (*q == '\''))
+              if (IsDoctypeQuote(q) != MagickFalse)
                 quote=(*q);
               else
                 if (*q == '[')
