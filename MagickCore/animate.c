@@ -1315,6 +1315,15 @@ static void XPlaceTransientWindows(Display *display,XWindows *windows,
     }
 }
 
+static AnimateCommand XControlOpenCommand(const XEvent event,
+  AnimateCommand animate_command)
+{
+  if ((event.xkey.state & ControlMask) == MagickFalse)
+    return(animate_command);
+  animate_command=OpenCommand;
+  return(animate_command);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2592,9 +2601,7 @@ MagickExport Image *XAnimateImages(Display *display,
         {
           case XK_o:
           {
-            if ((event.xkey.state & ControlMask) == MagickFalse)
-              break;
-            animate_command=OpenCommand;
+            animate_command=XControlOpenCommand(event,animate_command);
             break;
           }
           case XK_BackSpace:
