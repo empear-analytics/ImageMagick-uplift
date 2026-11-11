@@ -12593,6 +12593,37 @@ static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
   return(MagickFalse);
 }
 
+static void XROIMotion(const CropEventInput *event_input,
+  const ROITargets *targets)
+{
+  Display
+    *const display = event_input->display;
+
+  XWindows
+    *const windows = event_input->windows;
+
+  const XEvent
+    *const event = event_input->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  /*
+    Map and unmap Info widget as text cursor crosses its boundaries.
+  */
+  (*x)=(*event).xmotion.x;
+  (*y)=(*event).xmotion.y;
+  XTrackInfoWidget(display,windows,(*x),(*y));
+  (*roi_info).x=(ssize_t) windows->image.x+(*event).xmotion.x;
+  (*roi_info).y=(ssize_t) windows->image.y+(*event).xmotion.y;
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -13242,16 +13273,7 @@ static MagickBooleanType XROIImage(Display *display,
           break;
         case MotionNotify:
         {
-          if (event.xbutton.window != windows->image.id)
-            break;
-          /*
-            Map and unmap Info widget as text cursor crosses its boundaries.
-          */
-          x=event.xmotion.x;
-          y=event.xmotion.y;
-          XTrackInfoWidget(display,windows,x,y);
-          roi_info.x=(ssize_t) windows->image.x+event.xmotion.x;
-          roi_info.y=(ssize_t) windows->image.y+event.xmotion.y;
+          XROIMotion(&event_input,&targets);
           break;
         }
         case SelectionRequest:
