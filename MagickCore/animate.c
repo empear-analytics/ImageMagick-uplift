@@ -1962,6 +1962,70 @@ static void XUpdateAnimationTitle(const AnimationTitle *animation_title)
     }
 }
 
+typedef struct _AnimationSceneStep
+{
+  size_t
+    number_scenes;
+
+  Image
+    **image_list;
+
+  ssize_t
+    first_scene;
+} AnimationSceneStep;
+
+typedef struct _AnimationSceneTargets
+{
+  ssize_t
+    *scene,
+    *iterations;
+
+  MagickStatusType
+    *state;
+
+  MagickBooleanType
+    *pause;
+} AnimationSceneTargets;
+
+static void XWrapSceneForward(const AnimationSceneStep *scene_step,
+  const AnimationSceneTargets *targets)
+{
+  Image
+    **const image_list = scene_step->image_list;
+
+  const ssize_t
+    first_scene = scene_step->first_scene;
+
+  ssize_t
+    *const scene = targets->scene,
+    *const iterations = targets->iterations;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  MagickBooleanType
+    *const pause = targets->pause;
+
+  (*iterations)++;
+  if ((*iterations) == (ssize_t) image_list[0]->iterations)
+    {
+      (*iterations)=0;
+      (*state)|=ExitState;
+    }
+  if (((*state) & AutoReverseAnimationState) != 0)
+    {
+      (*state)&=(~ForwardAnimationState);
+      (*scene)--;
+    }
+  else
+    {
+      if (((*state) & RepeatAnimationState) == 0)
+        (*state)&=(~PlayAnimationState);
+      (*scene)=first_scene;
+      (*pause)=MagickTrue;
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2767,6 +2831,12 @@ MagickExport Image *XAnimateImages(Display *display,
         MagickBooleanType
           pause;
 
+        AnimationSceneStep
+          scene_step;
+
+        const AnimationSceneTargets
+          scene_targets = { &scene, &iterations, &state, &pause };
+
         pause=MagickFalse;
         delay=1000*image->delay/(size_t) MagickMax(image->ticks_per_second,
           1L);
@@ -2780,24 +2850,10 @@ MagickExport Image *XAnimateImages(Display *display,
               scene++;
             else
               {
-                iterations++;
-                if (iterations == (ssize_t) image_list[0]->iterations)
-                  {
-                    iterations=0;
-                    state|=ExitState;
-                  }
-                if ((state & AutoReverseAnimationState) != 0)
-                  {
-                    state&=(~ForwardAnimationState);
-                    scene--;
-                  }
-                else
-                  {
-                    if ((state & RepeatAnimationState) == 0)
-                      state&=(~PlayAnimationState);
-                    scene=first_scene;
-                    pause=MagickTrue;
-                  }
+                scene_step.number_scenes=number_scenes;
+                scene_step.image_list=image_list;
+                scene_step.first_scene=first_scene;
+                XWrapSceneForward(&scene_step,&scene_targets);
               }
           }
         else
