@@ -868,11 +868,14 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       if ((status == MagickFalse) || (number_files == 0))
         {
           XDestroyFileList(filelist,number_files);
-          if (number_files == 0)
-            {
-              ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
-              return((Image *) NULL);
-            }
+        }
+      if (number_files == 0)
+        {
+          ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
+          return((Image *) NULL);
+        }
+      if (status == MagickFalse)
+        {
           ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
             filenames);
           return((Image *) NULL);
