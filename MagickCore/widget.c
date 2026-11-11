@@ -2319,24 +2319,23 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
         XDelay(display,delay);
         delay=SuspendTime;
         (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if (north_info.raised == MagickFalse)
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              slider_info.id--;
-              state|=RedrawListState;
-            }
-        if (south_info.raised == MagickFalse)
-          if (slider_info.id < (int) colors)
-            {
-              /*
-                Move slider down.
-              */
-              slider_info.id++;
-              state|=RedrawListState;
-            }
+        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            slider_info.id--;
+            state|=RedrawListState;
+          }
+        if ((south_info.raised == MagickFalse) &&
+            (slider_info.id < (int) colors))
+          {
+            /*
+              Move slider down.
+            */
+            slider_info.id++;
+            state|=RedrawListState;
+          }
         if (event.type != ButtonRelease)
           continue;
       }
@@ -2352,28 +2351,27 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             slider_info.active=MagickTrue;
             break;
           }
-        if (MatteIsActive(north_info,event.xbutton))
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              north_info.raised=MagickFalse;
-              slider_info.id--;
-              state|=RedrawListState;
-              break;
-            }
-        if (MatteIsActive(south_info,event.xbutton))
-          if (slider_info.id < (int) colors)
-            {
-              /*
-                Move slider down.
-              */
-              south_info.raised=MagickFalse;
-              slider_info.id++;
-              state|=RedrawListState;
-              break;
-            }
+        if ((MatteIsActive(north_info,event.xbutton)) && (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            north_info.raised=MagickFalse;
+            slider_info.id--;
+            state|=RedrawListState;
+            break;
+          }
+        if ((MatteIsActive(south_info,event.xbutton)) &&
+            (slider_info.id < (int) colors))
+          {
+            /*
+              Move slider down.
+            */
+            south_info.raised=MagickFalse;
+            slider_info.id++;
+            state|=RedrawListState;
+            break;
+          }
         if (MatteIsActive(scroll_info,event.xbutton))
           {
             /*
@@ -2543,57 +2541,55 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
           }
         if (grab_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(grab_info,event.xbutton))
-                {
-                  /*
-                    Select a fill color from the X server.
-                  */
-                  (void) XGetWindowColor(display,windows,reply_info.text,
-                    exception);
-                  reply_info.marker=reply_info.text;
-                  reply_info.cursor=reply_info.text+Extent(reply_info.text);
-                  XDrawMatteText(display,&windows->widget,&reply_info);
-                  state|=RedrawActionState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(grab_info,event.xbutton)))
+              {
+                /*
+                  Select a fill color from the X server.
+                */
+                (void) XGetWindowColor(display,windows,reply_info.text,
+                  exception);
+                reply_info.marker=reply_info.text;
+                reply_info.cursor=reply_info.text+Extent(reply_info.text);
+                XDrawMatteText(display,&windows->widget,&reply_info);
+                state|=RedrawActionState;
+              }
             grab_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&grab_info);
           }
         if (reset_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(reset_info,event.xbutton))
-                {
-                  (void) CopyMagickString(glob_pattern,reset_pattern,
-                    MagickPathExtent);
-                  state|=UpdateListState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(reset_info,event.xbutton)))
+              {
+                (void) CopyMagickString(glob_pattern,reset_pattern,
+                  MagickPathExtent);
+                state|=UpdateListState;
+              }
             reset_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&reset_info);
           }
         if (action_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(action_info,event.xbutton)))
               {
-                if (MatteIsActive(action_info,event.xbutton))
-                  {
-                    if (*reply_info.text == '\0')
-                      (void) XBell(display,0);
-                    else
-                      state|=ExitState;
-                  }
+                if (*reply_info.text == '\0')
+                  (void) XBell(display,0);
+                else
+                  state|=ExitState;
               }
             action_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&action_info);
           }
         if (cancel_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(cancel_info,event.xbutton))
-                {
-                  *reply_info.text='\0';
-                  state|=ExitState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(cancel_info,event.xbutton)))
+              {
+                *reply_info.text='\0';
+                state|=ExitState;
+              }
             cancel_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
           }
