@@ -6489,6 +6489,49 @@ static void XDrawPanRectangle(Display *display,XWindows *windows)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XTrimUndoCache(const XResourceInfo *resource_info,size_t *bytes,
+  Image **undo_image)
+{
+  Image
+    *cache_image,
+    *previous_image;
+
+  if (*undo_image != (Image *) NULL)
+    {
+      /*
+        Ensure the undo cache has enough memory available.
+      */
+      previous_image=*undo_image;
+      while (previous_image != (Image *) NULL)
+      {
+        *bytes+=previous_image->list->columns*previous_image->list->rows*
+          sizeof(PixelInfo);
+        if (*bytes <= (resource_info->undo_cache << 20))
+          {
+            previous_image=GetPreviousImageInList(previous_image);
+            continue;
+          }
+        *bytes-=previous_image->list->columns*previous_image->list->rows*
+          sizeof(PixelInfo);
+        if (previous_image == *undo_image)
+          *undo_image=NewImageList();
+        else
+          previous_image->next->previous=NewImageList();
+        break;
+      }
+      while (previous_image != (Image *) NULL)
+      {
+        /*
+          Delete any excess memory from undo cache.
+        */
+        cache_image=previous_image;
+        previous_image=GetPreviousImageInList(previous_image);
+        cache_image->list=DestroyImage(cache_image->list);
+        cache_image=DestroyImage(cache_image);
+      }
+    }
+}
+
 static void XImageCache(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -6619,47 +6662,11 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
     case SaveToUndoBufferCommand:
     case RedoCommand:
     {
-      Image
-        *previous_image;
-
       size_t
         bytes;
 
       bytes=(*image)->columns*(*image)->rows*sizeof(PixelInfo);
-      if (undo_image != (Image *) NULL)
-        {
-          /*
-            Ensure the undo cache has enough memory available.
-          */
-          previous_image=undo_image;
-          while (previous_image != (Image *) NULL)
-          {
-            bytes+=previous_image->list->columns*previous_image->list->rows*
-              sizeof(PixelInfo);
-            if (bytes <= (resource_info->undo_cache << 20))
-              {
-                previous_image=GetPreviousImageInList(previous_image);
-                continue;
-              }
-            bytes-=previous_image->list->columns*previous_image->list->rows*
-              sizeof(PixelInfo);
-            if (previous_image == undo_image)
-              undo_image=NewImageList();
-            else
-              previous_image->next->previous=NewImageList();
-            break;
-          }
-          while (previous_image != (Image *) NULL)
-          {
-            /*
-              Delete any excess memory from undo cache.
-            */
-            cache_image=previous_image;
-            previous_image=GetPreviousImageInList(previous_image);
-            cache_image->list=DestroyImage(cache_image->list);
-            cache_image=DestroyImage(cache_image);
-          }
-        }
+      XTrimUndoCache(resource_info,&bytes,&undo_image);
       if (bytes > (resource_info->undo_cache << 20))
         break;
       /*
