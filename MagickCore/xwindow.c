@@ -9190,6 +9190,38 @@ static Colormap XAllocStaticColors(const XStaticColorSource *source,
   return(colormap);
 }
 
+static void XStoreImageColors(const XVisualInfo *visual_info,
+  const Image *image,const XPixelInfo *pixel,XColor *colors)
+{
+  ssize_t
+    i;
+
+  XColor
+    color,
+    *p;
+
+  unsigned short
+    gray_value;
+
+  p=colors;
+  color.flags=(char) (DoRed | DoGreen | DoBlue);
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    color.red=ScaleQuantumToShort(XRedGamma(image->colormap[i].red));
+    color.green=ScaleQuantumToShort(XGreenGamma(image->colormap[i].green));
+    color.blue=ScaleQuantumToShort(XBlueGamma(image->colormap[i].blue));
+    if (visual_info->klass != PseudoColor)
+      {
+        gray_value=(unsigned short) XPixelIntensity(&color);
+        color.red=gray_value;
+        color.green=gray_value;
+        color.blue=gray_value;
+      }
+    color.pixel=pixel->pixels[i];
+    *p++=color;
+  }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9557,23 +9589,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       /*
         Store the image colormap.
       */
-      p=colors;
-      color.flags=(char) (DoRed | DoGreen | DoBlue);
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        color.red=ScaleQuantumToShort(XRedGamma(image->colormap[i].red));
-        color.green=ScaleQuantumToShort(XGreenGamma(image->colormap[i].green));
-        color.blue=ScaleQuantumToShort(XBlueGamma(image->colormap[i].blue));
-        if (visual_info->klass != PseudoColor)
-          {
-            gray_value=(unsigned short) XPixelIntensity(&color);
-            color.red=gray_value;
-            color.green=gray_value;
-            color.blue=gray_value;
-          }
-        color.pixel=pixel->pixels[i];
-        *p++=color;
-      }
+      XStoreImageColors(visual_info,image,pixel,colors);
       (void) XStoreColors(display,colormap,colors,(int) image->colors);
       break;
     }
