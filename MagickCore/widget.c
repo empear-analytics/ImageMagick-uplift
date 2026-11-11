@@ -9218,6 +9218,9 @@ typedef struct _MenuTargets
   XWidgetInfo
     *selection_info,
     *highlight_info;
+
+  size_t
+    *state;
 } MenuTargets;
 
 typedef struct _MenuPointer
@@ -9402,6 +9405,83 @@ static void MapMenuWidget(Display *display,XWindows *windows)
   windows->widget.mapped=MagickFalse;
 }
 
+typedef struct _MenuEventContext
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *selections;
+
+  unsigned int
+    number_selections,
+    top_offset;
+
+  char
+    *item;
+} MenuEventContext;
+
+static void PressMenuSelection(const MenuEventContext *context,
+  const XEvent event,const MenuTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const selections = context->selections;
+
+  const unsigned int
+    number_selections = context->number_selections,
+    top_offset = context->top_offset;
+
+  char
+    *const item = context->item;
+
+  XWidgetInfo
+    *const selection_info = targets->selection_info,
+    *const highlight_info = targets->highlight_info;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    id;
+
+  if (event.xbutton.window != windows->widget.id)
+    {
+      /*
+        exit menu.
+      */
+      PutBackMenuEvent(display,windows,event);
+      (*selection_info).id=(~0);
+      *item='\0';
+      (*state)|=ExitState;
+      return;
+    }
+  (*state)&=(unsigned int) (~InactiveWidgetState);
+  if ((*selection_info).height == 0)
+    return;
+  id=(event.xbutton.y-(int) top_offset)/(int) (*selection_info).height;
+  (*selection_info).id=id;
+  if ((id < 0) || (id >= (int) number_selections))
+    return;
+  /*
+    Highlight this selection.
+  */
+  (*selection_info).y=((int) top_offset+id*(int) (*selection_info).height);
+  (*selection_info).text=(char *) selections[id];
+  XDrawWidgetText(display,&windows->widget,selection_info);
+  (*highlight_info).y=(*selection_info).y+(int) (*highlight_info).bevel_width;
+  XDrawBevel(display,&windows->widget,highlight_info);
+}
+
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9438,7 +9518,10 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
     selection_info;
 
   const MenuTargets
-    targets = { &selection_info, &highlight_info };
+    targets = { &selection_info, &highlight_info, &state };
+
+  MenuEventContext
+    event_context;
 
   /*
     Determine Menu widget attributes.
@@ -9500,6 +9583,12 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   (void) XCheckDefineCursor(display,windows->command.id,cursor);
   (void) XCheckDefineCursor(display,windows->widget.id,cursor);
   state=UpdateConfigurationState;
+  event_context.display=display;
+  event_context.windows=windows;
+  event_context.selections=selections;
+  event_context.number_selections=number_selections;
+  event_context.top_offset=top_offset;
+  event_context.item=item;
   do
   {
     if (state & UpdateConfigurationState)
@@ -9590,32 +9679,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
     {
       case ButtonPress:
       {
-        if (event.xbutton.window != windows->widget.id)
-          {
-            /*
-              exit menu.
-            */
-            PutBackMenuEvent(display,windows,event);
-            selection_info.id=(~0);
-            *item='\0';
-            state|=ExitState;
-            break;
-          }
-        state&=(unsigned int) (~InactiveWidgetState);
-        if (selection_info.height == 0)
-          break;
-        id=(event.xbutton.y-(int) top_offset)/(int) selection_info.height;
-        selection_info.id=id;
-        if ((id < 0) || (id >= (int) number_selections))
-          break;
-        /*
-          Highlight this selection.
-        */
-        selection_info.y=((int) top_offset+id*(int) selection_info.height);
-        selection_info.text=(char *) selections[id];
-        XDrawWidgetText(display,&windows->widget,&selection_info);
-        highlight_info.y=selection_info.y+(int) highlight_info.bevel_width;
-        XDrawBevel(display,&windows->widget,&highlight_info);
+        PressMenuSelection(&event_context,event,&targets);
         break;
       }
       case ButtonRelease:
