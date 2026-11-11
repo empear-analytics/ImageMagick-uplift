@@ -4866,6 +4866,76 @@ static double ForwardDirectChannelValue(const MorphologyDirectScan *scan,
   return(pixel);
 }
 
+static double ReverseDirectChannelValue(const MorphologyDirectScan *scan,
+  const MorphologyDirectPixel *input,const Quantum *magick_restrict pixels,
+  double pixel)
+{
+  Image
+    *const image = input->image;
+
+  const KernelInfo
+    *const kernel = input->kernel;
+
+  Quantum
+    *const q = input->q;
+
+  const ssize_t
+    x = input->x,
+    i = input->i;
+
+  const MorphologyMethod
+    method = scan->method;
+
+  const OffsetInfo
+    offset = scan->offset;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  MorphologyDirectPixel
+    row;
+
+  MorphologyKernelRows
+    rows;
+
+  switch (method)
+  {
+    case DistanceMorphology:
+    {
+      rows.image=image;
+      rows.kernel=kernel;
+      rows.i=i;
+      pixel=MinimizeTrailingRowsDistance(&rows,offset,pixels,pixel);
+      k=(&kernel->values[(ssize_t) kernel->width*kernel->y+kernel->x-1]);
+      row.image=image;
+      row.kernel=kernel;
+      row.q=q;
+      row.x=x;
+      row.i=i;
+      pixel=MinimizeTrailingRowDistance(&row,offset,k,pixel);
+      break;
+    }
+    case VoronoiMorphology:
+    {
+      rows.image=image;
+      rows.kernel=kernel;
+      rows.i=i;
+      pixel=MinimizeTrailingRowsDistance(&rows,offset,pixels,pixel);
+      k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
+      row.image=image;
+      row.kernel=kernel;
+      row.q=q;
+      row.x=x;
+      row.i=i;
+      pixel=MinimizeTrailingRowDistance(&row,offset,k,pixel);
+      break;
+    }
+    default:
+      break;
+  }
+  return(pixel);
+}
+
 static ssize_t MorphologyPrimitiveDirect(Image *image,
   const MorphologyMethod method,const KernelInfo *kernel,
   ExceptionInfo *exception)
@@ -4997,6 +5067,9 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
   morphology_view=AcquireAuthenticCacheView(image,exception);
   for (y=(ssize_t) image->rows-1; y >= 0; y--)
   {
+    const MorphologyDirectScan
+      scan = { method, offset };
+
     const Quantum
       *magick_restrict p;
 
@@ -5033,6 +5106,9 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
 
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
+        const MorphologyDirectPixel
+          input = { image, kernel, q, x, i };
+
         double
           pixel;
 
@@ -5042,17 +5118,8 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
         PixelTrait
           traits;
 
-        const MagickRealType
-          *magick_restrict k;
-
         const Quantum
           *magick_restrict pixels;
-
-        MorphologyDirectPixel
-          row;
-
-        MorphologyKernelRows
-          rows;
 
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
@@ -5062,41 +5129,7 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
           continue;
         pixels=p;
         pixel=(double) QuantumRange;
-        switch (method)
-        {
-          case DistanceMorphology:
-          {
-            rows.image=image;
-            rows.kernel=kernel;
-            rows.i=i;
-            pixel=MinimizeTrailingRowsDistance(&rows,offset,pixels,pixel);
-            k=(&kernel->values[(ssize_t) kernel->width*kernel->y+kernel->x-1]);
-            row.image=image;
-            row.kernel=kernel;
-            row.q=q;
-            row.x=x;
-            row.i=i;
-            pixel=MinimizeTrailingRowDistance(&row,offset,k,pixel);
-            break;
-          }
-          case VoronoiMorphology:
-          {
-            rows.image=image;
-            rows.kernel=kernel;
-            rows.i=i;
-            pixel=MinimizeTrailingRowsDistance(&rows,offset,pixels,pixel);
-            k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
-            row.image=image;
-            row.kernel=kernel;
-            row.q=q;
-            row.x=x;
-            row.i=i;
-            pixel=MinimizeTrailingRowDistance(&row,offset,k,pixel);
-            break;
-          }
-          default:
-            break;
-        }
+        pixel=ReverseDirectChannelValue(&scan,&input,pixels,pixel);
         if (fabs(pixel-(double) q[i]) > MagickEpsilon)
           changed++;
         q[i]=ClampToQuantum(pixel);
