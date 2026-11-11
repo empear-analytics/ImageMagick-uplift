@@ -1017,7 +1017,8 @@ needs two copies of the block.
    file scope), of arithmetic, enumeration or pointer type (not an array), whose
    address the caller takes nowhere else (checked by `grep`), counts as a plain local
    too (2026-11-11), on Recipe CT step 2's terms: it passes as a pointer like any
-   written variable, never as a copy.
+   written variable, never as a copy. CT step 2's structure form (a `static XColor`)
+   counts in the same way, `v.m` written `(*v).m` and `&v` written `v`.
    A parameter the caller receives by value, of a struct or arithmetic type (not a
    pointer, and not an array parameter, which is one), counts as a plain local
    (`ApplySpliceGravity`'s `RectangleInfo splice_geometry`): it is the caller's own
@@ -10702,7 +10703,12 @@ whole groups and keeps their nesting in the new function.
    A variable the caller declares `static` inside its body (block scope, never one at
    file scope), of arithmetic, enumeration or pointer type (not an array), may be one
    of the written variables as well, when the caller takes its address nowhere but in
-   the targets initialiser (checked by `grep`) (2026-11-11). With such a static the
+   the targets initialiser (checked by `grep`) (2026-11-11). So may such a `static` of
+   structure type (`static XColor border_color`, never an array of structures), on the
+   same terms (2026-11-11, later): its member type is a pointer to the structure, each
+   `v.m` of the block becomes `(*v).m` and each `&v` passed to a callee becomes `v`,
+   as Recipe E step 3's pointer form writes a struct local (`XParseColor(...,
+   &border_color)` becomes `XParseColor(...,border_color)`, the same address). With such a static the
    count may be one: a block whose only written variable that the caller reads
    afterwards is a `static` moves in this form, with a one-member targets struct,
    rather than under Recipe E step 7's value form, which would hold a copy of it while
@@ -10840,7 +10846,11 @@ static void SelectListBrowserEntry(const ListBrowserPress *press,
   the block declares stays one object with its initialiser applied once (6.7.9p10), and
   the helper is called only where the block stood: every execution of the block reads
   and writes it as before, the value it carries from one execution to the next
-  included.
+  included. A `static` of structure type is the same: one object at one address, so
+  `(*v).m` designates the member `v.m` named (6.5.2.3p3 with 6.5.3.2p4) and `v` is the
+  address `&v` gave the callee; no member is copied, so none is read that the block
+  did not read, and a callee that fills the whole structure through the pointer
+  (`XParseColor`) fills the static itself, as before.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved) and steps 1, 2, 4 and 7 checked by reading; or, when no case reaches
@@ -11362,3 +11372,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | CT | Step 2: a block-scope `static` of the caller (arithmetic, enumeration or pointer type, not an array, its address taken only in the targets initialiser) may be a written variable, and then one written variable suffices (a lone static goes by address, not by Recipe E step 7's copy); a `static` the block declares moves with it unchanged. *Careful* gives the argument: one object of static storage duration, reached through its own address, nothing copied, so re-entry through the block's calls sees the same writes | `display.c`'s `XCompositeImage` (campaign A, W17 lane b, wide build): its Dissolve case tail writes the local `blend` and the function's `static` `compose` and leaves the `switch` by `break;` from a depth-4 `if (*factor == '\0')`; its Displace tail writes `compose` alone. I step 2 refused the static, and E step 7's value form would copy it across `XDialogWidget`. Probe of the chain: the function leaves *Deep, Nested Complexity* and *Brain Method*, display.c 1.15 to 1.17, no finding on either helper | owner |
 | 2026-11-11 | AMEND | O | Step 2: a block-scope `static` of the caller (arithmetic, enumeration or pointer type, not an array, its address taken nowhere else) counts as a plain local, passed by pointer, on Recipe CT step 2's terms; *Careful* repeats CT's argument (one object of static storage duration at its own address, nothing copied) | `display.c`'s `XImageCache` (campaign A, W17 lane b, wide build): its undo-cache trim (`if (undo_image != NULL) { ... while ... if (bytes <= ...) ... if (previous_image == undo_image) undo_image=NewImageList(); ... }`) writes the local `bytes` and the function's `static` `undo_image` and holds the function at depth 4; O step 2 refused the static. Probe: the function leaves *Deep, Nested Complexity* and *Brain Method* | owner |
 | 2026-11-11 | AMEND | OC | Step 4: the variables a block only reads may go in one `const` input struct (Recipe N steps 2 to 6, its array, struct-value and read-then-written forms) for any block of step 1, not only step 6's whole loop body, when they would take the helper to five or more parameters; the helper takes `const Name *` first, then the written variables by pointer, at most four in all | `display.c`'s `XRotateImage` (campaign A, W17 lane b, wide build): its Command widget block (`id=XCommandWidget(...); if (id < 0) continue; ... switch (RotateCommands[id]) {...} ...; continue;`) holds two of the function's depth-4 statements, writes `state` and the static `direction` and reads nine variables (the display, the menus and tables, the event, the pen targets); OC step 2 capped the helper at four by-value inputs | owner |
+| 2026-11-11 | AMEND | CT | Step 2 (and O step 2 by reference): a block-scope `static` of structure type (not an array of structures), its address taken only in the targets initialiser, may be a written variable on the scalar static's terms; its member is a pointer to the structure, `v.m` becomes `(*v).m` and `&v` becomes `v`. *Careful* adds the argument (one object at one address, `(*v).m` is the member, nothing copied, a callee filling the structure through the pointer fills the static) | `display.c`'s `XMatteEditImage` (campaign A, W17 lane b, wide build): its Border Color case tail ends the case through `break;` from a depth-5 `if (*color_name == '\0')` and writes the function's `static XColor border_color` through `XParseColor(...,&border_color)`; CT step 2 admitted only arithmetic, enumeration and pointer statics. The case is one of the four whose move takes the function to depth 3 (probe: display.c 1.33 to 1.41, the function out of *Deep, Nested Complexity* and *Brain Method*, no finding on the helpers) | owner |
