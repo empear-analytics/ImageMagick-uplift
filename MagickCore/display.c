@@ -3428,6 +3428,86 @@ typedef struct _PaintMethodTargets
     *method;
 } PaintMethodTargets;
 
+typedef struct _PenColorTargets
+{
+  XColor
+    *color;
+
+  unsigned int
+    *pen_id;
+} PenColorTargets;
+
+static void XSelectPenColor(const EditMenuInput *menu,
+  XResourceInfo *resource_info,const PenColorTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const ColorEditMenu = menu->MatteEditMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  XColor
+    *const color = targets->color;
+
+  unsigned int
+    *const pen_id = targets->pen_id;
+
+  const char
+    *ColorMenu[MaxNumberPens];
+
+  int
+    pen_number;
+
+  ssize_t
+    i;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="Browser...";
+  ColorMenu[MaxNumberPens-1]=(const char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,ColorEditMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  if (pen_number == (MaxNumberPens-2))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set pen color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],color);
+  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
+    (unsigned int) MaxColors,color);
+  windows->pixel_info->pen_colors[pen_number]=(*color);
+  (*pen_id)=(unsigned int) pen_number;
+}
+
 static void
   XSelectPaintMethod(const EditMenuInput *,const PaintMethodTargets *);
 
@@ -3512,6 +3592,9 @@ static MagickBooleanType XColorEditImage(Display *display,
   const PaintMethodTargets
     method_targets = { &method };
 
+  const PenColorTargets
+    pen_targets = { &color, &pen_id };
+
   /*
     Map Command widget.
   */
@@ -3577,48 +3660,12 @@ static MagickBooleanType XColorEditImage(Display *display,
           }
           case ColorEditColorCommand:
           {
-            const char
-              *ColorMenu[MaxNumberPens];
-
-            int
-              pen_number;
-
-            /*
-              Initialize menu selections.
-            */
-            for (i=0; i < (int) (MaxNumberPens-2); i++)
-              ColorMenu[i]=resource_info->pen_colors[i];
-            ColorMenu[MaxNumberPens-2]="Browser...";
-            ColorMenu[MaxNumberPens-1]=(const char *) NULL;
-            /*
-              Select a pen color from the pop-up menu.
-            */
-            pen_number=XMenuWidget(display,windows,ColorEditMenu[id],
-              (const char **) ColorMenu,command);
-            if (pen_number < 0)
-              break;
-            if (pen_number == (MaxNumberPens-2))
-              {
-                static char
-                  color_name[MagickPathExtent] = "gray";
-
-                /*
-                  Select a pen color from a dialog.
-                */
-                resource_info->pen_colors[pen_number]=color_name;
-                XColorBrowserWidget(display,windows,"Select",color_name);
-                if (*color_name == '\0')
-                  break;
-              }
-            /*
-              Set pen color.
-            */
-            (void) XParseColor(display,windows->map_info->colormap,
-              resource_info->pen_colors[pen_number],&color);
-            XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-              (unsigned int) MaxColors,&color);
-            windows->pixel_info->pen_colors[pen_number]=color;
-            pen_id=(unsigned int) pen_number;
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=ColorEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectPenColor(&menu_input,resource_info,&pen_targets);
             break;
           }
           case ColorEditBorderCommand:
