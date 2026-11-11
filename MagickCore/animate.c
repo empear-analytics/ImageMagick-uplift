@@ -3471,9 +3471,7 @@ MagickExport Image *XAnimateImages(Display *display,
           }
         if (event.xunmap.window == windows->widget.id)
           {
-            if (windows->backdrop.id != (Window) NULL)
-              (void) XSetInputFocus(display,windows->image.id,RevertToParent,
-                CurrentTime);
+            XFocusBackdropImage(display,windows);
             windows->widget.mapped=MagickFalse;
             break;
           }
