@@ -1700,6 +1700,21 @@ static MagickBooleanType FetchOverSourceRow(const OverSourceRow *source,
   return(MagickTrue);
 }
 
+static MagickBooleanType GetCompositeClamp(const Image *image)
+{
+  const char
+    *value;
+
+  MagickBooleanType
+    clamp;
+
+  clamp=MagickTrue;
+  value=GetImageArtifact(image,"compose:clamp");
+  if (value != (const char *) NULL)
+    clamp=IsStringTrue(value);
+  return(clamp);
+}
+
 static MagickBooleanType CompositeOverImage(Image *image,
   const Image *source_image,const CompositePlacement *placement,
   ExceptionInfo *exception)
@@ -1717,9 +1732,6 @@ static MagickBooleanType CompositeOverImage(Image *image,
     *image_view,
     *source_view;
 
-  const char
-    *value;
-
   MagickBooleanType
     clamp,
     status;
@@ -1735,10 +1747,7 @@ static MagickBooleanType CompositeOverImage(Image *image,
   */
   status=MagickTrue;
   progress=0;
-  clamp=MagickTrue;
-  value=GetImageArtifact(image,"compose:clamp");
-  if (value != (const char *) NULL)
-    clamp=IsStringTrue(value);
+  clamp=GetCompositeClamp(image);
   status=MagickTrue;
   progress=0;
   source_view=AcquireVirtualCacheView(source_image,exception);
