@@ -1857,6 +1857,111 @@ static void XPauseAnimation(Display *display,XResourceInfo *resource_info,
   }
 }
 
+typedef struct _AnimationTitle
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image_list;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    scene;
+
+  size_t
+    number_scenes;
+
+  MagickStatusType
+    state;
+} AnimationTitle;
+
+static void XUpdateAnimationTitle(const AnimationTitle *animation_title)
+{
+  Display
+    *const display = animation_title->display;
+
+  XResourceInfo
+    *const resource_info = animation_title->resource_info;
+
+  XWindows
+    *const windows = animation_title->windows;
+
+  Image
+    **const image_list = animation_title->image_list;
+
+  Image
+    *const image = animation_title->image;
+
+  ExceptionInfo
+    *const exception = animation_title->exception;
+
+  const ssize_t
+    scene = animation_title->scene;
+
+  const size_t
+    number_scenes = animation_title->number_scenes;
+
+  const MagickStatusType
+    state = animation_title->state;
+
+  char
+    *p;
+
+  int
+    status;
+
+  XTextProperty
+    window_name;
+
+  if ((state & StepAnimationState) ||
+      (resource_info->title != (char *) NULL))
+    {
+      char
+        name[MagickPathExtent];
+
+      /*
+        Update window title.
+      */
+      p=image_list[scene]->filename+
+        strlen(image_list[scene]->filename)-1;
+      while ((p > image_list[scene]->filename) && (*(p-1) != '/'))
+        p--;
+      (void) FormatLocaleString(name,MagickPathExtent,
+        "%s: %s[%.17g of %.17g]",MagickPackageName,p,(double)
+        scene+1,(double) number_scenes);
+      (void) CloneString(&windows->image.name,name);
+      if (resource_info->title != (char *) NULL)
+        {
+          char
+            *title;
+
+          title=InterpretImageProperties(resource_info->image_info,
+            image,resource_info->title,exception);
+          (void) CloneString(&windows->image.name,title);
+          title=DestroyString(title);
+        }
+      status=XStringListToTextProperty(&windows->image.name,1,
+        &window_name);
+      if (status != Success)
+        {
+          XSetWMName(display,windows->image.id,&window_name);
+          (void) XFree((void *) window_name.value);
+        }
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2656,6 +2761,9 @@ MagickExport Image *XAnimateImages(Display *display,
     if ((XEventsQueued(display,QueuedAfterFlush) == 0) &&
         ((state & PlayAnimationState) || (state & StepAnimationState)))
       {
+        AnimationTitle
+          animation_title;
+
         MagickBooleanType
           pause;
 
@@ -2725,41 +2833,16 @@ MagickExport Image *XAnimateImages(Display *display,
         image=image_list[scene];
         if ((image != (Image *) NULL) && (image->start_loop != 0))
           first_scene=scene;
-        if ((state & StepAnimationState) ||
-            (resource_info->title != (char *) NULL))
-          {
-            char
-              name[MagickPathExtent];
-
-            /*
-              Update window title.
-            */
-            p=image_list[scene]->filename+
-              strlen(image_list[scene]->filename)-1;
-            while ((p > image_list[scene]->filename) && (*(p-1) != '/'))
-              p--;
-            (void) FormatLocaleString(name,MagickPathExtent,
-              "%s: %s[%.17g of %.17g]",MagickPackageName,p,(double)
-              scene+1,(double) number_scenes);
-            (void) CloneString(&windows->image.name,name);
-            if (resource_info->title != (char *) NULL)
-              {
-                char
-                  *title;
-
-                title=InterpretImageProperties(resource_info->image_info,
-                  image,resource_info->title,exception);
-                (void) CloneString(&windows->image.name,title);
-                title=DestroyString(title);
-              }
-            status=XStringListToTextProperty(&windows->image.name,1,
-              &window_name);
-            if (status != Success)
-              {
-                XSetWMName(display,windows->image.id,&window_name);
-                (void) XFree((void *) window_name.value);
-              }
-          }
+        animation_title.display=display;
+        animation_title.resource_info=resource_info;
+        animation_title.windows=windows;
+        animation_title.image_list=image_list;
+        animation_title.image=image;
+        animation_title.exception=exception;
+        animation_title.scene=scene;
+        animation_title.number_scenes=number_scenes;
+        animation_title.state=state;
+        XUpdateAnimationTitle(&animation_title);
         /*
           Copy X pixmap to Image window.
         */
