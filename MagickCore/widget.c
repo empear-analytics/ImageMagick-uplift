@@ -10105,6 +10105,23 @@ static void ReleaseNoticeDismiss(Display *display,XWindows *windows,
     }
 }
 
+static void PressNoticeDismiss(Display *display,XWindows *windows,
+  const XEvent event,const NoticeTargets *targets)
+{
+  XWidgetInfo
+    *const dismiss_info = targets->dismiss_info;
+
+  if (MatteIsActive((*dismiss_info),event.xbutton))
+    {
+      /*
+        User pressed Dismiss button.
+      */
+      (*dismiss_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      return;
+    }
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -10268,15 +10285,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
     {
       case ButtonPress:
       {
-        if (MatteIsActive(dismiss_info,event.xbutton))
-          {
-            /*
-              User pressed Dismiss button.
-            */
-            dismiss_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-            break;
-          }
+        PressNoticeDismiss(display,windows,event,&targets);
         break;
       }
       case ButtonRelease:
