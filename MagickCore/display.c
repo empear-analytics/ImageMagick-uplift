@@ -3404,6 +3404,433 @@ static void XReplaceImageColor(const XReplaceColorInput *replace)
     }
 }
 
+typedef struct _EditMenuInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *MatteEditMenu;
+
+  int
+    id;
+
+  char
+    *command;
+} EditMenuInput;
+
+typedef struct _PaintMethodTargets
+{
+  PaintMethod
+    *method;
+} PaintMethodTargets;
+
+typedef struct _ColorEditPixelInput
+{
+  Image
+    **image;
+
+  CacheView
+    *image_view;
+
+  int
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+
+  XResourceInfo
+    *resource_info;
+
+  PaintMethod
+    method;
+
+  XColor
+    color,
+    border_color;
+
+  unsigned int
+    pen_id;
+} ColorEditPixelInput;
+
+static void XColorFloodfill(const ColorEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  XResourceInfo
+    *const resource_info = pixel_input->resource_info;
+
+  const PaintMethod
+    method = pixel_input->method;
+
+  const XColor
+    border_color = pixel_input->border_color;
+
+  const unsigned int
+    pen_id = pixel_input->pen_id;
+
+  DrawInfo
+    *draw_info;
+
+  PixelInfo
+    target;
+
+  /*
+    Update color information using floodfill algorithm.
+  */
+  (void) GetOneVirtualPixelInfo(*image,
+    GetPixelCacheVirtualMethod(*image),(ssize_t) x_offset,(ssize_t)
+    y_offset,&target,exception);
+  if (method == FillToBorderMethod)
+    {
+      target.red=(double)
+        ScaleShortToQuantum(border_color.red);
+      target.green=(double)
+        ScaleShortToQuantum(border_color.green);
+      target.blue=(double)
+        ScaleShortToQuantum(border_color.blue);
+    }
+  draw_info=CloneDrawInfo(resource_info->image_info,
+    (DrawInfo *) NULL);
+  (void) QueryColorCompliance(resource_info->pen_colors[pen_id],
+    AllCompliance,&draw_info->fill,exception);
+  (void) FloodfillPaintImage(*image,draw_info,&target,
+    (ssize_t)x_offset,(ssize_t)y_offset,
+    method != FloodfillMethod ? MagickTrue : MagickFalse,exception);
+  draw_info=DestroyDrawInfo(draw_info);
+}
+
+static void XColorReset(const ColorEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  const XColor
+    color = pixel_input->color;
+
+  int
+    x,
+    y;
+
+  Quantum
+    *q;
+
+  for (y=0; y < (int) (*image)->rows; y++)
+  {
+    q=QueueCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
+      (*image)->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (int) (*image)->columns; x++)
+    {
+      SetPixelRed(*image,ScaleShortToQuantum(color.red),q);
+      SetPixelGreen(*image,ScaleShortToQuantum(color.green),q);
+      SetPixelBlue(*image,ScaleShortToQuantum(color.blue),q);
+      q+=(ptrdiff_t) GetPixelChannels(*image);
+    }
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+}
+
+static MagickBooleanType XColorDirectPixels(
+  const ColorEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  const PaintMethod
+    method = pixel_input->method;
+
+  const XColor
+    color = pixel_input->color;
+
+  Quantum
+    *q;
+
+  switch (method)
+  {
+    case PointMethod:
+    default:
+    {
+      /*
+        Update color information using point algorithm.
+      */
+      if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+      q=GetCacheViewAuthenticPixels(image_view,(ssize_t)x_offset,
+        (ssize_t) y_offset,1,1,exception);
+      if (q == (Quantum *) NULL)
+        break;
+      SetPixelRed(*image,ScaleShortToQuantum(color.red),q);
+      SetPixelGreen(*image,ScaleShortToQuantum(color.green),q);
+      SetPixelBlue(*image,ScaleShortToQuantum(color.blue),q);
+      (void) SyncCacheViewAuthenticPixels(image_view,exception);
+      break;
+    }
+    case ResetMethod:
+    {
+      /*
+        Update color information using reset algorithm.
+      */
+      if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+      XColorReset(pixel_input);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XColorEditPixels(
+  const ColorEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  const PaintMethod
+    method = pixel_input->method;
+
+  const XColor
+    color = pixel_input->color;
+
+  switch (method)
+  {
+    default:
+    {
+      if (XColorDirectPixels(pixel_input) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+    case ReplaceMethod:
+    {
+      PixelInfo
+        target;
+
+      XReplaceColorInput
+        replace;
+
+      /*
+        Update color information using replace algorithm.
+      */
+      (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
+        x_offset,(ssize_t) y_offset,&target,exception);
+      replace.image=image;
+      replace.image_view=image_view;
+      replace.target=target;
+      replace.color=color;
+      replace.exception=exception;
+      XReplaceImageColor(&replace);
+      break;
+    }
+    case FloodfillMethod:
+    case FillToBorderMethod:
+    {
+      XColorFloodfill(pixel_input);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+typedef struct _ColorBorderTargets
+{
+  XColor
+    *border_color;
+} ColorBorderTargets;
+
+static void XSelectColorBorder(const EditMenuInput *menu,
+  XResourceInfo *resource_info,const ColorBorderTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const ColorEditMenu = menu->MatteEditMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  XColor
+    *const border_color = targets->border_color;
+
+  const char
+    *ColorMenu[MaxNumberPens];
+
+  int
+    pen_number;
+
+  ssize_t
+    i;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="Browser...";
+  ColorMenu[MaxNumberPens-1]=(const char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,ColorEditMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  if (pen_number == (MaxNumberPens-2))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set border color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],border_color);
+}
+
+typedef struct _PenColorTargets
+{
+  XColor
+    *color;
+
+  unsigned int
+    *pen_id;
+} PenColorTargets;
+
+static void XSelectPenColor(const EditMenuInput *menu,
+  XResourceInfo *resource_info,const PenColorTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const ColorEditMenu = menu->MatteEditMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  XColor
+    *const color = targets->color;
+
+  unsigned int
+    *const pen_id = targets->pen_id;
+
+  const char
+    *ColorMenu[MaxNumberPens];
+
+  int
+    pen_number;
+
+  ssize_t
+    i;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="Browser...";
+  ColorMenu[MaxNumberPens-1]=(const char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,ColorEditMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  if (pen_number == (MaxNumberPens-2))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set pen color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],color);
+  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
+    (unsigned int) MaxColors,color);
+  windows->pixel_info->pen_colors[pen_number]=(*color);
+  (*pen_id)=(unsigned int) pen_number;
+}
+
+static void
+  XSelectPaintMethod(const EditMenuInput *,const PaintMethodTargets *);
+
+static void
+  XSelectFuzzFactor(const EditMenuInput *,const char *const *,char *,
+    Image **);
+
+static void
+  XDiscardMagnifyKeys(Display *,XWindows *,XEvent *);
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3450,21 +3877,14 @@ static MagickBooleanType XColorEditImage(Display *display,
     cursor;
 
   int
-    entry,
     id,
     x,
     x_offset,
     y,
     y_offset;
 
-  Quantum
-    *q;
-
   size_t
     state;
-
-  ssize_t
-    i;
 
   unsigned int
     height,
@@ -3475,6 +3895,15 @@ static MagickBooleanType XColorEditImage(Display *display,
 
   XEvent
     event;
+
+  const PaintMethodTargets
+    method_targets = { &method };
+
+  const PenColorTargets
+    pen_targets = { &color, &pen_id };
+
+  const ColorBorderTargets
+    border_targets = { &border_color };
 
   /*
     Map Command widget.
@@ -3515,6 +3944,9 @@ static MagickBooleanType XColorEditImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     if (event.xany.window == windows->command.id)
       {
+        EditMenuInput
+          menu_input;
+
         /*
           Select a command from the Command widget.
         */
@@ -3528,109 +3960,32 @@ static MagickBooleanType XColorEditImage(Display *display,
         {
           case ColorEditMethodCommand:
           {
-            char
-              **methods;
-
-            /*
-              Select a method from the pop-up menu.
-            */
-            methods=(char **) GetCommandOptions(MagickMethodOptions);
-            if (methods == (char **) NULL)
-              break;
-            entry=XMenuWidget(display,windows,ColorEditMenu[id],
-              (const char **) methods,command);
-            if (entry >= 0)
-              method=(PaintMethod) ParseCommandOption(MagickMethodOptions,
-                MagickFalse,methods[entry]);
-            methods=DestroyStringList(methods);
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=ColorEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectPaintMethod(&menu_input,&method_targets);
             break;
           }
           case ColorEditColorCommand:
           {
-            const char
-              *ColorMenu[MaxNumberPens];
-
-            int
-              pen_number;
-
-            /*
-              Initialize menu selections.
-            */
-            for (i=0; i < (int) (MaxNumberPens-2); i++)
-              ColorMenu[i]=resource_info->pen_colors[i];
-            ColorMenu[MaxNumberPens-2]="Browser...";
-            ColorMenu[MaxNumberPens-1]=(const char *) NULL;
-            /*
-              Select a pen color from the pop-up menu.
-            */
-            pen_number=XMenuWidget(display,windows,ColorEditMenu[id],
-              (const char **) ColorMenu,command);
-            if (pen_number < 0)
-              break;
-            if (pen_number == (MaxNumberPens-2))
-              {
-                static char
-                  color_name[MagickPathExtent] = "gray";
-
-                /*
-                  Select a pen color from a dialog.
-                */
-                resource_info->pen_colors[pen_number]=color_name;
-                XColorBrowserWidget(display,windows,"Select",color_name);
-                if (*color_name == '\0')
-                  break;
-              }
-            /*
-              Set pen color.
-            */
-            (void) XParseColor(display,windows->map_info->colormap,
-              resource_info->pen_colors[pen_number],&color);
-            XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-              (unsigned int) MaxColors,&color);
-            windows->pixel_info->pen_colors[pen_number]=color;
-            pen_id=(unsigned int) pen_number;
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=ColorEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectPenColor(&menu_input,resource_info,&pen_targets);
             break;
           }
           case ColorEditBorderCommand:
           {
-            const char
-              *ColorMenu[MaxNumberPens];
-
-            int
-              pen_number;
-
-            /*
-              Initialize menu selections.
-            */
-            for (i=0; i < (int) (MaxNumberPens-2); i++)
-              ColorMenu[i]=resource_info->pen_colors[i];
-            ColorMenu[MaxNumberPens-2]="Browser...";
-            ColorMenu[MaxNumberPens-1]=(const char *) NULL;
-            /*
-              Select a pen color from the pop-up menu.
-            */
-            pen_number=XMenuWidget(display,windows,ColorEditMenu[id],
-              (const char **) ColorMenu,command);
-            if (pen_number < 0)
-              break;
-            if (pen_number == (MaxNumberPens-2))
-              {
-                static char
-                  color_name[MagickPathExtent] = "gray";
-
-                /*
-                  Select a pen color from a dialog.
-                */
-                resource_info->pen_colors[pen_number]=color_name;
-                XColorBrowserWidget(display,windows,"Select",color_name);
-                if (*color_name == '\0')
-                  break;
-              }
-            /*
-              Set border color.
-            */
-            (void) XParseColor(display,windows->map_info->colormap,
-              resource_info->pen_colors[pen_number],&border_color);
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=ColorEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectColorBorder(&menu_input,resource_info,&border_targets);
             break;
           }
           case ColorEditFuzzCommand:
@@ -3650,27 +4005,12 @@ static MagickBooleanType XColorEditImage(Display *display,
             static char
               fuzz[MagickPathExtent];
 
-            /*
-              Select a command from the pop-up menu.
-            */
-            entry=XMenuWidget(display,windows,ColorEditMenu[id],FuzzMenu,
-              command);
-            if (entry < 0)
-              break;
-            if (entry != 5)
-              {
-                (*image)->fuzz=StringToDoubleInterval(FuzzMenu[entry],(double)
-                  QuantumRange+1.0);
-                break;
-              }
-            (void) (void) CopyMagickString(fuzz,"20%",MagickPathExtent);
-            (void) XDialogWidget(display,windows,"Ok",
-              "Enter fuzz factor (0.0 - 99.9%):",fuzz);
-            if (*fuzz == '\0')
-              break;
-            (void) ConcatenateMagickString(fuzz,"%",MagickPathExtent);
-            (*image)->fuzz=StringToDoubleInterval(fuzz,(double) QuantumRange+
-              1.0);
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=ColorEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,image);
             break;
           }
           case ColorEditUndoCommand:
@@ -3744,14 +4084,7 @@ static MagickBooleanType XColorEditImage(Display *display,
         KeySym
           key_symbol;
 
-        if (event.xkey.window == windows->magnify.id)
-          {
-            Window
-              window;
-
-            window=windows->magnify.id;
-            while (XCheckWindowEvent(display,window,KeyPressMask,&event)) ;
-          }
+        XDiscardMagnifyKeys(display,windows,&event);
         if (event.xkey.window != windows->image.id)
           break;
         /*
@@ -3792,17 +4125,7 @@ static MagickBooleanType XColorEditImage(Display *display,
         */
         x=event.xmotion.x;
         y=event.xmotion.y;
-        if (windows->info.mapped != MagickFalse)
-          {
-            if ((x < (windows->info.x+(int) windows->info.width)) &&
-                (y < (windows->info.y+(int) windows->info.height)))
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
-          }
-        else
-          if ((x > (windows->info.x+(int) windows->info.width)) ||
-              (y > (windows->info.y+(int) windows->info.height)))
-            (void) XMapWindow(display,windows->info.id);
+        XTrackInfoWidget(display,windows,x,y);
         break;
       }
       default:
@@ -3819,6 +4142,9 @@ static MagickBooleanType XColorEditImage(Display *display,
       {
         CacheView
           *image_view;
+
+        ColorEditPixelInput
+          pixel_input;
 
         int
           x,
@@ -3848,107 +4174,18 @@ static MagickBooleanType XColorEditImage(Display *display,
             (y_offset >= (int) (*image)->rows))
           continue;
         image_view=AcquireAuthenticCacheView(*image,exception);
-        switch (method)
-        {
-          case PointMethod:
-          default:
-          {
-            /*
-              Update color information using point algorithm.
-            */
-            if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
-              return(MagickFalse);
-            q=GetCacheViewAuthenticPixels(image_view,(ssize_t)x_offset,
-              (ssize_t) y_offset,1,1,exception);
-            if (q == (Quantum *) NULL)
-              break;
-            SetPixelRed(*image,ScaleShortToQuantum(color.red),q);
-            SetPixelGreen(*image,ScaleShortToQuantum(color.green),q);
-            SetPixelBlue(*image,ScaleShortToQuantum(color.blue),q);
-            (void) SyncCacheViewAuthenticPixels(image_view,exception);
-            break;
-          }
-          case ReplaceMethod:
-          {
-            PixelInfo
-              target;
-
-            XReplaceColorInput
-              replace;
-
-            /*
-              Update color information using replace algorithm.
-            */
-            (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
-              x_offset,(ssize_t) y_offset,&target,exception);
-            replace.image=image;
-            replace.image_view=image_view;
-            replace.target=target;
-            replace.color=color;
-            replace.exception=exception;
-            XReplaceImageColor(&replace);
-            break;
-          }
-          case FloodfillMethod:
-          case FillToBorderMethod:
-          {
-            DrawInfo
-              *draw_info;
-
-            PixelInfo
-              target;
-
-            /*
-              Update color information using floodfill algorithm.
-            */
-            (void) GetOneVirtualPixelInfo(*image,
-              GetPixelCacheVirtualMethod(*image),(ssize_t) x_offset,(ssize_t)
-              y_offset,&target,exception);
-            if (method == FillToBorderMethod)
-              {
-                target.red=(double)
-                  ScaleShortToQuantum(border_color.red);
-                target.green=(double)
-                  ScaleShortToQuantum(border_color.green);
-                target.blue=(double)
-                  ScaleShortToQuantum(border_color.blue);
-              }
-            draw_info=CloneDrawInfo(resource_info->image_info,
-              (DrawInfo *) NULL);
-            (void) QueryColorCompliance(resource_info->pen_colors[pen_id],
-              AllCompliance,&draw_info->fill,exception);
-            (void) FloodfillPaintImage(*image,draw_info,&target,
-              (ssize_t)x_offset,(ssize_t)y_offset,
-              method != FloodfillMethod ? MagickTrue : MagickFalse,exception);
-            draw_info=DestroyDrawInfo(draw_info);
-            break;
-          }
-          case ResetMethod:
-          {
-            /*
-              Update color information using reset algorithm.
-            */
-            if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
-              return(MagickFalse);
-            for (y=0; y < (int) (*image)->rows; y++)
-            {
-              q=QueueCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
-                (*image)->columns,1,exception);
-              if (q == (Quantum *) NULL)
-                break;
-              for (x=0; x < (int) (*image)->columns; x++)
-              {
-                SetPixelRed(*image,ScaleShortToQuantum(color.red),q);
-                SetPixelGreen(*image,ScaleShortToQuantum(color.green),q);
-                SetPixelBlue(*image,ScaleShortToQuantum(color.blue),q);
-                q+=(ptrdiff_t) GetPixelChannels(*image);
-              }
-              if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-                break;
-            }
-            break;
-          }
-        }
+        pixel_input.image=image;
+        pixel_input.image_view=image_view;
+        pixel_input.x_offset=x_offset;
+        pixel_input.y_offset=y_offset;
+        pixel_input.exception=exception;
+        pixel_input.resource_info=resource_info;
+        pixel_input.method=method;
+        pixel_input.color=color;
+        pixel_input.border_color=border_color;
+        pixel_input.pen_id=pen_id;
+        if (XColorEditPixels(&pixel_input) == MagickFalse)
+          return(MagickFalse);
         image_view=DestroyCacheView(image_view);
         state&=(~0x0080U);
       }
@@ -4761,6 +4998,522 @@ static void XShowCropHelp(Display *display,XResourceInfo *resource_info,
   }
 }
 
+static void XMapInfoWidget(Display *display,XWindows *windows)
+{
+  if (windows->info.mapped == MagickFalse)
+    (void) XMapWindow(display,windows->info.id);
+}
+
+static void XCheckSelectionBounds(XWindows *windows,const int x,const int y,
+  RectangleInfo *crop_info)
+{
+  /*
+    Check boundary conditions.
+  */
+  if ((*crop_info).x < 0)
+    (*crop_info).x=0;
+  else
+    if ((*crop_info).x > (ssize_t) windows->image.ximage->width)
+      (*crop_info).x=(ssize_t) windows->image.ximage->width;
+  if ((int) (*crop_info).x < x)
+    (*crop_info).width=(unsigned int) (x-(*crop_info).x);
+  else
+    {
+      (*crop_info).width=(unsigned int) ((*crop_info).x-x);
+      (*crop_info).x=(ssize_t) x;
+    }
+  if ((*crop_info).y < 0)
+    (*crop_info).y=0;
+  else
+    if ((*crop_info).y > (ssize_t) windows->image.ximage->height)
+      (*crop_info).y=(ssize_t) windows->image.ximage->height;
+  if ((int) (*crop_info).y < y)
+    (*crop_info).height=(unsigned int) (y-(*crop_info).y);
+  else
+    {
+      (*crop_info).height=(unsigned int) ((*crop_info).y-y);
+      (*crop_info).y=(ssize_t) y;
+    }
+}
+
+typedef struct _CropCommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  ClipboardMode
+    mode;
+
+  RectangleInfo
+    highlight_info;
+
+  const char
+    **RectifyModeMenu;
+
+  const ModeType
+    *RectifyCommands;
+} CropCommandInput;
+
+static void XCropRectifyCommand(const CropCommandInput *command_input,
+  XEvent *event,size_t *state)
+{
+  Display
+    *const display = command_input->display;
+
+  XResourceInfo
+    *const resource_info = command_input->resource_info;
+
+  XWindows
+    *const windows = command_input->windows;
+
+  const ClipboardMode
+    mode = command_input->mode;
+
+  const RectangleInfo
+    highlight_info = command_input->highlight_info;
+
+  const char
+    **const RectifyModeMenu = command_input->RectifyModeMenu;
+
+  const ModeType
+    *const RectifyCommands = command_input->RectifyCommands;
+
+  int
+    id;
+
+  /*
+    Select a command from the Command widget.
+  */
+  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+  id=XCommandWidget(display,windows,RectifyModeMenu,event);
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  if (id >= 0)
+    switch (RectifyCommands[id])
+    {
+      case RectifyCopyCommand:
+      {
+        (*state)|=ExitState;
+        break;
+      }
+      case RectifyHelpCommand:
+      {
+        (void) XSetFunction(display,windows->image.highlight_context,
+          GXcopy);
+        XShowCropHelp(display,resource_info,windows,mode);
+        (void) XSetFunction(display,windows->image.highlight_context,
+          GXinvert);
+        break;
+      }
+      case RectifyDismissCommand:
+      {
+        /*
+          Prematurely exit.
+        */
+        (*state)|=EscapeState;
+        (*state)|=ExitState;
+        break;
+      }
+      default:
+        break;
+    }
+}
+
+typedef struct _CropEventInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const XEvent
+    *event;
+
+  RectangleInfo
+    highlight_info;
+
+  const char
+    *text;
+
+  XResourceInfo
+    *resource_info;
+
+  ClipboardMode
+    mode;
+} CropEventInput;
+
+static void XCropButtonRelease(const CropEventInput *event_input,
+  const RectangleInfo crop_info)
+{
+  Display
+    *const display = event_input->display;
+
+  XWindows
+    *const windows = event_input->windows;
+
+  const XEvent
+    *const event = event_input->event;
+
+  const RectangleInfo
+    highlight_info = event_input->highlight_info;
+
+  if ((*event).xbutton.window == windows->pan.id)
+    if ((highlight_info.x != crop_info.x-windows->image.x) ||
+        (highlight_info.y != crop_info.y-windows->image.y))
+      XHighlightRectangle(display,windows->image.id,
+        windows->image.highlight_context,&highlight_info);
+  (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
+    (*event).xbutton.time);
+}
+
+typedef struct _CropTargets
+{
+  int
+    *x,
+    *y;
+
+  RectangleInfo
+    *crop_info;
+
+  size_t
+    *state;
+} CropTargets;
+
+static void XCropSelectionRequest(XEvent *event,const RectangleInfo crop_info,
+  char *text)
+{
+  XSelectionEvent
+    notify;
+
+  XSelectionRequestEvent
+    *request;
+
+  /*
+    Set primary selection.
+  */
+  (void) FormatLocaleString(text,MagickPathExtent,
+    "%.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
+    crop_info.height,(double) crop_info.x,(double) crop_info.y);
+  request=(&((*event).xselectionrequest));
+  (void) XChangeProperty(request->display,request->requestor,
+    request->property,request->target,8,PropModeReplace,
+    (unsigned char *) text,(int) strlen(text));
+  notify.type=SelectionNotify;
+  notify.display=request->display;
+  notify.requestor=request->requestor;
+  notify.selection=request->selection;
+  notify.target=request->target;
+  notify.time=request->time;
+  if (request->property == None)
+    notify.property=request->target;
+  else
+    notify.property=request->property;
+  (void) XSendEvent(request->display,request->requestor,False,0,
+    (XEvent *) &notify);
+}
+
+static void XCropMotion(const CropEventInput *event_input,
+  const CropTargets *targets)
+{
+  Display
+    *const display = event_input->display;
+
+  XWindows
+    *const windows = event_input->windows;
+
+  const XEvent
+    *const event = event_input->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  if ((*event).xmotion.window != windows->image.id)
+    return;
+  /*
+    Map and unmap Info widget as text cursor crosses its boundaries.
+  */
+  (*x)=(*event).xmotion.x;
+  (*y)=(*event).xmotion.y;
+  XTrackInfoWidget(display,windows,(*x),(*y));
+  (*crop_info).x=(ssize_t) windows->image.x+(*event).xmotion.x;
+  (*crop_info).y=(ssize_t) windows->image.y+(*event).xmotion.y;
+}
+
+static void XCropExpose(const CropEventInput *event_input,XEvent *event)
+{
+  Display
+    *const display = event_input->display;
+
+  XWindows
+    *const windows = event_input->windows;
+
+  const RectangleInfo
+    highlight_info = event_input->highlight_info;
+
+  const char
+    *const text = event_input->text;
+
+  if ((*event).xexpose.window == windows->image.id)
+    if ((*event).xexpose.count == 0)
+      {
+        (*event).xexpose.x=(int) highlight_info.x;
+        (*event).xexpose.y=(int) highlight_info.y;
+        (*event).xexpose.width=(int) highlight_info.width;
+        (*event).xexpose.height=(int) highlight_info.height;
+        XRefreshWindow(display,&windows->image,event);
+      }
+  if ((*event).xexpose.window == windows->info.id)
+    if ((*event).xexpose.count == 0)
+      XInfoWidget(display,windows,text);
+}
+
+static void XCropButtonPress(const CropEventInput *event_input,
+  const CropTargets *targets)
+{
+  XWindows
+    *const windows = event_input->windows;
+
+  const XEvent
+    *const event = event_input->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  (*x)=windows->image.x+(*event).xbutton.x;
+  (*y)=windows->image.y+(*event).xbutton.y;
+  if (IsNearTopLeftCorner((*x),(*y),(*crop_info)) != MagickFalse)
+    {
+      (*crop_info).x=(*crop_info).x+(ssize_t) (*crop_info).width;
+      (*crop_info).y=(*crop_info).y+(ssize_t) (*crop_info).height;
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearBottomLeftCorner((*x),(*y),(*crop_info)) != MagickFalse)
+    {
+      (*crop_info).x=((*crop_info).x+(int) (*crop_info).width);
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearTopRightCorner((*x),(*y),(*crop_info)) != MagickFalse)
+    {
+      (*crop_info).y=((*crop_info).y+(ssize_t) (*crop_info).height);
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearBottomRightCorner((*x),(*y),(*crop_info)) != MagickFalse)
+    {
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  XCropButtonRelease(event_input,(*crop_info));
+}
+
+static void XCropKeyHelp(Display *display,XResourceInfo *resource_info,
+  XWindows *windows,const ClipboardMode mode)
+{
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXcopy);
+  switch (mode)
+  {
+    case CopyMode:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Copy",ImageCopyHelp);
+      break;
+    }
+    case CropMode:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Cropg",ImageCropHelp);
+      break;
+    }
+    case CutMode:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Cutg",ImageCutHelp);
+      break;
+    }
+  }
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+}
+
+static void XCropDownHelpKey(const CropEventInput *event_input,
+  const CropTargets *targets,const KeySym key_symbol)
+{
+  Display
+    *const display = event_input->display;
+
+  XWindows
+    *const windows = event_input->windows;
+
+  XResourceInfo
+    *const resource_info = event_input->resource_info;
+
+  const ClipboardMode
+    mode = event_input->mode;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Prior:
+    case XK_Down:
+    case XK_KP_Down:
+    {
+      (*crop_info).y++;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XCropKeyHelp(display,resource_info,windows,mode);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+}
+
+static void XCropUpRightKey(const CropEventInput *event_input,
+  const CropTargets *targets,const KeySym key_symbol)
+{
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Up:
+    case XK_KP_Up:
+    case XK_Next:
+    {
+      (*crop_info).y--;
+      break;
+    }
+    case XK_Right:
+    case XK_KP_Right:
+    {
+      (*crop_info).x++;
+      break;
+    }
+    default:
+    {
+      XCropDownHelpKey(event_input,targets,key_symbol);
+      break;
+    }
+  }
+}
+
+static void XCropHomeLeftKey(const CropEventInput *event_input,
+  const CropTargets *targets,const KeySym key_symbol)
+{
+  XWindows
+    *const windows = event_input->windows;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Home:
+    case XK_KP_Home:
+    {
+      (*crop_info).x=(ssize_t) (windows->image.width/2L-(*crop_info).width/
+        2L);
+      (*crop_info).y=(ssize_t) (windows->image.height/2L-(*crop_info).height/
+        2L);
+      break;
+    }
+    case XK_Left:
+    case XK_KP_Left:
+    {
+      (*crop_info).x--;
+      break;
+    }
+    default:
+    {
+      XCropUpRightKey(event_input,targets,key_symbol);
+      break;
+    }
+  }
+}
+
+static void XCropKeyPress(const CropEventInput *event_input,XEvent *event,
+  const CropTargets *targets)
+{
+  Display
+    *const display = event_input->display;
+
+  XWindows
+    *const windows = event_input->windows;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  if ((*event).xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      (*state)|=EscapeState;
+      magick_fallthrough;
+    }
+    case XK_Return:
+    {
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+    {
+      XCropHomeLeftKey(event_input,targets,key_symbol);
+      break;
+    }
+  }
+  (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
+    (*event).xkey.time);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -4833,6 +5586,9 @@ static MagickBooleanType XCropImage(Display *display,
 
   XEvent
     event;
+
+  const CropTargets
+    targets = { &x, &y, &crop_info, &state };
 
   /*
     Map Command widget.
@@ -4982,17 +5738,7 @@ static MagickBooleanType XCropImage(Display *display,
         */
         x=event.xmotion.x;
         y=event.xmotion.y;
-        if (windows->info.mapped != MagickFalse)
-          {
-            if ((x < (windows->info.x+(int) windows->info.width)) &&
-                (y < (windows->info.y+(int) windows->info.height)))
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
-          }
-        else
-          if ((x > (windows->info.x+(int) windows->info.width)) ||
-              (y > (windows->info.y+(int) windows->info.height)))
-            (void) XMapWindow(display,windows->info.id);
+        XTrackInfoWidget(display,windows,x,y);
         crop_info.x=(ssize_t) windows->image.x+x;
         crop_info.y=(ssize_t) windows->image.y+y;
         break;
@@ -5033,8 +5779,7 @@ static MagickBooleanType XCropImage(Display *display,
           /*
             Display info and draw cropping rectangle.
           */
-          if (windows->info.mapped == MagickFalse)
-            (void) XMapWindow(display,windows->info.id);
+          XMapInfoWidget(display,windows);
           (void) FormatLocaleString(text,MagickPathExtent,
             " %.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
             crop_info.height,(double) crop_info.x,(double) crop_info.y);
@@ -5085,35 +5830,7 @@ static MagickBooleanType XCropImage(Display *display,
           break;
       }
       if (IsSelectionMovedOrDone(crop_info,x,y,state) != MagickFalse)
-        {
-          /*
-            Check boundary conditions.
-          */
-          if (crop_info.x < 0)
-            crop_info.x=0;
-          else
-            if (crop_info.x > (ssize_t) windows->image.ximage->width)
-              crop_info.x=(ssize_t) windows->image.ximage->width;
-          if ((int) crop_info.x < x)
-            crop_info.width=(unsigned int) (x-crop_info.x);
-          else
-            {
-              crop_info.width=(unsigned int) (crop_info.x-x);
-              crop_info.x=(ssize_t) x;
-            }
-          if (crop_info.y < 0)
-            crop_info.y=0;
-          else
-            if (crop_info.y > (ssize_t) windows->image.ximage->height)
-              crop_info.y=(ssize_t) windows->image.ximage->height;
-          if ((int) crop_info.y < y)
-            crop_info.height=(unsigned int) (y-crop_info.y);
-          else
-            {
-              crop_info.height=(unsigned int) (crop_info.y-y);
-              crop_info.y=(ssize_t) y;
-            }
-        }
+        XCheckSelectionBounds(windows,x,y,&crop_info);
     } while ((state & ExitState) == 0);
     /*
       Wait for user to grab a corner of the rectangle or press return.
@@ -5122,6 +5839,9 @@ static MagickBooleanType XCropImage(Display *display,
     (void) XMapWindow(display,windows->info.id);
     do
     {
+      CropEventInput
+        event_input;
+
       if (windows->info.mapped != MagickFalse)
         {
           /*
@@ -5146,264 +5866,60 @@ static MagickBooleanType XCropImage(Display *display,
       XScreenEvent(display,windows,&event,exception);
       if (event.xany.window == windows->command.id)
         {
-          /*
-            Select a command from the Command widget.
-          */
-          (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-          id=XCommandWidget(display,windows,RectifyModeMenu,&event);
-          (void) XSetFunction(display,windows->image.highlight_context,
-            GXinvert);
-          XHighlightRectangle(display,windows->image.id,
-            windows->image.highlight_context,&highlight_info);
-          if (id >= 0)
-            switch (RectifyCommands[id])
-            {
-              case RectifyCopyCommand:
-              {
-                state|=ExitState;
-                break;
-              }
-              case RectifyHelpCommand:
-              {
-                (void) XSetFunction(display,windows->image.highlight_context,
-                  GXcopy);
-                XShowCropHelp(display,resource_info,windows,mode);
-                (void) XSetFunction(display,windows->image.highlight_context,
-                  GXinvert);
-                break;
-              }
-              case RectifyDismissCommand:
-              {
-                /*
-                  Prematurely exit.
-                */
-                state|=EscapeState;
-                state|=ExitState;
-                break;
-              }
-              default:
-                break;
-            }
+          CropCommandInput
+            command_input;
+
+          command_input.display=display;
+          command_input.resource_info=resource_info;
+          command_input.windows=windows;
+          command_input.mode=mode;
+          command_input.highlight_info=highlight_info;
+          command_input.RectifyModeMenu=RectifyModeMenu;
+          command_input.RectifyCommands=RectifyCommands;
+          XCropRectifyCommand(&command_input,&event,&state);
           continue;
         }
       XHighlightRectangle(display,windows->image.id,
         windows->image.highlight_context,&highlight_info);
+      event_input.display=display;
+      event_input.windows=windows;
+      event_input.event=(&event);
+      event_input.highlight_info=highlight_info;
+      event_input.text=text;
+      event_input.resource_info=resource_info;
+      event_input.mode=mode;
       switch (event.type)
       {
         case ButtonPress:
         {
-          if (event.xbutton.button != Button1)
-            break;
-          if (event.xbutton.window != windows->image.id)
-            break;
-          x=windows->image.x+event.xbutton.x;
-          y=windows->image.y+event.xbutton.y;
-          if (IsNearTopLeftCorner(x,y,crop_info) != MagickFalse)
-            {
-              crop_info.x=crop_info.x+(ssize_t) crop_info.width;
-              crop_info.y=crop_info.y+(ssize_t) crop_info.height;
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearBottomLeftCorner(x,y,crop_info) != MagickFalse)
-            {
-              crop_info.x=(crop_info.x+(int) crop_info.width);
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearTopRightCorner(x,y,crop_info) != MagickFalse)
-            {
-              crop_info.y=(crop_info.y+(ssize_t) crop_info.height);
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearBottomRightCorner(x,y,crop_info) != MagickFalse)
-            {
-              state|=UpdateConfigurationState;
-              break;
-            }
-          magick_fallthrough;
+          XCropButtonPress(&event_input,&targets);
+          break;
         }
         case ButtonRelease:
         {
-          if (event.xbutton.window == windows->pan.id)
-            if ((highlight_info.x != crop_info.x-windows->image.x) ||
-                (highlight_info.y != crop_info.y-windows->image.y))
-              XHighlightRectangle(display,windows->image.id,
-                windows->image.highlight_context,&highlight_info);
-          (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
-            event.xbutton.time);
+          XCropButtonRelease(&event_input,crop_info);
           break;
         }
         case Expose:
         {
-          if (event.xexpose.window == windows->image.id)
-            if (event.xexpose.count == 0)
-              {
-                event.xexpose.x=(int) highlight_info.x;
-                event.xexpose.y=(int) highlight_info.y;
-                event.xexpose.width=(int) highlight_info.width;
-                event.xexpose.height=(int) highlight_info.height;
-                XRefreshWindow(display,&windows->image,&event);
-              }
-          if (event.xexpose.window == windows->info.id)
-            if (event.xexpose.count == 0)
-              XInfoWidget(display,windows,text);
+          XCropExpose(&event_input,&event);
           break;
         }
         case KeyPress:
         {
-          if (event.xkey.window != windows->image.id)
-            break;
-          /*
-            Respond to a user key press.
-          */
-          (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-            sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-          switch ((int) key_symbol)
-          {
-            case XK_Escape:
-            case XK_F20:
-            {
-              state|=EscapeState;
-              magick_fallthrough;
-            }
-            case XK_Return:
-            {
-              state|=ExitState;
-              break;
-            }
-            case XK_Home:
-            case XK_KP_Home:
-            {
-              crop_info.x=(ssize_t) (windows->image.width/2L-crop_info.width/
-                2L);
-              crop_info.y=(ssize_t) (windows->image.height/2L-crop_info.height/
-                2L);
-              break;
-            }
-            case XK_Left:
-            case XK_KP_Left:
-            {
-              crop_info.x--;
-              break;
-            }
-            case XK_Up:
-            case XK_KP_Up:
-            case XK_Next:
-            {
-              crop_info.y--;
-              break;
-            }
-            case XK_Right:
-            case XK_KP_Right:
-            {
-              crop_info.x++;
-              break;
-            }
-            case XK_Prior:
-            case XK_Down:
-            case XK_KP_Down:
-            {
-              crop_info.y++;
-              break;
-            }
-            case XK_F1:
-            case XK_Help:
-            {
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXcopy);
-              switch (mode)
-              {
-                case CopyMode:
-                {
-                  XTextViewHelp(display,resource_info,windows,MagickFalse,
-                    "Help Viewer - Image Copy",ImageCopyHelp);
-                  break;
-                }
-                case CropMode:
-                {
-                  XTextViewHelp(display,resource_info,windows,MagickFalse,
-                    "Help Viewer - Image Cropg",ImageCropHelp);
-                  break;
-                }
-                case CutMode:
-                {
-                  XTextViewHelp(display,resource_info,windows,MagickFalse,
-                    "Help Viewer - Image Cutg",ImageCutHelp);
-                  break;
-                }
-              }
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXinvert);
-              break;
-            }
-            default:
-            {
-              (void) XBell(display,0);
-              break;
-            }
-          }
-          (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
-            event.xkey.time);
+          XCropKeyPress(&event_input,&event,&targets);
           break;
         }
         case KeyRelease:
           break;
         case MotionNotify:
         {
-          if (event.xmotion.window != windows->image.id)
-            break;
-          /*
-            Map and unmap Info widget as text cursor crosses its boundaries.
-          */
-          x=event.xmotion.x;
-          y=event.xmotion.y;
-          if (windows->info.mapped != MagickFalse)
-            {
-              if ((x < (windows->info.x+(int) windows->info.width)) &&
-                  (y < (windows->info.y+(int) windows->info.height)))
-                (void) XWithdrawWindow(display,windows->info.id,
-                  windows->info.screen);
-            }
-          else
-            if ((x > (windows->info.x+(int) windows->info.width)) ||
-                (y > (windows->info.y+(int) windows->info.height)))
-              (void) XMapWindow(display,windows->info.id);
-          crop_info.x=(ssize_t) windows->image.x+event.xmotion.x;
-          crop_info.y=(ssize_t) windows->image.y+event.xmotion.y;
+          XCropMotion(&event_input,&targets);
           break;
         }
         case SelectionRequest:
         {
-          XSelectionEvent
-            notify;
-
-          XSelectionRequestEvent
-            *request;
-
-          /*
-            Set primary selection.
-          */
-          (void) FormatLocaleString(text,MagickPathExtent,
-            "%.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
-            crop_info.height,(double) crop_info.x,(double) crop_info.y);
-          request=(&(event.xselectionrequest));
-          (void) XChangeProperty(request->display,request->requestor,
-            request->property,request->target,8,PropModeReplace,
-            (unsigned char *) text,(int) strlen(text));
-          notify.type=SelectionNotify;
-          notify.display=request->display;
-          notify.requestor=request->requestor;
-          notify.selection=request->selection;
-          notify.target=request->target;
-          notify.time=request->time;
-          if (request->property == None)
-            notify.property=request->target;
-          else
-            notify.property=request->property;
-          (void) XSendEvent(request->display,request->requestor,False,0,
-            (XEvent *) &notify);
+          XCropSelectionRequest(&event,crop_info,text);
         }
         default:
           break;
@@ -9894,30 +10410,6 @@ static void XDiscardMagnifyKeys(Display *display,XWindows *windows,
     }
 }
 
-typedef struct _EditMenuInput
-{
-  Display
-    *display;
-
-  XWindows
-    *windows;
-
-  const char
-    *const *MatteEditMenu;
-
-  int
-    id;
-
-  char
-    *command;
-} EditMenuInput;
-
-typedef struct _PaintMethodTargets
-{
-  PaintMethod
-    *method;
-} PaintMethodTargets;
-
 static void XSelectPaintMethod(const EditMenuInput *menu,
   const PaintMethodTargets *targets)
 {
@@ -11652,12 +12144,657 @@ static DisplayCommand XSelectROIMenuEntry(const ROIMenuEntry *menu_entry,
   return(display_command);
 }
 
+#define ApplyMenus  7
+
+typedef struct _ROITargets
+{
+  int
+    *x,
+    *y;
+
+  RectangleInfo
+    *roi_info;
+
+  size_t
+    *state;
+} ROITargets;
+
+static void XROIButtonPress(const CropEventInput *event_input,
+  const RectangleInfo crop_info,const ROITargets *targets)
+{
+  XWindows
+    *const windows = event_input->windows;
+
+  const XEvent
+    *const event = event_input->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  size_t
+    *const state = targets->state;
+
+  (*x)=windows->image.x;
+  (*y)=windows->image.y;
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  (*x)=windows->image.x+(*event).xbutton.x;
+  (*y)=windows->image.y+(*event).xbutton.y;
+  if (IsNearTopLeftCorner((*x),(*y),(*roi_info)) != MagickFalse)
+    {
+      (*roi_info).x=(*roi_info).x+(int) (*roi_info).width;
+      (*roi_info).y=(*roi_info).y+(int) (*roi_info).height;
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearBottomLeftCorner((*x),(*y),(*roi_info)) != MagickFalse)
+    {
+      (*roi_info).x=(*roi_info).x+(int) (*roi_info).width;
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearTopRightCorner((*x),(*y),(*roi_info)) != MagickFalse)
+    {
+      (*roi_info).y=(*roi_info).y+(int) (*roi_info).height;
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearBottomRightCorner((*x),(*y),(*roi_info)) != MagickFalse)
+    {
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  XCropButtonRelease(event_input,crop_info);
+}
+
+typedef struct _ROIApplyInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const XEvent
+    *event;
+
+  const char
+    *const *ApplyMenu;
+} ROIApplyInput;
+
+static void XROIButtonRelease(const ROIApplyInput *apply_input,
+  const ROITargets *targets)
+{
+  Display
+    *const display = apply_input->display;
+
+  XWindows
+    *const windows = apply_input->windows;
+
+  const XEvent
+    *const event = apply_input->event;
+
+  const char
+    *const *const ApplyMenu = apply_input->ApplyMenu;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    User has committed to region of interest rectangle.
+  */
+  (*roi_info).x=(ssize_t) windows->image.x+(*event).xbutton.x;
+  (*roi_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
+  XSetCursorState(display,windows,MagickFalse);
+  (*state)|=ExitState;
+  if (LocaleCompare(windows->command.name,"Apply") == 0)
+    return;
+  (void) CloneString(&windows->command.name,"Apply");
+  windows->command.data=ApplyMenus;
+  (void) XCommandWidget(display,windows,ApplyMenu,(XEvent *) NULL);
+}
+
+typedef struct _ROIKeyInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const XEvent
+    *event;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+} ROIKeyInput;
+
+typedef struct _ROIKeyTargets
+{
+  RectangleInfo
+    *roi_info;
+
+  DisplayCommand
+    *display_command;
+
+  size_t
+    *state;
+} ROIKeyTargets;
+
+static void XROIDownHelpKey(const ROIKeyInput *key_input,
+  const ROIKeyTargets *targets,const KeySym key_symbol)
+{
+  Display
+    *const display = key_input->display;
+
+  XWindows
+    *const windows = key_input->windows;
+
+  XResourceInfo
+    *const resource_info = key_input->resource_info;
+
+  const XEvent
+    *const event = key_input->event;
+
+  Image
+    **const image = key_input->image;
+
+  ExceptionInfo
+    *const exception = key_input->exception;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  DisplayCommand
+    *const display_command = targets->display_command;
+
+  size_t
+    *const state = targets->state;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Prior:
+    case XK_Down:
+    case XK_KP_Down:
+    {
+      (*roi_info).y++;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Region of Interest",ImageROIHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    default:
+    {
+      (*display_command)=XImageWindowCommand(display,resource_info,windows,
+        (*event).xkey.state,key_symbol,image,exception);
+      if ((*display_command) != NullCommand)
+        (*state)|=UpdateRegionState;
+      break;
+    }
+  }
+}
+
+static void XROIUpRightKey(const ROIKeyInput *key_input,
+  const ROIKeyTargets *targets,const KeySym key_symbol)
+{
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Up:
+    case XK_KP_Up:
+    case XK_Next:
+    {
+      (*roi_info).y--;
+      break;
+    }
+    case XK_Right:
+    case XK_KP_Right:
+    {
+      (*roi_info).x++;
+      break;
+    }
+    default:
+    {
+      XROIDownHelpKey(key_input,targets,key_symbol);
+      break;
+    }
+  }
+}
+
+static void XROIHomeLeftKey(const ROIKeyInput *key_input,
+  const ROIKeyTargets *targets,const KeySym key_symbol)
+{
+  XWindows
+    *const windows = key_input->windows;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Home:
+    case XK_KP_Home:
+    {
+      (*roi_info).x=(ssize_t) (windows->image.width/2L-(*roi_info).width/2L);
+      (*roi_info).y=(ssize_t) (windows->image.height/2L-
+        (*roi_info).height/2L);
+      break;
+    }
+    case XK_Left:
+    case XK_KP_Left:
+    {
+      (*roi_info).x--;
+      break;
+    }
+    default:
+    {
+      XROIUpRightKey(key_input,targets,key_symbol);
+      break;
+    }
+  }
+}
+
+typedef struct _ROIRegionInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+
+  RectangleInfo
+    roi_info;
+
+  DisplayCommand
+    display_command;
+
+  const char
+    *text;
+} ROIRegionInput;
+
+static MagickBooleanType XROIApplyRegion(const ROIRegionInput *region_input,
+  RectangleInfo *crop_info)
+{
+  Display
+    *const display = region_input->display;
+
+  XResourceInfo
+    *const resource_info = region_input->resource_info;
+
+  XWindows
+    *const windows = region_input->windows;
+
+  Image
+    **const image = region_input->image;
+
+  ExceptionInfo
+    *const exception = region_input->exception;
+
+  const RectangleInfo
+    roi_info = region_input->roi_info;
+
+  const DisplayCommand
+    display_command = region_input->display_command;
+
+  double
+    scale_factor;
+
+  Image
+    *roi_image;
+
+  int
+    x,
+    y;
+
+  MagickProgressMonitor
+    progress_monitor;
+
+  unsigned int
+    height,
+    width;
+
+  /*
+    Region of interest is relative to image configuration.
+  */
+  progress_monitor=SetImageProgressMonitor(*image,
+    (MagickProgressMonitor) NULL,(*image)->client_data);
+  (*crop_info)=roi_info;
+  width=(unsigned int) (*image)->columns;
+  height=(unsigned int) (*image)->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
+      &width,&height);
+  scale_factor=(double) width/windows->image.ximage->width;
+  (*crop_info).x+=x;
+  (*crop_info).x=(ssize_t) (scale_factor*(*crop_info).x+0.5);
+  (*crop_info).width=(unsigned int) (scale_factor*(*crop_info).width+0.5);
+  scale_factor=(double)
+    height/windows->image.ximage->height;
+  (*crop_info).y+=y;
+  (*crop_info).y=(ssize_t) (scale_factor*(*crop_info).y+0.5);
+  (*crop_info).height=(unsigned int)
+    (scale_factor*(*crop_info).height+0.5);
+  roi_image=CropImage(*image,crop_info,exception);
+  (void) SetImageProgressMonitor(*image,progress_monitor,
+    (*image)->client_data);
+  if (roi_image == (Image *) NULL)
+    return(MagickTrue);
+  /*
+    Apply image processing technique to the region of interest.
+  */
+  windows->image.orphan=MagickTrue;
+  (void) XMagickCommand(display,resource_info,windows,
+    display_command,&roi_image,exception);
+  progress_monitor=SetImageProgressMonitor(*image,
+    (MagickProgressMonitor) NULL,(*image)->client_data);
+  (void) XMagickCommand(display,resource_info,windows,
+    SaveToUndoBufferCommand,image,exception);
+  windows->image.orphan=MagickFalse;
+  (void) CompositeImage(*image,roi_image,CopyCompositeOp,
+    MagickTrue,(*crop_info).x,(*crop_info).y,exception);
+  roi_image=DestroyImage(roi_image);
+  (void) SetImageProgressMonitor(*image,progress_monitor,
+    (*image)->client_data);
+  return(MagickFalse);
+}
+
+static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
+  size_t *state,RectangleInfo *crop_info)
+{
+  Display
+    *const display = region_input->display;
+
+  XResourceInfo
+    *const resource_info = region_input->resource_info;
+
+  XWindows
+    *const windows = region_input->windows;
+
+  Image
+    **const image = region_input->image;
+
+  ExceptionInfo
+    *const exception = region_input->exception;
+
+  const DisplayCommand
+    display_command = region_input->display_command;
+
+  const char
+    *const text = region_input->text;
+
+  if (((*state) & UpdateRegionState) != 0)
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+      switch (display_command)
+      {
+        case UndoCommand:
+        case RedoCommand:
+        {
+          (void) XMagickCommand(display,resource_info,windows,
+            display_command,image,exception);
+          break;
+        }
+        default:
+        {
+          if (XROIApplyRegion(region_input,crop_info) != MagickFalse)
+            return(MagickTrue);
+          break;
+        }
+      }
+      if (display_command != InfoCommand)
+        {
+          XConfigureImageColormap(display,resource_info,windows,*image,
+            exception);
+          (void) XConfigureImage(display,resource_info,windows,*image,
+            exception);
+        }
+      XCheckRefreshWindows(display,windows);
+      XInfoWidget(display,windows,text);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      (*state)&=(unsigned int) (~UpdateRegionState);
+    }
+  return(MagickFalse);
+}
+
+static void XROIMotion(const CropEventInput *event_input,
+  const ROITargets *targets)
+{
+  Display
+    *const display = event_input->display;
+
+  XWindows
+    *const windows = event_input->windows;
+
+  const XEvent
+    *const event = event_input->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  /*
+    Map and unmap Info widget as text cursor crosses its boundaries.
+  */
+  (*x)=(*event).xmotion.x;
+  (*y)=(*event).xmotion.y;
+  XTrackInfoWidget(display,windows,(*x),(*y));
+  (*roi_info).x=(ssize_t) windows->image.x+(*event).xmotion.x;
+  (*roi_info).y=(ssize_t) windows->image.y+(*event).xmotion.y;
+}
+
+static void XROIKeyPress(const ROIKeyInput *key_input,XEvent *event,
+  const ROIKeyTargets *targets)
+{
+  Display
+    *const display = key_input->display;
+
+  XWindows
+    *const windows = key_input->windows;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  if ((*event).xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Shift_L:
+    case XK_Shift_R:
+      break;
+    case XK_Escape:
+    case XK_F20:
+    {
+      (*state)|=EscapeState;
+      magick_fallthrough;
+    }
+    case XK_Return:
+    {
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+    {
+      XROIHomeLeftKey(key_input,targets,key_symbol);
+      break;
+    }
+  }
+  (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
+    (*event).xkey.time);
+}
+
+typedef struct _ROICommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  RectangleInfo
+    highlight_info;
+
+  const char
+    *const *ApplyMenu;
+
+  const DisplayCommand
+    *ApplyCommands;
+
+  const char
+    *const **Menus;
+
+  const DisplayCommand
+    **Commands;
+} ROICommandInput;
+
+static void XROICommand(const ROICommandInput *command_input,XEvent *event,
+  DisplayCommand *display_command,size_t *state)
+{
+  Display
+    *const display = command_input->display;
+
+  XResourceInfo
+    *const resource_info = command_input->resource_info;
+
+  XWindows
+    *const windows = command_input->windows;
+
+  const RectangleInfo
+    highlight_info = command_input->highlight_info;
+
+  const char
+    *const *const ApplyMenu = command_input->ApplyMenu;
+
+  const DisplayCommand
+    *const ApplyCommands = command_input->ApplyCommands;
+
+  const char
+    *const **const Menus = command_input->Menus;
+
+  const DisplayCommand
+    **const Commands = command_input->Commands;
+
+  char
+    command[MagickPathExtent];
+
+  int
+    entry,
+    id;
+
+  /*
+    Select a command from the Command widget.
+  */
+  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+  (*display_command)=NullCommand;
+  id=XCommandWidget(display,windows,ApplyMenu,event);
+  if (id >= 0)
+    {
+      (void) CopyMagickString(command,ApplyMenu[id],MagickPathExtent);
+      (*display_command)=ApplyCommands[id];
+      if (id < ApplyMenus)
+        {
+          ROIMenuEntry
+            menu_entry;
+
+          /*
+            Select a command from a pop-up menu.
+          */
+          entry=XMenuWidget(display,windows,ApplyMenu[id],
+            (const char **) Menus[id],command);
+          menu_entry.Menus=Menus;
+          menu_entry.Commands=Commands;
+          menu_entry.id=id;
+          menu_entry.entry=entry;
+          (*display_command)=XSelectROIMenuEntry(&menu_entry,command,
+            (*display_command));
+        }
+    }
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  if ((*display_command) == HelpCommand)
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Region of Interest",ImageROIHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      return;
+    }
+  if ((*display_command) == QuitCommand)
+    {
+      /*
+        exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      return;
+    }
+  if ((*display_command) != NullCommand)
+    (*state)|=UpdateRegionState;
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
-#define ApplyMenus  7
-
   const char
     *const ROIMenu[] =
     {
@@ -11875,35 +13012,27 @@ static MagickBooleanType XROIImage(Display *display,
   Cursor
     cursor;
 
-  Image
-    *roi_image;
-
   int
-    entry,
     id,
     x,
     y;
-
-  double
-    scale_factor;
-
-  MagickProgressMonitor
-    progress_monitor;
 
   RectangleInfo
     crop_info,
     highlight_info,
     roi_info;
 
-  unsigned int
-    height,
-    width;
-
   size_t
     state;
 
   XEvent
     event;
+
+  const ROITargets
+    targets = { &x, &y, &roi_info, &state };
+
+  const ROIKeyTargets
+    key_targets = { &roi_info, &display_command, &state };
 
   /*
     Map Command widget.
@@ -12038,17 +13167,7 @@ static MagickBooleanType XROIImage(Display *display,
         */
         x=event.xmotion.x;
         y=event.xmotion.y;
-        if (windows->info.mapped != MagickFalse)
-          {
-            if ((x < (windows->info.x+(int) windows->info.width)) &&
-                (y < (windows->info.y+(int) windows->info.height)))
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
-          }
-        else
-          if ((x > (windows->info.x+(int) windows->info.width)) ||
-              (y > (windows->info.y+(int) windows->info.height)))
-            (void) XMapWindow(display,windows->info.id);
+        XTrackInfoWidget(display,windows,x,y);
         roi_info.x=(ssize_t) windows->image.x+x;
         roi_info.y=(ssize_t) windows->image.y+y;
         break;
@@ -12089,8 +13208,7 @@ static MagickBooleanType XROIImage(Display *display,
           /*
             Display info and draw region of interest rectangle.
           */
-          if (windows->info.mapped == MagickFalse)
-            (void) XMapWindow(display,windows->info.id);
+          XMapInfoWidget(display,windows);
           (void) FormatLocaleString(text,MagickPathExtent,
             " %.17gx%.17g%+.20g%+.20g",(double) roi_info.width,(double)
             roi_info.height,(double) roi_info.x,(double) roi_info.y);
@@ -12118,18 +13236,14 @@ static MagickBooleanType XROIImage(Display *display,
         }
         case ButtonRelease:
         {
-          /*
-            User has committed to region of interest rectangle.
-          */
-          roi_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-          roi_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-          XSetCursorState(display,windows,MagickFalse);
-          state|=ExitState;
-          if (LocaleCompare(windows->command.name,"Apply") == 0)
-            break;
-          (void) CloneString(&windows->command.name,"Apply");
-          windows->command.data=ApplyMenus;
-          (void) XCommandWidget(display,windows,ApplyMenu,(XEvent *) NULL);
+          ROIApplyInput
+            apply_input;
+
+          apply_input.display=display;
+          apply_input.windows=windows;
+          apply_input.event=(&event);
+          apply_input.ApplyMenu=ApplyMenu;
+          XROIButtonRelease(&apply_input,&targets);
           break;
         }
         case Expose:
@@ -12143,35 +13257,7 @@ static MagickBooleanType XROIImage(Display *display,
           break;
       }
       if (IsSelectionMovedOrDone(roi_info,x,y,state) != MagickFalse)
-        {
-          /*
-            Check boundary conditions.
-          */
-          if (roi_info.x < 0)
-            roi_info.x=0;
-          else
-            if (roi_info.x > (ssize_t) windows->image.ximage->width)
-              roi_info.x=(ssize_t) windows->image.ximage->width;
-          if ((int) roi_info.x < x)
-            roi_info.width=(unsigned int) (x-roi_info.x);
-          else
-            {
-              roi_info.width=(unsigned int) (roi_info.x-x);
-              roi_info.x=(ssize_t) x;
-            }
-          if (roi_info.y < 0)
-            roi_info.y=0;
-          else
-            if (roi_info.y > (ssize_t) windows->image.ximage->height)
-              roi_info.y=(ssize_t) windows->image.ximage->height;
-          if ((int) roi_info.y < y)
-            roi_info.height=(unsigned int) (y-roi_info.y);
-          else
-            {
-              roi_info.height=(unsigned int) (roi_info.y-y);
-              roi_info.y=(ssize_t) y;
-            }
-        }
+        XCheckSelectionBounds(windows,x,y,&roi_info);
     } while ((state & ExitState) == 0);
     /*
       Wait for user to grab a corner of the rectangle or press return.
@@ -12183,6 +13269,15 @@ static MagickBooleanType XROIImage(Display *display,
     (void) XMapWindow(display,windows->info.id);
     do
     {
+      CropEventInput
+        event_input;
+
+      ROIRegionInput
+        region_input;
+
+      ROIKeyInput
+        key_input;
+
       if (windows->info.mapped != MagickFalse)
         {
           /*
@@ -12202,349 +13297,80 @@ static MagickBooleanType XROIImage(Display *display,
           state|=ExitState;
           break;
         }
-      if ((state & UpdateRegionState) != 0)
-        {
-          (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-          switch (display_command)
-          {
-            case UndoCommand:
-            case RedoCommand:
-            {
-              (void) XMagickCommand(display,resource_info,windows,
-                display_command,image,exception);
-              break;
-            }
-            default:
-            {
-              /*
-                Region of interest is relative to image configuration.
-              */
-              progress_monitor=SetImageProgressMonitor(*image,
-                (MagickProgressMonitor) NULL,(*image)->client_data);
-              crop_info=roi_info;
-              width=(unsigned int) (*image)->columns;
-              height=(unsigned int) (*image)->rows;
-              x=0;
-              y=0;
-              if (windows->image.crop_geometry != (char *) NULL)
-                (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
-                  &width,&height);
-              scale_factor=(double) width/windows->image.ximage->width;
-              crop_info.x+=x;
-              crop_info.x=(ssize_t) (scale_factor*crop_info.x+0.5);
-              crop_info.width=(unsigned int) (scale_factor*crop_info.width+0.5);
-              scale_factor=(double)
-                height/windows->image.ximage->height;
-              crop_info.y+=y;
-              crop_info.y=(ssize_t) (scale_factor*crop_info.y+0.5);
-              crop_info.height=(unsigned int)
-                (scale_factor*crop_info.height+0.5);
-              roi_image=CropImage(*image,&crop_info,exception);
-              (void) SetImageProgressMonitor(*image,progress_monitor,
-                (*image)->client_data);
-              if (roi_image == (Image *) NULL)
-                continue;
-              /*
-                Apply image processing technique to the region of interest.
-              */
-              windows->image.orphan=MagickTrue;
-              (void) XMagickCommand(display,resource_info,windows,
-                display_command,&roi_image,exception);
-              progress_monitor=SetImageProgressMonitor(*image,
-                (MagickProgressMonitor) NULL,(*image)->client_data);
-              (void) XMagickCommand(display,resource_info,windows,
-                SaveToUndoBufferCommand,image,exception);
-              windows->image.orphan=MagickFalse;
-              (void) CompositeImage(*image,roi_image,CopyCompositeOp,
-                MagickTrue,crop_info.x,crop_info.y,exception);
-              roi_image=DestroyImage(roi_image);
-              (void) SetImageProgressMonitor(*image,progress_monitor,
-                (*image)->client_data);
-              break;
-            }
-          }
-          if (display_command != InfoCommand)
-            {
-              XConfigureImageColormap(display,resource_info,windows,*image,
-                exception);
-              (void) XConfigureImage(display,resource_info,windows,*image,
-                exception);
-            }
-          XCheckRefreshWindows(display,windows);
-          XInfoWidget(display,windows,text);
-          (void) XSetFunction(display,windows->image.highlight_context,
-            GXinvert);
-          state&=(unsigned int) (~UpdateRegionState);
-        }
+      region_input.display=display;
+      region_input.resource_info=resource_info;
+      region_input.windows=windows;
+      region_input.image=image;
+      region_input.exception=exception;
+      region_input.roi_info=roi_info;
+      region_input.display_command=display_command;
+      region_input.text=text;
+      if (XROIUpdateRegion(&region_input,&state,&crop_info) != MagickFalse)
+        continue;
       XHighlightRectangle(display,windows->image.id,
         windows->image.highlight_context,&highlight_info);
       XScreenEvent(display,windows,&event,exception);
       if (event.xany.window == windows->command.id)
         {
-          /*
-            Select a command from the Command widget.
-          */
-          (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-          display_command=NullCommand;
-          id=XCommandWidget(display,windows,ApplyMenu,&event);
-          if (id >= 0)
-            {
-              (void) CopyMagickString(command,ApplyMenu[id],MagickPathExtent);
-              display_command=ApplyCommands[id];
-              if (id < ApplyMenus)
-                {
-                  ROIMenuEntry
-                    menu_entry;
+          ROICommandInput
+            command_input;
 
-                  /*
-                    Select a command from a pop-up menu.
-                  */
-                  entry=XMenuWidget(display,windows,ApplyMenu[id],
-                    (const char **) Menus[id],command);
-                  menu_entry.Menus=Menus;
-                  menu_entry.Commands=Commands;
-                  menu_entry.id=id;
-                  menu_entry.entry=entry;
-                  display_command=XSelectROIMenuEntry(&menu_entry,command,
-                    display_command);
-                }
-            }
-          (void) XSetFunction(display,windows->image.highlight_context,
-            GXinvert);
-          XHighlightRectangle(display,windows->image.id,
-            windows->image.highlight_context,&highlight_info);
-          if (display_command == HelpCommand)
-            {
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXcopy);
-              XTextViewHelp(display,resource_info,windows,MagickFalse,
-                "Help Viewer - Region of Interest",ImageROIHelp);
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXinvert);
-              continue;
-            }
-          if (display_command == QuitCommand)
-            {
-              /*
-                exit.
-              */
-              state|=EscapeState;
-              state|=ExitState;
-              continue;
-            }
-          if (display_command != NullCommand)
-            state|=UpdateRegionState;
+          command_input.display=display;
+          command_input.resource_info=resource_info;
+          command_input.windows=windows;
+          command_input.highlight_info=highlight_info;
+          command_input.ApplyMenu=ApplyMenu;
+          command_input.ApplyCommands=ApplyCommands;
+          command_input.Menus=Menus;
+          command_input.Commands=Commands;
+          XROICommand(&command_input,&event,&display_command,&state);
           continue;
         }
       XHighlightRectangle(display,windows->image.id,
         windows->image.highlight_context,&highlight_info);
+      event_input.display=display;
+      event_input.windows=windows;
+      event_input.event=(&event);
+      event_input.highlight_info=highlight_info;
+      event_input.text=text;
+      key_input.display=display;
+      key_input.resource_info=resource_info;
+      key_input.windows=windows;
+      key_input.event=(&event);
+      key_input.image=image;
+      key_input.exception=exception;
       switch (event.type)
       {
         case ButtonPress:
         {
-          x=windows->image.x;
-          y=windows->image.y;
-          if (event.xbutton.button != Button1)
-            break;
-          if (event.xbutton.window != windows->image.id)
-            break;
-          x=windows->image.x+event.xbutton.x;
-          y=windows->image.y+event.xbutton.y;
-          if (IsNearTopLeftCorner(x,y,roi_info) != MagickFalse)
-            {
-              roi_info.x=roi_info.x+(int) roi_info.width;
-              roi_info.y=roi_info.y+(int) roi_info.height;
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearBottomLeftCorner(x,y,roi_info) != MagickFalse)
-            {
-              roi_info.x=roi_info.x+(int) roi_info.width;
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearTopRightCorner(x,y,roi_info) != MagickFalse)
-            {
-              roi_info.y=roi_info.y+(int) roi_info.height;
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearBottomRightCorner(x,y,roi_info) != MagickFalse)
-            {
-              state|=UpdateConfigurationState;
-              break;
-            }
-          magick_fallthrough;
+          XROIButtonPress(&event_input,crop_info,&targets);
+          break;
         }
         case ButtonRelease:
         {
-          if (event.xbutton.window == windows->pan.id)
-            if ((highlight_info.x != crop_info.x-windows->image.x) ||
-                (highlight_info.y != crop_info.y-windows->image.y))
-              XHighlightRectangle(display,windows->image.id,
-                windows->image.highlight_context,&highlight_info);
-          (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
-            event.xbutton.time);
+          XCropButtonRelease(&event_input,crop_info);
           break;
         }
         case Expose:
         {
-          if (event.xexpose.window == windows->image.id)
-            if (event.xexpose.count == 0)
-              {
-                event.xexpose.x=(int) highlight_info.x;
-                event.xexpose.y=(int) highlight_info.y;
-                event.xexpose.width=(int) highlight_info.width;
-                event.xexpose.height=(int) highlight_info.height;
-                XRefreshWindow(display,&windows->image,&event);
-              }
-          if (event.xexpose.window == windows->info.id)
-            if (event.xexpose.count == 0)
-              XInfoWidget(display,windows,text);
+          XCropExpose(&event_input,&event);
           break;
         }
         case KeyPress:
         {
-          KeySym
-            key_symbol;
-
-          if (event.xkey.window != windows->image.id)
-            break;
-          /*
-            Respond to a user key press.
-          */
-          (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-            sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-          switch ((int) key_symbol)
-          {
-            case XK_Shift_L:
-            case XK_Shift_R:
-              break;
-            case XK_Escape:
-            case XK_F20:
-            {
-              state|=EscapeState;
-              magick_fallthrough;
-            }
-            case XK_Return:
-            {
-              state|=ExitState;
-              break;
-            }
-            case XK_Home:
-            case XK_KP_Home:
-            {
-              roi_info.x=(ssize_t) (windows->image.width/2L-roi_info.width/2L);
-              roi_info.y=(ssize_t) (windows->image.height/2L-
-                roi_info.height/2L);
-              break;
-            }
-            case XK_Left:
-            case XK_KP_Left:
-            {
-              roi_info.x--;
-              break;
-            }
-            case XK_Up:
-            case XK_KP_Up:
-            case XK_Next:
-            {
-              roi_info.y--;
-              break;
-            }
-            case XK_Right:
-            case XK_KP_Right:
-            {
-              roi_info.x++;
-              break;
-            }
-            case XK_Prior:
-            case XK_Down:
-            case XK_KP_Down:
-            {
-              roi_info.y++;
-              break;
-            }
-            case XK_F1:
-            case XK_Help:
-            {
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXcopy);
-              XTextViewHelp(display,resource_info,windows,MagickFalse,
-                "Help Viewer - Region of Interest",ImageROIHelp);
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXinvert);
-              break;
-            }
-            default:
-            {
-              display_command=XImageWindowCommand(display,resource_info,windows,
-                event.xkey.state,key_symbol,image,exception);
-              if (display_command != NullCommand)
-                state|=UpdateRegionState;
-              break;
-            }
-          }
-          (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
-            event.xkey.time);
+          XROIKeyPress(&key_input,&event,&key_targets);
           break;
         }
         case KeyRelease:
           break;
         case MotionNotify:
         {
-          if (event.xbutton.window != windows->image.id)
-            break;
-          /*
-            Map and unmap Info widget as text cursor crosses its boundaries.
-          */
-          x=event.xmotion.x;
-          y=event.xmotion.y;
-          if (windows->info.mapped != MagickFalse)
-            {
-              if ((x < (windows->info.x+(int) windows->info.width)) &&
-                  (y < (windows->info.y+(int) windows->info.height)))
-                (void) XWithdrawWindow(display,windows->info.id,
-                  windows->info.screen);
-            }
-          else
-            if ((x > (windows->info.x+(int) windows->info.width)) ||
-                (y > (windows->info.y+(int) windows->info.height)))
-              (void) XMapWindow(display,windows->info.id);
-          roi_info.x=(ssize_t) windows->image.x+event.xmotion.x;
-          roi_info.y=(ssize_t) windows->image.y+event.xmotion.y;
+          XROIMotion(&event_input,&targets);
           break;
         }
         case SelectionRequest:
         {
-          XSelectionEvent
-            notify;
-
-          XSelectionRequestEvent
-            *request;
-
-          /*
-            Set primary selection.
-          */
-          (void) FormatLocaleString(text,MagickPathExtent,
-            "%.17gx%.17g%+.20g%+.20g",(double) roi_info.width,(double)
-            roi_info.height,(double) roi_info.x,(double) roi_info.y);
-          request=(&(event.xselectionrequest));
-          (void) XChangeProperty(request->display,request->requestor,
-            request->property,request->target,8,PropModeReplace,
-            (unsigned char *) text,(int) strlen(text));
-          notify.type=SelectionNotify;
-          notify.display=request->display;
-          notify.requestor=request->requestor;
-          notify.selection=request->selection;
-          notify.target=request->target;
-          notify.time=request->time;
-          if (request->property == None)
-            notify.property=request->target;
-          else
-            notify.property=request->property;
-          (void) XSendEvent(request->display,request->requestor,False,0,
-            (XEvent *) &notify);
+          XCropSelectionRequest(&event,roi_info,text);
         }
         default:
           break;
