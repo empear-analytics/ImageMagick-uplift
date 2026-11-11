@@ -10243,6 +10243,76 @@ static MagickBooleanType XMatteEditPixels(
   return(MagickTrue);
 }
 
+typedef struct _BorderColorTargets
+{
+  XColor
+    *border_color;
+} BorderColorTargets;
+
+static void XSelectBorderColor(const EditMenuInput *menu,
+  XResourceInfo *resource_info,const BorderColorTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const MatteEditMenu = menu->MatteEditMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  XColor
+    *const border_color = targets->border_color;
+
+  const char
+    *ColorMenu[MaxNumberPens];
+
+  int
+    pen_number;
+
+  int
+    i;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="Browser...";
+  ColorMenu[MaxNumberPens-1]=(const char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,MatteEditMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  if (pen_number == (MaxNumberPens-2))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set border color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],border_color);
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -10296,9 +10366,6 @@ static MagickBooleanType XMatteEditImage(Display *display,
     y,
     y_offset;
 
-  int
-    i;
-
   unsigned int
     height,
     width;
@@ -10311,6 +10378,9 @@ static MagickBooleanType XMatteEditImage(Display *display,
 
   const PaintMethodTargets
     method_targets = { &method };
+
+  const BorderColorTargets
+    border_targets = { &border_color };
 
   /*
     Map Command widget.
@@ -10377,44 +10447,12 @@ static MagickBooleanType XMatteEditImage(Display *display,
           }
           case MatteEditBorderCommand:
           {
-            const char
-              *ColorMenu[MaxNumberPens];
-
-            int
-              pen_number;
-
-            /*
-              Initialize menu selections.
-            */
-            for (i=0; i < (int) (MaxNumberPens-2); i++)
-              ColorMenu[i]=resource_info->pen_colors[i];
-            ColorMenu[MaxNumberPens-2]="Browser...";
-            ColorMenu[MaxNumberPens-1]=(const char *) NULL;
-            /*
-              Select a pen color from the pop-up menu.
-            */
-            pen_number=XMenuWidget(display,windows,MatteEditMenu[id],
-              (const char **) ColorMenu,command);
-            if (pen_number < 0)
-              break;
-            if (pen_number == (MaxNumberPens-2))
-              {
-                static char
-                  color_name[MagickPathExtent] = "gray";
-
-                /*
-                  Select a pen color from a dialog.
-                */
-                resource_info->pen_colors[pen_number]=color_name;
-                XColorBrowserWidget(display,windows,"Select",color_name);
-                if (*color_name == '\0')
-                  break;
-              }
-            /*
-              Set border color.
-            */
-            (void) XParseColor(display,windows->map_info->colormap,
-              resource_info->pen_colors[pen_number],&border_color);
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=MatteEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectBorderColor(&menu_input,resource_info,&border_targets);
             break;
           }
           case MatteEditFuzzCommand:
