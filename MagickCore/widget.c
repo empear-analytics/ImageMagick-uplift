@@ -9510,6 +9510,30 @@ static void ReleaseMenuSelection(const MenuEventContext *context,
   (*state)|=ExitState;
 }
 
+static void ConfigureMenuWindow(const MenuEventContext *context,
+  const XEvent event,const MenuTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Update widget configuration.
+  */
+  if (event.xconfigure.window != windows->widget.id)
+    return;
+  if ((event.xconfigure.width == (int) windows->widget.width) &&
+      (event.xconfigure.height == (int) windows->widget.height))
+    return;
+  windows->widget.width=(unsigned int)
+    MagickMax(event.xconfigure.width,(int) windows->widget.min_width);
+  windows->widget.height=(unsigned int)
+    MagickMax(event.xconfigure.height,(int) windows->widget.min_height);
+  (*state)|=UpdateConfigurationState;
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9717,19 +9741,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       }
       case ConfigureNotify:
       {
-        /*
-          Update widget configuration.
-        */
-        if (event.xconfigure.window != windows->widget.id)
-          break;
-        if ((event.xconfigure.width == (int) windows->widget.width) &&
-            (event.xconfigure.height == (int) windows->widget.height))
-          break;
-        windows->widget.width=(unsigned int)
-          MagickMax(event.xconfigure.width,(int) windows->widget.min_width);
-        windows->widget.height=(unsigned int)
-          MagickMax(event.xconfigure.height,(int) windows->widget.min_height);
-        state|=UpdateConfigurationState;
+        ConfigureMenuWindow(&event_context,event,&targets);
         break;
       }
       case EnterNotify:
