@@ -2024,6 +2024,25 @@ static MagickBooleanType UpdateColorBrowserList(
   return(MagickTrue);
 }
 
+static size_t ConfigureWidgetWindow(XWindows *windows,const XEvent event,
+  size_t state)
+{
+  /*
+    Update widget configuration.
+  */
+  if (event.xconfigure.window != windows->widget.id)
+    return(state);
+  if ((event.xconfigure.width == (int) windows->widget.width) &&
+      (event.xconfigure.height == (int) windows->widget.height))
+    return(state);
+  windows->widget.width=(unsigned int)
+    MagickMax(event.xconfigure.width,(int) windows->widget.min_width);
+  windows->widget.height=(unsigned int)
+    MagickMax(event.xconfigure.height,(int) windows->widget.min_height);
+  state|=UpdateConfigurationState;
+  return(state);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2770,19 +2789,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case ConfigureNotify:
       {
-        /*
-          Update widget configuration.
-        */
-        if (event.xconfigure.window != windows->widget.id)
-          break;
-        if ((event.xconfigure.width == (int) windows->widget.width) &&
-            (event.xconfigure.height == (int) windows->widget.height))
-          break;
-        windows->widget.width=(unsigned int)
-          MagickMax(event.xconfigure.width,(int) windows->widget.min_width);
-        windows->widget.height=(unsigned int)
-          MagickMax(event.xconfigure.height,(int) windows->widget.min_height);
-        state|=UpdateConfigurationState;
+        state=ConfigureWidgetWindow(windows,event,state);
         break;
       }
       case EnterNotify:
