@@ -10752,13 +10752,19 @@ how an existing fill is rewritten. Recipe H, which moves preprocessor lines.
 3. `name` appears nowhere in the function but in its declaration, the run, and once as
    `&name` in that call, passed to a parameter of type pointer-to-`const` (FI step 3).
    The call is one expression statement ending in `;` (`F(...,&name,...);` or
-   `v=F(...,&name,...);`), the run and the call stand in the same compound statement,
-   and neither is the unbraced body of an `if`, `else` or loop, nor carries a label.
+   `v=F(...,&name,...);`), or the whole controlling expression of an `if` statement
+   with no `else`, compared with a constant (`if (F(...,&name,...) == MagickFalse)
+   S`), whose body `S` does not name `name` (2026-11-11); the run and the call stand in
+   the same compound statement, and neither is the unbraced body of an `if`, `else` or
+   loop, nor carries a label.
 4. Delete the declaration of `name` (with the blank line after it; a type line left with
    no name under it goes too). Replace the run and the call by a compound statement at
    the run's indentation: `{`, then `const Name name = { e1, e2, ... };` as FI step 4
    writes it (the values in declaration order, wrapped at 79 columns), a blank line, the
-   call unchanged but indented two more columns, and `}`.
+   call unchanged but indented two more columns, and `}`. A call that is an `if`'s
+   condition (step 3) takes the whole `if` statement, its body included, with it.
+   The body may leave through `return`, `break` or `continue`: leaving the compound
+   statement ends the struct's lifetime, which nothing reads after the call.
 5. Inside a `#pragma omp parallel` body the compound statement stays where the run stood,
    in the body: each thread initialises its own (FI step 5). No `#pragma` or
    preprocessor line lies inside the run or the call, and none moves.
@@ -11208,3 +11214,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | SD | Step 1: a `switch` with no `default:` label may be split too: its last groups move to the new function's `switch`, which has no `default:` either, and the caller gains `default:` holding the call as its last group; a value no label names runs no group in either, and the caller keeps another label | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its key slider `switch` (Home, Up, Down, Prior, Next, End; no `default:`) holds the function at nesting depth 4; moved whole by Recipe E it is a *Complex Method* of its own (cc 13, measured), and SD refused it for want of a `default:`; split first, the Prior/Next/End groups and then the rest move with no finding, as `XListBrowserWidget`'s did | owner |
 | 2026-11-11 | AMEND | N | Step 2: an array the block names only as an argument of calls (contents written, if at all, only through calls that keep no copy: Recipe E step 4's array clause) may be one of the group, as a member of the pointer type it converts to (`char *`, or `const char *` when only read), filled `name.a=a;`; Recipes Y, Z, LB and CT, which take N's input struct, read it the same way | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Back and Reset releases and its list update copy between the `static` `glob_pattern` and the local `back_pattern`, `reset_pattern` and `reply` arrays; with each array a parameter the helpers take five to seven, and N's step 3 (the variable's exact type) refused an array member | owner |
 | 2026-11-11 | AMEND | W | Step 8: in a `void` caller the block's exits are `return;`; the helper returns `MagickFalse` there and the caller writes `if (Helper(...) == MagickFalse) return;`; a local written only on the returning paths goes by value (step 3 unchanged) | `opencl.c`'s `LoadOpenCLDevices` (campaign A, W17 lane c, wide build): the `clEnv->contexts` allocation releases `devices` and `platforms` and leaves through `return;` on failure; W step 1 asked for `return(R);`, which a `void` function cannot write. Probe: the function leaves *Large Method*, 5.43 to 5.47 | owner |
+| 2026-11-11 | AMEND | FB | Steps 3 and 4: the one call may be the whole condition of an `if` with no `else`, compared with a constant, whose body does not name the struct (`if (F(...,&name,...) == MagickFalse) return(...);`); the whole `if` statement moves into the compound statement, its body leaving through `return`, `break` or `continue` as before. Still seven steps | `layer.c`'s `OptimizeLayerFrames` (campaign A, W17 lane d): its `choice` fill (four members) stands directly before `if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse) return(...)`, which step 3 refused as not an expression statement. The step frees the two lines that Recipe B's `entry` declaration for `IsBetterFrameBounds` adds, so the function's *Large Method* count does not grow; object code IDENTICAL | owner |
