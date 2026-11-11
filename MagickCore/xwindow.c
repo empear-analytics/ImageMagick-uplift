@@ -8983,6 +8983,25 @@ static void XCountRowDiversity(const Image *image,
   }
 }
 
+static void XCountColorDiversity(const Image *image,CacheView *image_view,
+  DiversityPacket *diversity,ExceptionInfo *exception)
+{
+  int
+    y;
+
+  for (y=0; y < (int) image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    p=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
+      image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    XCountRowDiversity(image,p,diversity);
+  }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9193,9 +9212,6 @@ MagickPrivate void XMakeStandardColormap(Display *display,
             *diversity;
 
           int
-            y;
-
-          int
             x;
 
           unsigned short
@@ -9221,17 +9237,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
             diversity[i].count=0;
           }
           image_view=AcquireAuthenticCacheView(image,exception);
-          for (y=0; y < (int) image->rows; y++)
-          {
-            const Quantum
-              *magick_restrict p;
-
-            p=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
-              image->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            XCountRowDiversity(image,p,diversity);
-          }
+          XCountColorDiversity(image,image_view,diversity,exception);
           image_view=DestroyCacheView(image_view);
           /*
             Sort colors by decreasing intensity.
