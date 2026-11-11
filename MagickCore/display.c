@@ -2175,6 +2175,27 @@ static void XSelectAnnotateRotation(const AnnotateMenuInput *menu,
   (*degrees)=StringToDouble(angle,(char **) NULL);
 }
 
+static void XRedrawTextLines(Display *display,XWindows *windows,
+  XAnnotateInfo *annotate_info,GC annotate_context)
+{
+  XAnnotateInfo
+    *text_info;
+
+  text_info=annotate_info;
+  while (text_info != (XAnnotateInfo *) NULL)
+  {
+    if (annotate_info->stencil == ForegroundStencil)
+      (void) XDrawString(display,windows->image.id,annotate_context,
+        text_info->x,text_info->y,text_info->text,
+        (int) strlen(text_info->text));
+    else
+      (void) XDrawImageString(display,windows->image.id,
+        annotate_context,text_info->x,text_info->y,text_info->text,
+        (int) strlen(text_info->text));
+    text_info=text_info->previous;
+  }
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -2628,26 +2649,11 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       {
         if (event.xexpose.count == 0)
           {
-            XAnnotateInfo
-              *text_info;
-
             /*
               Refresh Image window.
             */
             XRefreshWindow(display,&windows->image,(XEvent *) NULL);
-            text_info=annotate_info;
-            while (text_info != (XAnnotateInfo *) NULL)
-            {
-              if (annotate_info->stencil == ForegroundStencil)
-                (void) XDrawString(display,windows->image.id,annotate_context,
-                  text_info->x,text_info->y,text_info->text,
-                  (int) strlen(text_info->text));
-              else
-                (void) XDrawImageString(display,windows->image.id,
-                  annotate_context,text_info->x,text_info->y,text_info->text,
-                  (int) strlen(text_info->text));
-              text_info=text_info->previous;
-            }
+            XRedrawTextLines(display,windows,annotate_info,annotate_context);
             (void) XDrawString(display,windows->image.id,annotate_context,
               x,y,"_",1);
           }
