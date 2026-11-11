@@ -3919,6 +3919,42 @@ static CompositeOperator
   XSelectPasteOperator(const ComposeMenuInfo *,const char *const *,
     CompositeOperator);
 
+typedef struct _CompositeTargets
+{
+  double
+    *blend;
+
+  CompositeOperator
+    *compose;
+} CompositeTargets;
+
+static void XSelectDissolveBlend(Display *display,XWindows *windows,
+  const CompositeTargets *targets)
+{
+  double
+    *const blend = targets->blend;
+
+  CompositeOperator
+    *const compose = targets->compose;
+
+  static char
+    factor[MagickPathExtent] = "20.0";
+
+  /*
+    Dissolve the two images a given percent.
+  */
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXcopy);
+  (void) XDialogWidget(display,windows,"Dissolve",
+    "Enter the blend factor (0.0 - 99.9%):",factor);
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+  if (*factor == '\0')
+    return;
+  (*blend)=StringToDouble(factor,(char **) NULL);
+  (*compose)=DissolveCompositeOp;
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3982,6 +4018,9 @@ static MagickBooleanType XCompositeImage(Display *display,
 
   XEvent
     event;
+
+  const CompositeTargets
+    targets = { &blend, &compose };
 
   /*
     Request image file name from user.
@@ -4069,22 +4108,7 @@ static MagickBooleanType XCompositeImage(Display *display,
           }
           case CompositeDissolveCommand:
           {
-            static char
-              factor[MagickPathExtent] = "20.0";
-
-            /*
-              Dissolve the two images a given percent.
-            */
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            (void) XDialogWidget(display,windows,"Dissolve",
-              "Enter the blend factor (0.0 - 99.9%):",factor);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            if (*factor == '\0')
-              break;
-            blend=StringToDouble(factor,(char **) NULL);
-            compose=DissolveCompositeOp;
+            XSelectDissolveBlend(display,windows,&targets);
             break;
           }
           case CompositeDisplaceCommand:
