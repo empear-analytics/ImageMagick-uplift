@@ -4909,6 +4909,65 @@ static void MatchFileBrowserReply(const FileBrowserMatch *match,
       }
 }
 
+typedef struct _FileBrowserNames
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    **filelist;
+
+  size_t
+    files;
+
+  unsigned int
+    visible_files;
+
+  XWidgetInfo
+    list_info,
+    slider_info;
+} FileBrowserNames;
+
+static void DrawFileBrowserNames(const FileBrowserNames *names,
+  XWidgetInfo *selection_info)
+{
+  Display
+    *const display = names->display;
+
+  XWindows
+    *const windows = names->windows;
+
+  char
+    **const filelist = names->filelist;
+
+  const size_t
+    files = names->files;
+
+  const unsigned int
+    visible_files = names->visible_files;
+
+  const XWidgetInfo
+    list_info = names->list_info,
+    slider_info = names->slider_info;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) visible_files; i++)
+  {
+    (*selection_info).raised=(int) (slider_info.id+i) != list_info.id ?
+      MagickTrue : MagickFalse;
+    (*selection_info).text=(char *) NULL;
+    if ((slider_info.id+i) < (ssize_t) files)
+      (*selection_info).text=filelist[slider_info.id+i];
+    XDrawWidgetText(display,&windows->widget,selection_info);
+    (*selection_info).y+=(int) (*selection_info).height;
+  }
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -5351,21 +5410,22 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
             slider_info.min_y+1)/(int) files);
         if (slider_info.id != selection_info.id)
           {
+            FileBrowserNames
+              names;
+
             /*
               Redraw scroll bar and file names.
             */
             selection_info.id=slider_info.id;
             selection_info.y=list_info.y+(int) (height >> 3)+2;
-            for (i=0; i < (ssize_t) visible_files; i++)
-            {
-              selection_info.raised=(int) (slider_info.id+i) != list_info.id ?
-                MagickTrue : MagickFalse;
-              selection_info.text=(char *) NULL;
-              if ((slider_info.id+i) < (ssize_t) files)
-                selection_info.text=filelist[slider_info.id+i];
-              XDrawWidgetText(display,&windows->widget,&selection_info);
-              selection_info.y+=(int) selection_info.height;
-            }
+            names.display=display;
+            names.windows=windows;
+            names.filelist=filelist;
+            names.files=files;
+            names.visible_files=visible_files;
+            names.list_info=list_info;
+            names.slider_info=slider_info;
+            DrawFileBrowserNames(&names,&selection_info);
             /*
               Update slider.
             */
