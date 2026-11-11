@@ -3744,6 +3744,99 @@ cleanup:
   return(outputReady);
 }
 
+typedef struct _ResizeVerticalArgs
+{
+  const ResizeFilter
+    *resizeFilter;
+
+  cl_kernel
+    verticalKernel;
+
+  cl_mem
+    imageBuffer;
+
+  cl_uint
+    number_channels,
+    columns,
+    rows;
+
+  cl_mem
+    resizedImageBuffer;
+
+  cl_uint
+    resizedColumns,
+    resizedRows;
+
+  float
+    yFactor;
+
+  int
+    resizeFilterType,
+    resizeWindowType;
+
+  cl_mem
+    resizeFilterCubicCoefficients;
+
+  size_t
+    imageCacheLocalMemorySize;
+
+  int
+    numCachedPixels;
+
+  unsigned int
+    pixelPerWorkgroup,
+    chunkSize;
+
+  size_t
+    pixelAccumulatorLocalMemorySize,
+    weightAccumulatorLocalMemorySize,
+    gammaAccumulatorLocalMemorySize;
+} ResizeVerticalArgs;
+
+static cl_int SetResizeVerticalFilterArgs(const ResizeVerticalArgs *args)
+{
+  cl_int
+    status;
+
+  float
+    resizeFilterScale,
+    resizeFilterSupport,
+    resizeFilterWindowSupport,
+    resizeFilterBlur;
+
+  size_t
+    i;
+
+  resizeFilterScale=(float) GetResizeFilterScale(args->resizeFilter);
+  resizeFilterSupport=(float) GetResizeFilterSupport(args->resizeFilter);
+  resizeFilterBlur=(float) GetResizeFilterBlur(args->resizeFilter);
+  resizeFilterWindowSupport=(float) GetResizeFilterWindowSupport(args->resizeFilter);
+  i=0;
+  status =SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_mem),(void*)&args->imageBuffer);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_uint),(void*)&args->number_channels);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_uint),(void*)&args->columns);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_uint),(void*)&args->rows);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_mem),(void*)&args->resizedImageBuffer);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_uint),(void*)&args->resizedColumns);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_uint),(void*)&args->resizedRows);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(float),(void*)&args->yFactor);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(int),(void*)&args->resizeFilterType);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(int),(void*)&args->resizeWindowType);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_mem),(void*)&args->resizeFilterCubicCoefficients);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(float),(void*)&resizeFilterScale);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(float),(void*)&resizeFilterSupport);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(float),(void*)&resizeFilterWindowSupport);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(float),(void*)&resizeFilterBlur);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,args->imageCacheLocalMemorySize, NULL);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(int), &args->numCachedPixels);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(unsigned int), &args->pixelPerWorkgroup);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(unsigned int), &args->chunkSize);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,args->pixelAccumulatorLocalMemorySize, NULL);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,args->weightAccumulatorLocalMemorySize, NULL);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,args->gammaAccumulatorLocalMemorySize, NULL);
+  return(status);
+}
+
 static MagickBooleanType resizeVerticalFilter(MagickCLDevice device,
   cl_command_queue queue,const Image *image,Image * filteredImage,
   cl_mem imageBuffer,cl_uint number_channels,cl_uint columns,cl_uint rows,
@@ -3761,10 +3854,6 @@ static MagickBooleanType resizeVerticalFilter(MagickCLDevice device,
     workgroupSize = 256;
 
   float
-    resizeFilterScale,
-    resizeFilterSupport,
-    resizeFilterWindowSupport,
-    resizeFilterBlur,
     scale,
     support;
 
@@ -3776,10 +3865,12 @@ static MagickBooleanType resizeVerticalFilter(MagickCLDevice device,
   MagickBooleanType
     outputReady;
 
+  ResizeVerticalArgs
+    args;
+
   size_t
     gammaAccumulatorLocalMemorySize,
     gsize[2],
-    i,
     imageCacheLocalMemorySize,
     pixelAccumulatorLocalMemorySize,
     lsize[2],
@@ -3870,34 +3961,27 @@ RestoreMSCWarning
     goto cleanup;
   }
 
-  resizeFilterScale=(float) GetResizeFilterScale(resizeFilter);
-  resizeFilterSupport=(float) GetResizeFilterSupport(resizeFilter);
-  resizeFilterBlur=(float) GetResizeFilterBlur(resizeFilter);
-  resizeFilterWindowSupport=(float) GetResizeFilterWindowSupport(resizeFilter);
-
-  i=0;
-  status =SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_mem),(void*)&imageBuffer);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_uint),(void*)&number_channels);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_uint),(void*)&columns);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_uint),(void*)&rows);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_mem),(void*)&resizedImageBuffer);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_uint),(void*)&resizedColumns);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_uint),(void*)&resizedRows);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(float),(void*)&yFactor);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(int),(void*)&resizeFilterType);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(int),(void*)&resizeWindowType);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_mem),(void*)&resizeFilterCubicCoefficients);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(float),(void*)&resizeFilterScale);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(float),(void*)&resizeFilterSupport);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(float),(void*)&resizeFilterWindowSupport);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(float),(void*)&resizeFilterBlur);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,imageCacheLocalMemorySize, NULL);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(int), &numCachedPixels);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(unsigned int), &pixelPerWorkgroup);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(unsigned int), &chunkSize);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,pixelAccumulatorLocalMemorySize, NULL);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,weightAccumulatorLocalMemorySize, NULL);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,gammaAccumulatorLocalMemorySize, NULL);
+  args.resizeFilter=resizeFilter;
+  args.verticalKernel=verticalKernel;
+  args.imageBuffer=imageBuffer;
+  args.number_channels=number_channels;
+  args.columns=columns;
+  args.rows=rows;
+  args.resizedImageBuffer=resizedImageBuffer;
+  args.resizedColumns=resizedColumns;
+  args.resizedRows=resizedRows;
+  args.yFactor=yFactor;
+  args.resizeFilterType=resizeFilterType;
+  args.resizeWindowType=resizeWindowType;
+  args.resizeFilterCubicCoefficients=resizeFilterCubicCoefficients;
+  args.imageCacheLocalMemorySize=imageCacheLocalMemorySize;
+  args.numCachedPixels=numCachedPixels;
+  args.pixelPerWorkgroup=pixelPerWorkgroup;
+  args.chunkSize=chunkSize;
+  args.pixelAccumulatorLocalMemorySize=pixelAccumulatorLocalMemorySize;
+  args.weightAccumulatorLocalMemorySize=weightAccumulatorLocalMemorySize;
+  args.gammaAccumulatorLocalMemorySize=gammaAccumulatorLocalMemorySize;
+  status=SetResizeVerticalFilterArgs(&args);
 
   if (status != CL_SUCCESS)
   {
