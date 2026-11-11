@@ -9590,6 +9590,51 @@ static void LeaveMenuWindow(const MenuEventContext *context,
   XDrawWidgetText(display,&windows->widget,selection_info);
 }
 
+static void EnterMenuWindow(const MenuEventContext *context,
+  const XEvent event,const MenuTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const selections = context->selections;
+
+  const unsigned int
+    number_selections = context->number_selections,
+    top_offset = context->top_offset;
+
+  XWidgetInfo
+    *const selection_info = targets->selection_info;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    id;
+
+  MenuPointer
+    pointer;
+
+  if (event.xcrossing.window != windows->widget.id)
+    return;
+  if (event.xcrossing.state == 0)
+    return;
+  (*state)&=(unsigned int) (~InactiveWidgetState);
+  if ((*selection_info).height == 0)
+    return;
+  id=((event.xcrossing.y-(int) top_offset)/(int) (*selection_info).height);
+  pointer.display=display;
+  pointer.windows=windows;
+  pointer.selections=selections;
+  pointer.number_selections=number_selections;
+  pointer.top_offset=top_offset;
+  pointer.id=id;
+  EnterMenuSelection(&pointer,targets);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9802,24 +9847,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       }
       case EnterNotify:
       {
-        MenuPointer
-          pointer;
-
-        if (event.xcrossing.window != windows->widget.id)
-          break;
-        if (event.xcrossing.state == 0)
-          break;
-        state&=(unsigned int) (~InactiveWidgetState);
-        if (selection_info.height == 0)
-          break;
-        id=((event.xcrossing.y-(int) top_offset)/(int) selection_info.height);
-        pointer.display=display;
-        pointer.windows=windows;
-        pointer.selections=selections;
-        pointer.number_selections=number_selections;
-        pointer.top_offset=top_offset;
-        pointer.id=id;
-        EnterMenuSelection(&pointer,&targets);
+        EnterMenuWindow(&event_context,event,&targets);
         break;
       }
       case Expose:
