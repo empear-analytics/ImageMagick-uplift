@@ -9221,6 +9221,9 @@ typedef struct _MenuTargets
 
   size_t
     *state;
+
+  XWidgetInfo
+    *menu_info;
 } MenuTargets;
 
 typedef struct _MenuPointer
@@ -9422,6 +9425,9 @@ typedef struct _MenuEventContext
 
   char
     *item;
+
+  unsigned int
+    height;
 } MenuEventContext;
 
 static void PressMenuSelection(const MenuEventContext *context,
@@ -9694,6 +9700,52 @@ static void MoveMenuWindow(const MenuEventContext *context,
   MoveMenuSelection(&pointer,targets);
 }
 
+static void UpdateMenuLayout(const MenuEventContext *context,
+  const MenuTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const selection_info = targets->selection_info,
+    *const highlight_info = targets->highlight_info;
+
+  size_t
+    *const state = targets->state;
+
+  XWidgetInfo
+    *const menu_info = targets->menu_info;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      /*
+        Initialize selection information.
+      */
+      XGetWidgetInfo((char *) NULL,menu_info);
+      (*menu_info).bevel_width--;
+      (*menu_info).width=windows->widget.width-
+        (((*menu_info).bevel_width) << 1);
+      (*menu_info).height=windows->widget.height-
+        (((*menu_info).bevel_width) << 1);
+      (*menu_info).x=(int) (*menu_info).bevel_width;
+      (*menu_info).y=(int) (*menu_info).bevel_width;
+      XGetWidgetInfo((char *) NULL,selection_info);
+      (*selection_info).center=MagickFalse;
+      (*selection_info).width=(*menu_info).width;
+      (*selection_info).height=height;
+      (*selection_info).x=(*menu_info).x;
+      (*highlight_info)=(*selection_info);
+      (*highlight_info).bevel_width--;
+      (*highlight_info).width-=((*highlight_info).bevel_width << 1);
+      (*highlight_info).height-=((*highlight_info).bevel_width << 1);
+      (*highlight_info).x+=(int) (*highlight_info).bevel_width;
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9730,7 +9782,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
     selection_info;
 
   const MenuTargets
-    targets = { &selection_info, &highlight_info, &state };
+    targets = { &selection_info, &highlight_info, &state, &menu_info };
 
   MenuEventContext
     event_context;
@@ -9801,31 +9853,10 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   event_context.number_selections=number_selections;
   event_context.top_offset=top_offset;
   event_context.item=item;
+  event_context.height=height;
   do
   {
-    if (state & UpdateConfigurationState)
-      {
-        /*
-          Initialize selection information.
-        */
-        XGetWidgetInfo((char *) NULL,&menu_info);
-        menu_info.bevel_width--;
-        menu_info.width=windows->widget.width-((menu_info.bevel_width) << 1);
-        menu_info.height=windows->widget.height-((menu_info.bevel_width) << 1);
-        menu_info.x=(int) menu_info.bevel_width;
-        menu_info.y=(int) menu_info.bevel_width;
-        XGetWidgetInfo((char *) NULL,&selection_info);
-        selection_info.center=MagickFalse;
-        selection_info.width=menu_info.width;
-        selection_info.height=height;
-        selection_info.x=menu_info.x;
-        highlight_info=selection_info;
-        highlight_info.bevel_width--;
-        highlight_info.width-=(highlight_info.bevel_width << 1);
-        highlight_info.height-=(highlight_info.bevel_width << 1);
-        highlight_info.x+=(int) highlight_info.bevel_width;
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
+    UpdateMenuLayout(&event_context,&targets);
     if (state & RedrawWidgetState)
       {
         MenuSelections
