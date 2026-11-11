@@ -10098,6 +10098,45 @@ static void XMatteReplace(const MatteEditPixelInput *pixel_input)
   }
 }
 
+static void XMatteReset(const MatteEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  const char
+    *const matte = pixel_input->matte;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  int
+    x,
+    y;
+
+  Quantum
+    *q;
+
+  for (y=0; y < (int) (*image)->rows; y++)
+  {
+    q=QueueCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
+      (*image)->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (int) (*image)->columns; x++)
+    {
+      SetPixelAlpha(*image,(Quantum) StringToLong(matte),q);
+      q+=(ptrdiff_t) GetPixelChannels(*image);
+    }
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+  if (StringToLong(matte) == (long) OpaqueAlpha)
+    (*image)->alpha_trait=UndefinedPixelTrait;
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -10153,9 +10192,6 @@ static MagickBooleanType XMatteEditImage(Display *display,
 
   int
     i;
-
-  Quantum
-    *q;
 
   unsigned int
     height,
@@ -10571,22 +10607,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
             */
             if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
               return(MagickFalse);
-            for (y=0; y < (int) (*image)->rows; y++)
-            {
-              q=QueueCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
-                (*image)->columns,1,exception);
-              if (q == (Quantum *) NULL)
-                break;
-              for (x=0; x < (int) (*image)->columns; x++)
-              {
-                SetPixelAlpha(*image,(Quantum) StringToLong(matte),q);
-                q+=(ptrdiff_t) GetPixelChannels(*image);
-              }
-              if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-                break;
-            }
-            if (StringToLong(matte) == (long) OpaqueAlpha)
-              (*image)->alpha_trait=UndefinedPixelTrait;
+            XMatteReset(&pixel_input);
             break;
           }
         }
