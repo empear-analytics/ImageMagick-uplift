@@ -9867,6 +9867,31 @@ static void DrawMenuLine(const MenuEventContext *context,
     }
 }
 
+static void HandleMenuPointerEvent(const MenuEventContext *context,
+  const XEvent event,const MenuTargets *targets)
+{
+  switch (event.type)
+  {
+    case Expose:
+    {
+      ExposeMenuWindow(context,event,targets);
+      break;
+    }
+    case LeaveNotify:
+    {
+      LeaveMenuWindow(context,event,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      MoveMenuWindow(context,event,targets);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -10008,23 +10033,11 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
         EnterMenuWindow(&event_context,event,&targets);
         break;
       }
-      case Expose:
-      {
-        ExposeMenuWindow(&event_context,event,&targets);
-        break;
-      }
-      case LeaveNotify:
-      {
-        LeaveMenuWindow(&event_context,event,&targets);
-        break;
-      }
-      case MotionNotify:
-      {
-        MoveMenuWindow(&event_context,event,&targets);
-        break;
-      }
       default:
+      {
+        HandleMenuPointerEvent(&event_context,event,&targets);
         break;
+      }
     }
   } while ((state & ExitState) == 0);
   (void) XFreeCursor(display,cursor);
