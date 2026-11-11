@@ -11604,6 +11604,149 @@ Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the
 
 ---
 
+## Recipe CR - Extract a Tail That Ends Its Case or Iteration or Returns Failure
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Brain Method*, *Bumpy Road
+Ahead* or *Large Method*, and the block that would fix it is the tail of a `switch` case or
+of a sequential loop's body, so that every path out of it either ends the case or the
+iteration (by falling off its end, or through `break;` or `continue;` from inside it, which
+do the same) or leaves the function through `return(c);` of one constant, as `display.c`'s
+`XAnnotateEditImage` does for the text it adds to the annotation: the Return key's case
+(`if (annotate_info->next != NULL) { ...; break; }`, then two allocations that
+`return(MagickFalse);` when they fail) and the loop that pastes a selection, whose body
+`continue`s or returns.
+
+**Not covered by:** Recipe CT, whose step 1 refuses a `return` in the block (and whose helper
+is `void`); Recipe E step 7, whose `switch` form takes no `return` and whose `continue;`
+form no `return` either; Recipes I and W, which refuse the mix of a `break;` (or a
+`continue;`) that leaves the block and a `return` (I step 1: only `return(c);`, or only
+`break;`; W step 1: no `break` or `continue` that leaves it); Recipe LC, whose block is
+followed by statements that stay; Recipes BR and RV, whose `break;` ends a loop or that
+return different values.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#` line. It is (a) the run of
+   statements of a `switch` case after which the case runs only its closing `break;` on every
+   path (Recipe CT step 1's position: the whole body but that `break;`, or the last
+   statement of a branch that ends the case), or (b) the statements that end the body of a
+   sequential loop, after which the iteration ends (the whole body, or its last
+   statements). Every `break;` in it that leaves it ends that `switch` (a), every
+   `continue;` that leaves it continues that loop (b); a `break` or `continue` of a loop or
+   `switch` nested inside it stays as it is. It has no `goto`, and every `return` in it is
+   `return(c);` with one constant `c` (written alike); at least one such `return` stands.
+2. The variables of the caller the block writes and the caller reads after it go in one
+   `const` targets struct as Recipe CT steps 2 and 3 say (zero, or two to six; a single
+   one by pointer when it is a plain local); temporaries it writes before reading are
+   declared in the new function (Recipe E step 4); variables it declares move with it.
+3. Cut the block into a new `static MagickBooleanType` function directly above the caller.
+   Each `break;` or `continue;` that left it becomes `return(MagickTrue);`, each
+   `return(c);` becomes `return(MagickFalse);`, one for one, and the function ends with
+   `return(MagickTrue);`. Written variables are bound and written as CT step 5 says; nothing
+   else in the text changes.
+4. Pass what the block only reads by value, or in one `const` input struct as CT step 4
+   says, then `const T *targets` last: at most four parameters.
+5. Where the block stood write `if (Helper(...) == MagickFalse) return(c);`, with the
+   block's own `c`. In (a) the case's own `break;` follows it; in (b) the call is the last
+   statement of the body. Check every argument, member and binding by reading.
+
+**Before:**
+
+```c
+          case XK_Return:
+          case XK_KP_Enter:
+          {
+            *p='\0';
+            ...
+            if (annotate_info->next != (XAnnotateInfo *) NULL)
+              {
+                annotate_info=annotate_info->next;
+                ...
+                break;
+              }
+            annotate_info->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
+              sizeof(*annotate_info->next));
+            if (annotate_info->next == (XAnnotateInfo *) NULL)
+              return(MagickFalse);
+            ...
+            p=annotate_info->text;
+            break;
+          }
+```
+
+**After:**
+
+```c
+static MagickBooleanType XAdvanceTextLine(XWindows *windows,
+  XFontStruct *font_info,const AnnotateTargets *targets)
+{
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+  ...
+  *(*p)='\0';
+  ...
+  if ((*annotate_info)->next != (XAnnotateInfo *) NULL)
+    {
+      (*annotate_info)=(*annotate_info)->next;
+      ...
+      return(MagickTrue);
+    }
+  (*annotate_info)->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
+    sizeof(*(*annotate_info)->next));
+  if ((*annotate_info)->next == (XAnnotateInfo *) NULL)
+    return(MagickFalse);
+  ...
+  return(MagickTrue);
+}
+...
+          case XK_Return:
+          case XK_KP_Enter:
+          {
+            if (XAdvanceTextLine(windows,font_info,&targets) == MagickFalse)
+              return(MagickFalse);
+            break;
+          }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, path by path. A path that reached a `break;` (a) or a
+  `continue;` (b) ended the case or the iteration at once, running nothing after the block
+  (steps 1 and 5); in the helper it is `return(MagickTrue);`, the caller does not return,
+  and runs the case's `break;` (a) or ends the body (b), at the same point after the same
+  statements. A path that fell off the end of the block did the same and is the helper's
+  last `return(MagickTrue);`. A path that reached `return(c);` ran the same statements and
+  the helper returns `MagickFalse`, on which the caller returns the same `c` directly after
+  the call, nothing in between.
+- The written variables stay the caller's own locals, read and written directly
+  everywhere else; only their addresses travel, bound once to `*const` locals, so each
+  `(*v)` is the object `v` named at the same point (Recipe CT's argument). A by-value
+  input is a copy taken at the call, and the block wrote none of its inputs.
+- The helper's result is the block's status, not a value of the function: the caller
+  tests it for the one `return(c);` and for nothing else. A `return` of two different
+  values is Recipe RV's, a `break;` that ends a loop around the block is Recipe BR's.
+- The failure paths are mostly allocation failures that no case reaches: the oracle
+  checks the paths its cases take, the rest are checked by reading each `return(c);`
+  against its `return(MagickFalse);`, with `tools/case_tail_check.py --returns` and
+  `tools/obj_modulo.sh` for the lines no case reaches.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved) and steps 1, 2 and 4 checked by reading; or, when no case reaches
+some of the moved lines, guard: the same, plus `tools/case_tail_check.py FILE Targets Helper
+--returns` printing `OK` and `tools/obj_modulo.sh` (`WIDE=1` for the wide-build files)
+printing `IDENTICAL` or `MODULO-IDENTICAL`.
+
+**Provenance:** 2026-11-12, from `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b,
+wide build): the text loop's Return key and the selection-paste loop leave through `break;`
+or `continue;` on some paths and through `return(MagickFalse);` when an allocation fails, and
+write four locals the loop reads afterwards; CT refuses the `return`, I and W the mix. Their
+`if` that tests the result sits at depth 3 when the call stands in the event `switch`'s
+case, and depth 4 inside the key `switch`, which the next steps (Recipe W on the whole key
+`switch`) lift. Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -11998,3 +12141,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | NEW | FT | Replace a Fall-Through into a Call by the Call: a case ending `magick_fallthrough;` into a case whose whole body is a call of a `static void` helper and `break;` gets that call and a `break;` in place of the fall-through, so that Recipe CT (whose step 1 needs the case to end in `break;`) can move it | `display.c`'s `XCropImage` and `XROIImage` (campaign A, W18 lane b, wide build): the ButtonPress case (button, window and four corner tests, each leaving through `break;`) falls into ButtonRelease; CT refuses it and SD would carry twelve decisions into one helper. Probe of the XCropImage chain: see its commits | owner |
 | 2026-11-11 | NEW | LC | Extract Block Returning Whether It Continued: a block in a sequential loop body, followed by statements that stay, that leaves its iteration through `continue;` from inside it moves into a `static MagickBooleanType` function whose `continue;`s are `return(MagickTrue);` and whose end is `return(MagickFalse);`; the caller writes `if (Helper(...) != MagickFalse) continue;` | `display.c`'s `XROIImage` (campaign A, W18 lane b, wide build): the rectify loop's update-region block (a whole `if` holding a `switch` whose default group `continue`s when the region crop fails) holds three of the last depth-4 and 5 statements; OC needs the block followed by `continue;`, E step 7 the whole body or tail, LB a `break;` | owner |
 | 2026-11-12 | AMEND | CT | Step 3: a variable outside the targets struct may be added as a new last member (typedef and initialiser each gain one entry after the last) in the commit of the helper that writes it; the earlier helpers bind only the members they write and do not change. *Careful* gives the argument | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): `AnnotateTargets` (`annotate_info`, `p`, `x`, `y`) serves the text loop's line-advance blocks, and the BackSpace and Delete keys also write the cursor event `text_event`, which the step's "cannot be added later" refused; the text loop's key switch holds eleven depth-4 sites that need those helpers | owner |
+| 2026-11-12 | NEW | CR | Extract a Tail That Ends Its Case or Iteration or Returns Failure: the tail of a `switch` case or of a sequential loop's body that leaves through `break;` or `continue;` (the same as falling off its end) on some paths and through `return(c);` of one constant on others moves to a `static MagickBooleanType` function (each `break;`/`continue;` is `return(MagickTrue);`, each `return(c);` is `return(MagickFalse);`, the end `return(MagickTrue);`), written variables by Recipe CT's targets struct; the caller writes `if (Helper(...) == MagickFalse) return(c);`, followed by the case's `break;` | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's Return key and its selection-paste loop body leave through `break;`/`continue;` on some paths and `return(MagickFalse);` when an allocation fails, and write `annotate_info`, `p`, `x` and `y`; CT (no `return`), I and W (no mixed exits), E step 7 and LC refuse them | owner |
