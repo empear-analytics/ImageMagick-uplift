@@ -914,9 +914,6 @@ static Image *PlaceMontageTile(const MontageTilePlacement *placement,
   MagickStatusType
     flags;
 
-  MontageGravityInfo
-    gravity_info;
-
   ssize_t
     x,
     y;
@@ -930,14 +927,14 @@ static Image *PlaceMontageTile(const MontageTilePlacement *placement,
       image=AddTileBorder(image,placement->montage_info,&extent,
         placement->exception);
     }
-  gravity_info.tile_image=placement->tile_image;
-  gravity_info.width=placement->width;
-  gravity_info.height=placement->height;
-  gravity_info.montage_info=placement->montage_info;
-  gravity_info.image=image;
-  gravity_info.border_width=placement->border_width;
-  gravity_info.exception=placement->exception;
-  GravitateMontageTile(&gravity_info,&flags,&x,&y);
+  {
+    const MontageGravityInfo
+      gravity_info = { placement->tile_image, placement->width,
+        placement->height, placement->montage_info, image,
+        placement->border_width, placement->exception };
+
+    GravitateMontageTile(&gravity_info,&flags,&x,&y);
+  }
   if ((placement->montage_info->frame != (char *) NULL) &&
       (placement->bevel_width > 0))
     {
