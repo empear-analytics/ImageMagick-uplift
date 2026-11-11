@@ -4968,6 +4968,42 @@ static void DrawFileBrowserNames(const FileBrowserNames *names,
   }
 }
 
+typedef struct _FileBrowserPathRelease
+{
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  char
+    *working_path;
+} FileBrowserPathRelease;
+
+static size_t ReleaseFileBrowserUp(const FileBrowserPathRelease *up,
+  const XWidgetInfo up_info,size_t state)
+{
+  XWindows
+    *const windows = up->windows;
+
+  const XEvent
+    event = up->event;
+
+  char
+    *const working_path = up->working_path;
+
+  if ((event.xbutton.window == windows->widget.id) &&
+      (MatteIsActive(up_info,event.xbutton)))
+    {
+      ChopPathComponents(working_path,1);
+      if (*working_path == '\0')
+        (void) CopyMagickString(working_path,DirectorySeparator,
+          MagickPathExtent);
+      state|=UpdateListState;
+    }
+  return(state);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -5643,15 +5679,13 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
           }
         if (up_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(up_info,event.xbutton)))
-              {
-                ChopPathComponents(working_path,1);
-                if (*working_path == '\0')
-                  (void) CopyMagickString(working_path,DirectorySeparator,
-                    MagickPathExtent);
-                state|=UpdateListState;
-              }
+            FileBrowserPathRelease
+              up;
+
+            up.windows=windows;
+            up.event=event;
+            up.working_path=working_path;
+            state=ReleaseFileBrowserUp(&up,up_info,state);
             up_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&up_info);
           }
