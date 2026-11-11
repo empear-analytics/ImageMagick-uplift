@@ -9305,6 +9305,27 @@ static void XRankColorDiversity(Image *image,DiversityPacket *diversity,
     PopularityCompare);
 }
 
+static XColor *XQueryServerColors(Display *display,const Colormap colormap,
+  XVisualInfo *visual_info,Image *image)
+{
+  int
+    x;
+
+  XColor
+    *server_colors;
+
+  server_colors=(XColor *) AcquireQuantumMemory((size_t)
+    visual_info->colormap_size,sizeof(*server_colors));
+  if (server_colors == (XColor *) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,
+      "UnableToCreateColormap",image->filename);
+  for (x=visual_info->colormap_size-1; x >= 0; x--)
+    server_colors[x].pixel=(size_t) x;
+  (void) XQueryColors(display,colormap,server_colors,
+    (int) MagickMin((unsigned int) visual_info->colormap_size,256));
+  return(server_colors);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9492,9 +9513,6 @@ MagickPrivate void XMakeStandardColormap(Display *display,
           DiversityPacket
             *diversity;
 
-          int
-            x;
-
           unsigned short
             index;
 
@@ -9534,15 +9552,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
           /*
             Read X server colormap.
           */
-          server_colors=(XColor *) AcquireQuantumMemory((size_t)
-            visual_info->colormap_size,sizeof(*server_colors));
-          if (server_colors == (XColor *) NULL)
-            ThrowXWindowFatalException(ResourceLimitFatalError,
-              "UnableToCreateColormap",image->filename);
-          for (x=visual_info->colormap_size-1; x >= 0; x--)
-            server_colors[x].pixel=(size_t) x;
-          (void) XQueryColors(display,colormap,server_colors,
-            (int) MagickMin((unsigned int) visual_info->colormap_size,256));
+          server_colors=XQueryServerColors(display,colormap,visual_info,image);
           /*
             Select remaining colors from X server colormap.
           */
