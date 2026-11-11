@@ -12169,6 +12169,105 @@ static MagickBooleanType XROIImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _RotatePenMenu
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *RotateMenu;
+
+  int
+    id;
+
+  char
+    *command;
+} RotatePenMenu;
+
+typedef struct _RotateTargets
+{
+  unsigned int
+    *pen_id;
+} RotateTargets;
+
+static void XSelectRotatePenColor(const RotatePenMenu *menu,
+  const RotateTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XResourceInfo
+    *const resource_info = menu->resource_info;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const RotateMenu = menu->RotateMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  unsigned int
+    *const pen_id = targets->pen_id;
+
+  const char
+    *ColorMenu[MaxNumberPens];
+
+  int
+    i,
+    pen_number;
+
+  XColor
+    color;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="Browser...";
+  ColorMenu[MaxNumberPens-1]=(const char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,RotateMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  if (pen_number == (MaxNumberPens-2))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set pen color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],&color);
+  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
+    (unsigned int) MaxColors,&color);
+  windows->pixel_info->pen_colors[pen_number]=color;
+  (*pen_id)=(unsigned int) pen_number;
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -12218,13 +12317,13 @@ static MagickBooleanType XRotateImage(Display *display,
   double
     normalized_degrees;
 
-  int
-    i;
-
   unsigned int
     height,
     rotations,
     width;
+
+  const RotateTargets
+    targets = { &pen_id };
 
   if (degrees == 0.0)
     {
@@ -12283,51 +12382,16 @@ static MagickBooleanType XRotateImage(Display *display,
             {
               case RotateColorCommand:
               {
-                const char
-                  *ColorMenu[MaxNumberPens];
+                RotatePenMenu
+                  menu;
 
-                int
-                  pen_number;
-
-                XColor
-                  color;
-
-                /*
-                  Initialize menu selections.
-                */
-                for (i=0; i < (int) (MaxNumberPens-2); i++)
-                  ColorMenu[i]=resource_info->pen_colors[i];
-                ColorMenu[MaxNumberPens-2]="Browser...";
-                ColorMenu[MaxNumberPens-1]=(const char *) NULL;
-                /*
-                  Select a pen color from the pop-up menu.
-                */
-                pen_number=XMenuWidget(display,windows,RotateMenu[id],
-                  (const char **) ColorMenu,command);
-                if (pen_number < 0)
-                  break;
-                if (pen_number == (MaxNumberPens-2))
-                  {
-                    static char
-                      color_name[MagickPathExtent] = "gray";
-
-                    /*
-                      Select a pen color from a dialog.
-                    */
-                    resource_info->pen_colors[pen_number]=color_name;
-                    XColorBrowserWidget(display,windows,"Select",color_name);
-                    if (*color_name == '\0')
-                      break;
-                  }
-                /*
-                  Set pen color.
-                */
-                (void) XParseColor(display,windows->map_info->colormap,
-                  resource_info->pen_colors[pen_number],&color);
-                XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-                  (unsigned int) MaxColors,&color);
-                windows->pixel_info->pen_colors[pen_number]=color;
-                pen_id=(unsigned int) pen_number;
+                menu.display=display;
+                menu.resource_info=resource_info;
+                menu.windows=windows;
+                menu.RotateMenu=RotateMenu;
+                menu.id=id;
+                menu.command=command;
+                XSelectRotatePenColor(&menu,&targets);
                 break;
               }
               case RotateDirectionCommand:
