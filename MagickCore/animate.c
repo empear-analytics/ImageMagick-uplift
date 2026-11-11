@@ -2941,6 +2941,27 @@ static MagickStatusType XHandleDestroyNotify(XResourceInfo *resource_info,
   return(state);
 }
 
+static void XRepaintExposedWindows(Display *display,XWindows *windows,
+  const ssize_t scene,const XEvent event)
+{
+  /*
+    Repaint windows that are now exposed.
+  */
+  if (event.xexpose.window == windows->image.id)
+    {
+      windows->image.pixmap=windows->image.pixmaps[scene];
+      windows->image.matte_pixmap=windows->image.matte_pixmaps[scene];
+      XRefreshWindow(display,&windows->image,&event);
+      return;
+    }
+  if ((event.xexpose.window == windows->icon.id) &&
+      (event.xexpose.count == 0))
+    {
+      XRefreshWindow(display,&windows->icon,&event);
+      return;
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3873,22 +3894,7 @@ MagickExport Image *XAnimateImages(Display *display,
             "Expose: 0x%lx %dx%d+%d+%d",event.xexpose.window,
             event.xexpose.width,event.xexpose.height,event.xexpose.x,
             event.xexpose.y);
-        /*
-          Repaint windows that are now exposed.
-        */
-        if (event.xexpose.window == windows->image.id)
-          {
-            windows->image.pixmap=windows->image.pixmaps[scene];
-            windows->image.matte_pixmap=windows->image.matte_pixmaps[scene];
-            XRefreshWindow(display,&windows->image,&event);
-            break;
-          }
-        if ((event.xexpose.window == windows->icon.id) &&
-            (event.xexpose.count == 0))
-          {
-            XRefreshWindow(display,&windows->icon,&event);
-            break;
-          }
+        XRepaintExposedWindows(display,windows,scene,event);
         break;
       }
       case KeyPress:
