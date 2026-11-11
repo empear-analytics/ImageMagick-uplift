@@ -2888,6 +2888,20 @@ MagickPrivate void XFreeResources(Display *display,XVisualInfo *visual_info,
 %    o pixel: Specifies a pointer to a XPixelInfo structure.
 %
 */
+static void XReleaseStandardColormap(Display *display,
+  const XVisualInfo *visual_info,const XStandardColormap *map_info,
+  const XPixelInfo *pixel)
+{
+  if (map_info->colormap != XDefaultColormap(display,visual_info->screen))
+    (void) XFreeColormap(display,map_info->colormap);
+  else
+    if (pixel != (XPixelInfo *) NULL)
+      if ((visual_info->klass != TrueColor) &&
+          (visual_info->klass != DirectColor))
+        (void) XFreeColors(display,map_info->colormap,pixel->pixels,
+          (int) pixel->colors,0);
+}
+
 MagickPrivate void XFreeStandardColormap(Display *display,
   const XVisualInfo *visual_info,XStandardColormap *map_info,XPixelInfo *pixel)
 {
@@ -2901,16 +2915,7 @@ MagickPrivate void XFreeStandardColormap(Display *display,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   (void) XFlush(display);
   if (map_info->colormap != (Colormap) NULL)
-    {
-      if (map_info->colormap != XDefaultColormap(display,visual_info->screen))
-        (void) XFreeColormap(display,map_info->colormap);
-      else
-        if (pixel != (XPixelInfo *) NULL)
-          if ((visual_info->klass != TrueColor) &&
-              (visual_info->klass != DirectColor))
-            (void) XFreeColors(display,map_info->colormap,pixel->pixels,
-              (int) pixel->colors,0);
-    }
+    XReleaseStandardColormap(display,visual_info,map_info,pixel);
   map_info->colormap=(Colormap) NULL;
   if (pixel != (XPixelInfo *) NULL)
     {
