@@ -3915,6 +3915,10 @@ typedef struct _ComposeMenuInfo
     id;
 } ComposeMenuInfo;
 
+static CompositeOperator
+  XSelectPasteOperator(const ComposeMenuInfo *,const char *const *,
+    CompositeOperator);
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3957,7 +3961,6 @@ static MagickBooleanType XCompositeImage(Display *display,
     *composite_image;
 
   int
-    entry,
     id,
     x,
     y;
@@ -4055,22 +4058,13 @@ static MagickBooleanType XCompositeImage(Display *display,
         {
           case CompositeOperatorsCommand:
           {
-            char
-              command[MagickPathExtent],
-              **operators;
+            ComposeMenuInfo
+              menu_info;
 
-            /*
-              Select a command from the pop-up menu.
-            */
-            operators=GetCommandOptions(MagickComposeOptions);
-            if (operators == (char **) NULL)
-              break;
-            entry=XMenuWidget(display,windows,CompositeMenu[id],
-              (const char **) operators,command);
-            if (entry >= 0)
-              compose=(CompositeOperator) ParseCommandOption(
-                MagickComposeOptions,MagickFalse,operators[entry]);
-            operators=DestroyStringList(operators);
+            menu_info.display=display;
+            menu_info.windows=windows;
+            menu_info.id=id;
+            compose=XSelectPasteOperator(&menu_info,CompositeMenu,compose);
             break;
           }
           case CompositeDissolveCommand:
