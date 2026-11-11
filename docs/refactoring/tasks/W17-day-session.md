@@ -285,3 +285,28 @@ declaration and typedef move; input-struct bindings), 2e626175f SD step 1 (a `sw
 constant warning in accelerate.c's LocalContrast at every step. Whole wide catalogue: 14,145 cases, 0 diverged.
 Possible upstream: widget.c Font's reply press reads a stale `i` when `XLoadQueryFont` returns NULL (kept); Font's
 SelectionRequest leaves `notify.send_event` unset and does not check `reply_info.highlight`, unlike ListBrowser's.
+
+## Lane c, third round: compare.c split, opencl.c 5.27 -> 5.47 (merged)
+
+compare.c's one conditional, `#if defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)`, has no
+`#else`; the oracle's `cand` and `cand-wide` (HDRI and FFTW) compile it, `ci-gcc-min` and `ci-gcc-dlg` compile the
+file without it. acf515ccb tool: `split_branch_check.py` resolves clang's string-literal labels (`.L.str.N`) to
+their bytes and counts the compiled source path as `__FILE__` (a planted literal change still prints DIFFERENT;
+the earlier checks still pass). 7b97e311b S: GetImageDistortion, GetImageDistortions, SetImageColorMetric and
+SimilarityImage move to `compare-similarity.c` with 77 statics and 18 typedefs (81 functions, 5,195 lines; no
+smaller family is accepted, the statics are shared). **compare.c 2.97 -> 8.92, compare-similarity.c 2.97.**
+`split_branch_check.py`: `cand` IDENTICAL-MODULO-LAYOUT (26 functions; 22 `__LINE__`, 247 constant-pool labels,
+103 string-literal labels), `ci-gcc-min` and `ci-gcc-dlg` IDENTICAL-MODULO-LAYOUT (77 functions; 45 `.rodata`,
+22 `__LINE__`, 12 rip-relative). Combined guard OK (702 literals, 1,195 calls); oracle SimilarityImage 10,
+GetImageDistortion 165, GetImageDistortions 62, SetImageColorMetric 62, CompareImages 165 cases, 0 diverged.
+**For the owner:** this split relabels most of the file (the effect.c/visual-effects.c question, at its largest).
+
+opencl.c (wide build): cf1adf8f6 OC step 6 `LoadOpenCLPlatformDevices` 5.33 (cc 17 -> 11); 470124b95 E
+`AcquireOpenCLCacheDirectory` 5.38 (leaves Large Method; logs stay in the caller for `GetMagickModule()`);
+ded3ea345 P `IsDoctypeQuote` 5.40; fed781bc9 P `IsDoctypeEnd` 5.41; 6609ed18e P `IsOpenCLDeviceSkipped` 5.43;
+8ff5648a9 playbook (Recipe W step 8: a `void` caller's `return;` exits, Decided by `owner`); b7dd7edfc W step 8
+`AcquireOpenCLContexts` 5.47 (LoadOpenCLDevices leaves Large Method). verify_wt.sh prints VERIFY FAILED on every
+opencl.c step from the pre-existing `StopAccelerateTimer` warning (line 257, unchanged). Plateau: the DOCTYPE scan
+(lane a's LB break-form question), the uncompiled `#if WINDOWS` block in GetOpenCLCacheDirectory, five-argument
+helpers, the CF/function-pointer question. Whole catalogues on the lane: 15,900 and 14,145 cases, 1 diverged each
+(`infra/0fd402f13a` load timeout).
