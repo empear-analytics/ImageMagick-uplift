@@ -243,3 +243,45 @@ helper holding them is cc 9+, 6.13 in a probe); `AcquireKernelBuiltIn` (the open
 parked chain (owner), and split_source.py refuses any split (FxImage pulls in the parser through
 `AcquireFxInfoPrivate`). Lane catalogue: 15,900 cases, 0 diverged. Possible upstream: `ScaleKernelInfo`'s
 `minimum = 1` (W16); `(void) (void) FormatLocaleFile` (cosmetic, moved verbatim into `ApplyDirectMorphology`).
+
+## Lane d, third round: re-probing splits under the ruling (merged)
+
+- **resize.c 9.09 -> 10.0** (new `resize-rescale.c` 9.68). 2fc3b7d5a tool (`split_source.py`: a function
+  defined in both branches of an `#if`/`#else` calls what either definition calls; a file-level `#if` opened in
+  the moved region moves with its `#endif`; two false file-scope-variable refusals fixed; regression over every
+  public function of 15 files as a root: 74 of 78 byte-identical, the 4 that differ all resize.c). f2d312574
+  playbook (Recipe S, *Preprocessor branches*: a whole file-level `#if defined(...)`/`#else`/`#endif` holding
+  whole functions of the family moves with its directives when its `#endif` follows the family's last function,
+  nothing in it edited, every side compiled by an available build and passing `split_branch_check.py`).
+  b1a297769 S: InterpolativeResizeImage, LiquidRescaleImage, MinifyImage, ResampleImage, ThumbnailImage (30
+  functions, 864 lines, the contiguous tail, about a third of the file). The LQR block moves whole:
+  `split_branch_check.py` IDENTICAL-MODULO-LAYOUT in `ci-gcc-dlg` (delegate side; 39 functions, 53 `.rodata`
+  references, 28 `__LINE__` immediates) and `ci-gcc-min` (stub side; 31 functions, 59, 27). No oracle case runs
+  LiquidRescaleImage, so its delegate side rests on that check; combined guards 634 literals and 449 call sites
+  unchanged; oracle 59, 4, 13 and 132 cases on the other moved functions, 0 diverged.
+- **resize-image.c 9.38 -> 9.68**: d51efe94c RV step 6(a) `TryApplyResizeFilterPass` (ResizeImage leaves Complex
+  Method, 911 cases); c4313cb1e B `VerticalFilterPass` (7 -> 4 arguments, flat, leaves a category, 896 cases).
+  Ceiling: the public ResizeImage has 5 arguments.
+- Plateaus: threshold.c 9.09 (shared row helpers; `BuiltinMap`'s other side under
+  `#if MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` is compiled by no build), montage.c 9.11 (no natural family frees
+  the ~94 lines the Large Method fix needs), magnify.c 8.84 (one public reaches every static), statistic.c 9.38,
+  segment.c 9.02, quantize.c 8.74 (one family each; `MaxTreeDepth` refuses CompressImageColormap).
+
+## Lane a, third round: widget.c 2.26 -> 2.43, accelerate.c 2.90 -> 3.04 (wide build, merged)
+
+widget.c, 20 commits on `XFontBrowserWidget` (leaves Deep Nesting, Nested Complexity and Brain Method): a24167ba3
+CN (IDENTICAL), 321cf9384 CT; D reuses of the ListBrowser helpers (c3ef5289c, b1494bfdd, d744352ca typedef move,
+b35837ded, c8a141a80, 0e71fef43, 4d4e97556; reuse_check plus obj_modulo MODULO-IDENTICAL or IDENTICAL); 389eca142 E
+2.30; 7bd957c11 Z (depth 5 -> 4); 1c0639f25, f848f1ed5, 437a47347 E; 6e6703f57 SD, 30ceb2bd0 E; f2627c4c9 N;
+11e91aef0 N 2.38; c4608c1cc Z; ac301b0b6 LB step 8 2.43 (IDENTICAL). Not a plateau: XColorBrowserWidget and
+XFileBrowserWidget have the same shape (about +0.16 each with the new helpers). accelerate.c: 1e3cfaccd E
+`ReleaseGrayscaleResources` 2.97 (Contrast and Grayscale leave Code Duplication); 06fd2f469 N
+`SetResizeVerticalFilterArgs` 3.04 (the resize twins leave Code Duplication). Plateau: the 10 wrappers clone
+through the assert/trace preamble (moving it moves `GetMagickModule()`); Equalize's helper would be cc 11; bumps
+holding `OpenCLThrowMagickException(GetMagickModule())`. Recipe text (Decided by `owner`): 66f51afee D (forward
+declaration and typedef move; input-struct bindings), 2e626175f SD step 1 (a `switch` with no `default:`),
+20a94bbe7 N step 2 (an array passed only to calls). Tools: fa1130f3d `case_tail_check.py`, 0ccab1646 and
+0a24f1314 `reuse_check.py` (planted errors caught). Note: `ci_warnings.sh` reports a pre-existing `3999999999`
+constant warning in accelerate.c's LocalContrast at every step. Whole wide catalogue: 14,145 cases, 0 diverged.
+Possible upstream: widget.c Font's reply press reads a stale `i` when `XLoadQueryFont` returns NULL (kept); Font's
+SelectionRequest leaves `notify.send_event` unset and does not check `reply_info.highlight`, unlike ListBrowser's.
