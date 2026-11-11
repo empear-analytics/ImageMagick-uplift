@@ -1815,6 +1815,111 @@ static void XGoToPreviousTextLine(const AnnotateTargets *targets)
     (*p)+=(ptrdiff_t) strlen((*annotate_info)->text);
 }
 
+typedef struct _AnnotateMenuInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *AnnotateMenu;
+
+  int
+    id;
+
+  char
+    *command;
+} AnnotateMenuInput;
+
+typedef struct _AnnotateFontTargets
+{
+  unsigned int
+    *font_id;
+} AnnotateFontTargets;
+
+static void XSelectAnnotateFont(const AnnotateMenuInput *menu,
+  const AnnotateFontTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XResourceInfo
+    *const resource_info = menu->resource_info;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const AnnotateMenu = menu->AnnotateMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  unsigned int
+    *const font_id = targets->font_id;
+
+  const char
+    *FontMenu[MaxNumberFonts];
+
+  int
+    font_number;
+
+  ssize_t
+    i;
+
+  XFontStruct
+    *font_info;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < MaxNumberFonts; i++)
+    FontMenu[i]=resource_info->font_name[i];
+  FontMenu[MaxNumberFonts-2]="Browser...";
+  FontMenu[MaxNumberFonts-1]=(const char *) NULL;
+  /*
+    Select a font name from the pop-up menu.
+  */
+  font_number=XMenuWidget(display,windows,AnnotateMenu[id],
+    (const char **) FontMenu,command);
+  if (font_number < 0)
+    return;
+  if (font_number == (MaxNumberFonts-2))
+    {
+      static char
+        font_name[MagickPathExtent] = "fixed";
+
+      /*
+        Select a font name from a browser.
+      */
+      resource_info->font_name[font_number]=font_name;
+      XFontBrowserWidget(display,windows,"Select",font_name);
+      if (*font_name == '\0')
+        return;
+    }
+  /*
+    Initialize font info.
+  */
+  font_info=XLoadQueryFont(display,resource_info->font_name[
+    font_number]);
+  if (font_info == (XFontStruct *) NULL)
+    {
+      XNoticeWidget(display,windows,"Unable to load font:",
+        resource_info->font_name[font_number]);
+      return;
+    }
+  (*font_id)=(unsigned int) font_number;
+  (void) XFreeFont(display,font_info);
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -1919,6 +2024,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   const AnnotateTargets
     targets = { &annotate_info, &p, &x, &y };
 
+  const AnnotateFontTargets
+    font_targets = { &font_id };
+
   /*
     Map Command widget.
   */
@@ -1965,52 +2073,16 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         {
           case AnnotateNameCommand:
           {
-            const char
-              *FontMenu[MaxNumberFonts];
+            AnnotateMenuInput
+              annotate_input;
 
-            int
-              font_number;
-
-            /*
-              Initialize menu selections.
-            */
-            for (i=0; i < MaxNumberFonts; i++)
-              FontMenu[i]=resource_info->font_name[i];
-            FontMenu[MaxNumberFonts-2]="Browser...";
-            FontMenu[MaxNumberFonts-1]=(const char *) NULL;
-            /*
-              Select a font name from the pop-up menu.
-            */
-            font_number=XMenuWidget(display,windows,AnnotateMenu[id],
-              (const char **) FontMenu,command);
-            if (font_number < 0)
-              break;
-            if (font_number == (MaxNumberFonts-2))
-              {
-                static char
-                  font_name[MagickPathExtent] = "fixed";
-
-                /*
-                  Select a font name from a browser.
-                */
-                resource_info->font_name[font_number]=font_name;
-                XFontBrowserWidget(display,windows,"Select",font_name);
-                if (*font_name == '\0')
-                  break;
-              }
-            /*
-              Initialize font info.
-            */
-            font_info=XLoadQueryFont(display,resource_info->font_name[
-              font_number]);
-            if (font_info == (XFontStruct *) NULL)
-              {
-                XNoticeWidget(display,windows,"Unable to load font:",
-                  resource_info->font_name[font_number]);
-                break;
-              }
-            font_id=(unsigned int) font_number;
-            (void) XFreeFont(display,font_info);
+            annotate_input.display=display;
+            annotate_input.resource_info=resource_info;
+            annotate_input.windows=windows;
+            annotate_input.AnnotateMenu=AnnotateMenu;
+            annotate_input.id=id;
+            annotate_input.command=command;
+            XSelectAnnotateFont(&annotate_input,&font_targets);
             break;
           }
           case AnnotateFontColorCommand:
