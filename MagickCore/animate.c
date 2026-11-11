@@ -2984,6 +2984,25 @@ static void XUnmapPanelWindows(Display *display,XWindows *windows,
     }
 }
 
+static void XMapPanelWindows(XWindows *windows,const XEvent event)
+{
+  if (event.xmap.window == windows->command.id)
+    {
+      windows->command.mapped=MagickTrue;
+      return;
+    }
+  if (event.xmap.window == windows->popup.id)
+    {
+      windows->popup.mapped=MagickTrue;
+      return;
+    }
+  if (event.xmap.window == windows->widget.id)
+    {
+      windows->widget.mapped=MagickTrue;
+      return;
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4063,21 +4082,7 @@ MagickExport Image *XAnimateImages(Display *display,
             windows->icon.mapped=MagickTrue;
             break;
           }
-        if (event.xmap.window == windows->command.id)
-          {
-            windows->command.mapped=MagickTrue;
-            break;
-          }
-        if (event.xmap.window == windows->popup.id)
-          {
-            windows->popup.mapped=MagickTrue;
-            break;
-          }
-        if (event.xmap.window == windows->widget.id)
-          {
-            windows->widget.mapped=MagickTrue;
-            break;
-          }
+        XMapPanelWindows(windows,event);
         break;
       }
       case MappingNotify:
