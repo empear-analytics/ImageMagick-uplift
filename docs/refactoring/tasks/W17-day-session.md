@@ -372,3 +372,24 @@ CN), against the rule that every number is measured for its commit; 059c35d5b sa
 4 (only the list update did). Not a plateau: XFileBrowserWidget needs about ten new helpers; XPreferencesWidget's
 probe scored 2.79 (not taken). Possible upstream: XColorBrowserWidget's ButtonRelease ends with a redundant
 `if (MatteIsActive(...) == MagickFalse) break; break;`; Font's SelectionRequest does not set `notify.send_event`.
+
+## Lane d, fifth round: the 7.6-8.0 band again (merged)
+
+- **layer.c 8.00 -> 8.25** (new `layer-composite.c` 9.68): 573dc02ed S (CompositeLayers, 4 statics and
+  `LayerCompositeInfo`, 233 lines, no preprocessor branch; layer.c flat, step 1 of 2; 7 and 45 cases); 9e0ce6b63
+  playbook (FB steps 3/4: a call that is the whole controlling expression of an `if` with no `else`, compared with
+  a constant, takes the whole `if` with it); 4bc816b6f FB `choice` fill in OptimizeLayerFrames (IDENTICAL; 8.01);
+  64d3ce5fd B `IsBetterFrameBounds` 5 -> 4 arguments via `FrameBoundsEntry` (the file leaves Excess Number of
+  Function Arguments; 8.25). Plateau: the `#if DEBUG_OPT_FRAME` blocks (owner question; a stub probe reaches 8.47).
+- **feature-texture.c 7.60 -> 7.63**: 49f72b88b playbook (Recipe O step 7: five or six written caller variables,
+  or fewer whose pointers would make five or more arguments, go by one `const` struct of addresses, Z step 7's
+  form); c61d17628 O step 7 `AcquireFeatureBuffers` (six allocations; Large Method 252 -> 245; 26 cases). Rejected:
+  FB on `matrix` (object code differs in stack-frame layout only; FB step 6 refuses it); moving the five loops
+  (7.14). Plateau: the grays-fill bumps (owner question) and throw exits through `GetMagickModule()`.
+- fourier.c 7.59, no commit: every finding sits in the publics' `#if !defined(ENABLE_FFTW_DELEGATE)`/`#else` or
+  InverseFourier's `#if defined(MAGICKCORE_HAVE_COMPLEX_H)`/`#else`; the oracle build compiles and runs the FFTW
+  and complex.h sides, so this is the open owner question on editing the compiled side of an `#if defined` pair.
+  FB on four fills is IDENTICAL but flat (not committed); split_source.py refuses both families (7 shared statics).
+- distort.c 7.60, no commit: `poly_basis_dx` (clones `poly_basis_fn`'s chain; slower) and `SetDistortNoBestFit`
+  label deletion (owner question) hold it; a stub of both reaches 8.28.
+- **For the owner:** should FB accept a fill whose only object-code difference is stack-frame layout?
