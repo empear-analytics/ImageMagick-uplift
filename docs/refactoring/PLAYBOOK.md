@@ -771,6 +771,37 @@ with no new helper finding and no new *Code Duplication*; the commit names the f
 it removes and says that no *Code Duplication* was reported. A warning the block
 throws with `GetMagickModule()` now names the helper, which the oracle normalises.
 
+**A helper defined further down, or taking an input struct** (2026-11-11). Form (b),
+*Unreached functions* and *Object code that differs only in the caller* may call a
+helper that the file defines below the caller, and one whose block reads its inputs
+from a `const` input struct (Recipes N, Y and CT make such helpers):
+
+- *Further down:* a forward declaration of the helper, `static T` and on the next line
+  `Helper(<types>);`, the definition's parameter list with the parameter names left
+  out, stands directly above the caller's signature, once (a later caller further down
+  needs none). A `typedef` that the helper's parameter list names and that the file
+  declares below the caller moves, unchanged, to directly above that declaration, in a
+  commit of its own before the reuse, proven as Recipe L proves a moved type:
+  `obj_identical.sh` prints `IDENTICAL`.
+- *Input struct:* when the helper binds members at the top of its body from a
+  `const S *p` parameter (`T const m = p->m;`, each member under its own name), the
+  caller declares an `S` local at the top of the block that holds the call and fills,
+  directly before the call, every member the helper binds, `s.m=e;`; each binding then
+  counts as a parameter `m` bound to `e` under the renaming above (Recipe N's argument:
+  the helper reads `e`'s value through `m`). An `e` of the form `(&E)` (an address the
+  caller has no variable for, `(&windows->widget)`) binds the block's `E.f` to `m->f`
+  and its `&E` to `m`, the same objects; `&(*p)` in the helper is the pointer `p`.
+- `tools/reuse_check.py` checks both (one forward declaration whose types equal the
+  definition's, the fills one per bound member and before the call, nothing else
+  added) besides what it checked before; `--calls` moves as before, plus one for the
+  forward declaration. Types of the fills against the members are checked by reading
+  and by the build.
+
+The declaration only names the function the definition below defines, so every call
+reaches the same code; moving a `typedef` changes no object code. The fill is the
+argument list written member by member: the helper sees each value the block read, at
+the same point, and writes nothing through the struct.
+
 **Careful:**
 
 - Why identical object code is proof: `obj_identical.sh` compiles the file as
@@ -11086,3 +11117,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | Z | Step 7: the `const` targets struct also serves two to four written variables when one pointer per variable would bring step 6's call to five or more arguments, Recipe Q step 8's condition; the step and its argument are unchanged (each member is the address of the variable of its name, bound once, written `(*v)`) | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its play step advances `scene`, `iterations`, `state` and `pause` together while reading `number_scenes`, `image_list` and `first_scene`; the input struct and four pointers would be five arguments, which step 6 refuses, though the same block writing a fifth variable would pass | owner |
 | 2026-11-11 | AMEND | N | Step 2: an array of the caller (a local, or a function-local `static` nothing writes) that the block only subscripts or passes whole to a pointer parameter may be a member, of pointer-to-element type with the element's qualifiers, filled `name.v=v;`; the name converts to the address of its first element at the fill as at each use (C11 6.3.2.1p3), Recipe AR's argument for a read-only array | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its Image-window button branch and its command-menu block read the menu tables `CommandMenu`, `Menus` and `Commands` (local and `static const` arrays) with the window state; N's *Careful* kept arrays out of the struct only because they are not values a copy can take | owner |
 | 2026-11-11 | AMEND | N | Step 2 (the array member added earlier today): a function-local `static` array qualifies whether or not the caller writes its elements elsewhere; the member is the address of the array's own storage, not a copy, so each `v[e]` reads the element as it stands at that point, written before the fill or not, exactly as the name did; the block itself still only reads it | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its colormap-update loop reads `static XWindowInfo *magick_windows[MaXWindows]`, which the function fills once on its first call | owner |
+| 2026-11-11 | AMEND | D | *A helper defined further down, or taking an input struct*: form (b), *Unreached functions* and *Object code that differs only in the caller* may call a helper the file defines below the caller, through a forward declaration directly above the caller (a typedef its parameters name moves up in a commit of its own, `obj_identical.sh` IDENTICAL), and a helper that binds its inputs from a `const` input struct, the caller filling every bound member directly before the call (`(&E)` binds `E.f` to `m->f`); `tools/reuse_check.py` checks the declaration's types and the fills | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Control-U, confirm, release, click and expose blocks are the bodies of `XListBrowserWidget`'s and `XTextViewWidget`'s helpers, defined about 1,500 to 4,000 lines below it, some taking `ListBrowserRelease` or `ListBrowserClick`; new look-alike helpers would repeat them, and they hold the function at nesting depth 4 to 6 (a probe of the chain, 2.26 to 2.43, the function leaving *Deep, Nested Complexity* and *Brain Method*) | owner |
