@@ -12636,6 +12636,9 @@ static MagickBooleanType XROIImage(Display *display,
     (void) XMapWindow(display,windows->info.id);
     do
     {
+      CropEventInput
+        event_input;
+
       if (windows->info.mapped != MagickFalse)
         {
           /*
@@ -12791,6 +12794,10 @@ static MagickBooleanType XROIImage(Display *display,
         }
       XHighlightRectangle(display,windows->image.id,
         windows->image.highlight_context,&highlight_info);
+      event_input.display=display;
+      event_input.windows=windows;
+      event_input.event=(&event);
+      event_input.highlight_info=highlight_info;
       switch (event.type)
       {
         case ButtonPress:
@@ -12831,13 +12838,7 @@ static MagickBooleanType XROIImage(Display *display,
         }
         case ButtonRelease:
         {
-          if (event.xbutton.window == windows->pan.id)
-            if ((highlight_info.x != crop_info.x-windows->image.x) ||
-                (highlight_info.y != crop_info.y-windows->image.y))
-              XHighlightRectangle(display,windows->image.id,
-                windows->image.highlight_context,&highlight_info);
-          (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
-            event.xbutton.time);
+          XCropButtonRelease(&event_input,crop_info);
           break;
         }
         case Expose:
