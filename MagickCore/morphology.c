@@ -5982,6 +5982,145 @@ static void CollectKernelResult(const MorphologyKernelResult *result,
     }
 }
 
+typedef struct _MorphologyMethodLoop
+{
+  const Image
+    *image;
+
+  MorphologyMethod
+    method;
+
+  const KernelInfo
+    *kernel;
+
+  KernelInfo
+    *reflected_kernel;
+
+  double
+    bias;
+
+  MagickBooleanType
+    verbose;
+
+  size_t
+    method_limit,
+    stage_limit,
+    kernel_limit;
+
+  char
+    *v_info;
+
+  ExceptionInfo
+    *exception;
+
+  CompositeOperator
+    rslt_compose;
+} MorphologyMethodLoop;
+
+typedef struct _MorphologyApplyTargets
+{
+  Image
+    **curr_image,
+    **rslt_image,
+    **save_image,
+    **work_image;
+
+  size_t
+    *count;
+} MorphologyApplyTargets;
+
+static MagickBooleanType ApplyMorphologyMethodLoop(
+  const MorphologyMethodLoop *loop,const MorphologyApplyTargets *targets)
+{
+  Image
+    **const curr_image = targets->curr_image,
+    **const rslt_image = targets->rslt_image,
+    **const save_image = targets->save_image,
+    **const work_image = targets->work_image;
+
+  size_t
+    *const count = targets->count;
+
+  KernelInfo
+    *norm_kernel,      /* the current normal un-reflected kernel */
+    *rflt_kernel,      /* the current reflected kernel (if needed) */
+    *this_kernel;      /* the kernel being applied */
+
+  size_t
+    method_loop,    /* Loop 1: number of compound method iterations (norm 1) */
+    kernel_number,  /* Loop 2: the kernel number being applied */
+    method_changed; /* total count of changed over method iteration */
+
+  const MorphologyStageTargets
+    stage_targets = { &this_kernel, save_image, curr_image, work_image,
+      count, &method_changed };
+
+  /* Loop 1:  iterate the compound method */
+  method_loop = 0;
+  method_changed = 1;
+  while ( method_loop < loop->method_limit && method_changed > 0 ) {
+    method_loop++;
+    method_changed = 0;
+
+    /* Loop 2:  iterate over each kernel in a multi-kernel list */
+    norm_kernel = (KernelInfo *) loop->kernel;
+    this_kernel = (KernelInfo *) loop->kernel;
+    rflt_kernel = loop->reflected_kernel;
+
+    kernel_number = 0;
+    while ( norm_kernel != NULL ) {
+      const MorphologyStages
+        stages = { loop->image, loop->method, norm_kernel, rflt_kernel,
+          loop->bias, loop->verbose, method_loop, kernel_number,
+          loop->stage_limit, loop->kernel_limit, loop->v_info,
+          loop->exception };
+
+      MorphologyCompoundFinish
+        finish;
+
+      MorphologyKernelResult
+        kernel_result;
+
+      /* Loop 3: Compound Morphology Staging - Select Primitive to apply */
+      if (ApplyMorphologyStages(&stages,&stage_targets) == MagickFalse)
+        return(MagickFalse);
+
+      /*  Final Post-processing for some Compound Methods
+      **
+      ** The removal of any 'Sync' channel flag in the Image Composition
+      ** below ensures the mathematical compose method is applied in a
+      ** purely mathematical way, and only to the selected channels.
+      ** Turn off SVG composition 'alpha blending'.
+      */
+      finish.method=loop->method;
+      finish.verbose=loop->verbose;
+      finish.curr_image=(*curr_image);
+      finish.image=loop->image;
+      finish.exception=loop->exception;
+      (*save_image)=FinishCompoundMorphology(&finish,(*save_image));
+
+      /* multi-kernel handling:  re-iterate, or compose results */
+      kernel_result.kernel=loop->kernel;
+      kernel_result.rslt_compose=loop->rslt_compose;
+      kernel_result.verbose=loop->verbose;
+      kernel_result.this_kernel=this_kernel;
+      kernel_result.image=loop->image;
+      kernel_result.exception=loop->exception;
+      CollectKernelResult(&kernel_result,rslt_image,curr_image);
+      if (loop->verbose != MagickFalse)
+        (void) FormatLocaleFile(stderr, "\n");
+
+      /* loop to the next kernel in a multi-kernel list */
+      norm_kernel = norm_kernel->next;
+      if ( rflt_kernel != (KernelInfo *) NULL )
+        rflt_kernel = rflt_kernel->next;
+      kernel_number++;
+    } /* End Loop 2: Loop over each kernel */
+
+  } /* End Loop 1: compound method interaction */
+  return(MagickTrue);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -5997,10 +6136,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
     *rslt_image;    /* resultant image - after multi-kernel handling */
 
   KernelInfo
-    *reflected_kernel, /* A reflected copy of the kernel (if needed) */
-    *norm_kernel,      /* the current normal un-reflected kernel */
-    *rflt_kernel,      /* the current reflected kernel (if needed) */
-    *this_kernel;      /* the kernel being applied */
+    *reflected_kernel; /* A reflected copy of the kernel (if needed) */
 
   CompositeOperator
     rslt_compose;   /* multi-kernel compose method for results to use */
@@ -6010,20 +6146,16 @@ MagickPrivate Image *MorphologyApply(const Image *image,
     verbose;        /* verbose output of results */
 
   size_t
-    method_loop,    /* Loop 1: number of compound method iterations (norm 1) */
     method_limit,   /*         maximum number of compound method iterations */
-    kernel_number,  /* Loop 2: the kernel number being applied */
     stage_limit,    /*         how many primitives are in this compound */
     kernel_limit,   /*         number of times to iterate kernel */
-    count,          /* total count of primitive steps applied */
-    method_changed; /* total count of changed over method iteration */
+    count;          /* total count of primitive steps applied */
 
   char
     v_info[MagickPathExtent];
 
-  const MorphologyStageTargets
-    stage_targets = { &this_kernel, &save_image, &curr_image, &work_image,
-      &count, &method_changed };
+  const MorphologyApplyTargets
+    targets = { &curr_image, &rslt_image, &save_image, &work_image, &count };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -6109,68 +6241,15 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   /* Loops around more primitive morphology methods
   **  erose, dilate, open, close, smooth, edge, etc...
   */
-  /* Loop 1:  iterate the compound method */
-  method_loop = 0;
-  method_changed = 1;
-  while ( method_loop < method_limit && method_changed > 0 ) {
-    method_loop++;
-    method_changed = 0;
+  {
+    const MorphologyMethodLoop
+      loop = { image, method, kernel, reflected_kernel, bias, verbose,
+        method_limit, stage_limit, kernel_limit, v_info, exception,
+        rslt_compose };
 
-    /* Loop 2:  iterate over each kernel in a multi-kernel list */
-    norm_kernel = (KernelInfo *) kernel;
-    this_kernel = (KernelInfo *) kernel;
-    rflt_kernel = reflected_kernel;
-
-    kernel_number = 0;
-    while ( norm_kernel != NULL ) {
-      const MorphologyStages
-        stages = { image, method, norm_kernel, rflt_kernel, bias, verbose,
-          method_loop, kernel_number, stage_limit, kernel_limit, v_info,
-          exception };
-
-      MorphologyCompoundFinish
-        finish;
-
-      MorphologyKernelResult
-        kernel_result;
-
-      /* Loop 3: Compound Morphology Staging - Select Primitive to apply */
-      if (ApplyMorphologyStages(&stages,&stage_targets) == MagickFalse)
-        goto error_cleanup;
-
-      /*  Final Post-processing for some Compound Methods
-      **
-      ** The removal of any 'Sync' channel flag in the Image Composition
-      ** below ensures the mathematical compose method is applied in a
-      ** purely mathematical way, and only to the selected channels.
-      ** Turn off SVG composition 'alpha blending'.
-      */
-      finish.method=method;
-      finish.verbose=verbose;
-      finish.curr_image=curr_image;
-      finish.image=image;
-      finish.exception=exception;
-      save_image=FinishCompoundMorphology(&finish,save_image);
-
-      /* multi-kernel handling:  re-iterate, or compose results */
-      kernel_result.kernel=kernel;
-      kernel_result.rslt_compose=rslt_compose;
-      kernel_result.verbose=verbose;
-      kernel_result.this_kernel=this_kernel;
-      kernel_result.image=image;
-      kernel_result.exception=exception;
-      CollectKernelResult(&kernel_result,&rslt_image,&curr_image);
-      if (verbose != MagickFalse)
-        (void) FormatLocaleFile(stderr, "\n");
-
-      /* loop to the next kernel in a multi-kernel list */
-      norm_kernel = norm_kernel->next;
-      if ( rflt_kernel != (KernelInfo *) NULL )
-        rflt_kernel = rflt_kernel->next;
-      kernel_number++;
-    } /* End Loop 2: Loop over each kernel */
-
-  } /* End Loop 1: compound method interaction */
+    if (ApplyMorphologyMethodLoop(&loop,&targets) == MagickFalse)
+      goto error_cleanup;
+  }
 
   goto exit_cleanup;
 
