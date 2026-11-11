@@ -5918,6 +5918,9 @@ static int FindFontBrowserCursor(XFontStruct *font_info,
   return(i);
 }
 
+static XWidgetInfo
+  PlaceTextViewExpose(XWidgetInfo,const XWidgetInfo);
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6411,18 +6414,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
             /*
               Update slider.
             */
-            if (slider_info.y > expose_info.y)
-              {
-                expose_info.height=(unsigned int) (slider_info.y-expose_info.y);
-                expose_info.y=slider_info.y-(int) expose_info.height-(int)
-                  slider_info.bevel_width-1;
-              }
-            else
-              {
-                expose_info.height=(unsigned int) (expose_info.y-slider_info.y);
-                expose_info.y=slider_info.y+(int) slider_info.height+(int)
-                  slider_info.bevel_width+1;
-              }
+            expose_info=PlaceTextViewExpose(expose_info,slider_info);
             XDrawTriangleNorth(display,&windows->widget,&north_info);
             XDrawMatte(display,&windows->widget,&expose_info);
             XDrawBeveledButton(display,&windows->widget,&slider_info);
