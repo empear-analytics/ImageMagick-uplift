@@ -1252,6 +1252,28 @@ static void XFocusBackdropImage(Display *display,XWindows *windows)
       CurrentTime);
 }
 
+static Image *XFindColormapMismatch(Image *images,
+  const XVisualInfo *visual_info)
+{
+  Image
+    *next;
+
+  ssize_t
+    i;
+
+  for (next=images; next != (Image *) NULL; )
+  {
+    next->alpha_trait=UndefinedPixelTrait;
+    if (IsColormapMismatch(next,images,visual_info) != MagickFalse)
+      break;
+    i=FindColormapDifference(next,images);
+    if (i < (ssize_t) images->colors)
+      break;
+    next=GetNextImageInList(next);
+  }
+  return(next);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -1548,16 +1570,7 @@ MagickExport Image *XAnimateImages(Display *display,
         /*
           Determine if the sequence of images has the identical colormap.
         */
-        for (next=images; next != (Image *) NULL; )
-        {
-          next->alpha_trait=UndefinedPixelTrait;
-          if (IsColormapMismatch(next,images,visual_info) != MagickFalse)
-            break;
-          i=FindColormapDifference(next,images);
-          if (i < (ssize_t) images->colors)
-            break;
-          next=GetNextImageInList(next);
-        }
+        next=XFindColormapMismatch(images,visual_info);
         if (next != (Image *) NULL)
           (void) RemapImages(resource_info->quantize_info,images,
             (Image *) NULL,exception);
