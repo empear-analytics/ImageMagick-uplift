@@ -205,6 +205,13 @@ def main(argv):
     if len(calls) != 1:
         raise SystemExit(f"FAIL: expected one added call of {helper}, found {len(calls)}")
     call = calls[0]
+    call_at = added.index(call)
+    call_parts = [call]
+    k = call_at
+    while call.count("(") > call.count(")") and k + 1 < len(added):
+        k += 1  # a call wrapped over several lines: join them
+        call_parts.append(added[k])
+        call += added[k]
     inner = call[call.index(helper + "(") + len(helper) + 1:]
     depth, end = 1, 0
     for end, ch in enumerate(inner):
@@ -216,10 +223,9 @@ def main(argv):
     if len(args) != len(params):
         raise SystemExit(f"FAIL: {len(args)} arguments for {len(params)} parameters")
     binds = []
-    allowed = {call}
+    allowed = set(call_parts)
     dropped = set()
     body_all = [b.strip() for b in body.splitlines()]
-    call_at = added.index(call)
     for a, (p, ptr, ptext) in zip(args, params):
         s = re.fullmatch(r"&(\w+)", a)
         if ptr and s and re.match(r"const \w+ \*\s*\w+$", ptext.strip()) \
