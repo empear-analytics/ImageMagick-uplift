@@ -186,6 +186,16 @@ before the commit and quoted in its message, which carries `Verified: guard`:
    reading stands in for it: the message quotes the old call and the fill side by side.
    The type of each member against the variable's declaration (N step 3, B
    *Careful*) is checked by reading.
+   Under N step 8's sibling forms (one local filled once, several calls after it) the
+   fill does not stand directly before each call and `struct_fill_check.py` cannot
+   pass; `python3 tools/sibling_fill_check.py <file> <Type> <local> <Helper>` stands in
+   for it and prints `OK` (one run of `local.m=m;` for every member, in member order, in
+   the one function that holds the helper's calls, every call after it, no write to a
+   member's variable from the run to the last call, the bindings by name, every
+   removed line among the added ones), or `FAIL` listing only lines the recipe's own
+   text rewrites: an inner call's `&local` that step 8 passes on as `name`, a case's
+   `break;` that became `return;` (Recipe E step 7's switch form). The commit message
+   names each such line; any other line it lists stops the step.
 4. `sh tools/obj_modulo.sh <file> <Caller> <Helper>` prints `IDENTICAL` (the whole
    object file byte for byte, D's proof) or `MODULO-IDENTICAL`: every other function of
    the file compiles to the same instructions, addresses aside; the only new function
@@ -1742,6 +1752,15 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    later commit adds a member and its assignment). A block that later moves around
    such a call (the case holding a row loop whose column loop moved first) takes the
    same `const Name *name` and passes it on, as the loop-body paragraph above says.
+   A second function of the file whose sibling blocks read the same group, each
+   variable of the same name and exact type as a member, may use the typedef an
+   earlier function's siblings declared (2026-11-11), instead of a second typedef that
+   would repeat it member for member (`XMakeImageMSBFirst` beside
+   `XMakeImageLSBFirst`): it declares its own local of that type among its
+   declarations and fills every member once, by step 6's assignments, on the terms
+   above; each helper binds only the members its block reads. The two functions share
+   the type alone: each fills and passes its own local, so no value crosses between
+   them.
 
 **Before:**
 
@@ -10839,3 +10858,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | E | Step 3: the struct-pointer form also serves a struct local the block reads, or reads and assigns members of, when a copy of it draws clang's `-Wconditional-uninitialized` (CI) because the compiler cannot see it set on every path though every path sets it: `const T *v` when the block assigns no member (a write through a pointer member allowed), `T *v` in a `void` function when it does; `v.m` becomes `(*v).m`, `&v` becomes `v`, the call passes `&v`; N, Y and Z, which meet E's steps, read it the same way | `widget.c`'s `XDialogWidget` (campaign A, W16 lane a): its cancel release, reply-field press and Control-U blocks read or update `reply_info`, set by `XGetWidgetInfo` only inside the loop's configuration branch; passed by value (as `XListBrowserWidget`'s twins are, where the `targets` initialiser takes its address first) every copy failed `ci_warnings.sh`; with the pointer form the chain measured 1.59 to 1.70 | owner |
 | 2026-11-10 | AMEND | D | *Object code that differs only in the caller*: `reuse_check.py` (7394f75a1) also takes a helper returning the block's single output, called as the statement `v=Helper(...);` with `v` passed to a by-value parameter `p`, whose closing `return(p);` (the assignment back) is left out of the comparison, and compares a block whose lines break an expression at other tokens as one token stream | `widget.c`'s `XTextViewWidget` (campaign A, W16 lane a): its slider tracking and page press are `XListBrowserWidget`'s, which Recipe E made into `TrackListBrowserSlider` and `PageListBrowserSlider` (`slider_info=...(slider_info,...)`); the tracking lies on lines no case reaches and wraps its last expression at another token, so the check refused both; reusing them (instead of two look-alike helpers) is the step that measured 1.74 to 1.89 | owner |
 | 2026-11-10 | AMEND | I | Step 1: a block inside a `switch` case may leave only through `break;` statements that end that `switch` (the innermost `switch` or loop around it): each becomes `return(MagickFalse);` and the caller writes `if (Helper(...,&targets) == MagickFalse) break;` where the block stood, inside the same `switch`; the unreached level holds as written, `tools/targets_fill_check.py` counting `break;` as an exit (7c4c8a433) | `widget.c`'s `XMenuWidget` (campaign A, W16 lane a): its submenu test in the pointer-motion case sets `selection_info.id`, clears `*item` and sets ExitState, then leaves the `switch` by `break;` from two branches of nesting 5, on lines no case reaches; Recipe CT needs the case's tail, LB a loop, and I, V, Y and W a `return` or `goto` exit; with it the XMenuWidget chain measured 1.89 to 2.13 | owner |
+| 2026-11-11 | AMEND | N | *Two levels of evidence*, *Unreached functions: B and N*, item 3: under N step 8's sibling forms, where one fill serves several calls and `struct_fill_check.py` cannot pass, `tools/sibling_fill_check.py` (dc4c85873) stands in for it: `OK`, or `FAIL` listing only lines the recipe's own text rewrites (an inner call's `&local` passed on as `name`, a case's `break;` become `return;`), each named in the commit message | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W17 lane b), reached by no case (the oracle's X server is LSB-first): its conversion cases are the twins of `XMakeImageLSBFirst`'s, which moved as step 8 siblings over one `XImageRowSource` with the oracle; at the guard level only item 3's tool stood in the way. A probe of the chain: 1.58 to 1.64, the function leaving nesting depth 6 for 4, no finding on any helper | owner |
+| 2026-11-11 | AMEND | N | Step 8: a second function of the file whose sibling blocks read the same group (same names, exact types) may use the typedef an earlier function's siblings declared, with its own local and its own one fill, instead of a second typedef repeating it member for member | `xwindow.c`'s `XMakeImageMSBFirst`, whose cases read `canvas`, `canvas_view`, `exception`, `resource_info`, `ximage`, `scanline_pad`, `pixels` and `map_info`, the eight members of `XMakeImageLSBFirst`'s `XImageRowSource`, with the same types (campaign A, W17 lane b) | owner |
