@@ -1779,6 +1779,42 @@ static inline MagickBooleanType IsSelectionUnusable(const int status,
     (length == 0)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _AnnotateTargets
+{
+  XAnnotateInfo
+    **annotate_info;
+
+  char
+    **p;
+
+  int
+    *x,
+    *y;
+} AnnotateTargets;
+
+static void XGoToPreviousTextLine(const AnnotateTargets *targets)
+{
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  /*
+    Go to end of the previous line of text.
+  */
+  (*annotate_info)=(*annotate_info)->previous;
+  (*p)=(*annotate_info)->text;
+  (*x)=(*annotate_info)->x+(int) (*annotate_info)->width;
+  (*y)=(*annotate_info)->y;
+  if ((*annotate_info)->width != 0)
+    (*p)+=(ptrdiff_t) strlen((*annotate_info)->text);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -1876,6 +1912,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   XEvent
     event,
     text_event;
+
+  const AnnotateTargets
+    targets = { &annotate_info, &p, &x, &y };
 
   /*
     Map Command widget.
@@ -2420,15 +2459,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
                   break;
                 else
                   {
-                    /*
-                      Go to end of the previous line of text.
-                    */
-                    annotate_info=annotate_info->previous;
-                    p=annotate_info->text;
-                    x=annotate_info->x+(int) annotate_info->width;
-                    y=annotate_info->y;
-                    if (annotate_info->width != 0)
-                      p+=(ptrdiff_t) strlen(annotate_info->text);
+                    XGoToPreviousTextLine(&targets);
                     break;
                   }
               }
