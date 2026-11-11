@@ -6202,6 +6202,112 @@ static void MatchFontBrowserReply(const FontBrowserMatch *match,
       }
 }
 
+typedef struct _FontBrowserUpdate
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    *reply,
+    *glob_pattern;
+
+  const char
+    *back_pattern;
+
+  char
+    **listhead;
+} FontBrowserUpdate;
+
+typedef struct _FontBrowserUpdateTargets
+{
+  XWidgetInfo
+    *action_info;
+
+  char
+    ***fontlist;
+
+  int
+    *fonts;
+} FontBrowserUpdateTargets;
+
+static MagickBooleanType UpdateFontBrowserList(const FontBrowserUpdate *update,
+  const FontBrowserUpdateTargets *targets)
+{
+  Display
+    *const display = update->display;
+
+  XWindows
+    *const windows = update->windows;
+
+  char
+    *const reply = update->reply,
+    *const glob_pattern = update->glob_pattern;
+
+  const char
+    *const back_pattern = update->back_pattern;
+
+  char
+    **const listhead = update->listhead;
+
+  XWidgetInfo
+    *const action_info = targets->action_info;
+
+  char
+    ***const fontlist = targets->fontlist;
+
+  int
+    *const fonts = targets->fonts;
+
+  char
+    **checklist;
+
+  int
+    number_fonts;
+
+  checklist=XListFonts(display,glob_pattern,32767,&number_fonts);
+  if (checklist == (char **) NULL)
+    {
+      if ((strchr(glob_pattern,'*') == (char *) NULL) &&
+          (strchr(glob_pattern,'?') == (char *) NULL))
+        {
+          /*
+            Might be a scaleable font-- exit.
+          */
+          (void) CopyMagickString(reply,glob_pattern,MagickPathExtent);
+          (void) CopyMagickString(glob_pattern,back_pattern,MagickPathExtent);
+          (*action_info).raised=MagickFalse;
+          XDrawBeveledButton(display,&windows->widget,action_info);
+          return(MagickFalse);
+        }
+      (void) CopyMagickString(glob_pattern,back_pattern,MagickPathExtent);
+      (void) XBell(display,0);
+    }
+  else
+    if (number_fonts == 1)
+      {
+        /*
+          Reply is a single font name-- exit.
+        */
+        (void) CopyMagickString(reply,checklist[0],MagickPathExtent);
+        (void) CopyMagickString(glob_pattern,back_pattern,MagickPathExtent);
+        (void) XFreeFontNames(checklist);
+        (*action_info).raised=MagickFalse;
+        XDrawBeveledButton(display,&windows->widget,action_info);
+        return(MagickFalse);
+      }
+    else
+      {
+        (void) XFreeFontNames(listhead);
+        (*fontlist)=(char **) RelinquishMagickMemory((*fontlist));
+        (*fontlist)=checklist;
+        (*fonts)=number_fonts;
+      }
+  return(MagickTrue);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6554,53 +6660,23 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
       }
     if (state & UpdateListState)
       {
-        char
-          **checklist;
+        const FontBrowserUpdateTargets
+          update_targets = { &action_info, &fontlist, &fonts };
 
-        int
-          number_fonts;
+        FontBrowserUpdate
+          update;
 
         /*
           Update font list.
         */
-        checklist=XListFonts(display,glob_pattern,32767,&number_fonts);
-        if (checklist == (char **) NULL)
-          {
-            if ((strchr(glob_pattern,'*') == (char *) NULL) &&
-                (strchr(glob_pattern,'?') == (char *) NULL))
-              {
-                /*
-                  Might be a scaleable font-- exit.
-                */
-                (void) CopyMagickString(reply,glob_pattern,MagickPathExtent);
-                (void) CopyMagickString(glob_pattern,back_pattern,MagickPathExtent);
-                action_info.raised=MagickFalse;
-                XDrawBeveledButton(display,&windows->widget,&action_info);
-                break;
-              }
-            (void) CopyMagickString(glob_pattern,back_pattern,MagickPathExtent);
-            (void) XBell(display,0);
-          }
-        else
-          if (number_fonts == 1)
-            {
-              /*
-                Reply is a single font name-- exit.
-              */
-              (void) CopyMagickString(reply,checklist[0],MagickPathExtent);
-              (void) CopyMagickString(glob_pattern,back_pattern,MagickPathExtent);
-              (void) XFreeFontNames(checklist);
-              action_info.raised=MagickFalse;
-              XDrawBeveledButton(display,&windows->widget,&action_info);
-              break;
-            }
-          else
-            {
-              (void) XFreeFontNames(listhead);
-              fontlist=(char **) RelinquishMagickMemory(fontlist);
-              fontlist=checklist;
-              fonts=number_fonts;
-            }
+        update.display=display;
+        update.windows=windows;
+        update.reply=reply;
+        update.glob_pattern=glob_pattern;
+        update.back_pattern=back_pattern;
+        update.listhead=listhead;
+        if (UpdateFontBrowserList(&update,&update_targets) == MagickFalse)
+          break;
         /*
           Sort font list in ascending order.
         */
