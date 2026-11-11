@@ -105,7 +105,7 @@ def check_targets(text, type_name, names):
 
 def check_fill(text, input_type, local, helper, names):
     fill = "".join(r"\s*" + re.escape(f"{local}.{n}={n};") for n in names)
-    call = r"\s*" + re.escape(helper) + r"\(\s*&" + re.escape(local) + r"\b"
+    call = r"\s*(?:if \()?" + re.escape(helper) + r"\(\s*&" + re.escape(local) + r"\b"
     found = re.findall(fill + call, text)
     problems = []
     if len(found) != 1:
