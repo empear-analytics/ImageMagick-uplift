@@ -7826,6 +7826,48 @@ static void XPackBlueHigh32BitMSB(const XImageRowSource *source,
   }
 }
 
+static void XPackContinuousMultiByteMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  unsigned int
+    bytes_per_pixel;
+
+  /*
+    Convert to multi-byte continuous-tone X canvas.
+  */
+  bytes_per_pixel=(unsigned int) (ximage->bits_per_pixel >> 3);
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackContinuousMultiByteRowMSB(source,bytes_per_pixel,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -8029,24 +8071,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
             if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
               XPackBlueHigh32BitMSB(&row_source,q);
             else
-              {
-                unsigned int
-                  bytes_per_pixel;
-
-                /*
-                  Convert to multi-byte continuous-tone X canvas.
-                */
-                bytes_per_pixel=(unsigned int) (ximage->bits_per_pixel >> 3);
-                for (y=0; y < (int) canvas->rows; y++)
-                {
-                  p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-                    canvas->columns,1,exception);
-                  if (p == (const Quantum *) NULL)
-                    break;
-                  q=XPackContinuousMultiByteRowMSB(&row_source,bytes_per_pixel,p,q);
-                  q+=(ptrdiff_t) scanline_pad;
-                }
-              }
+              XPackContinuousMultiByteMSB(&row_source,q);
           break;
         }
       }
