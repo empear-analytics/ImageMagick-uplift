@@ -14186,6 +14186,22 @@ static inline MagickBooleanType IsDynamicVisualClass(const int v)
   return(MagickFalse);
 }
 
+static Image *XReloadModifiedImage(XResourceInfo *resource_info,
+  const Image *display_image,size_t *state,ExceptionInfo *exception)
+{
+  Image
+    *nexus;
+
+  (void) FormatLocaleString(
+    resource_info->image_info->filename,MagickPathExtent,
+    "%s:%s",display_image->magick,
+    display_image->filename);
+  nexus=ReadImage(resource_info->image_info,exception);
+  if (nexus != (Image *) NULL)
+    *state|=NextImageState | ExitState;
+  return(nexus);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -15226,13 +15242,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
                       /*
                         Redisplay image.
                       */
-                      (void) FormatLocaleString(
-                        resource_info->image_info->filename,MagickPathExtent,
-                        "%s:%s",display_image->magick,
-                        display_image->filename);
-                      nexus=ReadImage(resource_info->image_info,exception);
-                      if (nexus != (Image *) NULL)
-                        *state|=NextImageState | ExitState;
+                      nexus=XReloadModifiedImage(resource_info,display_image,
+                        state,exception);
                     }
                   delay=display_image->delay/(size_t) MagickMax(
                     display_image->ticks_per_second,1L);
