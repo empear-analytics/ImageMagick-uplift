@@ -2862,6 +2862,14 @@ a finding.
 5. In the caller, declare the `Name` local among the declarations at the top of the block
    that holds the call. Directly before the call, assign every member from the variable
    of its name, in declaration order, with nothing between the assignments and the call.
+   Or, when every member's variable is a plain identifier, write the fill in Recipe FB's
+   form (2026-11-11): no `Name` local among the declarations; where the block stood, a
+   compound statement holding `const Name name = { v1, v2, ... };` (the members'
+   variables in declaration order, wrapped at 79 columns), a blank line and step 6's
+   `if (Helper(&name,...) == MagickFalse)` with its exit, unchanged. The initialiser
+   reads each variable where the assignments would have, directly before the call, and
+   the exit leaves the compound statement as it left the block (Recipe FB *Careful*).
+   Recipe I's input struct (its step 4) may take the same form.
 6. Where the block stood, write `if (Helper(&name,&v) == MagickFalse) goto L;` (or
    `return(c);`, or Recipe V step 7's `{ S return(v); }` and its other forms, the exit's
    text unchanged), and check every member and argument by reading.
@@ -2996,7 +3004,13 @@ through a jump or a `return`.
 5. In the caller, declare the `Name` local among the declarations at the top of the
    block that holds the call. Directly before the call, assign every member from the
    variable of its name, in declaration order, with nothing between the assignments and
-   the call.
+   the call. Or, when every member's variable is a plain identifier, write the fill in
+   Recipe FB's form (2026-11-11): no `Name` local among the declarations; where the
+   block stood, a compound statement holding `const Name name = { v1, v2, ... };` (the
+   members' variables in declaration order, wrapped at 79 columns), a blank line and
+   step 6's call. The initialiser reads each variable at the point where the
+   assignments would have, directly before the call, and the struct lives only for
+   that call (Recipe FB *Careful*).
 6. Call it where the block stood with `&name` and `&v` for each written variable, at
    most four arguments in all; check every member and argument by reading.
 7. Five or six written variables. When the block writes five or six variables of the
@@ -3235,6 +3249,13 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    left in the caller as `{ S return(c); }` is; its expression reads no written
    variable. So does V step 7's side-effect-free `S return(e);`, whose `e` reads no
    written variable.
+   `M` may also be one of MagickCore's own throw macros (`exception-private.h`:
+   `ThrowImageException`, `ThrowBinaryException` and the like), whose expansion is
+   `(void) ThrowMagickException(exception,GetMagickModule(),...);` and `return(c);` of
+   one constant (2026-11-11). It stays in the caller as a function-local macro does, so
+   `GetMagickModule()` still names the caller; a variable its expansion reads that the
+   block writes (`ThrowImageException`'s `image`) is a written variable of step 2, and
+   the macro reads the value the block left in it, as before.
 
 **Before:**
 
@@ -6595,7 +6616,11 @@ addresses of written variables, not copies of read-only values.
 2. Every `e` is a plain identifier or a literal: no call, member access, cast, increment,
    assignment or macro with a side effect. Each identifier is declared before the
    struct's declaration (a parameter, a local of an enclosing block, or an earlier
-   declaration of the same block), so the initialiser may name it.
+   declaration of the same block), so the initialiser may name it. A read of a member
+   through a parameter of the function declared pointer-to-`const` (`p->m`, or
+   `p->m.n` of a struct-valued member; 2026-11-11) is admitted as well: it has no side
+   effect, and the run writes nothing it reads, since the run writes only `name`, a
+   local whose address nothing holds before the call (step 3).
 3. The struct is only read after the fill: it appears afterwards only as `&name` passed to
    a parameter of type pointer-to-`const`, or in `name.m` reads. Nothing writes it or a
    member of it.
@@ -10537,6 +10562,123 @@ either step left out the function keeps both (1.48). Added by Claude Code (Claud
 
 ---
 
+## Recipe FB - Fill a Struct by Initialiser in a Block of Its Own
+
+**Use when:** CodeScene reports *Large Method* (or *Complex Method* or *Bumpy Road
+Ahead*, when the lines the fill holds are what a later extraction cannot afford because
+*Lines of Code in a Single File* sets the budget), and the function fills a struct local
+member by member, `name.m=e;` per member, directly before its one call, where Recipe FI
+refuses the fill because some value is written between the top of the block that
+declares the struct and the run: `MontageImageList`'s `placement` (sixteen assignments;
+`width`, `height`, `x_offset`, `y_offset` and `max_height` are set earlier in the tile
+loop's body), `page_info` (sixteen; `extent` is set just before) and `bounds_info` (ten;
+`tiles_per_page` is set at the top of the page loop's body).
+
+**Not covered by:** Recipe FI, whose steps 1 to 4 need the run to follow the declaration
+directly and whose step 8 (b) needs every value fixed at the top of the block holding the
+run; here a value is written in between, so the declaration cannot move to that block's
+top with its initialiser. Recipe RF, which deletes a repeated fill; here every value
+stays and is written once. Recipes N, B and PC, which say how a new struct is filled, not
+how an existing fill is rewritten. Recipe H, which moves preprocessor lines.
+
+**How:**
+
+1. The struct local `name` is declared, with no initialiser, among the declarations at
+   the top of a block of the function, of a `typedef struct` type whose members are
+   scalars, pointers or struct values (no array member). Further down there is one run
+   of statements `name.m=e;` that assigns every member exactly once, in declaration
+   order (checked by script against the typedef), and the statement directly after the
+   run is the one call that uses `name`.
+2. Every `e` is a plain identifier or a literal (FI step 2): no call, member access,
+   cast, increment, assignment or macro with a side effect; or a member read through a
+   pointer-to-`const` parameter of the function, as FI step 2 admits it.
+3. `name` appears nowhere in the function but in its declaration, the run, and once as
+   `&name` in that call, passed to a parameter of type pointer-to-`const` (FI step 3).
+   The call is one expression statement ending in `;` (`F(...,&name,...);` or
+   `v=F(...,&name,...);`), the run and the call stand in the same compound statement,
+   and neither is the unbraced body of an `if`, `else` or loop, nor carries a label.
+4. Delete the declaration of `name` (with the blank line after it; a type line left with
+   no name under it goes too). Replace the run and the call by a compound statement at
+   the run's indentation: `{`, then `const Name name = { e1, e2, ... };` as FI step 4
+   writes it (the values in declaration order, wrapped at 79 columns), a blank line, the
+   call unchanged but indented two more columns, and `}`.
+5. Inside a `#pragma omp parallel` body the compound statement stays where the run stood,
+   in the body: each thread initialises its own (FI step 5). No `#pragma` or
+   preprocessor line lies inside the run or the call, and none moves.
+6. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
+   the step.
+7. One function's fills, however many, go in one commit (one recipe, one function).
+
+**Before:**
+
+```c
+    for (tile=0; tile < MagickMin((ssize_t) tiles_per_page,(ssize_t) number_images); tile++)
+    {
+      MontageTilePlacement
+        placement;
+
+      ...
+      height=concatenate != MagickFalse ? max_height : extract_info.height;
+      placement.border_width=border_width;
+      placement.montage_info=montage_info;
+      ...
+      placement.concatenate=concatenate;
+      placement.extract_info=extract_info;
+      image=PlaceMontageTile(&placement,image);
+```
+
+**After:**
+
+```c
+    for (tile=0; tile < MagickMin((ssize_t) tiles_per_page,(ssize_t) number_images); tile++)
+    {
+      ...
+      height=concatenate != MagickFalse ? max_height : extract_info.height;
+      {
+        const MontageTilePlacement
+          placement = { border_width, montage_info, width, height, exception,
+            tile_image, bevel_width, frame_info, metrics, montage, draw_info,
+            x_offset, y_offset, max_height, concatenate, extract_info };
+
+        image=PlaceMontageTile(&placement,image);
+      }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The assignments ran in order, each from an identifier
+  nothing between them wrote (they write only `name`, and step 2 rules out side
+  effects), directly before the call; the initialiser takes the same identifiers'
+  values at the same point, since a block's declarations are initialised when execution
+  reaches them (C11 6.8p3), once per pass as the run was. Every member is set, so none
+  is left to zero where it held an indeterminate value before. The struct now lives
+  only for the call, which was its only use (step 3); `const` is a promise the compiler
+  checks, and the pointer-to-`const` parameter says the callee keeps to it.
+- The compound statement is not a decision: it adds no branch and no conditional
+  nesting, and it is how C89 lets a declaration stand after statements
+  (`-Wdeclaration-after-statement` is met). The name is declared once, in the inner
+  block, so nothing is shadowed (`tools/ci_linux_warnings.sh` checks it).
+- Identical object code under the oracle build's flags (step 6) proves the step for this
+  build on every input, reached or not; it also catches a swapped pair of same-typed
+  members.
+- An initialiser that names automatic variables needs C99, as Recipe FI's does.
+- Like FI, the step shortens the function's text without hiding any of it: each value
+  is still written once, where it was written before, beside the call that reads it.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`; `refactor_guard.py` and `--calls` see no change.
+
+**Provenance:** 2026-11-11, from `montage.c`'s `MontageImageList` (campaign A, W17 lane
+d): its `bounds_info`, `page_info` and `placement` fills (ten, sixteen and sixteen
+assignments) are refused by FI step 8 (b), since `tiles_per_page`, `extent` and the tile
+geometry are written in the same loop body before each run. The file sits about 37
+lines under *Lines of Code in a Single File*, which every extraction of the tile loop
+would otherwise cross. A probe of the three: `IDENTICAL` object code, 227 to 198 lines,
+8.72 to 8.86. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10
+to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -10892,3 +11034,9 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | N | Step 8: a second function of the file whose sibling blocks read the same group (same names, exact types) may use the typedef an earlier function's siblings declared, with its own local and its own one fill, instead of a second typedef repeating it member for member | `xwindow.c`'s `XMakeImageMSBFirst`, whose cases read `canvas`, `canvas_view`, `exception`, `resource_info`, `ximage`, `scanline_pad`, `pixels` and `map_info`, the eight members of `XMakeImageLSBFirst`'s `XImageRowSource`, with the same types (campaign A, W17 lane b) | owner |
 | 2026-11-11 | AMEND | N | *Unreached functions: B and N*, item 3 (as amended earlier today): `sibling_fill_check.py`'s move check may also list a declarator of the caller that leaves because nothing left in the caller names the variable (Recipe E step 4; `-Wunused-variable` would fail CI otherwise), named in the commit message | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W17 lane b): with its continuous-tone multi-byte column loop moved, nothing in the caller reads `pixel`, and the check lists the `pixel,` declarator that left | owner |
 | 2026-11-11 | AMEND | B, N, I | *Unreached functions: B and N*, item 4: `tools/obj_modulo.sh` leaves the trailing run of alignment padding after each function's last instruction (the nop family, `int3`) out of the comparison; padding inside a function stays compared. The tool change is a commit of its own | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W17 lane b): its blue-high branch moved to an out-of-line N helper, and the only difference in the 64 other functions was one `nopw` added after `XDitherImage`'s last instruction (the next function's boundary moved). A planted loop-bound change in `XDitherImage` is still reported `DIFFERENT` | owner |
+| 2026-11-11 | NEW | FB | Fill a Struct by Initialiser in a Block of Its Own: a struct local filled member by member directly before its one call, from plain identifiers some of which are written in the same block before the run (FI step 8 (b) refuses it), loses its declaration; the run and the call become a compound statement `{ const Name name = { ... }; call }`; `obj_identical.sh` must print `IDENTICAL` | `montage.c`'s `MontageImageList` (campaign A, W17 lane d): `bounds_info`, `page_info` and `placement` (10, 16 and 16 assignments), 227 to 198 lines, 8.72 to 8.86 with `IDENTICAL` object code; the file sits about 37 lines under *Lines of Code in a Single File*, which the tile-loop extraction needs | owner |
+| 2026-11-11 | AMEND | Z | Step 5: when every member's variable is a plain identifier, the input struct may be filled in Recipe FB's form, a compound statement `{ const Name name = { ... }; Helper(&name,...); }` where the block stood, in place of a declaration at the block's top and a run of assignments | `montage.c`'s `MontageImageList` (campaign A, W17 lane d): its tile loop's row wrap (writes `x_offset`, `y_offset`, `max_height`; nine inputs) as a Z helper with step 5's assignments scores 8.86 to 8.85 (the function grows 198 to 201 lines while cc falls 19 to 16); in FB's form 8.88 | owner |
+| 2026-11-11 | AMEND | Y | Step 5: the same FB form for the input struct, the compound statement holding `if (Helper(&name,...) == MagickFalse)` and its unchanged exit; Recipe I's input struct (its step 4, Y steps 3 to 5) takes it too | Same session: the tile loop of `MontageImageList` reads nineteen inputs, whose assignment fill would cost the lines the file has left under *Lines of Code in a Single File* | owner |
+| 2026-11-11 | AMEND | I | Step 8: the macro left in the caller may also be one of MagickCore's own throw macros (`ThrowImageException`, `ThrowBinaryException`), whose expansion is a `ThrowMagickException` with `GetMagickModule()` and `return(c);` of one constant; `GetMagickModule()` keeps naming the caller, and a variable the expansion reads that the block writes (`image`) is a written variable of step 2 | `montage.c`'s `MontageImageList` (campaign A, W17 lane d): its tile loop leaves through `ThrowImageException` when `CloneImage` fails; E step 6 would move the throw into a helper of another return type (the macro returns `(Image *) NULL`) and change the module it names; with the macro left in the caller the loop moves under I with `image`, `progress_monitor` and `tiles` as targets | owner |
+| 2026-11-11 | AMEND | FI | Step 2: a value may also be a member read through a parameter of the function declared pointer-to-`const` (`p->m`, `p->m.n`): no side effect, and the run writes only the struct local, whose address nothing holds before the call | `montage.c`'s `PlaceMontageTile` (campaign A, W17 lane d): its `tile_info` (15 members), `extent` and `frame` fills copy members of `const MontageTilePlacement *placement`; with `gravity_info` (Recipe FB) they free the 18 lines `MontageImageList`'s next-page step needs under *Lines of Code in a Single File*: a probe of the four plus that step, 9.03 to 9.11, `IDENTICAL` object code for the fills | owner |
+| 2026-11-11 | AMEND | FB | Step 2: the same member reads as FI step 2 (as amended the same day) | Same session: `PlaceMontageTile`'s `gravity_info`, declared at the top and filled after `image` is reassigned, from six members of `placement` and `image` | owner |
