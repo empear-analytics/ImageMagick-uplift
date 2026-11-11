@@ -4289,6 +4289,12 @@ Recipe D, whose copies are moved whole and so may not leave the caller.
    block's own `R`, and check every argument against its parameter by reading.
 7. Another copy of the block, identical but for the expression of step 5 and its own `R`,
    may call the same function the same way (Recipe D), one commit per caller.
+8. In a `void` caller the block's exits are `return;` (2026-11-11): step 1 reads
+   `return;` for `return(R);` (every `return` in the block is `return;`), step 2 has no
+   `R` to check, and step 6 writes `if (Helper(...) == MagickFalse) return;`. Steps 3 to
+   5 hold as written: a local the block writes only on the paths that end in `return;`
+   (an array released before the caller gives up) goes by value, since nothing reads it
+   once the caller has returned.
 
 **Before:**
 
@@ -4330,6 +4336,9 @@ static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
 
 - On a failure path the caller returns from the same point as before, with the same
   value: a constant, or what the block left behind the pointer.
+- Under step 8 the failure path is the same with no value: the caller's `return;` runs
+  directly after the helper's `return(MagickFalse);`, where the block's `return;` stood,
+  after every statement the block ran before it.
 - On the success path the function returns at the block's end and the caller goes on
   with the next statement, where the block fell through.
 - A step-5 expression is evaluated once at the call instead of at each use; that is the
@@ -4346,7 +4355,12 @@ checked by reading.
 **Provenance:** 2026-10-29, from `xml-tree.c`'s `XMLTreeTagToXML` (four buffer-growing
 blocks) and `EncodePredefinedEntities` (a fifth), each leaving through `return`; a probe
 of all five: 2.39 to 2.44. Added by Claude Code (Claude Opus 5.5) during task M112, under
-the mandate of 2026-10-24.
+the mandate of 2026-10-24. Step 8 (2026-11-11, W17 lane c, wide build):
+`opencl.c`'s `LoadOpenCLDevices`, a `void`
+function whose allocation of `clEnv->contexts` releases the device and platform arrays
+and leaves through `return;` when it fails; as a helper it takes the function out of
+*Large Method*, 5.43 to 5.47 in a probe, no finding on the helper. Added by Claude Code
+(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -11193,3 +11207,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | D | *A helper defined further down, or taking an input struct*: form (b), *Unreached functions* and *Object code that differs only in the caller* may call a helper the file defines below the caller, through a forward declaration directly above the caller (a typedef its parameters name moves up in a commit of its own, `obj_identical.sh` IDENTICAL), and a helper that binds its inputs from a `const` input struct, the caller filling every bound member directly before the call (`(&E)` binds `E.f` to `m->f`); `tools/reuse_check.py` checks the declaration's types and the fills | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Control-U, confirm, release, click and expose blocks are the bodies of `XListBrowserWidget`'s and `XTextViewWidget`'s helpers, defined about 1,500 to 4,000 lines below it, some taking `ListBrowserRelease` or `ListBrowserClick`; new look-alike helpers would repeat them, and they hold the function at nesting depth 4 to 6 (a probe of the chain, 2.26 to 2.43, the function leaving *Deep, Nested Complexity* and *Brain Method*) | owner |
 | 2026-11-11 | AMEND | SD | Step 1: a `switch` with no `default:` label may be split too: its last groups move to the new function's `switch`, which has no `default:` either, and the caller gains `default:` holding the call as its last group; a value no label names runs no group in either, and the caller keeps another label | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its key slider `switch` (Home, Up, Down, Prior, Next, End; no `default:`) holds the function at nesting depth 4; moved whole by Recipe E it is a *Complex Method* of its own (cc 13, measured), and SD refused it for want of a `default:`; split first, the Prior/Next/End groups and then the rest move with no finding, as `XListBrowserWidget`'s did | owner |
 | 2026-11-11 | AMEND | N | Step 2: an array the block names only as an argument of calls (contents written, if at all, only through calls that keep no copy: Recipe E step 4's array clause) may be one of the group, as a member of the pointer type it converts to (`char *`, or `const char *` when only read), filled `name.a=a;`; Recipes Y, Z, LB and CT, which take N's input struct, read it the same way | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Back and Reset releases and its list update copy between the `static` `glob_pattern` and the local `back_pattern`, `reset_pattern` and `reply` arrays; with each array a parameter the helpers take five to seven, and N's step 3 (the variable's exact type) refused an array member | owner |
+| 2026-11-11 | AMEND | W | Step 8: in a `void` caller the block's exits are `return;`; the helper returns `MagickFalse` there and the caller writes `if (Helper(...) == MagickFalse) return;`; a local written only on the returning paths goes by value (step 3 unchanged) | `opencl.c`'s `LoadOpenCLDevices` (campaign A, W17 lane c, wide build): the `clEnv->contexts` allocation releases `devices` and `platforms` and leaves through `return;` on failure; W step 1 asked for `return(R);`, which a `void` function cannot write. Probe: the function leaves *Large Method*, 5.43 to 5.47 | owner |

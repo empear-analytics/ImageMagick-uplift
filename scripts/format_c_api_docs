@@ -42,6 +42,7 @@ if ( ! GetOptions(
 	 'colorspace-convert.c',
 	 'colorspace-generic-rgb.c',
 	 'compare.c',
+	 'compare-similarity.c',
 	 'composite.c',
 	 'constitute.c',
 	 'decorate.c',

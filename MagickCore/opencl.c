@@ -305,6 +305,45 @@ static char *CreateOpenCLCacheDirectory(char *home,char *path,char *temp)
   return(temp);
 }
 
+static char *AcquireOpenCLCacheDirectory(char *home,char *path,char *temp)
+{
+  MagickBooleanType
+    status;
+
+  if (home != (char *) NULL)
+    {
+      temp=CreateOpenCLCacheDirectory(home,path,temp);
+    }
+  else
+    {
+      home=GetEnvironmentValue("HOME");
+      if (home != (char *) NULL)
+        {
+          /* first check if $HOME/.cache exists */
+          (void) FormatLocaleString(path,MagickPathExtent,"%s%s.cache",
+            home,DirectorySeparator);
+          status=CreateOpenCLCachePath(path);
+
+          /* first check if $HOME/.cache/ImageMagick exists */
+          if (status != MagickFalse)
+            {
+              (void) FormatLocaleString(path,MagickPathExtent,
+                "%s%s.cache%sImageMagick",home,DirectorySeparator,
+                DirectorySeparator);
+              status=CreateOpenCLCachePath(path);
+            }
+
+          if (status != MagickFalse)
+            {
+              temp=(char*) AcquireCriticalMemory(strlen(path)+1);
+              (void) CopyMagickString(temp,path,strlen(path)+1);
+            }
+          home=DestroyString(home);
+        }
+    }
+  return(temp);
+}
+
 static const char *GetOpenCLCacheDirectory()
 {
   if (cache_directory == (char *) NULL)
@@ -318,9 +357,6 @@ static const char *GetOpenCLCacheDirectory()
             *home,
             path[MagickPathExtent],
             *temp;
-
-          MagickBooleanType
-            status;
 
           temp=(char *) NULL;
           home=GetEnvironmentValue("MAGICK_OPENCL_CACHE_DIR");
@@ -337,37 +373,7 @@ static const char *GetOpenCLCacheDirectory()
 #endif
             }
 
-          if (home != (char *) NULL)
-            {
-              temp=CreateOpenCLCacheDirectory(home,path,temp);
-            }
-          else
-            {
-              home=GetEnvironmentValue("HOME");
-              if (home != (char *) NULL)
-                {
-                  /* first check if $HOME/.cache exists */
-                  (void) FormatLocaleString(path,MagickPathExtent,"%s%s.cache",
-                    home,DirectorySeparator);
-                  status=CreateOpenCLCachePath(path);
-
-                  /* first check if $HOME/.cache/ImageMagick exists */
-                  if (status != MagickFalse)
-                    {
-                      (void) FormatLocaleString(path,MagickPathExtent,
-                        "%s%s.cache%sImageMagick",home,DirectorySeparator,
-                        DirectorySeparator);
-                      status=CreateOpenCLCachePath(path);
-                    }
-
-                  if (status != MagickFalse)
-                    {
-                      temp=(char*) AcquireCriticalMemory(strlen(path)+1);
-                      (void) CopyMagickString(temp,path,strlen(path)+1);
-                    }
-                  home=DestroyString(home);
-                }
-            }
+          temp=AcquireOpenCLCacheDirectory(home,path,temp);
           if (temp == (char *) NULL)
             {
               temp=AcquireString("?");
@@ -945,6 +951,17 @@ static int EndDoctypeQuote(const char *q,int quote)
   return(quote);
 }
 
+static inline MagickBooleanType IsDoctypeQuote(const char *q)
+{
+  return(((*q == '"') || (*q == '\'')) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsDoctypeEnd(const char *q,
+  const int bracket_depth)
+{
+  return(((*q == '>') && (bracket_depth == 0)) ? MagickTrue : MagickFalse);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -989,7 +1006,7 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
             quote=EndDoctypeQuote(q,quote);
           else
             {
-              if ((*q == '"') || (*q == '\''))
+              if (IsDoctypeQuote(q) != MagickFalse)
                 quote=(*q);
               else
                 if (*q == '[')
@@ -998,7 +1015,7 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
                   if (*q == ']')
                     bracket_depth=CloseDoctypeBracket(bracket_depth);
                   else
-                    if ((*q == '>') && (bracket_depth == 0))
+                    if (IsDoctypeEnd(q,bracket_depth) != MagickFalse)
                       {
                         q++;   /* consume final '>' */
                         break;
@@ -2378,6 +2395,13 @@ static size_t FindEnabledOpenCLDevice(MagickCLEnv clEnv)
   return(i);
 }
 
+static inline MagickBooleanType IsOpenCLDeviceSkipped(
+  const MagickCLDevice device)
+{
+  return(((device->enabled == MagickFalse) ||
+    (device->program != (cl_program) NULL)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2428,8 +2452,7 @@ static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
       device_signature;
 
     device=clEnv->devices[i];
-    if ((device->enabled == MagickFalse) ||
-        (device->program != (cl_program) NULL))
+    if (IsOpenCLDeviceSkipped(device) != MagickFalse)
       continue;
 
     LockSemaphoreInfo(device->lock);
@@ -2623,19 +2646,91 @@ static cl_uint AddOpenCLPlatformDevices(
   return(next);
 }
 
-static void LoadOpenCLDevices(MagickCLEnv clEnv)
+typedef struct _OpenCLPlatformLoad
 {
+  MagickCLEnv
+    clEnv;
+
+  cl_platform_id
+    *platforms;
+
+  cl_device_id
+    *devices;
+} OpenCLPlatformLoad;
+
+static void LoadOpenCLPlatformDevices(const OpenCLPlatformLoad *platform_load,
+  cl_uint i,cl_uint *next)
+{
+  const MagickCLEnv
+    clEnv = platform_load->clEnv;
+
+  cl_platform_id
+    *const platforms = platform_load->platforms;
+
+  cl_device_id
+    *const devices = platform_load->devices;
+
   OpenCLPlatformDevices
     platform_devices;
 
   cl_context_properties
     properties[3];
 
-  cl_device_id
-    *devices;
-
   cl_int
     status;
+
+  cl_uint
+    number_devices;
+
+  if (platforms[i] == (cl_platform_id) NULL)
+    return;
+
+  status=clEnv->library->clGetDeviceIDs(platforms[i],CL_DEVICE_TYPE_CPU |
+    CL_DEVICE_TYPE_GPU,(cl_uint) clEnv->number_devices,devices,&number_devices);
+  if (status != CL_SUCCESS)
+    return;
+
+  properties[0]=CL_CONTEXT_PLATFORM;
+  properties[1]=(cl_context_properties) platforms[i];
+  properties[2]=0;
+  clEnv->contexts[i]=openCL_library->clCreateContext(properties,number_devices,
+    devices,NULL,NULL,&status);
+  if (status != CL_SUCCESS)
+    return;
+
+  platform_devices.clEnv=clEnv;
+  platform_devices.platforms=platforms;
+  platform_devices.devices=devices;
+  platform_devices.i=i;
+  platform_devices.number_devices=number_devices;
+  *next=AddOpenCLPlatformDevices(&platform_devices,*next);
+}
+
+static MagickBooleanType AcquireOpenCLContexts(MagickCLEnv clEnv,
+  const cl_uint number_platforms,cl_device_id *devices,
+  cl_platform_id *platforms)
+{
+  clEnv->number_contexts=(size_t) number_platforms;
+  clEnv->contexts=(cl_context *) AcquireQuantumMemory(clEnv->number_contexts,
+    sizeof(cl_context));
+  if (clEnv->contexts == (cl_context *) NULL)
+    {
+      devices=(cl_device_id *) RelinquishMagickMemory(devices);
+      platforms=(cl_platform_id *) RelinquishMagickMemory(platforms);
+      RelinquishMagickCLDevices(clEnv);
+      return(MagickFalse);
+    }
+  (void) memset(clEnv->contexts,0,clEnv->number_contexts*sizeof(cl_context));
+  return(MagickTrue);
+}
+
+static void LoadOpenCLDevices(MagickCLEnv clEnv)
+{
+  OpenCLPlatformLoad
+    platform_load;
+
+  cl_device_id
+    *devices;
 
   cl_platform_id
     *platforms;
@@ -2643,7 +2738,6 @@ static void LoadOpenCLDevices(MagickCLEnv clEnv)
   cl_uint
     i,
     next,
-    number_devices,
     number_platforms;
 
   number_platforms=0;
@@ -2684,43 +2778,15 @@ static void LoadOpenCLDevices(MagickCLEnv clEnv)
       return;
     }
   (void) memset(devices,0,clEnv->number_devices*sizeof(cl_device_id));
-  clEnv->number_contexts=(size_t) number_platforms;
-  clEnv->contexts=(cl_context *) AcquireQuantumMemory(clEnv->number_contexts,
-    sizeof(cl_context));
-  if (clEnv->contexts == (cl_context *) NULL)
-    {
-      devices=(cl_device_id *) RelinquishMagickMemory(devices);
-      platforms=(cl_platform_id *) RelinquishMagickMemory(platforms);
-      RelinquishMagickCLDevices(clEnv);
-      return;
-    }
-  (void) memset(clEnv->contexts,0,clEnv->number_contexts*sizeof(cl_context));
+  if (AcquireOpenCLContexts(clEnv,number_platforms,devices,
+      platforms) == MagickFalse)
+    return;
   next=0;
+  platform_load.clEnv=clEnv;
+  platform_load.platforms=platforms;
+  platform_load.devices=devices;
   for (i = 0; i < number_platforms; i++)
-  {
-    if (platforms[i] == (cl_platform_id) NULL)
-      continue;
-
-    status=clEnv->library->clGetDeviceIDs(platforms[i],CL_DEVICE_TYPE_CPU |
-      CL_DEVICE_TYPE_GPU,(cl_uint) clEnv->number_devices,devices,&number_devices);
-    if (status != CL_SUCCESS)
-      continue;
-
-    properties[0]=CL_CONTEXT_PLATFORM;
-    properties[1]=(cl_context_properties) platforms[i];
-    properties[2]=0;
-    clEnv->contexts[i]=openCL_library->clCreateContext(properties,number_devices,
-      devices,NULL,NULL,&status);
-    if (status != CL_SUCCESS)
-      continue;
-
-    platform_devices.clEnv=clEnv;
-    platform_devices.platforms=platforms;
-    platform_devices.devices=devices;
-    platform_devices.i=i;
-    platform_devices.number_devices=number_devices;
-    next=AddOpenCLPlatformDevices(&platform_devices,next);
-  }
+    LoadOpenCLPlatformDevices(&platform_load,i,&next);
   if (next != clEnv->number_devices)
     RelinquishMagickCLDevices(clEnv);
   platforms=(cl_platform_id *) RelinquishMagickMemory(platforms);
