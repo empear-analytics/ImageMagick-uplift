@@ -166,3 +166,40 @@ guard`.
   XDisplayImage (depth 6, about 50 sites); XColorEditImage, XCropImage, XROIImage remain Complex/Large Method.
   Possible upstream: XCropImage help titles; XROIImage/XCropImage MotionNotify tests `event.xbutton.window` (not
   xmotion); SelectionRequest falls into `default:`; XROIImage ends `return(MagickTrue); return(MagickTrue);`.
+
+## Lane a, third round: accelerate.c 3.04 -> 3.19 (wide build, merged)
+
+27 commits (22 refactor); Bumpy Road is gone file-wide (it started on five functions). Whole wide catalogue: 14,145
+cases, 0 diverged (one load-sensitive case settled). Each step ran `verify_wt` (wide); its only complaint is the old
+`3999999999` warning in LocalContrast (it also prints VERIFY FAILED when a function has no oracle cases).
+- **ComputeEqualizeImage:** 2dcad9cb4, 6762e7f6a, fde450b8f, 93ebd41fa P (`EqualizesRed/Green/Blue/AlphaChannel`, two
+  sites each; flat, guard); 8891bedce E `EqualizeColormap` 3.06 (leaves Bumpy Road; the block is dead in practice,
+  `checkAccelerateCondition` refuses PseudoClass; obj_modulo DIFFERENT, so E's own proof).
+- **ComputeLocalContrastImage:** 1cd2e8032 CN (IDENTICAL); c2dac90a1 Y (launch loop, its throw moved into the helper)
+  3.08 (5 cases).
+- **ComputeContrastStretchImage** (no caller in the tree, 0 lines covered: guard level): 704f35af1, b7476a858,
+  9a0b3d958, 7ce7a48e5 P (`Stretches*Channel`); 4d763c20f E `StretchColormap` (obj_modulo MODULO-IDENTICAL with
+  `NOINLINE=ComputeContrastStretchImage`); e449166c9 SG 3.13; dd411bfc9 SG 3.15 (IDENTICAL).
+- **ComputeDespeckleImage:** cd1a3b8b2 E `ReleaseTempImageBuffers` (IDENTICAL); 34f03476d Y with an array as the
+  written variable 3.17 (2 cases).
+- **ComputeResizeImage:** 735ee2bc9 I `ResizeHorizontalThenVertical` (52 cases); acd3d636f SG shape (c) 3.19.
+- **New recipe text** (Decided by `owner`, 2026-11-10 OK): 123adc8cd **Recipe SG, Spread an Enclosing Guard over the
+  Tests Inside It** ((a) `if (G) { if (A1) X1 else if (A2) X2 ... }` becomes `if ((G) && (A1)) X1 else if ((G) &&
+  (A2)) X2 ...`; (b) `if (G) { S if (B) T }` becomes `if (G) S` then `if ((G) && (B)) T`; G has no side effect, S
+  writes nothing G reads; it un-nests a bump without a helper, avoiding four per-channel helpers that clone each other,
+  3.08 -> 3.01), checked by new `tools/guard_spread_check.py` (ba9a56d32; a planted `>=` is caught) and obj_modulo;
+  93074eee0 SG shape (c) (`if (G) { S } else E` then `if ((G) && (B)) T`, neither S nor E writing what G reads; tool
+  baffd4076); e6ce9691b V step 2 and Y step 4 (the one written variable may be a local array the block only indexes,
+  passed as `T *v`).
+- **For the owner:** throws moved into helpers in c2dac90a1, 34f03476d and 735ee2bc9 (reached code, oracle level):
+  they now name the helper in `GetMagickModule()`, against the brief's advice to keep throws in the caller (those
+  bumps held nothing else to cut around; same effect as segment.c under E step 6).
+- Plateau at 3.19: every single-function stub of the 18 smelly functions is flat, and so are two to five together; only
+  the eight largest together lift it (ContrastStretch, Despeckle, Equalize, LocalContrast, Motion, Blur, Rotational,
+  Resize stubbed: 3.84; without Resize 3.55), about cc 400, which needs shared prologue and cleanup helpers across all
+  of them plus kernel-argument and launch helpers. Still blocking: the 10 `Accelerate*` wrapper clones (owner), 18
+  Excess Arguments (all removed: +0.08), 3,882 lines (the lane's helpers added about 160). Rejected: D on 37 release
+  sites (flat; ContrastImage alone drops to 2.97 through a new clone), P on AccelerateGrayscaleImage (joins the wrapper
+  clone group), four per-channel stretch helpers (clones, 3.01), arm helpers for Resize with a nested exit test, a
+  typedef move for `ReadHistogramBuffer` (reverted). Possible upstream: ComputeEqualizeImage's PseudoClass block is
+  dead; ComputeContrastStretchImage has no caller anywhere in the tree.
