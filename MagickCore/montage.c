@@ -1201,6 +1201,47 @@ static MagickBooleanType CreateMontageThumbnails(
   return(MagickTrue);
 }
 
+typedef struct _MontageRowWrap
+{
+  ssize_t
+    tile;
+
+  size_t
+    tiles_per_page,
+    tiles_per_row;
+
+  RectangleInfo
+    extract_info;
+
+  size_t
+    height,
+    border_width;
+
+  TypeMetric
+    metrics;
+
+  size_t
+    number_lines;
+
+  const MontageInfo
+    *montage_info;
+} MontageRowWrap;
+
+static void WrapMontageRow(const MontageRowWrap *wrap,ssize_t *x_offset,
+  ssize_t *y_offset,size_t *max_height)
+{
+  if (((wrap->tile+1) == (ssize_t) wrap->tiles_per_page) ||
+      (((wrap->tile+1) % (ssize_t) wrap->tiles_per_row) == 0))
+    {
+      (*x_offset)=wrap->extract_info.x;
+      (*y_offset)+=(ssize_t) ((ssize_t) wrap->height+(wrap->extract_info.y+
+        (ssize_t) wrap->border_width)*2+(wrap->metrics.ascent-
+        wrap->metrics.descent+4)*wrap->number_lines+
+        (wrap->montage_info->shadow != MagickFalse ? 4 : 0));
+      (*max_height)=0;
+    }
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1416,15 +1457,13 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
         image=PlaceMontageTile(&placement,image);
       }
       x_offset+=(ssize_t) width+2*(extract_info.x+(ssize_t) border_width);
-      if (((tile+1) == (ssize_t) tiles_per_page) ||
-          (((tile+1) % (ssize_t) tiles_per_row) == 0))
-        {
-          x_offset=extract_info.x;
-          y_offset+=(ssize_t) ((ssize_t) height+(extract_info.y+
-            (ssize_t) border_width)*2+(metrics.ascent-metrics.descent+4)*
-            number_lines+(montage_info->shadow != MagickFalse ? 4 : 0));
-          max_height=0;
-        }
+      {
+        const MontageRowWrap
+          wrap = { tile, tiles_per_page, tiles_per_row, extract_info, height,
+            border_width, metrics, number_lines, montage_info };
+
+        WrapMontageRow(&wrap,&x_offset,&y_offset,&max_height);
+      }
       if (images->progress_monitor != (MagickProgressMonitor) NULL)
         status=SetMontageTileProgress(image,tiles,total_tiles,status);
       image_list[tile]=DestroyImage(image_list[tile]);
