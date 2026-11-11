@@ -1585,6 +1585,9 @@ typedef struct _AnimateWindowColormaps
 
   MagickStatusType
     context_mask;
+
+  XEvent
+    event;
 } AnimateWindowColormaps;
 
 static void XUpdateWindowColormaps(
@@ -1750,6 +1753,48 @@ static MagickBooleanType XReadDroppedImage(
   if (*nexus != (Image *) NULL)
     *state|=ExitState;
   (void) XFree((void *) data);
+  return(MagickTrue);
+}
+
+typedef struct _AnimateProtocolTargets
+{
+  MagickStatusType
+    *state;
+
+  XGCValues
+    *context_values;
+} AnimateProtocolTargets;
+
+static MagickBooleanType XHandleMagickProtocol(
+  const AnimateWindowColormaps *window_colormaps,
+  const AnimateProtocolTargets *targets)
+{
+  XWindows
+    *const windows = window_colormaps->windows;
+
+  const XEvent
+    event = window_colormaps->event;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  XGCValues
+    *const context_values = targets->context_values;
+
+  if (event.xclient.message_type == windows->im_protocols)
+    {
+      if (*event.xclient.data.l == (long) windows->im_update_colormap)
+        {
+          XUpdateWindowColormaps(window_colormaps,context_values);
+          return(MagickFalse);
+        }
+      if (*event.xclient.data.l == (long) windows->im_exit)
+        {
+          *state|=ExitState;
+          return(MagickFalse);
+        }
+      return(MagickFalse);
+    }
   return(MagickTrue);
 }
 
@@ -2789,35 +2834,30 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case ClientMessage:
       {
+        AnimateProtocolTargets
+          protocol_targets;
+
+        AnimateWindowColormaps
+          window_colormaps;
+
         if (resource_info->debug != MagickFalse)
           (void) LogMagickEvent(X11Event,GetMagickModule(),
             "Client Message: 0x%lx 0x%lx %d 0x%lx",(unsigned long)
             event.xclient.window,(unsigned long) event.xclient.message_type,
             event.xclient.format,(unsigned long) event.xclient.data.l[0]);
-        if (event.xclient.message_type == windows->im_protocols)
-          {
-            if (*event.xclient.data.l == (long) windows->im_update_colormap)
-              {
-                AnimateWindowColormaps
-                  window_colormaps;
-
-                window_colormaps.display=display;
-                window_colormaps.windows=windows;
-                window_colormaps.map_info=map_info;
-                window_colormaps.pixel=pixel;
-                window_colormaps.magick_windows=magick_windows;
-                window_colormaps.number_windows=number_windows;
-                window_colormaps.context_mask=context_mask;
-                XUpdateWindowColormaps(&window_colormaps,&context_values);
-                break;
-              }
-            if (*event.xclient.data.l == (long) windows->im_exit)
-              {
-                state|=ExitState;
-                break;
-              }
-            break;
-          }
+        window_colormaps.display=display;
+        window_colormaps.windows=windows;
+        window_colormaps.map_info=map_info;
+        window_colormaps.pixel=pixel;
+        window_colormaps.magick_windows=magick_windows;
+        window_colormaps.number_windows=number_windows;
+        window_colormaps.context_mask=context_mask;
+        window_colormaps.event=event;
+        protocol_targets.state=(&state);
+        protocol_targets.context_values=(&context_values);
+        if (XHandleMagickProtocol(&window_colormaps,&protocol_targets) ==
+            MagickFalse)
+          break;
         if (event.xclient.message_type == windows->dnd_protocols)
           {
             AnimateDropSource
