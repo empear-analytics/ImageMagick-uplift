@@ -9428,6 +9428,12 @@ typedef struct _MenuEventContext
 
   unsigned int
     height;
+
+  const char
+    *title;
+
+  unsigned int
+    title_height;
 } MenuEventContext;
 
 static void PressMenuSelection(const MenuEventContext *context,
@@ -9746,6 +9752,83 @@ static void UpdateMenuLayout(const MenuEventContext *context,
     }
 }
 
+static void RedrawMenuWidget(const MenuEventContext *context,
+  const MenuTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const selections = context->selections;
+
+  const unsigned int
+    number_selections = context->number_selections,
+    top_offset = context->top_offset;
+
+  const char
+    *const title = context->title;
+
+  const unsigned int
+    title_height = context->title_height;
+
+  XWidgetInfo
+    *const selection_info = targets->selection_info,
+    *const highlight_info = targets->highlight_info;
+
+  size_t
+    *const state = targets->state;
+
+  XWidgetInfo
+    *const menu_info = targets->menu_info;
+
+  int
+    y;
+
+  if ((*state) & RedrawWidgetState)
+    {
+      MenuSelections
+        entries;
+
+      /*
+        Redraw Menu widget.
+      */
+      if (submenu_info.active == 0)
+        {
+          y=(int) title_height;
+          XSetBevelColor(display,&windows->widget,MagickFalse);
+          (void) XDrawLine(display,windows->widget.id,
+            windows->widget.widget_context,(*selection_info).x,y-1,
+            (int) (*selection_info).width,y-1);
+          XSetBevelColor(display,&windows->widget,MagickTrue);
+          (void) XDrawLine(display,windows->widget.id,
+            windows->widget.widget_context,(*selection_info).x,y,
+            (int) (*selection_info).width,y);
+          (void) XSetFillStyle(display,windows->widget.widget_context,
+            FillSolid);
+        }
+      /*
+        Draw menu selections.
+      */
+      (*selection_info).center=MagickTrue;
+      (*selection_info).y=(int) (*menu_info).bevel_width;
+      (*selection_info).text=(char *) title;
+      if (submenu_info.active == 0)
+        XDrawWidgetText(display,&windows->widget,selection_info);
+      (*selection_info).center=MagickFalse;
+      (*selection_info).y=(int) top_offset;
+      entries.display=display;
+      entries.windows=windows;
+      entries.selections=selections;
+      entries.number_selections=number_selections;
+      DrawMenuSelections(&entries,selection_info,highlight_info);
+      XDrawBevel(display,&windows->widget,menu_info);
+      (*state)&=(unsigned int) (~RedrawWidgetState);
+    }
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9854,49 +9937,12 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   event_context.top_offset=top_offset;
   event_context.item=item;
   event_context.height=height;
+  event_context.title=title;
+  event_context.title_height=title_height;
   do
   {
     UpdateMenuLayout(&event_context,&targets);
-    if (state & RedrawWidgetState)
-      {
-        MenuSelections
-          entries;
-
-        /*
-          Redraw Menu widget.
-        */
-        if (submenu_info.active == 0)
-          {
-            y=(int) title_height;
-            XSetBevelColor(display,&windows->widget,MagickFalse);
-            (void) XDrawLine(display,windows->widget.id,
-              windows->widget.widget_context,selection_info.x,y-1,
-              (int) selection_info.width,y-1);
-            XSetBevelColor(display,&windows->widget,MagickTrue);
-            (void) XDrawLine(display,windows->widget.id,
-              windows->widget.widget_context,selection_info.x,y,
-              (int) selection_info.width,y);
-            (void) XSetFillStyle(display,windows->widget.widget_context,
-              FillSolid);
-          }
-        /*
-          Draw menu selections.
-        */
-        selection_info.center=MagickTrue;
-        selection_info.y=(int) menu_info.bevel_width;
-        selection_info.text=(char *) title;
-        if (submenu_info.active == 0)
-          XDrawWidgetText(display,&windows->widget,&selection_info);
-        selection_info.center=MagickFalse;
-        selection_info.y=(int) top_offset;
-        entries.display=display;
-        entries.windows=windows;
-        entries.selections=selections;
-        entries.number_selections=number_selections;
-        DrawMenuSelections(&entries,&selection_info,&highlight_info);
-        XDrawBevel(display,&windows->widget,&menu_info);
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
+    RedrawMenuWidget(&event_context,&targets);
     if (number_selections > 2)
       {
         /*
