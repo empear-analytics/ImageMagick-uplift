@@ -368,6 +368,22 @@ MagickExport MagickBooleanType AnimateImages(const ImageInfo *image_info,
 %
 %
 */
+static void XConfirmAnimateExit(Display *display,
+  XResourceInfo *resource_info,XWindows *windows)
+{
+  int
+    status;
+
+  /*
+    Confirm program exit.
+  */
+  status=XConfirmWidget(display,windows,"Do you really want to exit",
+    resource_info->client_name);
+  if (status != 0)
+    XClientMessage(display,windows->image.id,windows->im_protocols,
+      windows->im_exit,CurrentTime);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
@@ -656,19 +672,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
         XClientMessage(display,windows->image.id,windows->im_protocols,
           windows->im_exit,CurrentTime);
       else
-        {
-          int
-            status;
-
-          /*
-            Confirm program exit.
-          */
-          status=XConfirmWidget(display,windows,"Do you really want to exit",
-            resource_info->client_name);
-          if (status != 0)
-            XClientMessage(display,windows->image.id,windows->im_protocols,
-              windows->im_exit,CurrentTime);
-        }
+        XConfirmAnimateExit(display,resource_info,windows);
       break;
     }
     default:
