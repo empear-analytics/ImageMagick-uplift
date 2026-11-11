@@ -4261,6 +4261,25 @@ static MagickBooleanType IsPostscriptFormat(const ImageInfo *image_info)
     (LocaleCompare(image_info->magick,"PS2") == 0)) ? MagickTrue : MagickFalse);
 }
 
+static void XChangeToImageDirectory(const Image *image,char *filename,
+  ExceptionInfo *exception)
+{
+  char
+    path[MagickPathExtent];
+
+  int
+    status;
+
+  GetPathComponent(image->filename,HeadPath,path);
+  GetPathComponent(image->filename,TailPath,filename);
+  if (*path == '\0')
+    (void) CopyMagickString(path,".",MagickPathExtent);
+  status=chdir(path);
+  if (status == -1)
+    (void) ThrowMagickException(exception,GetMagickModule(),FileOpenError,
+      "UnableToOpenFile","%s",path);
+}
+
 static MagickBooleanType XSaveImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -4281,22 +4300,7 @@ static MagickBooleanType XSaveImage(Display *display,
     (void) CopyMagickString(filename,resource_info->write_filename,
       MagickPathExtent);
   else
-    {
-      char
-        path[MagickPathExtent];
-
-      int
-        status;
-
-      GetPathComponent(image->filename,HeadPath,path);
-      GetPathComponent(image->filename,TailPath,filename);
-      if (*path == '\0')
-        (void) CopyMagickString(path,".",MagickPathExtent);
-      status=chdir(path);
-      if (status == -1)
-        (void) ThrowMagickException(exception,GetMagickModule(),FileOpenError,
-          "UnableToOpenFile","%s",path);
-    }
+    XChangeToImageDirectory(image,filename,exception);
   XFileBrowserWidget(display,windows,"Save",filename);
   if (*filename == '\0')
     return(MagickTrue);
