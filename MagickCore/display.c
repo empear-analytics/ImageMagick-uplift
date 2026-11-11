@@ -6757,6 +6757,13 @@ static void XClampTrimLeftQuantum(XResourceInfo *resource_info,
     resource_info->quantum=(int) crop_info.width-1;
 }
 
+static void XClampTrimRightQuantum(XResourceInfo *resource_info,
+  const RectangleInfo crop_info)
+{
+  if (resource_info->quantum >= (int) (crop_info.width-(ssize_t) crop_info.x))
+    resource_info->quantum=(int) (crop_info.width-(ssize_t) crop_info.x-1);
+}
+
 static DisplayCommand XImageWindowCommand(Display *display,
   XResourceInfo *resource_info,XWindows *windows,const MagickStatusType state,
   KeySym key_symbol,Image **image,ExceptionInfo *exception)
@@ -7086,8 +7093,7 @@ static DisplayCommand XImageWindowCommand(Display *display,
             }
           if ((key_symbol == XK_Right) || (key_symbol == XK_KP_Right))
             {
-              if (resource_info->quantum >= (int) (crop_info.width-(ssize_t) crop_info.x))
-                resource_info->quantum=(int) (crop_info.width-(ssize_t) crop_info.x-1);
+              XClampTrimRightQuantum(resource_info,crop_info);
               crop_info.x+=resource_info->quantum;
               crop_info.width-=(size_t) resource_info->quantum;
             }
