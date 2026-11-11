@@ -10167,6 +10167,13 @@ static void TogglePreferencesButton(Display *display,XWindows *windows,
       }
 }
 
+static void DoublePreferencesUndoCache(XResourceInfo *resource_info)
+{
+  resource_info->undo_cache<<=1;
+  if (resource_info->undo_cache > 256)
+    resource_info->undo_cache=1;
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -10388,9 +10395,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
             width=WidgetTextWidth(font_info,cache);
             (void) XClearArea(display,windows->widget.id,x,y,width,height,
               False);
-            resource_info->undo_cache<<=1;
-            if (resource_info->undo_cache > 256)
-              resource_info->undo_cache=1;
+            DoublePreferencesUndoCache(resource_info);
             (void) FormatLocaleString(cache,MagickPathExtent,CacheButtonText,
               (unsigned long) resource_info->undo_cache);
             cache_info.raised=MagickFalse;
