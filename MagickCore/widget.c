@@ -6003,6 +6003,20 @@ static XWidgetInfo TrackFontBrowserSlider(XWidgetInfo slider_info,
   return(slider_info);
 }
 
+static size_t ReadFontBrowserPattern(const XWidgetInfo reply_info,
+  char *back_pattern,char *glob_pattern,size_t state)
+{
+  /*
+    Read new font or glob pattern.
+  */
+  if (*reply_info.text == '\0')
+    return(state);
+  (void) CopyMagickString(back_pattern,glob_pattern,MagickPathExtent);
+  (void) CopyMagickString(glob_pattern,reply_info.text,MagickPathExtent);
+  state|=UpdateListState;
+  return(state);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6883,14 +6897,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
           }
         if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
           {
-            /*
-              Read new font or glob pattern.
-            */
-            if (*reply_info.text == '\0')
-              break;
-            (void) CopyMagickString(back_pattern,glob_pattern,MagickPathExtent);
-            (void) CopyMagickString(glob_pattern,reply_info.text,MagickPathExtent);
-            state|=UpdateListState;
+            state=ReadFontBrowserPattern(reply_info,back_pattern,glob_pattern,
+              state);
             break;
           }
         if (key_symbol == XK_Control_L)
