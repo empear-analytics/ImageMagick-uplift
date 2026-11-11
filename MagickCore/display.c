@@ -5004,6 +5004,38 @@ static void XMapInfoWidget(Display *display,XWindows *windows)
     (void) XMapWindow(display,windows->info.id);
 }
 
+static void XCheckSelectionBounds(XWindows *windows,const int x,const int y,
+  RectangleInfo *crop_info)
+{
+  /*
+    Check boundary conditions.
+  */
+  if ((*crop_info).x < 0)
+    (*crop_info).x=0;
+  else
+    if ((*crop_info).x > (ssize_t) windows->image.ximage->width)
+      (*crop_info).x=(ssize_t) windows->image.ximage->width;
+  if ((int) (*crop_info).x < x)
+    (*crop_info).width=(unsigned int) (x-(*crop_info).x);
+  else
+    {
+      (*crop_info).width=(unsigned int) ((*crop_info).x-x);
+      (*crop_info).x=(ssize_t) x;
+    }
+  if ((*crop_info).y < 0)
+    (*crop_info).y=0;
+  else
+    if ((*crop_info).y > (ssize_t) windows->image.ximage->height)
+      (*crop_info).y=(ssize_t) windows->image.ximage->height;
+  if ((int) (*crop_info).y < y)
+    (*crop_info).height=(unsigned int) (y-(*crop_info).y);
+  else
+    {
+      (*crop_info).height=(unsigned int) ((*crop_info).y-y);
+      (*crop_info).y=(ssize_t) y;
+    }
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -5317,35 +5349,7 @@ static MagickBooleanType XCropImage(Display *display,
           break;
       }
       if (IsSelectionMovedOrDone(crop_info,x,y,state) != MagickFalse)
-        {
-          /*
-            Check boundary conditions.
-          */
-          if (crop_info.x < 0)
-            crop_info.x=0;
-          else
-            if (crop_info.x > (ssize_t) windows->image.ximage->width)
-              crop_info.x=(ssize_t) windows->image.ximage->width;
-          if ((int) crop_info.x < x)
-            crop_info.width=(unsigned int) (x-crop_info.x);
-          else
-            {
-              crop_info.width=(unsigned int) (crop_info.x-x);
-              crop_info.x=(ssize_t) x;
-            }
-          if (crop_info.y < 0)
-            crop_info.y=0;
-          else
-            if (crop_info.y > (ssize_t) windows->image.ximage->height)
-              crop_info.y=(ssize_t) windows->image.ximage->height;
-          if ((int) crop_info.y < y)
-            crop_info.height=(unsigned int) (y-crop_info.y);
-          else
-            {
-              crop_info.height=(unsigned int) (crop_info.y-y);
-              crop_info.y=(ssize_t) y;
-            }
-        }
+        XCheckSelectionBounds(windows,x,y,&crop_info);
     } while ((state & ExitState) == 0);
     /*
       Wait for user to grab a corner of the rectangle or press return.
