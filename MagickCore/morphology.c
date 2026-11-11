@@ -4800,6 +4800,16 @@ typedef struct _MorphologyDirectScan
 
   OffsetInfo
     offset;
+
+  CacheView
+    *image_view,
+    *morphology_view;
+
+  size_t
+    width;
+
+  ExceptionInfo
+    *exception;
 } MorphologyDirectScan;
 
 static double ForwardDirectChannelValue(const MorphologyDirectScan *scan,
@@ -5031,6 +5041,61 @@ static inline void MorphologyDirectPixels(const MorphologyDirectScan *scan,
   }
 }
 
+static inline MagickBooleanType MorphologyDirectScanRow(
+  const MorphologyDirectScan *scan,const ssize_t y,size_t *changed,
+  MagickBooleanType *status)
+{
+  const DirectScanSide
+    side = scan->side;
+
+  Image
+    *const image = scan->image;
+
+  const KernelInfo
+    *const kernel = scan->kernel;
+
+  const OffsetInfo
+    offset = scan->offset;
+
+  CacheView
+    *const image_view = scan->image_view,
+    *const morphology_view = scan->morphology_view;
+
+  const size_t
+    width = scan->width;
+
+  ExceptionInfo
+    *const exception = scan->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,-offset.x,((side ==
+    ForwardDirectScan) ? y-offset.y : y),width,((side == ForwardDirectScan) ?
+    (size_t) offset.y+1 : (size_t) kernel->y+1),exception);
+  q=GetCacheViewAuthenticPixels(morphology_view,0,y,image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  if (side == ReverseDirectScan)
+    {
+      p+=(ptrdiff_t) (image->columns-1)*GetPixelChannels(image);
+      q+=(ptrdiff_t) (image->columns-1)*GetPixelChannels(image);
+    }
+  MorphologyDirectPixels(scan,p,q,changed);
+  if (SyncCacheViewAuthenticPixels(morphology_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 static ssize_t MorphologyPrimitiveDirect(Image *image,
   const MorphologyMethod method,const KernelInfo *kernel,
   ExceptionInfo *exception)
@@ -5071,47 +5136,32 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
   image_view=AcquireVirtualCacheView(image,exception);
   morphology_view=AcquireAuthenticCacheView(image,exception);
   width=image->columns+kernel->width-1;
-  for (y=0; y < (ssize_t) image->rows; y++)
   {
     const MorphologyDirectScan
-      scan = { ForwardDirectScan, image, method, kernel, offset };
+      scan = { ForwardDirectScan, image, method, kernel, offset, image_view,
+        morphology_view, width, exception };
 
-    const Quantum
-      *magick_restrict p;
+    for (y=0; y < (ssize_t) image->rows; y++)
+    {
+      /*
+        Read virtual pixels, and authentic pixels, from the same image!  We read
+        using virtual to get virtual pixel handling, but write back into the same
+        image.
 
-    Quantum
-      *magick_restrict q;
-
-    /*
-      Read virtual pixels, and authentic pixels, from the same image!  We read
-      using virtual to get virtual pixel handling, but write back into the same
-      image.
-
-      Only top half of kernel is processed as we do a single pass downward
-      through the image iterating the distance function as we go.
-    */
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,-offset.x,y-offset.y,width,(size_t)
-      offset.y+1,exception);
-    q=GetCacheViewAuthenticPixels(morphology_view,0,y,image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
+        Only top half of kernel is processed as we do a single pass downward
+        through the image iterating the distance function as we go.
+      */
+      if (MorphologyDirectScanRow(&scan,y,&changed,&status) == MagickFalse)
         continue;
-      }
-    MorphologyDirectPixels(&scan,p,q,&changed);
-    if (SyncCacheViewAuthenticPixels(morphology_view,exception) == MagickFalse)
-      status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
+      if (image->progress_monitor != (MagickProgressMonitor) NULL)
+        {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
+          #pragma omp atomic
 #endif
-        progress++;
-        ReportMorphologyProgress(image,progress,2*image->rows,&status);
-      }
+          progress++;
+          ReportMorphologyProgress(image,progress,2*image->rows,&status);
+        }
+    }
   }
   morphology_view=DestroyCacheView(morphology_view);
   image_view=DestroyCacheView(image_view);
@@ -5120,48 +5170,31 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
   */
   image_view=AcquireVirtualCacheView(image,exception);
   morphology_view=AcquireAuthenticCacheView(image,exception);
-  for (y=(ssize_t) image->rows-1; y >= 0; y--)
   {
     const MorphologyDirectScan
-      scan = { ReverseDirectScan, image, method, kernel, offset };
+      scan = { ReverseDirectScan, image, method, kernel, offset, image_view,
+        morphology_view, width, exception };
 
-    const Quantum
-      *magick_restrict p;
+    for (y=(ssize_t) image->rows-1; y >= 0; y--)
+    {
+      /*
+         Read virtual pixels, and authentic pixels, from the same image.  We
+         read using virtual to get virtual pixel handling, but write back
+         into the same image.
 
-    Quantum
-      *magick_restrict q;
-
-    /*
-       Read virtual pixels, and authentic pixels, from the same image.  We
-       read using virtual to get virtual pixel handling, but write back
-       into the same image.
-
-       Only the bottom half of the kernel is processed as we up the image.
-    */
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,-offset.x,y,width,(size_t)
-      kernel->y+1,exception);
-    q=GetCacheViewAuthenticPixels(morphology_view,0,y,image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
+         Only the bottom half of the kernel is processed as we up the image.
+      */
+      if (MorphologyDirectScanRow(&scan,y,&changed,&status) == MagickFalse)
         continue;
-      }
-    p+=(ptrdiff_t) (image->columns-1)*GetPixelChannels(image);
-    q+=(ptrdiff_t) (image->columns-1)*GetPixelChannels(image);
-    MorphologyDirectPixels(&scan,p,q,&changed);
-    if (SyncCacheViewAuthenticPixels(morphology_view,exception) == MagickFalse)
-      status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
+      if (image->progress_monitor != (MagickProgressMonitor) NULL)
+        {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
+          #pragma omp atomic
 #endif
-        progress++;
-        ReportMorphologyProgress(image,progress,2*image->rows,&status);
-      }
+          progress++;
+          ReportMorphologyProgress(image,progress,2*image->rows,&status);
+        }
+    }
   }
   morphology_view=DestroyCacheView(morphology_view);
   image_view=DestroyCacheView(image_view);
