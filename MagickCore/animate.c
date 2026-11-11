@@ -1506,6 +1506,63 @@ static MagickStatusType XPressImageWindow(
 #define MaXWindows  8
 #define MagickTitle  "Commands"
 
+typedef struct _AnimateMenuSelection
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *CommandMenu,
+    *const **Menus;
+
+  const AnimateCommand
+    **Commands;
+
+  int
+    id;
+} AnimateMenuSelection;
+
+static MagickBooleanType XSelectMenuCommand(
+  const AnimateMenuSelection *menu_selection,char *command,
+  AnimateCommand *animate_command)
+{
+  Display
+    *const display = menu_selection->display;
+
+  XWindows
+    *const windows = menu_selection->windows;
+
+  const char
+    *const *const CommandMenu = menu_selection->CommandMenu,
+    *const **const Menus = menu_selection->Menus;
+
+  const AnimateCommand
+    **const Commands = menu_selection->Commands;
+
+  const int
+    id = menu_selection->id;
+
+  if (id < MagickMenus)
+    {
+      int
+        entry;
+
+      /*
+        Select a command from a pop-up menu.
+      */
+      entry=XMenuWidget(display,windows,CommandMenu[id],Menus[id],
+        command);
+      if (entry < 0)
+        return(MagickFalse);
+      (void) CopyMagickString(command,Menus[id][entry],MagickPathExtent);
+      *animate_command=Commands[id][entry];
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2468,6 +2525,9 @@ MagickExport Image *XAnimateImages(Display *display,
         MagickTrue : MagickFalse;
     if (event.xany.window == windows->command.id)
       {
+        AnimateMenuSelection
+          menu_selection;
+
         int
           id;
 
@@ -2479,21 +2539,15 @@ MagickExport Image *XAnimateImages(Display *display,
           continue;
         (void) CopyMagickString(command,CommandMenu[id],MagickPathExtent);
         animate_command=CommandMenus[id];
-        if (id < MagickMenus)
-          {
-            int
-              entry;
-
-            /*
-              Select a command from a pop-up menu.
-            */
-            entry=XMenuWidget(display,windows,CommandMenu[id],Menus[id],
-              command);
-            if (entry < 0)
-              continue;
-            (void) CopyMagickString(command,Menus[id][entry],MagickPathExtent);
-            animate_command=Commands[id][entry];
-          }
+        menu_selection.display=display;
+        menu_selection.windows=windows;
+        menu_selection.CommandMenu=CommandMenu;
+        menu_selection.Menus=Menus;
+        menu_selection.Commands=Commands;
+        menu_selection.id=id;
+        if (XSelectMenuCommand(&menu_selection,command,&animate_command) ==
+            MagickFalse)
+          continue;
         if (animate_command != NullCommand)
           nexus=XMagickCommand(display,resource_info,windows,animate_command,
             &image,&state,exception);
