@@ -11316,6 +11316,41 @@ static MagickBooleanType XPrintImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _ROIMenuEntry
+{
+  const char
+    *const **Menus;
+
+  const DisplayCommand
+    **Commands;
+
+  int
+    id,
+    entry;
+} ROIMenuEntry;
+
+static DisplayCommand XSelectROIMenuEntry(const ROIMenuEntry *menu_entry,
+  char *command,DisplayCommand display_command)
+{
+  const char
+    *const **const Menus = menu_entry->Menus;
+
+  const DisplayCommand
+    **const Commands = menu_entry->Commands;
+
+  const int
+    id = menu_entry->id,
+    entry = menu_entry->entry;
+
+  if (entry >= 0)
+    {
+      (void) CopyMagickString(command,Menus[id][entry],
+        MagickPathExtent);
+      display_command=Commands[id][entry];
+    }
+  return(display_command);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -11957,17 +11992,20 @@ static MagickBooleanType XROIImage(Display *display,
               display_command=ApplyCommands[id];
               if (id < ApplyMenus)
                 {
+                  ROIMenuEntry
+                    menu_entry;
+
                   /*
                     Select a command from a pop-up menu.
                   */
                   entry=XMenuWidget(display,windows,ApplyMenu[id],
                     (const char **) Menus[id],command);
-                  if (entry >= 0)
-                    {
-                      (void) CopyMagickString(command,Menus[id][entry],
-                        MagickPathExtent);
-                      display_command=Commands[id][entry];
-                    }
+                  menu_entry.Menus=Menus;
+                  menu_entry.Commands=Commands;
+                  menu_entry.id=id;
+                  menu_entry.entry=entry;
+                  display_command=XSelectROIMenuEntry(&menu_entry,command,
+                    display_command);
                 }
             }
           (void) XSetFunction(display,windows->image.highlight_context,
