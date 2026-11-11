@@ -1452,6 +1452,56 @@ static void XMapAnimateImageWindow(const AnimateImageWindow *image_window,
   windows->image.mapped=MagickTrue;
 }
 
+typedef struct _AnimateCommandWindow
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *CommandMenu;
+} AnimateCommandWindow;
+
+static MagickStatusType XPressImageWindow(
+  const AnimateCommandWindow *command_window,MagickStatusType state)
+{
+  Display
+    *const display = command_window->display;
+
+  XResourceInfo
+    *const resource_info = command_window->resource_info;
+
+  XWindows
+    *const windows = command_window->windows;
+
+  const char
+    *const *const CommandMenu = command_window->CommandMenu;
+
+  if (resource_info->immutable != MagickFalse)
+    {
+      state|=ExitState;
+      return(state);
+    }
+  /*
+    Map/unmap Command widget.
+  */
+  if (windows->command.mapped)
+    (void) XWithdrawWindow(display,windows->command.id,
+      windows->command.screen);
+  else
+    {
+      (void) XCommandWidget(display,windows,CommandMenu,
+        (XEvent *) NULL);
+      (void) XMapRaised(display,windows->command.id);
+    }
+  return(state);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2474,23 +2524,14 @@ MagickExport Image *XAnimateImages(Display *display,
           }
         if (event.xbutton.window == windows->image.id)
           {
-            if (resource_info->immutable != MagickFalse)
-              {
-                state|=ExitState;
-                break;
-              }
-            /*
-              Map/unmap Command widget.
-            */
-            if (windows->command.mapped)
-              (void) XWithdrawWindow(display,windows->command.id,
-                windows->command.screen);
-            else
-              {
-                (void) XCommandWidget(display,windows,CommandMenu,
-                  (XEvent *) NULL);
-                (void) XMapRaised(display,windows->command.id);
-              }
+            AnimateCommandWindow
+              command_window;
+
+            command_window.display=display;
+            command_window.resource_info=resource_info;
+            command_window.windows=windows;
+            command_window.CommandMenu=CommandMenu;
+            state=XPressImageWindow(&command_window,state);
           }
         break;
       }
