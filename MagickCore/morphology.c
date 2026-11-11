@@ -5850,6 +5850,65 @@ static MagickBooleanType ApplyDirectMorphology(
   return(MagickTrue);
 }
 
+typedef struct _MorphologyCompoundFinish
+{
+  MorphologyMethod
+    method;
+
+  MagickBooleanType
+    verbose;
+
+  Image
+    *curr_image;
+
+  const Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} MorphologyCompoundFinish;
+
+static Image *FinishCompoundMorphology(const MorphologyCompoundFinish *finish,
+  Image *save_image)
+{
+  const MorphologyMethod
+    method = finish->method;
+
+  const MagickBooleanType
+    verbose = finish->verbose;
+
+  Image
+    *const curr_image = finish->curr_image;
+
+  const Image
+    *const image = finish->image;
+
+  ExceptionInfo
+    *const exception = finish->exception;
+
+  switch( method ) {
+    case EdgeOutMorphology:
+    case EdgeInMorphology:
+    case TopHatMorphology:
+    case BottomHatMorphology:
+      ReportCompoundDifference(verbose,method,
+        "\n%s: Difference with original image");
+      (void) CompositeImage(curr_image,image,DifferenceCompositeOp,
+        MagickTrue,0,0,exception);
+      break;
+    case EdgeMorphology:
+      ReportCompoundDifference(verbose,method,
+        "\n%s: Difference of Dilate and Erode");
+      (void) CompositeImage(curr_image,save_image,DifferenceCompositeOp,
+        MagickTrue,0,0,exception);
+      save_image = DestroyImage(save_image); /* finished with save image */
+      break;
+    default:
+      break;
+  }
+  return(save_image);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -5994,6 +6053,9 @@ MagickPrivate Image *MorphologyApply(const Image *image,
       MorphologyKernelCompose
         kernel_compose;
 
+      MorphologyCompoundFinish
+        finish;
+
       MorphologyStages
         stages;
 
@@ -6021,26 +6083,12 @@ MagickPrivate Image *MorphologyApply(const Image *image,
       ** purely mathematical way, and only to the selected channels.
       ** Turn off SVG composition 'alpha blending'.
       */
-      switch( method ) {
-        case EdgeOutMorphology:
-        case EdgeInMorphology:
-        case TopHatMorphology:
-        case BottomHatMorphology:
-          ReportCompoundDifference(verbose,method,
-            "\n%s: Difference with original image");
-          (void) CompositeImage(curr_image,image,DifferenceCompositeOp,
-            MagickTrue,0,0,exception);
-          break;
-        case EdgeMorphology:
-          ReportCompoundDifference(verbose,method,
-            "\n%s: Difference of Dilate and Erode");
-          (void) CompositeImage(curr_image,save_image,DifferenceCompositeOp,
-            MagickTrue,0,0,exception);
-          save_image = DestroyImage(save_image); /* finished with save image */
-          break;
-        default:
-          break;
-      }
+      finish.method=method;
+      finish.verbose=verbose;
+      finish.curr_image=curr_image;
+      finish.image=image;
+      finish.exception=exception;
+      save_image=FinishCompoundMorphology(&finish,save_image);
 
       /* multi-kernel handling:  re-iterate, or compose results */
       if ( kernel->next == (KernelInfo *) NULL )
