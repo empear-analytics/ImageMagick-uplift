@@ -2568,17 +2568,10 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
         release.window_info=(&windows->widget);
         release.event=event;
         ReleaseListBrowserAction(&release,reply_info,&action_info,&state);
-        if (cancel_info.raised == MagickFalse)
-          {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(cancel_info,event.xbutton)))
-              {
-                *reply_info.text='\0';
-                state|=ExitState;
-              }
-            cancel_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-          }
+        release.display=display;
+        release.window_info=(&windows->widget);
+        release.event=event;
+        ReleaseListBrowserCancel(&release,reply_info,&cancel_info,&state);
         if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
           break;
         break;
