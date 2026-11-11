@@ -2195,6 +2195,22 @@ static void XShowAnimationScene(const AnimateSceneView *scene_view,
     }
 }
 
+static void XPauseAnimationScene(const AnimateSceneView *scene_view,
+  const MagickBooleanType pause,XEvent *event)
+{
+  Display
+    *const display = scene_view->display;
+
+  XResourceInfo
+    *const resource_info = scene_view->resource_info;
+
+  XWindows
+    *const windows = scene_view->windows;
+
+  if (pause != MagickFalse)
+    XPauseAnimation(display,resource_info,windows,event);
+}
+
 static ssize_t XLoopStartScene(const Image *image,const ssize_t scene,
   ssize_t first_scene)
 {
@@ -3057,8 +3073,7 @@ MagickExport Image *XAnimateImages(Display *display,
         scene_view.scene=scene;
         XShowAnimationScene(&scene_view,state,&event);
         state&=(~StepAnimationState);
-        if (pause != MagickFalse)
-          XPauseAnimation(display,resource_info,windows,&event);
+        XPauseAnimationScene(&scene_view,pause,&event);
         continue;
       }
     /*
