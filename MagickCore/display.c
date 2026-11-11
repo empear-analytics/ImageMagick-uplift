@@ -12887,6 +12887,22 @@ static int XPredicate(Display *magick_unused(display),XEvent *event,char *data)
 }
 #endif
 
+static void XSetMagnifyPosition(XWindows *windows,int x,int y)
+{
+  if (x < 0)
+    x=0;
+  else
+    if (x >= (int) windows->image.width)
+      x=(int) (windows->image.width-1);
+  windows->magnify.x=(int) windows->image.x+x;
+  if (y < 0)
+    y=0;
+  else
+   if (y >= (int) windows->image.height)
+     y=(int) (windows->image.height-1);
+  windows->magnify.y=windows->image.y+y;
+}
+
 static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
@@ -12930,18 +12946,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
             */
             x=event->xbutton.x;
             y=event->xbutton.y;
-            if (x < 0)
-              x=0;
-            else
-              if (x >= (int) windows->image.width)
-                x=(int) (windows->image.width-1);
-            windows->magnify.x=(int) windows->image.x+x;
-            if (y < 0)
-              y=0;
-            else
-             if (y >= (int) windows->image.height)
-               y=(int) (windows->image.height-1);
-            windows->magnify.y=windows->image.y+y;
+            XSetMagnifyPosition(windows,x,y);
             if (windows->magnify.mapped == MagickFalse)
               (void) XMapRaised(display,windows->magnify.id);
             XMakeMagnifyImage(display,windows,exception);
@@ -13073,18 +13078,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
             */
             x=event->xmotion.x;
             y=event->xmotion.y;
-            if (x < 0)
-              x=0;
-            else
-              if (x >= (int) windows->image.width)
-                x=(int) (windows->image.width-1);
-            windows->magnify.x=(int) windows->image.x+x;
-            if (y < 0)
-              y=0;
-            else
-             if (y >= (int) windows->image.height)
-               y=(int) (windows->image.height-1);
-            windows->magnify.y=windows->image.y+y;
+            XSetMagnifyPosition(windows,x,y);
             XMakeMagnifyImage(display,windows,exception);
           }
       break;
