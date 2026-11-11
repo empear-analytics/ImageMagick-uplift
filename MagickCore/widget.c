@@ -9534,6 +9534,22 @@ static void ConfigureMenuWindow(const MenuEventContext *context,
   (*state)|=UpdateConfigurationState;
 }
 
+static void ExposeMenuWindow(const MenuEventContext *context,
+  const XEvent event,const MenuTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  if (event.xexpose.window != windows->widget.id)
+    return;
+  if (event.xexpose.count != 0)
+    return;
+  (*state)|=RedrawWidgetState;
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9768,11 +9784,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       }
       case Expose:
       {
-        if (event.xexpose.window != windows->widget.id)
-          break;
-        if (event.xexpose.count != 0)
-          break;
-        state|=RedrawWidgetState;
+        ExposeMenuWindow(&event_context,event,&targets);
         break;
       }
       case LeaveNotify:
