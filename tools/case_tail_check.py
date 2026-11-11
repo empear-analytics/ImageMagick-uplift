@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """Check the targets, the input fill, the bindings and the rewrite of a Recipe CT step.
 
-  case_tail_check.py FILE TARGETS HELPER [INPUT LOCAL]
+  case_tail_check.py FILE TARGETS HELPER [INPUT LOCAL] [--returns]
+
+With `--returns` the helper is the `static MagickBooleanType` function of Recipe CR (a
+tail that ends its case or iteration or returns failure): each `break;` or `continue;`
+the block lost is read as `return(MagickTrue);`, each `return(c);` as
+`return(MagickFalse);`, the helper ends with one more `return(MagickTrue);`, and the
+call is `if (HELPER(...) == MagickFalse)` followed by `return(c);` and the case's
+`break;` (or the loop's closing brace). Everything else is as below.
 
 TARGETS is the targets typedef (members are pointers to the caller's written
 variables, each named after its variable), HELPER the new `static void` function whose
@@ -67,11 +74,15 @@ def members(text, type_name):
     return names, m.group(0)
 
 
+RETURNS = False  # Recipe CR: the helper is a `static MagickBooleanType` function
+
+
 def helper_parts(text, helper):
-    m = re.search(r"^static void\s+" + re.escape(helper) + r"\((.*?)\)\s*\n\{(.*?)\n\}",
-                  text, re.S | re.M)
+    rtype = "MagickBooleanType" if RETURNS else "void"
+    m = re.search(r"^static " + rtype + r"\s+" + re.escape(helper) +
+                  r"\((.*?)\)\s*\n\{(.*?)\n\}", text, re.S | re.M)
     if not m:
-        raise SystemExit(f"FAIL: static void {helper}(...) not found")
+        raise SystemExit(f"FAIL: static {rtype} {helper}(...) not found")
     return m.group(0), m.group(1), m.group(2)
 
 
@@ -107,6 +118,17 @@ def check_fill(text, input_type, local, helper, names):
 
 
 def check_position(text, helper):
+    if RETURNS:
+        calls = list(re.finditer(r"^\s*if \(" + re.escape(helper) +
+                                 r"\([^;]*?\) == MagickFalse\)\s*\n\s*return\((\w+)\);"
+                                 r"\s*\n\s*(\S[^\n]*)", text, re.M))
+        if len(calls) != 1:
+            return [f"expected one `if ({helper}(...) == MagickFalse) return(c);`, "
+                    f"found {len(calls)}"]
+        if calls[0].group(2).strip() not in ("break;", "}"):
+            return [f"the call is followed by '{calls[0].group(2).strip()}', not break; "
+                    f"or the loop's closing brace"]
+        return []
     calls = list(re.finditer(r"^\s*" + re.escape(helper) + r"\([^;]*\);\s*\n\s*(\S[^\n]*)",
                              text, re.M))
     if len(calls) != 1:
@@ -146,7 +168,12 @@ def split_body(body, targets_ptr, input_ptr, target_names, input_names):
 
 def forward(line, names):
     """A removed line as Recipe CT step 5 writes it in the helper."""
-    if line == "break;":
+    if RETURNS:
+        if line in ("break;", "continue;"):
+            return "return(MagickTrue);"
+        if re.fullmatch(r"return\(\w+\);", line):
+            return "return(MagickFalse);"
+    elif line == "break;":
         return "return;"
     for n in names:
         line = re.sub(r"(?<![\w.>])&" + n + r"\b", "\0" + n, line)
@@ -165,7 +192,7 @@ def caller_body(text, helper, whole):
     """The body of the function that calls HELPER (the text outside HELPER's definition,
     from the `{` that opens the enclosing function to its closing `}`)."""
     outside = text.replace(whole, "")
-    call = re.search(r"^\s+" + re.escape(helper) + r"\(", outside, re.M)
+    call = re.search(r"^\s+(?:if \()?" + re.escape(helper) + r"\(", outside, re.M)
     if not call:
         return ""
     start = outside.rfind("\n{\n", 0, call.start())
@@ -255,6 +282,9 @@ def diff_lines(path):
 
 
 def main(argv):
+    global RETURNS
+    RETURNS = "--returns" in argv
+    argv = [a for a in argv if a != "--returns"]
     if len(argv) not in (4, 6):
         raise SystemExit(__doc__)
     path, targets_type, helper = argv[1:4]
@@ -291,6 +321,16 @@ def main(argv):
     outside.subtract(Counter(l.strip() for l in
                              (targets_typedef + "\n" + input_typedef).splitlines()
                              if l.strip() not in TRIVIAL))
+    if RETURNS:
+        # the `return(c);` the call adds to the caller is not part of the block
+        call = re.search(r"^\s*if \(" + re.escape(helper) +
+                         r"\([^;]*?\) == MagickFalse\)\s*\n\s*(return\(\w+\);)", text, re.M)
+        if call and outside[call.group(1)] > 0:
+            outside[call.group(1)] -= 1
+        elif call:
+            # the diff aligned the caller's `return(c);` with one of the block's: it is
+            # context, so the block's copy is missing from the removed lines
+            removed.append(call.group(1))
     removed_c = Counter(removed)
     for line in list(removed_c):
         same = min(removed_c[line], max(outside[line], 0))
@@ -309,6 +349,11 @@ def main(argv):
     for line, n in (want - have).items():
         problems.append(f"removed but not moved ({n}x): {line}")
     extra = have - want
+    if RETURNS:
+        # the helper's own last statement
+        if extra["return(MagickTrue)"] < 1:
+            problems.append(f"{helper} does not end with return(MagickTrue);")
+        extra["return(MagickTrue)"] -= 1
     temporaries = kept_temporaries(caller_body(text, helper, whole), moved, removed, extra)
     problems += unexplained(extra, temporaries, helper)
     # what else was added outside the helper
@@ -319,7 +364,7 @@ def main(argv):
             continue
         if local and re.fullmatch(re.escape(local) + r"\.\w+=\w+;", line):
             continue  # the fill, checked above
-        if re.match(re.escape(helper) + r"\(", line) or line.endswith(");"):
+        if re.match(r"(?:if \()?" + re.escape(helper) + r"\(", line) or line.endswith(");"):
             if helper in line or re.fullmatch(r"[\w&,\s]*\);", line):
                 continue  # the call, possibly wrapped
         if tlocal and (line.startswith(f"const {targets_type}") or line.startswith(tlocal) or
