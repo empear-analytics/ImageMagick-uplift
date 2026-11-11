@@ -344,6 +344,21 @@ static char *AcquireOpenCLCacheDirectory(char *home,char *path,char *temp)
   return(temp);
 }
 
+static void SetOpenCLCacheDirectory(char *home,char *path,char *temp)
+{
+  temp=AcquireOpenCLCacheDirectory(home,path,temp);
+  if (temp == (char *) NULL)
+    {
+      temp=AcquireString("?");
+      (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
+        "Cannot use cache directory: \"%s\"",path);
+    }
+  else
+    (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
+      "Using cache directory: \"%s\"",temp);
+  cache_directory=temp;
+}
+
 static const char *GetOpenCLCacheDirectory()
 {
   if (cache_directory == (char *) NULL)
@@ -373,17 +388,7 @@ static const char *GetOpenCLCacheDirectory()
 #endif
             }
 
-          temp=AcquireOpenCLCacheDirectory(home,path,temp);
-          if (temp == (char *) NULL)
-            {
-              temp=AcquireString("?");
-              (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
-                "Cannot use cache directory: \"%s\"",path);
-            }
-          else
-            (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
-              "Using cache directory: \"%s\"",temp);
-          cache_directory=temp;
+          SetOpenCLCacheDirectory(home,path,temp);
         }
       UnlockSemaphoreInfo(cache_directory_lock);
     }
