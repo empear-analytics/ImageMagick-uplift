@@ -748,15 +748,65 @@ static void XPlayCommand(const AnimateCommandTile *tile,
   }
 }
 
+static Image *XReadImageFileList(const AnimateCommandTile *tile,
+  char **filelist,const int number_files)
+{
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  Image
+    *images,
+    *next;
+
+  ImageInfo
+    *read_info;
+
+  int
+    i;
+
+  MagickBooleanType
+    proceed;
+
+  read_info=CloneImageInfo(resource_info->image_info);
+  images=NewImageList();
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  for (i=0; i < number_files; i++)
+  {
+    (void) CopyMagickString(read_info->filename,filelist[i],MagickPathExtent);
+    filelist[i]=DestroyString(filelist[i]);
+    *read_info->magick='\0';
+    next=ReadImage(read_info,exception);
+    CatchException(exception);
+    if (next != (Image *) NULL)
+      AppendImageToList(&images,next);
+    if (number_files <= 5)
+      continue;
+    proceed=SetImageProgress(images,LoadImageTag,i,(MagickSizeType)
+      number_files);
+    if (proceed == MagickFalse)
+      break;
+  }
+  filelist=(char **) RelinquishMagickMemory(filelist);
+  read_info=DestroyImageInfo(read_info);
+  return(images);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
 {
   Image
     *nexus;
-
-  MagickBooleanType
-    proceed;
 
   MagickStatusType
     status;
@@ -776,11 +826,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
         **filelist;
 
       Image
-        *images,
-        *next;
-
-      ImageInfo
-        *read_info;
+        *images;
 
       int
         number_files;
@@ -826,28 +872,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
             filenames);
           return((Image *) NULL);
         }
-      read_info=CloneImageInfo(resource_info->image_info);
-      images=NewImageList();
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      for (i=0; i < number_files; i++)
-      {
-        (void) CopyMagickString(read_info->filename,filelist[i],MagickPathExtent);
-        filelist[i]=DestroyString(filelist[i]);
-        *read_info->magick='\0';
-        next=ReadImage(read_info,exception);
-        CatchException(exception);
-        if (next != (Image *) NULL)
-          AppendImageToList(&images,next);
-        if (number_files <= 5)
-          continue;
-        proceed=SetImageProgress(images,LoadImageTag,i,(MagickSizeType)
-          number_files);
-        if (proceed == MagickFalse)
-          break;
-      }
-      filelist=(char **) RelinquishMagickMemory(filelist);
-      read_info=DestroyImageInfo(read_info);
+      images=XReadImageFileList(&tile,filelist,number_files);
       if (images == (Image *) NULL)
         {
           XSetCursorState(display,windows,MagickFalse);
