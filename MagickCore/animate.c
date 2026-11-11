@@ -3415,6 +3415,14 @@ static void XLogButtonRelease(XResourceInfo *resource_info,const XEvent event)
       event.xbutton.button,event.xbutton.x,event.xbutton.y);
 }
 
+static void XLogReparentNotify(XResourceInfo *resource_info,const XEvent event)
+{
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Reparent Notify: 0x%lx=>0x%lx",event.xreparent.parent,
+      event.xreparent.window);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4387,10 +4395,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case ReparentNotify:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Reparent Notify: 0x%lx=>0x%lx",event.xreparent.parent,
-            event.xreparent.window);
+        XLogReparentNotify(resource_info,event);
         break;
       }
       case UnmapNotify:
