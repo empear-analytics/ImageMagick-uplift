@@ -12386,6 +12386,39 @@ static void XROIUpRightKey(const ROIKeyInput *key_input,
   }
 }
 
+static void XROIHomeLeftKey(const ROIKeyInput *key_input,
+  const ROIKeyTargets *targets,const KeySym key_symbol)
+{
+  XWindows
+    *const windows = key_input->windows;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Home:
+    case XK_KP_Home:
+    {
+      (*roi_info).x=(ssize_t) (windows->image.width/2L-(*roi_info).width/2L);
+      (*roi_info).y=(ssize_t) (windows->image.height/2L-
+        (*roi_info).height/2L);
+      break;
+    }
+    case XK_Left:
+    case XK_KP_Left:
+    {
+      (*roi_info).x--;
+      break;
+    }
+    default:
+    {
+      XROIUpRightKey(key_input,targets,key_symbol);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -13095,23 +13128,9 @@ static MagickBooleanType XROIImage(Display *display,
               state|=ExitState;
               break;
             }
-            case XK_Home:
-            case XK_KP_Home:
-            {
-              roi_info.x=(ssize_t) (windows->image.width/2L-roi_info.width/2L);
-              roi_info.y=(ssize_t) (windows->image.height/2L-
-                roi_info.height/2L);
-              break;
-            }
-            case XK_Left:
-            case XK_KP_Left:
-            {
-              roi_info.x--;
-              break;
-            }
             default:
             {
-              XROIUpRightKey(&key_input,&key_targets,key_symbol);
+              XROIHomeLeftKey(&key_input,&key_targets,key_symbol);
               break;
             }
           }
