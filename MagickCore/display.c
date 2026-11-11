@@ -2839,6 +2839,22 @@ static ModeType XSelectChopDirection(const int id,
   return(direction);
 }
 
+static void XTrackInfoWidget(Display *display,XWindows *windows,const int x,
+  const int y)
+{
+  if (windows->info.mapped != MagickFalse)
+    {
+      if ((x < (windows->info.x+(int) windows->info.width)) &&
+          (y < (windows->info.y+(int) windows->info.height)))
+        (void) XWithdrawWindow(display,windows->info.id,
+          windows->info.screen);
+    }
+  else
+    if ((x > (windows->info.x+(int) windows->info.width)) ||
+        (y > (windows->info.y+(int) windows->info.height)))
+      (void) XMapWindow(display,windows->info.id);
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3056,17 +3072,7 @@ static MagickBooleanType XChopImage(Display *display,
         */
         x=event.xmotion.x;
         y=event.xmotion.y;
-        if (windows->info.mapped != MagickFalse)
-          {
-            if ((x < (windows->info.x+(int) windows->info.width)) &&
-                (y < (windows->info.y+(int) windows->info.height)))
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
-          }
-        else
-          if ((x > (windows->info.x+(int) windows->info.width)) ||
-              (y > (windows->info.y+(int) windows->info.height)))
-            (void) XMapWindow(display,windows->info.id);
+        XTrackInfoWidget(display,windows,x,y);
       }
     }
   } while ((state & ExitState) == 0);
