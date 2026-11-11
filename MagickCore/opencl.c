@@ -2983,6 +2983,18 @@ static void UpdateKernelProfileRecord(KernelProfileRecord profile_record,
   profile_record->count+=1;
 }
 
+static KernelProfileRecord AcquireKernelProfileRecord(char *name)
+{
+  KernelProfileRecord
+    profile_record;
+
+  profile_record=(KernelProfileRecord) AcquireCriticalMemory(
+    sizeof(*profile_record));
+  (void) memset(profile_record,0,sizeof(*profile_record));
+  profile_record->kernel_name=name;
+  return(profile_record);
+}
+
 MagickPrivate MagickBooleanType RecordProfileData(MagickCLDevice device,
   cl_kernel kernel,cl_event event)
 {
@@ -3039,10 +3051,7 @@ MagickPrivate MagickBooleanType RecordProfileData(MagickCLDevice device,
     name=DestroyString(name);
   else
     {
-      profile_record=(KernelProfileRecord) AcquireCriticalMemory(
-        sizeof(*profile_record));
-      (void) memset(profile_record,0,sizeof(*profile_record));
-      profile_record->kernel_name=name;
+      profile_record=AcquireKernelProfileRecord(name);
       device->profile_records=(KernelProfileRecord *) ResizeQuantumMemory(
         device->profile_records,(i+2),sizeof(*device->profile_records));
       if (device->profile_records == (KernelProfileRecord *) NULL)
