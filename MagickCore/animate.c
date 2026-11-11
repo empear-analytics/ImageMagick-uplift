@@ -2548,6 +2548,23 @@ static void XStoreSceneWindow(const AnimateSceneWindow *scene_window,
   }
 }
 
+static void XCountSceneColors(Image *images,XResourceInfo *resource_info)
+{
+  Image
+    *p;
+
+  for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
+  {
+    if (p->storage_class == DirectClass)
+      {
+        resource_info->colors=0;
+        break;
+      }
+    if (p->colors > resource_info->colors)
+      resource_info->colors=p->colors;
+  }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2767,22 +2784,10 @@ MagickExport Image *XAnimateImages(Display *display,
     }
   else
     {
-      Image
-        *p;
-
       /*
         Initialize window structure.
       */
-      for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
-      {
-        if (p->storage_class == DirectClass)
-          {
-            resource_info->colors=0;
-            break;
-          }
-        if (p->colors > resource_info->colors)
-          resource_info->colors=p->colors;
-      }
+      XCountSceneColors(images,resource_info);
       windows=XSetWindows(XInitializeWindows(display,resource_info));
       if (windows == (XWindows *) NULL)
         ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
