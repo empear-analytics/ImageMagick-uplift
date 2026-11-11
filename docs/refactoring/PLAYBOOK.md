@@ -10434,6 +10434,13 @@ and all.
    constant); their labels are enumeration constants. No group falls into a peeled
    group (the group before each ends in `break;` or a `return`), and a kept group
    carries `default:`. No `#` line stands in the peeled groups.
+   Integer form (2026-11-11): `e` may instead be a parameter of an integer type (`ssize_t
+   n`) whose peeled labels are decimal integer literals and whose `S` is `return(c);` of
+   a numeric literal; the predicate's parameter is `const` of `e`'s declared type, and a
+   kept `switch` that has no `default:` stays without one (`-Wswitch` concerns
+   enumerations only; a value matching no label falls out of the `switch` as it did, to
+   the statement after it). A comment on a peeled label's line moves to the predicate's
+   line for that label.
 2. Write LP step 2's predicate directly above the function: `static MagickBooleanType
    Name(const T x)` (`T` the declared type of `e`), whose body is `switch (x) { <every
    peeled group's comment lines and labels, in the original order> return(MagickTrue);
@@ -10522,6 +10529,11 @@ static MagickBooleanType IsRotationUselessKernel(const KernelInfoType type)
   (it only reads its argument); the `switch` then evaluates `e` again, which nothing has
   written since, and selects the same kept group as before, since its labels are
   unchanged; a value that matched no label reaches the kept `default:` as before.
+- Integer form: nothing differs but the label type. The predicate returns `MagickTrue`
+  for exactly the literals the peeled groups carried (step 4), and `S` is what each of
+  those groups returned; any other value reaches the kept `switch`, which holds the
+  other labels, or, finding none, the statement after it, as before. Called per pixel
+  (`poly_basis_dx`, twice per polynomial term), the step is timed as CF step 7 says.
 - The peeled groups' labels are gone from the `switch`, but no value that would select
   them reaches it any more. Step 1's ban on a group falling into a peeled group keeps
   every path through the kept groups as it was; a peeled group itself always left.
@@ -11522,3 +11534,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | NEW | UX | Unnest an Exit Implied by Its Guard: a guard on the disjunction of `A` and `B` whose body runs a clean-up `S`, then exits through `X` when `B` holds and through `Y` otherwise, becomes three statements: the guard holding `S` alone, `if (B) X`, and `if (A) { Y }`; `A` and `B` are side-effect-free reads of locals that `S` does not write | `animate.c`'s `XMagickCommand` (campaign A, W17 lane c, wide build): the Open command's failure guard releases the file list and then throws one of two `ThrowXWindowException`s, which record `GetMagickModule()` and must stay in the function; the nested test is the function's last bump after the SD splits. Probe of the chain: `XMagickCommand` leaves Bumpy Road Ahead and Large Method, 3.48 to 3.67 with the XSaveImage steps | owner |
 | 2026-11-11 | WORDING | UX | Step 5 and *Evidence level*: `refactor_guard.py` counts distinct values, so repeating `A` may leave it at PASS; a WARN is expected only when a literal of `A` is new to the count | The first use (`XMagickCommand`, `status == MagickFalse`) printed PASS, not the WARN the text predicted | owner |
 | 2026-11-11 | AMEND | MA | Step 2 (c): the lvalues of the copies may differ in a member of the chain before the last when each is a chain of member selections through one shared pointer variable (no call, no subscript), of one type; the block may only read or only assign it. *Careful* adds the argument (the address names the very object the copy named; nothing is read that the copy did not read) | `widget.c`'s `XScreenEvent` (campaign A, W18 lane a, wide build): the popup block's two `windows->popup.mapped` assignments and the existing helper `XScreenTrackWidgetMapping` (`windows->widget.mapped`) are twins differing in one member of the chain; one helper taking `MagickBooleanType *mapped` serves both. Probe: the function leaves Bumpy Road Ahead and drops from cc 15 to 13, 3.04 to 3.06, no new function | owner |
+| 2026-11-11 | AMEND | PL | Integer form of step 1: `e` may be a parameter of an integer type whose peeled labels are decimal integer literals and whose `S` is `return(c);` of a numeric literal; the predicate takes `const` of `e`'s type, a kept `switch` without `default:` stays without one, a comment on a peeled label moves to the predicate. *Careful* adds the value-by-value argument and the timing duty for a per-pixel caller | `distort.c`'s `poly_basis_dx` (campaign A, W18 lane a): six of its twenty-one labels (`0`, `2`, `5`, `9`, `14`, `20`) only `return( 0.0 );`; peeled into `IsPolyBasisDxZero` the file goes 7.60 to 7.70 (cc 22 to 16); a polynomial distort of 1500x1500 pixels, order 5, medians of 11 alternating runs: 1.305 s against 1.314 s (+0.6%) | owner |
