@@ -12834,7 +12834,8 @@ static MagickBooleanType XROIImage(Display *display,
               state|=UpdateConfigurationState;
               break;
             }
-          magick_fallthrough;
+          XCropButtonRelease(&event_input,crop_info);
+          break;
         }
         case ButtonRelease:
         {
