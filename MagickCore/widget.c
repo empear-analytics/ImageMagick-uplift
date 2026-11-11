@@ -10153,6 +10153,33 @@ static void KeyNoticeDismiss(Display *display,XWindows *windows,
     }
 }
 
+static void MoveNoticeDismiss(Display *display,XWindows *windows,XEvent event,
+  const NoticeTargets *targets)
+{
+  XWidgetInfo
+    *const dismiss_info = targets->dismiss_info;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
+  if ((*state) & InactiveWidgetState)
+    return;
+  if ((*dismiss_info).raised == MatteIsActive((*dismiss_info),event.xmotion))
+    {
+      /*
+        Dismiss button status changed.
+      */
+      (*dismiss_info).raised=
+        (*dismiss_info).raised == MagickFalse ? MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      return;
+    }
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -10358,22 +10385,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
       }
       case MotionNotify:
       {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (state & InactiveWidgetState)
-          break;
-        if (dismiss_info.raised == MatteIsActive(dismiss_info,event.xmotion))
-          {
-            /*
-              Dismiss button status changed.
-            */
-            dismiss_info.raised=
-              dismiss_info.raised == MagickFalse ? MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-            break;
-          }
+        MoveNoticeDismiss(display,windows,event,&targets);
         break;
       }
       default:
