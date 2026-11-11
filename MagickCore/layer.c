@@ -82,6 +82,15 @@ typedef struct _DifferingPixelScan
     *alpha_pixel,
     *beta_pixel;
 } DifferingPixelScan;
+
+typedef struct _FrameBoundsEntry
+{
+  const RectangleInfo
+    *bounds;
+
+  ssize_t
+    i;
+} FrameBoundsEntry;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1256,8 +1265,14 @@ static inline MagickBooleanType IsPartialPageFrame(const Image *curr,
 
 static inline MagickBooleanType IsBetterFrameBounds(
   const MagickBooleanType try_cleared,const MagickBooleanType cleared,
-  const RectangleInfo try_bounds,const RectangleInfo *bounds,const ssize_t i)
+  const RectangleInfo try_bounds,const FrameBoundsEntry *entry)
 {
+  const RectangleInfo
+    *bounds = entry->bounds;
+
+  const ssize_t
+    i = entry->i;
+
   return(( (!try_cleared && cleared ) ||
     try_bounds.width * try_bounds.height
     <  bounds[i].width * bounds[i].height ) ? MagickTrue : MagickFalse);
@@ -1828,6 +1843,9 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
         const DuplicateFrameTrial
           trial = { add_frames, curr, bounds, disposals, i, exception };
 
+        const FrameBoundsEntry
+          entry = { bounds, i };
+
         /*
           Compare a none disposal against a previous disposal
         */
@@ -1839,7 +1857,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
          (double) try_bounds.x,(double) try_bounds.y,
          try_cleared?"  (pixels were cleared)":"");
 #endif
-        if (IsBetterFrameBounds(try_cleared,cleared,try_bounds,bounds,i) !=
+        if (IsBetterFrameBounds(try_cleared,cleared,try_bounds,&entry) !=
             MagickFalse)
           {
             cleared=try_cleared;
