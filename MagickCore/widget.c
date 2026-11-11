@@ -1868,6 +1868,57 @@ static size_t ReadColorBrowserPattern(const XWidgetInfo reply_info,
   return(state);
 }
 
+typedef struct _ColorBrowserGrab
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  XWidgetInfo
+    grab_info;
+
+  ExceptionInfo
+    *exception;
+} ColorBrowserGrab;
+
+static void ReleaseColorBrowserGrab(const ColorBrowserGrab *grab,
+  XWidgetInfo *reply_info,size_t *state)
+{
+  Display
+    *const display = grab->display;
+
+  XWindows
+    *const windows = grab->windows;
+
+  const XEvent
+    event = grab->event;
+
+  const XWidgetInfo
+    grab_info = grab->grab_info;
+
+  ExceptionInfo
+    *const exception = grab->exception;
+
+  if ((event.xbutton.window == windows->widget.id) &&
+      (MatteIsActive(grab_info,event.xbutton)))
+    {
+      /*
+        Select a fill color from the X server.
+      */
+      (void) XGetWindowColor(display,windows,(*reply_info).text,
+        exception);
+      (*reply_info).marker=(*reply_info).text;
+      (*reply_info).cursor=(*reply_info).text+Extent((*reply_info).text);
+      XDrawMatteText(display,&windows->widget,&(*reply_info));
+      (*state)|=RedrawActionState;
+    }
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2574,19 +2625,15 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
           }
         if (grab_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(grab_info,event.xbutton)))
-              {
-                /*
-                  Select a fill color from the X server.
-                */
-                (void) XGetWindowColor(display,windows,reply_info.text,
-                  exception);
-                reply_info.marker=reply_info.text;
-                reply_info.cursor=reply_info.text+Extent(reply_info.text);
-                XDrawMatteText(display,&windows->widget,&reply_info);
-                state|=RedrawActionState;
-              }
+            ColorBrowserGrab
+              grab;
+
+            grab.display=display;
+            grab.windows=windows;
+            grab.event=event;
+            grab.grab_info=grab_info;
+            grab.exception=exception;
+            ReleaseColorBrowserGrab(&grab,&reply_info,&state);
             grab_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&grab_info);
           }
