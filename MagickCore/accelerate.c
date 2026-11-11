@@ -1387,6 +1387,18 @@ MagickPrivate MagickBooleanType AccelerateContrastStretchImage(
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+static void ReleaseTempImageBuffers(MagickCLEnv clEnv,cl_mem *tempImageBuffer)
+{
+  int
+    k;
+
+  for (k = 0; k < 2; k++)
+  {
+    if (tempImageBuffer[k]!=NULL)
+      clEnv->library->clReleaseMemObject(tempImageBuffer[k]);
+  }
+}
+
 static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   ExceptionInfo*exception)
 {
@@ -1738,11 +1750,7 @@ cleanup:
     ReleaseOpenCLDevice(device);
   if (imageBuffer!=NULL)
     clEnv->library->clReleaseMemObject(imageBuffer);
-  for (k = 0; k < 2; k++)
-  {
-    if (tempImageBuffer[k]!=NULL)
-      clEnv->library->clReleaseMemObject(tempImageBuffer[k]);
-  }
+  ReleaseTempImageBuffers(clEnv,tempImageBuffer);
   if (filteredImageBuffer!=NULL)
     clEnv->library->clReleaseMemObject(filteredImageBuffer);
   if (hullPass1!=NULL)
