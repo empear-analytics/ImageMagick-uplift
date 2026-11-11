@@ -522,11 +522,11 @@ static Image *FinishComplexImages(Image *complex_images,
   return(complex_images);
 }
 
+#define ComplexImageTag  "Complex/Image"
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
-#define ComplexImageTag  "Complex/Image"
-
   CacheView
     *Ai_view,
     *Ar_view,
