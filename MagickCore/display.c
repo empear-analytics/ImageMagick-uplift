@@ -3436,12 +3436,81 @@ typedef struct _ColorEditPixelInput
   CacheView
     *image_view;
 
+  int
+    x_offset,
+    y_offset;
+
   ExceptionInfo
     *exception;
 
+  XResourceInfo
+    *resource_info;
+
+  PaintMethod
+    method;
+
   XColor
-    color;
+    color,
+    border_color;
+
+  unsigned int
+    pen_id;
 } ColorEditPixelInput;
+
+static void XColorFloodfill(const ColorEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  XResourceInfo
+    *const resource_info = pixel_input->resource_info;
+
+  const PaintMethod
+    method = pixel_input->method;
+
+  const XColor
+    border_color = pixel_input->border_color;
+
+  const unsigned int
+    pen_id = pixel_input->pen_id;
+
+  DrawInfo
+    *draw_info;
+
+  PixelInfo
+    target;
+
+  /*
+    Update color information using floodfill algorithm.
+  */
+  (void) GetOneVirtualPixelInfo(*image,
+    GetPixelCacheVirtualMethod(*image),(ssize_t) x_offset,(ssize_t)
+    y_offset,&target,exception);
+  if (method == FillToBorderMethod)
+    {
+      target.red=(double)
+        ScaleShortToQuantum(border_color.red);
+      target.green=(double)
+        ScaleShortToQuantum(border_color.green);
+      target.blue=(double)
+        ScaleShortToQuantum(border_color.blue);
+    }
+  draw_info=CloneDrawInfo(resource_info->image_info,
+    (DrawInfo *) NULL);
+  (void) QueryColorCompliance(resource_info->pen_colors[pen_id],
+    AllCompliance,&draw_info->fill,exception);
+  (void) FloodfillPaintImage(*image,draw_info,&target,
+    (ssize_t)x_offset,(ssize_t)y_offset,
+    method != FloodfillMethod ? MagickTrue : MagickFalse,exception);
+  draw_info=DestroyDrawInfo(draw_info);
+}
 
 static void XColorReset(const ColorEditPixelInput *pixel_input)
 {
@@ -3990,8 +4059,14 @@ static MagickBooleanType XColorEditImage(Display *display,
         image_view=AcquireAuthenticCacheView(*image,exception);
         pixel_input.image=image;
         pixel_input.image_view=image_view;
+        pixel_input.x_offset=x_offset;
+        pixel_input.y_offset=y_offset;
         pixel_input.exception=exception;
+        pixel_input.resource_info=resource_info;
+        pixel_input.method=method;
         pixel_input.color=color;
+        pixel_input.border_color=border_color;
+        pixel_input.pen_id=pen_id;
         switch (method)
         {
           case PointMethod:
@@ -4036,35 +4111,7 @@ static MagickBooleanType XColorEditImage(Display *display,
           case FloodfillMethod:
           case FillToBorderMethod:
           {
-            DrawInfo
-              *draw_info;
-
-            PixelInfo
-              target;
-
-            /*
-              Update color information using floodfill algorithm.
-            */
-            (void) GetOneVirtualPixelInfo(*image,
-              GetPixelCacheVirtualMethod(*image),(ssize_t) x_offset,(ssize_t)
-              y_offset,&target,exception);
-            if (method == FillToBorderMethod)
-              {
-                target.red=(double)
-                  ScaleShortToQuantum(border_color.red);
-                target.green=(double)
-                  ScaleShortToQuantum(border_color.green);
-                target.blue=(double)
-                  ScaleShortToQuantum(border_color.blue);
-              }
-            draw_info=CloneDrawInfo(resource_info->image_info,
-              (DrawInfo *) NULL);
-            (void) QueryColorCompliance(resource_info->pen_colors[pen_id],
-              AllCompliance,&draw_info->fill,exception);
-            (void) FloodfillPaintImage(*image,draw_info,&target,
-              (ssize_t)x_offset,(ssize_t)y_offset,
-              method != FloodfillMethod ? MagickTrue : MagickFalse,exception);
-            draw_info=DestroyDrawInfo(draw_info);
+            XColorFloodfill(&pixel_input);
             break;
           }
           case ResetMethod:
