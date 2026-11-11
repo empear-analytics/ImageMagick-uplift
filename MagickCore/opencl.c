@@ -2783,10 +2783,48 @@ static MagickBooleanType AcquireOpenCLContexts(MagickCLEnv clEnv,
   return(MagickTrue);
 }
 
+typedef struct _OpenCLPlatformTargets
+{
+  cl_uint
+    *number_platforms;
+
+  cl_platform_id
+    **platforms;
+} OpenCLPlatformTargets;
+
+static MagickBooleanType AcquireOpenCLPlatforms(
+  const OpenCLPlatformTargets *targets)
+{
+  cl_uint
+    *const number_platforms = targets->number_platforms;
+
+  cl_platform_id
+    **const platforms = targets->platforms;
+
+  *number_platforms=0;
+  if (openCL_library->clGetPlatformIDs(0,NULL,number_platforms) != CL_SUCCESS)
+    return(MagickFalse);
+  if (*number_platforms == 0)
+    return(MagickFalse);
+  *platforms=(cl_platform_id *) AcquireQuantumMemory(1,*number_platforms*
+    sizeof(cl_platform_id));
+  if (*platforms == (cl_platform_id *) NULL)
+    return(MagickFalse);
+  if (openCL_library->clGetPlatformIDs(*number_platforms,*platforms,NULL) != CL_SUCCESS)
+    {
+       *platforms=(cl_platform_id *) RelinquishMagickMemory(*platforms);
+       return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void LoadOpenCLDevices(MagickCLEnv clEnv)
 {
   OpenCLPlatformLoad
     platform_load;
+
+  OpenCLPlatformTargets
+    targets;
 
   cl_device_id
     *devices;
@@ -2799,20 +2837,10 @@ static void LoadOpenCLDevices(MagickCLEnv clEnv)
     next,
     number_platforms;
 
-  number_platforms=0;
-  if (openCL_library->clGetPlatformIDs(0,NULL,&number_platforms) != CL_SUCCESS)
+  targets.number_platforms=(&number_platforms);
+  targets.platforms=(&platforms);
+  if (AcquireOpenCLPlatforms(&targets) == MagickFalse)
     return;
-  if (number_platforms == 0)
-    return;
-  platforms=(cl_platform_id *) AcquireQuantumMemory(1,number_platforms*
-    sizeof(cl_platform_id));
-  if (platforms == (cl_platform_id *) NULL)
-    return;
-  if (openCL_library->clGetPlatformIDs(number_platforms,platforms,NULL) != CL_SUCCESS)
-    {
-       platforms=(cl_platform_id *) RelinquishMagickMemory(platforms);
-       return;
-    }
   CountOpenCLDevices(clEnv,platforms,number_platforms);
   if (clEnv->number_devices == 0)
     {
