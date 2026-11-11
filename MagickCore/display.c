@@ -10313,6 +10313,50 @@ static void XSelectBorderColor(const EditMenuInput *menu,
     resource_info->pen_colors[pen_number],border_color);
 }
 
+static void XSelectMatteValue(const EditMenuInput *menu,
+  const char *const *MatteMenu,char *message,char *matte)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const MatteEditMenu = menu->MatteEditMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  int
+    entry;
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  entry=XMenuWidget(display,windows,MatteEditMenu[id],MatteMenu,
+    command);
+  if (entry < 0)
+    return;
+  if (entry != 2)
+    {
+      (void) FormatLocaleString(matte,MagickPathExtent,"%g",
+        (double) OpaqueAlpha);
+      if (LocaleCompare(MatteMenu[entry],"Transparent") == 0)
+        (void) FormatLocaleString(matte,MagickPathExtent,"%g",
+          (double) TransparentAlpha);
+      return;
+    }
+  (void) FormatLocaleString(message,MagickPathExtent,
+    "Enter matte value (0 - " "%g" "):",(double) QuantumRange);
+  (void) XDialogWidget(display,windows,"Matte",message,matte);
+  if (*matte == '\0')
+    return;
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -10359,7 +10403,6 @@ static MagickBooleanType XMatteEditImage(Display *display,
     cursor;
 
   int
-    entry,
     id,
     x,
     x_offset,
@@ -10494,27 +10537,12 @@ static MagickBooleanType XMatteEditImage(Display *display,
             static char
               message[MagickPathExtent];
 
-            /*
-              Select a command from the pop-up menu.
-            */
-            entry=XMenuWidget(display,windows,MatteEditMenu[id],MatteMenu,
-              command);
-            if (entry < 0)
-              break;
-            if (entry != 2)
-              {
-                (void) FormatLocaleString(matte,MagickPathExtent,"%g",
-                  (double) OpaqueAlpha);
-                if (LocaleCompare(MatteMenu[entry],"Transparent") == 0)
-                  (void) FormatLocaleString(matte,MagickPathExtent,"%g",
-                    (double) TransparentAlpha);
-                break;
-              }
-            (void) FormatLocaleString(message,MagickPathExtent,
-              "Enter matte value (0 - " "%g" "):",(double) QuantumRange);
-            (void) XDialogWidget(display,windows,"Matte",message,matte);
-            if (*matte == '\0')
-              break;
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=MatteEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectMatteValue(&menu_input,MatteMenu,message,matte);
             break;
           }
           case MatteEditUndoCommand:
