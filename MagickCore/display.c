@@ -12419,6 +12419,118 @@ static void XROIHomeLeftKey(const ROIKeyInput *key_input,
   }
 }
 
+typedef struct _ROIRegionInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+
+  RectangleInfo
+    roi_info;
+
+  DisplayCommand
+    display_command;
+} ROIRegionInput;
+
+static MagickBooleanType XROIApplyRegion(const ROIRegionInput *region_input,
+  RectangleInfo *crop_info)
+{
+  Display
+    *const display = region_input->display;
+
+  XResourceInfo
+    *const resource_info = region_input->resource_info;
+
+  XWindows
+    *const windows = region_input->windows;
+
+  Image
+    **const image = region_input->image;
+
+  ExceptionInfo
+    *const exception = region_input->exception;
+
+  const RectangleInfo
+    roi_info = region_input->roi_info;
+
+  const DisplayCommand
+    display_command = region_input->display_command;
+
+  double
+    scale_factor;
+
+  Image
+    *roi_image;
+
+  int
+    x,
+    y;
+
+  MagickProgressMonitor
+    progress_monitor;
+
+  unsigned int
+    height,
+    width;
+
+  /*
+    Region of interest is relative to image configuration.
+  */
+  progress_monitor=SetImageProgressMonitor(*image,
+    (MagickProgressMonitor) NULL,(*image)->client_data);
+  (*crop_info)=roi_info;
+  width=(unsigned int) (*image)->columns;
+  height=(unsigned int) (*image)->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
+      &width,&height);
+  scale_factor=(double) width/windows->image.ximage->width;
+  (*crop_info).x+=x;
+  (*crop_info).x=(ssize_t) (scale_factor*(*crop_info).x+0.5);
+  (*crop_info).width=(unsigned int) (scale_factor*(*crop_info).width+0.5);
+  scale_factor=(double)
+    height/windows->image.ximage->height;
+  (*crop_info).y+=y;
+  (*crop_info).y=(ssize_t) (scale_factor*(*crop_info).y+0.5);
+  (*crop_info).height=(unsigned int)
+    (scale_factor*(*crop_info).height+0.5);
+  roi_image=CropImage(*image,crop_info,exception);
+  (void) SetImageProgressMonitor(*image,progress_monitor,
+    (*image)->client_data);
+  if (roi_image == (Image *) NULL)
+    return(MagickTrue);
+  /*
+    Apply image processing technique to the region of interest.
+  */
+  windows->image.orphan=MagickTrue;
+  (void) XMagickCommand(display,resource_info,windows,
+    display_command,&roi_image,exception);
+  progress_monitor=SetImageProgressMonitor(*image,
+    (MagickProgressMonitor) NULL,(*image)->client_data);
+  (void) XMagickCommand(display,resource_info,windows,
+    SaveToUndoBufferCommand,image,exception);
+  windows->image.orphan=MagickFalse;
+  (void) CompositeImage(*image,roi_image,CopyCompositeOp,
+    MagickTrue,(*crop_info).x,(*crop_info).y,exception);
+  roi_image=DestroyImage(roi_image);
+  (void) SetImageProgressMonitor(*image,progress_monitor,
+    (*image)->client_data);
+  return(MagickFalse);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12640,29 +12752,16 @@ static MagickBooleanType XROIImage(Display *display,
   Cursor
     cursor;
 
-  Image
-    *roi_image;
-
   int
     entry,
     id,
     x,
     y;
 
-  double
-    scale_factor;
-
-  MagickProgressMonitor
-    progress_monitor;
-
   RectangleInfo
     crop_info,
     highlight_info,
     roi_info;
-
-  unsigned int
-    height,
-    width;
 
   size_t
     state;
@@ -12914,6 +13013,9 @@ static MagickBooleanType XROIImage(Display *display,
       CropEventInput
         event_input;
 
+      ROIRegionInput
+        region_input;
+
       ROIKeyInput
         key_input;
 
@@ -12936,6 +13038,13 @@ static MagickBooleanType XROIImage(Display *display,
           state|=ExitState;
           break;
         }
+      region_input.display=display;
+      region_input.resource_info=resource_info;
+      region_input.windows=windows;
+      region_input.image=image;
+      region_input.exception=exception;
+      region_input.roi_info=roi_info;
+      region_input.display_command=display_command;
       if ((state & UpdateRegionState) != 0)
         {
           (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
@@ -12950,50 +13059,8 @@ static MagickBooleanType XROIImage(Display *display,
             }
             default:
             {
-              /*
-                Region of interest is relative to image configuration.
-              */
-              progress_monitor=SetImageProgressMonitor(*image,
-                (MagickProgressMonitor) NULL,(*image)->client_data);
-              crop_info=roi_info;
-              width=(unsigned int) (*image)->columns;
-              height=(unsigned int) (*image)->rows;
-              x=0;
-              y=0;
-              if (windows->image.crop_geometry != (char *) NULL)
-                (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
-                  &width,&height);
-              scale_factor=(double) width/windows->image.ximage->width;
-              crop_info.x+=x;
-              crop_info.x=(ssize_t) (scale_factor*crop_info.x+0.5);
-              crop_info.width=(unsigned int) (scale_factor*crop_info.width+0.5);
-              scale_factor=(double)
-                height/windows->image.ximage->height;
-              crop_info.y+=y;
-              crop_info.y=(ssize_t) (scale_factor*crop_info.y+0.5);
-              crop_info.height=(unsigned int)
-                (scale_factor*crop_info.height+0.5);
-              roi_image=CropImage(*image,&crop_info,exception);
-              (void) SetImageProgressMonitor(*image,progress_monitor,
-                (*image)->client_data);
-              if (roi_image == (Image *) NULL)
+              if (XROIApplyRegion(&region_input,&crop_info) != MagickFalse)
                 continue;
-              /*
-                Apply image processing technique to the region of interest.
-              */
-              windows->image.orphan=MagickTrue;
-              (void) XMagickCommand(display,resource_info,windows,
-                display_command,&roi_image,exception);
-              progress_monitor=SetImageProgressMonitor(*image,
-                (MagickProgressMonitor) NULL,(*image)->client_data);
-              (void) XMagickCommand(display,resource_info,windows,
-                SaveToUndoBufferCommand,image,exception);
-              windows->image.orphan=MagickFalse;
-              (void) CompositeImage(*image,roi_image,CopyCompositeOp,
-                MagickTrue,crop_info.x,crop_info.y,exception);
-              roi_image=DestroyImage(roi_image);
-              (void) SetImageProgressMonitor(*image,progress_monitor,
-                (*image)->client_data);
               break;
             }
           }
