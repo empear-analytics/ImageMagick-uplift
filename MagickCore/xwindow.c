@@ -9613,41 +9613,41 @@ MagickPrivate void XMakeStandardColormap(Display *display,
         pixel);
       number_colors=(unsigned int) (map_info->base_pixel+
         (map_info->red_max+1)*(map_info->green_max+1)*(map_info->blue_max+1));
-      if ((map_info->red_max*map_info->green_max*map_info->blue_max) != 0)
-        if (IsColorRecoveryDither(image,resource_info,number_colors) != MagickFalse)
-          {
-            Image
-              *affinity_image;
+      if (((map_info->red_max*map_info->green_max*map_info->blue_max) != 0) &&
+          (IsColorRecoveryDither(image,resource_info,number_colors) != MagickFalse))
+        {
+          Image
+            *affinity_image;
 
-            Quantum
-              *magick_restrict q;
+          Quantum
+            *magick_restrict q;
 
-            /*
-              Improve image appearance with error diffusion.
-            */
-            affinity_image=AcquireImage((ImageInfo *) NULL,exception);
-            if (affinity_image == (Image *) NULL)
-              ThrowXWindowFatalException(ResourceLimitFatalError,
-                "UnableToDitherImage",image->filename);
-            affinity_image->columns=number_colors;
-            affinity_image->rows=1;
-            /*
-              Initialize colormap image.
-            */
-            q=QueueAuthenticPixels(affinity_image,0,0,affinity_image->columns,
-              1,exception);
-            if (q != (Quantum *) NULL)
-              {
-                SetAffinityColormap(affinity_image,map_info,number_colors,q);
-                (void) SyncAuthenticPixels(affinity_image,exception);
-                (void) RemapImage(resource_info->quantize_info,image,
-                  affinity_image,exception);
-              }
-            XGetPixelInfo(display,visual_info,map_info,resource_info,image,
-              pixel);
-            (void) SetImageStorageClass(image,DirectClass,exception);
-            affinity_image=DestroyImage(affinity_image);
-          }
+          /*
+            Improve image appearance with error diffusion.
+          */
+          affinity_image=AcquireImage((ImageInfo *) NULL,exception);
+          if (affinity_image == (Image *) NULL)
+            ThrowXWindowFatalException(ResourceLimitFatalError,
+              "UnableToDitherImage",image->filename);
+          affinity_image->columns=number_colors;
+          affinity_image->rows=1;
+          /*
+            Initialize colormap image.
+          */
+          q=QueueAuthenticPixels(affinity_image,0,0,affinity_image->columns,
+            1,exception);
+          if (q != (Quantum *) NULL)
+            {
+              SetAffinityColormap(affinity_image,map_info,number_colors,q);
+              (void) SyncAuthenticPixels(affinity_image,exception);
+              (void) RemapImage(resource_info->quantize_info,image,
+                affinity_image,exception);
+            }
+          XGetPixelInfo(display,visual_info,map_info,resource_info,image,
+            pixel);
+          (void) SetImageStorageClass(image,DirectClass,exception);
+          affinity_image=DestroyImage(affinity_image);
+        }
       if ((GetLogEventMask() & X11Event) != 0)
         {
           (void) LogMagickEvent(X11Event,GetMagickModule(),
