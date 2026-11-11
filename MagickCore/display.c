@@ -12624,6 +12624,57 @@ static void XROIMotion(const CropEventInput *event_input,
   (*roi_info).y=(ssize_t) windows->image.y+(*event).xmotion.y;
 }
 
+static void XROIKeyPress(const ROIKeyInput *key_input,XEvent *event,
+  const ROIKeyTargets *targets)
+{
+  Display
+    *const display = key_input->display;
+
+  XWindows
+    *const windows = key_input->windows;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  if ((*event).xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Shift_L:
+    case XK_Shift_R:
+      break;
+    case XK_Escape:
+    case XK_F20:
+    {
+      (*state)|=EscapeState;
+      magick_fallthrough;
+    }
+    case XK_Return:
+    {
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+    {
+      XROIHomeLeftKey(key_input,targets,key_symbol);
+      break;
+    }
+  }
+  (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
+    (*event).xkey.time);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -13233,40 +13284,7 @@ static MagickBooleanType XROIImage(Display *display,
         }
         case KeyPress:
         {
-          KeySym
-            key_symbol;
-
-          if (event.xkey.window != windows->image.id)
-            break;
-          /*
-            Respond to a user key press.
-          */
-          (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-            sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-          switch ((int) key_symbol)
-          {
-            case XK_Shift_L:
-            case XK_Shift_R:
-              break;
-            case XK_Escape:
-            case XK_F20:
-            {
-              state|=EscapeState;
-              magick_fallthrough;
-            }
-            case XK_Return:
-            {
-              state|=ExitState;
-              break;
-            }
-            default:
-            {
-              XROIHomeLeftKey(&key_input,&key_targets,key_symbol);
-              break;
-            }
-          }
-          (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
-            event.xkey.time);
+          XROIKeyPress(&key_input,&event,&key_targets);
           break;
         }
         case KeyRelease:
