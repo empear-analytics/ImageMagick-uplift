@@ -4876,6 +4876,39 @@ static ssize_t FindFileBrowserCursor(XFontStruct *font_info,
   return(i);
 }
 
+typedef struct _FileBrowserMatch
+{
+  char
+    **filelist;
+
+  size_t
+    files;
+
+  char
+    *reply;
+} FileBrowserMatch;
+
+static void MatchFileBrowserReply(const FileBrowserMatch *match,
+  XWidgetInfo *list_info,ssize_t *i)
+{
+  char
+    **const filelist = match->filelist;
+
+  const size_t
+    files = match->files;
+
+  char
+    *const reply = match->reply;
+
+  for ((*i)=0; (*i) < (ssize_t) files; (*i)++)
+    if (LocaleCompare(filelist[(*i)],reply) >= 0)
+      {
+        (*list_info).id=(int)
+          (LocaleCompare(filelist[(*i)],reply) == 0 ? (*i) : ~0);
+        break;
+      }
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -5285,17 +5318,17 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
     if (state & JumpListState)
       {
+        FileBrowserMatch
+          match;
+
         /*
           Jump scroll to match user filename.
         */
         list_info.id=(~0);
-        for (i=0; i < (ssize_t) files; i++)
-          if (LocaleCompare(filelist[i],reply) >= 0)
-            {
-              list_info.id=(int)
-                (LocaleCompare(filelist[i],reply) == 0 ? i : ~0);
-              break;
-            }
+        match.filelist=filelist;
+        match.files=files;
+        match.reply=reply;
+        MatchFileBrowserReply(&match,&list_info,&i);
         if ((i < (ssize_t) slider_info.id) ||
             (i >= (slider_info.id+(ssize_t) visible_files)))
           slider_info.id=i-(int) (visible_files >> 1);
