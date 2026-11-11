@@ -1828,6 +1828,9 @@ static void
   MoveFontBrowserSliderByPage(const KeySym,const unsigned int,const int,
     XWidgetInfo *);
 
+static XWidgetInfo
+  MoveFontBrowserSlider(XWidgetInfo,const KeySym,const unsigned int,const int);
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2658,33 +2661,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             /*
               Move slider.
             */
-            switch ((int) key_symbol)
-            {
-              case XK_Home:
-              case XK_KP_Home:
-              {
-                slider_info.id=0;
-                break;
-              }
-              case XK_Up:
-              case XK_KP_Up:
-              {
-                slider_info.id--;
-                break;
-              }
-              case XK_Down:
-              case XK_KP_Down:
-              {
-                slider_info.id++;
-                break;
-              }
-              default:
-              {
-                MoveFontBrowserSliderByPage(key_symbol,visible_colors,
-                  (int) colors,&slider_info);
-                break;
-              }
-            }
+            slider_info=MoveFontBrowserSlider(slider_info,key_symbol,
+              visible_colors,(int) colors);
             state|=RedrawListState;
             break;
           }
