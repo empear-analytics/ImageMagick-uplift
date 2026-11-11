@@ -12412,6 +12412,38 @@ static void XRotateCommand(const RotateCommandInput *input,
     GXinvert);
 }
 
+typedef struct _RotateLineTargets
+{
+  XSegment
+    *rotate_info;
+
+  size_t
+    *state;
+} RotateLineTargets;
+
+static void XStartRotateLine(Display *display,XWindows *windows,
+  const XEvent event,const RotateLineTargets *targets)
+{
+  XSegment
+    *const rotate_info = targets->rotate_info;
+
+  size_t
+    *const state = targets->state;
+
+  if (event.xbutton.button != Button1)
+    return;
+  if (event.xbutton.window != windows->image.id)
+    return;
+  /*
+    exit loop.
+  */
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXcopy);
+  (*rotate_info).x1=event.xbutton.x;
+  (*rotate_info).y1=event.xbutton.y;
+  (*state)|=ExitState;
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -12482,6 +12514,9 @@ static MagickBooleanType XRotateImage(Display *display,
       XSegment
         rotate_info;
 
+      const RotateLineTargets
+        line_targets = { &rotate_info, &state };
+
       /*
         Map Command widget.
       */
@@ -12532,18 +12567,7 @@ static MagickBooleanType XRotateImage(Display *display,
         {
           case ButtonPress:
           {
-            if (event.xbutton.button != Button1)
-              break;
-            if (event.xbutton.window != windows->image.id)
-              break;
-            /*
-              exit loop.
-            */
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            rotate_info.x1=event.xbutton.x;
-            rotate_info.y1=event.xbutton.y;
-            state|=ExitState;
+            XStartRotateLine(display,windows,event,&line_targets);
             break;
           }
           case ButtonRelease:
