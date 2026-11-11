@@ -10833,7 +10833,12 @@ whole groups and keeps their nesting in the new function.
    the top of its body, with the addresses as its initialiser (`const T targets = { &a,
    &b, ... };`). A later block of the same function whose written variables are among
    its members takes the same struct instead of a new one and binds only the members
-   it writes; a variable outside the struct cannot be added to it later.
+   it writes. A variable outside the struct may be added to it as a new last member
+   (2026-11-12), when the block that writes it is moved under this recipe: the typedef
+   gains the member after the last, the initialiser the address `&v` after the last,
+   in the commit of that helper; the helpers made earlier bind only the members they
+   write, so their text does not change, and the entries before the new one keep their
+   positions. Six members stay the limit.
 4. Cut the block into a new `static void` function directly above the caller. It takes
    the variables the block only reads by value, or in one `const` input struct filled
    as Recipe Y steps 3 to 5 say (Recipe N step 2's conditions for struct values and its
@@ -10936,6 +10941,11 @@ static void SelectListBrowserEntry(const ListBrowserPress *press,
   and the second falls off its end; either way the caller runs the case's own `break;`
   next, so the `switch` ends at the same point after the same statements, as in Recipe
   E step 7's `void` form.
+- A member added to the targets struct by a later commit (step 3) changes no earlier
+  helper: each binds `V *const v = targets->v;` by member name, so a member after its
+  own is never read by it, and the initialiser's earlier entries stand where they stood;
+  the new member's address is the address of a caller local, taken like the others
+  (step 2), so the new helper writes that local and nothing else of it changes.
 - The written variables stay the caller's own locals, read and written directly
   everywhere else; only their addresses travel, fixed at the declaration and bound once
   to `*const` locals in the helper, so each `(*v)` is the object `v` named, read and
@@ -11987,3 +11997,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | D | A cast of a call to the exact type its function is declared to return (`(char **) GetCommandOptions(...)`) and a `(void)` cast of a `(void)` cast (`(void) (void) CopyMagickString(...)`) are not differing values; the script removes them before comparing and the helper is written without them (C11 6.5.4p5, 6.3.2.2) | `display.c`'s `XColorEditImage` (campaign A, W18 lane b, wide build): its Method and Fuzz cases equal `XSelectPaintMethod` and `XSelectFuzzFactor`, which `XMatteEditImage` already calls, but for those two spellings; reuse removes two of the function's depth-4 sites and is one step of the chain that takes it out of *Brain Method* (probe: display.c 1.41 to 1.49) | owner |
 | 2026-11-11 | NEW | FT | Replace a Fall-Through into a Call by the Call: a case ending `magick_fallthrough;` into a case whose whole body is a call of a `static void` helper and `break;` gets that call and a `break;` in place of the fall-through, so that Recipe CT (whose step 1 needs the case to end in `break;`) can move it | `display.c`'s `XCropImage` and `XROIImage` (campaign A, W18 lane b, wide build): the ButtonPress case (button, window and four corner tests, each leaving through `break;`) falls into ButtonRelease; CT refuses it and SD would carry twelve decisions into one helper. Probe of the XCropImage chain: see its commits | owner |
 | 2026-11-11 | NEW | LC | Extract Block Returning Whether It Continued: a block in a sequential loop body, followed by statements that stay, that leaves its iteration through `continue;` from inside it moves into a `static MagickBooleanType` function whose `continue;`s are `return(MagickTrue);` and whose end is `return(MagickFalse);`; the caller writes `if (Helper(...) != MagickFalse) continue;` | `display.c`'s `XROIImage` (campaign A, W18 lane b, wide build): the rectify loop's update-region block (a whole `if` holding a `switch` whose default group `continue`s when the region crop fails) holds three of the last depth-4 and 5 statements; OC needs the block followed by `continue;`, E step 7 the whole body or tail, LB a `break;` | owner |
+| 2026-11-12 | AMEND | CT | Step 3: a variable outside the targets struct may be added as a new last member (typedef and initialiser each gain one entry after the last) in the commit of the helper that writes it; the earlier helpers bind only the members they write and do not change. *Careful* gives the argument | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): `AnnotateTargets` (`annotate_info`, `p`, `x`, `y`) serves the text loop's line-advance blocks, and the BackSpace and Delete keys also write the cursor event `text_event`, which the step's "cannot be added later" refused; the text loop's key switch holds eleven depth-4 sites that need those helpers | owner |
