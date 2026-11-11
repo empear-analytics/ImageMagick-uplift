@@ -761,19 +761,13 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   MagickStatusType
     status;
 
-  AnimateCommandTile
-    tile;
+  const AnimateCommandTile
+    tile = { display, resource_info, windows, image, state, exception };
 
   /*
     Process user command.
   */
   nexus=NewImageList();
-  tile.display=display;
-  tile.resource_info=resource_info;
-  tile.windows=windows;
-  tile.image=image;
-  tile.state=state;
-  tile.exception=exception;
   switch (animate_command)
   {
     case OpenCommand:
