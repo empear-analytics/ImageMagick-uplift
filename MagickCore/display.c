@@ -9881,6 +9881,19 @@ static void XReplaceRowAlpha(Image **image,Quantum *q,const PixelInfo target,
   }
 }
 
+static void XDiscardMagnifyKeys(Display *display,XWindows *windows,
+  XEvent *event)
+{
+  if ((*event).xkey.window == windows->magnify.id)
+    {
+      Window
+        window;
+
+      window=windows->magnify.id;
+      while (XCheckWindowEvent(display,window,KeyPressMask,event)) ;
+    }
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -10213,14 +10226,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
         KeySym
           key_symbol;
 
-        if (event.xkey.window == windows->magnify.id)
-          {
-            Window
-              window;
-
-            window=windows->magnify.id;
-            while (XCheckWindowEvent(display,window,KeyPressMask,&event)) ;
-          }
+        XDiscardMagnifyKeys(display,windows,&event);
         if (event.xkey.window != windows->image.id)
           break;
         /*
