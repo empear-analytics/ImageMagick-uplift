@@ -4148,6 +4148,98 @@ static void XImportPseudoClassRows(Image *composite_image,
   }
 }
 
+typedef struct _XDirectRowSource
+{
+  Image
+    *composite_image;
+
+  CacheView
+    *composite_view;
+
+  ExceptionInfo
+    *exception;
+
+  XImage
+    *ximage;
+
+  XColor
+    *colors;
+
+  size_t
+    blue_mask,
+    blue_shift,
+    green_mask,
+    green_shift,
+    red_mask,
+    red_shift;
+} XDirectRowSource;
+
+static void XImportDirectColorRows(const XDirectRowSource *source)
+{
+  Image
+    *const composite_image = source->composite_image;
+
+  CacheView
+    *const composite_view = source->composite_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  XImage
+    *const ximage = source->ximage;
+
+  XColor
+    *const colors = source->colors;
+
+  const size_t
+    blue_mask = source->blue_mask,
+    blue_shift = source->blue_shift,
+    green_mask = source->green_mask,
+    green_shift = source->green_shift,
+    red_mask = source->red_mask,
+    red_shift = source->red_shift;
+
+  int
+    x,
+    y;
+
+  Quantum
+    *magick_restrict q;
+
+  size_t
+    index,
+    pixel;
+
+  Status
+    status;
+
+  for (y=0; y < (int) composite_image->rows; y++)
+  {
+    q=QueueCacheViewAuthenticPixels(composite_view,0,(ssize_t) y,
+      composite_image->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (int) composite_image->columns; x++)
+    {
+      pixel=XGetPixel(ximage,x,y);
+      index=(pixel >> red_shift) & red_mask;
+      SetPixelRed(composite_image,
+        ScaleShortToQuantum(colors[index].red),q);
+      index=(pixel >> green_shift) & green_mask;
+      SetPixelGreen(composite_image,
+        ScaleShortToQuantum(colors[index].green),q);
+      index=(pixel >> blue_shift) & blue_mask;
+      SetPixelBlue(composite_image,
+        ScaleShortToQuantum(colors[index].blue),q);
+      q+=(ptrdiff_t) GetPixelChannels(composite_image);
+    }
+    status=SyncCacheViewAuthenticPixels(composite_view,exception)
+      == MagickFalse ? 0 : 1;
+    if (status == MagickFalse)
+      break;
+  }
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4467,8 +4559,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
           default:
           {
             size_t
-              color,
-              index;
+              color;
 
             size_t
               blue_mask,
@@ -4477,6 +4568,9 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
               green_shift,
               red_mask,
               red_shift;
+
+            XDirectRowSource
+              direct_source;
 
             /*
               Determine shift and mask for red, green, and blue.
@@ -4505,33 +4599,20 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
             /*
               Convert X image to DirectClass packets.
             */
+            direct_source.composite_image=composite_image;
+            direct_source.composite_view=composite_view;
+            direct_source.exception=exception;
+            direct_source.ximage=ximage;
+            direct_source.colors=colors;
+            direct_source.blue_mask=blue_mask;
+            direct_source.blue_shift=blue_shift;
+            direct_source.green_mask=green_mask;
+            direct_source.green_shift=green_shift;
+            direct_source.red_mask=red_mask;
+            direct_source.red_shift=red_shift;
             if ((number_colors != 0) &&
                 (window_info[id].visual->klass == DirectColor))
-              for (y=0; y < (int) composite_image->rows; y++)
-              {
-                q=QueueCacheViewAuthenticPixels(composite_view,0,(ssize_t) y,
-                  composite_image->columns,1,exception);
-                if (q == (Quantum *) NULL)
-                  break;
-                for (x=0; x < (int) composite_image->columns; x++)
-                {
-                  pixel=XGetPixel(ximage,x,y);
-                  index=(pixel >> red_shift) & red_mask;
-                  SetPixelRed(composite_image,
-                    ScaleShortToQuantum(colors[index].red),q);
-                  index=(pixel >> green_shift) & green_mask;
-                  SetPixelGreen(composite_image,
-                    ScaleShortToQuantum(colors[index].green),q);
-                  index=(pixel >> blue_shift) & blue_mask;
-                  SetPixelBlue(composite_image,
-                    ScaleShortToQuantum(colors[index].blue),q);
-                  q+=(ptrdiff_t) GetPixelChannels(composite_image);
-                }
-                status=SyncCacheViewAuthenticPixels(composite_view,exception)
-                  == MagickFalse ? 0 : 1;
-                if (status == MagickFalse)
-                  break;
-              }
+              XImportDirectColorRows(&direct_source);
             else
               for (y=0; y < (int) composite_image->rows; y++)
               {
