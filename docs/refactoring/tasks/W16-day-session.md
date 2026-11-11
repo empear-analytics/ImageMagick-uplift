@@ -424,3 +424,16 @@ as the callers' locals already did; ci_linux_warnings does not compile widget.c 
 22cc19c36 and ab37ec7c5 briefly added a Complex Method helper that the next commit's SD split removed. **Upstream:**
 XFontBrowserWidget frees `font_info` without resetting it and later calls `XTextWidth(font_info,...)` (likely use after
 free); with `font_info` NULL the reply press uses a stale `i`; Dialog and Font leave `notify.send_event` unset.
+
+## Closing the W16 PR (2026-11-11)
+
+The four lanes stopped on 2026-11-10 at the weekly usage limit. **Not in this PR:** lane b's second xwindow.c leg (23
+commits on `campaign/W16-b`, including an N amendment and `tools/sibling_fill_check.py`) and lane c's display.c start
+(10 commits on `campaign/W16-c`, including a P amendment); neither finished its measured plan or its whole wide
+catalogue run, so both wait on their branches for the next batch. Lanes a (widget.c browsers) and d
+(MorphologyPrimitiveDirect) left nothing committed. **CI on the PR (run 42856917927):** the Windows jobs flagged MSVC
+C4702 at five `return(kernel);` lines after Recipe ST's helper switches in morphology.c, where every group returns;
+a `fix` commit drops them (object code IDENTICAL). Recipe ST's text should say that the caller's closing return does
+not follow into a helper whose every group returns (for the owner). The remaining CI failures are campaign B files:
+blob.c (Linux, first stop), type.c C2664, annotate.c, pixel-export.c, pixel-import.c, quantum-import.c (Windows);
+MacOS arm64 failed in its set-up step.
