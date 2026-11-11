@@ -9635,6 +9635,65 @@ static void EnterMenuWindow(const MenuEventContext *context,
   EnterMenuSelection(&pointer,targets);
 }
 
+static void MoveMenuWindow(const MenuEventContext *context,
+  XEvent event,const MenuTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const selections = context->selections;
+
+  const unsigned int
+    number_selections = context->number_selections,
+    top_offset = context->top_offset;
+
+  char
+    *const item = context->item;
+
+  XWidgetInfo
+    *const selection_info = targets->selection_info;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    id;
+
+  MenuExitTargets
+    exit_targets;
+
+  MenuPointer
+    pointer;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
+  exit_targets.selection_info=(selection_info);
+  exit_targets.state=(state);
+  if (StayInMenuOnCommand(windows,event,item,&exit_targets) ==
+      MagickFalse)
+    return;
+  if (event.xmotion.window != windows->widget.id)
+    return;
+  if ((*state) & InactiveWidgetState)
+    return;
+  if ((*selection_info).height == 0)
+    return;
+  id=(event.xmotion.y-(int) top_offset)/(int) (*selection_info).height;
+  pointer.display=display;
+  pointer.windows=windows;
+  pointer.selections=selections;
+  pointer.number_selections=number_selections;
+  pointer.top_offset=top_offset;
+  pointer.id=id;
+  MoveMenuSelection(&pointer,targets);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9862,35 +9921,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       }
       case MotionNotify:
       {
-        MenuExitTargets
-          exit_targets;
-
-        MenuPointer
-          pointer;
-
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        exit_targets.selection_info=(&selection_info);
-        exit_targets.state=(&state);
-        if (StayInMenuOnCommand(windows,event,item,&exit_targets) ==
-            MagickFalse)
-          break;
-        if (event.xmotion.window != windows->widget.id)
-          break;
-        if (state & InactiveWidgetState)
-          break;
-        if (selection_info.height == 0)
-          break;
-        id=(event.xmotion.y-(int) top_offset)/(int) selection_info.height;
-        pointer.display=display;
-        pointer.windows=windows;
-        pointer.selections=selections;
-        pointer.number_selections=number_selections;
-        pointer.top_offset=top_offset;
-        pointer.id=id;
-        MoveMenuSelection(&pointer,&targets);
+        MoveMenuWindow(&event_context,event,&targets);
         break;
       }
       default:
