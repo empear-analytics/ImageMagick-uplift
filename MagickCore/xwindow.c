@@ -838,6 +838,19 @@ static XFontStruct *XLoadFirstFont(Display *display,char **fontlist,
   return(font_info);
 }
 
+static XFontStruct *XLoadListedFont(Display *display,const char **p,
+  XFontStruct *font_info)
+{
+  while (*p != (char *) NULL)
+  {
+    if (font_info != (XFontStruct *) NULL)
+      break;
+    font_info=XLoadQueryFont(display,(char *) *p);
+    p++;
+  }
+  return(font_info);
+}
+
 MagickPrivate XFontStruct *XBestFont(Display *display,
   const XResourceInfo *resource_info,const MagickBooleanType text_font)
 {
@@ -897,13 +910,7 @@ MagickPrivate XFontStruct *XBestFont(Display *display,
     p=TextFonts;
   if (XDisplayHeight(display,XDefaultScreen(display)) >= 748)
     p++;
-  while (*p != (char *) NULL)
-  {
-    if (font_info != (XFontStruct *) NULL)
-      break;
-    font_info=XLoadQueryFont(display,(char *) *p);
-    p++;
-  }
+  font_info=XLoadListedFont(display,p,font_info);
   return(font_info);
 }
 
