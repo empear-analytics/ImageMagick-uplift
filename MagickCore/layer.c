@@ -1695,9 +1695,6 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   const Image
     *curr;
 
-  DisposeChoice
-    choice;
-
   DisposeType
     *disposals;
 
@@ -1948,12 +1945,13 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
        Finalise choice of dispose, set new prev_image,
        and junk any extra images as appropriate,
     */
-    choice.curr=curr;
-    choice.bounds=bounds;
-    choice.disposals=disposals;
-    choice.dup_bounds=dup_bounds;
-    if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse)
-      return(ReleaseFrameLists(bounds,disposals));
+    {
+      const DisposeChoice
+        choice = { curr, bounds, disposals, dup_bounds };
+
+      if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse)
+        return(ReleaseFrameLists(bounds,disposals));
+    }
     assert(prev_image != (Image *) NULL);
     disposals[i]=disposals[i-1];
 #if DEBUG_OPT_FRAME
