@@ -5568,7 +5568,8 @@ static MagickBooleanType XCropImage(Display *display,
               state|=UpdateConfigurationState;
               break;
             }
-          magick_fallthrough;
+          XCropButtonRelease(&event_input,crop_info);
+          break;
         }
         case ButtonRelease:
         {
