@@ -11279,8 +11279,8 @@ MagickPrivate Window XWindowByName(Display *display,const Window root_window,
 %    o property: Specifies the property of the window to locate.
 %
 */
-MagickPrivate Window XWindowByProperty(Display *display,const Window window,
-  const Atom property)
+static Window XFindPropertyChild(Display *display,Window *children,
+  const unsigned int number_children,const Atom property)
 {
   Atom
     type;
@@ -11295,12 +11295,38 @@ MagickPrivate Window XWindowByProperty(Display *display,const Window window,
     *data;
 
   unsigned int
-    i,
-    number_children;
+    i;
 
   unsigned long
     after,
     number_items;
+
+  Window
+    child;
+
+  type=(Atom) NULL;
+  child=(Window) NULL;
+  for (i=0; (i < number_children) && (child == (Window) NULL); i++)
+  {
+    status=XGetWindowProperty(display,children[i],property,0L,0L,MagickFalse,
+      (Atom) AnyPropertyType,&type,&format,&number_items,&after,&data);
+    if (data != NULL)
+      (void) XFree((void *) data);
+    if ((status == Success) && (type != (Atom) NULL))
+      child=children[i];
+  }
+  return(child);
+}
+
+MagickPrivate Window XWindowByProperty(Display *display,const Window window,
+  const Atom property)
+{
+  Status
+    status;
+
+  unsigned int
+    i,
+    number_children;
 
   Window
     child,
@@ -11316,17 +11342,7 @@ MagickPrivate Window XWindowByProperty(Display *display,const Window window,
   status=XQueryTree(display,window,&root,&parent,&children,&number_children);
   if (status == False)
     return((Window) NULL);
-  type=(Atom) NULL;
-  child=(Window) NULL;
-  for (i=0; (i < number_children) && (child == (Window) NULL); i++)
-  {
-    status=XGetWindowProperty(display,children[i],property,0L,0L,MagickFalse,
-      (Atom) AnyPropertyType,&type,&format,&number_items,&after,&data);
-    if (data != NULL)
-      (void) XFree((void *) data);
-    if ((status == Success) && (type != (Atom) NULL))
-      child=children[i];
-  }
+  child=XFindPropertyChild(display,children,number_children,property);
   for (i=0; (i < number_children) && (child == (Window) NULL); i++)
     child=XWindowByProperty(display,children[i],property);
   if (children != (Window *) NULL)
