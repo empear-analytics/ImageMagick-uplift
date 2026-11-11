@@ -679,6 +679,75 @@ static void XStepCommand(const AnimateCommandTile *tile,
   }
 }
 
+static void XPlayCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  Image
+    **const image = tile->image;
+
+  MagickStatusType
+    *const state = tile->state;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  XTextProperty
+    window_name;
+
+  switch (animate_command)
+  {
+    case PlayCommand:
+    {
+      char
+        basename[MagickPathExtent],
+        name[MagickPathExtent];
+
+      int
+        status;
+
+      /*
+        Window name is the base of the filename.
+      */
+      *state|=PlayAnimationState;
+      *state&=(~AutoReverseAnimationState);
+      GetPathComponent((*image)->magick_filename,BasePath,basename);
+      (void) FormatLocaleString(name,MagickPathExtent,"%s: %s",
+        MagickPackageName,basename);
+      (void) CloneString(&windows->image.name,name);
+      if (resource_info->title != (char *) NULL)
+        {
+          char
+            *title;
+
+          title=InterpretImageProperties(resource_info->image_info,*image,
+            resource_info->title,exception);
+          (void) CloneString(&windows->image.name,title);
+          title=DestroyString(title);
+        }
+      status=XStringListToTextProperty(&windows->image.name,1,&window_name);
+      if (status == 0)
+        break;
+      XSetWMName(display,windows->image.id,&window_name);
+      (void) XFree((void *) window_name.value);
+      break;
+    }
+    default:
+    {
+      XStepCommand(tile,animate_command);
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
@@ -691,9 +760,6 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
 
   MagickStatusType
     status;
-
-  XTextProperty
-    window_name;
 
   AnimateCommandTile
     tile;
@@ -798,44 +864,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       *state|=ExitState;
       break;
     }
-    case PlayCommand:
-    {
-      char
-        basename[MagickPathExtent],
-        name[MagickPathExtent];
-
-      int
-        status;
-
-      /*
-        Window name is the base of the filename.
-      */
-      *state|=PlayAnimationState;
-      *state&=(~AutoReverseAnimationState);
-      GetPathComponent((*image)->magick_filename,BasePath,basename);
-      (void) FormatLocaleString(name,MagickPathExtent,"%s: %s",
-        MagickPackageName,basename);
-      (void) CloneString(&windows->image.name,name);
-      if (resource_info->title != (char *) NULL)
-        {
-          char
-            *title;
-
-          title=InterpretImageProperties(resource_info->image_info,*image,
-            resource_info->title,exception);
-          (void) CloneString(&windows->image.name,title);
-          title=DestroyString(title);
-        }
-      status=XStringListToTextProperty(&windows->image.name,1,&window_name);
-      if (status == 0)
-        break;
-      XSetWMName(display,windows->image.id,&window_name);
-      (void) XFree((void *) window_name.value);
-      break;
-    }
     default:
     {
-      XStepCommand(&tile,animate_command);
+      XPlayCommand(&tile,animate_command);
       break;
     }
   }
