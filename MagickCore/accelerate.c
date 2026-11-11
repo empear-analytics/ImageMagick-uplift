@@ -863,6 +863,13 @@ static MagickBooleanType StretchesRedChannel(const Image *image,
     (black.x != white.x)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType StretchesGreenChannel(const Image *image,
+  const cl_float4 black,const cl_float4 white)
+{
+  return((((image->channel_mask & GreenChannel) != 0) &&
+    (black.y != white.y)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const double black_point,const double white_point,
   ExceptionInfo *exception)
@@ -1175,8 +1182,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
       if (StretchesRedChannel(image,black,white) != MagickFalse)
         image->colormap[i].red=stretch_map[
           ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
-      if (((image->channel_mask & GreenChannel) != 0) &&
-          (black.y != white.y))
+      if (StretchesGreenChannel(image,black,white) != MagickFalse)
         image->colormap[i].green=stretch_map[
           ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
       if (((image->channel_mask & BlueChannel) != 0) &&
