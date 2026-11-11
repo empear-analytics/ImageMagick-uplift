@@ -3181,6 +3181,13 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    left in the caller as `{ S return(c); }` is; its expression reads no written
    variable. So does V step 7's side-effect-free `S return(e);`, whose `e` reads no
    written variable.
+   `M` may also be one of MagickCore's own throw macros (`exception-private.h`:
+   `ThrowImageException`, `ThrowBinaryException` and the like), whose expansion is
+   `(void) ThrowMagickException(exception,GetMagickModule(),...);` and `return(c);` of
+   one constant (2026-11-11). It stays in the caller as a function-local macro does, so
+   `GetMagickModule()` still names the caller; a variable its expansion reads that the
+   block writes (`ThrowImageException`'s `image`) is a written variable of step 2, and
+   the macro reads the value the block left in it, as before.
 
 **Before:**
 
@@ -10950,3 +10957,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | NEW | FB | Fill a Struct by Initialiser in a Block of Its Own: a struct local filled member by member directly before its one call, from plain identifiers some of which are written in the same block before the run (FI step 8 (b) refuses it), loses its declaration; the run and the call become a compound statement `{ const Name name = { ... }; call }`; `obj_identical.sh` must print `IDENTICAL` | `montage.c`'s `MontageImageList` (campaign A, W17 lane d): `bounds_info`, `page_info` and `placement` (10, 16 and 16 assignments), 227 to 198 lines, 8.72 to 8.86 with `IDENTICAL` object code; the file sits about 37 lines under *Lines of Code in a Single File*, which the tile-loop extraction needs | owner |
 | 2026-11-11 | AMEND | Z | Step 5: when every member's variable is a plain identifier, the input struct may be filled in Recipe FB's form, a compound statement `{ const Name name = { ... }; Helper(&name,...); }` where the block stood, in place of a declaration at the block's top and a run of assignments | `montage.c`'s `MontageImageList` (campaign A, W17 lane d): its tile loop's row wrap (writes `x_offset`, `y_offset`, `max_height`; nine inputs) as a Z helper with step 5's assignments scores 8.86 to 8.85 (the function grows 198 to 201 lines while cc falls 19 to 16); in FB's form 8.88 | owner |
 | 2026-11-11 | AMEND | Y | Step 5: the same FB form for the input struct, the compound statement holding `if (Helper(&name,...) == MagickFalse)` and its unchanged exit; Recipe I's input struct (its step 4, Y steps 3 to 5) takes it too | Same session: the tile loop of `MontageImageList` reads nineteen inputs, whose assignment fill would cost the lines the file has left under *Lines of Code in a Single File* | owner |
+| 2026-11-11 | AMEND | I | Step 8: the macro left in the caller may also be one of MagickCore's own throw macros (`ThrowImageException`, `ThrowBinaryException`), whose expansion is a `ThrowMagickException` with `GetMagickModule()` and `return(c);` of one constant; `GetMagickModule()` keeps naming the caller, and a variable the expansion reads that the block writes (`image`) is a written variable of step 2 | `montage.c`'s `MontageImageList` (campaign A, W17 lane d): its tile loop leaves through `ThrowImageException` when `CloneImage` fails; E step 6 would move the throw into a helper of another return type (the macro returns `(Image *) NULL`) and change the module it names; with the macro left in the caller the loop moves under I with `image`, `progress_monitor` and `tiles` as targets | owner |
