@@ -2854,7 +2854,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
             p++;
             if ((x+font_info->max_bounds.width) < (int) windows->image.width)
               break;
-            magick_fallthrough;
+            if (XAdvanceTextLine(windows,font_info,&targets) == MagickFalse)
+              return(MagickFalse);
+            break;
           }
           case XK_Return:
           case XK_KP_Enter:
