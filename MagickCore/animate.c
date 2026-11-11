@@ -1502,14 +1502,14 @@ static MagickStatusType XPressImageWindow(
   return(state);
 }
 
-MagickExport Image *XAnimateImages(Display *display,
-  XResourceInfo *resource_info,char **argv,const int argc,Image *images,
-  ExceptionInfo *exception)
-{
 #define MagickMenus  4
 #define MaXWindows  8
 #define MagickTitle  "Commands"
 
+MagickExport Image *XAnimateImages(Display *display,
+  XResourceInfo *resource_info,char **argv,const int argc,Image *images,
+  ExceptionInfo *exception)
+{
   const char
     *const CommandMenu[]=
     {
