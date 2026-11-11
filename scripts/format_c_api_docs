@@ -90,6 +90,7 @@ if ( ! GetOptions(
 	 'transform-region.c',
 	 'transform-tiles.c',
 	 'resize.c',
+	 'resize-rescale.c',
 	 'resize-sample.c',
 	 'resize-scale.c',
 	 'resize-image.c',
