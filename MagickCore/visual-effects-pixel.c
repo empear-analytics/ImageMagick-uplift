@@ -1527,10 +1527,28 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void MorphPixelChannels(const Image *morph_image,
-  const Image *morph_images,const Quantum *magick_restrict p,
-  Quantum *magick_restrict q,const double alpha,const double beta)
+typedef struct _MorphPixel
 {
+  const Image
+    *morph_image,
+    *morph_images;
+
+  double
+    alpha,
+    beta;
+} MorphPixel;
+
+static void MorphPixelChannels(const MorphPixel *morph_pixel,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const morph_image = morph_pixel->morph_image,
+    *const morph_images = morph_pixel->morph_images;
+
+  const double
+    alpha = morph_pixel->alpha,
+    beta = morph_pixel->beta;
+
   ssize_t
     i;
 
@@ -1632,6 +1650,9 @@ static void MorphFrameRow(MagickBooleanType *status,
   const double
     beta = info->beta;
 
+  const MorphPixel
+    morph_pixel = { morph_image, morph_images, alpha, beta };
+
   MagickBooleanType
     sync;
 
@@ -1657,7 +1678,7 @@ static void MorphFrameRow(MagickBooleanType *status,
     }
   for (x=0; x < (ssize_t) morph_images->columns; x++)
   {
-    MorphPixelChannels(morph_image,morph_images,p,q,alpha,beta);
+    MorphPixelChannels(&morph_pixel,p,q);
     p+=(ptrdiff_t) GetPixelChannels(morph_image);
     q+=(ptrdiff_t) GetPixelChannels(morph_images);
   }
