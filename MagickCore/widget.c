@@ -3690,6 +3690,30 @@ static size_t ReleaseConfirmChoice(const ConfirmRelease *release,
   return(state);
 }
 
+static size_t ClientWidgetMessage(Display *display,XWindows *windows,
+  const XEvent event,size_t state)
+{
+  /*
+    If client window delete message, exit.
+  */
+  if (event.xclient.message_type != windows->wm_protocols)
+    return(state);
+  if (*event.xclient.data.l == (int) windows->wm_take_focus)
+    {
+      (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
+        (Time) event.xclient.data.l[1]);
+      return(state);
+    }
+  if (*event.xclient.data.l != (int) windows->wm_delete_window)
+    return(state);
+  if (event.xclient.window == windows->widget.id)
+    {
+      state|=ExitState;
+      return(state);
+    }
+  return(state);
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -3921,24 +3945,7 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
       }
       case ClientMessage:
       {
-        /*
-          If client window delete message, exit.
-        */
-        if (event.xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event.xclient.data.l == (int) windows->wm_take_focus)
-          {
-            (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
-              (Time) event.xclient.data.l[1]);
-            break;
-          }
-        if (*event.xclient.data.l != (int) windows->wm_delete_window)
-          break;
-        if (event.xclient.window == windows->widget.id)
-          {
-            state|=ExitState;
-            break;
-          }
+        state=ClientWidgetMessage(display,windows,event,state);
         break;
       }
       case ConfigureNotify:
