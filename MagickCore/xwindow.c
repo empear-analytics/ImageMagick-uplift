@@ -7379,6 +7379,44 @@ static unsigned char *XPackContinuous8BitRowMSB(const Image *canvas,
   return(q);
 }
 
+static unsigned char *XPackColormappedMultiByteRowMSB(
+  const XImageRowSource *source,const unsigned int bytes_per_pixel,
+  const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  int
+    k;
+
+  int
+    x;
+
+  unsigned char
+    channel[sizeof(size_t)];
+
+  unsigned long
+    pixel;
+
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=pixels[(ssize_t)
+      GetPixelIndex(canvas,p)];
+    for (k=(int) bytes_per_pixel-1; k >= 0; k--)
+    {
+      channel[k]=(unsigned char) pixel;
+      pixel>>=8;
+    }
+    for (k=0; k < (int) bytes_per_pixel; k++)
+      *q++=channel[k];
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7422,6 +7460,9 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
 
   XStandardColormap
     *map_info;
+
+  XImageRowSource
+    row_source;
 
   assert(resource_info != (XResourceInfo *) NULL);
   assert(window != (XWindowInfo *) NULL);
@@ -7467,6 +7508,14 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   q=(unsigned char *) ximage->data;
   x=0;
   canvas_view=AcquireVirtualCacheView(canvas,exception);
+  row_source.canvas=canvas;
+  row_source.canvas_view=canvas_view;
+  row_source.exception=exception;
+  row_source.resource_info=resource_info;
+  row_source.ximage=ximage;
+  row_source.scanline_pad=scanline_pad;
+  row_source.pixels=pixels;
+  row_source.map_info=map_info;
   if (ximage->format == XYBitmap)
     {
       unsigned short
@@ -7580,14 +7629,8 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
         }
         default:
         {
-          int
-            k;
-
           unsigned int
             bytes_per_pixel;
-
-          unsigned char
-            channel[sizeof(size_t)];
 
           /*
             Convert to 8 bit color-mapped X canvas.
@@ -7599,19 +7642,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
               canvas->columns,1,exception);
             if (p == (const Quantum *) NULL)
               break;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=pixels[(ssize_t)
-                GetPixelIndex(canvas,p)];
-              for (k=(int) bytes_per_pixel-1; k >= 0; k--)
-              {
-                channel[k]=(unsigned char) pixel;
-                pixel>>=8;
-              }
-              for (k=0; k < (int) bytes_per_pixel; k++)
-                *q++=channel[k];
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
+            q=XPackColormappedMultiByteRowMSB(&row_source,bytes_per_pixel,p,q);
             q+=(ptrdiff_t) scanline_pad;
           }
           break;
