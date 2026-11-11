@@ -4229,6 +4229,12 @@ Recipe D, whose copies are moved whole and so may not leave the caller.
    block's own `R`, and check every argument against its parameter by reading.
 7. Another copy of the block, identical but for the expression of step 5 and its own `R`,
    may call the same function the same way (Recipe D), one commit per caller.
+8. In a `void` caller the block's exits are `return;` (2026-11-11): step 1 reads
+   `return;` for `return(R);` (every `return` in the block is `return;`), step 2 has no
+   `R` to check, and step 6 writes `if (Helper(...) == MagickFalse) return;`. Steps 3 to
+   5 hold as written: a local the block writes only on the paths that end in `return;`
+   (an array released before the caller gives up) goes by value, since nothing reads it
+   once the caller has returned.
 
 **Before:**
 
@@ -4270,6 +4276,9 @@ static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
 
 - On a failure path the caller returns from the same point as before, with the same
   value: a constant, or what the block left behind the pointer.
+- Under step 8 the failure path is the same with no value: the caller's `return;` runs
+  directly after the helper's `return(MagickFalse);`, where the block's `return;` stood,
+  after every statement the block ran before it.
 - On the success path the function returns at the block's end and the caller goes on
   with the next statement, where the block fell through.
 - A step-5 expression is evaluated once at the call instead of at each use; that is the
@@ -4286,7 +4295,12 @@ checked by reading.
 **Provenance:** 2026-10-29, from `xml-tree.c`'s `XMLTreeTagToXML` (four buffer-growing
 blocks) and `EncodePredefinedEntities` (a fifth), each leaving through `return`; a probe
 of all five: 2.39 to 2.44. Added by Claude Code (Claude Opus 5.5) during task M112, under
-the mandate of 2026-10-24.
+the mandate of 2026-10-24. Step 8 (2026-11-11, W17 lane c, wide build):
+`opencl.c`'s `LoadOpenCLDevices`, a `void`
+function whose allocation of `clEnv->contexts` releases the device and platform arrays
+and leaves through `return;` when it fails; as a helper it takes the function out of
+*Large Method*, 5.43 to 5.47 in a probe, no finding on the helper. Added by Claude Code
+(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -11086,3 +11100,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | Z | Step 7: the `const` targets struct also serves two to four written variables when one pointer per variable would bring step 6's call to five or more arguments, Recipe Q step 8's condition; the step and its argument are unchanged (each member is the address of the variable of its name, bound once, written `(*v)`) | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its play step advances `scene`, `iterations`, `state` and `pause` together while reading `number_scenes`, `image_list` and `first_scene`; the input struct and four pointers would be five arguments, which step 6 refuses, though the same block writing a fifth variable would pass | owner |
 | 2026-11-11 | AMEND | N | Step 2: an array of the caller (a local, or a function-local `static` nothing writes) that the block only subscripts or passes whole to a pointer parameter may be a member, of pointer-to-element type with the element's qualifiers, filled `name.v=v;`; the name converts to the address of its first element at the fill as at each use (C11 6.3.2.1p3), Recipe AR's argument for a read-only array | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its Image-window button branch and its command-menu block read the menu tables `CommandMenu`, `Menus` and `Commands` (local and `static const` arrays) with the window state; N's *Careful* kept arrays out of the struct only because they are not values a copy can take | owner |
 | 2026-11-11 | AMEND | N | Step 2 (the array member added earlier today): a function-local `static` array qualifies whether or not the caller writes its elements elsewhere; the member is the address of the array's own storage, not a copy, so each `v[e]` reads the element as it stands at that point, written before the fill or not, exactly as the name did; the block itself still only reads it | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its colormap-update loop reads `static XWindowInfo *magick_windows[MaXWindows]`, which the function fills once on its first call | owner |
+| 2026-11-11 | AMEND | W | Step 8: in a `void` caller the block's exits are `return;`; the helper returns `MagickFalse` there and the caller writes `if (Helper(...) == MagickFalse) return;`; a local written only on the returning paths goes by value (step 3 unchanged) | `opencl.c`'s `LoadOpenCLDevices` (campaign A, W17 lane c, wide build): the `clEnv->contexts` allocation releases `devices` and `platforms` and leaves through `return;` on failure; W step 1 asked for `return(R);`, which a `void` function cannot write. Probe: the function leaves *Large Method*, 5.43 to 5.47 | owner |
