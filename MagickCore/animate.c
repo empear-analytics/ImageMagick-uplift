@@ -4307,6 +4307,14 @@ static MagickBooleanType IsJPEGFormat(const ImageInfo *image_info)
     MagickFalse);
 }
 
+static void XSetJPEGQuality(Image *image,ImageInfo *image_info,
+  const char *quality,const int status)
+{
+  image->quality=StringToUnsignedLong(quality);
+  image_info->interlace=status != MagickFalse ?  NoInterlace :
+    PlaneInterlace;
+}
+
 static MagickBooleanType XSaveImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -4363,9 +4371,7 @@ static MagickBooleanType XSaveImage(Display *display,
         quality);
       if (*quality == '\0')
         return(MagickTrue);
-      image->quality=StringToUnsignedLong(quality);
-      image_info->interlace=status != MagickFalse ?  NoInterlace :
-        PlaneInterlace;
+      XSetJPEGQuality(image,image_info,quality,status);
     }
   if (IsPostscriptFormat(image_info) != MagickFalse)
     XRequestPageGeometry(display,windows,image_info);
