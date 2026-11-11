@@ -2962,6 +2962,28 @@ static void XRepaintExposedWindows(Display *display,XWindows *windows,
     }
 }
 
+static void XUnmapPanelWindows(Display *display,XWindows *windows,
+  const XEvent event)
+{
+  if (event.xunmap.window == windows->command.id)
+    {
+      windows->command.mapped=MagickFalse;
+      return;
+    }
+  if (event.xunmap.window == windows->popup.id)
+    {
+      XFocusBackdropImage(display,windows);
+      windows->popup.mapped=MagickFalse;
+      return;
+    }
+  if (event.xunmap.window == windows->widget.id)
+    {
+      XFocusBackdropImage(display,windows);
+      windows->widget.mapped=MagickFalse;
+      return;
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4150,23 +4172,7 @@ MagickExport Image *XAnimateImages(Display *display,
             XReleaseIconColormap(&icon_colormaps);
             break;
           }
-        if (event.xunmap.window == windows->command.id)
-          {
-            windows->command.mapped=MagickFalse;
-            break;
-          }
-        if (event.xunmap.window == windows->popup.id)
-          {
-            XFocusBackdropImage(display,windows);
-            windows->popup.mapped=MagickFalse;
-            break;
-          }
-        if (event.xunmap.window == windows->widget.id)
-          {
-            XFocusBackdropImage(display,windows);
-            windows->widget.mapped=MagickFalse;
-            break;
-          }
+        XUnmapPanelWindows(display,windows,event);
         break;
       }
       default:
