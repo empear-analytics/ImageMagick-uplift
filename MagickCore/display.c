@@ -10003,6 +10003,101 @@ static void XSelectFuzzFactor(const EditMenuInput *menu,
     1.0);
 }
 
+typedef struct _MatteEditPixelInput
+{
+  Image
+    **image;
+
+  CacheView
+    *image_view;
+
+  int
+    x_offset,
+    y_offset;
+
+  const char
+    *matte;
+
+  ExceptionInfo
+    *exception;
+} MatteEditPixelInput;
+
+static void XMattePoint(const MatteEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  const char
+    *const matte = pixel_input->matte;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  Quantum
+    *q;
+
+  /*
+    Update matte information using point algorithm.
+  */
+  q=GetCacheViewAuthenticPixels(image_view,(ssize_t) x_offset,
+    (ssize_t) y_offset,1,1,exception);
+  if (q == (Quantum *) NULL)
+    return;
+  SetPixelAlpha(*image,(Quantum) StringToLong(matte),q);
+  (void) SyncCacheViewAuthenticPixels(image_view,exception);
+}
+
+static void XMatteReplace(const MatteEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  const char
+    *const matte = pixel_input->matte;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  int
+    y;
+
+  PixelInfo
+    target;
+
+  Quantum
+    *q;
+
+  /*
+    Update matte information using replace algorithm.
+  */
+  (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
+    x_offset,(ssize_t) y_offset,&target,exception);
+  for (y=0; y < (int) (*image)->rows; y++)
+  {
+    q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
+      (*image)->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    XReplaceRowAlpha(image,q,target,matte);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -10380,6 +10475,9 @@ static MagickBooleanType XMatteEditImage(Display *display,
           x,
           y;
 
+        MatteEditPixelInput
+          pixel_input;
+
         /*
           Matte edit is relative to image configuration.
         */
@@ -10408,42 +10506,23 @@ static MagickBooleanType XMatteEditImage(Display *display,
         if ((*image)->alpha_trait == UndefinedPixelTrait)
           (void) SetImageAlphaChannel(*image,OpaqueAlphaChannel,exception);
         image_view=AcquireAuthenticCacheView(*image,exception);
+        pixel_input.image=image;
+        pixel_input.image_view=image_view;
+        pixel_input.x_offset=x_offset;
+        pixel_input.y_offset=y_offset;
+        pixel_input.matte=matte;
+        pixel_input.exception=exception;
         switch (method)
         {
           case PointMethod:
           default:
           {
-            /*
-              Update matte information using point algorithm.
-            */
-            q=GetCacheViewAuthenticPixels(image_view,(ssize_t) x_offset,
-              (ssize_t) y_offset,1,1,exception);
-            if (q == (Quantum *) NULL)
-              break;
-            SetPixelAlpha(*image,(Quantum) StringToLong(matte),q);
-            (void) SyncCacheViewAuthenticPixels(image_view,exception);
+            XMattePoint(&pixel_input);
             break;
           }
           case ReplaceMethod:
           {
-            PixelInfo
-              target;
-
-            /*
-              Update matte information using replace algorithm.
-            */
-            (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
-              x_offset,(ssize_t) y_offset,&target,exception);
-            for (y=0; y < (int) (*image)->rows; y++)
-            {
-              q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
-                (*image)->columns,1,exception);
-              if (q == (Quantum *) NULL)
-                break;
-              XReplaceRowAlpha(image,q,target,matte);
-              if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-                break;
-            }
+            XMatteReplace(&pixel_input);
             break;
           }
           case FloodfillMethod:
