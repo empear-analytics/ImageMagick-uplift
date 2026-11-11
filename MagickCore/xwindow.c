@@ -4113,6 +4113,41 @@ static void XInitializeDirectColors(const WindowInfo *window_info,
   }
 }
 
+static void XImportPseudoClassRows(Image *composite_image,
+  CacheView *composite_view,XImage *ximage,ExceptionInfo *exception)
+{
+  int
+    x,
+    y;
+
+  Status
+    status;
+
+  Quantum
+    index,
+    *magick_restrict q;
+
+  for (y=0; y < (int) composite_image->rows; y++)
+  {
+    q=QueueCacheViewAuthenticPixels(composite_view,0,(ssize_t) y,
+      composite_image->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (int) composite_image->columns; x++)
+    {
+      index=(Quantum) XGetPixel(ximage,x,y);
+      SetPixelIndex(composite_image,index,q);
+      SetPixelViaPixelInfo(composite_image,
+        composite_image->colormap+(ssize_t) index,q);
+      q+=(ptrdiff_t) GetPixelChannels(composite_image);
+    }
+    status=SyncCacheViewAuthenticPixels(composite_view,exception)
+      == MagickFalse ? 0 : 1;
+    if (status == MagickFalse)
+      break;
+  }
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4140,9 +4175,6 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
     id,
     x_offset,
     y_offset;
-
-  Quantum
-    index;
 
   RectangleInfo
     crop_info;
@@ -4561,25 +4593,8 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
             /*
               Convert X image to PseudoClass packets.
             */
-            for (y=0; y < (int) composite_image->rows; y++)
-            {
-              q=QueueCacheViewAuthenticPixels(composite_view,0,(ssize_t) y,
-                composite_image->columns,1,exception);
-              if (q == (Quantum *) NULL)
-                break;
-              for (x=0; x < (int) composite_image->columns; x++)
-              {
-                index=(Quantum) XGetPixel(ximage,x,y);
-                SetPixelIndex(composite_image,index,q);
-                SetPixelViaPixelInfo(composite_image,
-                  composite_image->colormap+(ssize_t) index,q);
-                q+=(ptrdiff_t) GetPixelChannels(composite_image);
-              }
-              status=SyncCacheViewAuthenticPixels(composite_view,exception)
-                == MagickFalse ? 0 : 1;
-              if (status == MagickFalse)
-                break;
-            }
+            XImportPseudoClassRows(composite_image,composite_view,ximage,
+              exception);
             break;
           }
         }
