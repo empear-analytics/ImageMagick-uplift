@@ -5908,6 +5908,16 @@ static void
 static XWidgetInfo
   HighlightListBrowserReply(const ListBrowserClick *,char *,XWidgetInfo);
 
+static int FindFontBrowserCursor(XFontStruct *font_info,
+  const XWidgetInfo reply_info,const int x,int i)
+{
+  if (font_info != (XFontStruct *) NULL)
+    for (i=1; i <= Extent(reply_info.marker); i++)
+      if (XTextWidth(font_info,reply_info.marker,i) > x)
+        break;
+  return(i);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6591,10 +6601,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
               Move text cursor to position of button press.
             */
             x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            if (font_info != (XFontStruct *) NULL)
-              for (i=1; i <= Extent(reply_info.marker); i++)
-                if (XTextWidth(font_info,reply_info.marker,i) > x)
-                  break;
+            i=FindFontBrowserCursor(font_info,reply_info,x,i);
             reply_info.cursor=reply_info.marker+i-1;
             click.display=display;
             click.window_info=(&windows->widget);
