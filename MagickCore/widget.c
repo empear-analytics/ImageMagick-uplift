@@ -1821,6 +1821,9 @@ static void
 static void
   DrawFontBrowserNames(const FontBrowserNames *,XWidgetInfo *,int *);
 
+static size_t
+  ReleaseFontBrowserBack(const FontBrowserBack *,size_t);
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2547,13 +2550,15 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
           }
         if (reset_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(reset_info,event.xbutton)))
-              {
-                (void) CopyMagickString(glob_pattern,reset_pattern,
-                  MagickPathExtent);
-                state|=UpdateListState;
-              }
+            FontBrowserBack
+              back;
+
+            back.windows=windows;
+            back.event=event;
+            back.back_info=reset_info;
+            back.glob_pattern=glob_pattern;
+            back.back_pattern=reset_pattern;
+            state=ReleaseFontBrowserBack(&back,state);
             reset_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&reset_info);
           }
