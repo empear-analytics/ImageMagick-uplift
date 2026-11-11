@@ -350,3 +350,25 @@ CompositeOverImage sets `status`/`progress` twice and fills two unread `PixelInf
   attribute-depth.c and attribute-depth-measure.c 8.16 (every finding inside the `#if !defined(HDRI)` branch),
   feature.c 9.09 (three natural algorithm families share `SetFeatureProgress`; **for the owner:** a split needs the
   helper copied into each file or a ruling), enhance.c 9.09.
+
+## Lane a, fourth round: widget.c 2.43 -> 2.80 (wide build, merged)
+
+XColorBrowserWidget leaves Deep Nesting and Brain Method (depth 6 -> 3, bumps 25 -> 8, cc 165 -> 115): a82e8a01d
+CN 2.49, 507efd07c D 2.54, 059c35d5b Z 2.64, 6424787b2 LB 2.70; flat plan steps 6836dd083 (typedef and declaration
+move, IDENTICAL), D reuses f9b5ba877, 2b65ca45b, 3e6e7a6c3, c3db7a481, 1a2cebac4, ba6e198ad, ba9692d47, 62ab50637,
+247a84e70, 9efaa0ef9, e4889fb94, fe6f50339, d7178b9b7 (SD into `MoveFontBrowserSliderByPage`), E c97580604,
+a1b65539b, dce428d20 (reuse_check OK; obj_modulo MODULO-IDENTICAL or IDENTICAL; 14 cases). XFileBrowserWidget:
+535f8f62e CN 2.76 (IDENTICAL, 21 cases). XConfirmWidget: 86f70f06c CN (IDENTICAL), f72e5afb4 D (a)
+`ReleaseConfirmChoice` 2.80 (leaves Deep Nesting). Whole wide catalogue: 14,145 cases, 0 diverged.
+
+Evidence notes: f9b5ba877 and fe6f50339 print DIFFERENT under plain obj_modulo because XFontBrowserWidget stops
+inlining the now-shared helper; 9f2858989 adds `NOINLINE=` to obj_modulo.sh (keeps a named helper out of line on
+both sides): fe6f50339 MODULO-IDENTICAL, f9b5ba877 one `lea` apart (the static `glob_pattern`'s address now passed
+as an argument); both rest on the oracle with XFontBrowserWidget's 12 cases rerun. 059c35d5b and 6424787b2 were
+checked by a rewrite diff (the moved text is rewritten as `(*v)`). Recipe text (Decided by `owner`): a630a7db2 D
+(*case tail*, *returned local*, *split selection*), tools c61d11ec1 and 26cb14426 (planted errors caught).
+**Message slips (not amended):** 6836dd083 and a82e8a01d quote 945 LoC from the morning review (941 measured after
+CN), against the rule that every number is measured for its commit; 059c35d5b says the jump test remains at depth
+4 (only the list update did). Not a plateau: XFileBrowserWidget needs about ten new helpers; XPreferencesWidget's
+probe scored 2.79 (not taken). Possible upstream: XColorBrowserWidget's ButtonRelease ends with a redundant
+`if (MatteIsActive(...) == MagickFalse) break; break;`; Font's SelectionRequest does not set `notify.send_event`.
