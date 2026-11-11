@@ -9482,6 +9482,34 @@ static void PressMenuSelection(const MenuEventContext *context,
 }
 
 
+static void ReleaseMenuSelection(const MenuEventContext *context,
+  const XEvent event,const MenuTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const item = context->item;
+
+  size_t
+    *const state = targets->state;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  if ((event.xbutton.window == windows->command.id) &&
+      (((*state) & InactiveWidgetState) == 0))
+    return;
+  /*
+    exit menu.
+  */
+  XSetCursorState(display,windows,MagickFalse);
+  *item='\0';
+  (*state)|=ExitState;
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9684,17 +9712,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        if ((event.xbutton.window == windows->command.id) &&
-            ((state & InactiveWidgetState) == 0))
-          break;
-        /*
-          exit menu.
-        */
-        XSetCursorState(display,windows,MagickFalse);
-        *item='\0';
-        state|=ExitState;
+        ReleaseMenuSelection(&event_context,event,&targets);
         break;
       }
       case ConfigureNotify:
