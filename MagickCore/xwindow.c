@@ -819,6 +819,25 @@ static char **FontToList(char *font)
   return(fontlist);
 }
 
+static XFontStruct *XLoadFirstFont(Display *display,char **fontlist,
+  XFontStruct *font_info)
+{
+  int
+    i;
+
+  if (fontlist != (char **) NULL)
+    {
+      for (i=0; fontlist[i] != (char *) NULL; i++)
+      {
+        if (font_info == (XFontStruct *) NULL)
+          font_info=XLoadQueryFont(display,fontlist[i]);
+        fontlist[i]=DestroyString(fontlist[i]);
+      }
+      fontlist=(char **) RelinquishMagickMemory(fontlist);
+    }
+  return(font_info);
+}
+
 MagickPrivate XFontStruct *XBestFont(Display *display,
   const XResourceInfo *resource_info,const MagickBooleanType text_font)
 {
@@ -862,23 +881,11 @@ MagickPrivate XFontStruct *XBestFont(Display *display,
       char
         **fontlist;
 
-      int
-        i;
-
       /*
         Load preferred font specified in the X resource database.
       */
       fontlist=FontToList(font_name);
-      if (fontlist != (char **) NULL)
-        {
-          for (i=0; fontlist[i] != (char *) NULL; i++)
-          {
-            if (font_info == (XFontStruct *) NULL)
-              font_info=XLoadQueryFont(display,fontlist[i]);
-            fontlist[i]=DestroyString(fontlist[i]);
-          }
-          fontlist=(char **) RelinquishMagickMemory(fontlist);
-        }
+      font_info=XLoadFirstFont(display,fontlist,font_info);
       if (font_info == (XFontStruct *) NULL)
         ThrowXWindowException(XServerError,"UnableToLoadFont",font_name);
     }
