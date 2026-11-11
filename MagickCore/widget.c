@@ -2052,6 +2052,17 @@ static size_t EnterWidgetWindow(XWindows *windows,const XEvent event,
   return(state);
 }
 
+static size_t ExposeWidgetWindow(XWindows *windows,const XEvent event,
+  size_t state)
+{
+  if (event.xexpose.window != windows->widget.id)
+    return(state);
+  if (event.xexpose.count != 0)
+    return(state);
+  state|=RedrawWidgetState;
+  return(state);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2808,11 +2819,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case Expose:
       {
-        if (event.xexpose.window != windows->widget.id)
-          break;
-        if (event.xexpose.count != 0)
-          break;
-        state|=RedrawWidgetState;
+        state=ExposeWidgetWindow(windows,event,state);
         break;
       }
       case KeyPress:
