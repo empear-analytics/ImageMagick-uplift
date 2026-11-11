@@ -173,19 +173,20 @@ def caller_body(text, helper, whole):
 
 
 def declaration_pairs(moved):
-    """(name, type line) of each declaration `type` / `name;` among HELPER's lines."""
+    """(name, type line, line) of each declaration `type` / `name;` among HELPER's lines;
+    the declarator may be a pointer (`*font_info;`) or an array (`*ColorMenu[N];`)."""
     pairs = []
     for k in range(1, len(moved)):
-        m = re.fullmatch(r"(\w+);", moved[k])
+        m = re.fullmatch(r"\**(\w+)(?:\[[^\]]*\])?;", moved[k])
         if m and not re.search(r"[=;(,]", moved[k - 1]):
-            pairs.append((m.group(1), moved[k - 1]))
+            pairs.append((m.group(1), moved[k - 1], moved[k].rstrip(",;")))
     return pairs
 
 
 def declares(body, name, type_line):
     """Whether BODY declares NAME under TYPE_LINE (alone or in a list of names)."""
-    pattern = (r"^\s*" + re.escape(type_line) + r"\s*\n(?:\s*[^;\n]*,\s*\n)*\s*" + name +
-               r"\s*[,;]")
+    pattern = (r"^\s*" + re.escape(type_line) + r"\s*\n(?:\s*[^;\n]*,\s*\n)*\s*\**" + name +
+               r"\s*[,;\[]")
     return re.search(pattern, body, re.M) is not None
 
 
@@ -198,22 +199,22 @@ def kept_temporaries(caller, moved, removed, extra):
     the helper (a type line, then `name;`) that the removed lines do not account for,
     of a name the removed lines use, which the caller still declares with the same
     type line (kept because the caller uses the name elsewhere). Returns
-    [(name, type line)]. Whether the block writes the name before it reads it, and the
-    caller does not read the value afterwards, is checked by reading (Recipe E step
-    4)."""
+    [(name, type line, declarator line)]. Whether the block writes the name before it
+    reads it, and the caller does not read the value afterwards, is checked by reading
+    (Recipe E step 4)."""
     found = []
-    for name, type_line in declaration_pairs(moved):
-        if min(extra[name], extra[type_line]) <= 0:
+    for name, type_line, line in declaration_pairs(moved):
+        if min(extra[line], extra[type_line]) <= 0:
             continue
         if uses(removed, name) and declares(caller, name, type_line):
-            found.append((name, type_line))
+            found.append((name, type_line, line))
     return found
 
 
 def unexplained(extra, temporaries, helper):
     """The problems left by HELPER's lines the removed lines do not account for."""
-    for name, type_line in temporaries:
-        extra[name] -= 1
+    for name, type_line, line in temporaries:
+        extra[line] -= 1
         extra[type_line] -= 1
     return [f"in {helper} but not removed ({n}x): {line}"
             for line, n in extra.items() if n > 0]
@@ -221,7 +222,23 @@ def unexplained(extra, temporaries, helper):
 
 def temporaries_note(temporaries, helper):
     return "".join(f"; temporary {name} ({type_line}) declared in {helper}, its "
-                   f"declaration kept in the caller" for name, type_line in temporaries)
+                   f"declaration kept in the caller" for name, type_line, _ in temporaries)
+
+
+def comment_lines(text):
+    """The stripped text of the lines of FILE that lie inside a `/* ... */` comment and
+    carry no code (a comment line moves with its block and is not rewritten)."""
+    lines, inside = set(), False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if inside:
+            if line.endswith("*/"):
+                inside = False
+            elif line not in TRIVIAL:
+                lines.add(line)
+        elif line == "/*":
+            inside = True
+    return lines
 
 
 def diff_lines(path):
@@ -279,10 +296,15 @@ def main(argv):
         same = min(removed_c[line], max(outside[line], 0))
         removed_c[line] -= same
         outside[line] -= same
+    comments = comment_lines(subprocess.run(["git", "show", "HEAD:" + path],
+                                            capture_output=True, text=True,
+                                            errors="replace", check=True).stdout)
     want = Counter()
     for line, n in removed_c.items():
         if n > 0:
-            want[canonical(forward(line, bound_t), bound_t)] += n
+            # a line of a comment moves as it is: the rewrite does not apply to text
+            moved_line = line if line in comments else forward(line, bound_t)
+            want[canonical(moved_line, bound_t)] += n
     have = Counter(canonical(b, bound_t) for b in moved)
     for line, n in (want - have).items():
         problems.append(f"removed but not moved ({n}x): {line}")
