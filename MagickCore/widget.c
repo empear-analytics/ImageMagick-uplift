@@ -5152,6 +5152,90 @@ static size_t ReleaseFileBrowserGrab(const FileBrowserPathRelease *grab,
   return(state);
 }
 
+typedef struct _FileBrowserSpecial
+{
+  unsigned int
+    anomaly;
+
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    *format;
+
+  FileBrowserFormatTargets
+    format_targets;
+
+  XEvent
+    event;
+
+  char
+    *working_path;
+} FileBrowserSpecial;
+
+typedef struct _FileBrowserSpecialTargets
+{
+  size_t
+    *state;
+
+  XWidgetInfo
+    *special_info;
+} FileBrowserSpecialTargets;
+
+static MagickBooleanType ReleaseFileBrowserSpecial(
+  const FileBrowserSpecial *special,const FileBrowserSpecialTargets *targets)
+{
+  const unsigned int
+    anomaly = special->anomaly;
+
+  Display
+    *const display = special->display;
+
+  XWindows
+    *const windows = special->windows;
+
+  char
+    *const format = special->format;
+
+  const FileBrowserFormatTargets
+    format_targets = special->format_targets;
+
+  const XEvent
+    event = special->event;
+
+  char
+    *const working_path = special->working_path;
+
+  size_t
+    *const state = targets->state;
+
+  XWidgetInfo
+    *const special_info = targets->special_info;
+
+  if ((*special_info).raised == MagickFalse)
+    {
+      FileBrowserPathRelease
+        grab;
+
+      if (anomaly == MagickFalse)
+        {
+          SelectFileBrowserFormat(display,windows,format,
+            &format_targets);
+          return(MagickFalse);
+        }
+      grab.windows=windows;
+      grab.event=event;
+      grab.working_path=working_path;
+      (*state)=ReleaseFileBrowserGrab(&grab,(*special_info),(*state));
+      (*special_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,special_info);
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -5233,6 +5317,9 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 
   const FileBrowserFormatTargets
     format_targets = { &reply_info, &special_info };
+
+  const FileBrowserSpecialTargets
+    special_targets = { &state, &special_info };
 
   /*
     Read filelist from current directory.
@@ -5797,6 +5884,9 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
+        FileBrowserSpecial
+          special;
+
         ListBrowserRelease
           release;
 
@@ -5854,24 +5944,15 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
             home_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&home_info);
           }
-        if (special_info.raised == MagickFalse)
-          {
-            FileBrowserPathRelease
-              grab;
-
-            if (anomaly == MagickFalse)
-              {
-                SelectFileBrowserFormat(display,windows,format,
-                  &format_targets);
-                break;
-              }
-            grab.windows=windows;
-            grab.event=event;
-            grab.working_path=working_path;
-            state=ReleaseFileBrowserGrab(&grab,special_info,state);
-            special_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&special_info);
-          }
+        special.anomaly=anomaly;
+        special.display=display;
+        special.windows=windows;
+        special.format=format;
+        special.format_targets=format_targets;
+        special.event=event;
+        special.working_path=working_path;
+        if (ReleaseFileBrowserSpecial(&special,&special_targets) == MagickFalse)
+          break;
         release.display=display;
         release.window_info=(&windows->widget);
         release.event=event;
