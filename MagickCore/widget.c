@@ -5004,6 +5004,40 @@ static size_t ReleaseFileBrowserUp(const FileBrowserPathRelease *up,
   return(state);
 }
 
+typedef struct _FileBrowserCancel
+{
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  char
+    *reply;
+} FileBrowserCancel;
+
+static size_t ReleaseFileBrowserCancel(const FileBrowserCancel *cancel,
+  const XWidgetInfo cancel_info,const XWidgetInfo reply_info,size_t state)
+{
+  XWindows
+    *const windows = cancel->windows;
+
+  const XEvent
+    event = cancel->event;
+
+  char
+    *const reply = cancel->reply;
+
+  if ((event.xbutton.window == windows->widget.id) &&
+      (MatteIsActive(cancel_info,event.xbutton)))
+    {
+      *reply_info.text='\0';
+      *reply='\0';
+      state|=ExitState;
+    }
+  return(state);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -5760,13 +5794,13 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         ReleaseListBrowserAction(&release,reply_info,&action_info,&state);
         if (cancel_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(cancel_info,event.xbutton)))
-              {
-                *reply_info.text='\0';
-                *reply='\0';
-                state|=ExitState;
-              }
+            FileBrowserCancel
+              cancel;
+
+            cancel.windows=windows;
+            cancel.event=event;
+            cancel.reply=reply;
+            state=ReleaseFileBrowserCancel(&cancel,cancel_info,reply_info,state);
             cancel_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
           }
