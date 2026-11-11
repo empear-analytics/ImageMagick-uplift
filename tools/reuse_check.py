@@ -360,11 +360,14 @@ def main(argv):
     case_tail = void_helper and after == "break;" and "return;" in \
         [b.strip() for b in body.splitlines()]
     groups = before == "default:" and "default:" in added
+    kept_break = False
     if groups:
         allowed.add("default:")
         i = added.index(call_parts[-1])
         if i + 1 < len(added) and added[i + 1] == "break;":
             allowed.add("break;")
+        elif after == "break;":
+            kept_break = True  # the diff kept a moved group's `break;` as context
     elif case_tail:
         i = added.index(call_parts[-1])
         if i + 1 < len(added) and added[i + 1] == "break;":
@@ -412,6 +415,8 @@ def main(argv):
             body_lines = body_lines[1:]
             note += f", the groups of {caller_switch} after its new default:"
     rewritten = [rewrite(r, binds) for r in removed if not r.startswith("#")]
+    if kept_break:
+        rewritten.append("break;")
     if case_tail:
         rewritten = ["return;" if r == "break;" else r for r in rewritten]
         note += ", a case tail (break; compared as return;)"
