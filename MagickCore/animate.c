@@ -3653,6 +3653,22 @@ static void XLogDisplayImage(XResourceInfo *resource_info,
     }
 }
 
+static void XLogSceneImage(Image **image_list,const ssize_t scene,
+  const unsigned int columns,const unsigned int rows)
+{
+  if (image_list[scene]->debug != MagickFalse)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "Image: [%.17g] %s %.17gx%.17g ",(double) image_list[scene]->scene,
+        image_list[scene]->filename,(double) columns,(double) rows);
+      if (image_list[scene]->colors != 0)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
+          image_list[scene]->colors);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
+        image_list[scene]->magick);
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4315,17 +4331,7 @@ MagickExport Image *XAnimateImages(Display *display,
     if (status == MagickFalse)
       ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
         images->filename);
-    if (image_list[scene]->debug != MagickFalse)
-      {
-        (void) LogMagickEvent(X11Event,GetMagickModule(),
-          "Image: [%.17g] %s %.17gx%.17g ",(double) image_list[scene]->scene,
-          image_list[scene]->filename,(double) columns,(double) rows);
-        if (image_list[scene]->colors != 0)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
-            image_list[scene]->colors);
-        (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
-          image_list[scene]->magick);
-      }
+    XLogSceneImage(image_list,scene,columns,rows);
     /*
       Window name is the base of the filename.
     */
