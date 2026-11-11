@@ -2121,6 +2121,26 @@ static void XAdvanceScene(const AnimationSceneStep *scene_step,
     }
 }
 
+static void XRemapColormapMismatch(XResourceInfo *resource_info,
+  XVisualInfo *visual_info,Image *images,ExceptionInfo *exception)
+{
+  if (resource_info->map_type == (char *) NULL)
+    if ((visual_info->klass != TrueColor) &&
+        (visual_info->klass != DirectColor))
+      {
+        Image
+          *next;
+
+        /*
+          Determine if the sequence of images has the identical colormap.
+        */
+        next=XFindColormapMismatch(images,visual_info);
+        if (next != (Image *) NULL)
+          (void) RemapImages(resource_info->quantize_info,images,
+            (Image *) NULL,exception);
+      }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2403,21 +2423,7 @@ MagickExport Image *XAnimateImages(Display *display,
     ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
       images->filename);
   images=coalesce_image;
-  if (resource_info->map_type == (char *) NULL)
-    if ((visual_info->klass != TrueColor) &&
-        (visual_info->klass != DirectColor))
-      {
-        Image
-          *next;
-
-        /*
-          Determine if the sequence of images has the identical colormap.
-        */
-        next=XFindColormapMismatch(images,visual_info);
-        if (next != (Image *) NULL)
-          (void) RemapImages(resource_info->quantize_info,images,
-            (Image *) NULL,exception);
-      }
+  XRemapColormapMismatch(resource_info,visual_info,images,exception);
   /*
     Sort images by increasing scene number.
   */
