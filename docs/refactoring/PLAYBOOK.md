@@ -7015,6 +7015,21 @@ Recipe LB (a `break;`, not a `return`).
    then moves with its call to directly before the new call, past statements that write
    none of the members' values (check by reading: an address `&v` is fixed for the
    caller's whole body).
+   (d) Five or six written locals (2026-11-11). When the block writes five or six plain
+   locals of the caller that the caller reads after it, (b)'s limit of four rises to six
+   if their addresses go in (c)'s one `const` struct: it is declared with its
+   initialiser (the addresses `&v`, and the block's read-only inputs as further members)
+   among the declarations at the top of the block that holds the call, no statement
+   between it and the call, so each input member holds the value the block read. The
+   helper binds each address as `T *const v = name->v;` and writes `(*v)` at every use,
+   so it still takes at most four parameters: the struct, the arrays or pointers it
+   reads (`char *token`), and `T *result`. A local the block writes only on paths that
+   leave through `return(R);` keeps (b)'s by-value form.
+   (e) The result variable (2026-11-11). When some `return(R);` of the block returns a
+   local `w` of the caller that the block also writes through (under (b) or (d)), or a
+   constant, the caller may pass `&w` as `T *result` and write `return(w);` in place of
+   `return(returned);`, and declare no `returned`: each `return(R);` is still rewritten
+   as `(*result)=R;` and `return(MagickTrue);` one for one, the helper's text unchanged.
 
 **Before:**
 
@@ -7083,6 +7098,19 @@ static MagickBooleanType TryLeadingOperand (FxInfo * pfx,
   fill is allowed only past statements that write none of its members' values). A
   `const` struct is not written by any helper, so passing it on hands the inner helper
   exactly what its caller filled.
+- Under step 6 (d) the six locals stay the caller's own: only their addresses travel,
+  in a `const` struct nothing writes, and no other name for them is in use while the
+  helper runs, so every read and write through `(*v)` reaches the object the block named,
+  at the same point and in the same order. On the path that returns `MagickTrue` the
+  caller returns the stored `R` at once; on the fall-through path it reads each local as
+  the block left it. The count of four in (b) bounded the parameters, which (c)'s struct
+  already removes; the struct adds no read or write the block did not make.
+- Under step 6 (e) `result` and the pointer the block writes `w` through are one object;
+  `(*result)=R;` stores `R` there, which for `R` equal to `w`'s own value is a store of
+  the value already held, and for another `R` (a constant) a store the caller reads at
+  once, in `return(w);`, and never otherwise: the paths that fall through never store,
+  so `w` keeps what the block left; a path that returns stores `R` into a local that
+  nothing reads after the return but the return itself.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new function,
 nothing else moved), and steps 1 and 2 checked by reading.
@@ -7102,6 +7130,20 @@ block returned. Step 4 refused the `ssize_t` result, step 2 the written `colour`
 both blocks need six or more parameters. A probe of both: the function leaves Complex
 Method, fx.c 3.73 to 3.78 to 3.88, no finding on either helper. Added by Claude Code
 (Claude Opus 5.5).
+Step 6 (d) (2026-11-11, W18 lane d, owner's OK to evolve the recipes): `channel.c`'s
+`ChannelFxImage`, whose token-separator `switch` (`,`, `|` and `;`) writes `p`,
+`source_image`, `destination_image`, `channels`, `destination_channel` and `channel_mask`
+(six locals), reads `channel_op` and `exception`, and leaves through
+`destination_image=DestroyImageList(destination_image); return(destination_image);` on
+one path and `return((Image *) NULL);` on another, which Recipes I, V and W refuse (two
+different exits) and step 6 (b) stopped at four locals. A probe of the helper: the
+function goes from cc 17 to 12, channel.c 9.31 to 9.46, no finding on the helper. Added
+by Claude Code (Claude Sonnet 5.5).
+Step 6 (e) (2026-11-11, W18 lane d): the same helper's caller, whose `returned` costs
+two lines of a function that stands at 72 lines against a limit of 70 once its loop is
+moved by Recipe N; `destination_image` is both what the first exit returns and the
+object the block writes through, so it serves as the result. Added by Claude Code
+(Claude Sonnet 5.5).
 
 ---
 
@@ -11522,3 +11564,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | NEW | UX | Unnest an Exit Implied by Its Guard: a guard on the disjunction of `A` and `B` whose body runs a clean-up `S`, then exits through `X` when `B` holds and through `Y` otherwise, becomes three statements: the guard holding `S` alone, `if (B) X`, and `if (A) { Y }`; `A` and `B` are side-effect-free reads of locals that `S` does not write | `animate.c`'s `XMagickCommand` (campaign A, W17 lane c, wide build): the Open command's failure guard releases the file list and then throws one of two `ThrowXWindowException`s, which record `GetMagickModule()` and must stay in the function; the nested test is the function's last bump after the SD splits. Probe of the chain: `XMagickCommand` leaves Bumpy Road Ahead and Large Method, 3.48 to 3.67 with the XSaveImage steps | owner |
 | 2026-11-11 | WORDING | UX | Step 5 and *Evidence level*: `refactor_guard.py` counts distinct values, so repeating `A` may leave it at PASS; a WARN is expected only when a literal of `A` is new to the count | The first use (`XMagickCommand`, `status == MagickFalse`) printed PASS, not the WARN the text predicted | owner |
 | 2026-11-11 | AMEND | MA | Step 2 (c): the lvalues of the copies may differ in a member of the chain before the last when each is a chain of member selections through one shared pointer variable (no call, no subscript), of one type; the block may only read or only assign it. *Careful* adds the argument (the address names the very object the copy named; nothing is read that the copy did not read) | `widget.c`'s `XScreenEvent` (campaign A, W18 lane a, wide build): the popup block's two `windows->popup.mapped` assignments and the existing helper `XScreenTrackWidgetMapping` (`windows->widget.mapped`) are twins differing in one member of the chain; one helper taking `MagickBooleanType *mapped` serves both. Probe: the function leaves Bumpy Road Ahead and drops from cc 15 to 13, 3.04 to 3.06, no new function | owner |
+| 2026-11-11 | AMEND | RV | Step 6 (new (d)): five or six written locals of the caller go by (c)'s one `const` struct of addresses, bound as `T *const v = name->v;` and written `(*v)`, so the helper keeps at most four parameters (the struct, the arrays or pointers it reads, `T *result`). *Careful* gives the argument: the locals stay the caller's, only addresses travel, and nothing else names them while the helper runs | `channel.c`'s `ChannelFxImage` (campaign A, W18 lane d): the token-separator `switch` writes six locals and leaves through two different `return`s (`return(destination_image)` after `DestroyImageList`, and `return((Image *) NULL)`), which I, V, W refuse; step 6 (b) stopped at four. A probe: the function cc 17 to 12, channel.c 9.31 to 9.46, no finding on the helper | owner |
+| 2026-11-11 | AMEND | RV | Step 6 (new (e)): the caller may pass the address of a local `w` that the block writes through (and that one exit returns) as `T *result`, and write `return(w);`, declaring no `returned`; the helper's text is unchanged. *Careful* gives the argument: `result` and the written pointer name one object, the paths that fall through never store, a path that returns stores into a local nothing reads but the return | `channel.c`'s `ChannelFxImage` (campaign A, W18 lane d): `destination_image` is what the separator helper's first exit returns and what it writes through; the `returned` local costs two lines of the loop helper that Recipe N moves, which then stands at 72 lines against the Large Method limit of 70 | owner |

@@ -723,32 +723,137 @@ static MagickBooleanType ParseChannelDestination(
   return(MagickTrue);
 }
 
-MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
-  ExceptionInfo *exception)
+typedef struct _ChannelFxSeparator
 {
+  ChannelFx
+    channel_op;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    **destination_image;
+
+  ssize_t
+    *channels;
+
+  PixelChannel
+    *destination_channel;
+
+  ChannelType
+    *channel_mask;
+
+  const char
+    **p;
+
+  const Image
+    **source_image;
+} ChannelFxSeparator;
+
+static MagickBooleanType TryFxSeparator(
+  const ChannelFxSeparator *separator,char *token,Image **result)
+{
+  const ChannelFx
+    channel_op = separator->channel_op;
+
+  ExceptionInfo
+    *const exception = separator->exception;
+
+  Image
+    **const destination_image = separator->destination_image;
+
+  ssize_t
+    *const channels = separator->channels;
+
+  PixelChannel
+    *const destination_channel = separator->destination_channel;
+
+  ChannelType
+    *const channel_mask = separator->channel_mask;
+
+  const char
+    **const p = separator->p;
+
+  const Image
+    **const source_image = separator->source_image;
+
+  switch (*token)
+  {
+    case ',':
+    {
+      (void) GetNextToken((*p),p,MagickPathExtent,token);
+      break;
+    }
+    case '|':
+    {
+      AdvanceSourceImage(source_image,p,token);
+      break;
+    }
+    case ';':
+    {
+      Image
+        *canvas;
+
+      (void) SetPixelChannelMask((*destination_image),(*channel_mask));
+      SetGrayChannelImage((*destination_image),channel_op,(*channels),
+        exception);
+      if (AcquireChannelCanvas((*source_image),&canvas,exception) ==
+          MagickFalse)
+        {
+          (*destination_image)=DestroyImageList((*destination_image));
+          (*result)=(*destination_image);
+          return(MagickTrue);
+        }
+      if (AppendChannelCanvas(destination_image,canvas,exception) ==
+          MagickFalse)
+        {
+          (*result)=(Image *) NULL;
+          return(MagickTrue);
+        }
+      (void) GetNextToken((*p),p,MagickPathExtent,token);
+      (*channels)=0;
+      (*destination_channel)=RedPixelChannel;
+      (*channel_mask)=(*destination_image)->channel_mask;
+      break;
+    }
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
+typedef struct _ChannelFxTokens
+{
+  const Image
+    *image;
+
+  const char
+    *expression;
+
+  ExceptionInfo
+    *exception;
+
+  ChannelType
+    channel_mask;
+} ChannelFxTokens;
+
+static Image *ParseChannelFxTokens(const ChannelFxTokens *tokens,
+  const char *p,const Image *source_image,Image *destination_image)
+{
+  ExceptionInfo
+    *const exception = tokens->exception;
+
   ChannelFx
     channel_op = ExtractChannelOp;
 
   ChannelType
-    channel_mask;
+    channel_mask = tokens->channel_mask;
 
   char
     token[MagickPathExtent] = "";
 
-  const char
-    *p;
-
-  const Image
-    *source_image;
-
   double
     pixel = 0.0;
-
-  Image
-    *destination_image;
-
-  MagickBooleanType
-    status = MagickTrue;
 
   PixelChannel
     source_channel,
@@ -756,6 +861,88 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
 
   ssize_t
     channels = 0;
+
+  (void) GetNextToken(p,&p,MagickPathExtent,token);
+  while (*token != '\0')
+  {
+    const ChannelFxTargets
+      targets = { &destination_image, &channels };
+
+    ssize_t
+      i;
+
+    const ChannelFxDestinationTargets
+      destination_targets = { &pixel, &i, &destination_channel, &channel_mask,
+        &p };
+
+    const ChannelFxSeparator
+      separator = { channel_op, exception, &destination_image, &channels,
+        &destination_channel, &channel_mask, &p, &source_image };
+
+    /*
+      Interpret channel expression.
+    */
+    if (TryFxSeparator(&separator,token,&destination_image) != MagickFalse)
+      return(destination_image);
+    i=ParsePixelChannelOption(token);
+    source_channel=(PixelChannel) i;
+    if (CheckSourceChannel(source_image,source_channel,token,
+          exception) == MagickFalse)
+      {
+        destination_image=DestroyImageList(destination_image);
+        return(destination_image);
+      }
+    ParseChannelOperator(&channel_op,&p,token);
+    {
+      const ChannelFxDestination
+        parse = { channel_op, tokens->image, destination_image, exception };
+
+      if (ParseChannelDestination(&parse,token,&destination_targets) ==
+          MagickFalse)
+        {
+          destination_image=DestroyImageList(destination_image);
+          return(destination_image);
+        }
+    }
+    {
+      const ChannelFxApply
+        apply = { destination_channel, channel_op, source_image,
+          source_channel, pixel, exception };
+
+      if (ApplyChannelOperation(&apply,&targets) == MagickFalse)
+        break;
+    }
+    AdvanceDestinationChannel(channel_op,&channel_mask,&destination_channel);
+    if (SetChannelFxProgress(source_image,p,tokens->expression) == MagickFalse)
+      break;
+  }
+  if (destination_image == (Image *) NULL)
+    return(destination_image);
+  (void) SetPixelChannelMask(destination_image,channel_mask);
+  SetGrayChannelImage(destination_image,channel_op,channels,exception);
+  return(GetFirstImageInList(destination_image));
+}
+
+MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
+  ExceptionInfo *exception)
+{
+  ChannelType
+    channel_mask;
+
+  const char
+    *p;
+
+  const Image
+    *source_image;
+
+  ChannelFxTokens
+    tokens;
+
+  Image
+    *destination_image;
+
+  MagickBooleanType
+    status = MagickTrue;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -777,100 +964,11 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
       return((Image *) NULL);
     }
   channel_mask=destination_image->channel_mask;
-  (void) GetNextToken(p,&p,MagickPathExtent,token);
-  while (*token != '\0')
-  {
-    ChannelFxApply
-      apply;
-
-    const ChannelFxTargets
-      targets = { &destination_image, &channels };
-
-    ssize_t
-      i;
-
-    ChannelFxDestination
-      parse;
-
-    const ChannelFxDestinationTargets
-      destination_targets = { &pixel, &i, &destination_channel, &channel_mask,
-        &p };
-
-    /*
-      Interpret channel expression.
-    */
-    switch (*token)
-    {
-      case ',':
-      {
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-        break;
-      }
-      case '|':
-      {
-        AdvanceSourceImage(&source_image,&p,token);
-        break;
-      }
-      case ';':
-      {
-        Image
-          *canvas;
-
-        (void) SetPixelChannelMask(destination_image,channel_mask);
-        SetGrayChannelImage(destination_image,channel_op,channels,exception);
-        if (AcquireChannelCanvas(source_image,&canvas,exception) == MagickFalse)
-          {
-            destination_image=DestroyImageList(destination_image);
-            return(destination_image);
-          }
-        if (AppendChannelCanvas(&destination_image,canvas,exception) ==
-            MagickFalse)
-          return((Image *) NULL);
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-        channels=0;
-        destination_channel=RedPixelChannel;
-        channel_mask=destination_image->channel_mask;
-        break;
-      }
-      default:
-        break;
-    }
-    i=ParsePixelChannelOption(token);
-    source_channel=(PixelChannel) i;
-    if (CheckSourceChannel(source_image,source_channel,token,
-          exception) == MagickFalse)
-      {
-        destination_image=DestroyImageList(destination_image);
-        return(destination_image);
-      }
-    ParseChannelOperator(&channel_op,&p,token);
-    parse.channel_op=channel_op;
-    parse.image=image;
-    parse.destination_image=destination_image;
-    parse.exception=exception;
-    if (ParseChannelDestination(&parse,token,&destination_targets) ==
-        MagickFalse)
-      {
-        destination_image=DestroyImageList(destination_image);
-        return(destination_image);
-      }
-    apply.destination_channel=destination_channel;
-    apply.channel_op=channel_op;
-    apply.source_image=source_image;
-    apply.source_channel=source_channel;
-    apply.pixel=pixel;
-    apply.exception=exception;
-    if (ApplyChannelOperation(&apply,&targets) == MagickFalse)
-      break;
-    AdvanceDestinationChannel(channel_op,&channel_mask,&destination_channel);
-    if (SetChannelFxProgress(source_image,p,expression) == MagickFalse)
-      break;
-  }
-  if (destination_image == (Image *) NULL)
-    return(destination_image);
-  (void) SetPixelChannelMask(destination_image,channel_mask);
-  SetGrayChannelImage(destination_image,channel_op,channels,exception);
-  return(GetFirstImageInList(destination_image));
+  tokens.image=image;
+  tokens.expression=expression;
+  tokens.exception=exception;
+  tokens.channel_mask=channel_mask;
+  return(ParseChannelFxTokens(&tokens,p,source_image,destination_image));
 }
 
 
