@@ -1669,6 +1669,364 @@ static MagickBooleanType IsUnusableSelection(const Status status,const Atom type
     (length == 0)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _ListBrowserClick
+{
+  Display
+    *display;
+
+  XWindowInfo
+    *window_info;
+
+  XEvent
+    event;
+
+  Time
+    click_time;
+} ListBrowserClick;
+
+typedef struct _ListBrowserRelease
+{
+  Display
+    *display;
+
+  XWindowInfo
+    *window_info;
+
+  XEvent
+    event;
+} ListBrowserRelease;
+
+typedef struct _FontBrowserTargets
+{
+  XWidgetInfo
+    *reply_info;
+
+  size_t
+    *state;
+
+  XWidgetInfo
+    *selection_info,
+    *list_info;
+} FontBrowserTargets;
+
+typedef struct _FontBrowserPress
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    **fontlist;
+
+  int
+    fonts;
+
+  unsigned int
+    height;
+
+  XEvent
+    event;
+
+  XWidgetInfo
+    slider_info;
+} FontBrowserPress;
+
+typedef struct _FontBrowserNames
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    **fontlist;
+
+  int
+    fonts;
+
+  unsigned int
+    visible_fonts;
+
+  XWidgetInfo
+    list_info,
+    slider_info;
+} FontBrowserNames;
+
+typedef struct _FontBrowserMatch
+{
+  char
+    **fontlist;
+
+  int
+    fonts;
+
+  char
+    *reply;
+} FontBrowserMatch;
+
+typedef struct _FontBrowserBack
+{
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  XWidgetInfo
+    back_info;
+
+  char
+    *glob_pattern;
+
+  const char
+    *back_pattern;
+} FontBrowserBack;
+
+static XWidgetInfo
+  ApplyListBrowserControlKey(XWidgetInfo,const KeySym,const size_t);
+
+static size_t
+  ConfirmListBrowserReply(Display *,const XWidgetInfo,size_t);
+
+static void
+  ReleaseListBrowserAction(const ListBrowserRelease *,const XWidgetInfo,
+    XWidgetInfo *,size_t *);
+
+static void
+  ReleaseListBrowserCancel(const ListBrowserRelease *,const XWidgetInfo,
+    XWidgetInfo *,size_t *);
+
+static XWidgetInfo
+  HighlightListBrowserReply(const ListBrowserClick *,char *,XWidgetInfo);
+
+static XWidgetInfo
+  PlaceTextViewExpose(XWidgetInfo,const XWidgetInfo);
+
+static void
+  SelectFontBrowserEntry(const FontBrowserPress *,char *,
+    const FontBrowserTargets *);
+
+static int
+  FindListBrowserCursor(XFontStruct *,const XWidgetInfo,const int);
+
+static XWidgetInfo
+  PageListBrowserSlider(XWidgetInfo,const XEvent,const unsigned int);
+
+static void
+  MatchFontBrowserReply(const FontBrowserMatch *,XWidgetInfo *,int *);
+
+static void
+  DrawFontBrowserNames(const FontBrowserNames *,XWidgetInfo *,int *);
+
+static size_t
+  ReleaseFontBrowserBack(const FontBrowserBack *,size_t);
+
+static void
+  MoveFontBrowserSliderByPage(const KeySym,const unsigned int,const int,
+    XWidgetInfo *);
+
+static XWidgetInfo
+  MoveFontBrowserSlider(XWidgetInfo,const KeySym,const unsigned int,const int);
+
+static void CopyColorBrowserMode(const XWidgetInfo mode_info,
+  const XWidgetInfo reply_info)
+{
+  if (mode_info.text != (char *) NULL)
+    (void) CopyMagickString(reply_info.text,mode_info.text,
+      MagickPathExtent);
+}
+
+static XWidgetInfo TrackColorBrowserSlider(XWidgetInfo slider_info,
+  const XEvent event,const size_t colors)
+{
+  slider_info.y=event.xmotion.y-(int)
+    ((slider_info.height+slider_info.bevel_width) >> 1)+1;
+  if (slider_info.y < slider_info.min_y)
+    slider_info.y=slider_info.min_y;
+  if (slider_info.y > slider_info.max_y)
+    slider_info.y=slider_info.max_y;
+  slider_info.id=0;
+  if (slider_info.y != slider_info.min_y)
+    slider_info.id=(int) (((int) colors*(slider_info.y-
+      slider_info.min_y+1))/(slider_info.max_y-slider_info.min_y+1));
+  return(slider_info);
+}
+
+static size_t ReadColorBrowserPattern(const XWidgetInfo reply_info,
+  char *glob_pattern,size_t state)
+{
+  /*
+    Read new color or glob pattern.
+  */
+  if (*reply_info.text == '\0')
+    return(state);
+  (void) CopyMagickString(glob_pattern,reply_info.text,MagickPathExtent);
+  state|=UpdateListState;
+  return(state);
+}
+
+typedef struct _ColorBrowserGrab
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  XWidgetInfo
+    grab_info;
+
+  ExceptionInfo
+    *exception;
+} ColorBrowserGrab;
+
+static void ReleaseColorBrowserGrab(const ColorBrowserGrab *grab,
+  XWidgetInfo *reply_info,size_t *state)
+{
+  Display
+    *const display = grab->display;
+
+  XWindows
+    *const windows = grab->windows;
+
+  const XEvent
+    event = grab->event;
+
+  const XWidgetInfo
+    grab_info = grab->grab_info;
+
+  ExceptionInfo
+    *const exception = grab->exception;
+
+  if ((event.xbutton.window == windows->widget.id) &&
+      (MatteIsActive(grab_info,event.xbutton)))
+    {
+      /*
+        Select a fill color from the X server.
+      */
+      (void) XGetWindowColor(display,windows,(*reply_info).text,
+        exception);
+      (*reply_info).marker=(*reply_info).text;
+      (*reply_info).cursor=(*reply_info).text+Extent((*reply_info).text);
+      XDrawMatteText(display,&windows->widget,&(*reply_info));
+      (*state)|=RedrawActionState;
+    }
+}
+
+typedef struct _ColorBrowserUpdate
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    *reply,
+    *glob_pattern;
+
+  const char
+    *reset_pattern;
+
+  ExceptionInfo
+    *exception;
+} ColorBrowserUpdate;
+
+typedef struct _ColorBrowserUpdateTargets
+{
+  XWidgetInfo
+    *action_info;
+
+  char
+    ***colorlist;
+
+  size_t
+    *colors;
+} ColorBrowserUpdateTargets;
+
+static MagickBooleanType UpdateColorBrowserList(
+  const ColorBrowserUpdate *update,const ColorBrowserUpdateTargets *targets)
+{
+  Display
+    *const display = update->display;
+
+  XWindows
+    *const windows = update->windows;
+
+  char
+    *const reply = update->reply,
+    *const glob_pattern = update->glob_pattern;
+
+  const char
+    *const reset_pattern = update->reset_pattern;
+
+  ExceptionInfo
+    *const exception = update->exception;
+
+  XWidgetInfo
+    *const action_info = targets->action_info;
+
+  char
+    ***const colorlist = targets->colorlist;
+
+  size_t
+    *const colors = targets->colors;
+
+  char
+    **checklist;
+
+  int
+    i;
+
+  size_t
+    number_colors;
+
+  Status
+    status;
+
+  XColor
+    color;
+
+  status=XParseColor(display,windows->widget.map_info->colormap,
+    glob_pattern,&color);
+  if ((status != False) || (strchr(glob_pattern,'-') != (char *) NULL))
+    {
+      /*
+        Reply is a single color name-- exit.
+      */
+      (void) CopyMagickString(reply,glob_pattern,MagickPathExtent);
+      (void) CopyMagickString(glob_pattern,reset_pattern,MagickPathExtent);
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return(MagickFalse);
+    }
+  /*
+    Update color list.
+  */
+  checklist=GetColorList(glob_pattern,&number_colors,exception);
+  if (number_colors == 0)
+    {
+      (void) CopyMagickString(glob_pattern,reset_pattern,MagickPathExtent);
+      (void) XBell(display,0);
+    }
+  else
+    {
+      for (i=0; i < (int) (*colors); i++)
+        (*colorlist)[i]=DestroyString((*colorlist)[i]);
+      if ((*colorlist) != (char **) NULL)
+        (*colorlist)=(char **) RelinquishMagickMemory((*colorlist));
+      (*colorlist)=checklist;
+      (*colors)=number_colors;
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -1744,6 +2102,9 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
 
   XWindowChanges
     window_changes;
+
+  const FontBrowserTargets
+    targets = { &reply_info, &state, &selection_info, &list_info };
 
   /*
     Get color list and sort in ascending order.
@@ -2007,43 +2368,20 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
     if (state & UpdateListState)
       {
-        char
-          **checklist;
+        const ColorBrowserUpdateTargets
+          update_targets = { &action_info, &colorlist, &colors };
+        
+        ColorBrowserUpdate
+          update;
 
-        size_t
-          number_colors;
-
-        status=XParseColor(display,windows->widget.map_info->colormap,
-          glob_pattern,&color);
-        if ((status != False) || (strchr(glob_pattern,'-') != (char *) NULL))
-          {
-            /*
-              Reply is a single color name-- exit.
-            */
-            (void) CopyMagickString(reply,glob_pattern,MagickPathExtent);
-            (void) CopyMagickString(glob_pattern,reset_pattern,MagickPathExtent);
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        /*
-          Update color list.
-        */
-        checklist=GetColorList(glob_pattern,&number_colors,exception);
-        if (number_colors == 0)
-          {
-            (void) CopyMagickString(glob_pattern,reset_pattern,MagickPathExtent);
-            (void) XBell(display,0);
-          }
-        else
-          {
-            for (i=0; i < (int) colors; i++)
-              colorlist[i]=DestroyString(colorlist[i]);
-            if (colorlist != (char **) NULL)
-              colorlist=(char **) RelinquishMagickMemory(colorlist);
-            colorlist=checklist;
-            colors=number_colors;
-          }
+        update.display=display;
+        update.windows=windows;
+        update.reply=reply;
+        update.glob_pattern=glob_pattern;
+        update.reset_pattern=reset_pattern;
+        update.exception=exception;
+        if (UpdateColorBrowserList(&update,&update_targets) == MagickFalse)
+          break;
         /*
           Sort color list in ascending order.
         */
@@ -2077,16 +2415,17 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
     if (state & JumpListState)
       {
+        FontBrowserMatch
+          match;
+
         /*
           Jump scroll to match user color.
         */
         list_info.id=(~0);
-        for (i=0; i < (int) colors; i++)
-          if (LocaleCompare(colorlist[i],reply) >= 0)
-            {
-              list_info.id=LocaleCompare(colorlist[i],reply) == 0 ? i : ~0;
-              break;
-            }
+        match.fontlist=colorlist;
+        match.fonts=(int) colors;
+        match.reply=reply;
+        MatchFontBrowserReply(&match,&list_info,&i);
         if ((i < slider_info.id) ||
             (i >= (int) (slider_info.id+(int) visible_colors)))
           slider_info.id=i-(int) (visible_colors >> 1);
@@ -2109,36 +2448,26 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             slider_info.min_y+1)/(int) colors;
         if (slider_info.id != selection_info.id)
           {
+            FontBrowserNames
+              names;
+
             /*
               Redraw scroll bar and file names.
             */
             selection_info.id=slider_info.id;
             selection_info.y=list_info.y+(int) (height >> 3)+2;
-            for (i=0; i < (int) visible_colors; i++)
-            {
-              selection_info.raised=(slider_info.id+i) != list_info.id ?
-                MagickTrue : MagickFalse;
-              selection_info.text=(char *) NULL;
-              if ((slider_info.id+i) < (int) colors)
-                selection_info.text=colorlist[slider_info.id+i];
-              XDrawWidgetText(display,&windows->widget,&selection_info);
-              selection_info.y+=(int) selection_info.height;
-            }
+            names.display=display;
+            names.windows=windows;
+            names.fontlist=colorlist;
+            names.fonts=(int) colors;
+            names.visible_fonts=visible_colors;
+            names.list_info=list_info;
+            names.slider_info=slider_info;
+            DrawFontBrowserNames(&names,&selection_info,&i);
             /*
               Update slider.
             */
-            if (slider_info.y > expose_info.y)
-              {
-                expose_info.height=(unsigned int) (slider_info.y-expose_info.y);
-                expose_info.y=slider_info.y-(int) expose_info.height-(int)
-                  slider_info.bevel_width-1;
-              }
-            else
-              {
-                expose_info.height=(unsigned int) (expose_info.y-slider_info.y);
-                expose_info.y=slider_info.y+(int) slider_info.height+(int)
-                  slider_info.bevel_width+1;
-              }
+            expose_info=PlaceTextViewExpose(expose_info,slider_info);
             XDrawTriangleNorth(display,&windows->widget,&north_info);
             XDrawMatte(display,&windows->widget,&expose_info);
             XDrawBeveledButton(display,&windows->widget,&slider_info);
@@ -2183,24 +2512,23 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
         XDelay(display,delay);
         delay=SuspendTime;
         (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if (north_info.raised == MagickFalse)
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              slider_info.id--;
-              state|=RedrawListState;
-            }
-        if (south_info.raised == MagickFalse)
-          if (slider_info.id < (int) colors)
-            {
-              /*
-                Move slider down.
-              */
-              slider_info.id++;
-              state|=RedrawListState;
-            }
+        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            slider_info.id--;
+            state|=RedrawListState;
+          }
+        if ((south_info.raised == MagickFalse) &&
+            (slider_info.id < (int) colors))
+          {
+            /*
+              Move slider down.
+            */
+            slider_info.id++;
+            state|=RedrawListState;
+          }
         if (event.type != ButtonRelease)
           continue;
       }
@@ -2216,68 +2544,49 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             slider_info.active=MagickTrue;
             break;
           }
-        if (MatteIsActive(north_info,event.xbutton))
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              north_info.raised=MagickFalse;
-              slider_info.id--;
-              state|=RedrawListState;
-              break;
-            }
-        if (MatteIsActive(south_info,event.xbutton))
-          if (slider_info.id < (int) colors)
-            {
-              /*
-                Move slider down.
-              */
-              south_info.raised=MagickFalse;
-              slider_info.id++;
-              state|=RedrawListState;
-              break;
-            }
+        if ((MatteIsActive(north_info,event.xbutton)) && (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            north_info.raised=MagickFalse;
+            slider_info.id--;
+            state|=RedrawListState;
+            break;
+          }
+        if ((MatteIsActive(south_info,event.xbutton)) &&
+            (slider_info.id < (int) colors))
+          {
+            /*
+              Move slider down.
+            */
+            south_info.raised=MagickFalse;
+            slider_info.id++;
+            state|=RedrawListState;
+            break;
+          }
         if (MatteIsActive(scroll_info,event.xbutton))
           {
             /*
               Move slider.
             */
-            if (event.xbutton.y < slider_info.y)
-              slider_info.id-=(int) (visible_colors-1);
-            else
-              slider_info.id+=(int) (visible_colors-1);
+            slider_info=PageListBrowserSlider(slider_info,event,visible_colors);
             state|=RedrawListState;
             break;
           }
         if (MatteIsActive(list_info,event.xbutton))
           {
-            int
-              id;
+            FontBrowserPress
+              press;
 
-            /*
-              User pressed list matte.
-            */
-            id=slider_info.id+(event.xbutton.y-(list_info.y+(int)
-              (height >> 1))+1)/(int) selection_info.height;
-            if (id >= (int) colors)
-              break;
-            (void) CopyMagickString(reply_info.text,colorlist[id],
-              MagickPathExtent);
-            reply_info.highlight=MagickFalse;
-            reply_info.marker=reply_info.text;
-            reply_info.cursor=reply_info.text+Extent(reply_info.text);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-            state|=RedrawActionState;
-            if (id == list_info.id)
-              {
-                (void) CopyMagickString(glob_pattern,reply_info.text,
-                  MagickPathExtent);
-                state|=UpdateListState;
-              }
-            selection_info.id=(~0);
-            list_info.id=id;
-            state|=RedrawListState;
+            press.display=display;
+            press.windows=windows;
+            press.fontlist=colorlist;
+            press.fonts=colors;
+            press.height=height;
+            press.event=event;
+            press.slider_info=slider_info;
+            SelectFontBrowserEntry(&press,glob_pattern,&targets);
             break;
           }
         if (MatteIsActive(grab_info,event.xbutton))
@@ -2303,9 +2612,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             /*
               User pressed mode button.
             */
-            if (mode_info.text != (char *) NULL)
-              (void) CopyMagickString(reply_info.text,mode_info.text,
-                MagickPathExtent);
+            CopyColorBrowserMode(mode_info,reply_info);
             (void) CopyMagickString(primary_selection,reply_info.text,
               MagickPathExtent);
             (void) XSetSelectionOwner(display,XA_PRIMARY,windows->widget.id,
@@ -2342,28 +2649,21 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             static Time
               click_time;
 
+            ListBrowserClick
+              click;
+
             /*
               Move text cursor to position of button press.
             */
             x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            for (i=1; i <= Extent(reply_info.marker); i++)
-              if (XTextWidth(font_info,reply_info.marker,i) > x)
-                break;
+            i=FindListBrowserCursor(font_info,reply_info,x);
             reply_info.cursor=reply_info.marker+i-1;
-            if (event.xbutton.time > (click_time+(unsigned long) DoubleClick))
-              reply_info.highlight=MagickFalse;
-            else
-              {
-                /*
-                  Become the XA_PRIMARY selection owner.
-                */
-                (void) CopyMagickString(primary_selection,reply_info.text,
-                  MagickPathExtent);
-                (void) XSetSelectionOwner(display,XA_PRIMARY,windows->widget.id,
-                  event.xbutton.time);
-                reply_info.highlight=XGetSelectionOwner(display,XA_PRIMARY) ==
-                  windows->widget.id ? MagickTrue : MagickFalse;
-              }
+            click.display=display;
+            click.window_info=(&windows->widget);
+            click.event=event;
+            click.click_time=click_time;
+            reply_info=HighlightListBrowserReply(&click,primary_selection,
+              reply_info);
             XDrawMatteText(display,&windows->widget,&reply_info);
             click_time=event.xbutton.time;
             break;
@@ -2377,6 +2677,9 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
+        ListBrowserRelease
+          release;
+
         if (windows->widget.mapped == MagickFalse)
           break;
         if (north_info.raised == MagickFalse)
@@ -2407,60 +2710,40 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
           }
         if (grab_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(grab_info,event.xbutton))
-                {
-                  /*
-                    Select a fill color from the X server.
-                  */
-                  (void) XGetWindowColor(display,windows,reply_info.text,
-                    exception);
-                  reply_info.marker=reply_info.text;
-                  reply_info.cursor=reply_info.text+Extent(reply_info.text);
-                  XDrawMatteText(display,&windows->widget,&reply_info);
-                  state|=RedrawActionState;
-                }
+            ColorBrowserGrab
+              grab;
+
+            grab.display=display;
+            grab.windows=windows;
+            grab.event=event;
+            grab.grab_info=grab_info;
+            grab.exception=exception;
+            ReleaseColorBrowserGrab(&grab,&reply_info,&state);
             grab_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&grab_info);
           }
         if (reset_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(reset_info,event.xbutton))
-                {
-                  (void) CopyMagickString(glob_pattern,reset_pattern,
-                    MagickPathExtent);
-                  state|=UpdateListState;
-                }
+            FontBrowserBack
+              back;
+
+            back.windows=windows;
+            back.event=event;
+            back.back_info=reset_info;
+            back.glob_pattern=glob_pattern;
+            back.back_pattern=reset_pattern;
+            state=ReleaseFontBrowserBack(&back,state);
             reset_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&reset_info);
           }
-        if (action_info.raised == MagickFalse)
-          {
-            if (event.xbutton.window == windows->widget.id)
-              {
-                if (MatteIsActive(action_info,event.xbutton))
-                  {
-                    if (*reply_info.text == '\0')
-                      (void) XBell(display,0);
-                    else
-                      state|=ExitState;
-                  }
-              }
-            action_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-          }
-        if (cancel_info.raised == MagickFalse)
-          {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(cancel_info,event.xbutton))
-                {
-                  *reply_info.text='\0';
-                  state|=ExitState;
-                }
-            cancel_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-          }
+        release.display=display;
+        release.window_info=(&windows->widget);
+        release.event=event;
+        ReleaseListBrowserAction(&release,reply_info,&action_info,&state);
+        release.display=display;
+        release.window_info=(&windows->widget);
+        release.event=event;
+        ReleaseListBrowserCancel(&release,reply_info,&cancel_info,&state);
         if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
           break;
         break;
@@ -2545,57 +2828,14 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             /*
               Move slider.
             */
-            switch ((int) key_symbol)
-            {
-              case XK_Home:
-              case XK_KP_Home:
-              {
-                slider_info.id=0;
-                break;
-              }
-              case XK_Up:
-              case XK_KP_Up:
-              {
-                slider_info.id--;
-                break;
-              }
-              case XK_Down:
-              case XK_KP_Down:
-              {
-                slider_info.id++;
-                break;
-              }
-              case XK_Prior:
-              case XK_KP_Prior:
-              {
-                slider_info.id-=(int) visible_colors;
-                break;
-              }
-              case XK_Next:
-              case XK_KP_Next:
-              {
-                slider_info.id+=(int) visible_colors;
-                break;
-              }
-              case XK_End:
-              case XK_KP_End:
-              {
-                slider_info.id=(int) colors;
-                break;
-              }
-            }
+            slider_info=MoveFontBrowserSlider(slider_info,key_symbol,
+              visible_colors,(int) colors);
             state|=RedrawListState;
             break;
           }
         if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
           {
-            /*
-              Read new color or glob pattern.
-            */
-            if (*reply_info.text == '\0')
-              break;
-            (void) CopyMagickString(glob_pattern,reply_info.text,MagickPathExtent);
-            state|=UpdateListState;
+            state=ReadColorBrowserPattern(reply_info,glob_pattern,state);
             break;
           }
         if (key_symbol == XK_Control_L)
@@ -2603,24 +2843,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             state|=ControlState;
             break;
           }
-        if (state & ControlState)
-          switch ((int) key_symbol)
-          {
-            case XK_u:
-            case XK_U:
-            {
-              /*
-                Erase the entire line of text.
-              */
-              *reply_info.text='\0';
-              reply_info.cursor=reply_info.text;
-              reply_info.marker=reply_info.text;
-              reply_info.highlight=MagickFalse;
-              break;
-            }
-            default:
-              break;
-          }
+        reply_info=ApplyListBrowserControlKey(reply_info,key_symbol,state);
         XEditText(display,&reply_info,key_symbol,command,state);
         XDrawMatteText(display,&windows->widget,&reply_info);
         state|=JumpListState;
@@ -2673,16 +2896,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             /*
               Move slider matte.
             */
-            slider_info.y=event.xmotion.y-(int)
-              ((slider_info.height+slider_info.bevel_width) >> 1)+1;
-            if (slider_info.y < slider_info.min_y)
-              slider_info.y=slider_info.min_y;
-            if (slider_info.y > slider_info.max_y)
-              slider_info.y=slider_info.max_y;
-            slider_info.id=0;
-            if (slider_info.y != slider_info.min_y)
-              slider_info.id=(int) (((int) colors*(slider_info.y-
-                slider_info.min_y+1))/(slider_info.max_y-slider_info.min_y+1));
+            slider_info=TrackColorBrowserSlider(slider_info,event,colors);
             state|=RedrawListState;
             break;
           }
@@ -3418,6 +3632,39 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
 %    o description: Specifies any description to the message.
 %
 */
+typedef struct _ConfirmRelease
+{
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  int
+    *confirm;
+} ConfirmRelease;
+
+static size_t ReleaseConfirmChoice(const ConfirmRelease *release,
+  const XWidgetInfo button_info,const int choice,size_t state)
+{
+  XWindows
+    *const windows = release->windows;
+
+  const XEvent
+    event = release->event;
+
+  int
+    *const confirm = release->confirm;
+
+  if ((event.xbutton.window == windows->widget.id) &&
+      (MatteIsActive(button_info,event.xbutton)))
+    {
+      (*confirm)=choice;
+      state|=ExitState;
+    }
+  return(state);
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -3619,38 +3866,29 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
+        ConfirmRelease
+          release;
+
         if (windows->widget.mapped == MagickFalse)
           break;
+        release.windows=windows;
+        release.event=event;
+        release.confirm=(&confirm);
         if (cancel_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(cancel_info,event.xbutton))
-                {
-                  confirm=0;
-                  state|=ExitState;
-                }
+            state=ReleaseConfirmChoice(&release,cancel_info,0,state);
             cancel_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
           }
         if (dismiss_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(dismiss_info,event.xbutton))
-                {
-                  confirm=(-1);
-                  state|=ExitState;
-                }
+            state=ReleaseConfirmChoice(&release,dismiss_info,(-1),state);
             dismiss_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&dismiss_info);
           }
         if (yes_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(yes_info,event.xbutton))
-                {
-                  confirm=1;
-                  state|=ExitState;
-                }
+            state=ReleaseConfirmChoice(&release,yes_info,1,state);
             yes_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&yes_info);
           }
@@ -4994,24 +5232,23 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         XDelay(display,delay);
         delay=SuspendTime;
         (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if (north_info.raised == MagickFalse)
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              slider_info.id--;
-              state|=RedrawListState;
-            }
-        if (south_info.raised == MagickFalse)
-          if (slider_info.id < (int) files)
-            {
-              /*
-                Move slider down.
-              */
-              slider_info.id++;
-              state|=RedrawListState;
-            }
+        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            slider_info.id--;
+            state|=RedrawListState;
+          }
+        if ((south_info.raised == MagickFalse) &&
+            (slider_info.id < (int) files))
+          {
+            /*
+              Move slider down.
+            */
+            slider_info.id++;
+            state|=RedrawListState;
+          }
         if (event.type != ButtonRelease)
           continue;
       }
@@ -5027,28 +5264,27 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
             slider_info.active=MagickTrue;
             break;
           }
-        if (MatteIsActive(north_info,event.xbutton))
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              north_info.raised=MagickFalse;
-              slider_info.id--;
-              state|=RedrawListState;
-              break;
-            }
-        if (MatteIsActive(south_info,event.xbutton))
-          if (slider_info.id < (int) files)
-            {
-              /*
-                Move slider down.
-              */
-              south_info.raised=MagickFalse;
-              slider_info.id++;
-              state|=RedrawListState;
-              break;
-            }
+        if ((MatteIsActive(north_info,event.xbutton)) && (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            north_info.raised=MagickFalse;
+            slider_info.id--;
+            state|=RedrawListState;
+            break;
+          }
+        if ((MatteIsActive(south_info,event.xbutton)) &&
+            (slider_info.id < (int) files))
+          {
+            /*
+              Move slider down.
+            */
+            south_info.raised=MagickFalse;
+            slider_info.id++;
+            state|=RedrawListState;
+            break;
+          }
         if (MatteIsActive(scroll_info,event.xbutton))
           {
             /*
@@ -5215,27 +5451,27 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
           }
         if (up_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(up_info,event.xbutton))
-                {
-                  ChopPathComponents(working_path,1);
-                  if (*working_path == '\0')
-                    (void) CopyMagickString(working_path,DirectorySeparator,
-                      MagickPathExtent);
-                  state|=UpdateListState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(up_info,event.xbutton)))
+              {
+                ChopPathComponents(working_path,1);
+                if (*working_path == '\0')
+                  (void) CopyMagickString(working_path,DirectorySeparator,
+                    MagickPathExtent);
+                state|=UpdateListState;
+              }
             up_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&up_info);
           }
         if (home_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(home_info,event.xbutton))
-                {
-                  (void) CopyMagickString(working_path,home_directory,
-                    MagickPathExtent);
-                  state|=UpdateListState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(home_info,event.xbutton)))
+              {
+                (void) CopyMagickString(working_path,home_directory,
+                  MagickPathExtent);
+                state|=UpdateListState;
+              }
             home_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&home_info);
           }
@@ -5281,39 +5517,37 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
                 formats=(char **) RelinquishMagickMemory(formats);
                 break;
               }
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(special_info,event.xbutton))
-                {
-                  (void) CopyMagickString(working_path,"x:",MagickPathExtent);
-                  state|=ExitState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(special_info,event.xbutton)))
+              {
+                (void) CopyMagickString(working_path,"x:",MagickPathExtent);
+                state|=ExitState;
+              }
             special_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&special_info);
           }
         if (action_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(action_info,event.xbutton)))
               {
-                if (MatteIsActive(action_info,event.xbutton))
-                  {
-                    if (*reply_info.text == '\0')
-                      (void) XBell(display,0);
-                    else
-                      state|=ExitState;
-                  }
+                if (*reply_info.text == '\0')
+                  (void) XBell(display,0);
+                else
+                  state|=ExitState;
               }
             action_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&action_info);
           }
         if (cancel_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(cancel_info,event.xbutton))
-                {
-                  *reply_info.text='\0';
-                  *reply='\0';
-                  state|=ExitState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(cancel_info,event.xbutton)))
+              {
+                *reply_info.text='\0';
+                *reply='\0';
+                state|=ExitState;
+              }
             cancel_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
           }
@@ -5766,43 +6000,6 @@ static int FontCompare(const void *x,const void *y)
 }
 #endif
 
-typedef struct _FontBrowserTargets
-{
-  XWidgetInfo
-    *reply_info;
-
-  size_t
-    *state;
-
-  XWidgetInfo
-    *selection_info,
-    *list_info;
-} FontBrowserTargets;
-
-typedef struct _FontBrowserPress
-{
-  Display
-    *display;
-
-  XWindows
-    *windows;
-
-  char
-    **fontlist;
-
-  int
-    fonts;
-
-  unsigned int
-    height;
-
-  XEvent
-    event;
-
-  XWidgetInfo
-    slider_info;
-} FontBrowserPress;
-
 static void SelectFontBrowserEntry(const FontBrowserPress *press,
   char *glob_pattern,const FontBrowserTargets *targets)
 {
@@ -5864,50 +6061,6 @@ static void SelectFontBrowserEntry(const FontBrowserPress *press,
   (*state)|=RedrawListState;
 }
 
-static XWidgetInfo
-  ApplyListBrowserControlKey(XWidgetInfo,const KeySym,const size_t);
-
-static size_t
-  ConfirmListBrowserReply(Display *,const XWidgetInfo,size_t);
-
-typedef struct _ListBrowserClick
-{
-  Display
-    *display;
-
-  XWindowInfo
-    *window_info;
-
-  XEvent
-    event;
-
-  Time
-    click_time;
-} ListBrowserClick;
-
-typedef struct _ListBrowserRelease
-{
-  Display
-    *display;
-
-  XWindowInfo
-    *window_info;
-
-  XEvent
-    event;
-} ListBrowserRelease;
-
-static void
-  ReleaseListBrowserAction(const ListBrowserRelease *,const XWidgetInfo,
-    XWidgetInfo *,size_t *);
-
-static void
-  ReleaseListBrowserCancel(const ListBrowserRelease *,const XWidgetInfo,
-    XWidgetInfo *,size_t *);
-
-static XWidgetInfo
-  HighlightListBrowserReply(const ListBrowserClick *,char *,XWidgetInfo);
-
 static int FindFontBrowserCursor(XFontStruct *font_info,
   const XWidgetInfo reply_info,const int x,int i)
 {
@@ -5917,31 +6070,6 @@ static int FindFontBrowserCursor(XFontStruct *font_info,
         break;
   return(i);
 }
-
-static XWidgetInfo
-  PlaceTextViewExpose(XWidgetInfo,const XWidgetInfo);
-
-typedef struct _FontBrowserNames
-{
-  Display
-    *display;
-
-  XWindows
-    *windows;
-
-  char
-    **fontlist;
-
-  int
-    fonts;
-
-  unsigned int
-    visible_fonts;
-
-  XWidgetInfo
-    list_info,
-    slider_info;
-} FontBrowserNames;
 
 static void DrawFontBrowserNames(const FontBrowserNames *names,
   XWidgetInfo *selection_info,int *i)
@@ -6076,24 +6204,6 @@ static XWidgetInfo MoveFontBrowserSlider(XWidgetInfo slider_info,
   return(slider_info);
 }
 
-typedef struct _FontBrowserBack
-{
-  XWindows
-    *windows;
-
-  XEvent
-    event;
-
-  XWidgetInfo
-    back_info;
-
-  char
-    *glob_pattern;
-
-  const char
-    *back_pattern;
-} FontBrowserBack;
-
 static size_t ReleaseFontBrowserBack(const FontBrowserBack *back,
   size_t state)
 {
@@ -6169,18 +6279,6 @@ static size_t ReleaseFontBrowserReset(const FontBrowserReset *reset,
     }
   return(state);
 }
-
-typedef struct _FontBrowserMatch
-{
-  char
-    **fontlist;
-
-  int
-    fonts;
-
-  char
-    *reply;
-} FontBrowserMatch;
 
 static void MatchFontBrowserReply(const FontBrowserMatch *match,
   XWidgetInfo *list_info,int *i)

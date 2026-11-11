@@ -46,6 +46,30 @@ input struct*):
     `&windows->widget`) also binds `E.` to `p->` (`(&E)->m` is `E.m`), and `&*p` is
     compared as `p` (the address of the object `p` points to).
 
+Three forms added 2026-11-11 (Recipe D, *A case tail, a returned local, a split
+selection*):
+
+  - a parameter `const T *p` passed `&t`, where `t` is filled by no added `t.m=e;`
+    but by an initialiser `const T t = { &v1, &v2, ... };` (Recipe CT's targets): each
+    entry must be an address `&v`, one per member of `typedef struct _T` in member
+    order; the helper's binding of member `m` is read as a pointer parameter `m`
+    bound to `&v` of its position (every `v` of the block `*m`); the initialiser's
+    lines are allowed added lines when the step adds it;
+  - a case tail: when the call of a `void` helper stands directly before `break;` in
+    the working file, each `break;` the block lost is compared as `return;` (Recipe CT
+    step 4; a `break;` of a loop nested in the block would be miscounted, which is
+    checked by reading);
+  - a returned local: `v=HELPER(...);` with `v` passed to no parameter, where HELPER
+    declares a local `v` of its own (a type line and `v;`) and ends with `return(v);`:
+    the declaration and the closing return are left out of the body compared (the
+    block's `v` is the caller's `v`, assigned the helper's at the return; that the
+    block writes `v` before reading it is checked by reading);
+  - a split selection: when the call is the first statement of an added `default:`
+    group and HELPER's body is one `switch` on the same expression as the `switch`
+    that holds the call, HELPER's `switch (...)` line is left out of the body
+    compared, and the added `default:` and the `break;` after the call are allowed
+    (Recipe SD with an existing function as its new one).
+
 It prints OK or FAIL with the line that broke the rule. Argument types against
 parameter types, and the OpenMP condition of the step, are checked by reading.
 """
@@ -100,7 +124,7 @@ def struct_bindings(body, param):
     the type lines that head them)."""
     lines = [b.strip() for b in body.splitlines()]
     bound, drop = {}, set()
-    pat = re.compile(r"^(?:[\w\s]*?\*?\s*(?:const\s+)?)?(\w+)\s*=\s*" + param
+    pat = re.compile(r"^(?:[\w\s]*?\**\s*(?:const\s+)?)?(\w+)\s*=\s*" + param
                      + r"->(\w+)\s*[,;]$")
     for i, line in enumerate(lines):
         m = pat.match(line)
@@ -124,13 +148,28 @@ def diff_lines(path):
     diff = subprocess.run(["git", "diff", "-U0", "HEAD", "--", path],
                           capture_output=True, text=True, check=True).stdout
     removed, added = [], []
+    ADDED_AT.clear()
+    new_no = 0
     for line in diff.splitlines():
+        h = re.match(r"@@ -\S+ \+(\d+)", line)
+        if h:
+            new_no = int(h.group(1))
+            continue
         text = line[1:].strip()
-        if line.startswith(("---", "+++")) or text in TRIVIAL:
+        if line.startswith(("---", "+++")):
+            continue
+        if line[:1] == "+":
+            new_no += 1
+        if text in TRIVIAL:
             continue
         if line[:1] in "-+":
             (removed if line[0] == "-" else added).append(text)
+            if line[0] == "+":
+                ADDED_AT.append(new_no - 2)
     return removed, added
+
+
+ADDED_AT = []  # 0-based working-file line of each added line, in order
 
 
 def ident(e):
@@ -223,6 +262,7 @@ def main(argv):
     if len(args) != len(params):
         raise SystemExit(f"FAIL: {len(args)} arguments for {len(params)} parameters")
     binds = []
+    targets_note = []
     allowed = set(call_parts)
     dropped = set()
     body_all = [b.strip() for b in body.splitlines()]
@@ -246,6 +286,31 @@ def main(argv):
                     problems.append(f"fill of a member {p} does not bind: {line}")
                 fills[f.group(1)] = f.group(2)
                 allowed.add(line)
+            if not fills:
+                init = re.search(r"const\s+" + re.escape(stype) + r"\s+" + re.escape(local)
+                                 + r"\s*=\s*\{([^{}]*)\};", text)
+                tdef = re.search(r"typedef struct _" + re.escape(stype) + r"\s*\{(.*?)\}\s*"
+                                 + re.escape(stype) + r";", text, re.S)
+                if init and tdef:
+                    members = re.findall(r"\**(\w+)\s*[,;]", tdef.group(1))
+                    entries = split_args(init.group(1))
+                    if len(entries) != len(members):
+                        problems.append(f"initialiser of {local}: {len(entries)} entries "
+                                        f"for {len(members)} members")
+                    for member, entry in zip(members, entries):
+                        if not re.fullmatch(r"&\w+", entry):
+                            problems.append(f"initialiser entry {entry} is not &v")
+                        if member in bound:
+                            binds.append((entry, member, True))
+                    for member in bound:
+                        if member not in members:
+                            problems.append(f"member {member} bound but not in {stype}")
+                    for line in added:
+                        if line == f"const {stype}" or (line.startswith(local + " = {")
+                                                        and line.endswith("};")):
+                            allowed.add(line)
+                    targets_note.append(f"{local} initialised {{{init.group(1).strip()}}}")
+                    continue
             for member in bound:
                 if member not in fills:
                     problems.append(f"member {member} bound but not filled")
@@ -268,6 +333,45 @@ def main(argv):
         note_proto = ", forward declaration added"
     else:
         note_proto = ""
+    flines = [l.strip() for l in text.split("\n")]
+    at = [ADDED_AT[call_at]] if flines[ADDED_AT[call_at]] == call_parts[0] else []
+    after = before = ""
+    caller_switch = None
+    if len(at) == 1:
+        k = at[0] + len(call_parts)
+        while k < len(flines) and flines[k] in ("", "}"):
+            k += 1
+        after = flines[k] if k < len(flines) else ""
+        k = at[0] - 1
+        while k >= 0 and flines[k] in ("", "{"):
+            k -= 1
+        before = flines[k]
+        depth = 0
+        for k in range(at[0] - 1, -1, -1):
+            if flines[k] == "}":
+                depth += 1
+            elif flines[k] == "{":
+                if depth == 0 and k > 0 and flines[k - 1].startswith("switch ("):
+                    caller_switch = flines[k - 1]
+                    break
+                depth = max(depth - 1, 0)
+    void_helper = re.search(r"^static void\b[^;{]*\b" + re.escape(helper) + r"\(",
+                            text, re.M) is not None
+    case_tail = void_helper and after == "break;" and "return;" in \
+        [b.strip() for b in body.splitlines()]
+    groups = before == "default:" and "default:" in added
+    kept_break = False
+    if groups:
+        allowed.add("default:")
+        i = added.index(call_parts[-1])
+        if i + 1 < len(added) and added[i + 1] == "break;":
+            allowed.add("break;")
+        elif after == "break;":
+            kept_break = True  # the diff kept a moved group's `break;` as context
+    elif case_tail:
+        i = added.index(call_parts[-1])
+        if i + 1 < len(added) and added[i + 1] == "break;":
+            allowed.add("break;")
     for line in added:
         if line not in allowed:
             problems.append(f"added besides the call: {line}")
@@ -281,9 +385,17 @@ def main(argv):
     if returned:
         target = returned.group(1)
         bound = [p for a, p, ptr in binds if a == target and not ptr]
+        own_decl = [i for i in range(1, len(body_lines))
+                    if body_lines[i] == f"{target};"
+                    and re.fullmatch(r"[\w\s]+", body_lines[i - 1])]
         if not call.endswith(");") or not re.fullmatch(
                 r"\w+=" + re.escape(helper) + r"\(.*\);", call):
             problems.append(f"the call is not the statement {target}={helper}(...);")
+        elif not bound and len(own_decl) == 1 and body_lines \
+                and body_lines[-1] == f"return({target});":
+            d = own_decl[0]
+            body_lines = body_lines[:d - 1] + body_lines[d + 1:-1]
+            note += f", its own local {target} returned and assigned back to {target}"
         elif not bound:
             problems.append(f"{target} is assigned but passed to no parameter")
         elif not body_lines or body_lines[-1] != f"return({bound[0]});":
@@ -293,7 +405,23 @@ def main(argv):
             note += f", return({bound[0]}) assigned back to {target}"
     elif re.match(r"^\w+\s*=", call):
         problems.append(f"the call assigns its result: {call}")
+    if groups:
+        head = body_lines[0] if body_lines else ""
+        if caller_switch is None or not head.startswith("switch (") or \
+                rewrite(caller_switch, binds) != head:
+            problems.append(f"default: group, but {helper}'s body is not a switch on "
+                            f"the caller's expression ({caller_switch} / {head})")
+        else:
+            body_lines = body_lines[1:]
+            note += f", the groups of {caller_switch} after its new default:"
     rewritten = [rewrite(r, binds) for r in removed if not r.startswith("#")]
+    if kept_break:
+        rewritten.append("break;")
+    if case_tail:
+        rewritten = ["return;" if r == "break;" else r for r in rewritten]
+        note += ", a case tail (break; compared as return;)"
+    if targets_note:
+        note += ", " + ", ".join(targets_note)
     moved = Counter(rewritten)
     own = Counter(body_lines)
     if moved != own and "".join("".join(rewritten).split()) == \
