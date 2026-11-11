@@ -2108,6 +2108,73 @@ static void XSelectAnnotateBoxColor(const AnnotateMenuInput *menu,
   (*box_id)=(unsigned int) pen_number;
 }
 
+typedef struct _AnnotateRotateTargets
+{
+  double
+    *degrees;
+} AnnotateRotateTargets;
+
+static void XSelectAnnotateRotation(const AnnotateMenuInput *menu,
+  const AnnotateRotateTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const AnnotateMenu = menu->AnnotateMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  double
+    *const degrees = targets->degrees;
+
+  int
+    entry;
+
+  const char
+    *const RotateMenu[] =
+    {
+      "-90",
+      "-45",
+      "-30",
+      "0",
+      "30",
+      "45",
+      "90",
+      "180",
+      "Dialog...",
+      (char *) NULL,
+    };
+
+  static char
+    angle[MagickPathExtent] = "30.0";
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  entry=XMenuWidget(display,windows,AnnotateMenu[id],RotateMenu,
+    command);
+  if (entry < 0)
+    return;
+  if (entry != 8)
+    {
+      (*degrees)=StringToDouble(RotateMenu[entry],(char **) NULL);
+      return;
+    }
+  (void) XDialogWidget(display,windows,"OK","Enter rotation angle:",
+    angle);
+  if (*angle == '\0')
+    return;
+  (*degrees)=StringToDouble(angle,(char **) NULL);
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -2208,6 +2275,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   const AnnotateTargets
     targets = { &annotate_info, &p, &x, &y };
 
+  const AnnotateRotateTargets
+    rotate_targets = { &degrees };
+
   const AnnotateBoxColorTargets
     box_color_targets = { &transparent_box, &color, &box_id };
 
@@ -2305,44 +2375,16 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
           }
           case AnnotateRotateCommand:
           {
-            int
-              entry;
+            AnnotateMenuInput
+              annotate_input;
 
-            const char
-              *const RotateMenu[] =
-              {
-                "-90",
-                "-45",
-                "-30",
-                "0",
-                "30",
-                "45",
-                "90",
-                "180",
-                "Dialog...",
-                (char *) NULL,
-              };
-
-            static char
-              angle[MagickPathExtent] = "30.0";
-
-            /*
-              Select a command from the pop-up menu.
-            */
-            entry=XMenuWidget(display,windows,AnnotateMenu[id],RotateMenu,
-              command);
-            if (entry < 0)
-              break;
-            if (entry != 8)
-              {
-                degrees=StringToDouble(RotateMenu[entry],(char **) NULL);
-                break;
-              }
-            (void) XDialogWidget(display,windows,"OK","Enter rotation angle:",
-              angle);
-            if (*angle == '\0')
-              break;
-            degrees=StringToDouble(angle,(char **) NULL);
+            annotate_input.display=display;
+            annotate_input.resource_info=resource_info;
+            annotate_input.windows=windows;
+            annotate_input.AnnotateMenu=AnnotateMenu;
+            annotate_input.id=id;
+            annotate_input.command=command;
+            XSelectAnnotateRotation(&annotate_input,&rotate_targets);
             break;
           }
           case AnnotateHelpCommand:
