@@ -2623,19 +2623,73 @@ static cl_uint AddOpenCLPlatformDevices(
   return(next);
 }
 
-static void LoadOpenCLDevices(MagickCLEnv clEnv)
+typedef struct _OpenCLPlatformLoad
 {
+  MagickCLEnv
+    clEnv;
+
+  cl_platform_id
+    *platforms;
+
+  cl_device_id
+    *devices;
+} OpenCLPlatformLoad;
+
+static void LoadOpenCLPlatformDevices(const OpenCLPlatformLoad *platform_load,
+  cl_uint i,cl_uint *next)
+{
+  const MagickCLEnv
+    clEnv = platform_load->clEnv;
+
+  cl_platform_id
+    *const platforms = platform_load->platforms;
+
+  cl_device_id
+    *const devices = platform_load->devices;
+
   OpenCLPlatformDevices
     platform_devices;
 
   cl_context_properties
     properties[3];
 
-  cl_device_id
-    *devices;
-
   cl_int
     status;
+
+  cl_uint
+    number_devices;
+
+  if (platforms[i] == (cl_platform_id) NULL)
+    return;
+
+  status=clEnv->library->clGetDeviceIDs(platforms[i],CL_DEVICE_TYPE_CPU |
+    CL_DEVICE_TYPE_GPU,(cl_uint) clEnv->number_devices,devices,&number_devices);
+  if (status != CL_SUCCESS)
+    return;
+
+  properties[0]=CL_CONTEXT_PLATFORM;
+  properties[1]=(cl_context_properties) platforms[i];
+  properties[2]=0;
+  clEnv->contexts[i]=openCL_library->clCreateContext(properties,number_devices,
+    devices,NULL,NULL,&status);
+  if (status != CL_SUCCESS)
+    return;
+
+  platform_devices.clEnv=clEnv;
+  platform_devices.platforms=platforms;
+  platform_devices.devices=devices;
+  platform_devices.i=i;
+  platform_devices.number_devices=number_devices;
+  *next=AddOpenCLPlatformDevices(&platform_devices,*next);
+}
+
+static void LoadOpenCLDevices(MagickCLEnv clEnv)
+{
+  OpenCLPlatformLoad
+    platform_load;
+
+  cl_device_id
+    *devices;
 
   cl_platform_id
     *platforms;
@@ -2643,7 +2697,6 @@ static void LoadOpenCLDevices(MagickCLEnv clEnv)
   cl_uint
     i,
     next,
-    number_devices,
     number_platforms;
 
   number_platforms=0;
@@ -2696,31 +2749,11 @@ static void LoadOpenCLDevices(MagickCLEnv clEnv)
     }
   (void) memset(clEnv->contexts,0,clEnv->number_contexts*sizeof(cl_context));
   next=0;
+  platform_load.clEnv=clEnv;
+  platform_load.platforms=platforms;
+  platform_load.devices=devices;
   for (i = 0; i < number_platforms; i++)
-  {
-    if (platforms[i] == (cl_platform_id) NULL)
-      continue;
-
-    status=clEnv->library->clGetDeviceIDs(platforms[i],CL_DEVICE_TYPE_CPU |
-      CL_DEVICE_TYPE_GPU,(cl_uint) clEnv->number_devices,devices,&number_devices);
-    if (status != CL_SUCCESS)
-      continue;
-
-    properties[0]=CL_CONTEXT_PLATFORM;
-    properties[1]=(cl_context_properties) platforms[i];
-    properties[2]=0;
-    clEnv->contexts[i]=openCL_library->clCreateContext(properties,number_devices,
-      devices,NULL,NULL,&status);
-    if (status != CL_SUCCESS)
-      continue;
-
-    platform_devices.clEnv=clEnv;
-    platform_devices.platforms=platforms;
-    platform_devices.devices=devices;
-    platform_devices.i=i;
-    platform_devices.number_devices=number_devices;
-    next=AddOpenCLPlatformDevices(&platform_devices,next);
-  }
+    LoadOpenCLPlatformDevices(&platform_load,i,&next);
   if (next != clEnv->number_devices)
     RelinquishMagickCLDevices(clEnv);
   platforms=(cl_platform_id *) RelinquishMagickMemory(platforms);
