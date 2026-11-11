@@ -12299,6 +12299,119 @@ static void XSelectRotatePenColor(const RotatePenMenu *menu,
   (*pen_id)=(unsigned int) pen_number;
 }
 
+typedef struct _RotateCommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  const char
+    *const *RotateMenu;
+
+  const ModeType
+    *RotateCommands,
+    *DirectionCommands;
+
+  char
+    *command;
+
+  RotateTargets
+    targets;
+} RotateCommandInput;
+
+static void XRotateCommand(const RotateCommandInput *input,
+  ModeType *direction,size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  XEvent
+    event = input->event;
+
+  const char
+    *const *const RotateMenu = input->RotateMenu;
+
+  int
+    id;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(display,windows,RotateMenu,&event);
+  if (id < 0)
+    return;
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXcopy);
+  switch (input->RotateCommands[id])
+  {
+    case RotateColorCommand:
+    {
+      RotatePenMenu
+        menu;
+
+      menu.display=display;
+      menu.resource_info=resource_info;
+      menu.windows=windows;
+      menu.RotateMenu=RotateMenu;
+      menu.id=id;
+      menu.command=input->command;
+      XSelectRotatePenColor(&menu,&input->targets);
+      break;
+    }
+    case RotateDirectionCommand:
+    {
+      const char
+        *Directions[] =
+        {
+          "horizontal",
+          "vertical",
+          (char *) NULL,
+        };
+
+      /*
+        Select a command from the pop-up menu.
+      */
+      id=XMenuWidget(display,windows,RotateMenu[id],
+        Directions,input->command);
+      *direction=XSelectChopDirection(id,input->DirectionCommands,*direction);
+      break;
+    }
+    case RotateHelpCommand:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Rotation",ImageRotateHelp);
+      break;
+    }
+    case RotateDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      *state|=EscapeState;
+      *state|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -12341,7 +12454,6 @@ static MagickBooleanType XRotateImage(Display *display,
     *rotate_image;
 
   int
-    id,
     x,
     y;
 
@@ -12401,68 +12513,19 @@ static MagickBooleanType XRotateImage(Display *display,
           windows->image.highlight_context,&rotate_info);
         if (event.xany.window == windows->command.id)
           {
-            /*
-              Select a command from the Command widget.
-            */
-            id=XCommandWidget(display,windows,RotateMenu,&event);
-            if (id < 0)
-              continue;
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            switch (RotateCommands[id])
-            {
-              case RotateColorCommand:
-              {
-                RotatePenMenu
-                  menu;
+            RotateCommandInput
+              input;
 
-                menu.display=display;
-                menu.resource_info=resource_info;
-                menu.windows=windows;
-                menu.RotateMenu=RotateMenu;
-                menu.id=id;
-                menu.command=command;
-                XSelectRotatePenColor(&menu,&targets);
-                break;
-              }
-              case RotateDirectionCommand:
-              {
-                const char
-                  *Directions[] =
-                  {
-                    "horizontal",
-                    "vertical",
-                    (char *) NULL,
-                  };
-
-                /*
-                  Select a command from the pop-up menu.
-                */
-                id=XMenuWidget(display,windows,RotateMenu[id],
-                  Directions,command);
-                direction=XSelectChopDirection(id,DirectionCommands,direction);
-                break;
-              }
-              case RotateHelpCommand:
-              {
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Rotation",ImageRotateHelp);
-                break;
-              }
-              case RotateDismissCommand:
-              {
-                /*
-                  Prematurely exit.
-                */
-                state|=EscapeState;
-                state|=ExitState;
-                break;
-              }
-              default:
-                break;
-            }
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
+            input.display=display;
+            input.resource_info=resource_info;
+            input.windows=windows;
+            input.event=event;
+            input.RotateMenu=RotateMenu;
+            input.RotateCommands=RotateCommands;
+            input.DirectionCommands=DirectionCommands;
+            input.command=command;
+            input.targets=targets;
+            XRotateCommand(&input,&direction,&state);
             continue;
           }
         switch (event.type)
