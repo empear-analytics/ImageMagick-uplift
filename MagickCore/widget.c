@@ -3837,34 +3837,34 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
           break;
         if (cancel_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(cancel_info,event.xbutton))
-                {
-                  confirm=0;
-                  state|=ExitState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(cancel_info,event.xbutton)))
+              {
+                confirm=0;
+                state|=ExitState;
+              }
             cancel_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
           }
         if (dismiss_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(dismiss_info,event.xbutton))
-                {
-                  confirm=(-1);
-                  state|=ExitState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(dismiss_info,event.xbutton)))
+              {
+                confirm=(-1);
+                state|=ExitState;
+              }
             dismiss_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&dismiss_info);
           }
         if (yes_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(yes_info,event.xbutton))
-                {
-                  confirm=1;
-                  state|=ExitState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(yes_info,event.xbutton)))
+              {
+                confirm=1;
+                state|=ExitState;
+              }
             yes_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&yes_info);
           }
