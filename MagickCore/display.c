@@ -5036,6 +5036,97 @@ static void XCheckSelectionBounds(XWindows *windows,const int x,const int y,
     }
 }
 
+typedef struct _CropCommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  ClipboardMode
+    mode;
+
+  RectangleInfo
+    highlight_info;
+
+  const char
+    **RectifyModeMenu;
+
+  const ModeType
+    *RectifyCommands;
+} CropCommandInput;
+
+static void XCropRectifyCommand(const CropCommandInput *command_input,
+  XEvent *event,size_t *state)
+{
+  Display
+    *const display = command_input->display;
+
+  XResourceInfo
+    *const resource_info = command_input->resource_info;
+
+  XWindows
+    *const windows = command_input->windows;
+
+  const ClipboardMode
+    mode = command_input->mode;
+
+  const RectangleInfo
+    highlight_info = command_input->highlight_info;
+
+  const char
+    **const RectifyModeMenu = command_input->RectifyModeMenu;
+
+  const ModeType
+    *const RectifyCommands = command_input->RectifyCommands;
+
+  int
+    id;
+
+  /*
+    Select a command from the Command widget.
+  */
+  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+  id=XCommandWidget(display,windows,RectifyModeMenu,event);
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  if (id >= 0)
+    switch (RectifyCommands[id])
+    {
+      case RectifyCopyCommand:
+      {
+        (*state)|=ExitState;
+        break;
+      }
+      case RectifyHelpCommand:
+      {
+        (void) XSetFunction(display,windows->image.highlight_context,
+          GXcopy);
+        XShowCropHelp(display,resource_info,windows,mode);
+        (void) XSetFunction(display,windows->image.highlight_context,
+          GXinvert);
+        break;
+      }
+      case RectifyDismissCommand:
+      {
+        /*
+          Prematurely exit.
+        */
+        (*state)|=EscapeState;
+        (*state)|=ExitState;
+        break;
+      }
+      default:
+        break;
+    }
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -5382,44 +5473,17 @@ static MagickBooleanType XCropImage(Display *display,
       XScreenEvent(display,windows,&event,exception);
       if (event.xany.window == windows->command.id)
         {
-          /*
-            Select a command from the Command widget.
-          */
-          (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-          id=XCommandWidget(display,windows,RectifyModeMenu,&event);
-          (void) XSetFunction(display,windows->image.highlight_context,
-            GXinvert);
-          XHighlightRectangle(display,windows->image.id,
-            windows->image.highlight_context,&highlight_info);
-          if (id >= 0)
-            switch (RectifyCommands[id])
-            {
-              case RectifyCopyCommand:
-              {
-                state|=ExitState;
-                break;
-              }
-              case RectifyHelpCommand:
-              {
-                (void) XSetFunction(display,windows->image.highlight_context,
-                  GXcopy);
-                XShowCropHelp(display,resource_info,windows,mode);
-                (void) XSetFunction(display,windows->image.highlight_context,
-                  GXinvert);
-                break;
-              }
-              case RectifyDismissCommand:
-              {
-                /*
-                  Prematurely exit.
-                */
-                state|=EscapeState;
-                state|=ExitState;
-                break;
-              }
-              default:
-                break;
-            }
+          CropCommandInput
+            command_input;
+
+          command_input.display=display;
+          command_input.resource_info=resource_info;
+          command_input.windows=windows;
+          command_input.mode=mode;
+          command_input.highlight_info=highlight_info;
+          command_input.RectifyModeMenu=RectifyModeMenu;
+          command_input.RectifyCommands=RectifyCommands;
+          XCropRectifyCommand(&command_input,&event,&state);
           continue;
         }
       XHighlightRectangle(display,windows->image.id,
