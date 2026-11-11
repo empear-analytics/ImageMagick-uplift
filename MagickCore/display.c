@@ -12571,8 +12571,7 @@ static MagickBooleanType XROIImage(Display *display,
           /*
             Display info and draw region of interest rectangle.
           */
-          if (windows->info.mapped == MagickFalse)
-            (void) XMapWindow(display,windows->info.id);
+          XMapInfoWidget(display,windows);
           (void) FormatLocaleString(text,MagickPathExtent,
             " %.17gx%.17g%+.20g%+.20g",(double) roi_info.width,(double)
             roi_info.height,(double) roi_info.x,(double) roi_info.y);
