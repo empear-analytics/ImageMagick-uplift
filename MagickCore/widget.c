@@ -5528,6 +5528,9 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
+        ListBrowserRelease
+          release;
+
         if (windows->widget.mapped == MagickFalse)
           break;
         if (north_info.raised == MagickFalse)
@@ -5633,16 +5636,10 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
             special_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&special_info);
           }
-        if (action_info.raised == MagickFalse)
-          {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(action_info,event.xbutton)))
-              {
-                state=ConfirmListBrowserReply(display,reply_info,state);
-              }
-            action_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-          }
+        release.display=display;
+        release.window_info=(&windows->widget);
+        release.event=event;
+        ReleaseListBrowserAction(&release,reply_info,&action_info,&state);
         if (cancel_info.raised == MagickFalse)
           {
             if ((event.xbutton.window == windows->widget.id) &&
