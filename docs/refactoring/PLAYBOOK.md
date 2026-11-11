@@ -5216,6 +5216,30 @@ helper returns a status the caller tests, which here would always lead to the sa
    declares and the caller does not read after it (`p`, `q`, `sync`) move into the
    helper; the loop keeps its `for` statement and its body becomes the call, with no
    `continue;` after it (step 1's tail).
+7. A block that is not a whole loop body, whose inputs and written variables would give
+   five or more parameters under steps 2 and 4 (2026-11-11): the variables it only reads
+   go in an input struct as Recipe Z steps 2 and 5 say (one member per variable, its
+   exact type and name; an array the block names only as a call argument as Recipe N
+   step 2 allows; the local declared at the top of the block that holds the call and
+   filled directly before it), and the two to four variables it writes go by one
+   `const` struct of their addresses as Recipe Z step 7 says (declared `const` once, at
+   the top of the caller's body, with the addresses as its initialiser; one pointer
+   member per variable, in the order the block first writes them). A struct local whose
+   address the block passes to a callee's non-`const` pointer parameter (`&event`) is
+   one of the written variables. The helper takes `const Name *name` and then `const
+   Targets *targets`, binds each target once at the top of its body (`T *const v =
+   targets->v;`), reads the inputs as `name->member` or through `const` locals (Recipe
+   N step 4), and writes `(*v)` for each written variable, `&v` becoming `&(*v)`, as
+   Recipe Z step 4 does; each `continue;` that continued `Lp` becomes `return;` (step
+   3). The block's own declarations, and each temporary it writes before reading that
+   nothing after it reads (Recipe E step 4), move into the helper. Step 5 holds: the
+   call, then the `continue;` that followed the block. Why the behaviour is the same:
+   the members are copied directly before the call from variables the block does not
+   write, so each read sees the value it saw (Recipe N); every write goes through an
+   address fixed at the caller's declaration to the caller's own object, in the same
+   order (Recipe Z step 7, Recipe I); every path out of the helper returns to the
+   `continue;`, as every path out of the block reached one (*Careful*). Checked by
+   reading.
 
 **Before:**
 
@@ -5315,7 +5339,13 @@ loop (guard, a fetch that `continue;`s, `IntegrateRow`, a sync test and a progre
 needs six parameters as a plain OC helper; with its views, images and exception in a
 struct, the function leaves Bumpy Road and Complex Method, 6.49 to 6.77 in a probe, no
 finding on the helper. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
-2026-10-24.
+2026-10-24. Step 7 (2026-11-11, campaign A, W17 lane c, wide build): `animate.c`'s
+`XAnimateImages`, whose Command-widget branch in the event loop leaves through two
+`continue;`s and a final one, reads nine variables (the display, the windows, the four
+menu tables, the `command` buffer, resource info, exception) and writes `event`,
+`image`, `state` and `nexus`; the probe takes the function from 10 bumps to 9, 3.42 to
+3.48. Added by Claude Code (Claude Opus 5.5) under the owner's OK to evolve the recipes
+(2026-11-10).
 
 ---
 
@@ -11208,3 +11238,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | SD | Step 1: a `switch` with no `default:` label may be split too: its last groups move to the new function's `switch`, which has no `default:` either, and the caller gains `default:` holding the call as its last group; a value no label names runs no group in either, and the caller keeps another label | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its key slider `switch` (Home, Up, Down, Prior, Next, End; no `default:`) holds the function at nesting depth 4; moved whole by Recipe E it is a *Complex Method* of its own (cc 13, measured), and SD refused it for want of a `default:`; split first, the Prior/Next/End groups and then the rest move with no finding, as `XListBrowserWidget`'s did | owner |
 | 2026-11-11 | AMEND | N | Step 2: an array the block names only as an argument of calls (contents written, if at all, only through calls that keep no copy: Recipe E step 4's array clause) may be one of the group, as a member of the pointer type it converts to (`char *`, or `const char *` when only read), filled `name.a=a;`; Recipes Y, Z, LB and CT, which take N's input struct, read it the same way | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Back and Reset releases and its list update copy between the `static` `glob_pattern` and the local `back_pattern`, `reset_pattern` and `reply` arrays; with each array a parameter the helpers take five to seven, and N's step 3 (the variable's exact type) refused an array member | owner |
 | 2026-11-11 | AMEND | W | Step 8: in a `void` caller the block's exits are `return;`; the helper returns `MagickFalse` there and the caller writes `if (Helper(...) == MagickFalse) return;`; a local written only on the returning paths goes by value (step 3 unchanged) | `opencl.c`'s `LoadOpenCLDevices` (campaign A, W17 lane c, wide build): the `clEnv->contexts` allocation releases `devices` and `platforms` and leaves through `return;` on failure; W step 1 asked for `return(R);`, which a `void` function cannot write. Probe: the function leaves *Large Method*, 5.43 to 5.47 | owner |
+| 2026-11-11 | AMEND | OC | Step 7: a block that is not a whole loop body, whose inputs and written variables would give five or more parameters, takes its read-only variables in an input struct (Recipe Z steps 2 and 5) and its two to four written variables by one `const` struct of addresses (Recipe Z step 7); each `continue;` of the loop becomes `return;` and the caller keeps the `continue;` after the call | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): the Command-widget branch of the event loop leaves through `continue;` on every path, reads nine variables and writes four (`event`, `image`, `state`, `nexus`); OC step 2 allows four parameters and Z step 1 refuses a `continue` that leaves the block. Probe: 10 bumps to 9, 3.42 to 3.48 | owner |
