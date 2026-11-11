@@ -2075,6 +2075,21 @@ static inline MagickBooleanType IsAnimationPlaying(
     MagickTrue : MagickFalse);
 }
 
+static void XAdvanceSceneForward(const AnimationSceneStep *scene_step,
+  const AnimationSceneTargets *targets)
+{
+  const size_t
+    number_scenes = scene_step->number_scenes;
+
+  ssize_t
+    *const scene = targets->scene;
+
+  if ((*scene) < ((ssize_t) number_scenes-1))
+    (*scene)++;
+  else
+    XWrapSceneForward(scene_step,targets);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2895,15 +2910,10 @@ MagickExport Image *XAnimateImages(Display *display,
             /*
               Forward animation:  increment scene number.
             */
-            if (scene < ((ssize_t) number_scenes-1))
-              scene++;
-            else
-              {
-                scene_step.number_scenes=number_scenes;
-                scene_step.image_list=image_list;
-                scene_step.first_scene=first_scene;
-                XWrapSceneForward(&scene_step,&scene_targets);
-              }
+            scene_step.number_scenes=number_scenes;
+            scene_step.image_list=image_list;
+            scene_step.first_scene=first_scene;
+            XAdvanceSceneForward(&scene_step,&scene_targets);
           }
         else
           {
