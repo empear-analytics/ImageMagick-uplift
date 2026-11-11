@@ -3551,6 +3551,65 @@ static void XColorReset(const ColorEditPixelInput *pixel_input)
   }
 }
 
+static MagickBooleanType XColorDirectPixels(
+  const ColorEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  const PaintMethod
+    method = pixel_input->method;
+
+  const XColor
+    color = pixel_input->color;
+
+  Quantum
+    *q;
+
+  switch (method)
+  {
+    case PointMethod:
+    default:
+    {
+      /*
+        Update color information using point algorithm.
+      */
+      if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+      q=GetCacheViewAuthenticPixels(image_view,(ssize_t)x_offset,
+        (ssize_t) y_offset,1,1,exception);
+      if (q == (Quantum *) NULL)
+        break;
+      SetPixelRed(*image,ScaleShortToQuantum(color.red),q);
+      SetPixelGreen(*image,ScaleShortToQuantum(color.green),q);
+      SetPixelBlue(*image,ScaleShortToQuantum(color.blue),q);
+      (void) SyncCacheViewAuthenticPixels(image_view,exception);
+      break;
+    }
+    case ResetMethod:
+    {
+      /*
+        Update color information using reset algorithm.
+      */
+      if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+      XColorReset(pixel_input);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 typedef struct _ColorBorderTargets
 {
   XColor
@@ -3762,9 +3821,6 @@ static MagickBooleanType XColorEditImage(Display *display,
     x_offset,
     y,
     y_offset;
-
-  Quantum
-    *q;
 
   size_t
     state;
@@ -4069,22 +4125,10 @@ static MagickBooleanType XColorEditImage(Display *display,
         pixel_input.pen_id=pen_id;
         switch (method)
         {
-          case PointMethod:
           default:
           {
-            /*
-              Update color information using point algorithm.
-            */
-            if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+            if (XColorDirectPixels(&pixel_input) == MagickFalse)
               return(MagickFalse);
-            q=GetCacheViewAuthenticPixels(image_view,(ssize_t)x_offset,
-              (ssize_t) y_offset,1,1,exception);
-            if (q == (Quantum *) NULL)
-              break;
-            SetPixelRed(*image,ScaleShortToQuantum(color.red),q);
-            SetPixelGreen(*image,ScaleShortToQuantum(color.green),q);
-            SetPixelBlue(*image,ScaleShortToQuantum(color.blue),q);
-            (void) SyncCacheViewAuthenticPixels(image_view,exception);
             break;
           }
           case ReplaceMethod:
@@ -4112,16 +4156,6 @@ static MagickBooleanType XColorEditImage(Display *display,
           case FillToBorderMethod:
           {
             XColorFloodfill(&pixel_input);
-            break;
-          }
-          case ResetMethod:
-          {
-            /*
-              Update color information using reset algorithm.
-            */
-            if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
-              return(MagickFalse);
-            XColorReset(&pixel_input);
             break;
           }
         }
