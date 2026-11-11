@@ -9413,6 +9413,54 @@ static size_t XRetainDefaultColors(const XDefaultColorSource *default_source,
   return(number_colors);
 }
 
+typedef struct _XServerColorSource
+{
+  Image
+    *image;
+
+  XVisualInfo
+    *visual_info;
+
+  XColor
+    *server_colors,
+    *p;
+} XServerColorSource;
+
+static size_t XRetainServerColors(const XServerColorSource *server_source,
+  size_t number_colors)
+{
+  Image
+    *const image = server_source->image;
+
+  XVisualInfo
+    *const visual_info = server_source->visual_info;
+
+  XColor
+    *const server_colors = server_source->server_colors;
+
+  XColor
+    *p = server_source->p;
+
+  size_t
+    retain_colors;
+
+  ssize_t
+    i;
+
+  if ((int) image->colors < visual_info->colormap_size)
+    {
+      /*
+        Fill up colors array-- more choices for pen colors.
+      */
+      retain_colors=MagickMin((unsigned int)
+        (visual_info->colormap_size-(int) image->colors),256);
+      for (i=0; i < (ssize_t) retain_colors; i++)
+        *p++=server_colors[i];
+      number_colors+=retain_colors;
+    }
+  return(number_colors);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9427,8 +9475,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
     status;
 
   size_t
-    number_colors,
-    retain_colors;
+    number_colors;
 
   XColor
     color,
@@ -9606,6 +9653,9 @@ MagickPrivate void XMakeStandardColormap(Display *display,
           XColor
             *server_colors;
 
+          XServerColorSource
+            server_source;
+
           /*
             Define Standard colormap for shared GrayScale or PseudoColor visual.
           */
@@ -9658,17 +9708,11 @@ MagickPrivate void XMakeStandardColormap(Display *display,
             pixel->pixels[index]=color.pixel;
             *p++=color;
           }
-          if ((int) image->colors < visual_info->colormap_size)
-            {
-              /*
-                Fill up colors array-- more choices for pen colors.
-              */
-              retain_colors=MagickMin((unsigned int)
-                (visual_info->colormap_size-(int) image->colors),256);
-              for (i=0; i < (ssize_t) retain_colors; i++)
-                *p++=server_colors[i];
-              number_colors+=retain_colors;
-            }
+          server_source.image=image;
+          server_source.visual_info=visual_info;
+          server_source.server_colors=server_colors;
+          server_source.p=p;
+          number_colors=XRetainServerColors(&server_source,number_colors);
           server_colors=(XColor *) RelinquishMagickMemory(server_colors);
           diversity=(DiversityPacket *) RelinquishMagickMemory(diversity);
           break;
