@@ -7530,6 +7530,56 @@ static void XPackColormapped4BitMSB(const XImageRowSource *source,
   }
 }
 
+static void XPackColormapped8BitMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const XResourceInfo
+    *const resource_info = source->resource_info;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 8 bit color-mapped X canvas.
+  */
+  if ((resource_info->color_recovery != MagickFalse) &&
+      (resource_info->quantize_info->dither_method != NoDitherMethod))
+    {
+      XDitherImage(canvas,ximage,exception);
+      return;
+    }
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackColormapped8BitRowMSB(canvas,pixels,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7697,24 +7747,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
         case 6:
         case 8:
         {
-          /*
-            Convert to 8 bit color-mapped X canvas.
-          */
-          if ((resource_info->color_recovery != MagickFalse) &&
-              (resource_info->quantize_info->dither_method != NoDitherMethod))
-            {
-              XDitherImage(canvas,ximage,exception);
-              break;
-            }
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            q=XPackColormapped8BitRowMSB(canvas,pixels,p,q);
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackColormapped8BitMSB(&row_source,q);
           break;
         }
         default:
