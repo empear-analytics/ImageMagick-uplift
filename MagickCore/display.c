@@ -2389,6 +2389,23 @@ static MagickBooleanType XInsertTextCharacter(
   return(MagickTrue);
 }
 
+static KeySym XModifyKeySymbol(const size_t state,KeySym key_symbol)
+{
+  if ((state & ModifierState) != 0)
+    switch ((int) key_symbol)
+    {
+      case XK_u:
+      case XK_U:
+      {
+        key_symbol=DeleteCommand;
+        break;
+      }
+      default:
+        break;
+    }
+  return(key_symbol);
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -2868,18 +2885,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         if (((event.xkey.state & ControlMask) != 0) ||
             ((event.xkey.state & Mod1Mask) != 0))
           state|=ModifierState;
-        if ((state & ModifierState) != 0)
-          switch ((int) key_symbol)
-          {
-            case XK_u:
-            case XK_U:
-            {
-              key_symbol=DeleteCommand;
-              break;
-            }
-            default:
-              break;
-          }
+        key_symbol=XModifyKeySymbol(state,key_symbol);
         switch ((int) key_symbol)
         {
           case XK_BackSpace:
