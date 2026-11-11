@@ -583,6 +583,14 @@ static MagickBooleanType TryCloneComplexImages(const Image *images,
   return(MagickFalse);
 }
 
+static Image *FinishComplexImages(Image *complex_images,
+  const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    complex_images=DestroyImageList(complex_images);
+  return(complex_images);
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -687,9 +695,7 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   Bi_view=DestroyCacheView(Bi_view);
   Ar_view=DestroyCacheView(Ar_view);
   Ai_view=DestroyCacheView(Ai_view);
-  if (status == MagickFalse)
-    complex_images=DestroyImageList(complex_images);
-  return(complex_images);
+  return(FinishComplexImages(complex_images,status));
 }
 
 /*
