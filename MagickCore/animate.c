@@ -2895,6 +2895,35 @@ static void XRunCommandWidget(const AnimateCommandWidget *command_widget,
       &(*image),&(*state),command_widget->exception);
 }
 
+static void XHandleConfigureNotify(Display *display,
+  XResourceInfo *resource_info,XWindows *windows,const XEvent event)
+{
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Configure Notify: 0x%lx %dx%d+%d+%d %d",event.xconfigure.window,
+      event.xconfigure.width,event.xconfigure.height,event.xconfigure.x,
+      event.xconfigure.y,event.xconfigure.send_event);
+  if (event.xconfigure.window == windows->image.id)
+    {
+      XPlaceTransientWindows(display,windows,event);
+      /*
+        Image window has a new configuration.
+      */
+      windows->image.width=(unsigned int) event.xconfigure.width;
+      windows->image.height=(unsigned int) event.xconfigure.height;
+      return;
+    }
+  if (event.xconfigure.window == windows->icon.id)
+    {
+      /*
+        Icon window has a new configuration.
+      */
+      windows->icon.width=(unsigned int) event.xconfigure.width;
+      windows->icon.height=(unsigned int) event.xconfigure.height;
+      return;
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3801,30 +3830,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case ConfigureNotify:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Configure Notify: 0x%lx %dx%d+%d+%d %d",event.xconfigure.window,
-            event.xconfigure.width,event.xconfigure.height,event.xconfigure.x,
-            event.xconfigure.y,event.xconfigure.send_event);
-        if (event.xconfigure.window == windows->image.id)
-          {
-            XPlaceTransientWindows(display,windows,event);
-            /*
-              Image window has a new configuration.
-            */
-            windows->image.width=(unsigned int) event.xconfigure.width;
-            windows->image.height=(unsigned int) event.xconfigure.height;
-            break;
-          }
-        if (event.xconfigure.window == windows->icon.id)
-          {
-            /*
-              Icon window has a new configuration.
-            */
-            windows->icon.width=(unsigned int) event.xconfigure.width;
-            windows->icon.height=(unsigned int) event.xconfigure.height;
-            break;
-          }
+        XHandleConfigureNotify(display,resource_info,windows,event);
         break;
       }
       case DestroyNotify:
@@ -4328,6 +4334,14 @@ static MagickStatusType XWriteSavedImages(ImageInfo *image_info,
   return(status);
 }
 
+static MagickBooleanType XFinishSaveImage(Display *display,
+  XWindows *windows,ImageInfo *image_info,const MagickStatusType status)
+{
+  image_info=DestroyImageInfo(image_info);
+  XSetCursorState(display,windows,MagickFalse);
+  return(status != 0 ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType XSaveImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -4392,9 +4406,7 @@ static MagickBooleanType XSaveImage(Display *display,
     Write image.
   */
   status=XWriteSavedImages(image_info,image,filename,exception);
-  image_info=DestroyImageInfo(image_info);
-  XSetCursorState(display,windows,MagickFalse);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return(XFinishSaveImage(display,windows,image_info,status));
 }
 #else
 
