@@ -124,6 +124,20 @@ prints `IDENTICAL` (the preprocessor drops the branch, so that proves everything
 The exception does not reach an `#if defined(...)` branch that some configuration
 compiles.
 
+**Exception: a branch moved whole by a split, checked in a build that compiles it** (owner,
+2026-11-11). A Recipe S split may move a function that holds an `#if defined(...)` or
+`#if !defined(...)` branch (with its `#else`) to the new file, token for token, when nothing in
+the function is edited. The oracle's build does not compile the branch, so the step is checked
+in one that does: `python3 tools/split_branch_check.py <rev>~1:<original> <new file> <build>`
+with `cand-wide` (X11, OpenCL) or `ci-gcc-min`/`ci-gcc-dlg` (CI's non-HDRI configurations,
+built by `tools/ci_linux_warnings.sh`) compiles the original as it stood and the new file, and
+compares every function the new file defines, instruction by instruction. It must print
+`IDENTICAL-MODULO-LAYOUT`: the only differences allowed are a `__LINE__` immediate, a `.rodata`
+reference (`__FILE__` and string addresses), a constant-pool label number and a rip-relative
+offset. A planted change to one constant of a moved function prints `DIFFERENT`. The commit
+names the build and quotes the tool's counts. A branch no available build compiles (Windows,
+an uninstalled delegate) is still refused, as is any edit inside a branch.
+
 This stands until `tools/oracle/build.sh` can build the X11, OpenCL and Windows code in
 one command ([`VERIFICATION.md`](VERIFICATION.md), step 5). Then that code becomes
 guard-verified, below, in the build that compiles it.
@@ -1662,6 +1676,18 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
 2. List the variables the block only reads. Choose a group of them that are scalars or
    pointers, none written anywhere in the block, so the new function keeps at most four
    parameters: the struct and what the block writes through (a pixel buffer, say).
+   An array of the caller (a local, or a function-local `static`) that the block uses
+   only as `v[e]` read, or passes whole to a callee's pointer parameter, never under
+   `sizeof` or `&` or in any other expression, may be one of the group (2026-11-11;
+   the member points to the array's own storage, so an element the caller writes
+   elsewhere, before the fill or in an earlier iteration, is read through it as
+   through the name): its member is a pointer to its element type, the
+   element's qualifiers kept (`const char *const CommandMenu[]` gives `const char
+   *const *CommandMenu`), filled `name.v=v;` and bound or written as step 4 says.
+   The array's name in the fill converts to the address of its first element, as it
+   did at each use (C11 6.3.2.1p3), and `v[e]` is `*(v+e)` through either (Recipe
+   AR's argument): each subscript reads the same element and each callee receives the
+   same address.
    A plain struct value (a `PixelInfo`, `PointInfo` or `RectangleInfo` local or
    parameter; not an array, an array of structs, or a pointer's target) may be one of
    the group when, checked by reading: (a) every member of it is set on every path to
@@ -3027,7 +3053,9 @@ through a jump or a `return`.
 6. Call it where the block stood with `&name` and `&v` for each written variable, at
    most four arguments in all; check every member and argument by reading.
 7. Five or six written variables. When the block writes five or six variables of the
-   caller (each meeting step 1), pass their addresses in one `const` struct, Recipe Q
+   caller (each meeting step 1), or two to four whose pointers, one per variable, would
+   bring step 6's call to five or more arguments (2026-11-11, Recipe Q step 8's
+   condition), pass their addresses in one `const` struct, Recipe Q
    step 8's form: a `typedef struct` directly above the new function with one pointer
    member per written variable, named as the variable, in the order the block first
    writes them, holding addresses only. The function takes `const Name *name` (step 2,
@@ -11054,3 +11082,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | FI | Step 2: a value may also be a member read through a parameter of the function declared pointer-to-`const` (`p->m`, `p->m.n`): no side effect, and the run writes only the struct local, whose address nothing holds before the call | `montage.c`'s `PlaceMontageTile` (campaign A, W17 lane d): its `tile_info` (15 members), `extent` and `frame` fills copy members of `const MontageTilePlacement *placement`; with `gravity_info` (Recipe FB) they free the 18 lines `MontageImageList`'s next-page step needs under *Lines of Code in a Single File*: a probe of the four plus that step, 9.03 to 9.11, `IDENTICAL` object code for the fills | owner |
 | 2026-11-11 | AMEND | FB | Step 2: the same member reads as FI step 2 (as amended the same day) | Same session: `PlaceMontageTile`'s `gravity_info`, declared at the top and filled after `image` is reassigned, from six members of `placement` and `image` | owner |
 | 2026-11-11 | AMEND | S | Step 2: a run of conditional lines at the end of the original's include block, after its last unconditional `#include`, that holds every `#define` of the block (a delegate's headers and macros) is left out of the new file's copy when no line of the family, comments and strings aside, names one of those macros; the original keeps the run unchanged; *Careful*: why the family cannot need what the run declares (the build refuses an implicit declaration or an unknown identifier) and the instruction check. `tools/split_source.py` does it and prints the run it left out; its output for splits it accepted before is unchanged (layer.c, effect.c, transform.c and feature.c dry runs compared byte for byte) | `fourier.c` (campaign A, W17 lane a): the `ComplexImages` family (14 functions, its own row and operand types, no FFTW call) was refused only because the include block ends in the `MAGICKCORE_FFTW_DELEGATE`/`ENABLE_FFTW_DELEGATE` run that defines `cabs`, `carg`, `cimag` and `creal`, which the family never names; the split measures fourier.c 7.22 to 7.59, the new file 9.50 | owner |
+| 2026-11-11 | AMEND | S | *Preprocessor branches*: a split may move a function whole with an `#if defined(...)`/`#if !defined(...)` branch inside it, verbatim, when `tools/split_branch_check.py` prints `IDENTICAL-MODULO-LAYOUT` in a build that compiles the branch (`cand-wide`, `ci-gcc-min`, `ci-gcc-dlg`); AGENTS.md gains the matching exception | `effect.c`'s split (99aa3f82b, three `#if defined(MAGICKCORE_OPENCL_SUPPORT)` branches; wide build: 3,434 lines, 40 `__LINE__` immediates and 76 constant-pool labels differ, nothing else) and `attribute-depth.c`'s (492c52f3b, `#if !defined(MAGICKCORE_HDRI_SUPPORT)`; CI non-HDRI builds: 1,367 lines, `__LINE__`, `.rodata` and one rip-relative offset); a planted constant change prints DIFFERENT; the owner answered "Yes, allow it" | owner |
+| 2026-11-11 | AMEND | Z | Step 7: the `const` targets struct also serves two to four written variables when one pointer per variable would bring step 6's call to five or more arguments, Recipe Q step 8's condition; the step and its argument are unchanged (each member is the address of the variable of its name, bound once, written `(*v)`) | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its play step advances `scene`, `iterations`, `state` and `pause` together while reading `number_scenes`, `image_list` and `first_scene`; the input struct and four pointers would be five arguments, which step 6 refuses, though the same block writing a fifth variable would pass | owner |
+| 2026-11-11 | AMEND | N | Step 2: an array of the caller (a local, or a function-local `static` nothing writes) that the block only subscripts or passes whole to a pointer parameter may be a member, of pointer-to-element type with the element's qualifiers, filled `name.v=v;`; the name converts to the address of its first element at the fill as at each use (C11 6.3.2.1p3), Recipe AR's argument for a read-only array | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its Image-window button branch and its command-menu block read the menu tables `CommandMenu`, `Menus` and `Commands` (local and `static const` arrays) with the window state; N's *Careful* kept arrays out of the struct only because they are not values a copy can take | owner |
+| 2026-11-11 | AMEND | N | Step 2 (the array member added earlier today): a function-local `static` array qualifies whether or not the caller writes its elements elsewhere; the member is the address of the array's own storage, not a copy, so each `v[e]` reads the element as it stands at that point, written before the fill or not, exactly as the name did; the block itself still only reads it | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its colormap-update loop reads `static XWindowInfo *magick_windows[MaXWindows]`, which the function fills once on its first call | owner |
