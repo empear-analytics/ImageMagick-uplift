@@ -2348,6 +2348,19 @@ static void XReleaseAnimateResources(
   DestroyXResources();
 }
 
+static WarningHandler XSetAnimateWarningHandlers(
+  const XResourceInfo *resource_info,WarningHandler warning_handler)
+{
+  if (warning_handler == (WarningHandler) NULL)
+    {
+      warning_handler=resource_info->display_warnings ?
+        SetErrorHandler(XWarning) : SetErrorHandler((ErrorHandler) NULL);
+      warning_handler=resource_info->display_warnings ?
+        SetWarningHandler(XWarning) : SetWarningHandler((WarningHandler) NULL);
+    }
+  return(warning_handler);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2997,13 +3010,7 @@ MagickExport Image *XAnimateImages(Display *display,
   /*
     Set out progress and warning handlers.
   */
-  if (warning_handler == (WarningHandler) NULL)
-    {
-      warning_handler=resource_info->display_warnings ?
-        SetErrorHandler(XWarning) : SetErrorHandler((ErrorHandler) NULL);
-      warning_handler=resource_info->display_warnings ?
-        SetWarningHandler(XWarning) : SetWarningHandler((WarningHandler) NULL);
-    }
+  warning_handler=XSetAnimateWarningHandlers(resource_info,warning_handler);
   /*
     Initialize X image structure.
   */
