@@ -2415,6 +2415,26 @@ static Image *XPrepareSceneImages(const AnimateSceneList *scene_list)
   return(display_image);
 }
 
+static void XCenterImageOnBackdrop(Display *display,XWindows *windows,
+  XVisualInfo *visual_info)
+{
+  (void) XMapWindow(display,windows->backdrop.id);
+  (void) XClearWindow(display,windows->backdrop.id);
+  if (windows->image.id != (Window) NULL)
+    {
+      (void) XDestroyWindow(display,windows->image.id);
+      windows->image.id=(Window) NULL;
+    }
+  /*
+    Position image in the center the backdrop.
+  */
+  windows->image.flags|=USPosition;
+  windows->image.x=(XDisplayWidth(display,visual_info->screen)/2)-
+    ((int) windows->image.width/2);
+  windows->image.y=(XDisplayHeight(display,visual_info->screen)/2)-
+    ((int) windows->image.height/2);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2901,21 +2921,7 @@ MagickExport Image *XAnimateImages(Display *display,
       if (resource_info->debug != MagickFalse)
         (void) LogMagickEvent(X11Event,GetMagickModule(),
           "Window id: 0x%lx (backdrop)",windows->backdrop.id);
-      (void) XMapWindow(display,windows->backdrop.id);
-      (void) XClearWindow(display,windows->backdrop.id);
-      if (windows->image.id != (Window) NULL)
-        {
-          (void) XDestroyWindow(display,windows->image.id);
-          windows->image.id=(Window) NULL;
-        }
-      /*
-        Position image in the center the backdrop.
-      */
-      windows->image.flags|=USPosition;
-      windows->image.x=(XDisplayWidth(display,visual_info->screen)/2)-
-        ((int) windows->image.width/2);
-      windows->image.y=(XDisplayHeight(display,visual_info->screen)/2)-
-        ((int) windows->image.height/2);
+      XCenterImageOnBackdrop(display,windows,visual_info);
     }
   manager_hints->flags=IconWindowHint | InputHint | StateHint;
   manager_hints->icon_window=windows->icon.id;
