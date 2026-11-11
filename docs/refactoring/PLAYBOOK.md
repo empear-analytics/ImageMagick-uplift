@@ -11396,15 +11396,19 @@ end in `break;`.
    (nothing after it in the group), and the next case `B` is directly below it. `B`'s
    whole body, after an earlier step of this catalogue (Recipe N, CT or E step 7), is
    one expression statement `Q(a1,...,an);` followed by `break;`, `Q` a `static void`
-   function; `B` declares nothing and runs nothing else.
+   function; `B` declares nothing and runs nothing else. Or (2026-11-12), after Recipe
+   CR, W or I, the failure guard `if (Q(a1,...,an) == MagickFalse) return(c);` followed
+   by `break;`, `Q` a `static MagickBooleanType` function and `c` a constant, the
+   guard's two lines being `B`'s whole body.
 2. Every name in the arguments `a1,...,an` is declared outside both cases (in a block that
    encloses the `switch`), so it means the same object in `A` as in `B`. Nothing runs
    between the end of `A`'s group and `B`'s call (`B`'s label is the next thing and `B`
    declares nothing), so the call placed in `A` reads the values the fall-through
    carried (checked by reading).
 3. In `A` replace `magick_fallthrough;` by the call `Q(a1,...,an);` copied from `B`,
-   character for character, followed by `break;`. `B` stays as it is, entered by its own
-   label.
+   character for character, followed by `break;` (in the guard form, by the guard's two
+   lines, the `if` and its `return(c);`, copied likewise, then `break;`). `B` stays as it
+   is, entered by its own label.
 4. Check by reading that `A` now ends in `break;` on every path and `B` is untouched; the
    next step is the Recipe that moves `A` (CT, whose helper then holds the call).
 
@@ -11461,7 +11465,10 @@ end in `break;`.
   run the same call with the same arguments at the same point and break; the paths that
   left `A` earlier are untouched, and a dispatch on `B`'s label still runs `B`'s body.
   Nothing ran between the end of `A` and the call in the original (step 1), and nothing
-  runs between them now.
+  runs between them now. In the guard form the same holds for the two statements: the
+  fall-through ran `B`'s `if` first and `Q`'s result decided `return(c);` or `break;`; the
+  copy in `A` evaluates the same call at the same point and returns the same `c` or
+  breaks, so `A`'s paths end as `B`'s body ended.
 - The call appears twice in the text: `refactor_guard.py --calls` reports `+1` for `Q`
   (the one added call), which is this recipe's expected movement and nothing else.
 - Removing `magick_fallthrough;` removes a `-Wimplicit-fallthrough` annotation the case no
@@ -12142,3 +12149,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | NEW | LC | Extract Block Returning Whether It Continued: a block in a sequential loop body, followed by statements that stay, that leaves its iteration through `continue;` from inside it moves into a `static MagickBooleanType` function whose `continue;`s are `return(MagickTrue);` and whose end is `return(MagickFalse);`; the caller writes `if (Helper(...) != MagickFalse) continue;` | `display.c`'s `XROIImage` (campaign A, W18 lane b, wide build): the rectify loop's update-region block (a whole `if` holding a `switch` whose default group `continue`s when the region crop fails) holds three of the last depth-4 and 5 statements; OC needs the block followed by `continue;`, E step 7 the whole body or tail, LB a `break;` | owner |
 | 2026-11-12 | AMEND | CT | Step 3: a variable outside the targets struct may be added as a new last member (typedef and initialiser each gain one entry after the last) in the commit of the helper that writes it; the earlier helpers bind only the members they write and do not change. *Careful* gives the argument | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): `AnnotateTargets` (`annotate_info`, `p`, `x`, `y`) serves the text loop's line-advance blocks, and the BackSpace and Delete keys also write the cursor event `text_event`, which the step's "cannot be added later" refused; the text loop's key switch holds eleven depth-4 sites that need those helpers | owner |
 | 2026-11-12 | NEW | CR | Extract a Tail That Ends Its Case or Iteration or Returns Failure: the tail of a `switch` case or of a sequential loop's body that leaves through `break;` or `continue;` (the same as falling off its end) on some paths and through `return(c);` of one constant on others moves to a `static MagickBooleanType` function (each `break;`/`continue;` is `return(MagickTrue);`, each `return(c);` is `return(MagickFalse);`, the end `return(MagickTrue);`), written variables by Recipe CT's targets struct; the caller writes `if (Helper(...) == MagickFalse) return(c);`, followed by the case's `break;` | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's Return key and its selection-paste loop body leave through `break;`/`continue;` on some paths and `return(MagickFalse);` when an allocation fails, and write `annotate_info`, `p`, `x` and `y`; CT (no `return`), I and W (no mixed exits), E step 7 and LC refuse them | owner |
+| 2026-11-12 | AMEND | FT | Step 1 and step 3: the case `B` that `A` falls into may instead be the failure guard `if (Q(a1,...,an) == MagickFalse) return(c);` followed by `break;`, `Q` a `static MagickBooleanType` function made by Recipe CR, W or I and `c` a constant; `A` gets the guard's two lines and a `break;` in place of `magick_fallthrough;`. *Careful* gives the argument | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's default key group (draw a character, then `magick_fallthrough;` when the line is full) falls into the Return group, which Recipe CR made `if (XAdvanceTextLine(...) == MagickFalse) return(MagickFalse); break;`; FT's void-call form refuses it, so the default group's four depth-4 tests cannot move | owner |
