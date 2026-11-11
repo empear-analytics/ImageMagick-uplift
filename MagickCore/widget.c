@@ -1855,6 +1855,19 @@ static XWidgetInfo TrackColorBrowserSlider(XWidgetInfo slider_info,
   return(slider_info);
 }
 
+static size_t ReadColorBrowserPattern(const XWidgetInfo reply_info,
+  char *glob_pattern,size_t state)
+{
+  /*
+    Read new color or glob pattern.
+  */
+  if (*reply_info.text == '\0')
+    return(state);
+  (void) CopyMagickString(glob_pattern,reply_info.text,MagickPathExtent);
+  state|=UpdateListState;
+  return(state);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2690,13 +2703,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
           }
         if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
           {
-            /*
-              Read new color or glob pattern.
-            */
-            if (*reply_info.text == '\0')
-              break;
-            (void) CopyMagickString(glob_pattern,reply_info.text,MagickPathExtent);
-            state|=UpdateListState;
+            state=ReadColorBrowserPattern(reply_info,glob_pattern,state);
             break;
           }
         if (key_symbol == XK_Control_L)
