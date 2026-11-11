@@ -10585,6 +10585,17 @@ whole groups and keeps their nesting in the new function.
    as their written variables). Writes through pointers the block already uses stay as
    they are; variables the block declares, and temporaries it writes before reading
    that the caller does not read afterwards (Recipe E step 4), move with it.
+   A variable the caller declares `static` inside its body (block scope, never one at
+   file scope), of arithmetic, enumeration or pointer type (not an array), may be one
+   of the written variables as well, when the caller takes its address nowhere but in
+   the targets initialiser (checked by `grep`) (2026-11-11). With such a static the
+   count may be one: a block whose only written variable that the caller reads
+   afterwards is a `static` moves in this form, with a one-member targets struct,
+   rather than under Recipe E step 7's value form, which would hold a copy of it while
+   the block's calls run. A `static` the block itself declares, which nothing outside
+   the block names (`static char factor[MagickPathExtent] = "20.0";` at the top of a
+   case), moves into the new function with its declaration, initialiser and storage
+   class unchanged, as any declaration of the block does.
 3. Directly above the new function declare a `typedef struct` of one pointer member per
    written variable, named and typed as Recipe I step 3 says, in the order the block
    first writes them, holding addresses only. The caller declares it once, `const`, at
@@ -10700,6 +10711,22 @@ static void SelectListBrowserEntry(const ListBrowserPress *press,
   that step 8's script can check. Re-wrap a line the prefix pushes past 80 columns.
 - An initialiser of addresses of automatic variables needs C99, as Recipe I step 2's
   `const` form already does.
+- A block-scope `static` (step 2) has static storage duration (C11 6.2.4p3): one object
+  for the whole run, initialised once before the program starts, at the same address at
+  every point. Bound by `V *const v = targets->v;`, each `(*v)` designates that object
+  (6.5.3.2p4), so every read and write of the helper is the access the block made, to
+  the same object, at the same point. Nothing is copied: should a call made by the
+  block re-enter the caller (a widget loop dispatching back into the same command, a
+  recursion), a write it makes to the static is seen by the helper's next read as it
+  was by the block's, so the helper is no more and no less sensitive to re-entry than
+  the caller. That is why a lone static goes by address here and not by value under
+  Recipe E step 7, whose copy would miss such a write. The name has block scope, so no
+  other function can name the object; with `&v` taken only in the targets initialiser,
+  the member is its one other access path, used only while the helper runs. A static
+  the block declares stays one object with its initialiser applied once (6.7.9p10), and
+  the helper is called only where the block stood: every execution of the block reads
+  and writes it as before, the value it carries from one execution to the next
+  included.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved) and steps 1, 2, 4 and 7 checked by reading; or, when no case reaches
@@ -11208,3 +11235,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | SD | Step 1: a `switch` with no `default:` label may be split too: its last groups move to the new function's `switch`, which has no `default:` either, and the caller gains `default:` holding the call as its last group; a value no label names runs no group in either, and the caller keeps another label | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its key slider `switch` (Home, Up, Down, Prior, Next, End; no `default:`) holds the function at nesting depth 4; moved whole by Recipe E it is a *Complex Method* of its own (cc 13, measured), and SD refused it for want of a `default:`; split first, the Prior/Next/End groups and then the rest move with no finding, as `XListBrowserWidget`'s did | owner |
 | 2026-11-11 | AMEND | N | Step 2: an array the block names only as an argument of calls (contents written, if at all, only through calls that keep no copy: Recipe E step 4's array clause) may be one of the group, as a member of the pointer type it converts to (`char *`, or `const char *` when only read), filled `name.a=a;`; Recipes Y, Z, LB and CT, which take N's input struct, read it the same way | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Back and Reset releases and its list update copy between the `static` `glob_pattern` and the local `back_pattern`, `reset_pattern` and `reply` arrays; with each array a parameter the helpers take five to seven, and N's step 3 (the variable's exact type) refused an array member | owner |
 | 2026-11-11 | AMEND | W | Step 8: in a `void` caller the block's exits are `return;`; the helper returns `MagickFalse` there and the caller writes `if (Helper(...) == MagickFalse) return;`; a local written only on the returning paths goes by value (step 3 unchanged) | `opencl.c`'s `LoadOpenCLDevices` (campaign A, W17 lane c, wide build): the `clEnv->contexts` allocation releases `devices` and `platforms` and leaves through `return;` on failure; W step 1 asked for `return(R);`, which a `void` function cannot write. Probe: the function leaves *Large Method*, 5.43 to 5.47 | owner |
+| 2026-11-11 | AMEND | CT | Step 2: a block-scope `static` of the caller (arithmetic, enumeration or pointer type, not an array, its address taken only in the targets initialiser) may be a written variable, and then one written variable suffices (a lone static goes by address, not by Recipe E step 7's copy); a `static` the block declares moves with it unchanged. *Careful* gives the argument: one object of static storage duration, reached through its own address, nothing copied, so re-entry through the block's calls sees the same writes | `display.c`'s `XCompositeImage` (campaign A, W17 lane b, wide build): its Dissolve case tail writes the local `blend` and the function's `static` `compose` and leaves the `switch` by `break;` from a depth-4 `if (*factor == '\0')`; its Displace tail writes `compose` alone. I step 2 refused the static, and E step 7's value form would copy it across `XDialogWidget`. Probe of the chain: the function leaves *Deep, Nested Complexity* and *Brain Method*, display.c 1.15 to 1.17, no finding on either helper | owner |
