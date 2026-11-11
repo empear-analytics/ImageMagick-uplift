@@ -680,6 +680,27 @@ anything but a plain variable, is a differing value. A block whose every path en
 `return(<expr>);` becomes `return(<call>);` in each copy, the helper having the
 callers' return type, as Recipe E step 7 says.
 
+**Casts to a call's own return type, and a repeated `(void)`** (2026-11-11). Two more
+spellings are no differing value, on the same terms as a cast of a variable to its own
+type. (a) A cast of a call to the exact type its function is declared to return
+(`(char **) GetCommandOptions(MagickMethodOptions)`, where `option.h` declares `char
+**GetCommandOptions(const CommandOption)`): the value of the call already has that type,
+the cast converts a value to its own type and so leaves it unchanged (C11 6.5.4p5 with
+6.3.1.8's identity), and the cast expression and the call alone are the same value of the
+same type. The function is declared by name in a header and returns exactly that type,
+pointer levels and qualifiers included (checked by reading the declaration; a cast of a
+call to any other type, or of a call to a function declared with a different return type,
+is a differing value). (b) A `(void)` cast of an expression that is itself a `(void)`
+cast (`(void) (void) CopyMagickString(...)`): the inner cast discards the call's value and
+yields an expression of type `void`, and a cast to `void` of that expression is permitted
+(6.3.2.2: an explicit conversion to `void` may be applied to any expression) and again
+yields a `void` expression, so the doubled spelling and the single one are the same
+statement. The script removes both before it compares, the helper is written without
+them (`GetCommandOptions(...)`, `(void) CopyMagickString(...)`), and the evidence is
+the step's own: the oracle for a function some case reaches, `obj_identical.sh` or
+`reuse_check.py` with `obj_modulo.sh` for one none reaches (the casts, being the
+identity, compile to the same instructions, which is what those two prove).
+
 A variable the copies write and their callers read afterwards goes to the helper by
 address, exactly as in Recipe O (one pointer per such variable, the helper writing through
 it where each copy wrote the variable); the helper may instead return one of them, as in
@@ -897,6 +918,11 @@ owner's OK to evolve the recipes, from campaign A's W16 lane d: `transform.c`'s
 call compiles to a different `ExcerptImage` (DIFFERENT) with every other function
 unchanged (MODULO-IDENTICAL), 8.95 to 9.09 in a probe. Added by Claude Code (Claude
 Opus 5.5).
+*Casts to a call's own return type, and a repeated `(void)`:* 2026-11-11, owner's OK to
+evolve the recipes, from campaign A's W18 lane b (wide build): `display.c`'s
+`XColorEditImage`, whose Method and Fuzz cases are the bodies of `XSelectPaintMethod` and
+`XSelectFuzzFactor` (made for `XMatteEditImage`) but for `(char **) GetCommandOptions(...)`
+and `(void) (void) CopyMagickString(...)`. Added by Claude Code (Claude Sonnet 5.5).
 
 ---
 
@@ -11508,3 +11534,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | CT | Step 2 (and O step 2 by reference): a block-scope `static` of structure type (not an array of structures), its address taken only in the targets initialiser, may be a written variable on the scalar static's terms; its member is a pointer to the structure, `v.m` becomes `(*v).m` and `&v` becomes `v`. *Careful* adds the argument (one object at one address, `(*v).m` is the member, nothing copied, a callee filling the structure through the pointer fills the static) | `display.c`'s `XMatteEditImage` (campaign A, W17 lane b, wide build): its Border Color case tail ends the case through `break;` from a depth-5 `if (*color_name == '\0')` and writes the function's `static XColor border_color` through `XParseColor(...,&border_color)`; CT step 2 admitted only arithmetic, enumeration and pointer statics. The case is one of the four whose move takes the function to depth 3 (probe: display.c 1.33 to 1.41, the function out of *Deep, Nested Complexity* and *Brain Method*, no finding on the helpers) | owner |
 | 2026-11-11 | NEW | UX | Unnest an Exit Implied by Its Guard: a guard on the disjunction of `A` and `B` whose body runs a clean-up `S`, then exits through `X` when `B` holds and through `Y` otherwise, becomes three statements: the guard holding `S` alone, `if (B) X`, and `if (A) { Y }`; `A` and `B` are side-effect-free reads of locals that `S` does not write | `animate.c`'s `XMagickCommand` (campaign A, W17 lane c, wide build): the Open command's failure guard releases the file list and then throws one of two `ThrowXWindowException`s, which record `GetMagickModule()` and must stay in the function; the nested test is the function's last bump after the SD splits. Probe of the chain: `XMagickCommand` leaves Bumpy Road Ahead and Large Method, 3.48 to 3.67 with the XSaveImage steps | owner |
 | 2026-11-11 | WORDING | UX | Step 5 and *Evidence level*: `refactor_guard.py` counts distinct values, so repeating `A` may leave it at PASS; a WARN is expected only when a literal of `A` is new to the count | The first use (`XMagickCommand`, `status == MagickFalse`) printed PASS, not the WARN the text predicted | owner |
+| 2026-11-11 | AMEND | D | A cast of a call to the exact type its function is declared to return (`(char **) GetCommandOptions(...)`) and a `(void)` cast of a `(void)` cast (`(void) (void) CopyMagickString(...)`) are not differing values; the script removes them before comparing and the helper is written without them (C11 6.5.4p5, 6.3.2.2) | `display.c`'s `XColorEditImage` (campaign A, W18 lane b, wide build): its Method and Fuzz cases equal `XSelectPaintMethod` and `XSelectFuzzFactor`, which `XMatteEditImage` already calls, but for those two spellings; reuse removes two of the function's depth-4 sites and is one step of the chain that takes it out of *Brain Method* (probe: display.c 1.41 to 1.49) | owner |
