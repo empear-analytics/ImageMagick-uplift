@@ -10476,6 +10476,13 @@ and all.
    constant); their labels are enumeration constants. No group falls into a peeled
    group (the group before each ends in `break;` or a `return`), and a kept group
    carries `default:`. No `#` line stands in the peeled groups.
+   Integer form (2026-11-11): `e` may instead be a parameter of an integer type (`ssize_t
+   n`) whose peeled labels are decimal integer literals and whose `S` is `return(c);` of
+   a numeric literal; the predicate's parameter is `const` of `e`'s declared type, and a
+   kept `switch` that has no `default:` stays without one (`-Wswitch` concerns
+   enumerations only; a value matching no label falls out of the `switch` as it did, to
+   the statement after it). A comment on a peeled label's line moves to the predicate's
+   line for that label.
 2. Write LP step 2's predicate directly above the function: `static MagickBooleanType
    Name(const T x)` (`T` the declared type of `e`), whose body is `switch (x) { <every
    peeled group's comment lines and labels, in the original order> return(MagickTrue);
@@ -10564,6 +10571,11 @@ static MagickBooleanType IsRotationUselessKernel(const KernelInfoType type)
   (it only reads its argument); the `switch` then evaluates `e` again, which nothing has
   written since, and selects the same kept group as before, since its labels are
   unchanged; a value that matched no label reaches the kept `default:` as before.
+- Integer form: nothing differs but the label type. The predicate returns `MagickTrue`
+  for exactly the literals the peeled groups carried (step 4), and `S` is what each of
+  those groups returned; any other value reaches the kept `switch`, which holds the
+  other labels, or, finding none, the statement after it, as before. Called per pixel
+  (`poly_basis_dx`, twice per polynomial term), the step is timed as CF step 7 says.
 - The peeled groups' labels are gone from the `switch`, but no value that would select
   them reaches it any more. Step 1's ban on a group falling into a peeled group keeps
   every path through the kept groups as it was; a peeled group itself always left.
@@ -11566,3 +11578,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | MA | Step 2 (c): the lvalues of the copies may differ in a member of the chain before the last when each is a chain of member selections through one shared pointer variable (no call, no subscript), of one type; the block may only read or only assign it. *Careful* adds the argument (the address names the very object the copy named; nothing is read that the copy did not read) | `widget.c`'s `XScreenEvent` (campaign A, W18 lane a, wide build): the popup block's two `windows->popup.mapped` assignments and the existing helper `XScreenTrackWidgetMapping` (`windows->widget.mapped`) are twins differing in one member of the chain; one helper taking `MagickBooleanType *mapped` serves both. Probe: the function leaves Bumpy Road Ahead and drops from cc 15 to 13, 3.04 to 3.06, no new function | owner |
 | 2026-11-11 | AMEND | RV | Step 6 (new (d)): five or six written locals of the caller go by (c)'s one `const` struct of addresses, bound as `T *const v = name->v;` and written `(*v)`, so the helper keeps at most four parameters (the struct, the arrays or pointers it reads, `T *result`). *Careful* gives the argument: the locals stay the caller's, only addresses travel, and nothing else names them while the helper runs | `channel.c`'s `ChannelFxImage` (campaign A, W18 lane d): the token-separator `switch` writes six locals and leaves through two different `return`s (`return(destination_image)` after `DestroyImageList`, and `return((Image *) NULL)`), which I, V, W refuse; step 6 (b) stopped at four. A probe: the function cc 17 to 12, channel.c 9.31 to 9.46, no finding on the helper | owner |
 | 2026-11-11 | AMEND | RV | Step 6 (new (e)): the caller may pass the address of a local `w` that the block writes through (and that one exit returns) as `T *result`, and write `return(w);`, declaring no `returned`; the helper's text is unchanged. *Careful* gives the argument: `result` and the written pointer name one object, the paths that fall through never store, a path that returns stores into a local nothing reads but the return | `channel.c`'s `ChannelFxImage` (campaign A, W18 lane d): `destination_image` is what the separator helper's first exit returns and what it writes through; the `returned` local costs two lines of the loop helper that Recipe N moves, which then stands at 72 lines against the Large Method limit of 70 | owner |
+| 2026-11-11 | AMEND | PL | Integer form of step 1: `e` may be a parameter of an integer type whose peeled labels are decimal integer literals and whose `S` is `return(c);` of a numeric literal; the predicate takes `const` of `e`'s type, a kept `switch` without `default:` stays without one, a comment on a peeled label moves to the predicate. *Careful* adds the value-by-value argument and the timing duty for a per-pixel caller | `distort.c`'s `poly_basis_dx` (campaign A, W18 lane a): six of its twenty-one labels (`0`, `2`, `5`, `9`, `14`, `20`) only `return( 0.0 );`; peeled into `IsPolyBasisDxZero` the file goes 7.60 to 7.70 (cc 22 to 16); a polynomial distort of 1500x1500 pixels, order 5, medians of 11 alternating runs: 1.305 s against 1.314 s (+0.6%) | owner |
