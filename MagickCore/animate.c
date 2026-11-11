@@ -811,6 +811,15 @@ static void XDestroyFileList(char **filelist,const int number_files)
   filelist=(char **) RelinquishMagickMemory(filelist);
 }
 
+static void XDestroyFailedFileList(const MagickStatusType status,
+  char **filelist,const int number_files)
+{
+  if ((status == MagickFalse) || (number_files == 0))
+    {
+      XDestroyFileList(filelist,number_files);
+    }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
@@ -865,10 +874,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       number_files=1;
       filelist[0]=filenames;
       status=ExpandFilenames(&number_files,&filelist);
-      if ((status == MagickFalse) || (number_files == 0))
-        {
-          XDestroyFileList(filelist,number_files);
-        }
+      XDestroyFailedFileList(status,filelist,number_files);
       if (number_files == 0)
         {
           ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
