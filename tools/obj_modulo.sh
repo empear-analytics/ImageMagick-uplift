@@ -19,6 +19,8 @@
 #           body calls, or that CALLER's body calls and whose definition is the same
 #           text on both sides (a different inlining decision, not a change of code);
 #     and prints MODULO-IDENTICAL and exits 0, or DIFFERENT and exits 1.
+# NOINLINE=F1,F2 in the environment keeps those existing functions out of line on
+# both sides (see below).
 # CALLER and HELPER themselves are not compared here: their text is checked by
 # refactor_guard.py (literals and calls) and by tools/struct_fill_check.py.
 set -e
@@ -42,6 +44,29 @@ base=$(basename "$file")
 mkdir "$tmp/before" "$tmp/after"
 git -C "$root" show "$rev:$file" > "$tmp/before/$base"
 cp "$root/$file" "$tmp/after/$base"
+# NOINLINE=F1,F2: keep these existing static functions out of line on both sides
+# (`__attribute__((noinline))` added to each one's definition line in both copies).
+# For a reuse that gives an existing helper a second caller: the compiler stops
+# inlining it into its first caller, which then differs only by that decision;
+# with the helper out of line on both sides, the first caller must compare equal.
+if [ -n "${NOINLINE:-}" ]
+then
+  for side in before after
+  do
+    python3 - "$tmp/$side/$base" "$NOINLINE" <<'PY'
+import re, sys
+p, names = sys.argv[1], sys.argv[2].split(",")
+s = open(p).read()
+for n in names:
+    s, k = re.subn(r"^static ([^;\n]*\b" + re.escape(n) + r"\()",
+                   r"static __attribute__((noinline)) \1", s, flags=re.M)
+    if k != 1:
+        sys.exit("NOINLINE: %d definition lines of %s" % (k, n))
+open(p, "w").write(s)
+PY
+  done
+  echo "kept out of line on both sides: $NOINLINE"
+fi
 for side in before after
 do
   ( cd "$tmp/$side" &&
