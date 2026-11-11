@@ -5326,6 +5326,36 @@ static void XCropButtonPress(const CropEventInput *event_input,
   XCropButtonRelease(event_input,(*crop_info));
 }
 
+static void XCropKeyHelp(Display *display,XResourceInfo *resource_info,
+  XWindows *windows,const ClipboardMode mode)
+{
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXcopy);
+  switch (mode)
+  {
+    case CopyMode:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Copy",ImageCopyHelp);
+      break;
+    }
+    case CropMode:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Cropg",ImageCropHelp);
+      break;
+    }
+    case CutMode:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Cutg",ImageCutHelp);
+      break;
+    }
+  }
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -5775,31 +5805,7 @@ static MagickBooleanType XCropImage(Display *display,
             case XK_F1:
             case XK_Help:
             {
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXcopy);
-              switch (mode)
-              {
-                case CopyMode:
-                {
-                  XTextViewHelp(display,resource_info,windows,MagickFalse,
-                    "Help Viewer - Image Copy",ImageCopyHelp);
-                  break;
-                }
-                case CropMode:
-                {
-                  XTextViewHelp(display,resource_info,windows,MagickFalse,
-                    "Help Viewer - Image Cropg",ImageCropHelp);
-                  break;
-                }
-                case CutMode:
-                {
-                  XTextViewHelp(display,resource_info,windows,MagickFalse,
-                    "Help Viewer - Image Cutg",ImageCutHelp);
-                  break;
-                }
-              }
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXinvert);
+              XCropKeyHelp(display,resource_info,windows,mode);
               break;
             }
             default:
