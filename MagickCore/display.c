@@ -2235,6 +2235,33 @@ static void XEraseTextCharacter(Display *display,XWindows *windows,
   XRefreshWindow(display,&windows->image,text_event);
 }
 
+static void XEraseTextLine(Display *display,XWindows *windows,
+  XFontStruct *font_info,const AnnotateTargets *targets)
+{
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x;
+
+  XEvent
+    *const text_event = targets->text_event;
+
+  /*
+    Erase the entire line of text.
+  */
+  while ((*p) != (*annotate_info)->text)
+  {
+    (*p)--;
+    (*x)-=XTextWidth(font_info,(*p),1);
+    (*text_event).xexpose.x=(*x);
+    XRefreshWindow(display,&windows->image,text_event);
+  }
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -2740,16 +2767,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
           }
           case DeleteCommand:
           {
-            /*
-              Erase the entire line of text.
-            */
-            while (p != annotate_info->text)
-            {
-              p--;
-              x-=XTextWidth(font_info,p,1);
-              text_event.xexpose.x=x;
-              XRefreshWindow(display,&windows->image,&text_event);
-            }
+            XEraseTextLine(display,windows,font_info,&targets);
             break;
           }
           case XK_Escape:
