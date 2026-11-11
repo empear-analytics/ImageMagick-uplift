@@ -3430,6 +3430,24 @@ static void XLogUnknownEvent(XResourceInfo *resource_info,const XEvent event)
       event.type);
 }
 
+static void XHandleKeyRelease(XResourceInfo *resource_info,XEvent event)
+{
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key release.
+  */
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Key release: 0x%lx (%c)",(unsigned long) key_symbol,*command);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3544,9 +3562,6 @@ MagickExport Image *XAnimateImages(Display *display,
 
   int
     status;
-
-  KeySym
-    key_symbol;
 
   MagickStatusType
     context_mask,
@@ -4362,14 +4377,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case KeyRelease:
       {
-        /*
-          Respond to a user key release.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Key release: 0x%lx (%c)",(unsigned long) key_symbol,*command);
+        XHandleKeyRelease(resource_info,event);
         break;
       }
       case LeaveNotify:
