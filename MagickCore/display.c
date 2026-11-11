@@ -3428,6 +3428,60 @@ typedef struct _PaintMethodTargets
     *method;
 } PaintMethodTargets;
 
+typedef struct _ColorEditPixelInput
+{
+  Image
+    **image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  XColor
+    color;
+} ColorEditPixelInput;
+
+static void XColorReset(const ColorEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  const XColor
+    color = pixel_input->color;
+
+  int
+    x,
+    y;
+
+  Quantum
+    *q;
+
+  for (y=0; y < (int) (*image)->rows; y++)
+  {
+    q=QueueCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
+      (*image)->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (int) (*image)->columns; x++)
+    {
+      SetPixelRed(*image,ScaleShortToQuantum(color.red),q);
+      SetPixelGreen(*image,ScaleShortToQuantum(color.green),q);
+      SetPixelBlue(*image,ScaleShortToQuantum(color.blue),q);
+      q+=(ptrdiff_t) GetPixelChannels(*image);
+    }
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+}
+
 typedef struct _ColorBorderTargets
 {
   XColor
@@ -3903,6 +3957,9 @@ static MagickBooleanType XColorEditImage(Display *display,
         CacheView
           *image_view;
 
+        ColorEditPixelInput
+          pixel_input;
+
         int
           x,
           y;
@@ -3931,6 +3988,10 @@ static MagickBooleanType XColorEditImage(Display *display,
             (y_offset >= (int) (*image)->rows))
           continue;
         image_view=AcquireAuthenticCacheView(*image,exception);
+        pixel_input.image=image;
+        pixel_input.image_view=image_view;
+        pixel_input.exception=exception;
+        pixel_input.color=color;
         switch (method)
         {
           case PointMethod:
@@ -4013,22 +4074,7 @@ static MagickBooleanType XColorEditImage(Display *display,
             */
             if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
               return(MagickFalse);
-            for (y=0; y < (int) (*image)->rows; y++)
-            {
-              q=QueueCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
-                (*image)->columns,1,exception);
-              if (q == (Quantum *) NULL)
-                break;
-              for (x=0; x < (int) (*image)->columns; x++)
-              {
-                SetPixelRed(*image,ScaleShortToQuantum(color.red),q);
-                SetPixelGreen(*image,ScaleShortToQuantum(color.green),q);
-                SetPixelBlue(*image,ScaleShortToQuantum(color.blue),q);
-                q+=(ptrdiff_t) GetPixelChannels(*image);
-              }
-              if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-                break;
-            }
+            XColorReset(&pixel_input);
             break;
           }
         }
