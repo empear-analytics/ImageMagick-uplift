@@ -3636,6 +3636,23 @@ static void XHandleEnterNotify(const AnimateEventContext *event_context,
     XInstallColormap(display,map_info->colormap);
 }
 
+static void XLogDisplayImage(XResourceInfo *resource_info,
+  const Image *display_image)
+{
+  if (resource_info->debug != MagickFalse)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "Image: %s[%.17g] %.17gx%.17g ",display_image->filename,(double)
+        display_image->scene,(double) display_image->columns,(double)
+        display_image->rows);
+      if (display_image->colors != 0)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
+          display_image->colors);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
+        display_image->magick);
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3926,18 +3943,7 @@ MagickExport Image *XAnimateImages(Display *display,
   scene_list.number_scenes=number_scenes;
   scene_list.exception=exception;
   display_image=XPrepareSceneImages(&scene_list);
-  if (resource_info->debug != MagickFalse)
-    {
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "Image: %s[%.17g] %.17gx%.17g ",display_image->filename,(double)
-        display_image->scene,(double) display_image->columns,(double)
-        display_image->rows);
-      if (display_image->colors != 0)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
-          display_image->colors);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
-        display_image->magick);
-    }
+  XLogDisplayImage(resource_info,display_image);
   XMakeStandardColormap(display,visual_info,resource_info,display_image,
     map_info,pixel,exception);
   /*
