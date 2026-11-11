@@ -5466,6 +5466,54 @@ static void XCropHomeLeftKey(const CropEventInput *event_input,
   }
 }
 
+static void XCropKeyPress(const CropEventInput *event_input,XEvent *event,
+  const CropTargets *targets)
+{
+  Display
+    *const display = event_input->display;
+
+  XWindows
+    *const windows = event_input->windows;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  if ((*event).xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      (*state)|=EscapeState;
+      magick_fallthrough;
+    }
+    case XK_Return:
+    {
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+    {
+      XCropHomeLeftKey(event_input,targets,key_symbol);
+      break;
+    }
+  }
+  (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
+    (*event).xkey.time);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -5859,34 +5907,7 @@ static MagickBooleanType XCropImage(Display *display,
         }
         case KeyPress:
         {
-          if (event.xkey.window != windows->image.id)
-            break;
-          /*
-            Respond to a user key press.
-          */
-          (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-            sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-          switch ((int) key_symbol)
-          {
-            case XK_Escape:
-            case XK_F20:
-            {
-              state|=EscapeState;
-              magick_fallthrough;
-            }
-            case XK_Return:
-            {
-              state|=ExitState;
-              break;
-            }
-            default:
-            {
-              XCropHomeLeftKey(&event_input,&targets,key_symbol);
-              break;
-            }
-          }
-          (void) XSetSelectionOwner(display,XA_PRIMARY,windows->image.id,
-            event.xkey.time);
+          XCropKeyPress(&event_input,&event,&targets);
           break;
         }
         case KeyRelease:
