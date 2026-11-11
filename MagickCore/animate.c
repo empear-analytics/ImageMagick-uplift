@@ -795,6 +795,18 @@ static MagickBooleanType XNextBackgroundEvent(Display *display,XEvent *event)
   return(MagickTrue);
 }
 
+static void XSortSceneList(Image **image_list,const size_t number_scenes)
+{
+  ssize_t
+    scene;
+
+  for (scene=0; scene < (ssize_t) number_scenes; scene++)
+    if (image_list[scene]->scene == 0)
+      break;
+  if (scene == (ssize_t) number_scenes)
+    qsort((void *) image_list,number_scenes,sizeof(Image *),SceneCompare);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -815,9 +827,6 @@ MagickExport void XAnimateBackgroundImage(Display *display,
 
   RectangleInfo
     geometry_info;
-
-  ssize_t
-    i;
 
   size_t
     delay,
@@ -945,11 +954,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   if (image_list == (Image **) NULL)
     ThrowXWindowFatalException(ResourceLimitFatalError,
       "MemoryAllocationFailed",images->filename);
-  for (i=0; i < (ssize_t) number_scenes; i++)
-    if (image_list[i]->scene == 0)
-      break;
-  if (i == (ssize_t) number_scenes)
-    qsort((void *) image_list,number_scenes,sizeof(Image *),SceneCompare);
+  XSortSceneList(image_list,number_scenes);
   /*
     Initialize Standard Colormap.
   */
@@ -2121,6 +2126,546 @@ static void XAdvanceScene(const AnimationSceneStep *scene_step,
     }
 }
 
+typedef struct _AnimateSceneView
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  XVisualInfo
+    *visual_info;
+
+  XStandardColormap
+    *map_info;
+
+  Image
+    **image_list;
+
+  Image
+    *image;
+
+  ssize_t
+    scene;
+} AnimateSceneView;
+
+static void XShowAnimationScene(const AnimateSceneView *scene_view,
+  const MagickStatusType state,XEvent *event)
+{
+  Display
+    *const display = scene_view->display;
+
+  XResourceInfo
+    *const resource_info = scene_view->resource_info;
+
+  XWindows
+    *const windows = scene_view->windows;
+
+  XVisualInfo
+    *const visual_info = scene_view->visual_info;
+
+  XStandardColormap
+    *const map_info = scene_view->map_info;
+
+  Image
+    **const image_list = scene_view->image_list;
+
+  Image
+    *const image = scene_view->image;
+
+  const ssize_t
+    scene = scene_view->scene;
+
+  XGetPixelInfo(display,visual_info,map_info,resource_info,
+    image_list[scene],windows->image.pixel_info);
+  if (image != (Image *) NULL)
+    {
+      windows->image.ximage->width=(int) image->columns;
+      windows->image.ximage->height=(int) image->rows;
+    }
+  windows->image.pixmap=windows->image.pixmaps[scene];
+  windows->image.matte_pixmap=windows->image.matte_pixmaps[scene];
+  (*event).xexpose.x=0;
+  (*event).xexpose.y=0;
+  (*event).xexpose.width=(int) image->columns;
+  (*event).xexpose.height=(int) image->rows;
+  if ((state & ExitState) == 0)
+    {
+      XRefreshWindow(display,&windows->image,event);
+      (void) XSync(display,MagickFalse);
+    }
+}
+
+static void XPauseAnimationScene(const AnimateSceneView *scene_view,
+  const MagickBooleanType pause,XEvent *event)
+{
+  Display
+    *const display = scene_view->display;
+
+  XResourceInfo
+    *const resource_info = scene_view->resource_info;
+
+  XWindows
+    *const windows = scene_view->windows;
+
+  if (pause != MagickFalse)
+    XPauseAnimation(display,resource_info,windows,event);
+}
+
+static ssize_t XLoopStartScene(const Image *image,const ssize_t scene,
+  ssize_t first_scene)
+{
+  if ((image != (Image *) NULL) && (image->start_loop != 0))
+    first_scene=scene;
+  return(first_scene);
+}
+
+static void XRemapColormapMismatch(XResourceInfo *resource_info,
+  XVisualInfo *visual_info,Image *images,ExceptionInfo *exception)
+{
+  if (resource_info->map_type == (char *) NULL)
+    if ((visual_info->klass != TrueColor) &&
+        (visual_info->klass != DirectColor))
+      {
+        Image
+          *next;
+
+        /*
+          Determine if the sequence of images has the identical colormap.
+        */
+        next=XFindColormapMismatch(images,visual_info);
+        if (next != (Image *) NULL)
+          (void) RemapImages(resource_info->quantize_info,images,
+            (Image *) NULL,exception);
+      }
+}
+
+static void XWithdrawColormapWindows(Display *display,XWindows *windows)
+{
+  if (IsColormapVisual(windows->visual_info) != MagickFalse)
+    {
+      /*
+        Withdraw windows.
+      */
+      if (windows->info.mapped)
+        (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+      if (windows->command.mapped)
+        (void) XWithdrawWindow(display,windows->command.id,
+          windows->command.screen);
+    }
+}
+
+static void XFreeScenePixmaps(Display *display,XWindows *windows,
+  const size_t number_scenes)
+{
+  ssize_t
+    scene;
+
+  for (scene=1; scene < (ssize_t) number_scenes; scene++)
+  {
+    if (windows->image.pixmaps[scene] != (Pixmap) NULL)
+      (void) XFreePixmap(display,windows->image.pixmaps[scene]);
+    windows->image.pixmaps[scene]=(Pixmap) NULL;
+    if (windows->image.matte_pixmaps[scene] != (Pixmap) NULL)
+      (void) XFreePixmap(display,windows->image.matte_pixmaps[scene]);
+    windows->image.matte_pixmaps[scene]=(Pixmap) NULL;
+  }
+}
+
+typedef struct _AnimateX11Resources
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  XVisualInfo
+    *visual_info;
+
+  XStandardColormap
+    *map_info;
+
+  XPixelInfo
+    *pixel;
+
+  XVisualInfo
+    *icon_visual;
+
+  XStandardColormap
+    *icon_map;
+
+  XPixelInfo
+    *icon_pixel;
+} AnimateX11Resources;
+
+static void XReleaseAnimateResources(
+  const AnimateX11Resources *x11_resources)
+{
+  Display
+    *const display = x11_resources->display;
+
+  XResourceInfo
+    *const resource_info = x11_resources->resource_info;
+
+  XWindows
+    *const windows = x11_resources->windows;
+
+  XVisualInfo
+    *const visual_info = x11_resources->visual_info;
+
+  XStandardColormap
+    *const map_info = x11_resources->map_info;
+
+  XPixelInfo
+    *const pixel = x11_resources->pixel;
+
+  XVisualInfo
+    *const icon_visual = x11_resources->icon_visual;
+
+  XStandardColormap
+    *const icon_map = x11_resources->icon_map;
+
+  XPixelInfo
+    *const icon_pixel = x11_resources->icon_pixel;
+
+  /*
+    Free X resources.
+  */
+  if (windows->image.mapped != MagickFalse)
+    (void) XWithdrawWindow(display,windows->image.id,windows->image.screen);
+  XDelay(display,SuspendTime);
+  (void) XFreeStandardColormap(display,icon_visual,icon_map,icon_pixel);
+  if (resource_info->map_type == (char *) NULL)
+    (void) XFreeStandardColormap(display,visual_info,map_info,pixel);
+  DestroyXResources();
+}
+
+static WarningHandler XSetAnimateWarningHandlers(
+  const XResourceInfo *resource_info,WarningHandler warning_handler)
+{
+  if (warning_handler == (WarningHandler) NULL)
+    {
+      warning_handler=resource_info->display_warnings ?
+        SetErrorHandler(XWarning) : SetErrorHandler((ErrorHandler) NULL);
+      warning_handler=resource_info->display_warnings ?
+        SetWarningHandler(XWarning) : SetWarningHandler((WarningHandler) NULL);
+    }
+  return(warning_handler);
+}
+
+typedef struct _AnimateSceneList
+{
+  XResourceInfo
+    *resource_info;
+
+  XVisualInfo
+    *visual_info;
+
+  Image
+    **image_list;
+
+  size_t
+    number_scenes;
+
+  ExceptionInfo
+    *exception;
+} AnimateSceneList;
+
+static Image *XPrepareSceneImages(const AnimateSceneList *scene_list)
+{
+  XResourceInfo
+    *const resource_info = scene_list->resource_info;
+
+  XVisualInfo
+    *const visual_info = scene_list->visual_info;
+
+  Image
+    **const image_list = scene_list->image_list;
+
+  const size_t
+    number_scenes = scene_list->number_scenes;
+
+  ExceptionInfo
+    *const exception = scene_list->exception;
+
+  Image
+    *display_image;
+
+  ssize_t
+    scene;
+
+  display_image=image_list[0];
+  for (scene=0; scene < (ssize_t) number_scenes; scene++)
+  {
+    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
+      (void) SetImageType(image_list[scene],image_list[scene]->alpha_trait ==
+        BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
+    if ((display_image->columns < image_list[scene]->columns) &&
+        (display_image->rows < image_list[scene]->rows))
+      display_image=image_list[scene];
+  }
+  return(display_image);
+}
+
+static void XCenterImageOnBackdrop(Display *display,XWindows *windows,
+  XVisualInfo *visual_info)
+{
+  (void) XMapWindow(display,windows->backdrop.id);
+  (void) XClearWindow(display,windows->backdrop.id);
+  if (windows->image.id != (Window) NULL)
+    {
+      (void) XDestroyWindow(display,windows->image.id);
+      windows->image.id=(Window) NULL;
+    }
+  /*
+    Position image in the center the backdrop.
+  */
+  windows->image.flags|=USPosition;
+  windows->image.x=(XDisplayWidth(display,visual_info->screen)/2)-
+    ((int) windows->image.width/2);
+  windows->image.y=(XDisplayHeight(display,visual_info->screen)/2)-
+    ((int) windows->image.height/2);
+}
+
+typedef struct _AnimateSceneWindow
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image_list;
+
+  size_t
+    number_scenes;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    scene;
+} AnimateSceneWindow;
+
+static void XNameSceneWindow(const AnimateSceneWindow *scene_window)
+{
+  XResourceInfo
+    *const resource_info = scene_window->resource_info;
+
+  XWindows
+    *const windows = scene_window->windows;
+
+  Image
+    **const image_list = scene_window->image_list;
+
+  const size_t
+    number_scenes = scene_window->number_scenes;
+
+  ExceptionInfo
+    *const exception = scene_window->exception;
+
+  const ssize_t
+    scene = scene_window->scene;
+
+  char
+    *p;
+
+  if (resource_info->title != (char *) NULL)
+    {
+      char
+        *title;
+
+      title=InterpretImageProperties(resource_info->image_info,
+        image_list[scene],resource_info->title,exception);
+      (void) CloneString(&windows->image.name,title);
+      title=DestroyString(title);
+    }
+  else
+    {
+      char
+        window_name[MagickPathExtent];
+
+      p=image_list[scene]->magick_filename+
+        strlen(image_list[scene]->magick_filename)-1;
+      while ((p > image_list[scene]->magick_filename) && (*(p-1) != '/'))
+        p--;
+      (void) FormatLocaleString(window_name,MagickPathExtent,
+        "%s: %s[%.17g of %.17g]",MagickPackageName,p,(double) scene+1,
+        (double) number_scenes);
+      (void) CloneString(&windows->image.name,window_name);
+    }
+}
+
+static void XStoreSceneWindow(const AnimateSceneWindow *scene_window,
+  XEvent *event)
+{
+  Display
+    *const display = scene_window->display;
+
+  XWindows
+    *const windows = scene_window->windows;
+
+  Image
+    **const image_list = scene_window->image_list;
+
+  const ssize_t
+    scene = scene_window->scene;
+
+  int
+    status;
+
+  XTextProperty
+    window_name;
+
+  status=XStringListToTextProperty(&windows->image.name,1,&window_name);
+  if (status != Success)
+    {
+      XSetWMName(display,windows->image.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  windows->image.pixmaps[scene]=windows->image.pixmap;
+  windows->image.matte_pixmaps[scene]=windows->image.matte_pixmap;
+  if (scene == 0)
+    {
+      (*event).xexpose.x=0;
+      (*event).xexpose.y=0;
+      (*event).xexpose.width=(int) image_list[scene]->columns;
+      (*event).xexpose.height=(int) image_list[scene]->rows;
+      XRefreshWindow(display,&windows->image,event);
+      (void) XSync(display,MagickFalse);
+  }
+}
+
+static void XCountSceneColors(Image *images,XResourceInfo *resource_info)
+{
+  Image
+    *p;
+
+  for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
+  {
+    if (p->storage_class == DirectClass)
+      {
+        resource_info->colors=0;
+        break;
+      }
+    if (p->colors > resource_info->colors)
+      resource_info->colors=p->colors;
+  }
+}
+
+static void XClearMagickWindowIds(XWindowInfo **magick_windows,
+  const size_t number_windows)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_windows; i++)
+    magick_windows[i]->id=(Window) NULL;
+}
+
+typedef struct _AnimateCommandWidget
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  ExceptionInfo
+    *exception;
+
+  const char
+    *const *CommandMenu;
+
+  const AnimateCommand
+    *CommandMenus;
+
+  const char
+    *const **Menus;
+
+  const AnimateCommand
+    **Commands;
+
+  char
+    *command;
+} AnimateCommandWidget;
+
+typedef struct _AnimateCommandTargets
+{
+  XEvent
+    *event;
+
+  Image
+    **image;
+
+  MagickStatusType
+    *state;
+
+  Image
+    **nexus;
+} AnimateCommandTargets;
+
+static void XRunCommandWidget(const AnimateCommandWidget *command_widget,
+  const AnimateCommandTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  Image
+    **const image = targets->image;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  Image
+    **const nexus = targets->nexus;
+
+  AnimateCommand
+    animate_command;
+
+  AnimateMenuSelection
+    menu_selection;
+
+  int
+    id;
+
+  id=XCommandWidget(command_widget->display,command_widget->windows,
+    command_widget->CommandMenu,&(*event));
+  if (id < 0)
+    return;
+  (void) CopyMagickString(command_widget->command,
+    command_widget->CommandMenu[id],MagickPathExtent);
+  animate_command=command_widget->CommandMenus[id];
+  menu_selection.display=command_widget->display;
+  menu_selection.windows=command_widget->windows;
+  menu_selection.CommandMenu=command_widget->CommandMenu;
+  menu_selection.Menus=command_widget->Menus;
+  menu_selection.Commands=command_widget->Commands;
+  menu_selection.id=id;
+  if (XSelectMenuCommand(&menu_selection,command_widget->command,
+      &animate_command) == MagickFalse)
+    return;
+  if (animate_command != NullCommand)
+    (*nexus)=XMagickCommand(command_widget->display,
+      command_widget->resource_info,command_widget->windows,animate_command,
+      &(*image),&(*state),command_widget->exception);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2227,7 +2772,6 @@ MagickExport Image *XAnimateImages(Display *display,
     command[MagickPathExtent],
     *directory,
     geometry[MagickPathExtent],
-    *p,
     resource_name[MagickPathExtent];
 
   Image
@@ -2252,7 +2796,6 @@ MagickExport Image *XAnimateImages(Display *display,
 
   ssize_t
     first_scene,
-    i,
     iterations,
     scene;
 
@@ -2301,9 +2844,6 @@ MagickExport Image *XAnimateImages(Display *display,
     *icon_map,
     *map_info;
 
-  XTextProperty
-    window_name;
-
   XVisualInfo
     *icon_visual,
     *visual_info;
@@ -2316,6 +2856,12 @@ MagickExport Image *XAnimateImages(Display *display,
 
   XWMHints
     *manager_hints;
+
+  AnimateSceneList
+    scene_list;
+
+  const AnimateCommandTargets
+    command_targets = { &event, &image, &state, &nexus };
 
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
@@ -2341,22 +2887,10 @@ MagickExport Image *XAnimateImages(Display *display,
     }
   else
     {
-      Image
-        *p;
-
       /*
         Initialize window structure.
       */
-      for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
-      {
-        if (p->storage_class == DirectClass)
-          {
-            resource_info->colors=0;
-            break;
-          }
-        if (p->colors > resource_info->colors)
-          resource_info->colors=p->colors;
-      }
+      XCountSceneColors(images,resource_info);
       windows=XSetWindows(XInitializeWindows(display,resource_info));
       if (windows == (XWindows *) NULL)
         ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
@@ -2372,8 +2906,7 @@ MagickExport Image *XAnimateImages(Display *display,
       magick_windows[number_windows++]=(&windows->command);
       magick_windows[number_windows++]=(&windows->widget);
       magick_windows[number_windows++]=(&windows->popup);
-      for (i=0; i < (ssize_t) number_windows; i++)
-        magick_windows[i]->id=(Window) NULL;
+      XClearMagickWindowIds(magick_windows,number_windows);
     }
   /*
     Initialize font info.
@@ -2403,21 +2936,7 @@ MagickExport Image *XAnimateImages(Display *display,
     ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
       images->filename);
   images=coalesce_image;
-  if (resource_info->map_type == (char *) NULL)
-    if ((visual_info->klass != TrueColor) &&
-        (visual_info->klass != DirectColor))
-      {
-        Image
-          *next;
-
-        /*
-          Determine if the sequence of images has the identical colormap.
-        */
-        next=XFindColormapMismatch(images,visual_info);
-        if (next != (Image *) NULL)
-          (void) RemapImages(resource_info->quantize_info,images,
-            (Image *) NULL,exception);
-      }
+  XRemapColormapMismatch(resource_info,visual_info,images,exception);
   /*
     Sort images by increasing scene number.
   */
@@ -2426,25 +2945,17 @@ MagickExport Image *XAnimateImages(Display *display,
   if (image_list == (Image **) NULL)
     ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
       images->filename);
-  for (scene=0; scene < (ssize_t) number_scenes; scene++)
-    if (image_list[scene]->scene == 0)
-      break;
-  if (scene == (ssize_t) number_scenes)
-    qsort((void *) image_list,number_scenes,sizeof(Image *),SceneCompare);
+  XSortSceneList(image_list,number_scenes);
   /*
     Initialize Standard Colormap.
   */
   nexus=NewImageList();
-  display_image=image_list[0];
-  for (scene=0; scene < (ssize_t) number_scenes; scene++)
-  {
-    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
-      (void) SetImageType(image_list[scene],image_list[scene]->alpha_trait ==
-        BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
-    if ((display_image->columns < image_list[scene]->columns) &&
-        (display_image->rows < image_list[scene]->rows))
-      display_image=image_list[scene];
-  }
+  scene_list.resource_info=resource_info;
+  scene_list.visual_info=visual_info;
+  scene_list.image_list=image_list;
+  scene_list.number_scenes=number_scenes;
+  scene_list.exception=exception;
+  display_image=XPrepareSceneImages(&scene_list);
   if (resource_info->debug != MagickFalse)
     {
       (void) LogMagickEvent(X11Event,GetMagickModule(),
@@ -2626,21 +3137,7 @@ MagickExport Image *XAnimateImages(Display *display,
       if (resource_info->debug != MagickFalse)
         (void) LogMagickEvent(X11Event,GetMagickModule(),
           "Window id: 0x%lx (backdrop)",windows->backdrop.id);
-      (void) XMapWindow(display,windows->backdrop.id);
-      (void) XClearWindow(display,windows->backdrop.id);
-      if (windows->image.id != (Window) NULL)
-        {
-          (void) XDestroyWindow(display,windows->image.id);
-          windows->image.id=(Window) NULL;
-        }
-      /*
-        Position image in the center the backdrop.
-      */
-      windows->image.flags|=USPosition;
-      windows->image.x=(XDisplayWidth(display,visual_info->screen)/2)-
-        ((int) windows->image.width/2);
-      windows->image.y=(XDisplayHeight(display,visual_info->screen)/2)-
-        ((int) windows->image.height/2);
+      XCenterImageOnBackdrop(display,windows,visual_info);
     }
   manager_hints->flags=IconWindowHint | InputHint | StateHint;
   manager_hints->icon_window=windows->icon.id;
@@ -2788,13 +3285,7 @@ MagickExport Image *XAnimateImages(Display *display,
   /*
     Set out progress and warning handlers.
   */
-  if (warning_handler == (WarningHandler) NULL)
-    {
-      warning_handler=resource_info->display_warnings ?
-        SetErrorHandler(XWarning) : SetErrorHandler((ErrorHandler) NULL);
-      warning_handler=resource_info->display_warnings ?
-        SetWarningHandler(XWarning) : SetWarningHandler((WarningHandler) NULL);
-    }
+  warning_handler=XSetAnimateWarningHandlers(resource_info,warning_handler);
   /*
     Initialize X image structure.
   */
@@ -2821,6 +3312,9 @@ MagickExport Image *XAnimateImages(Display *display,
   XSetCursorState(display,windows,MagickTrue);
   for (scene=0; scene < (ssize_t) number_scenes; scene++)
   {
+    AnimateSceneWindow
+      scene_window;
+
     unsigned int
       columns,
       rows;
@@ -2859,47 +3353,15 @@ MagickExport Image *XAnimateImages(Display *display,
     /*
       Window name is the base of the filename.
     */
-    if (resource_info->title != (char *) NULL)
-      {
-        char
-          *title;
-
-        title=InterpretImageProperties(resource_info->image_info,
-          image_list[scene],resource_info->title,exception);
-        (void) CloneString(&windows->image.name,title);
-        title=DestroyString(title);
-      }
-    else
-      {
-        char
-          window_name[MagickPathExtent];
-
-        p=image_list[scene]->magick_filename+
-          strlen(image_list[scene]->magick_filename)-1;
-        while ((p > image_list[scene]->magick_filename) && (*(p-1) != '/'))
-          p--;
-        (void) FormatLocaleString(window_name,MagickPathExtent,
-          "%s: %s[%.17g of %.17g]",MagickPackageName,p,(double) scene+1,
-          (double) number_scenes);
-        (void) CloneString(&windows->image.name,window_name);
-      }
-    status=XStringListToTextProperty(&windows->image.name,1,&window_name);
-    if (status != Success)
-      {
-        XSetWMName(display,windows->image.id,&window_name);
-        (void) XFree((void *) window_name.value);
-      }
-    windows->image.pixmaps[scene]=windows->image.pixmap;
-    windows->image.matte_pixmaps[scene]=windows->image.matte_pixmap;
-    if (scene == 0)
-      {
-        event.xexpose.x=0;
-        event.xexpose.y=0;
-        event.xexpose.width=(int) image_list[scene]->columns;
-        event.xexpose.height=(int) image_list[scene]->rows;
-        XRefreshWindow(display,&windows->image,&event);
-        (void) XSync(display,MagickFalse);
-    }
+    scene_window.display=display;
+    scene_window.resource_info=resource_info;
+    scene_window.windows=windows;
+    scene_window.image_list=image_list;
+    scene_window.number_scenes=number_scenes;
+    scene_window.exception=exception;
+    scene_window.scene=scene;
+    XNameSceneWindow(&scene_window);
+    XStoreSceneWindow(&scene_window,&event);
   }
   XSetCursorState(display,windows,MagickFalse);
   if (windows->command.mapped)
@@ -2929,6 +3391,9 @@ MagickExport Image *XAnimateImages(Display *display,
         AnimationSceneStep
           scene_step;
 
+        AnimateSceneView
+          scene_view;
+
         const AnimationSceneTargets
           scene_targets = { &scene, &iterations, &state, &pause };
 
@@ -2942,8 +3407,7 @@ MagickExport Image *XAnimateImages(Display *display,
         XAdvanceScene(&scene_step,&scene_targets);
         scene=MagickMax(scene,0);
         image=image_list[scene];
-        if ((image != (Image *) NULL) && (image->start_loop != 0))
-          first_scene=scene;
+        first_scene=XLoopStartScene(image,scene,first_scene);
         animation_title.display=display;
         animation_title.resource_info=resource_info;
         animation_title.windows=windows;
@@ -2957,27 +3421,17 @@ MagickExport Image *XAnimateImages(Display *display,
         /*
           Copy X pixmap to Image window.
         */
-        XGetPixelInfo(display,visual_info,map_info,resource_info,
-          image_list[scene],windows->image.pixel_info);
-        if (image != (Image *) NULL)
-          {
-            windows->image.ximage->width=(int) image->columns;
-            windows->image.ximage->height=(int) image->rows;
-          }
-        windows->image.pixmap=windows->image.pixmaps[scene];
-        windows->image.matte_pixmap=windows->image.matte_pixmaps[scene];
-        event.xexpose.x=0;
-        event.xexpose.y=0;
-        event.xexpose.width=(int) image->columns;
-        event.xexpose.height=(int) image->rows;
-        if ((state & ExitState) == 0)
-          {
-            XRefreshWindow(display,&windows->image,&event);
-            (void) XSync(display,MagickFalse);
-          }
+        scene_view.display=display;
+        scene_view.resource_info=resource_info;
+        scene_view.windows=windows;
+        scene_view.visual_info=visual_info;
+        scene_view.map_info=map_info;
+        scene_view.image_list=image_list;
+        scene_view.image=image;
+        scene_view.scene=scene;
+        XShowAnimationScene(&scene_view,state,&event);
         state&=(~StepAnimationState);
-        if (pause != MagickFalse)
-          XPauseAnimation(display,resource_info,windows,&event);
+        XPauseAnimationScene(&scene_view,pause,&event);
         continue;
       }
     /*
@@ -2990,32 +3444,22 @@ MagickExport Image *XAnimateImages(Display *display,
         MagickTrue : MagickFalse;
     if (event.xany.window == windows->command.id)
       {
-        AnimateMenuSelection
-          menu_selection;
-
-        int
-          id;
+        AnimateCommandWidget
+          command_widget;
 
         /*
           Select a command from the Command widget.
         */
-        id=XCommandWidget(display,windows,CommandMenu,&event);
-        if (id < 0)
-          continue;
-        (void) CopyMagickString(command,CommandMenu[id],MagickPathExtent);
-        animate_command=CommandMenus[id];
-        menu_selection.display=display;
-        menu_selection.windows=windows;
-        menu_selection.CommandMenu=CommandMenu;
-        menu_selection.Menus=Menus;
-        menu_selection.Commands=Commands;
-        menu_selection.id=id;
-        if (XSelectMenuCommand(&menu_selection,command,&animate_command) ==
-            MagickFalse)
-          continue;
-        if (animate_command != NullCommand)
-          nexus=XMagickCommand(display,resource_info,windows,animate_command,
-            &image,&state,exception);
+        command_widget.display=display;
+        command_widget.resource_info=resource_info;
+        command_widget.windows=windows;
+        command_widget.exception=exception;
+        command_widget.CommandMenu=CommandMenu;
+        command_widget.CommandMenus=CommandMenus;
+        command_widget.Menus=Menus;
+        command_widget.Commands=Commands;
+        command_widget.command=command;
+        XRunCommandWidget(&command_widget,&command_targets);
         continue;
       }
     switch (event.type)
@@ -3489,17 +3933,7 @@ MagickExport Image *XAnimateImages(Display *display,
   while (!(state & ExitState));
   image_list=(Image **) RelinquishMagickMemory(image_list);
   images=DestroyImageList(images);
-  if (IsColormapVisual(windows->visual_info) != MagickFalse)
-    {
-      /*
-        Withdraw windows.
-      */
-      if (windows->info.mapped)
-        (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-      if (windows->command.mapped)
-        (void) XWithdrawWindow(display,windows->command.id,
-          windows->command.screen);
-    }
+  XWithdrawColormapWindows(display,windows);
   if ((resource_info->backdrop == MagickFalse) &&
       (windows->backdrop.mapped))
     {
@@ -3513,15 +3947,7 @@ MagickExport Image *XAnimateImages(Display *display,
     }
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
-  for (scene=1; scene < (ssize_t) number_scenes; scene++)
-  {
-    if (windows->image.pixmaps[scene] != (Pixmap) NULL)
-      (void) XFreePixmap(display,windows->image.pixmaps[scene]);
-    windows->image.pixmaps[scene]=(Pixmap) NULL;
-    if (windows->image.matte_pixmaps[scene] != (Pixmap) NULL)
-      (void) XFreePixmap(display,windows->image.matte_pixmaps[scene]);
-    windows->image.matte_pixmaps[scene]=(Pixmap) NULL;
-  }
+  XFreeScenePixmaps(display,windows,number_scenes);
   XSetCursorState(display,windows,MagickFalse);
   windows->image.pixmaps=(Pixmap *)
     RelinquishMagickMemory(windows->image.pixmaps);
@@ -3529,16 +3955,19 @@ MagickExport Image *XAnimateImages(Display *display,
     RelinquishMagickMemory(windows->image.matte_pixmaps);
   if (nexus == (Image *) NULL)
     {
-      /*
-        Free X resources.
-      */
-      if (windows->image.mapped != MagickFalse)
-        (void) XWithdrawWindow(display,windows->image.id,windows->image.screen);
-      XDelay(display,SuspendTime);
-      (void) XFreeStandardColormap(display,icon_visual,icon_map,icon_pixel);
-      if (resource_info->map_type == (char *) NULL)
-        (void) XFreeStandardColormap(display,visual_info,map_info,pixel);
-      DestroyXResources();
+      AnimateX11Resources
+        x11_resources;
+
+      x11_resources.display=display;
+      x11_resources.resource_info=resource_info;
+      x11_resources.windows=windows;
+      x11_resources.visual_info=visual_info;
+      x11_resources.map_info=map_info;
+      x11_resources.pixel=pixel;
+      x11_resources.icon_visual=icon_visual;
+      x11_resources.icon_map=icon_map;
+      x11_resources.icon_pixel=icon_pixel;
+      XReleaseAnimateResources(&x11_resources);
     }
   (void) XSync(display,MagickFalse);
   /*

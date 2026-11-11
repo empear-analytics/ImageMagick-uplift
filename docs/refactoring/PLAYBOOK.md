@@ -5279,6 +5279,30 @@ helper returns a status the caller tests, which here would always lead to the sa
    declares and the caller does not read after it (`p`, `q`, `sync`) move into the
    helper; the loop keeps its `for` statement and its body becomes the call, with no
    `continue;` after it (step 1's tail).
+7. A block that is not a whole loop body, whose inputs and written variables would give
+   five or more parameters under steps 2 and 4 (2026-11-11): the variables it only reads
+   go in an input struct as Recipe Z steps 2 and 5 say (one member per variable, its
+   exact type and name; an array the block names only as a call argument as Recipe N
+   step 2 allows; the local declared at the top of the block that holds the call and
+   filled directly before it), and the two to four variables it writes go by one
+   `const` struct of their addresses as Recipe Z step 7 says (declared `const` once, at
+   the top of the caller's body, with the addresses as its initialiser; one pointer
+   member per variable, in the order the block first writes them). A struct local whose
+   address the block passes to a callee's non-`const` pointer parameter (`&event`) is
+   one of the written variables. The helper takes `const Name *name` and then `const
+   Targets *targets`, binds each target once at the top of its body (`T *const v =
+   targets->v;`), reads the inputs as `name->member` or through `const` locals (Recipe
+   N step 4), and writes `(*v)` for each written variable, `&v` becoming `&(*v)`, as
+   Recipe Z step 4 does; each `continue;` that continued `Lp` becomes `return;` (step
+   3). The block's own declarations, and each temporary it writes before reading that
+   nothing after it reads (Recipe E step 4), move into the helper. Step 5 holds: the
+   call, then the `continue;` that followed the block. Why the behaviour is the same:
+   the members are copied directly before the call from variables the block does not
+   write, so each read sees the value it saw (Recipe N); every write goes through an
+   address fixed at the caller's declaration to the caller's own object, in the same
+   order (Recipe Z step 7, Recipe I); every path out of the helper returns to the
+   `continue;`, as every path out of the block reached one (*Careful*). Checked by
+   reading.
 
 **Before:**
 
@@ -5378,7 +5402,13 @@ loop (guard, a fetch that `continue;`s, `IntegrateRow`, a sync test and a progre
 needs six parameters as a plain OC helper; with its views, images and exception in a
 struct, the function leaves Bumpy Road and Complex Method, 6.49 to 6.77 in a probe, no
 finding on the helper. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
-2026-10-24.
+2026-10-24. Step 7 (2026-11-11, campaign A, W17 lane c, wide build): `animate.c`'s
+`XAnimateImages`, whose Command-widget branch in the event loop leaves through two
+`continue;`s and a final one, reads nine variables (the display, the windows, the four
+menu tables, the `command` buffer, resource info, exception) and writes `event`,
+`image`, `state` and `nexus`; the probe takes the function from 10 bumps to 9, 3.42 to
+3.48. Added by Claude Code (Claude Opus 5.5) under the owner's OK to evolve the recipes
+(2026-11-10).
 
 ---
 
@@ -11280,3 +11310,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | D | *A case tail, a returned local, a split selection*: forms (b), *Unreached functions* and *Object code that differs only in the caller* may reuse a Recipe CT helper for a case tail (lost `break;`s are its `return;`s, the call before the case's `break;`, CT's `const` targets initialiser binding each member to `&v` by position), a helper that returns a local of its own (`v=Helper(...);`, `v` passed to no parameter, written by the block before any read), and an existing one-`switch` helper as SD's new function for the last groups of a `switch` with no `default:`; `tools/reuse_check.py` checks each | `widget.c`'s `XColorBrowserWidget` (campaign A, W17 lane a): its list press is `SelectFontBrowserEntry`'s body as a case tail, its reply cursor search is `FindListBrowserCursor`'s body returning the helper's own `i`, and its key slider's Prior, Next and End groups are `MoveFontBrowserSliderByPage`'s `switch`; without the forms each would be a new near-copy of an existing helper (the key slider moved whole by Recipe E measured cc 13, a *Complex Method*) | owner |
 | 2026-11-11 | AMEND | FB | Steps 3 and 4: the one call may be the whole condition of an `if` with no `else`, compared with a constant, whose body does not name the struct (`if (F(...,&name,...) == MagickFalse) return(...);`); the whole `if` statement moves into the compound statement, its body leaving through `return`, `break` or `continue` as before. Still seven steps | `layer.c`'s `OptimizeLayerFrames` (campaign A, W17 lane d): its `choice` fill (four members) stands directly before `if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse) return(...)`, which step 3 refused as not an expression statement. The step frees the two lines that Recipe B's `entry` declaration for `IsBetterFrameBounds` adds, so the function's *Large Method* count does not grow; object code IDENTICAL | owner |
 | 2026-11-11 | AMEND | O | *Use when*: the block may also be a straight run of assignments setting several locals together. Step 7 (new): five or six written variables, or fewer whose pointers would give five or more arguments, pass by one `const` struct of addresses declared at the top of the caller (Recipe Z step 7's form), bound to `T *const v` locals, `(*v)` at every use. Seven steps | `feature-texture.c`'s `GetImageFeatures` (campaign A, W17 lane d): its six buffer allocations (`cooccurrence`, `density_x`, `density_xy`, `density_y`, `Q`, `sum`, reading `number_grays`) lie outside every OpenMP region and write six locals; E step 4 refuses them, Q and K need a function with no OpenMP region, Z needs a selection, I and V an exit. Probe: 7.60 to 7.63, no new finding | owner |
+| 2026-11-11 | AMEND | OC | Step 7: a block that is not a whole loop body, whose inputs and written variables would give five or more parameters, takes its read-only variables in an input struct (Recipe Z steps 2 and 5) and its two to four written variables by one `const` struct of addresses (Recipe Z step 7); each `continue;` of the loop becomes `return;` and the caller keeps the `continue;` after the call | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): the Command-widget branch of the event loop leaves through `continue;` on every path, reads nine variables and writes four (`event`, `image`, `state`, `nexus`); OC step 2 allows four parameters and Z step 1 refuses a `continue` that leaves the block. Probe: 10 bumps to 9, 3.42 to 3.48 | owner |
