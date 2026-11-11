@@ -1666,6 +1666,9 @@ typedef struct _AnimateDropSource
 
   XEvent
     event;
+
+  XWindows
+    *windows;
 } AnimateDropSource;
 
 typedef struct _AnimateDropTargets
@@ -1793,6 +1796,24 @@ static MagickBooleanType XHandleMagickProtocol(
           *state|=ExitState;
           return(MagickFalse);
         }
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XHandleDropProtocol(
+  const AnimateDropSource *drop_source,const AnimateDropTargets *targets)
+{
+  XWindows
+    *const windows = drop_source->windows;
+
+  const XEvent
+    event = drop_source->event;
+
+  if (event.xclient.message_type == windows->dnd_protocols)
+    {
+      if (XReadDroppedImage(drop_source,targets) == MagickFalse)
+        return(MagickFalse);
       return(MagickFalse);
     }
   return(MagickTrue);
@@ -2834,6 +2855,12 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case ClientMessage:
       {
+        AnimateDropSource
+          drop_source;
+
+        AnimateDropTargets
+          targets;
+
         AnimateProtocolTargets
           protocol_targets;
 
@@ -2858,25 +2885,16 @@ MagickExport Image *XAnimateImages(Display *display,
         if (XHandleMagickProtocol(&window_colormaps,&protocol_targets) ==
             MagickFalse)
           break;
-        if (event.xclient.message_type == windows->dnd_protocols)
-          {
-            AnimateDropSource
-              drop_source;
-
-            AnimateDropTargets
-              targets;
-
-            drop_source.display=display;
-            drop_source.root_window=root_window;
-            drop_source.resource_info=resource_info;
-            drop_source.exception=exception;
-            drop_source.event=event;
-            targets.nexus=(&nexus);
-            targets.state=(&state);
-            if (XReadDroppedImage(&drop_source,&targets) == MagickFalse)
-              break;
-            break;
-          }
+        drop_source.display=display;
+        drop_source.root_window=root_window;
+        drop_source.resource_info=resource_info;
+        drop_source.exception=exception;
+        drop_source.event=event;
+        drop_source.windows=windows;
+        targets.nexus=(&nexus);
+        targets.state=(&state);
+        if (XHandleDropProtocol(&drop_source,&targets) == MagickFalse)
+          break;
         /*
           If client window delete message, exit.
         */
