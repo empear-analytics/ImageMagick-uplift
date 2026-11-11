@@ -6678,6 +6678,45 @@ static void XPackContinuous8BitLSB(const XImageRowSource *source,
   }
 }
 
+static void XPackRedHigh32BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 32 bit continuous-tone X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    if (IsGammaCorrected() != MagickFalse)
+      {
+        /*
+          Gamma correct canvas.
+        */
+        q=XPackGammaBGRARowLSB(canvas,p,q);
+        continue;
+      }
+    q=XPackBGRARowLSB(canvas,p,q);
+  }
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -6876,27 +6915,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
         default:
         {
           if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-            {
-              /*
-                Convert to 32 bit continuous-tone X canvas.
-              */
-              for (y=0; y < (int) canvas->rows; y++)
-              {
-                p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-                  canvas->columns,1,exception);
-                if (p == (const Quantum *) NULL)
-                  break;
-                if (IsGammaCorrected() != MagickFalse)
-                  {
-                    /*
-                      Gamma correct canvas.
-                    */
-                    q=XPackGammaBGRARowLSB(canvas,p,q);
-                    continue;
-                  }
-                q=XPackBGRARowLSB(canvas,p,q);
-              }
-            }
+            XPackRedHigh32BitLSB(&row_source,q);
           else
             if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
               {
