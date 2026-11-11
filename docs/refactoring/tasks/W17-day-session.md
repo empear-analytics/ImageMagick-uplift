@@ -213,3 +213,33 @@ fits, not allowed on unreached lines; the twins would clone); `XMakeImage`, `Des
 code; `XGetWindowImage` probes to depth 4 are flat; `XDitherImage` (function-static tables and 2D maps).
 Possible upstream: `XMakeMagnifyImage`'s bitmap cases advance `q+=scanline_pad` inside the column loop rather than
 once per row; `XMakeStandardColormap` never sets `pad` in the copied `XColor`s.
+
+## Lane d, second round: morphology.c 4.48 -> 6.19, fx.c 4.61 no commit (merged)
+
+`MorphologyPrimitiveDirect` (88 cases; no finding left): 7a785f91e D (b) progress tails reuse
+`ReportMorphologyProgress` 4.50; 2a915969a E `GetDirectKernelOffset` 4.53; 6291d7ed9 N
+`ForwardDirectChannelValue` 4.73; a0c385339 N `ReverseDirectChannelValue` 4.82; 4dd1230d9 playbook (MT
+amendment); 2d205ba09 MT nested pair (channel bodies and pixel loops in one commit, as amended step 6) 5.27;
+fd1299174 MT loop heads `MorphologyDirectScanRow` 5.35; 0ceb06f54 MT orphaned atomic `MorphologyDirectPass` 5.60.
+Timing (medians of 11 alternating runs against the baseline, Distance Euclidean:6 and Voronoi Manhattan:5 on
+1500x1500): 6291d7ed9 +1.8% / -3.1%, a0c385339 -0.5% / +0.8%, 2d205ba09 Voronoi -4.3% / -3.4% (the channel merge
+alone, not inlined, measured +4.1% to +5.9% and was not taken alone); the two per-row steps stayed within 3% at
+load averages of 9-29 (noisy). No indirect call in the object file.
+
+`MorphologyApply` (2,609 cases; once per kernel iteration, not timed): 7f73e686d E 5.63, c7b618dad E 5.66,
+44c83dcb2 Y 5.75, b2e81dc07 N 5.84, ca45ccdca Z 5.89, fb2cdb14b FI step 8 (flat, IDENTICAL), e06a06624 I 6.01,
+9ebccb019 N 6.10, faad7b3d9 SD 6.19.
+
+MT amendment (4dd1230d9, Decided by `owner` under the 2026-11-10 OK): step 1 admits copies differing by a
+statement in one copy only (outside any parallel region), an orphaned `#pragma omp atomic` at the same place in
+both (moved whole, unchanged), and a sequential loop's body head; step 4 writes the one-copy statement as
+`if (side == NameB) S` and a loop head in PC step 3's form; step 6 lets an inner pair whose out-of-line call
+slows the pixel path merge in one commit with the outer pair that holds both calls, quoting both timings.
+
+Plateau: `MorphologyApply` cc 22, 101 lines (the Smooth group, the seven-label two-stage run and `default`: any
+helper holding them is cc 9+, 6.13 in a probe); `AcquireKernelBuiltIn` (the open `#if 1`/`#else` question and its
+`#if 0` labels); `AcquireFreiChenKernel` (shortening cases 15-19 clones EdgeBasis, 5.91 in a probe);
+`ParseKernelArray` (`#if 0`/`#else`). fx.c: everything but `ExecuteRPN` is clean; splitting the evaluator is the
+parked chain (owner), and split_source.py refuses any split (FxImage pulls in the parser through
+`AcquireFxInfoPrivate`). Lane catalogue: 15,900 cases, 0 diverged. Possible upstream: `ScaleKernelInfo`'s
+`minimum = 1` (W16); `(void) (void) FormatLocaleFile` (cosmetic, moved verbatim into `ApplyDirectMorphology`).
