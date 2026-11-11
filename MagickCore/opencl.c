@@ -344,6 +344,21 @@ static char *AcquireOpenCLCacheDirectory(char *home,char *path,char *temp)
   return(temp);
 }
 
+static void SetOpenCLCacheDirectory(char *home,char *path,char *temp)
+{
+  temp=AcquireOpenCLCacheDirectory(home,path,temp);
+  if (temp == (char *) NULL)
+    {
+      temp=AcquireString("?");
+      (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
+        "Cannot use cache directory: \"%s\"",path);
+    }
+  else
+    (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
+      "Using cache directory: \"%s\"",temp);
+  cache_directory=temp;
+}
+
 static const char *GetOpenCLCacheDirectory()
 {
   if (cache_directory == (char *) NULL)
@@ -373,17 +388,7 @@ static const char *GetOpenCLCacheDirectory()
 #endif
             }
 
-          temp=AcquireOpenCLCacheDirectory(home,path,temp);
-          if (temp == (char *) NULL)
-            {
-              temp=AcquireString("?");
-              (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
-                "Cannot use cache directory: \"%s\"",path);
-            }
-          else
-            (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
-              "Using cache directory: \"%s\"",temp);
-          cache_directory=temp;
+          SetOpenCLCacheDirectory(home,path,temp);
         }
       UnlockSemaphoreInfo(cache_directory_lock);
     }
@@ -2402,6 +2407,78 @@ static inline MagickBooleanType IsOpenCLDeviceSkipped(
     (device->program != (cl_program) NULL)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _OpenCLDeviceCompile
+{
+  MagickCLEnv
+    clEnv;
+
+  char
+    *accelerateKernelsBuffer;
+
+  const char
+    *options;
+
+  size_t
+    signature;
+
+  ExceptionInfo
+    *exception;
+} OpenCLDeviceCompile;
+
+static MagickBooleanType CompileOpenCLDevices(
+  const OpenCLDeviceCompile *compile)
+{
+  const MagickCLEnv
+    clEnv = compile->clEnv;
+
+  char
+    *const accelerateKernelsBuffer = compile->accelerateKernelsBuffer;
+
+  const char
+    *const options = compile->options;
+
+  const size_t
+    signature = compile->signature;
+
+  ExceptionInfo
+    *const exception = compile->exception;
+
+  MagickBooleanType
+    status;
+
+  size_t
+    i;
+
+  status=MagickTrue;
+  for (i = 0; i < clEnv->number_devices; i++)
+  {
+    MagickCLDevice
+      device;
+
+    size_t
+      device_signature;
+
+    device=clEnv->devices[i];
+    if (IsOpenCLDeviceSkipped(device) != MagickFalse)
+      continue;
+
+    LockSemaphoreInfo(device->lock);
+    if (device->program != (cl_program) NULL)
+    {
+      UnlockSemaphoreInfo(device->lock);
+      continue;
+    }
+    device_signature=signature;
+    device_signature^=StringSignature(device->platform_name);
+    status=CompileOpenCLKernel(device,accelerateKernelsBuffer,options,
+      device_signature,exception);
+    UnlockSemaphoreInfo(device->lock);
+    if (status == MagickFalse)
+      break;
+  }
+  return(status);
+}
+
 static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2411,6 +2488,9 @@ static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
 
   MagickBooleanType
     status;
+
+  OpenCLDeviceCompile
+    compile;
 
   size_t
     i;
@@ -2442,33 +2522,12 @@ static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
     strlen(accelerateKernels2)+1,"%s%s",accelerateKernels,accelerateKernels2);
   signature^=StringSignature(accelerateKernelsBuffer);
 
-  status=MagickTrue;
-  for (i = 0; i < clEnv->number_devices; i++)
-  {
-    MagickCLDevice
-      device;
-
-    size_t
-      device_signature;
-
-    device=clEnv->devices[i];
-    if (IsOpenCLDeviceSkipped(device) != MagickFalse)
-      continue;
-
-    LockSemaphoreInfo(device->lock);
-    if (device->program != (cl_program) NULL)
-    {
-      UnlockSemaphoreInfo(device->lock);
-      continue;
-    }
-    device_signature=signature;
-    device_signature^=StringSignature(device->platform_name);
-    status=CompileOpenCLKernel(device,accelerateKernelsBuffer,options,
-      device_signature,exception);
-    UnlockSemaphoreInfo(device->lock);
-    if (status == MagickFalse)
-      break;
-  }
+  compile.clEnv=clEnv;
+  compile.accelerateKernelsBuffer=accelerateKernelsBuffer;
+  compile.options=options;
+  compile.signature=signature;
+  compile.exception=exception;
+  status=CompileOpenCLDevices(&compile);
   accelerateKernelsBuffer=(char *) RelinquishMagickMemory(
     accelerateKernelsBuffer);
   return(status);
@@ -2724,10 +2783,48 @@ static MagickBooleanType AcquireOpenCLContexts(MagickCLEnv clEnv,
   return(MagickTrue);
 }
 
+typedef struct _OpenCLPlatformTargets
+{
+  cl_uint
+    *number_platforms;
+
+  cl_platform_id
+    **platforms;
+} OpenCLPlatformTargets;
+
+static MagickBooleanType AcquireOpenCLPlatforms(
+  const OpenCLPlatformTargets *targets)
+{
+  cl_uint
+    *const number_platforms = targets->number_platforms;
+
+  cl_platform_id
+    **const platforms = targets->platforms;
+
+  *number_platforms=0;
+  if (openCL_library->clGetPlatformIDs(0,NULL,number_platforms) != CL_SUCCESS)
+    return(MagickFalse);
+  if (*number_platforms == 0)
+    return(MagickFalse);
+  *platforms=(cl_platform_id *) AcquireQuantumMemory(1,*number_platforms*
+    sizeof(cl_platform_id));
+  if (*platforms == (cl_platform_id *) NULL)
+    return(MagickFalse);
+  if (openCL_library->clGetPlatformIDs(*number_platforms,*platforms,NULL) != CL_SUCCESS)
+    {
+       *platforms=(cl_platform_id *) RelinquishMagickMemory(*platforms);
+       return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void LoadOpenCLDevices(MagickCLEnv clEnv)
 {
   OpenCLPlatformLoad
     platform_load;
+
+  OpenCLPlatformTargets
+    targets;
 
   cl_device_id
     *devices;
@@ -2740,20 +2837,10 @@ static void LoadOpenCLDevices(MagickCLEnv clEnv)
     next,
     number_platforms;
 
-  number_platforms=0;
-  if (openCL_library->clGetPlatformIDs(0,NULL,&number_platforms) != CL_SUCCESS)
+  targets.number_platforms=(&number_platforms);
+  targets.platforms=(&platforms);
+  if (AcquireOpenCLPlatforms(&targets) == MagickFalse)
     return;
-  if (number_platforms == 0)
-    return;
-  platforms=(cl_platform_id *) AcquireQuantumMemory(1,number_platforms*
-    sizeof(cl_platform_id));
-  if (platforms == (cl_platform_id *) NULL)
-    return;
-  if (openCL_library->clGetPlatformIDs(number_platforms,platforms,NULL) != CL_SUCCESS)
-    {
-       platforms=(cl_platform_id *) RelinquishMagickMemory(platforms);
-       return;
-    }
   CountOpenCLDevices(clEnv,platforms,number_platforms);
   if (clEnv->number_devices == 0)
     {

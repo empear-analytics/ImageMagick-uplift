@@ -1793,7 +1793,8 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    pointers, none written anywhere in the block, so the new function keeps at most four
    parameters: the struct and what the block writes through (a pixel buffer, say).
    An array of the caller (a local, or a function-local `static`) that the block uses
-   only as `v[e]` read, or passes whole to a callee's pointer parameter, never under
+   only as `v[e]` read, or passes whole to a callee's pointer parameter, or assigns whole
+   to a pointer member of a struct local the block fills (`s.m=v;`), never under
    `sizeof` or `&` or in any other expression, may be one of the group (2026-11-11;
    the member points to the array's own storage, so an element the caller writes
    elsewhere, before the fill or in an earlier iteration, is read through it as
@@ -1804,6 +1805,14 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    did at each use (C11 6.3.2.1p3), and `v[e]` is `*(v+e)` through either (Recipe
    AR's argument): each subscript reads the same element and each callee receives the
    same address.
+   The whole-array assignment `s.m=v;` (2026-11-11, later: `animate.c`'s
+   `window_colormaps.magick_windows=magick_windows;` and `command_window.CommandMenu=
+   CommandMenu;`) converts the array to the address of its first element as a call's
+   argument does (C11 6.3.2.1p3; simple assignment, 6.5.16.1p1, to a pointer of the
+   element type): the new function's member holds that address, bound as step 4 says,
+   and the block's `s.m=v;` stores the same address as before into the block's own
+   struct, which goes on only to the callees that received it before, so each reads the
+   same address and through it the same element.
    A plain struct value (a `PixelInfo`, `PointInfo` or `RectangleInfo` local or
    parameter; not an array, an array of structs, or a pointer's target) may be one of
    the group when, checked by reading: (a) every member of it is set on every path to
@@ -10803,6 +10812,16 @@ whole groups and keeps their nesting in the new function.
    the variables the block only reads by value, or in one `const` input struct filled
    as Recipe Y steps 3 to 5 say (Recipe N step 2's conditions for struct values and its
    by-address form), then `const T *targets` last: at most four parameters.
+   When the caller's sibling blocks already share one input struct under Recipe N step 8
+   (declared among the caller's declarations and filled once before them, nothing
+   writing a member's variable from the fill to the last call), the helper takes that
+   `const Name *name` first, in place of a struct of its own, and binds the members its
+   block reads as N step 4 does (a member may be written `name->member` at its uses,
+   member by member); no typedef, local or fill is added, and the call passes `&name`
+   where the block read the variables (2026-11-11, later: `animate.c`'s
+   `AnimateEventContext`, shared by the helpers of the event switch's cases). The
+   argument is N step 8's for the reads and this recipe's for the writes, which do not
+   meet: a written variable goes by the targets struct, never by the input struct.
 5. At the top of its body bind, per member the block writes and in member order,
    `V *const v = targets->v;` (and the input struct's members as Recipe N step 4 does).
    Write each written variable `v` as `(*v)` at every use, reads included, `&v` as `v`;
@@ -11705,3 +11724,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | RV | Step 6 (new (e)): the caller may pass the address of a local `w` that the block writes through (and that one exit returns) as `T *result`, and write `return(w);`, declaring no `returned`; the helper's text is unchanged. *Careful* gives the argument: `result` and the written pointer name one object, the paths that fall through never store, a path that returns stores into a local nothing reads but the return | `channel.c`'s `ChannelFxImage` (campaign A, W18 lane d): `destination_image` is what the separator helper's first exit returns and what it writes through; the `returned` local costs two lines of the loop helper that Recipe N moves, which then stands at 72 lines against the Large Method limit of 70 | owner |
 | 2026-11-11 | AMEND | PL | Integer form of step 1: `e` may be a parameter of an integer type whose peeled labels are decimal integer literals and whose `S` is `return(c);` of a numeric literal; the predicate takes `const` of `e`'s type, a kept `switch` without `default:` stays without one, a comment on a peeled label moves to the predicate. *Careful* adds the value-by-value argument and the timing duty for a per-pixel caller | `distort.c`'s `poly_basis_dx` (campaign A, W18 lane a): six of its twenty-one labels (`0`, `2`, `5`, `9`, `14`, `20`) only `return( 0.0 );`; peeled into `IsPolyBasisDxZero` the file goes 7.60 to 7.70 (cc 22 to 16); a polynomial distort of 1500x1500 pixels, order 5, medians of 11 alternating runs: 1.305 s against 1.314 s (+0.6%) | owner |
 | 2026-11-11 | NEW | HT | Hoist the Exit Test Common to a Selection's Branches: in `if (C) P else Q` where `P` ends in `if (V == F) return(V);` and `Q` holds the same test followed by statements `Z` that run only when it passed, `Q` becomes a `static MagickBooleanType` helper returning `V`, the selection assigns `V` from it, and the test is written once after the selection; `tools/tail_hoist_check.py` checks the rewrite token by token | `quantize.c`'s `KmeansImage` (campaign A, W18 lane d): the two seeding branches each hold a nested `if (status == MagickFalse) return(status);`, the function's two bumps; Recipe W refuses (its `R` is a variable), nothing else reaches the shape. Probe: quantize.c 8.74 to 8.81, no finding on the helper | owner |
+| 2026-11-11 | AMEND | N | Step 2's array clause: a caller array the block assigns whole to a pointer member of a struct it fills (`s.m=v;`) may join the input group, as one it passes whole to a callee's pointer parameter may; *Careful* in the step gives the argument (array-to-pointer conversion is the same in an assignment as in an argument, C11 6.3.2.1p3 and 6.5.16.1p1; the member holds the address the block stored) | `animate.c`'s `XAnimateImages` (campaign A, W18 lane c, wide build): the ClientMessage case fills `window_colormaps.magick_windows=magick_windows;` (a function-static array) and the ButtonPress case `command_window.CommandMenu=CommandMenu;` (a const local array) before passing the struct to a helper; N step 2 listed only subscripts and call arguments. Probe: stubbing both cases takes `XAnimateImages` out of two nested-conditional chunks, animate.c 4.06 to 4.18 | owner |
+| 2026-11-11 | AMEND | CT | Step 4: the helper takes the input struct that the caller's sibling blocks share under Recipe N step 8 (filled once before them) in place of an input struct of its own, binding the members its block reads as N step 4 does; the written variables still go by the targets struct | `animate.c`'s `XAnimateImages` (campaign A, W18 lane c, wide build): the event switch's cases MapNotify, PropertyNotify and KeyPress write `nexus`, `image` and `state` (the existing `AnimateCommandTargets`) and read the display, windows, resource info, exception and more, which Unmap, Expose and ClientMessage tails read as well; one `AnimateEventContext` filled once before the `do` loop serves all of them. Added after the first three uses, which cite N step 8 and CT step 4 together | owner |
