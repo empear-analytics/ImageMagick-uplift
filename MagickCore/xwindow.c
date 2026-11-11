@@ -4071,6 +4071,48 @@ static inline MagickBooleanType IsInsideWindowBounds(
     MagickFalse);
 }
 
+static void XInitializeDirectColors(const WindowInfo *window_info,
+  const int id,const unsigned int number_colors,XColor *colors)
+{
+  int
+    i;
+
+  size_t
+    blue,
+    blue_bit,
+    green,
+    green_bit,
+    red,
+    red_bit;
+
+  /*
+    DirectColor or TrueColor visual.
+  */
+  red=0;
+  green=0;
+  blue=0;
+  red_bit=window_info[id].visual->red_mask &
+    (~(window_info[id].visual->red_mask)+1);
+  green_bit=window_info[id].visual->green_mask &
+    (~(window_info[id].visual->green_mask)+1);
+  blue_bit=window_info[id].visual->blue_mask &
+    (~(window_info[id].visual->blue_mask)+1);
+  for (i=0; i < (int) number_colors; i++)
+  {
+    colors[i].pixel=(unsigned long) (red | green | blue);
+    colors[i].pad='\0';
+    red+=red_bit;
+    if (red > window_info[id].visual->red_mask)
+      red=0;
+    green+=green_bit;
+    if (green > window_info[id].visual->green_mask)
+      green=0;
+    blue+=blue_bit;
+    if (blue > window_info[id].visual->blue_mask)
+      blue=0;
+  }
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4353,42 +4395,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
                     colors[i].pad='\0';
                   }
                 else
-                  {
-                    size_t
-                      blue,
-                      blue_bit,
-                      green,
-                      green_bit,
-                      red,
-                      red_bit;
-
-                    /*
-                      DirectColor or TrueColor visual.
-                    */
-                    red=0;
-                    green=0;
-                    blue=0;
-                    red_bit=window_info[id].visual->red_mask &
-                      (~(window_info[id].visual->red_mask)+1);
-                    green_bit=window_info[id].visual->green_mask &
-                      (~(window_info[id].visual->green_mask)+1);
-                    blue_bit=window_info[id].visual->blue_mask &
-                      (~(window_info[id].visual->blue_mask)+1);
-                    for (i=0; i < (int) number_colors; i++)
-                    {
-                      colors[i].pixel=(unsigned long) (red | green | blue);
-                      colors[i].pad='\0';
-                      red+=red_bit;
-                      if (red > window_info[id].visual->red_mask)
-                        red=0;
-                      green+=green_bit;
-                      if (green > window_info[id].visual->green_mask)
-                        green=0;
-                      blue+=blue_bit;
-                      if (blue > window_info[id].visual->blue_mask)
-                        blue=0;
-                    }
-                  }
+                  XInitializeDirectColors(window_info,id,number_colors,colors);
                 (void) XQueryColors(display,window_info[id].colormap,colors,
                   (int) number_colors);
                 /*
