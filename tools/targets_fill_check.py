@@ -22,9 +22,11 @@ Recipe I gives:
     removed lines and HELPER's body lines must be the same multiset, indentation and
     a declarator's trailing `,` or `;` aside, except: the bindings and their type
     lines that open the body; the one `return(MagickTrue);` that ends it; and the
-    exits. Each removed exit (`goto L;`, `return ...;`) must reappear unchanged
-    among the added lines outside HELPER (the caller's exit, step 7 or 8), and HELPER
-    must hold as many `return(MagickFalse);` as the block had exits;
+    exits. Each removed exit (`goto L;`, `return ...;`, or step 1's `break;` of the
+    enclosing `switch`) must reappear unchanged among the added lines outside HELPER
+    (the caller's one exit after the call, step 7 or 8; several removed exits of the
+    same text are matched by that one line), and HELPER must hold as many
+    `return(MagickFalse);` as the block had exits;
   - nothing else is added: every added line outside HELPER's body belongs to the
     typedef, HELPER's signature, the declaration of LOCAL, its fill, the call, or is
     the exit matched above.
@@ -40,7 +42,7 @@ import sys
 from collections import Counter, namedtuple
 
 TRIVIAL = {"", "{", "}", "/*", "*/"}
-EXIT = re.compile(r"^(goto \w+;|return\b.*;)$")
+EXIT = re.compile(r"^(goto \w+;|return\b.*;|break;)$")
 Step = namedtuple("Step", "path type_name local helper")
 
 
@@ -162,13 +164,16 @@ def check_rewrite(path, body, ptr, names):
     trues = [b for b in body_lines if b == "return(MagickTrue);"]
     if len(trues) != 1 or body_lines[-1] != "return(MagickTrue);":
         problems.append("the helper must end with its one return(MagickTrue);")
+    matched_exits = set()
     for r in removed:
         f = canonical(forward(r, names), names).rstrip(",;")
         if helper[f] > 0:
             helper[f] -= 1
             continue
-        if EXIT.match(r) and outside[r] > 0:
-            outside[r] -= 1
+        if EXIT.match(r) and (r in matched_exits or outside[r] > 0):
+            if r not in matched_exits:
+                outside[r] -= 1  # the caller's one exit line stands for every copy
+                matched_exits.add(r)
             exits += 1
             continue
         problems.append(f"removed but not moved: {r}  (as {f})")
@@ -190,6 +195,9 @@ def check_outside(text, step, outside):
     allowed = {l.strip() for l in (typedef + "\n" + sig).splitlines()}
     allowed |= {step.type_name, "const " + step.type_name, step.local + ";",
                 step.local + ","}
+    for call in re.finditer(r"^[^\n]*\b" + re.escape(step.helper) + r"\([^;{]*\)[^;{]*",
+                            text, re.M):
+        allowed |= {l.strip() for l in call.group(0).splitlines()}  # a wrapped call
     init = re.search(r"^\s*(" + re.escape(step.local) + r"\s*=\s*\{[^}]*\};)", text, re.M)
     if init:
         allowed.add(init.group(1).strip())  # the const form, checked by check_fill
