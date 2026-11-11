@@ -1779,6 +1779,42 @@ static inline MagickBooleanType IsSelectionUnusable(const int status,
     (length == 0)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _AnnotateTargets
+{
+  XAnnotateInfo
+    **annotate_info;
+
+  char
+    **p;
+
+  int
+    *x,
+    *y;
+} AnnotateTargets;
+
+static void XGoToPreviousTextLine(const AnnotateTargets *targets)
+{
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  /*
+    Go to end of the previous line of text.
+  */
+  (*annotate_info)=(*annotate_info)->previous;
+  (*p)=(*annotate_info)->text;
+  (*x)=(*annotate_info)->x+(int) (*annotate_info)->width;
+  (*y)=(*annotate_info)->y;
+  if ((*annotate_info)->width != 0)
+    (*p)+=(ptrdiff_t) strlen((*annotate_info)->text);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -1876,6 +1912,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   XEvent
     event,
     text_event;
+
+  const AnnotateTargets
+    targets = { &annotate_info, &p, &x, &y };
 
   /*
     Map Command widget.
@@ -2420,15 +2459,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
                   break;
                 else
                   {
-                    /*
-                      Go to end of the previous line of text.
-                    */
-                    annotate_info=annotate_info->previous;
-                    p=annotate_info->text;
-                    x=annotate_info->x+(int) annotate_info->width;
-                    y=annotate_info->y;
-                    if (annotate_info->width != 0)
-                      p+=(ptrdiff_t) strlen(annotate_info->text);
+                    XGoToPreviousTextLine(&targets);
                     break;
                   }
               }
@@ -3294,6 +3325,85 @@ static void XReplaceRowColor(Image **image,Quantum *q,const PixelInfo target,
   }
 }
 
+static void XReplaceColormapColor(Image **image,const PixelInfo target,
+  const XColor color,ExceptionInfo *exception)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) (*image)->colors; i++)
+    if (IsFuzzyEquivalencePixelInfo((*image)->colormap+i,&target))
+      {
+        (*image)->colormap[i].red=(double) ScaleShortToQuantum(
+          color.red);
+        (*image)->colormap[i].green=(double) ScaleShortToQuantum(
+          color.green);
+        (*image)->colormap[i].blue=(double) ScaleShortToQuantum(
+          color.blue);
+      }
+  (void) SyncImage(*image,exception);
+}
+
+typedef struct _XReplaceColorInput
+{
+  Image
+    **image;
+
+  CacheView
+    *image_view;
+
+  PixelInfo
+    target;
+
+  XColor
+    color;
+
+  ExceptionInfo
+    *exception;
+} XReplaceColorInput;
+
+static void XReplaceImageColor(const XReplaceColorInput *replace)
+{
+  Image
+    **const image = replace->image;
+
+  CacheView
+    *const image_view = replace->image_view;
+
+  const PixelInfo
+    target = replace->target;
+
+  const XColor
+    color = replace->color;
+
+  ExceptionInfo
+    *const exception = replace->exception;
+
+  int
+    y;
+
+  Quantum
+    *q;
+
+  if ((*image)->storage_class == DirectClass)
+    {
+      for (y=0; y < (int) (*image)->rows; y++)
+      {
+        q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
+          (*image)->columns,1,exception);
+        if (q == (Quantum *) NULL)
+          break;
+        XReplaceRowColor(image,q,target,color);
+        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+          break;
+      }
+    }
+  else
+    {
+      XReplaceColormapColor(image,target,color,exception);
+    }
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3763,38 +3873,20 @@ static MagickBooleanType XColorEditImage(Display *display,
             PixelInfo
               target;
 
+            XReplaceColorInput
+              replace;
+
             /*
               Update color information using replace algorithm.
             */
             (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
               x_offset,(ssize_t) y_offset,&target,exception);
-            if ((*image)->storage_class == DirectClass)
-              {
-                for (y=0; y < (int) (*image)->rows; y++)
-                {
-                  q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
-                    (*image)->columns,1,exception);
-                  if (q == (Quantum *) NULL)
-                    break;
-                  XReplaceRowColor(image,q,target,color);
-                  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-                    break;
-                }
-              }
-            else
-              {
-                for (i=0; i < (ssize_t) (*image)->colors; i++)
-                  if (IsFuzzyEquivalencePixelInfo((*image)->colormap+i,&target))
-                    {
-                      (*image)->colormap[i].red=(double) ScaleShortToQuantum(
-                        color.red);
-                      (*image)->colormap[i].green=(double) ScaleShortToQuantum(
-                        color.green);
-                      (*image)->colormap[i].blue=(double) ScaleShortToQuantum(
-                        color.blue);
-                    }
-                (void) SyncImage(*image,exception);
-              }
+            replace.image=image;
+            replace.image_view=image_view;
+            replace.target=target;
+            replace.color=color;
+            replace.exception=exception;
+            XReplaceImageColor(&replace);
             break;
           }
           case FloodfillMethod:
@@ -3903,6 +3995,78 @@ static MagickBooleanType XColorEditImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _ComposeMenuInfo
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  int
+    id;
+} ComposeMenuInfo;
+
+static CompositeOperator
+  XSelectPasteOperator(const ComposeMenuInfo *,const char *const *,
+    CompositeOperator);
+
+typedef struct _CompositeTargets
+{
+  double
+    *blend;
+
+  CompositeOperator
+    *compose;
+} CompositeTargets;
+
+static void XSelectDissolveBlend(Display *display,XWindows *windows,
+  const CompositeTargets *targets)
+{
+  double
+    *const blend = targets->blend;
+
+  CompositeOperator
+    *const compose = targets->compose;
+
+  static char
+    factor[MagickPathExtent] = "20.0";
+
+  /*
+    Dissolve the two images a given percent.
+  */
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXcopy);
+  (void) XDialogWidget(display,windows,"Dissolve",
+    "Enter the blend factor (0.0 - 99.9%):",factor);
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+  if (*factor == '\0')
+    return;
+  (*blend)=StringToDouble(factor,(char **) NULL);
+  (*compose)=DissolveCompositeOp;
+}
+
+static void XSelectDisplaceGeometry(Display *display,XWindows *windows,
+  char *displacement_geometry,const CompositeTargets *targets)
+{
+  CompositeOperator
+    *const compose = targets->compose;
+
+  /*
+    Get horizontal and vertical scale displacement geometry.
+  */
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXcopy);
+  (void) XDialogWidget(display,windows,"Displace",
+    "Enter the horizontal and vertical scale:",displacement_geometry);
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+  if (*displacement_geometry == '\0')
+    return;
+  (*compose)=DisplaceCompositeOp;
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3945,7 +4109,6 @@ static MagickBooleanType XCompositeImage(Display *display,
     *composite_image;
 
   int
-    entry,
     id,
     x,
     y;
@@ -3967,6 +4130,9 @@ static MagickBooleanType XCompositeImage(Display *display,
 
   XEvent
     event;
+
+  const CompositeTargets
+    targets = { &blend, &compose };
 
   /*
     Request image file name from user.
@@ -4043,58 +4209,24 @@ static MagickBooleanType XCompositeImage(Display *display,
         {
           case CompositeOperatorsCommand:
           {
-            char
-              command[MagickPathExtent],
-              **operators;
+            ComposeMenuInfo
+              menu_info;
 
-            /*
-              Select a command from the pop-up menu.
-            */
-            operators=GetCommandOptions(MagickComposeOptions);
-            if (operators == (char **) NULL)
-              break;
-            entry=XMenuWidget(display,windows,CompositeMenu[id],
-              (const char **) operators,command);
-            if (entry >= 0)
-              compose=(CompositeOperator) ParseCommandOption(
-                MagickComposeOptions,MagickFalse,operators[entry]);
-            operators=DestroyStringList(operators);
+            menu_info.display=display;
+            menu_info.windows=windows;
+            menu_info.id=id;
+            compose=XSelectPasteOperator(&menu_info,CompositeMenu,compose);
             break;
           }
           case CompositeDissolveCommand:
           {
-            static char
-              factor[MagickPathExtent] = "20.0";
-
-            /*
-              Dissolve the two images a given percent.
-            */
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            (void) XDialogWidget(display,windows,"Dissolve",
-              "Enter the blend factor (0.0 - 99.9%):",factor);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            if (*factor == '\0')
-              break;
-            blend=StringToDouble(factor,(char **) NULL);
-            compose=DissolveCompositeOp;
+            XSelectDissolveBlend(display,windows,&targets);
             break;
           }
           case CompositeDisplaceCommand:
           {
-            /*
-              Get horizontal and vertical scale displacement geometry.
-            */
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            (void) XDialogWidget(display,windows,"Displace",
-              "Enter the horizontal and vertical scale:",displacement_geometry);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            if (*displacement_geometry == '\0')
-              break;
-            compose=DisplaceCompositeOp;
+            XSelectDisplaceGeometry(display,windows,displacement_geometry,
+              &targets);
             break;
           }
           case CompositeHelpCommand:
@@ -4227,17 +4359,7 @@ static MagickBooleanType XCompositeImage(Display *display,
         */
         x=event.xmotion.x;
         y=event.xmotion.y;
-        if (windows->info.mapped != MagickFalse)
-          {
-            if ((x < (windows->info.x+(int) windows->info.width)) &&
-                (y < (windows->info.y+(int) windows->info.height)))
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
-          }
-        else
-          if ((x > (windows->info.x+(int) windows->info.width)) ||
-              (y > (windows->info.y+(int) windows->info.height)))
-            (void) XMapWindow(display,windows->info.id);
+        XTrackInfoWidget(display,windows,x,y);
         composite_info.x=(ssize_t) windows->image.x+x;
         composite_info.y=(ssize_t) windows->image.y+y;
         break;
@@ -6459,6 +6581,49 @@ static void XDrawPanRectangle(Display *display,XWindows *windows)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XTrimUndoCache(const XResourceInfo *resource_info,size_t *bytes,
+  Image **undo_image)
+{
+  Image
+    *cache_image,
+    *previous_image;
+
+  if (*undo_image != (Image *) NULL)
+    {
+      /*
+        Ensure the undo cache has enough memory available.
+      */
+      previous_image=*undo_image;
+      while (previous_image != (Image *) NULL)
+      {
+        *bytes+=previous_image->list->columns*previous_image->list->rows*
+          sizeof(PixelInfo);
+        if (*bytes <= (resource_info->undo_cache << 20))
+          {
+            previous_image=GetPreviousImageInList(previous_image);
+            continue;
+          }
+        *bytes-=previous_image->list->columns*previous_image->list->rows*
+          sizeof(PixelInfo);
+        if (previous_image == *undo_image)
+          *undo_image=NewImageList();
+        else
+          previous_image->next->previous=NewImageList();
+        break;
+      }
+      while (previous_image != (Image *) NULL)
+      {
+        /*
+          Delete any excess memory from undo cache.
+        */
+        cache_image=previous_image;
+        previous_image=GetPreviousImageInList(previous_image);
+        cache_image->list=DestroyImage(cache_image->list);
+        cache_image=DestroyImage(cache_image);
+      }
+    }
+}
+
 static void XImageCache(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -6589,47 +6754,11 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
     case SaveToUndoBufferCommand:
     case RedoCommand:
     {
-      Image
-        *previous_image;
-
       size_t
         bytes;
 
       bytes=(*image)->columns*(*image)->rows*sizeof(PixelInfo);
-      if (undo_image != (Image *) NULL)
-        {
-          /*
-            Ensure the undo cache has enough memory available.
-          */
-          previous_image=undo_image;
-          while (previous_image != (Image *) NULL)
-          {
-            bytes+=previous_image->list->columns*previous_image->list->rows*
-              sizeof(PixelInfo);
-            if (bytes <= (resource_info->undo_cache << 20))
-              {
-                previous_image=GetPreviousImageInList(previous_image);
-                continue;
-              }
-            bytes-=previous_image->list->columns*previous_image->list->rows*
-              sizeof(PixelInfo);
-            if (previous_image == undo_image)
-              undo_image=NewImageList();
-            else
-              previous_image->next->previous=NewImageList();
-            break;
-          }
-          while (previous_image != (Image *) NULL)
-          {
-            /*
-              Delete any excess memory from undo cache.
-            */
-            cache_image=previous_image;
-            previous_image=GetPreviousImageInList(previous_image);
-            cache_image->list=DestroyImage(cache_image->list);
-            cache_image=DestroyImage(cache_image);
-          }
-        }
+      XTrimUndoCache(resource_info,&bytes,&undo_image);
       if (bytes > (resource_info->undo_cache << 20))
         break;
       /*
@@ -10693,18 +10822,6 @@ static void XPanImage(Display *display,XWindows *windows,XEvent *event,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-typedef struct _ComposeMenuInfo
-{
-  Display
-    *display;
-
-  XWindows
-    *windows;
-
-  int
-    id;
-} ComposeMenuInfo;
-
 static CompositeOperator XSelectPasteOperator(const ComposeMenuInfo *menu_info,
   const char *const *PasteMenu,CompositeOperator compose)
 {
@@ -11199,6 +11316,41 @@ static MagickBooleanType XPrintImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _ROIMenuEntry
+{
+  const char
+    *const **Menus;
+
+  const DisplayCommand
+    **Commands;
+
+  int
+    id,
+    entry;
+} ROIMenuEntry;
+
+static DisplayCommand XSelectROIMenuEntry(const ROIMenuEntry *menu_entry,
+  char *command,DisplayCommand display_command)
+{
+  const char
+    *const **const Menus = menu_entry->Menus;
+
+  const DisplayCommand
+    **const Commands = menu_entry->Commands;
+
+  const int
+    id = menu_entry->id,
+    entry = menu_entry->entry;
+
+  if (entry >= 0)
+    {
+      (void) CopyMagickString(command,Menus[id][entry],
+        MagickPathExtent);
+      display_command=Commands[id][entry];
+    }
+  return(display_command);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -11840,17 +11992,20 @@ static MagickBooleanType XROIImage(Display *display,
               display_command=ApplyCommands[id];
               if (id < ApplyMenus)
                 {
+                  ROIMenuEntry
+                    menu_entry;
+
                   /*
                     Select a command from a pop-up menu.
                   */
                   entry=XMenuWidget(display,windows,ApplyMenu[id],
                     (const char **) Menus[id],command);
-                  if (entry >= 0)
-                    {
-                      (void) CopyMagickString(command,Menus[id][entry],
-                        MagickPathExtent);
-                      display_command=Commands[id][entry];
-                    }
+                  menu_entry.Menus=Menus;
+                  menu_entry.Commands=Commands;
+                  menu_entry.id=id;
+                  menu_entry.entry=entry;
+                  display_command=XSelectROIMenuEntry(&menu_entry,command,
+                    display_command);
                 }
             }
           (void) XSetFunction(display,windows->image.highlight_context,
@@ -12144,6 +12299,380 @@ static MagickBooleanType XROIImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _RotatePenMenu
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *RotateMenu;
+
+  int
+    id;
+
+  char
+    *command;
+} RotatePenMenu;
+
+typedef struct _RotateTargets
+{
+  unsigned int
+    *pen_id;
+} RotateTargets;
+
+static void XSelectRotatePenColor(const RotatePenMenu *menu,
+  const RotateTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XResourceInfo
+    *const resource_info = menu->resource_info;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const RotateMenu = menu->RotateMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  unsigned int
+    *const pen_id = targets->pen_id;
+
+  const char
+    *ColorMenu[MaxNumberPens];
+
+  int
+    i,
+    pen_number;
+
+  XColor
+    color;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="Browser...";
+  ColorMenu[MaxNumberPens-1]=(const char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,RotateMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  if (pen_number == (MaxNumberPens-2))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set pen color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],&color);
+  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
+    (unsigned int) MaxColors,&color);
+  windows->pixel_info->pen_colors[pen_number]=color;
+  (*pen_id)=(unsigned int) pen_number;
+}
+
+typedef struct _RotateCommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  const char
+    *const *RotateMenu;
+
+  const ModeType
+    *RotateCommands,
+    *DirectionCommands;
+
+  char
+    *command;
+
+  RotateTargets
+    targets;
+} RotateCommandInput;
+
+static void XRotateCommand(const RotateCommandInput *input,
+  ModeType *direction,size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  XEvent
+    event = input->event;
+
+  const char
+    *const *const RotateMenu = input->RotateMenu;
+
+  int
+    id;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(display,windows,RotateMenu,&event);
+  if (id < 0)
+    return;
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXcopy);
+  switch (input->RotateCommands[id])
+  {
+    case RotateColorCommand:
+    {
+      RotatePenMenu
+        menu;
+
+      menu.display=display;
+      menu.resource_info=resource_info;
+      menu.windows=windows;
+      menu.RotateMenu=RotateMenu;
+      menu.id=id;
+      menu.command=input->command;
+      XSelectRotatePenColor(&menu,&input->targets);
+      break;
+    }
+    case RotateDirectionCommand:
+    {
+      const char
+        *Directions[] =
+        {
+          "horizontal",
+          "vertical",
+          (char *) NULL,
+        };
+
+      /*
+        Select a command from the pop-up menu.
+      */
+      id=XMenuWidget(display,windows,RotateMenu[id],
+        Directions,input->command);
+      *direction=XSelectChopDirection(id,input->DirectionCommands,*direction);
+      break;
+    }
+    case RotateHelpCommand:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Rotation",ImageRotateHelp);
+      break;
+    }
+    case RotateDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      *state|=EscapeState;
+      *state|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+}
+
+typedef struct _RotateLineTargets
+{
+  XSegment
+    *rotate_info;
+
+  size_t
+    *state;
+} RotateLineTargets;
+
+static void XStartRotateLine(Display *display,XWindows *windows,
+  const XEvent event,const RotateLineTargets *targets)
+{
+  XSegment
+    *const rotate_info = targets->rotate_info;
+
+  size_t
+    *const state = targets->state;
+
+  if (event.xbutton.button != Button1)
+    return;
+  if (event.xbutton.window != windows->image.id)
+    return;
+  /*
+    exit loop.
+  */
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXcopy);
+  (*rotate_info).x1=event.xbutton.x;
+  (*rotate_info).y1=event.xbutton.y;
+  (*state)|=ExitState;
+}
+
+typedef struct _RotateKeyInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+} RotateKeyInput;
+
+static void XRotateKeyPress(const RotateKeyInput *key_input,
+  const RotateLineTargets *targets)
+{
+  Display
+    *const display = key_input->display;
+
+  XResourceInfo
+    *const resource_info = key_input->resource_info;
+
+  XWindows
+    *const windows = key_input->windows;
+
+  XEvent
+    event = key_input->event;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  if (event.xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Rotation",ImageRotateHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+}
+
+typedef struct _RotateInfoInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    *text;
+
+  ModeType
+    direction;
+
+  double
+    degrees;
+
+  XSegment
+    rotate_info;
+} RotateInfoInput;
+
+static void XShowRotateInfo(const RotateInfoInput *show)
+{
+  Display
+    *const display = show->display;
+
+  XWindows
+    *const windows = show->windows;
+
+  char
+    *const text = show->text;
+
+  const ModeType
+    direction = show->direction;
+
+  const double
+    degrees = show->degrees;
+
+  const XSegment
+    rotate_info = show->rotate_info;
+
+  /*
+    Display info and draw rotation line.
+  */
+  if (windows->info.mapped == MagickFalse)
+    (void) XMapWindow(display,windows->info.id);
+  (void) FormatLocaleString(text,MagickPathExtent," %g",
+    direction == VerticalRotateCommand ? degrees-90.0 : degrees);
+  XInfoWidget(display,windows,text);
+  XHighlightLine(display,windows->image.id,
+    windows->image.highlight_context,&rotate_info);
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -12186,20 +12715,19 @@ static MagickBooleanType XRotateImage(Display *display,
     *rotate_image;
 
   int
-    id,
     x,
     y;
 
   double
     normalized_degrees;
 
-  int
-    i;
-
   unsigned int
     height,
     rotations,
     width;
+
+  const RotateTargets
+    targets = { &pen_id };
 
   if (degrees == 0.0)
     {
@@ -12214,6 +12742,9 @@ static MagickBooleanType XRotateImage(Display *display,
 
       XSegment
         rotate_info;
+
+      const RotateLineTargets
+        line_targets = { &rotate_info, &state };
 
       /*
         Map Command widget.
@@ -12246,122 +12777,26 @@ static MagickBooleanType XRotateImage(Display *display,
           windows->image.highlight_context,&rotate_info);
         if (event.xany.window == windows->command.id)
           {
-            /*
-              Select a command from the Command widget.
-            */
-            id=XCommandWidget(display,windows,RotateMenu,&event);
-            if (id < 0)
-              continue;
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            switch (RotateCommands[id])
-            {
-              case RotateColorCommand:
-              {
-                const char
-                  *ColorMenu[MaxNumberPens];
+            RotateCommandInput
+              input;
 
-                int
-                  pen_number;
-
-                XColor
-                  color;
-
-                /*
-                  Initialize menu selections.
-                */
-                for (i=0; i < (int) (MaxNumberPens-2); i++)
-                  ColorMenu[i]=resource_info->pen_colors[i];
-                ColorMenu[MaxNumberPens-2]="Browser...";
-                ColorMenu[MaxNumberPens-1]=(const char *) NULL;
-                /*
-                  Select a pen color from the pop-up menu.
-                */
-                pen_number=XMenuWidget(display,windows,RotateMenu[id],
-                  (const char **) ColorMenu,command);
-                if (pen_number < 0)
-                  break;
-                if (pen_number == (MaxNumberPens-2))
-                  {
-                    static char
-                      color_name[MagickPathExtent] = "gray";
-
-                    /*
-                      Select a pen color from a dialog.
-                    */
-                    resource_info->pen_colors[pen_number]=color_name;
-                    XColorBrowserWidget(display,windows,"Select",color_name);
-                    if (*color_name == '\0')
-                      break;
-                  }
-                /*
-                  Set pen color.
-                */
-                (void) XParseColor(display,windows->map_info->colormap,
-                  resource_info->pen_colors[pen_number],&color);
-                XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-                  (unsigned int) MaxColors,&color);
-                windows->pixel_info->pen_colors[pen_number]=color;
-                pen_id=(unsigned int) pen_number;
-                break;
-              }
-              case RotateDirectionCommand:
-              {
-                const char
-                  *Directions[] =
-                  {
-                    "horizontal",
-                    "vertical",
-                    (char *) NULL,
-                  };
-
-                /*
-                  Select a command from the pop-up menu.
-                */
-                id=XMenuWidget(display,windows,RotateMenu[id],
-                  Directions,command);
-                if (id >= 0)
-                  direction=DirectionCommands[id];
-                break;
-              }
-              case RotateHelpCommand:
-              {
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Rotation",ImageRotateHelp);
-                break;
-              }
-              case RotateDismissCommand:
-              {
-                /*
-                  Prematurely exit.
-                */
-                state|=EscapeState;
-                state|=ExitState;
-                break;
-              }
-              default:
-                break;
-            }
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
+            input.display=display;
+            input.resource_info=resource_info;
+            input.windows=windows;
+            input.event=event;
+            input.RotateMenu=RotateMenu;
+            input.RotateCommands=RotateCommands;
+            input.DirectionCommands=DirectionCommands;
+            input.command=command;
+            input.targets=targets;
+            XRotateCommand(&input,&direction,&state);
             continue;
           }
         switch (event.type)
         {
           case ButtonPress:
           {
-            if (event.xbutton.button != Button1)
-              break;
-            if (event.xbutton.window != windows->image.id)
-              break;
-            /*
-              exit loop.
-            */
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            rotate_info.x1=event.xbutton.x;
-            rotate_info.y1=event.xbutton.y;
-            state|=ExitState;
+            XStartRotateLine(display,windows,event,&line_targets);
             break;
           }
           case ButtonRelease:
@@ -12370,48 +12805,14 @@ static MagickBooleanType XRotateImage(Display *display,
             break;
           case KeyPress:
           {
-            char
-              command[MagickPathExtent];
+            RotateKeyInput
+              key_input;
 
-            KeySym
-              key_symbol;
-
-            if (event.xkey.window != windows->image.id)
-              break;
-            /*
-              Respond to a user key press.
-            */
-            (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-              sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-            switch ((int) key_symbol)
-            {
-              case XK_Escape:
-              case XK_F20:
-              {
-                /*
-                  Prematurely exit.
-                */
-                state|=EscapeState;
-                state|=ExitState;
-                break;
-              }
-              case XK_F1:
-              case XK_Help:
-              {
-                (void) XSetFunction(display,windows->image.highlight_context,
-                  GXcopy);
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Rotation",ImageRotateHelp);
-                (void) XSetFunction(display,windows->image.highlight_context,
-                  GXinvert);
-                break;
-              }
-              default:
-              {
-                (void) XBell(display,0);
-                break;
-              }
-            }
+            key_input.display=display;
+            key_input.resource_info=resource_info;
+            key_input.windows=windows;
+            key_input.event=event;
+            XRotateKeyPress(&key_input,&line_targets);
             break;
           }
           case MotionNotify:
@@ -12441,16 +12842,16 @@ static MagickBooleanType XRotateImage(Display *display,
       {
         if (distance > 9)
           {
-            /*
-              Display info and draw rotation line.
-            */
-            if (windows->info.mapped == MagickFalse)
-              (void) XMapWindow(display,windows->info.id);
-            (void) FormatLocaleString(text,MagickPathExtent," %g",
-              direction == VerticalRotateCommand ? degrees-90.0 : degrees);
-            XInfoWidget(display,windows,text);
-            XHighlightLine(display,windows->image.id,
-              windows->image.highlight_context,&rotate_info);
+            RotateInfoInput
+              show;
+
+            show.display=display;
+            show.windows=windows;
+            show.text=text;
+            show.direction=direction;
+            show.degrees=degrees;
+            show.rotate_info=rotate_info;
+            XShowRotateInfo(&show);
           }
         else
           if (windows->info.mapped != MagickFalse)
@@ -12862,6 +13263,43 @@ static int XPredicate(Display *magick_unused(display),XEvent *event,char *data)
 }
 #endif
 
+static void XSetMagnifyPosition(XWindows *windows,int x,int y)
+{
+  if (x < 0)
+    x=0;
+  else
+    if (x >= (int) windows->image.width)
+      x=(int) (windows->image.width-1);
+  windows->magnify.x=(int) windows->image.x+x;
+  if (y < 0)
+    y=0;
+  else
+   if (y >= (int) windows->image.height)
+     y=(int) (windows->image.height-1);
+  windows->magnify.y=windows->image.y+y;
+}
+
+static void XMagnifyAtButton(Display *display,XWindows *windows,
+  XEvent *event,ExceptionInfo *exception)
+{
+  int
+    x,
+    y;
+
+  /*
+    Update magnified image.
+  */
+  x=event->xbutton.x;
+  y=event->xbutton.y;
+  XSetMagnifyPosition(windows,x,y);
+  if (windows->magnify.mapped == MagickFalse)
+    (void) XMapRaised(display,windows->magnify.id);
+  XMakeMagnifyImage(display,windows,exception);
+  if (event->type == ButtonRelease)
+    (void) XWithdrawWindow(display,windows->info.id,
+      windows->info.screen);
+}
+
 static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
@@ -12900,29 +13338,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
       if (event->xbutton.window == windows->image.id)
         if (event->xbutton.button == Button2)
           {
-            /*
-              Update magnified image.
-            */
-            x=event->xbutton.x;
-            y=event->xbutton.y;
-            if (x < 0)
-              x=0;
-            else
-              if (x >= (int) windows->image.width)
-                x=(int) (windows->image.width-1);
-            windows->magnify.x=(int) windows->image.x+x;
-            if (y < 0)
-              y=0;
-            else
-             if (y >= (int) windows->image.height)
-               y=(int) (windows->image.height-1);
-            windows->magnify.y=windows->image.y+y;
-            if (windows->magnify.mapped == MagickFalse)
-              (void) XMapRaised(display,windows->magnify.id);
-            XMakeMagnifyImage(display,windows,exception);
-            if (event->type == ButtonRelease)
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
+            XMagnifyAtButton(display,windows,event,exception);
             break;
           }
       break;
@@ -13048,18 +13464,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
             */
             x=event->xmotion.x;
             y=event->xmotion.y;
-            if (x < 0)
-              x=0;
-            else
-              if (x >= (int) windows->image.width)
-                x=(int) (windows->image.width-1);
-            windows->magnify.x=(int) windows->image.x+x;
-            if (y < 0)
-              y=0;
-            else
-             if (y >= (int) windows->image.height)
-               y=(int) (windows->image.height-1);
-            windows->magnify.y=windows->image.y+y;
+            XSetMagnifyPosition(windows,x,y);
             XMakeMagnifyImage(display,windows,exception);
           }
       break;
@@ -13214,6 +13619,74 @@ static void XSetCropGeometry(Display *display,XWindows *windows,
 static inline MagickBooleanType IsTileNameCharacter(const char *q)
 {
   return(((*q != '\xff') && (*q != '\0')) ? MagickTrue : MagickFalse);
+}
+
+typedef struct _XTileFillInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  int
+    x_offset,
+    y_offset;
+
+  unsigned int
+    height,
+    width;
+
+  PixelInfo
+    pixel;
+
+  ExceptionInfo
+    *exception;
+} XTileFillInfo;
+
+static void XFillMissingTile(const XTileFillInfo *fill)
+{
+  Image
+    *const image = fill->image;
+
+  CacheView
+    *const image_view = fill->image_view;
+
+  const int
+    x_offset = fill->x_offset,
+    y_offset = fill->y_offset;
+
+  const unsigned int
+    height = fill->height,
+    width = fill->width;
+
+  const PixelInfo
+    pixel = fill->pixel;
+
+  ExceptionInfo
+    *const exception = fill->exception;
+
+  int
+    i,
+    j;
+
+  Quantum
+    *s;
+
+  for (i=0; i < (int) height; i++)
+  {
+    s=GetCacheViewAuthenticPixels(image_view,(ssize_t) x_offset,(ssize_t)
+      y_offset+i,width,1,exception);
+    if (s == (Quantum *) NULL)
+      break;
+    for (j=0; j < (int) width; j++)
+    {
+      SetPixelViaPixelInfo(image,&pixel,s);
+      s+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
 }
 
 static Image *XTileImage(Display *display,XResourceInfo *resource_info,
@@ -13403,12 +13876,6 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
       PixelInfo
         pixel;
 
-      int
-        j;
-
-      Quantum
-        *s;
-
       /*
         Ensure all the images exist.
       */
@@ -13418,6 +13885,9 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
       {
         CacheView
           *image_view;
+
+        XTileFillInfo
+          fill;
 
         q=p;
         while ((IsTileNameCharacter(q) != MagickFalse) &&
@@ -13439,20 +13909,15 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
           y);
         image_view=AcquireAuthenticCacheView(image,exception);
         (void) GetOneCacheViewVirtualPixelInfo(image_view,0,0,&pixel,exception);
-        for (i=0; i < (int) height; i++)
-        {
-          s=GetCacheViewAuthenticPixels(image_view,(ssize_t) x_offset,(ssize_t)
-            y_offset+i,width,1,exception);
-          if (s == (Quantum *) NULL)
-            break;
-          for (j=0; j < (int) width; j++)
-          {
-            SetPixelViaPixelInfo(image,&pixel,s);
-            s+=(ptrdiff_t) GetPixelChannels(image);
-          }
-          if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-            break;
-        }
+        fill.image=image;
+        fill.image_view=image_view;
+        fill.x_offset=x_offset;
+        fill.y_offset=y_offset;
+        fill.height=height;
+        fill.width=width;
+        fill.pixel=pixel;
+        fill.exception=exception;
+        XFillMissingTile(&fill);
         image_view=DestroyCacheView(image_view);
         tile++;
       }

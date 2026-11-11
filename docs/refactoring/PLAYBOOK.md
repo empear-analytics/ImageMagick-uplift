@@ -1013,6 +1013,11 @@ needs two copies of the block.
    helper's targets struct, under Recipe I step 2's exception (a struct of Recipe I, LB
    step 8 or Q step 8, its `const` form included, read by nothing but that helper's
    call).
+   A variable the caller declares `static` inside its body (block scope, never one at
+   file scope), of arithmetic, enumeration or pointer type (not an array), whose
+   address the caller takes nowhere else (checked by `grep`), counts as a plain local
+   too (2026-11-11), on Recipe CT step 2's terms: it passes as a pointer like any
+   written variable, never as a copy.
    A parameter the caller receives by value, of a struct or arithmetic type (not a
    pointer, and not an array parameter, which is one), counts as a plain local
    (`ApplySpliceGravity`'s `RectangleInfo splice_geometry`): it is the caller's own
@@ -1128,6 +1133,12 @@ static void SelectMagnifyMethod(const char *option,
   `T p[]` is refused, to keep the helper's `T **` parameter visibly the same type.
 - The function must be oracle-verified, with no unmatched or unreached survivor on the
   block's lines: the guard sees the moved literals but not a write that went missing.
+- A block-scope `static` (step 2) is one object of static storage duration at one fixed
+  address (C11 6.2.4p3); through the out-parameter each `*v` designates that object
+  (6.5.3.2p4), read and written at the points the block read and wrote it. Nothing is
+  copied, so a write a re-entrant call of the block's callees made to it would be seen
+  as before, and its name, of block scope, gives no other function a path to it
+  (Recipe CT's *Careful*).
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`.
 
@@ -5264,7 +5275,17 @@ helper returns a status the caller tests, which here would always lead to the sa
    use of a written variable `v`, reads included (`(*v)++` for `v++`, `*(*v)++` for
    `*v++`, `**v` for `*v`, `*(*v+1)` for `*(v+1)`). Nothing else in the text changes.
 4. Pass the variables it only reads by value and each written variable as a pointer,
-   in the order the block first writes them.
+   in the order the block first writes them. When the variables it only reads would
+   take the new function to five or more parameters, they go in one `const` input
+   struct instead, for any block of step 1, not only step 6's whole body (2026-11-11):
+   Recipe N steps 2 to 6 (a `typedef struct` above the helper, one member per variable
+   with its exact type and name, N step 2's forms for arrays, struct values and a
+   variable read and then written that nothing after the block reads; a local of that
+   type declared at the top of the block that holds the call and filled member by
+   member directly before it; the helper binds each member once at the top of its
+   body). The helper takes `const Name *` first, then the written variables by pointer,
+   at most four parameters in all. The fill copies each value where the block read it,
+   and the block writes none of them (N's argument), so every read sees what it saw.
 5. Where the block stood, write the call. The `continue;` that followed the block stays,
    directly after the call. Check every argument against its parameter by reading.
 6. A block that is the whole body of a sequential loop, declarations included, whose
@@ -10678,6 +10699,17 @@ whole groups and keeps their nesting in the new function.
    as their written variables). Writes through pointers the block already uses stay as
    they are; variables the block declares, and temporaries it writes before reading
    that the caller does not read afterwards (Recipe E step 4), move with it.
+   A variable the caller declares `static` inside its body (block scope, never one at
+   file scope), of arithmetic, enumeration or pointer type (not an array), may be one
+   of the written variables as well, when the caller takes its address nowhere but in
+   the targets initialiser (checked by `grep`) (2026-11-11). With such a static the
+   count may be one: a block whose only written variable that the caller reads
+   afterwards is a `static` moves in this form, with a one-member targets struct,
+   rather than under Recipe E step 7's value form, which would hold a copy of it while
+   the block's calls run. A `static` the block itself declares, which nothing outside
+   the block names (`static char factor[MagickPathExtent] = "20.0";` at the top of a
+   case), moves into the new function with its declaration, initialiser and storage
+   class unchanged, as any declaration of the block does.
 3. Directly above the new function declare a `typedef struct` of one pointer member per
    written variable, named and typed as Recipe I step 3 says, in the order the block
    first writes them, holding addresses only. The caller declares it once, `const`, at
@@ -10793,6 +10825,22 @@ static void SelectListBrowserEntry(const ListBrowserPress *press,
   that step 8's script can check. Re-wrap a line the prefix pushes past 80 columns.
 - An initialiser of addresses of automatic variables needs C99, as Recipe I step 2's
   `const` form already does.
+- A block-scope `static` (step 2) has static storage duration (C11 6.2.4p3): one object
+  for the whole run, initialised once before the program starts, at the same address at
+  every point. Bound by `V *const v = targets->v;`, each `(*v)` designates that object
+  (6.5.3.2p4), so every read and write of the helper is the access the block made, to
+  the same object, at the same point. Nothing is copied: should a call made by the
+  block re-enter the caller (a widget loop dispatching back into the same command, a
+  recursion), a write it makes to the static is seen by the helper's next read as it
+  was by the block's, so the helper is no more and no less sensitive to re-entry than
+  the caller. That is why a lone static goes by address here and not by value under
+  Recipe E step 7, whose copy would miss such a write. The name has block scope, so no
+  other function can name the object; with `&v` taken only in the targets initialiser,
+  the member is its one other access path, used only while the helper runs. A static
+  the block declares stays one object with its initialiser applied once (6.7.9p10), and
+  the helper is called only where the block stood: every execution of the block reads
+  and writes it as before, the value it carries from one execution to the next
+  included.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved) and steps 1, 2, 4 and 7 checked by reading; or, when no case reaches
@@ -11311,3 +11359,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | FB | Steps 3 and 4: the one call may be the whole condition of an `if` with no `else`, compared with a constant, whose body does not name the struct (`if (F(...,&name,...) == MagickFalse) return(...);`); the whole `if` statement moves into the compound statement, its body leaving through `return`, `break` or `continue` as before. Still seven steps | `layer.c`'s `OptimizeLayerFrames` (campaign A, W17 lane d): its `choice` fill (four members) stands directly before `if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse) return(...)`, which step 3 refused as not an expression statement. The step frees the two lines that Recipe B's `entry` declaration for `IsBetterFrameBounds` adds, so the function's *Large Method* count does not grow; object code IDENTICAL | owner |
 | 2026-11-11 | AMEND | O | *Use when*: the block may also be a straight run of assignments setting several locals together. Step 7 (new): five or six written variables, or fewer whose pointers would give five or more arguments, pass by one `const` struct of addresses declared at the top of the caller (Recipe Z step 7's form), bound to `T *const v` locals, `(*v)` at every use. Seven steps | `feature-texture.c`'s `GetImageFeatures` (campaign A, W17 lane d): its six buffer allocations (`cooccurrence`, `density_x`, `density_xy`, `density_y`, `Q`, `sum`, reading `number_grays`) lie outside every OpenMP region and write six locals; E step 4 refuses them, Q and K need a function with no OpenMP region, Z needs a selection, I and V an exit. Probe: 7.60 to 7.63, no new finding | owner |
 | 2026-11-11 | AMEND | OC | Step 7: a block that is not a whole loop body, whose inputs and written variables would give five or more parameters, takes its read-only variables in an input struct (Recipe Z steps 2 and 5) and its two to four written variables by one `const` struct of addresses (Recipe Z step 7); each `continue;` of the loop becomes `return;` and the caller keeps the `continue;` after the call | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): the Command-widget branch of the event loop leaves through `continue;` on every path, reads nine variables and writes four (`event`, `image`, `state`, `nexus`); OC step 2 allows four parameters and Z step 1 refuses a `continue` that leaves the block. Probe: 10 bumps to 9, 3.42 to 3.48 | owner |
+| 2026-11-11 | AMEND | CT | Step 2: a block-scope `static` of the caller (arithmetic, enumeration or pointer type, not an array, its address taken only in the targets initialiser) may be a written variable, and then one written variable suffices (a lone static goes by address, not by Recipe E step 7's copy); a `static` the block declares moves with it unchanged. *Careful* gives the argument: one object of static storage duration, reached through its own address, nothing copied, so re-entry through the block's calls sees the same writes | `display.c`'s `XCompositeImage` (campaign A, W17 lane b, wide build): its Dissolve case tail writes the local `blend` and the function's `static` `compose` and leaves the `switch` by `break;` from a depth-4 `if (*factor == '\0')`; its Displace tail writes `compose` alone. I step 2 refused the static, and E step 7's value form would copy it across `XDialogWidget`. Probe of the chain: the function leaves *Deep, Nested Complexity* and *Brain Method*, display.c 1.15 to 1.17, no finding on either helper | owner |
+| 2026-11-11 | AMEND | O | Step 2: a block-scope `static` of the caller (arithmetic, enumeration or pointer type, not an array, its address taken nowhere else) counts as a plain local, passed by pointer, on Recipe CT step 2's terms; *Careful* repeats CT's argument (one object of static storage duration at its own address, nothing copied) | `display.c`'s `XImageCache` (campaign A, W17 lane b, wide build): its undo-cache trim (`if (undo_image != NULL) { ... while ... if (bytes <= ...) ... if (previous_image == undo_image) undo_image=NewImageList(); ... }`) writes the local `bytes` and the function's `static` `undo_image` and holds the function at depth 4; O step 2 refused the static. Probe: the function leaves *Deep, Nested Complexity* and *Brain Method* | owner |
+| 2026-11-11 | AMEND | OC | Step 4: the variables a block only reads may go in one `const` input struct (Recipe N steps 2 to 6, its array, struct-value and read-then-written forms) for any block of step 1, not only step 6's whole loop body, when they would take the helper to five or more parameters; the helper takes `const Name *` first, then the written variables by pointer, at most four in all | `display.c`'s `XRotateImage` (campaign A, W17 lane b, wide build): its Command widget block (`id=XCommandWidget(...); if (id < 0) continue; ... switch (RotateCommands[id]) {...} ...; continue;`) holds two of the function's depth-4 statements, writes `state` and the static `direction` and reads nine variables (the display, the menus and tables, the event, the pen targets); OC step 2 capped the helper at four by-value inputs | owner |
