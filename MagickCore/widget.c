@@ -4735,6 +4735,120 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
 %    o reply: the response from the user is returned in this parameter.
 %
 */
+typedef struct _FileBrowserTargets
+{
+  XWidgetInfo
+    *reply_info;
+
+  size_t
+    *state;
+
+  XWidgetInfo
+    *selection_info,
+    *list_info;
+} FileBrowserTargets;
+
+typedef struct _FileBrowserPress
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    **filelist;
+
+  size_t
+    files;
+
+  unsigned int
+    height;
+
+  XEvent
+    event;
+
+  XWidgetInfo
+    slider_info;
+
+  char
+    *working_path,
+    *reply;
+} FileBrowserPress;
+
+static void SelectFileBrowserEntry(const FileBrowserPress *press,
+  const FileBrowserTargets *targets)
+{
+  Display
+    *const display = press->display;
+
+  XWindows
+    *const windows = press->windows;
+
+  char
+    **const filelist = press->filelist;
+
+  const size_t
+    files = press->files;
+
+  const unsigned int
+    height = press->height;
+
+  const XEvent
+    event = press->event;
+
+  const XWidgetInfo
+    slider_info = press->slider_info;
+
+  char
+    *const working_path = press->working_path,
+    *const reply = press->reply;
+
+  XWidgetInfo
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
+
+  XWidgetInfo
+    *const selection_info = targets->selection_info,
+    *const list_info = targets->list_info;
+
+  int
+    id;
+
+  /*
+    User pressed file matte.
+  */
+  id=slider_info.id+(event.xbutton.y-((*list_info).y+(int)
+    (height >> 1))+1)/(int) (*selection_info).height;
+  if (id >= (int) files)
+    return;
+  (void) CopyMagickString((*reply_info).text,filelist[id],MagickPathExtent);
+  (*reply_info).highlight=MagickFalse;
+  (*reply_info).marker=(*reply_info).text;
+  (*reply_info).cursor=(*reply_info).text+Extent((*reply_info).text);
+  XDrawMatteText(display,&windows->widget,reply_info);
+  if (id == (*list_info).id)
+    {
+      char
+        *p;
+
+      p=(*reply_info).text+strlen((*reply_info).text)-1;
+      if (*p == *DirectorySeparator)
+        ChopPathComponents((*reply_info).text,1);
+      (void) ConcatenateMagickString(working_path,DirectorySeparator,
+        MagickPathExtent);
+      (void) ConcatenateMagickString(working_path,(*reply_info).text,
+        MagickPathExtent);
+      *reply='\0';
+      (*state)|=UpdateListState;
+    }
+  (*selection_info).id=(~0);
+  (*list_info).id=id;
+  (*state)|=RedrawListState;
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -4810,6 +4924,9 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 
   XWindowChanges
     window_changes;
+
+  const FileBrowserTargets
+    targets = { &reply_info, &state, &selection_info, &list_info };
 
   /*
     Read filelist from current directory.
@@ -5299,39 +5416,19 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
           }
         if (MatteIsActive(list_info,event.xbutton))
           {
-            int
-              id;
+            FileBrowserPress
+              entry;
 
-            /*
-              User pressed file matte.
-            */
-            id=slider_info.id+(event.xbutton.y-(list_info.y+(int)
-              (height >> 1))+1)/(int) selection_info.height;
-            if (id >= (int) files)
-              break;
-            (void) CopyMagickString(reply_info.text,filelist[id],MagickPathExtent);
-            reply_info.highlight=MagickFalse;
-            reply_info.marker=reply_info.text;
-            reply_info.cursor=reply_info.text+Extent(reply_info.text);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-            if (id == list_info.id)
-              {
-                char
-                  *p;
-
-                p=reply_info.text+strlen(reply_info.text)-1;
-                if (*p == *DirectorySeparator)
-                  ChopPathComponents(reply_info.text,1);
-                (void) ConcatenateMagickString(working_path,DirectorySeparator,
-                  MagickPathExtent);
-                (void) ConcatenateMagickString(working_path,reply_info.text,
-                  MagickPathExtent);
-                *reply='\0';
-                state|=UpdateListState;
-              }
-            selection_info.id=(~0);
-            list_info.id=id;
-            state|=RedrawListState;
+            entry.display=display;
+            entry.windows=windows;
+            entry.filelist=filelist;
+            entry.files=files;
+            entry.height=height;
+            entry.event=event;
+            entry.slider_info=slider_info;
+            entry.working_path=working_path;
+            entry.reply=reply;
+            SelectFileBrowserEntry(&entry,&targets);
             break;
           }
         if (MatteIsActive(up_info,event.xbutton))
