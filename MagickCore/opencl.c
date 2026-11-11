@@ -2395,6 +2395,13 @@ static size_t FindEnabledOpenCLDevice(MagickCLEnv clEnv)
   return(i);
 }
 
+static inline MagickBooleanType IsOpenCLDeviceSkipped(
+  const MagickCLDevice device)
+{
+  return(((device->enabled == MagickFalse) ||
+    (device->program != (cl_program) NULL)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2445,8 +2452,7 @@ static MagickBooleanType HasOpenCLDevices(MagickCLEnv clEnv,
       device_signature;
 
     device=clEnv->devices[i];
-    if ((device->enabled == MagickFalse) ||
-        (device->program != (cl_program) NULL))
+    if (IsOpenCLDeviceSkipped(device) != MagickFalse)
       continue;
 
     LockSemaphoreInfo(device->lock);
