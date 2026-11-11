@@ -10975,9 +10975,10 @@ expression but leaves the nesting.
    out unchanged, re-indented one level up; then `if (A) { Y }`, a new `if` whose condition
    is `A`'s text inside the parentheses, character for character, and whose braced body is
    `Y`, re-indented. When `S` is empty, the first statement is omitted.
-5. Nothing else changes. `refactor_guard.py` sees the literals of `A` once more (a WARN
-   whose counts only rose, every value present); name them in the commit message.
-   `--calls` sees no change when `A` holds no call (step 2).
+5. Nothing else changes. `refactor_guard.py` may see the literals of `A` once more (a
+   WARN whose counts only rose, every value present; it counts distinct values, so a
+   literal already in the file, such as `0`, leaves it at PASS); name any rise in the
+   commit message. `--calls` sees no change when `A` holds no call (step 2).
 
 **Before:**
 
@@ -11046,7 +11047,7 @@ expression but leaves the nesting.
   where a later step (Recipe E on `if ((A) || (B)) { S }`) takes the first statement out.
 
 **Evidence level:** oracle, with steps 1 to 3 checked by reading; `refactor_guard.py`
-WARN with only `A`'s literals risen, `--calls` unchanged.
+PASS, or WARN with only `A`'s literals risen; `--calls` unchanged.
 
 **Provenance:** 2026-11-11, from `animate.c`'s `XMagickCommand` (campaign A, W17 lane c,
 wide build): after Recipe SD splits its 19-label switch, the Open group's failure guard
@@ -11434,3 +11435,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | O | *Use when*: the block may also be a straight run of assignments setting several locals together. Step 7 (new): five or six written variables, or fewer whose pointers would give five or more arguments, pass by one `const` struct of addresses declared at the top of the caller (Recipe Z step 7's form), bound to `T *const v` locals, `(*v)` at every use. Seven steps | `feature-texture.c`'s `GetImageFeatures` (campaign A, W17 lane d): its six buffer allocations (`cooccurrence`, `density_x`, `density_xy`, `density_y`, `Q`, `sum`, reading `number_grays`) lie outside every OpenMP region and write six locals; E step 4 refuses them, Q and K need a function with no OpenMP region, Z needs a selection, I and V an exit. Probe: 7.60 to 7.63, no new finding | owner |
 | 2026-11-11 | AMEND | OC | Step 7: a block that is not a whole loop body, whose inputs and written variables would give five or more parameters, takes its read-only variables in an input struct (Recipe Z steps 2 and 5) and its two to four written variables by one `const` struct of addresses (Recipe Z step 7); each `continue;` of the loop becomes `return;` and the caller keeps the `continue;` after the call | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): the Command-widget branch of the event loop leaves through `continue;` on every path, reads nine variables and writes four (`event`, `image`, `state`, `nexus`); OC step 2 allows four parameters and Z step 1 refuses a `continue` that leaves the block. Probe: 10 bumps to 9, 3.42 to 3.48 | owner |
 | 2026-11-11 | NEW | UX | Unnest an Exit Implied by Its Guard: a guard on the disjunction of `A` and `B` whose body runs a clean-up `S`, then exits through `X` when `B` holds and through `Y` otherwise, becomes three statements: the guard holding `S` alone, `if (B) X`, and `if (A) { Y }`; `A` and `B` are side-effect-free reads of locals that `S` does not write | `animate.c`'s `XMagickCommand` (campaign A, W17 lane c, wide build): the Open command's failure guard releases the file list and then throws one of two `ThrowXWindowException`s, which record `GetMagickModule()` and must stay in the function; the nested test is the function's last bump after the SD splits. Probe of the chain: `XMagickCommand` leaves Bumpy Road Ahead and Large Method, 3.48 to 3.67 with the XSaveImage steps | owner |
+| 2026-11-11 | WORDING | UX | Step 5 and *Evidence level*: `refactor_guard.py` counts distinct values, so repeating `A` may leave it at PASS; a WARN is expected only when a literal of `A` is new to the count | The first use (`XMagickCommand`, `status == MagickFalse`) printed PASS, not the WARN the text predicted | owner |
