@@ -9607,8 +9607,12 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
    block evaluates first and unconditionally (the `x` of a leading `if ((x & M) != 0)`),
    a call of a function with no side effect or a read of an object the block does not
    write; (c) the member designator of one lvalue `e.m`, the same base `e` in every copy,
-   which the block reads and assigns and does not take the address of. All members of
-   role (c) have one declared type `T`. Any other difference stops the step.
+   which the block reads or assigns and does not take the address of. The lvalues of the
+   copies may also differ in a member of the chain before the last, when each is a chain
+   of member selections through one pointer variable the copies share (`windows->popup.mapped`,
+   `windows->widget.mapped`: `windows->M.mapped`), with no call and no subscript in it
+   (2026-11-11). All lvalues of role (c) have one declared type `T`. Any other difference
+   stops the step.
 3. Write one `static void` function directly above the caller (or in place of step 1's
    helper): its parameters are the variables a copy reads, or the input struct the
    copies already read, then one parameter per role (a) of the constant's type (Recipe
@@ -9691,6 +9695,11 @@ static void EqualizeColormapValue(const EqualizeColors *colors,
   effect; evaluated as an argument directly before the call, after everything the
   previous statement did, it reads the same objects in the same state and yields the
   same value, which the block then tests where it tested the expression.
+- Role (c) with a chain (2026-11-11): `&windows->popup.mapped` is the address of the very
+  object the copy's `windows->popup.mapped` named; the chain only selects members through
+  a pointer variable already holding a valid object (the copy read `windows->popup.id` to
+  reach the block), so computing the address reads nothing the copy did not read and
+  `(*value)` reads and writes that object where the copy did.
 - Role (c): `&e.m` is the address of the member the copy named, so `(*value)` reads and
   writes the very object `e.m` did, in the same order, with the same type `T`. Computing
   the address reads no member; the base `e` (`image->colormap[j]`) must designate an
@@ -9715,7 +9724,11 @@ recipe applies". A probe: 8.47 to 9.09, *Bumpy Road Ahead* and *Overall Code
 Complexity* leaving the file, no finding on the new function; the four reaching cases
 (`palette`, `bilevel`, `rose_alpha -colors 16`, OpenCL palette, each `-equalize`) 0
 diverged. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to
-evolve the recipes.
+evolve the recipes. Step 2 (c) amended 2026-11-11 (W18 lane a) from `widget.c`'s
+`XScreenEvent`: its popup block sets `windows->popup.mapped` on MapNotify and UnmapNotify,
+and the existing helper `XScreenTrackWidgetMapping` is the same two tests on
+`windows->widget.mapped`; the helper takes the flag by pointer and serves both (no new
+function), the function leaves *Bumpy Road Ahead* (probe 3.04 to 3.06).
 
 ---
 
@@ -11508,3 +11521,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | CT | Step 2 (and O step 2 by reference): a block-scope `static` of structure type (not an array of structures), its address taken only in the targets initialiser, may be a written variable on the scalar static's terms; its member is a pointer to the structure, `v.m` becomes `(*v).m` and `&v` becomes `v`. *Careful* adds the argument (one object at one address, `(*v).m` is the member, nothing copied, a callee filling the structure through the pointer fills the static) | `display.c`'s `XMatteEditImage` (campaign A, W17 lane b, wide build): its Border Color case tail ends the case through `break;` from a depth-5 `if (*color_name == '\0')` and writes the function's `static XColor border_color` through `XParseColor(...,&border_color)`; CT step 2 admitted only arithmetic, enumeration and pointer statics. The case is one of the four whose move takes the function to depth 3 (probe: display.c 1.33 to 1.41, the function out of *Deep, Nested Complexity* and *Brain Method*, no finding on the helpers) | owner |
 | 2026-11-11 | NEW | UX | Unnest an Exit Implied by Its Guard: a guard on the disjunction of `A` and `B` whose body runs a clean-up `S`, then exits through `X` when `B` holds and through `Y` otherwise, becomes three statements: the guard holding `S` alone, `if (B) X`, and `if (A) { Y }`; `A` and `B` are side-effect-free reads of locals that `S` does not write | `animate.c`'s `XMagickCommand` (campaign A, W17 lane c, wide build): the Open command's failure guard releases the file list and then throws one of two `ThrowXWindowException`s, which record `GetMagickModule()` and must stay in the function; the nested test is the function's last bump after the SD splits. Probe of the chain: `XMagickCommand` leaves Bumpy Road Ahead and Large Method, 3.48 to 3.67 with the XSaveImage steps | owner |
 | 2026-11-11 | WORDING | UX | Step 5 and *Evidence level*: `refactor_guard.py` counts distinct values, so repeating `A` may leave it at PASS; a WARN is expected only when a literal of `A` is new to the count | The first use (`XMagickCommand`, `status == MagickFalse`) printed PASS, not the WARN the text predicted | owner |
+| 2026-11-11 | AMEND | MA | Step 2 (c): the lvalues of the copies may differ in a member of the chain before the last when each is a chain of member selections through one shared pointer variable (no call, no subscript), of one type; the block may only read or only assign it. *Careful* adds the argument (the address names the very object the copy named; nothing is read that the copy did not read) | `widget.c`'s `XScreenEvent` (campaign A, W18 lane a, wide build): the popup block's two `windows->popup.mapped` assignments and the existing helper `XScreenTrackWidgetMapping` (`windows->widget.mapped`) are twins differing in one member of the chain; one helper taking `MagickBooleanType *mapped` serves both. Probe: the function leaves Bumpy Road Ahead and drops from cc 15 to 13, 3.04 to 3.06, no new function | owner |
