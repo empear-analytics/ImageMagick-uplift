@@ -3279,6 +3279,37 @@ static MagickStatusType XHandleDeleteMessage(
   return(state);
 }
 
+static void XHelpKeyCommand(const KeySym key_symbol,
+  AnimateCommand *animate_command)
+{
+  switch (key_symbol)
+  {
+    case XK_F1:
+    {
+      (*animate_command)=HelpCommand;
+      break;
+    }
+    case XK_Find:
+    {
+      (*animate_command)=BrowseDocumentationCommand;
+      break;
+    }
+    case XK_question:
+    {
+      (*animate_command)=InfoCommand;
+      break;
+    }
+    case XK_q:
+    case XK_Escape:
+    {
+      (*animate_command)=QuitCommand;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4252,29 +4283,11 @@ MagickExport Image *XAnimateImages(Display *display,
             animate_command=SlowerCommand;
             break;
           }
-          case XK_F1:
-          {
-            animate_command=HelpCommand;
-            break;
-          }
-          case XK_Find:
-          {
-            animate_command=BrowseDocumentationCommand;
-            break;
-          }
-          case XK_question:
-          {
-            animate_command=InfoCommand;
-            break;
-          }
-          case XK_q:
-          case XK_Escape:
-          {
-            animate_command=QuitCommand;
-            break;
-          }
           default:
+          {
+            XHelpKeyCommand(key_symbol,&animate_command);
             break;
+          }
         }
         if (animate_command != NullCommand)
           nexus=XMagickCommand(display,resource_info,windows,
