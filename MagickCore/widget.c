@@ -2063,6 +2063,15 @@ static size_t ExposeWidgetWindow(XWindows *windows,const XEvent event,
   return(state);
 }
 
+static size_t LeaveWidgetWindow(XWindows *windows,const XEvent event,
+  size_t state)
+{
+  if (event.xcrossing.window != windows->widget.id)
+    return(state);
+  state|=InactiveWidgetState;
+  return(state);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2892,9 +2901,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case LeaveNotify:
       {
-        if (event.xcrossing.window != windows->widget.id)
-          break;
-        state|=InactiveWidgetState;
+        state=LeaveWidgetWindow(windows,event,state);
         break;
       }
       case MapNotify:
