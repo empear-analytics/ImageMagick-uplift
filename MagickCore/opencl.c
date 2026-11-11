@@ -2570,8 +2570,64 @@ static void CountOpenCLDevices(MagickCLEnv clEnv,cl_platform_id *platforms,
   }
 }
 
+typedef struct _OpenCLPlatformDevices
+{
+  MagickCLEnv
+    clEnv;
+
+  cl_platform_id
+    *platforms;
+
+  cl_device_id
+    *devices;
+
+  cl_uint
+    i,
+    number_devices;
+} OpenCLPlatformDevices;
+
+static cl_uint AddOpenCLPlatformDevices(
+  const OpenCLPlatformDevices *platform_devices,cl_uint next)
+{
+  const MagickCLEnv
+    clEnv = platform_devices->clEnv;
+
+  cl_platform_id
+    *const platforms = platform_devices->platforms;
+
+  cl_device_id
+    *const devices = platform_devices->devices;
+
+  const cl_uint
+    i = platform_devices->i,
+    number_devices = platform_devices->number_devices;
+
+  cl_uint
+    j;
+
+  for (j = 0; j < number_devices; j++,next++)
+  {
+    MagickCLDevice
+      device;
+
+    device=AcquireMagickCLDevice();
+    if (device == (MagickCLDevice) NULL)
+      break;
+
+    SetOpenCLDeviceInfo(device,clEnv->contexts[i],platforms[i],devices[j]);
+
+    clEnv->devices[next]=device;
+    (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
+      "Found device: %s (%s)",device->name,device->platform_name);
+  }
+  return(next);
+}
+
 static void LoadOpenCLDevices(MagickCLEnv clEnv)
 {
+  OpenCLPlatformDevices
+    platform_devices;
+
   cl_context_properties
     properties[3];
 
@@ -2586,7 +2642,6 @@ static void LoadOpenCLDevices(MagickCLEnv clEnv)
 
   cl_uint
     i,
-    j,
     next,
     number_devices,
     number_platforms;
@@ -2659,21 +2714,12 @@ static void LoadOpenCLDevices(MagickCLEnv clEnv)
     if (status != CL_SUCCESS)
       continue;
 
-    for (j = 0; j < number_devices; j++,next++)
-    {
-      MagickCLDevice
-        device;
-
-      device=AcquireMagickCLDevice();
-      if (device == (MagickCLDevice) NULL)
-        break;
-
-      SetOpenCLDeviceInfo(device,clEnv->contexts[i],platforms[i],devices[j]);
-
-      clEnv->devices[next]=device;
-      (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
-        "Found device: %s (%s)",device->name,device->platform_name);
-    }
+    platform_devices.clEnv=clEnv;
+    platform_devices.platforms=platforms;
+    platform_devices.devices=devices;
+    platform_devices.i=i;
+    platform_devices.number_devices=number_devices;
+    next=AddOpenCLPlatformDevices(&platform_devices,next);
   }
   if (next != clEnv->number_devices)
     RelinquishMagickCLDevices(clEnv);
@@ -2983,6 +3029,18 @@ static void UpdateKernelProfileRecord(KernelProfileRecord profile_record,
   profile_record->count+=1;
 }
 
+static KernelProfileRecord AcquireKernelProfileRecord(char *name)
+{
+  KernelProfileRecord
+    profile_record;
+
+  profile_record=(KernelProfileRecord) AcquireCriticalMemory(
+    sizeof(*profile_record));
+  (void) memset(profile_record,0,sizeof(*profile_record));
+  profile_record->kernel_name=name;
+  return(profile_record);
+}
+
 MagickPrivate MagickBooleanType RecordProfileData(MagickCLDevice device,
   cl_kernel kernel,cl_event event)
 {
@@ -3039,10 +3097,7 @@ MagickPrivate MagickBooleanType RecordProfileData(MagickCLDevice device,
     name=DestroyString(name);
   else
     {
-      profile_record=(KernelProfileRecord) AcquireCriticalMemory(
-        sizeof(*profile_record));
-      (void) memset(profile_record,0,sizeof(*profile_record));
-      profile_record->kernel_name=name;
+      profile_record=AcquireKernelProfileRecord(name);
       device->profile_records=(KernelProfileRecord *) ResizeQuantumMemory(
         device->profile_records,(i+2),sizeof(*device->profile_records));
       if (device->profile_records == (KernelProfileRecord *) NULL)

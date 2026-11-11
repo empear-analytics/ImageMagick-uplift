@@ -1622,6 +1622,58 @@ static void RelinquishAcquiredFeatureBuffers(const FeatureBuffers *buffers)
   density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
 }
 
+static void ZeroFeatureDensities(FeatureStatistics *density_x,
+  FeatureStatistics *density_xy,FeatureStatistics *density_y,
+  const unsigned int number_grays)
+{
+  (void) memset(density_x,0,2*(number_grays+1)*sizeof(*density_x));
+  (void) memset(density_xy,0,2*(number_grays+1)*sizeof(*density_xy));
+  (void) memset(density_y,0,2*(number_grays+1)*sizeof(*density_y));
+}
+
+static void DestroyFeatureMatrix(FeatureStatistics **matrix,
+  const unsigned int number_grays)
+{
+  RelinquishFeatureMatrix(matrix,number_grays);
+  matrix=(FeatureStatistics **) RelinquishMagickMemory(matrix);
+}
+
+static ChannelFeatures *RelinquishFeatureGrays(PixelPacket *grays,
+  ChannelFeatures *channel_features)
+{
+  grays=(PixelPacket *) RelinquishMagickMemory(grays);
+  channel_features=(ChannelFeatures *) RelinquishMagickMemory(
+    channel_features);
+  return(channel_features);
+}
+
+typedef struct _FeatureGrayRow
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} FeatureGrayRow;
+
+static MagickBooleanType FetchFeatureGrayRow(const FeatureGrayRow *row,
+  const ssize_t r,const Quantum *magick_restrict *p,MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*p)=GetCacheViewVirtualPixels(row->image_view,0,r,row->image->columns,1,
+    row->exception);
+  if ((*p) == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1715,14 +1767,11 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     ssize_t
       x;
 
-    if (status == MagickFalse)
+    const FeatureGrayRow
+      row = { image, image_view, exception };
+
+    if (FetchFeatureGrayRow(&row,r,&p,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,r,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       grays[ScaleQuantumToMap(GetPixelRed(image,p))].red=
@@ -1743,9 +1792,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   image_view=DestroyCacheView(image_view);
   if (status == MagickFalse)
     {
-      grays=(PixelPacket *) RelinquishMagickMemory(grays);
-      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
-        channel_features);
+      channel_features=RelinquishFeatureGrays(grays,channel_features);
       return(channel_features);
     }
   gray=CompactFeatureGrays(image,grays);
@@ -1772,17 +1819,13 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   if (IsFeatureMemoryMissing(&buffers) != MagickFalse)
     {
       RelinquishFeatureBuffers(&buffers);
-      grays=(PixelPacket *) RelinquishMagickMemory(grays);
-      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
-        channel_features);
+      channel_features=RelinquishFeatureGrays(grays,channel_features);
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
       return(channel_features);
     }
   (void) memset(&correlation,0,sizeof(correlation));
-  (void) memset(density_x,0,2*(number_grays+1)*sizeof(*density_x));
-  (void) memset(density_xy,0,2*(number_grays+1)*sizeof(*density_xy));
-  (void) memset(density_y,0,2*(number_grays+1)*sizeof(*density_y));
+  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
   (void) memset(&mean,0,sizeof(mean));
   (void) memset(sum,0,number_grays*sizeof(*sum));
   (void) memset(&sum_squares,0,sizeof(sum_squares));
@@ -1798,9 +1841,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     {
       RelinquishFeatureRows(cooccurrence,Q,i);
       RelinquishAcquiredFeatureBuffers(&buffers);
-      grays=(PixelPacket *) RelinquishMagickMemory(grays);
-      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
-        channel_features);
+      channel_features=RelinquishFeatureGrays(grays,channel_features);
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
       return(channel_features);
@@ -1816,8 +1857,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   status=FillFeatureCooccurrence(&matrix);
   if (status == MagickFalse)
     {
-      RelinquishFeatureMatrix(cooccurrence,number_grays);
-      cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
+      DestroyFeatureMatrix(cooccurrence,number_grays);
       channel_features=(ChannelFeatures *) RelinquishMagickMemory(
         channel_features);
       (void) ThrowMagickException(exception,GetMagickModule(),
@@ -1930,12 +1970,10 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     Relinquish resources.
   */
   sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
-  RelinquishFeatureMatrix(Q,number_grays);
-  Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
+  DestroyFeatureMatrix(Q,number_grays);
   density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
   density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
   density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
-  RelinquishFeatureMatrix(cooccurrence,number_grays);
-  cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
+  DestroyFeatureMatrix(cooccurrence,number_grays);
   return(channel_features);
 }

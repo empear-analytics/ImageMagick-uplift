@@ -77,6 +77,10 @@ Never, in any commit:
   a delegate library that is not installed). Nothing can check it.
   The one exception (owner, 2026-11-01): a branch no configuration compiles, `#if 0`, may
   move verbatim with the code that holds it (the playbook's *Preprocessor branches*).
+  A second (owner, 2026-11-11): a Recipe S split may move a function whole, with an
+  `#if defined(...)`/`#if !defined(...)` branch inside it, verbatim, when a build that
+  compiles the branch shows the moved functions' instructions unchanged
+  (`tools/split_branch_check.py` prints `IDENTICAL-MODULO-LAYOUT`).
 - Modify a `static const` data table.
 - Fix a bug you noticed. Report it.
 

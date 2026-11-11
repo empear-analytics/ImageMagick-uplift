@@ -31,6 +31,7 @@ $call Make attribute.c
 $call Make attribute-hull.c
 $call Make attribute-bounds.c
 $call Make attribute-depth.c
+$call Make attribute-depth-measure.c
 $call Make blob.c
 $call Make cache.c
 $call Make cache-view.c
@@ -75,6 +76,7 @@ $call Make exception.c
 $call Make feature.c
 $call Make feature-texture.c
 $call Make fourier.c
+$call Make fourier-complex.c
 $call Make fx.c
 $call Make gem.c
 $call Make geometry.c

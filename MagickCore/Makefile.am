@@ -88,6 +88,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/attribute-hull.c \
   MagickCore/attribute-bounds.c \
   MagickCore/attribute-depth.c \
+  MagickCore/attribute-depth-measure.c \
   MagickCore/attribute.h \
   MagickCore/blob.c \
   MagickCore/blob.h \
@@ -171,6 +172,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/feature-texture.c \
   MagickCore/feature.h \
   MagickCore/fourier.c \
+  MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
   MagickCore/fx.c \
   MagickCore/fx.h \

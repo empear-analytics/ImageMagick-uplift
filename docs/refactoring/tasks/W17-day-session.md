@@ -116,3 +116,76 @@ the exception's function in the unreached `GetImageDynamicThreshold`.
 the load average at 18-28 while lanes b and c ran. Run by hand at the same load, both binaries finish and write
 all 10,300 files: baseline 57.9 s, candidate 27.0 s, exit 0 each. The case is file-system bound and touches no
 file this merge changed; recorded as a load timeout.
+
+## Lane a, second round: layer, distort, attribute-depth, feature-texture, fourier (merged up to d5c4d00d9)
+
+| File | Score | Commits |
+| --- | --- | --- |
+| `layer.c` | 7.98 -> 8.00 | 3ea4c337f E `AcquireFrameBounds`, 32ff96881 E `AcquireFrameDisposals` (OptimizeLayerFrames) |
+| `feature-texture.c` | 7.53 -> 7.60 | c26c07ff4 PC `FetchFeatureGrayRow`; f14e9a20f D (a) `RelinquishFeatureGrays`; 805763e23 D (a) `DestroyFeatureMatrix`; 5649f016f E sibling run `ZeroFeatureDensities` (GetImageFeatures) |
+| `fourier.c` | 6.52 -> 7.59 | ee98b70cc, ef3969b4c, 720ba43d2 E (ForwardFourierTransform, no findings left), 7d2507db9 E (InverseFourier leaves Large Method), ec40c537c E step 7 and 2c33273fd D (a) (ComplexImages); 21772299f playbook and a74ffbef6 tool (Recipe S step 2: a trailing run of conditional delegate includes that holds every `#define` of the include block is left out of the new file when no line of the family names one of its macros); d5c4d00d9 S `ComplexImages` and 13 statics to `fourier-complex.c` (9.50, about a quarter of the file; the new file has no preprocessor branch) |
+
+`distort.c` 7.60, no commit (`poly_basis_dx` on the hot path, measured 5-20% slower in table/chain forms;
+`SetDistortNoBestFit` label deletion is an owner question; the tool refuses any split because
+`GenerateCoefficients` is shared). Plateaus: layer.c (`#if DEBUG_OPT_FRAME` blocks and the
+`ThrowImageException` validation), feature-texture.c (the grays column loop writing the shared table, an owner
+question; one public function), fourier.c (the transforms sit in the `#else` of `#if !defined(ENABLE_FFTW_DELEGATE)`).
+
+**Held back, for the owner: the attribute-depth.c split** (492c52f3b, branch `w17-attribute-depth-split`,
+7.56 -> 8.16, new `attribute-depth-measure.c` 8.16). It moves `GetImageDepth` whole, including its
+`#if !defined(MAGICKCORE_HDRI_SUPPORT)` branch, verbatim. The oracle's HDRI build does not compile that branch;
+AGENTS.md forbids touching such code, with only `#if 0` excepted. The non-HDRI CI configurations do compile it,
+and there the 27 functions the new file defines disassemble the same as in the original (1,367 lines; the only
+differences are the `__LINE__` immediates, shifted by 6, `__FILE__`/constant-pool references and one
+rip-relative offset). **The same question covers effect.c's split (99aa3f82b, merged above):** it moved three
+`#if defined(MAGICKCORE_OPENCL_SUPPORT)` branches verbatim. In the wide build (OpenCL on), the moved functions
+disassemble the same (3,434 lines; only `__LINE__` immediates and constant-pool label numbers differ). Should a
+split move a compiled-elsewhere branch verbatim when the build that compiles it shows the same instructions? If
+not, effect.c's split is reverted and the attribute-depth.c split dropped.
+
+Possible upstream: feature-texture.c `GetImageFeatures` leaks `density_x`, `density_xy`, `density_y`, `Q` and
+`sum` when `FillFeatureCooccurrence` fails; its parallel grays fill writes the shared `grays[]` from several
+threads (a race, every write storing the same value).
+
+## Owner ruling (2026-11-11): splits may move a compiled-elsewhere branch whole
+
+The owner answered "Yes, allow it" to the question above. Recorded in f9589c422: AGENTS.md's second
+exception, the playbook's *Preprocessor branches* section and a Recipe S row; new
+`tools/split_branch_check.py` compiles the original at the split's parent and the new file with a build's flags
+(`cand-wide`, `ci-gcc-min`, `ci-gcc-dlg`) and prints `IDENTICAL-MODULO-LAYOUT` only when every function the new
+file defines differs at most in `__LINE__` immediates, `.rodata` references, constant-pool label numbers and
+rip-relative offsets (a planted one-constant change prints DIFFERENT). effect.c's split stands (wide build: 40
+`__LINE__` immediates, 76 labels). The attribute-depth.c split is merged (e38bd8ebd): `attribute-depth.c`
+7.56 -> 8.16, `attribute-depth-measure.c` 8.16; `split_branch_check.py` in ci-gcc-min and ci-gcc-dlg:
+IDENTICAL-MODULO-LAYOUT (6 `.rodata` references, 5 `__LINE__` immediates, 1 rip-relative offset). Gate:
+15,900 cases, 0 diverged (`infra/0fd402f13a` load timeout, passed on rerun).
+
+## Lane c, second round: animate.c 2.49 -> 3.35, opencl.c 5.03 -> 5.27 (wide build, merged)
+
+animate.c, 25 refactor commits. `XAnimateBackgroundImage`: 87cc80834 E (flat), 513e342ff LB 2.59 (leaves Deep
+Nesting). `XAnimateImages` (30 cases): every statement above depth 3 went into a helper; raising steps 36941f57c
+E 2.65 (after 4afb47b2c D, flat), 1e0d6d9ba N 2.71, 030d72d4c N 2.77, 01421bbf1 P 2.90, 6a4402a7c D 3.35 (reuses
+`XFocusBackdropImage`; leaves Brain Method and Deep Nesting); flat plan steps e35ba63ee CN, c7272670c,
+62c30529c, d5567bf9f, 7d682080e E, 51f38b5a4, 858de5eed, 82d8d50d3, dddf26448, 24012b30b Z, 749f09c70,
+a24867657 N, d02830403 H (pp check against the wide build: IDENTICAL), f1f0cda1b LB, 66112b45f, 58d44db8f,
+e1ffaebdf I. **Correction:** e35ba63ee (CN) gave `XAnimateImages` a Complex Conditional finding at a flat score
+and its message does not say so; 01421bbf1 (P) removes it and says so. 4afb47b2c (D) is the one step with
+DIFFERENT object code (`FindColormapDifference` no longer inlined into `XAnimateBackgroundImage`); it rests on a
+text check and the oracle.
+
+opencl.c: c3ff375d9 E `RecordProfileData` 5.22 (leaves Large Method); 2e14e50ba N `LoadOpenCLDevices` 5.27
+(leaves Bumpy Road, 253 cases). Rejected: BenchmarkOpenCLDevices' score loop (5.11, a Code Duplication twin of
+`EnableSameOpenCLDevices`). Stopped early to save context; `LoadOpenCLDevices`' platform loop is next.
+
+Recipe text (Decided by `owner`, 2026-11-10 OK): ef17bfab2 Z step 7 (five or six caller variables, or two to
+four whose pointers would bring the call to five or more arguments, go by one `const` struct of addresses);
+64ab6430e and 793736b19 N step 2 (a caller array used only as `v[e]` reads or passed whole to a pointer
+parameter may join the group as a pointer member).
+
+Whole wide catalogue on the lane: 14,145 cases, 1 diverged (`infra/0fd402f13a`, times out on the baseline).
+
+For the owner: `tools/pp_identical.sh` uses the narrow build, so it proves nothing for wide-build files (lane c
+ran a copy pointed at `cand-wide`); `tools/ci_warnings.sh` fails on opencl.c before any change
+(`-Wdeclaration-after-statement` in the `#else` of `StopAccelerateTimer`, which no recipe may edit).
+Possible upstream: animate.c's scene loops pick `TrueColorType` when `alpha_trait == BlendPixelTrait`, while
+`XAnimateBackgroundImage`'s later `display_image` call uses `!=` for the same choice.
