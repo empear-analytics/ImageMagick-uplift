@@ -21,7 +21,11 @@ in FILE that only the family uses. --copy-macro NAME (repeatable) defines a one-
 2026-11-11), each refused when the kept part names it; a two-line forward declaration
 of a moved static at the top of FILE moves to NEW. A trailing run of conditional lines
 in FILE's include block that holds every macro the block defines (a delegate's headers)
-is left out of NEW's copy when the family names none of those macros.
+is left out of NEW's copy when the family names none of those macros. A file-level
+`#if defined(...)` ... `#else` ... `#endif` block that holds whole functions of the family
+(a delegate's code and its stub of the same public function) moves whole, its directives
+included, when its `#endif` follows the family's last function; a function defined in both
+branches calls what either definition calls (owner, 2026-11-11).
 """
 import collections, glob, os, re, sys
 
@@ -153,7 +157,9 @@ while i < len(L):
     i += 1
 names = {d[0] for d in defs}
 # a name that only a comment mentions ("Contrast limited ...") is not a call
-body = {d[0]: re.sub(r"/\*.*?\*/", "", "\n".join(L[d[1]:d[2] + 1]), flags=re.S) for d in defs}
+# a function defined once in each branch of an #if/#else (a delegate's code and its stub) calls what either one calls
+body = collections.defaultdict(str)
+for d in defs: body[d[0]] += re.sub(r"/\*.*?\*/", "", "\n".join(L[d[1]:d[2] + 1]), flags=re.S) + "\n"
 calls = {n: {x for x in names if x != n and re.search(r"\b%s\b" % re.escape(x), body[n])} for n in names}
 static = {d[0] for d in defs if d[3]}
 reach = set(roots); st = list(roots)
@@ -228,6 +234,8 @@ for run in runs:
         if re.match(r"#\s*(else|elif)\b", t) and depth > 0: continue
         if re.match(r"#\s*endif\b", t) and depth > 0: depth -= 1; continue
         if t: bad.append((n + 1, t))
+    # a file-level #if opened in the region whose #endif follows its last function moves whole, #endif included
+    while depth and b < len(L) and re.match(r"#\s*endif\b", L[b].strip()): depth -= 1; b += 1
     if depth: bad.append(("unbalanced conditional", depth))
     typedefs.extend(typedef_names(L, inner))
     if bad: sys.exit("refused: top-level code in the region: %s" % bad[:5])
@@ -287,6 +295,11 @@ for k, line in enumerate(rest_lines):
     e = k
     while e < len(rest_lines) and ";" not in rest_lines[e] and "=" not in rest_lines[e]: e += 1
     decl = " ".join(rest_lines[k:e + 1]).split("=")[0]
+    if rest_lines[k + 1:k + 2] == ["{"]:
+        # `static struct` / `{` members `}` declarator: the variable is named after the closing brace
+        e = next(x for x in range(k, len(rest_lines)) if rest_lines[x].startswith("}"))
+        decl = rest_lines[e][1:].split("=")[0]
+    elif "(" in decl: continue  # a forward declaration of functions (`static double` / `  I0(double x),`)
     for vname in re.findall(r"(\w+)\s*(?:\[[^\]]*\])?\s*(?:,|;|$)", decl.strip()):
         if re.search(r"\b%s\b" % vname, region): sys.exit("refused: file-scope variable %s defined outside the region and used in it" % vname)
 # a non-static function the region calls must be declared in a header
