@@ -11261,6 +11261,128 @@ Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe LC - Extract Block Returning Whether It Continued
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Brain Method*, *Bumpy Road
+Ahead* or *Large Method*, and the block that would fix it sits in the body of a
+sequential loop, is followed by statements that stay, and leaves its iteration early
+through `continue;` from inside it, as the update-region block of `display.c`'s
+`XROIImage` does (`if ((state & UpdateRegionState) != 0) { ... switch (display_command)
+{ ... default: ... if (roi_image == NULL) continue; ... } ... }`, followed by the rectangle
+drawing and the event wait that the `continue;` skips).
+
+**Not covered by:** Recipe OC, whose block is followed by `continue;` or ends the loop's
+body, so that every path out of it ends the iteration; Recipe E step 7, whose `continue;`
+forms need the block to be the loop's whole body or its tail; Recipe LB, whose block
+leaves the loop through `break;`; Recipes O, K, T, J, N, Q, U, Wa and Z, which refuse a
+block with a `continue` that leaves it.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. The
+   innermost loop around it is a sequential loop `Lp`, and every `continue;` in the block
+   that leaves it continues `Lp`. It contains no `return`, no `goto`, and no `break` that
+   leaves it; a `break` or `continue` of a loop or `switch` nested inside it stays as it is.
+   The block may be a whole `if` statement, its test included.
+2. The variables of the caller it writes and that the caller reads afterwards meet Recipe O
+   step 2 (plain locals whose address the caller passes elsewhere only to calls that keep no
+   copy of it): each goes by pointer, written `(*v)` at every use, `&v` passed on written
+   `v`. A variable it writes before it reads it on every path, and that nothing after the
+   block reads, is declared in the new function (Recipe E step 4).
+3. Cut the block into a new `static MagickBooleanType` function directly above the caller.
+   Each `continue;` that continued `Lp` becomes `return(MagickTrue);`, one for one, and the
+   function ends with `return(MagickFalse);`. Nothing else in the text changes.
+4. Pass what the block only reads in one `const` input struct (Recipe N steps 2 to 6: a
+   `typedef struct` above the function, one member per variable with its exact type and
+   name, the local declared at the top of the block that holds the call and filled member by
+   member directly before it, the function binding each member once), then the written
+   variables by pointer in the order the block first writes them: at most four parameters.
+   When the reads and writes are four or fewer, no struct.
+5. Where the block stood write `if (Helper(...) != MagickFalse) continue;`, and check every
+   argument against its parameter by reading.
+
+**Before:**
+
+```c
+      if ((state & UpdateRegionState) != 0)
+        {
+          (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+          switch (display_command)
+          {
+            ...
+            default:
+            {
+              ...
+              roi_image=CropImage(*image,&crop_info,exception);
+              if (roi_image == (Image *) NULL)
+                continue;
+              ...
+              break;
+            }
+          }
+          ...
+          state&=(unsigned int) (~UpdateRegionState);
+        }
+      XHighlightRectangle(display,windows->image.id,
+        windows->image.highlight_context,&highlight_info);
+```
+
+**After:**
+
+```c
+static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
+  size_t *state,RectangleInfo *crop_info)
+{
+  ...
+  if (((*state) & UpdateRegionState) != 0)
+    {
+      ...
+              if (roi_image == (Image *) NULL)
+                return(MagickTrue);
+      ...
+    }
+  return(MagickFalse);
+}
+...
+      region_input.display=display;
+      ...
+      if (XROIUpdateRegion(&region_input,&state,&crop_info) != MagickFalse)
+        continue;
+      XHighlightRectangle(display,windows->image.id,
+        windows->image.highlight_context,&highlight_info);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Every path through the block either reached a `continue;`
+  of `Lp` or fell off its end. After, the first returns `MagickTrue` at the same point, after
+  the same statements, and the caller continues `Lp` at once; the second returns
+  `MagickFalse` and the caller runs the statement that followed the block, as the fall-off did.
+  Nothing runs between the helper's return and the caller's `continue;` or next statement.
+- The written variables stay the caller's own locals: only their addresses travel, each
+  `(*v)` the object `v` named, read and written in the same order (Recipe O's argument); the
+  temporaries are written before they are read on every path and read by nothing after the
+  block, so the helper's own copies hold every value the caller's did. The input struct holds
+  copies taken directly before the call of variables the block does not write (Recipe N's
+  argument).
+- The helper's result is a status of the block, not a value of the function: the caller
+  tests it for `continue;` only. A block with a `break;` leaving `Lp` is Recipe LB, one with
+  a `return` Recipe W, RV or V.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1 and 2 checked by reading; or, for lines no case reaches,
+guard with `tools/obj_modulo.sh` (*Two levels of evidence*).
+
+**Provenance:** 2026-11-11, from `display.c`'s `XROIImage` (campaign A, W18 lane b, wide
+build): the update-region block of its rectify loop holds three of the function's depth-4
+and 5 statements and leaves the iteration through `continue;` from the default group of
+its `switch` when the region crop fails, so that OC (block followed by `continue;`), E step 7
+(whole body or tail) and the break/return recipes refuse it; a probe of the chain with this
+recipe takes the function out of *Deep, Nested Complexity* and *Brain Method*. Added by
+Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -11646,3 +11768,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | WORDING | UX | Step 5 and *Evidence level*: `refactor_guard.py` counts distinct values, so repeating `A` may leave it at PASS; a WARN is expected only when a literal of `A` is new to the count | The first use (`XMagickCommand`, `status == MagickFalse`) printed PASS, not the WARN the text predicted | owner |
 | 2026-11-11 | AMEND | D | A cast of a call to the exact type its function is declared to return (`(char **) GetCommandOptions(...)`) and a `(void)` cast of a `(void)` cast (`(void) (void) CopyMagickString(...)`) are not differing values; the script removes them before comparing and the helper is written without them (C11 6.5.4p5, 6.3.2.2) | `display.c`'s `XColorEditImage` (campaign A, W18 lane b, wide build): its Method and Fuzz cases equal `XSelectPaintMethod` and `XSelectFuzzFactor`, which `XMatteEditImage` already calls, but for those two spellings; reuse removes two of the function's depth-4 sites and is one step of the chain that takes it out of *Brain Method* (probe: display.c 1.41 to 1.49) | owner |
 | 2026-11-11 | NEW | FT | Replace a Fall-Through into a Call by the Call: a case ending `magick_fallthrough;` into a case whose whole body is a call of a `static void` helper and `break;` gets that call and a `break;` in place of the fall-through, so that Recipe CT (whose step 1 needs the case to end in `break;`) can move it | `display.c`'s `XCropImage` and `XROIImage` (campaign A, W18 lane b, wide build): the ButtonPress case (button, window and four corner tests, each leaving through `break;`) falls into ButtonRelease; CT refuses it and SD would carry twelve decisions into one helper. Probe of the XCropImage chain: see its commits | owner |
+| 2026-11-11 | NEW | LC | Extract Block Returning Whether It Continued: a block in a sequential loop body, followed by statements that stay, that leaves its iteration through `continue;` from inside it moves into a `static MagickBooleanType` function whose `continue;`s are `return(MagickTrue);` and whose end is `return(MagickFalse);`; the caller writes `if (Helper(...) != MagickFalse) continue;` | `display.c`'s `XROIImage` (campaign A, W18 lane b, wide build): the rectify loop's update-region block (a whole `if` holding a `switch` whose default group `continue`s when the region crop fails) holds three of the last depth-4 and 5 statements; OC needs the block followed by `continue;`, E step 7 the whole body or tail, LB a `break;` | owner |
