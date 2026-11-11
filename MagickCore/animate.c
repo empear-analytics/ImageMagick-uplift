@@ -3615,6 +3615,27 @@ static void XHandleClientMessage(const AnimateEventContext *event_context,
   (*state)=XHandleDeleteMessage(event_context,event,(*state));
 }
 
+static void XHandleEnterNotify(const AnimateEventContext *event_context,
+  const XEvent event)
+{
+  Display
+    *const display = event_context->display;
+
+  XVisualInfo
+    *const visual_info = event_context->visual_info;
+
+  XStandardColormap
+    *const map_info = event_context->map_info;
+
+  /*
+    Selectively install colormap.
+  */
+  if ((map_info->colormap !=
+       XDefaultColormap(display,visual_info->screen)) &&
+      (event.xcrossing.mode != NotifyUngrab))
+    XInstallColormap(display,map_info->colormap);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4458,13 +4479,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case EnterNotify:
       {
-        /*
-          Selectively install colormap.
-        */
-        if ((map_info->colormap !=
-             XDefaultColormap(display,visual_info->screen)) &&
-            (event.xcrossing.mode != NotifyUngrab))
-          XInstallColormap(display,map_info->colormap);
+        XHandleEnterNotify(&event_context,event);
         break;
       }
       case Expose:
