@@ -2182,6 +2182,29 @@ static void SetVirtualDissolvePixel(const VirtualCompositeInputs *composite,
   }
 }
 
+static void SetVirtualSourcePixel(const VirtualCompositeInputs *composite,
+  const PixelChannel channel,const Quantum *source,MagickRealType *pixel)
+{
+  switch (composite->compose)
+  {
+    case ClearCompositeOp:
+    case CopyCompositeOp:
+    case ReplaceCompositeOp:
+    {
+      if (channel == AlphaPixelChannel)
+        (*pixel)=(MagickRealType) TransparentAlpha;
+      else
+        (*pixel)=0.0;
+      break;
+    }
+    default:
+    {
+      SetVirtualDissolvePixel(composite,channel,source,&(*pixel));
+      break;
+    }
+  }
+}
+
 static inline void SetVirtualCompositeChannels(
   const VirtualCompositeInputs *composite,const Quantum *source,
   Quantum *magick_restrict q)
@@ -2219,19 +2242,9 @@ static inline void SetVirtualCompositeChannels(
           pixel=(MagickRealType) q[i];
         break;
       }
-      case ClearCompositeOp:
-      case CopyCompositeOp:
-      case ReplaceCompositeOp:
-      {
-        if (channel == AlphaPixelChannel)
-          pixel=(MagickRealType) TransparentAlpha;
-        else
-          pixel=0.0;
-        break;
-      }
       default:
       {
-        SetVirtualDissolvePixel(composite,channel,source,&pixel);
+        SetVirtualSourcePixel(composite,channel,source,&pixel);
         break;
       }
     }
