@@ -12409,8 +12409,7 @@ static MagickBooleanType XRotateImage(Display *display,
                 */
                 id=XMenuWidget(display,windows,RotateMenu[id],
                   Directions,command);
-                if (id >= 0)
-                  direction=DirectionCommands[id];
+                direction=XSelectChopDirection(id,DirectionCommands,direction);
                 break;
               }
               case RotateHelpCommand:
