@@ -3404,6 +3404,30 @@ static void XReplaceImageColor(const XReplaceColorInput *replace)
     }
 }
 
+typedef struct _EditMenuInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *MatteEditMenu;
+
+  int
+    id;
+
+  char
+    *command;
+} EditMenuInput;
+
+typedef struct _PaintMethodTargets
+{
+  PaintMethod
+    *method;
+} PaintMethodTargets;
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -9893,30 +9917,6 @@ static void XDiscardMagnifyKeys(Display *display,XWindows *windows,
       while (XCheckWindowEvent(display,window,KeyPressMask,event)) ;
     }
 }
-
-typedef struct _EditMenuInput
-{
-  Display
-    *display;
-
-  XWindows
-    *windows;
-
-  const char
-    *const *MatteEditMenu;
-
-  int
-    id;
-
-  char
-    *command;
-} EditMenuInput;
-
-typedef struct _PaintMethodTargets
-{
-  PaintMethod
-    *method;
-} PaintMethodTargets;
 
 static void XSelectPaintMethod(const EditMenuInput *menu,
   const PaintMethodTargets *targets)
