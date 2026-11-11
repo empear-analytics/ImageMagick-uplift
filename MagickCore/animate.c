@@ -2924,6 +2924,23 @@ static void XHandleConfigureNotify(Display *display,
     }
 }
 
+static MagickStatusType XHandleDestroyNotify(XResourceInfo *resource_info,
+  XWindows *windows,const XEvent event,MagickStatusType state)
+{
+  /*
+    Group leader has exited.
+  */
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Destroy Notify: 0x%lx",event.xdestroywindow.window);
+  if (event.xdestroywindow.window == windows->group_leader.id)
+    {
+      state|=ExitState;
+      return(state);
+    }
+  return(state);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3835,17 +3852,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case DestroyNotify:
       {
-        /*
-          Group leader has exited.
-        */
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Destroy Notify: 0x%lx",event.xdestroywindow.window);
-        if (event.xdestroywindow.window == windows->group_leader.id)
-          {
-            state|=ExitState;
-            break;
-          }
+        state=XHandleDestroyNotify(resource_info,windows,event,state);
         break;
       }
       case EnterNotify:
