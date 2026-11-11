@@ -2014,6 +2014,100 @@ static void XSelectAnnotateFontColor(const AnnotateMenuInput *menu,
   (*pen_id)=(unsigned int) pen_number;
 }
 
+typedef struct _AnnotateBoxColorTargets
+{
+  MagickBooleanType
+    *transparent_box;
+
+  XColor
+    *color;
+
+  unsigned int
+    *box_id;
+} AnnotateBoxColorTargets;
+
+static void XSelectAnnotateBoxColor(const AnnotateMenuInput *menu,
+  const AnnotateBoxColorTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XResourceInfo
+    *const resource_info = menu->resource_info;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const AnnotateMenu = menu->AnnotateMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  MagickBooleanType
+    *const transparent_box = targets->transparent_box;
+
+  XColor
+    *const color = targets->color;
+
+  unsigned int
+    *const box_id = targets->box_id;
+
+  const char
+    *ColorMenu[MaxNumberPens+1];
+
+  int
+    pen_number;
+
+  ssize_t
+    i;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="transparent";
+  ColorMenu[MaxNumberPens-1]="Browser...";
+  ColorMenu[MaxNumberPens]=(const char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,AnnotateMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  (*transparent_box)=pen_number == (MaxNumberPens-2) ? MagickTrue :
+    MagickFalse;
+  if ((*transparent_box) != MagickFalse)
+    return;
+  if (pen_number == (MaxNumberPens-1))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set pen color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],color);
+  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
+    (unsigned int) MaxColors,color);
+  windows->pixel_info->pen_colors[pen_number]=(*color);
+  (*box_id)=(unsigned int) pen_number;
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -2072,9 +2166,6 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     *p,
     text[MagickPathExtent];
 
-  const char
-    *ColorMenu[MaxNumberPens+1];
-
   Cursor
     cursor;
 
@@ -2083,7 +2174,6 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
 
   int
     id,
-    pen_number,
     status,
     x,
     y;
@@ -2117,6 +2207,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
 
   const AnnotateTargets
     targets = { &annotate_info, &p, &x, &y };
+
+  const AnnotateBoxColorTargets
+    box_color_targets = { &transparent_box, &color, &box_id };
 
   const AnnotateFontColorTargets
     font_color_targets = { &transparent_pen, &color, &pen_id };
@@ -2198,47 +2291,16 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
           }
           case AnnotateBackgroundColorCommand:
           {
-            /*
-              Initialize menu selections.
-            */
-            for (i=0; i < (int) (MaxNumberPens-2); i++)
-              ColorMenu[i]=resource_info->pen_colors[i];
-            ColorMenu[MaxNumberPens-2]="transparent";
-            ColorMenu[MaxNumberPens-1]="Browser...";
-            ColorMenu[MaxNumberPens]=(const char *) NULL;
-            /*
-              Select a pen color from the pop-up menu.
-            */
-            pen_number=XMenuWidget(display,windows,AnnotateMenu[id],
-              (const char **) ColorMenu,command);
-            if (pen_number < 0)
-              break;
-            transparent_box=pen_number == (MaxNumberPens-2) ? MagickTrue :
-              MagickFalse;
-            if (transparent_box != MagickFalse)
-              break;
-            if (pen_number == (MaxNumberPens-1))
-              {
-                static char
-                  color_name[MagickPathExtent] = "gray";
+            AnnotateMenuInput
+              annotate_input;
 
-                /*
-                  Select a pen color from a dialog.
-                */
-                resource_info->pen_colors[pen_number]=color_name;
-                XColorBrowserWidget(display,windows,"Select",color_name);
-                if (*color_name == '\0')
-                  break;
-              }
-            /*
-              Set pen color.
-            */
-            (void) XParseColor(display,windows->map_info->colormap,
-              resource_info->pen_colors[pen_number],&color);
-            XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-              (unsigned int) MaxColors,&color);
-            windows->pixel_info->pen_colors[pen_number]=color;
-            box_id=(unsigned int) pen_number;
+            annotate_input.display=display;
+            annotate_input.resource_info=resource_info;
+            annotate_input.windows=windows;
+            annotate_input.AnnotateMenu=AnnotateMenu;
+            annotate_input.id=id;
+            annotate_input.command=command;
+            XSelectAnnotateBoxColor(&annotate_input,&box_color_targets);
             break;
           }
           case AnnotateRotateCommand:
