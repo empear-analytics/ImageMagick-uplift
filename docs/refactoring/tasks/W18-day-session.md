@@ -48,3 +48,29 @@ segment.c 9.02 (the unreached `GetImageDynamicThreshold`: neither bump fits E/G/
 seed-block helper plus a hoisted identical exit test probes at 8.81, +0.07, but needs a new "hoist an identical
 tail" recipe: not taken yet). Possible upstream: `ChannelFxImage` leaks the destination list when
 `AppendChannelCanvas` fails. Tool note: `refactor_guard --calls` fails a helper renamed after its first commit.
+
+## Lane a, second round: distort.c 7.60 -> 7.70 (merged); fourier, feature-texture, layer no commit
+
+- **distort.c:** 1741aa935 playbook (Recipe PL step 1, integer form: `e` may be an integer parameter `ssize_t n`
+  whose peeled labels are decimal literals and whose `S` is `return(c);` of a numeric literal; the predicate's
+  parameter is `const` of `e`'s type; a kept `switch` without `default:` stays without one; a comment on a peeled
+  label moves with it), 6f05f56b1 PL `poly_basis_dx` (labels 0, 2, 5, 9, 14, 20, each only `return( 0.0 );`, into
+  `IsPolyBasisDxZero(const ssize_t n)`; cc 22 -> 16, still Complex Method; script check that the predicate holds exactly
+  the six labels and comments and the kept `switch` is the original minus them; 17 cases, 0 diverged). Timing (per
+  pixel, twice per polynomial term): polynomial distort of 1500x1500, order 5, 11 alternating runs: median 1.305 s
+  baseline, 1.314 s candidate, +0.6%; an order-2 run +0.7%. Plateau 7.70: `poly_basis_dx` keeps 15 labels; a chain
+  clones `poly_basis_fn`'s chain (dx(15..19) equals `PolyBasisFn` cases 10..14) and is slower; `SetDistortNoBestFit`
+  is the owner question; `DistortImage` and `SparseColorImage` are public with 6 and 5 arguments; every split is
+  refused (`GenerateCoefficients` shared).
+- **fourier.c 7.59:** every finding sits in the publics' `#if !defined(ENABLE_FFTW_DELEGATE)`/`#else` bodies or
+  InverseFourier's `HAVE_COMPLEX_H` pairs (owner question); split_source.py refuses both families (seven shared statics).
+- **feature-texture.c 7.63:** stub ceilings for `GetImageFeatures`: tail loops removed 7.98, plus the grays block 8.22,
+  plus the allocation and exit blocks 8.46, emptied 9.38. Blocks: the tail loops' `shared(status)` clause names
+  `status`, which a helper would never use (unused-variable under CI's `-Wextra` without OpenMP); the grays column
+  loop (owner question); the exit blocks throw through `GetMagickModule()`; the six-memset run as Recipe O step 7 is
+  only +0.01 and strains O step 2.
+- **layer.c 8.25:** every movable block of `OptimizeLayerFrames` carries `#if DEBUG_OPT_FRAME` lines, the rest are
+  `ThrowImageException` exits.
+- Probes passed to lane d: colorspace-convert.c ConvertRGBToGeneric as a three-helper SD chain scores 7.78 or 8.28
+  against 9.08 (Code Duplication); threshold.c B on `RangeThresholdValue`/`RangeThresholdChannels` is flat at 9.09.
+- Possible upstream: `poly_basis_dy` calls `poly_basis_dx(n-1)` ("weird but true"). Gate: 15,900 cases, 0 diverged.
