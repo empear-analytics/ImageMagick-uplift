@@ -5403,6 +5403,35 @@ static void XCropDownHelpKey(const CropEventInput *event_input,
   }
 }
 
+static void XCropUpRightKey(const CropEventInput *event_input,
+  const CropTargets *targets,const KeySym key_symbol)
+{
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Up:
+    case XK_KP_Up:
+    case XK_Next:
+    {
+      (*crop_info).y--;
+      break;
+    }
+    case XK_Right:
+    case XK_KP_Right:
+    {
+      (*crop_info).x++;
+      break;
+    }
+    default:
+    {
+      XCropDownHelpKey(event_input,targets,key_symbol);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -5831,22 +5860,9 @@ static MagickBooleanType XCropImage(Display *display,
               crop_info.x--;
               break;
             }
-            case XK_Up:
-            case XK_KP_Up:
-            case XK_Next:
-            {
-              crop_info.y--;
-              break;
-            }
-            case XK_Right:
-            case XK_KP_Right:
-            {
-              crop_info.x++;
-              break;
-            }
             default:
             {
-              XCropDownHelpKey(&event_input,&targets,key_symbol);
+              XCropUpRightKey(&event_input,&targets,key_symbol);
               break;
             }
           }
