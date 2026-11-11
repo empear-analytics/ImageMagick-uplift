@@ -7417,6 +7417,43 @@ static unsigned char *XPackColormappedMultiByteRowMSB(
   return(q);
 }
 
+static unsigned char *XPackContinuousMultiByteRowMSB(
+  const XImageRowSource *source,const unsigned int bytes_per_pixel,
+  const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  int
+    k;
+
+  int
+    x;
+
+  unsigned char
+    channel[sizeof(size_t)];
+
+  unsigned long
+    pixel;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    pixel=XGammaPixel(canvas,map_info,p);
+    for (k=(int) bytes_per_pixel-1; k >= 0; k--)
+    {
+      channel[k]=(unsigned char) pixel;
+      pixel>>=8;
+    }
+    for (k=0; k < (int) bytes_per_pixel; k++)
+      *q++=channel[k];
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7455,7 +7492,6 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
     scanline_pad;
 
   unsigned long
-    pixel,
     *pixels;
 
   XStandardColormap
@@ -7755,14 +7791,8 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
               }
             else
               {
-                int
-                  k;
-
                 unsigned int
                   bytes_per_pixel;
-
-                unsigned char
-                  channel[sizeof(size_t)];
 
                 /*
                   Convert to multi-byte continuous-tone X canvas.
@@ -7774,18 +7804,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
                     canvas->columns,1,exception);
                   if (p == (const Quantum *) NULL)
                     break;
-                  for (x=(int) canvas->columns-1; x >= 0; x--)
-                  {
-                    pixel=XGammaPixel(canvas,map_info,p);
-                    for (k=(int) bytes_per_pixel-1; k >= 0; k--)
-                    {
-                      channel[k]=(unsigned char) pixel;
-                      pixel>>=8;
-                    }
-                    for (k=0; k < (int) bytes_per_pixel; k++)
-                      *q++=channel[k];
-                    p+=(ptrdiff_t) GetPixelChannels(canvas);
-                  }
+                  q=XPackContinuousMultiByteRowMSB(&row_source,bytes_per_pixel,p,q);
                   q+=(ptrdiff_t) scanline_pad;
                 }
               }
