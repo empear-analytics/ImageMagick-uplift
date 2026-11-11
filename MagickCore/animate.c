@@ -3003,6 +3003,113 @@ static void XMapPanelWindows(XWindows *windows,const XEvent event)
     }
 }
 
+typedef struct _AnimateEventContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  XVisualInfo
+    *visual_info;
+
+  XStandardColormap
+    *map_info;
+
+  Image
+    **image_list;
+
+  Image
+    *display_image;
+
+  ExceptionInfo
+    *exception;
+
+  XResourceInfo
+    *icon_resources;
+
+  XVisualInfo
+    *icon_visual;
+
+  XStandardColormap
+    *icon_map;
+
+  XPixelInfo
+    *icon_pixel;
+} AnimateEventContext;
+
+static void XHandleUnmapNotify(const AnimateEventContext *event_context,
+  const XEvent event)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  XStandardColormap
+    *const map_info = event_context->map_info;
+
+  Image
+    *const display_image = event_context->display_image;
+
+  ExceptionInfo
+    *const exception = event_context->exception;
+
+  XVisualInfo
+    *const icon_visual = event_context->icon_visual;
+
+  XStandardColormap
+    *const icon_map = event_context->icon_map;
+
+  XPixelInfo
+    *const icon_pixel = event_context->icon_pixel;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Unmap Notify: 0x%lx",event.xunmap.window);
+  if (event.xunmap.window == windows->backdrop.id)
+    {
+      windows->backdrop.mapped=MagickFalse;
+      return;
+    }
+  if (event.xunmap.window == windows->image.id)
+    {
+      windows->image.mapped=MagickFalse;
+      return;
+    }
+  if (event.xunmap.window == windows->info.id)
+    {
+      windows->info.mapped=MagickFalse;
+      return;
+    }
+  if (event.xunmap.window == windows->icon.id)
+    {
+      AnimateIconColormaps
+        icon_colormaps;
+
+      icon_colormaps.display=display;
+      icon_colormaps.resource_info=resource_info;
+      icon_colormaps.windows=windows;
+      icon_colormaps.display_image=display_image;
+      icon_colormaps.exception=exception;
+      icon_colormaps.map_info=map_info;
+      icon_colormaps.icon_map=icon_map;
+      icon_colormaps.icon_visual=icon_visual;
+      icon_colormaps.icon_pixel=icon_pixel;
+      XReleaseIconColormap(&icon_colormaps);
+      return;
+    }
+  XUnmapPanelWindows(display,windows,event);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3193,6 +3300,9 @@ MagickExport Image *XAnimateImages(Display *display,
 
   XWMHints
     *manager_hints;
+
+  AnimateEventContext
+    event_context;
 
   AnimateSceneList
     scene_list;
@@ -3712,6 +3822,18 @@ MagickExport Image *XAnimateImages(Display *display,
   iterations=0;
   image=image_list[0];
   state=(MagickStatusType) (ForwardAnimationState | RepeatAnimationState);
+  event_context.display=display;
+  event_context.resource_info=resource_info;
+  event_context.windows=windows;
+  event_context.visual_info=visual_info;
+  event_context.map_info=map_info;
+  event_context.image_list=image_list;
+  event_context.display_image=display_image;
+  event_context.exception=exception;
+  event_context.icon_resources=icon_resources;
+  event_context.icon_visual=icon_visual;
+  event_context.icon_map=icon_map;
+  event_context.icon_pixel=icon_pixel;
   (void) XMagickCommand(display,resource_info,windows,PlayCommand,&images,
     &state,exception);
   do
@@ -4142,42 +4264,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case UnmapNotify:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Unmap Notify: 0x%lx",event.xunmap.window);
-        if (event.xunmap.window == windows->backdrop.id)
-          {
-            windows->backdrop.mapped=MagickFalse;
-            break;
-          }
-        if (event.xunmap.window == windows->image.id)
-          {
-            windows->image.mapped=MagickFalse;
-            break;
-          }
-        if (event.xunmap.window == windows->info.id)
-          {
-            windows->info.mapped=MagickFalse;
-            break;
-          }
-        if (event.xunmap.window == windows->icon.id)
-          {
-            AnimateIconColormaps
-              icon_colormaps;
-
-            icon_colormaps.display=display;
-            icon_colormaps.resource_info=resource_info;
-            icon_colormaps.windows=windows;
-            icon_colormaps.display_image=display_image;
-            icon_colormaps.exception=exception;
-            icon_colormaps.map_info=map_info;
-            icon_colormaps.icon_map=icon_map;
-            icon_colormaps.icon_visual=icon_visual;
-            icon_colormaps.icon_pixel=icon_pixel;
-            XReleaseIconColormap(&icon_colormaps);
-            break;
-          }
-        XUnmapPanelWindows(display,windows,event);
+        XHandleUnmapNotify(&event_context,event);
         break;
       }
       default:
