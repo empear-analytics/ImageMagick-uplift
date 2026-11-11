@@ -993,6 +993,11 @@ static inline MagickBooleanType IsEagle3XBottomEdge(const ssize_t corner_bl,
   return((corner_bl && corner_br) ? MagickTrue : MagickFalse);
 }
 
+static inline int Eagle3XTopLeftSource(const ssize_t corner_tl)
+{
+  return(corner_tl ? 0 : 4);
+}
+
 static inline void Eagle3X(const Image *magick_unused(source),
   const Quantum *pixels,Quantum *result,const size_t channels)
 {
@@ -1010,7 +1015,7 @@ static inline void Eagle3X(const Image *magick_unused(source),
   corner_tr=IsEagle3XTopRightCorner(pixels,channels) != MagickFalse;
   corner_bl=IsEagle3XBottomLeftCorner(pixels,channels) != MagickFalse;
   corner_br=IsEagle3XBottomRightCorner(pixels,channels) != MagickFalse;
-  CopyPixels(&magnify,(ssize_t) (corner_tl ? 0 : 4),0);
+  CopyPixels(&magnify,(ssize_t) Eagle3XTopLeftSource(corner_tl),0);
   if (IsEagle3XTopEdge(corner_tl,corner_tr) != MagickFalse)
     Mix2Pixels(&magnify,0,2,1);
   else
