@@ -1563,6 +1563,90 @@ static MagickBooleanType XSelectMenuCommand(
   return(MagickTrue);
 }
 
+typedef struct _AnimateWindowColormaps
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  XStandardColormap
+    *map_info;
+
+  XPixelInfo
+    *pixel;
+
+  XWindowInfo
+    **magick_windows;
+
+  size_t
+    number_windows;
+
+  MagickStatusType
+    context_mask;
+} AnimateWindowColormaps;
+
+static void XUpdateWindowColormaps(
+  const AnimateWindowColormaps *window_colormaps,XGCValues *context_values)
+{
+  Display
+    *const display = window_colormaps->display;
+
+  XWindows
+    *const windows = window_colormaps->windows;
+
+  XStandardColormap
+    *const map_info = window_colormaps->map_info;
+
+  XPixelInfo
+    *const pixel = window_colormaps->pixel;
+
+  XWindowInfo
+    **const magick_windows = window_colormaps->magick_windows;
+
+  const size_t
+    number_windows = window_colormaps->number_windows;
+
+  const MagickStatusType
+    context_mask = window_colormaps->context_mask;
+
+  ssize_t
+    i;
+
+  /*
+    Update graphic context and window colormap.
+  */
+  for (i=0; i < (ssize_t) number_windows; i++)
+  {
+    if (magick_windows[i]->id == windows->icon.id)
+      continue;
+    (*context_values).background=pixel->background_color.pixel;
+    (*context_values).foreground=pixel->foreground_color.pixel;
+    (void) XChangeGC(display,magick_windows[i]->annotate_context,
+      context_mask,context_values);
+    (void) XChangeGC(display,magick_windows[i]->widget_context,
+      context_mask,context_values);
+    (*context_values).background=pixel->foreground_color.pixel;
+    (*context_values).foreground=pixel->background_color.pixel;
+    (*context_values).plane_mask=
+      (*context_values).background ^ (*context_values).foreground;
+    (void) XChangeGC(display,magick_windows[i]->highlight_context,
+      (size_t) (context_mask | GCPlaneMask),
+      context_values);
+    magick_windows[i]->attributes.background_pixel=
+      pixel->background_color.pixel;
+    magick_windows[i]->attributes.border_pixel=
+      pixel->border_color.pixel;
+    magick_windows[i]->attributes.colormap=map_info->colormap;
+    (void) XChangeWindowAttributes(display,magick_windows[i]->id,
+      (unsigned long) magick_windows[i]->mask,
+      &magick_windows[i]->attributes);
+  }
+  if (windows->backdrop.id != (Window) NULL)
+    (void) XInstallColormap(display,map_info->colormap);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2608,37 +2692,17 @@ MagickExport Image *XAnimateImages(Display *display,
           {
             if (*event.xclient.data.l == (long) windows->im_update_colormap)
               {
-                /*
-                  Update graphic context and window colormap.
-                */
-                for (i=0; i < (ssize_t) number_windows; i++)
-                {
-                  if (magick_windows[i]->id == windows->icon.id)
-                    continue;
-                  context_values.background=pixel->background_color.pixel;
-                  context_values.foreground=pixel->foreground_color.pixel;
-                  (void) XChangeGC(display,magick_windows[i]->annotate_context,
-                    context_mask,&context_values);
-                  (void) XChangeGC(display,magick_windows[i]->widget_context,
-                    context_mask,&context_values);
-                  context_values.background=pixel->foreground_color.pixel;
-                  context_values.foreground=pixel->background_color.pixel;
-                  context_values.plane_mask=
-                    context_values.background ^ context_values.foreground;
-                  (void) XChangeGC(display,magick_windows[i]->highlight_context,
-                    (size_t) (context_mask | GCPlaneMask),
-                    &context_values);
-                  magick_windows[i]->attributes.background_pixel=
-                    pixel->background_color.pixel;
-                  magick_windows[i]->attributes.border_pixel=
-                    pixel->border_color.pixel;
-                  magick_windows[i]->attributes.colormap=map_info->colormap;
-                  (void) XChangeWindowAttributes(display,magick_windows[i]->id,
-                    (unsigned long) magick_windows[i]->mask,
-                    &magick_windows[i]->attributes);
-                }
-                if (windows->backdrop.id != (Window) NULL)
-                  (void) XInstallColormap(display,map_info->colormap);
+                AnimateWindowColormaps
+                  window_colormaps;
+
+                window_colormaps.display=display;
+                window_colormaps.windows=windows;
+                window_colormaps.map_info=map_info;
+                window_colormaps.pixel=pixel;
+                window_colormaps.magick_windows=magick_windows;
+                window_colormaps.number_windows=number_windows;
+                window_colormaps.context_mask=context_mask;
+                XUpdateWindowColormaps(&window_colormaps,&context_values);
                 break;
               }
             if (*event.xclient.data.l == (long) windows->im_exit)
