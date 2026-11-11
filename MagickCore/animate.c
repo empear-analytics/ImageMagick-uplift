@@ -2121,6 +2121,80 @@ static void XAdvanceScene(const AnimationSceneStep *scene_step,
     }
 }
 
+typedef struct _AnimateSceneView
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  XVisualInfo
+    *visual_info;
+
+  XStandardColormap
+    *map_info;
+
+  Image
+    **image_list;
+
+  Image
+    *image;
+
+  ssize_t
+    scene;
+} AnimateSceneView;
+
+static void XShowAnimationScene(const AnimateSceneView *scene_view,
+  const MagickStatusType state,XEvent *event)
+{
+  Display
+    *const display = scene_view->display;
+
+  XResourceInfo
+    *const resource_info = scene_view->resource_info;
+
+  XWindows
+    *const windows = scene_view->windows;
+
+  XVisualInfo
+    *const visual_info = scene_view->visual_info;
+
+  XStandardColormap
+    *const map_info = scene_view->map_info;
+
+  Image
+    **const image_list = scene_view->image_list;
+
+  Image
+    *const image = scene_view->image;
+
+  const ssize_t
+    scene = scene_view->scene;
+
+  XGetPixelInfo(display,visual_info,map_info,resource_info,
+    image_list[scene],windows->image.pixel_info);
+  if (image != (Image *) NULL)
+    {
+      windows->image.ximage->width=(int) image->columns;
+      windows->image.ximage->height=(int) image->rows;
+    }
+  windows->image.pixmap=windows->image.pixmaps[scene];
+  windows->image.matte_pixmap=windows->image.matte_pixmaps[scene];
+  (*event).xexpose.x=0;
+  (*event).xexpose.y=0;
+  (*event).xexpose.width=(int) image->columns;
+  (*event).xexpose.height=(int) image->rows;
+  if ((state & ExitState) == 0)
+    {
+      XRefreshWindow(display,&windows->image,event);
+      (void) XSync(display,MagickFalse);
+    }
+}
+
 static ssize_t XLoopStartScene(const Image *image,const ssize_t scene,
   ssize_t first_scene)
 {
@@ -2943,6 +3017,9 @@ MagickExport Image *XAnimateImages(Display *display,
         AnimationSceneStep
           scene_step;
 
+        AnimateSceneView
+          scene_view;
+
         const AnimationSceneTargets
           scene_targets = { &scene, &iterations, &state, &pause };
 
@@ -2970,24 +3047,15 @@ MagickExport Image *XAnimateImages(Display *display,
         /*
           Copy X pixmap to Image window.
         */
-        XGetPixelInfo(display,visual_info,map_info,resource_info,
-          image_list[scene],windows->image.pixel_info);
-        if (image != (Image *) NULL)
-          {
-            windows->image.ximage->width=(int) image->columns;
-            windows->image.ximage->height=(int) image->rows;
-          }
-        windows->image.pixmap=windows->image.pixmaps[scene];
-        windows->image.matte_pixmap=windows->image.matte_pixmaps[scene];
-        event.xexpose.x=0;
-        event.xexpose.y=0;
-        event.xexpose.width=(int) image->columns;
-        event.xexpose.height=(int) image->rows;
-        if ((state & ExitState) == 0)
-          {
-            XRefreshWindow(display,&windows->image,&event);
-            (void) XSync(display,MagickFalse);
-          }
+        scene_view.display=display;
+        scene_view.resource_info=resource_info;
+        scene_view.windows=windows;
+        scene_view.visual_info=visual_info;
+        scene_view.map_info=map_info;
+        scene_view.image_list=image_list;
+        scene_view.image=image;
+        scene_view.scene=scene;
+        XShowAnimationScene(&scene_view,state,&event);
         state&=(~StepAnimationState);
         if (pause != MagickFalse)
           XPauseAnimation(display,resource_info,windows,&event);
