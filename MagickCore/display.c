@@ -4589,6 +4589,32 @@ static inline MagickBooleanType IsSelectionMovedOrDone(
     ((state & ExitState) != 0)) ? MagickTrue : MagickFalse);
 }
 
+static void XShowCropHelp(Display *display,XResourceInfo *resource_info,
+  XWindows *windows,const ClipboardMode mode)
+{
+  switch (mode)
+  {
+    case CopyMode:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Copy",ImageCopyHelp);
+      break;
+    }
+    case CropMode:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Crop",ImageCropHelp);
+      break;
+    }
+    case CutMode:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Cut",ImageCutHelp);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -4728,27 +4754,7 @@ static MagickBooleanType XCropImage(Display *display,
         {
           case CropHelpCommand:
           {
-            switch (mode)
-            {
-              case CopyMode:
-              {
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Copy",ImageCopyHelp);
-                break;
-              }
-              case CropMode:
-              {
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Crop",ImageCropHelp);
-                break;
-              }
-              case CutMode:
-              {
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Cut",ImageCutHelp);
-                break;
-              }
-            }
+            XShowCropHelp(display,resource_info,windows,mode);
             break;
           }
           case CropDismissCommand:
@@ -4810,27 +4816,7 @@ static MagickBooleanType XCropImage(Display *display,
           case XK_F1:
           case XK_Help:
           {
-            switch (mode)
-            {
-              case CopyMode:
-              {
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Copy",ImageCopyHelp);
-                break;
-              }
-              case CropMode:
-              {
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Crop",ImageCropHelp);
-                break;
-              }
-              case CutMode:
-              {
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Cut",ImageCutHelp);
-                break;
-              }
-            }
+            XShowCropHelp(display,resource_info,windows,mode);
             break;
           }
           default:
@@ -5035,27 +5021,7 @@ static MagickBooleanType XCropImage(Display *display,
               {
                 (void) XSetFunction(display,windows->image.highlight_context,
                   GXcopy);
-                switch (mode)
-                {
-                  case CopyMode:
-                  {
-                    XTextViewHelp(display,resource_info,windows,MagickFalse,
-                      "Help Viewer - Image Copy",ImageCopyHelp);
-                    break;
-                  }
-                  case CropMode:
-                  {
-                    XTextViewHelp(display,resource_info,windows,MagickFalse,
-                      "Help Viewer - Image Crop",ImageCropHelp);
-                    break;
-                  }
-                  case CutMode:
-                  {
-                    XTextViewHelp(display,resource_info,windows,MagickFalse,
-                      "Help Viewer - Image Cut",ImageCutHelp);
-                    break;
-                  }
-                }
+                XShowCropHelp(display,resource_info,windows,mode);
                 (void) XSetFunction(display,windows->image.highlight_context,
                   GXinvert);
                 break;
