@@ -12357,6 +12357,35 @@ static void XROIDownHelpKey(const ROIKeyInput *key_input,
   }
 }
 
+static void XROIUpRightKey(const ROIKeyInput *key_input,
+  const ROIKeyTargets *targets,const KeySym key_symbol)
+{
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Up:
+    case XK_KP_Up:
+    case XK_Next:
+    {
+      (*roi_info).y--;
+      break;
+    }
+    case XK_Right:
+    case XK_KP_Right:
+    {
+      (*roi_info).x++;
+      break;
+    }
+    default:
+    {
+      XROIDownHelpKey(key_input,targets,key_symbol);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -13080,22 +13109,9 @@ static MagickBooleanType XROIImage(Display *display,
               roi_info.x--;
               break;
             }
-            case XK_Up:
-            case XK_KP_Up:
-            case XK_Next:
-            {
-              roi_info.y--;
-              break;
-            }
-            case XK_Right:
-            case XK_KP_Right:
-            {
-              roi_info.x++;
-              break;
-            }
             default:
             {
-              XROIDownHelpKey(&key_input,&key_targets,key_symbol);
+              XROIUpRightKey(&key_input,&key_targets,key_symbol);
               break;
             }
           }
