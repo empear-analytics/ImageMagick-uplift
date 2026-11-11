@@ -2508,6 +2508,46 @@ static void XNameSceneWindow(const AnimateSceneWindow *scene_window)
     }
 }
 
+static void XStoreSceneWindow(const AnimateSceneWindow *scene_window,
+  XEvent *event)
+{
+  Display
+    *const display = scene_window->display;
+
+  XWindows
+    *const windows = scene_window->windows;
+
+  Image
+    **const image_list = scene_window->image_list;
+
+  const ssize_t
+    scene = scene_window->scene;
+
+  int
+    status;
+
+  XTextProperty
+    window_name;
+
+  status=XStringListToTextProperty(&windows->image.name,1,&window_name);
+  if (status != Success)
+    {
+      XSetWMName(display,windows->image.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  windows->image.pixmaps[scene]=windows->image.pixmap;
+  windows->image.matte_pixmaps[scene]=windows->image.matte_pixmap;
+  if (scene == 0)
+    {
+      (*event).xexpose.x=0;
+      (*event).xexpose.y=0;
+      (*event).xexpose.width=(int) image_list[scene]->columns;
+      (*event).xexpose.height=(int) image_list[scene]->rows;
+      XRefreshWindow(display,&windows->image,event);
+      (void) XSync(display,MagickFalse);
+  }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2686,9 +2726,6 @@ MagickExport Image *XAnimateImages(Display *display,
   XStandardColormap
     *icon_map,
     *map_info;
-
-  XTextProperty
-    window_name;
 
   XVisualInfo
     *icon_visual,
@@ -3217,23 +3254,7 @@ MagickExport Image *XAnimateImages(Display *display,
     scene_window.exception=exception;
     scene_window.scene=scene;
     XNameSceneWindow(&scene_window);
-    status=XStringListToTextProperty(&windows->image.name,1,&window_name);
-    if (status != Success)
-      {
-        XSetWMName(display,windows->image.id,&window_name);
-        (void) XFree((void *) window_name.value);
-      }
-    windows->image.pixmaps[scene]=windows->image.pixmap;
-    windows->image.matte_pixmaps[scene]=windows->image.matte_pixmap;
-    if (scene == 0)
-      {
-        event.xexpose.x=0;
-        event.xexpose.y=0;
-        event.xexpose.width=(int) image_list[scene]->columns;
-        event.xexpose.height=(int) image_list[scene]->rows;
-        XRefreshWindow(display,&windows->image,&event);
-        (void) XSync(display,MagickFalse);
-    }
+    XStoreSceneWindow(&scene_window,&event);
   }
   XSetCursorState(display,windows,MagickFalse);
   if (windows->command.mapped)
