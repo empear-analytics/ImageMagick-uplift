@@ -305,6 +305,45 @@ static char *CreateOpenCLCacheDirectory(char *home,char *path,char *temp)
   return(temp);
 }
 
+static char *AcquireOpenCLCacheDirectory(char *home,char *path,char *temp)
+{
+  MagickBooleanType
+    status;
+
+  if (home != (char *) NULL)
+    {
+      temp=CreateOpenCLCacheDirectory(home,path,temp);
+    }
+  else
+    {
+      home=GetEnvironmentValue("HOME");
+      if (home != (char *) NULL)
+        {
+          /* first check if $HOME/.cache exists */
+          (void) FormatLocaleString(path,MagickPathExtent,"%s%s.cache",
+            home,DirectorySeparator);
+          status=CreateOpenCLCachePath(path);
+
+          /* first check if $HOME/.cache/ImageMagick exists */
+          if (status != MagickFalse)
+            {
+              (void) FormatLocaleString(path,MagickPathExtent,
+                "%s%s.cache%sImageMagick",home,DirectorySeparator,
+                DirectorySeparator);
+              status=CreateOpenCLCachePath(path);
+            }
+
+          if (status != MagickFalse)
+            {
+              temp=(char*) AcquireCriticalMemory(strlen(path)+1);
+              (void) CopyMagickString(temp,path,strlen(path)+1);
+            }
+          home=DestroyString(home);
+        }
+    }
+  return(temp);
+}
+
 static const char *GetOpenCLCacheDirectory()
 {
   if (cache_directory == (char *) NULL)
@@ -318,9 +357,6 @@ static const char *GetOpenCLCacheDirectory()
             *home,
             path[MagickPathExtent],
             *temp;
-
-          MagickBooleanType
-            status;
 
           temp=(char *) NULL;
           home=GetEnvironmentValue("MAGICK_OPENCL_CACHE_DIR");
@@ -337,37 +373,7 @@ static const char *GetOpenCLCacheDirectory()
 #endif
             }
 
-          if (home != (char *) NULL)
-            {
-              temp=CreateOpenCLCacheDirectory(home,path,temp);
-            }
-          else
-            {
-              home=GetEnvironmentValue("HOME");
-              if (home != (char *) NULL)
-                {
-                  /* first check if $HOME/.cache exists */
-                  (void) FormatLocaleString(path,MagickPathExtent,"%s%s.cache",
-                    home,DirectorySeparator);
-                  status=CreateOpenCLCachePath(path);
-
-                  /* first check if $HOME/.cache/ImageMagick exists */
-                  if (status != MagickFalse)
-                    {
-                      (void) FormatLocaleString(path,MagickPathExtent,
-                        "%s%s.cache%sImageMagick",home,DirectorySeparator,
-                        DirectorySeparator);
-                      status=CreateOpenCLCachePath(path);
-                    }
-
-                  if (status != MagickFalse)
-                    {
-                      temp=(char*) AcquireCriticalMemory(strlen(path)+1);
-                      (void) CopyMagickString(temp,path,strlen(path)+1);
-                    }
-                  home=DestroyString(home);
-                }
-            }
+          temp=AcquireOpenCLCacheDirectory(home,path,temp);
           if (temp == (char *) NULL)
             {
               temp=AcquireString("?");
