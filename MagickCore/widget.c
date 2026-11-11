@@ -5076,6 +5076,61 @@ static size_t ReadFileBrowserPath(const FileBrowserPaths *paths,
   return(state);
 }
 
+typedef struct _FileBrowserFormatTargets
+{
+  XWidgetInfo
+    *reply_info,
+    *special_info;
+} FileBrowserFormatTargets;
+
+static void SelectFileBrowserFormat(Display *display,XWindows *windows,
+  char *format,const FileBrowserFormatTargets *targets)
+{
+  XWidgetInfo
+    *const reply_info = targets->reply_info,
+    *const special_info = targets->special_info;
+
+  char
+    **formats;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    number_formats;
+
+  ssize_t
+    i;
+
+  /*
+    Let user select image format.
+  */
+  exception=AcquireExceptionInfo();
+  formats=GetMagickList("*",&number_formats,exception);
+  exception=DestroyExceptionInfo(exception);
+  if (formats == (char **) NULL)
+    return;
+  (void) XCheckDefineCursor(display,windows->widget.id,
+    windows->widget.busy_cursor);
+  windows->popup.x=windows->widget.x+60;
+  windows->popup.y=windows->widget.y+60;
+  XListBrowserWidget(display,windows,&windows->popup,
+    (const char **) formats,"Select","Select image format type:",
+    format);
+  XSetCursorState(display,windows,MagickTrue);
+  (void) XCheckDefineCursor(display,windows->widget.id,
+    windows->widget.cursor);
+  LocaleLower(format);
+  AppendImageFormat(format,(*reply_info).text);
+  (*reply_info).cursor=(*reply_info).text+Extent((*reply_info).text);
+  XDrawMatteText(display,&windows->widget,reply_info);
+  (*special_info).raised=MagickTrue;
+  XDrawBeveledButton(display,&windows->widget,special_info);
+  for (i=0; i < (ssize_t) number_formats; i++)
+    formats[i]=DestroyString(formats[i]);
+  formats=(char **) RelinquishMagickMemory(formats);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -5154,6 +5209,9 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 
   const FileBrowserTargets
     targets = { &reply_info, &state, &selection_info, &list_info };
+
+  const FileBrowserFormatTargets
+    format_targets = { &reply_info, &special_info };
 
   /*
     Read filelist from current directory.
@@ -5779,42 +5837,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
           {
             if (anomaly == MagickFalse)
               {
-                char
-                  **formats;
-
-                ExceptionInfo
-                  *exception;
-
-                size_t
-                  number_formats;
-
-                /*
-                  Let user select image format.
-                */
-                exception=AcquireExceptionInfo();
-                formats=GetMagickList("*",&number_formats,exception);
-                exception=DestroyExceptionInfo(exception);
-                if (formats == (char **) NULL)
-                  break;
-                (void) XCheckDefineCursor(display,windows->widget.id,
-                  windows->widget.busy_cursor);
-                windows->popup.x=windows->widget.x+60;
-                windows->popup.y=windows->widget.y+60;
-                XListBrowserWidget(display,windows,&windows->popup,
-                  (const char **) formats,"Select","Select image format type:",
-                  format);
-                XSetCursorState(display,windows,MagickTrue);
-                (void) XCheckDefineCursor(display,windows->widget.id,
-                  windows->widget.cursor);
-                LocaleLower(format);
-                AppendImageFormat(format,reply_info.text);
-                reply_info.cursor=reply_info.text+Extent(reply_info.text);
-                XDrawMatteText(display,&windows->widget,&reply_info);
-                special_info.raised=MagickTrue;
-                XDrawBeveledButton(display,&windows->widget,&special_info);
-                for (i=0; i < (ssize_t) number_formats; i++)
-                  formats[i]=DestroyString(formats[i]);
-                formats=(char **) RelinquishMagickMemory(formats);
+                SelectFileBrowserFormat(display,windows,format,
+                  &format_targets);
                 break;
               }
             if ((event.xbutton.window == windows->widget.id) &&
