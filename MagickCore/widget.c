@@ -9829,6 +9829,44 @@ static void RedrawMenuWidget(const MenuEventContext *context,
     }
 }
 
+static void DrawMenuLine(const MenuEventContext *context,
+  const MenuTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    number_selections = context->number_selections,
+    top_offset = context->top_offset;
+
+  XWidgetInfo
+    *const selection_info = targets->selection_info;
+
+  int
+    y;
+
+  if (number_selections > 2)
+    {
+      /*
+        Redraw Menu line.
+      */
+      y=((int) top_offset+(int) (*selection_info).height*(int)
+        (number_selections-1));
+      XSetBevelColor(display,&windows->widget,MagickFalse);
+      (void) XDrawLine(display,windows->widget.id,
+        windows->widget.widget_context,(*selection_info).x,y-1,
+        (int) (*selection_info).width,y-1);
+      XSetBevelColor(display,&windows->widget,MagickTrue);
+      (void) XDrawLine(display,windows->widget.id,
+        windows->widget.widget_context,(*selection_info).x,y,
+        (int) (*selection_info).width,y);
+      (void) XSetFillStyle(display,windows->widget.widget_context,FillSolid);
+    }
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9943,23 +9981,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   {
     UpdateMenuLayout(&event_context,&targets);
     RedrawMenuWidget(&event_context,&targets);
-    if (number_selections > 2)
-      {
-        /*
-          Redraw Menu line.
-        */
-        y=((int) top_offset+(int) selection_info.height*(int)
-          (number_selections-1));
-        XSetBevelColor(display,&windows->widget,MagickFalse);
-        (void) XDrawLine(display,windows->widget.id,
-          windows->widget.widget_context,selection_info.x,y-1,
-          (int) selection_info.width,y-1);
-        XSetBevelColor(display,&windows->widget,MagickTrue);
-        (void) XDrawLine(display,windows->widget.id,
-          windows->widget.widget_context,selection_info.x,y,
-          (int) selection_info.width,y);
-        (void) XSetFillStyle(display,windows->widget.widget_context,FillSolid);
-      }
+    DrawMenuLine(&event_context,&targets);
     /*
       Wait for next event.
     */
