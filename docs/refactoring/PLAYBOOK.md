@@ -1793,7 +1793,8 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    pointers, none written anywhere in the block, so the new function keeps at most four
    parameters: the struct and what the block writes through (a pixel buffer, say).
    An array of the caller (a local, or a function-local `static`) that the block uses
-   only as `v[e]` read, or passes whole to a callee's pointer parameter, never under
+   only as `v[e]` read, or passes whole to a callee's pointer parameter, or assigns whole
+   to a pointer member of a struct local the block fills (`s.m=v;`), never under
    `sizeof` or `&` or in any other expression, may be one of the group (2026-11-11;
    the member points to the array's own storage, so an element the caller writes
    elsewhere, before the fill or in an earlier iteration, is read through it as
@@ -1804,6 +1805,14 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    did at each use (C11 6.3.2.1p3), and `v[e]` is `*(v+e)` through either (Recipe
    AR's argument): each subscript reads the same element and each callee receives the
    same address.
+   The whole-array assignment `s.m=v;` (2026-11-11, later: `animate.c`'s
+   `window_colormaps.magick_windows=magick_windows;` and `command_window.CommandMenu=
+   CommandMenu;`) converts the array to the address of its first element as a call's
+   argument does (C11 6.3.2.1p3; simple assignment, 6.5.16.1p1, to a pointer of the
+   element type): the new function's member holds that address, bound as step 4 says,
+   and the block's `s.m=v;` stores the same address as before into the block's own
+   struct, which goes on only to the callees that received it before, so each reads the
+   same address and through it the same element.
    A plain struct value (a `PixelInfo`, `PointInfo` or `RectangleInfo` local or
    parameter; not an array, an array of structs, or a pointer's target) may be one of
    the group when, checked by reading: (a) every member of it is set on every path to
@@ -11508,3 +11517,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | CT | Step 2 (and O step 2 by reference): a block-scope `static` of structure type (not an array of structures), its address taken only in the targets initialiser, may be a written variable on the scalar static's terms; its member is a pointer to the structure, `v.m` becomes `(*v).m` and `&v` becomes `v`. *Careful* adds the argument (one object at one address, `(*v).m` is the member, nothing copied, a callee filling the structure through the pointer fills the static) | `display.c`'s `XMatteEditImage` (campaign A, W17 lane b, wide build): its Border Color case tail ends the case through `break;` from a depth-5 `if (*color_name == '\0')` and writes the function's `static XColor border_color` through `XParseColor(...,&border_color)`; CT step 2 admitted only arithmetic, enumeration and pointer statics. The case is one of the four whose move takes the function to depth 3 (probe: display.c 1.33 to 1.41, the function out of *Deep, Nested Complexity* and *Brain Method*, no finding on the helpers) | owner |
 | 2026-11-11 | NEW | UX | Unnest an Exit Implied by Its Guard: a guard on the disjunction of `A` and `B` whose body runs a clean-up `S`, then exits through `X` when `B` holds and through `Y` otherwise, becomes three statements: the guard holding `S` alone, `if (B) X`, and `if (A) { Y }`; `A` and `B` are side-effect-free reads of locals that `S` does not write | `animate.c`'s `XMagickCommand` (campaign A, W17 lane c, wide build): the Open command's failure guard releases the file list and then throws one of two `ThrowXWindowException`s, which record `GetMagickModule()` and must stay in the function; the nested test is the function's last bump after the SD splits. Probe of the chain: `XMagickCommand` leaves Bumpy Road Ahead and Large Method, 3.48 to 3.67 with the XSaveImage steps | owner |
 | 2026-11-11 | WORDING | UX | Step 5 and *Evidence level*: `refactor_guard.py` counts distinct values, so repeating `A` may leave it at PASS; a WARN is expected only when a literal of `A` is new to the count | The first use (`XMagickCommand`, `status == MagickFalse`) printed PASS, not the WARN the text predicted | owner |
+| 2026-11-11 | AMEND | N | Step 2's array clause: a caller array the block assigns whole to a pointer member of a struct it fills (`s.m=v;`) may join the input group, as one it passes whole to a callee's pointer parameter may; *Careful* in the step gives the argument (array-to-pointer conversion is the same in an assignment as in an argument, C11 6.3.2.1p3 and 6.5.16.1p1; the member holds the address the block stored) | `animate.c`'s `XAnimateImages` (campaign A, W18 lane c, wide build): the ClientMessage case fills `window_colormaps.magick_windows=magick_windows;` (a function-static array) and the ButtonPress case `command_window.CommandMenu=CommandMenu;` (a const local array) before passing the struct to a helper; N step 2 listed only subscripts and call arguments. Probe: stubbing both cases takes `XAnimateImages` out of two nested-conditional chunks, animate.c 4.06 to 4.18 | owner |
