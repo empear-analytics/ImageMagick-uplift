@@ -5166,6 +5166,71 @@ static void XCropButtonRelease(const CropEventInput *event_input,
     (*event).xbutton.time);
 }
 
+typedef struct _CropTargets
+{
+  int
+    *x,
+    *y;
+
+  RectangleInfo
+    *crop_info;
+
+  size_t
+    *state;
+} CropTargets;
+
+static void XCropButtonPress(const CropEventInput *event_input,
+  const CropTargets *targets)
+{
+  XWindows
+    *const windows = event_input->windows;
+
+  const XEvent
+    *const event = event_input->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  (*x)=windows->image.x+(*event).xbutton.x;
+  (*y)=windows->image.y+(*event).xbutton.y;
+  if (IsNearTopLeftCorner((*x),(*y),(*crop_info)) != MagickFalse)
+    {
+      (*crop_info).x=(*crop_info).x+(ssize_t) (*crop_info).width;
+      (*crop_info).y=(*crop_info).y+(ssize_t) (*crop_info).height;
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearBottomLeftCorner((*x),(*y),(*crop_info)) != MagickFalse)
+    {
+      (*crop_info).x=((*crop_info).x+(int) (*crop_info).width);
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearTopRightCorner((*x),(*y),(*crop_info)) != MagickFalse)
+    {
+      (*crop_info).y=((*crop_info).y+(ssize_t) (*crop_info).height);
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearBottomRightCorner((*x),(*y),(*crop_info)) != MagickFalse)
+    {
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  XCropButtonRelease(event_input,(*crop_info));
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -5238,6 +5303,9 @@ static MagickBooleanType XCropImage(Display *display,
 
   XEvent
     event;
+
+  const CropTargets
+    targets = { &x, &y, &crop_info, &state };
 
   /*
     Map Command widget.
@@ -5538,37 +5606,7 @@ static MagickBooleanType XCropImage(Display *display,
       {
         case ButtonPress:
         {
-          if (event.xbutton.button != Button1)
-            break;
-          if (event.xbutton.window != windows->image.id)
-            break;
-          x=windows->image.x+event.xbutton.x;
-          y=windows->image.y+event.xbutton.y;
-          if (IsNearTopLeftCorner(x,y,crop_info) != MagickFalse)
-            {
-              crop_info.x=crop_info.x+(ssize_t) crop_info.width;
-              crop_info.y=crop_info.y+(ssize_t) crop_info.height;
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearBottomLeftCorner(x,y,crop_info) != MagickFalse)
-            {
-              crop_info.x=(crop_info.x+(int) crop_info.width);
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearTopRightCorner(x,y,crop_info) != MagickFalse)
-            {
-              crop_info.y=(crop_info.y+(ssize_t) crop_info.height);
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearBottomRightCorner(x,y,crop_info) != MagickFalse)
-            {
-              state|=UpdateConfigurationState;
-              break;
-            }
-          XCropButtonRelease(&event_input,crop_info);
+          XCropButtonPress(&event_input,&targets);
           break;
         }
         case ButtonRelease:
