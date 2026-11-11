@@ -1212,6 +1212,23 @@ static MagickBooleanType CheckFourierMemory(const MemoryInfo *source_info,
   return(MagickTrue);
 }
 
+static void SetForwardFourierRectangular(const FourierInfo *fourier_info,
+  const ForwardFourierPlanes *planes,const fftw_complex *forward_pixels,
+  ssize_t i)
+{
+  ssize_t
+    x,
+    y;
+
+  for (y=0L; y < (ssize_t) fourier_info->height; y++)
+    for (x=0L; x < (ssize_t) fourier_info->center; x++)
+    {
+      planes->magnitude_pixels[i]=creal(forward_pixels[i]);
+      planes->phase_pixels[i]=cimag(forward_pixels[i]);
+      i++;
+    }
+}
+
 static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
   const Image *image,const ForwardFourierPlanes *planes,
   ExceptionInfo *exception)
@@ -1305,13 +1322,7 @@ static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
         i++;
       }
   else
-    for (y=0L; y < (ssize_t) fourier_info->height; y++)
-      for (x=0L; x < (ssize_t) fourier_info->center; x++)
-      {
-        planes->magnitude_pixels[i]=creal(forward_pixels[i]);
-        planes->phase_pixels[i]=cimag(forward_pixels[i]);
-        i++;
-      }
+    SetForwardFourierRectangular(fourier_info,planes,forward_pixels,i);
   forward_info=(MemoryInfo *) RelinquishVirtualMemory(forward_info);
   return(MagickTrue);
 }
