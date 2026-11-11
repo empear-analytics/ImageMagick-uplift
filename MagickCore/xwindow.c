@@ -9021,6 +9021,32 @@ static void XFillLinearColorRamp(const XStandardColormap *map_info,
   }
 }
 
+static void XFillColorRamp(const XStandardColormap *map_info,
+  const size_t number_colors,XColor color,XColor *p)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_colors; i++)
+  {
+    color.red=(unsigned short) 0;
+    if (map_info->red_max != 0)
+      color.red=(unsigned short) ((size_t) ((65535L*(i/(ssize_t)
+         map_info->red_mult))/(ssize_t) map_info->red_max));
+    color.green=(unsigned int) 0;
+    if (map_info->green_max != 0)
+      color.green=(unsigned short) ((size_t) ((65535L*((i/(ssize_t)
+        map_info->green_mult) % (ssize_t) (map_info->green_max+1)))/
+        (ssize_t) map_info->green_max));
+    color.blue=(unsigned short) 0;
+    if (map_info->blue_max != 0)
+      color.blue=(unsigned short) ((size_t) ((65535L*(i % (ssize_t)
+      map_info->green_mult))/(ssize_t) map_info->blue_max));
+    color.pixel=XStandardPixel(map_info,&color);
+    *p++=color;
+  }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9459,24 +9485,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       if (linear_colormap != MagickFalse)
         XFillLinearColorRamp(map_info,number_colors,color,p);
       else
-        for (i=0; i < (ssize_t) number_colors; i++)
-        {
-          color.red=(unsigned short) 0;
-          if (map_info->red_max != 0)
-            color.red=(unsigned short) ((size_t) ((65535L*(i/(ssize_t)
-               map_info->red_mult))/(ssize_t) map_info->red_max));
-          color.green=(unsigned int) 0;
-          if (map_info->green_max != 0)
-            color.green=(unsigned short) ((size_t) ((65535L*((i/(ssize_t)
-              map_info->green_mult) % (ssize_t) (map_info->green_max+1)))/
-              (ssize_t) map_info->green_max));
-          color.blue=(unsigned short) 0;
-          if (map_info->blue_max != 0)
-            color.blue=(unsigned short) ((size_t) ((65535L*(i % (ssize_t)
-            map_info->green_mult))/(ssize_t) map_info->blue_max));
-          color.pixel=XStandardPixel(map_info,&color);
-          *p++=color;
-        }
+        XFillColorRamp(map_info,number_colors,color,p);
       if ((visual_info->klass == DirectColor) &&
           (colormap != XDefaultColormap(display,visual_info->screen)))
         (void) XStoreColors(display,colormap,colors,(int) number_colors);
