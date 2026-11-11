@@ -801,6 +801,16 @@ static Image *XReadImageFileList(const AnimateCommandTile *tile,
   return(images);
 }
 
+static void XDestroyFileList(char **filelist,const int number_files)
+{
+  int
+    i;
+
+  for (i=0; i < number_files; i++)
+    filelist[i]=DestroyString(filelist[i]);
+  filelist=(char **) RelinquishMagickMemory(filelist);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
@@ -831,9 +841,6 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       int
         number_files;
 
-      int
-        i;
-
       static char
         filenames[MagickPathExtent] = "*";
 
@@ -860,9 +867,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       status=ExpandFilenames(&number_files,&filelist);
       if ((status == MagickFalse) || (number_files == 0))
         {
-          for (i=0; i < number_files; i++)
-            filelist[i]=DestroyString(filelist[i]);
-          filelist=(char **) RelinquishMagickMemory(filelist);
+          XDestroyFileList(filelist,number_files);
           if (number_files == 0)
             {
               ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
