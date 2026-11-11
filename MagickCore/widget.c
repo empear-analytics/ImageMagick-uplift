@@ -10122,6 +10122,37 @@ static void PressNoticeDismiss(Display *display,XWindows *windows,
     }
 }
 
+static void KeyNoticeDismiss(Display *display,XWindows *windows,
+  const XEvent event,const NoticeTargets *targets)
+{
+  XWidgetInfo
+    *const dismiss_info = targets->dismiss_info;
+
+  size_t
+    *const state = targets->state;
+
+  static char
+    command[MagickPathExtent];
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      (*dismiss_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      (*state)|=ExitState;
+      return;
+    }
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -10317,26 +10348,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
       }
       case KeyPress:
       {
-        static char
-          command[MagickPathExtent];
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            dismiss_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-            state|=ExitState;
-            break;
-          }
+        KeyNoticeDismiss(display,windows,event,&targets);
         break;
       }
       case LeaveNotify:
