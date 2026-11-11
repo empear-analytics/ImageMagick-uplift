@@ -5412,10 +5412,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
             /*
               Move slider.
             */
-            if (event.xbutton.y < slider_info.y)
-              slider_info.id-=(int) (visible_files-1);
-            else
-              slider_info.id+=(int) (visible_files-1);
+            slider_info=PageListBrowserSlider(slider_info,event,visible_files);
             state|=RedrawListState;
             break;
           }
