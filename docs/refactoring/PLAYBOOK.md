@@ -138,6 +138,16 @@ offset. A planted change to one constant of a moved function prints `DIFFERENT`.
 names the build and quotes the tool's counts. A branch no available build compiles (Windows,
 an uninstalled delegate) is still refused, as is any edit inside a branch.
 
+A file-level conditional block moves the same way (owner, 2026-11-11): an `#if defined(...)`
+... `#else` ... `#endif` standing between functions and holding whole functions of the family
+(a delegate's implementation and the stub that defines the same public function without it,
+as `resize.c`'s `LiquidRescaleImage` under `MAGICKCORE_LQR_DELEGATE`) moves whole, its
+directives included, when its `#endif` follows the family's last function and nothing in it
+is edited. Every side must be compiled by an available build and pass `split_branch_check.py`
+there; the commit names each side's build and quotes its counts. `tools/split_source.py`
+reads a function defined in both branches as one member of the family, calling what either
+definition calls.
+
 This stands until `tools/oracle/build.sh` can build the X11, OpenCL and Windows code in
 one command ([`VERIFICATION.md`](VERIFICATION.md), step 5). Then that code becomes
 guard-verified, below, in the build that compiles it.
@@ -11129,3 +11139,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | N | Step 2: an array of the caller (a local, or a function-local `static` nothing writes) that the block only subscripts or passes whole to a pointer parameter may be a member, of pointer-to-element type with the element's qualifiers, filled `name.v=v;`; the name converts to the address of its first element at the fill as at each use (C11 6.3.2.1p3), Recipe AR's argument for a read-only array | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its Image-window button branch and its command-menu block read the menu tables `CommandMenu`, `Menus` and `Commands` (local and `static const` arrays) with the window state; N's *Careful* kept arrays out of the struct only because they are not values a copy can take | owner |
 | 2026-11-11 | AMEND | N | Step 2 (the array member added earlier today): a function-local `static` array qualifies whether or not the caller writes its elements elsewhere; the member is the address of the array's own storage, not a copy, so each `v[e]` reads the element as it stands at that point, written before the fill or not, exactly as the name did; the block itself still only reads it | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its colormap-update loop reads `static XWindowInfo *magick_windows[MaXWindows]`, which the function fills once on its first call | owner |
 | 2026-11-11 | AMEND | MT | Steps 1, 4 and 6: copies in a function with no parallel region may differ by a statement in one copy only (written `if (side == NameB) S`), may hold an orphaned `#pragma omp atomic` construct moving whole, and may be sequential loop heads (moved in Recipe PC step 3's form); a pair of selector constants is written `side`; a nested pair (copies whose enclosing loops are copies too) merges in one commit when the inner function alone stays out of line and slows the step | `morphology.c`'s `MorphologyPrimitiveDirect` (campaign A, W17 lane d): the forward and reverse passes; the merged channel function alone timed +4.1% to +5.9% on Voronoi, with the pixel loops merged -3.4%; probes 4.82 to 5.27, 5.35 and 5.60 | owner |
+| 2026-11-11 | AMEND | S | *Preprocessor branches*: a file-level `#if defined(...)`/`#else`/`#endif` block holding whole functions of the family (a delegate's implementation and its stub of the same public function) moves whole, directives included, when its `#endif` follows the family's last function; every side compiled by an available build and checked there with `split_branch_check.py` | `resize.c`'s `LiquidRescaleImage` (LQR delegate and stub) in the split of the interpolative, liquid, minify, resample and thumbnail family: `ci-gcc-min` compiles the stub (31 functions, IDENTICAL-MODULO-LAYOUT: 59 `.rodata` references, 27 `__LINE__` immediates), `ci-gcc-dlg` the delegate side (39 functions: 53 and 28); the owner's ruling of 2026-11-11 names "a whole file-level conditional block of functions" | owner |
