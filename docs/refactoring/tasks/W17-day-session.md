@@ -393,3 +393,17 @@ probe scored 2.79 (not taken). Possible upstream: XColorBrowserWidget's ButtonRe
 - distort.c 7.60, no commit: `poly_basis_dx` (clones `poly_basis_fn`'s chain; slower) and `SetDistortNoBestFit`
   label deletion (owner question) hold it; a stub of both reaches 8.28.
 - **For the owner:** should FB accept a fill whose only object-code difference is stack-frame layout?
+
+## Lane c, fourth round: animate.c 3.35 -> 3.48 (wide build, merged)
+
+Probes with dissimilar padding show animate.c moves only at thresholds: XAnimateImages and XAnimateBackgroundImage
+reaching 9 bumps (+0.06, +0.07), and XAnimateImages' cc reaching about 120 (now 150). XAnimateImages: ce9b139a3 E
+(bumps 17 -> 16), a1add3189 E, f9b87bf89 N, e9d8dc06f N step 8, 82eb0aec4 E (16 -> 15), 8e9b8427e, 0f7f27b42 E,
+8541a1efb N, 26b060642 E, e3a9b096c N, 46fd7eae3 E, bf2e3e80a N, a30d6852e N step 8, 90546bab8, 9d3b0cfbf E (flat
+plan steps, object code IDENTICAL or MODULO-IDENTICAL); 3b9f462a4 D (XAnimateBackgroundImage reuses `XSortSceneList`,
+3.42, bumps 10 -> 9); 70c52210d playbook (Recipe OC step 7: a block that is not a whole loop body, its read
+inputs in an input struct and two to four written variables by a `const` struct of addresses, Decided by `owner`);
+7dbb7ccaa OC step 7 `XRunCommandWidget` 3.48 (no case reaches the Command-widget branch; object code IDENTICAL).
+Wide oracle 30 and 9 cases; whole wide catalogue 14,145 cases, 1 diverged (`infra/0fd402f13a`, also times out on
+the baseline; 0 on rerun). Remaining plan: event-switch case tails (about 8 commits for +0.05), XMagickCommand's
+19-label switch by SD with XSaveImage (+0.29 in probes); XAnimateBackgroundImage's static-local blocks refused.
