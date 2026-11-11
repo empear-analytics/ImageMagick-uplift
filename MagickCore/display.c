@@ -3428,6 +3428,9 @@ typedef struct _PaintMethodTargets
     *method;
 } PaintMethodTargets;
 
+static void
+  XSelectPaintMethod(const EditMenuInput *,const PaintMethodTargets *);
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3500,6 +3503,9 @@ static MagickBooleanType XColorEditImage(Display *display,
   XEvent
     event;
 
+  const PaintMethodTargets
+    method_targets = { &method };
+
   /*
     Map Command widget.
   */
@@ -3539,6 +3545,9 @@ static MagickBooleanType XColorEditImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     if (event.xany.window == windows->command.id)
       {
+        EditMenuInput
+          menu_input;
+
         /*
           Select a command from the Command widget.
         */
@@ -3552,21 +3561,12 @@ static MagickBooleanType XColorEditImage(Display *display,
         {
           case ColorEditMethodCommand:
           {
-            char
-              **methods;
-
-            /*
-              Select a method from the pop-up menu.
-            */
-            methods=(char **) GetCommandOptions(MagickMethodOptions);
-            if (methods == (char **) NULL)
-              break;
-            entry=XMenuWidget(display,windows,ColorEditMenu[id],
-              (const char **) methods,command);
-            if (entry >= 0)
-              method=(PaintMethod) ParseCommandOption(MagickMethodOptions,
-                MagickFalse,methods[entry]);
-            methods=DestroyStringList(methods);
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=ColorEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectPaintMethod(&menu_input,&method_targets);
             break;
           }
           case ColorEditColorCommand:
