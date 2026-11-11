@@ -965,6 +965,11 @@ needs two copies of the block.
    helper's targets struct, under Recipe I step 2's exception (a struct of Recipe I, LB
    step 8 or Q step 8, its `const` form included, read by nothing but that helper's
    call).
+   A variable the caller declares `static` inside its body (block scope, never one at
+   file scope), of arithmetic, enumeration or pointer type (not an array), whose
+   address the caller takes nowhere else (checked by `grep`), counts as a plain local
+   too (2026-11-11), on Recipe CT step 2's terms: it passes as a pointer like any
+   written variable, never as a copy.
    A parameter the caller receives by value, of a struct or arithmetic type (not a
    pointer, and not an array parameter, which is one), counts as a plain local
    (`ApplySpliceGravity`'s `RectangleInfo splice_geometry`): it is the caller's own
@@ -1065,6 +1070,12 @@ static void SelectMagnifyMethod(const char *option,
   `T p[]` is refused, to keep the helper's `T **` parameter visibly the same type.
 - The function must be oracle-verified, with no unmatched or unreached survivor on the
   block's lines: the guard sees the moved literals but not a write that went missing.
+- A block-scope `static` (step 2) is one object of static storage duration at one fixed
+  address (C11 6.2.4p3); through the out-parameter each `*v` designates that object
+  (6.5.3.2p4), read and written at the points the block read and wrote it. Nothing is
+  copied, so a write a re-entrant call of the block's callees made to it would be seen
+  as before, and its name, of block scope, gives no other function a path to it
+  (Recipe CT's *Careful*).
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`.
 
@@ -11236,3 +11247,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | N | Step 2: an array the block names only as an argument of calls (contents written, if at all, only through calls that keep no copy: Recipe E step 4's array clause) may be one of the group, as a member of the pointer type it converts to (`char *`, or `const char *` when only read), filled `name.a=a;`; Recipes Y, Z, LB and CT, which take N's input struct, read it the same way | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Back and Reset releases and its list update copy between the `static` `glob_pattern` and the local `back_pattern`, `reset_pattern` and `reply` arrays; with each array a parameter the helpers take five to seven, and N's step 3 (the variable's exact type) refused an array member | owner |
 | 2026-11-11 | AMEND | W | Step 8: in a `void` caller the block's exits are `return;`; the helper returns `MagickFalse` there and the caller writes `if (Helper(...) == MagickFalse) return;`; a local written only on the returning paths goes by value (step 3 unchanged) | `opencl.c`'s `LoadOpenCLDevices` (campaign A, W17 lane c, wide build): the `clEnv->contexts` allocation releases `devices` and `platforms` and leaves through `return;` on failure; W step 1 asked for `return(R);`, which a `void` function cannot write. Probe: the function leaves *Large Method*, 5.43 to 5.47 | owner |
 | 2026-11-11 | AMEND | CT | Step 2: a block-scope `static` of the caller (arithmetic, enumeration or pointer type, not an array, its address taken only in the targets initialiser) may be a written variable, and then one written variable suffices (a lone static goes by address, not by Recipe E step 7's copy); a `static` the block declares moves with it unchanged. *Careful* gives the argument: one object of static storage duration, reached through its own address, nothing copied, so re-entry through the block's calls sees the same writes | `display.c`'s `XCompositeImage` (campaign A, W17 lane b, wide build): its Dissolve case tail writes the local `blend` and the function's `static` `compose` and leaves the `switch` by `break;` from a depth-4 `if (*factor == '\0')`; its Displace tail writes `compose` alone. I step 2 refused the static, and E step 7's value form would copy it across `XDialogWidget`. Probe of the chain: the function leaves *Deep, Nested Complexity* and *Brain Method*, display.c 1.15 to 1.17, no finding on either helper | owner |
+| 2026-11-11 | AMEND | O | Step 2: a block-scope `static` of the caller (arithmetic, enumeration or pointer type, not an array, its address taken nowhere else) counts as a plain local, passed by pointer, on Recipe CT step 2's terms; *Careful* repeats CT's argument (one object of static storage duration at its own address, nothing copied) | `display.c`'s `XImageCache` (campaign A, W17 lane b, wide build): its undo-cache trim (`if (undo_image != NULL) { ... while ... if (bytes <= ...) ... if (previous_image == undo_image) undo_image=NewImageList(); ... }`) writes the local `bytes` and the function's `static` `undo_image` and holds the function at depth 4; O step 2 refused the static. Probe: the function leaves *Deep, Nested Complexity* and *Brain Method* | owner |
