@@ -10148,6 +10148,25 @@ static size_t ReleasePreferencesButton(XWindows *windows,const XEvent event,
   return(state);
 }
 
+static void TogglePreferencesButton(Display *display,XWindows *windows,
+  const XEvent event,XWidgetInfo *preferences_info)
+{
+  int
+    i;
+
+  for (i=0; i < NumberPreferences; i++)
+    if (MatteIsActive(preferences_info[i],event.xbutton))
+      {
+        /*
+          User pressed a Preferences button.
+        */
+        preferences_info[i].raised=preferences_info[i].raised ==
+          MagickFalse ? MagickTrue : MagickFalse;
+        XDrawBeveledButton(display,&windows->widget,&preferences_info[i]);
+        break;
+      }
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -10357,17 +10376,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
             break;
           }
-        for (i=0; i < NumberPreferences; i++)
-          if (MatteIsActive(preferences_info[i],event.xbutton))
-            {
-              /*
-                User pressed a Preferences button.
-              */
-              preferences_info[i].raised=preferences_info[i].raised ==
-                MagickFalse ? MagickTrue : MagickFalse;
-              XDrawBeveledButton(display,&windows->widget,&preferences_info[i]);
-              break;
-            }
+        TogglePreferencesButton(display,windows,event,preferences_info);
         if (MatteIsActive(cache_info,event.xbutton))
           {
             /*
