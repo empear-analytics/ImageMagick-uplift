@@ -9002,6 +9002,25 @@ static void XCountColorDiversity(const Image *image,CacheView *image_view,
   }
 }
 
+static void XFillLinearColorRamp(const XStandardColormap *map_info,
+  const size_t number_colors,XColor color,XColor *p)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_colors; i++)
+  {
+    color.blue=(unsigned short) 0;
+    if (map_info->blue_max != 0)
+      color.blue=(unsigned short) (((65535L*(i % (ssize_t)
+        map_info->green_mult))/(ssize_t) map_info->blue_max));
+    color.green=color.blue;
+    color.red=color.blue;
+    color.pixel=XStandardPixel(map_info,&color);
+    *p++=color;
+  }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9438,17 +9457,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       p=colors;
       color.flags=(char) (DoRed | DoGreen | DoBlue);
       if (linear_colormap != MagickFalse)
-        for (i=0; i < (ssize_t) number_colors; i++)
-        {
-          color.blue=(unsigned short) 0;
-          if (map_info->blue_max != 0)
-            color.blue=(unsigned short) (((65535L*(i % (ssize_t)
-              map_info->green_mult))/(ssize_t) map_info->blue_max));
-          color.green=color.blue;
-          color.red=color.blue;
-          color.pixel=XStandardPixel(map_info,&color);
-          *p++=color;
-        }
+        XFillLinearColorRamp(map_info,number_colors,color,p);
       else
         for (i=0; i < (ssize_t) number_colors; i++)
         {
