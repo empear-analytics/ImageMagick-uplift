@@ -433,3 +433,20 @@ XDrawEditImage's stipple helper would be cc 9; XDisplayImage 9 depth-6 sites; a 
 function's maximum depth costs score. Tool notes: `case_tail_check.py` rewrites identifiers inside string
 literals; `struct_fill_check.py` falsely matches a local named `info`. Possible upstream: XColorEditImage's
 `(void) (void) CopyMagickString`; its point and reset methods return without destroying `image_view`.
+
+## Lane a, fifth round: widget.c 2.80 -> 2.97 (wide build, merged)
+
+XFileBrowserWidget leaves Deep Nesting and Brain Method (depth 5 -> 3, bumps 22 -> 7, cc 177 -> 120; 21 cases,
+0 diverged each step): CT ec9ea095f, fe0fbc640; E 7a90c5623, 36a883247 (IDENTICAL); D reuses 4e535f945, bf1bc9130,
+e3bbe6057, 9e8bba031, c7483e9f8, 4987eb3f0, dd30085ec, f41948513, f73751330; SD 0df9de9a2; Z 62cef4ecf, a029bda38;
+N 68009654d, 4fa14bc44, d0bc3699d; 4ebf944c3 N with E step 7 `ReadFileBrowserPath` 2.80 -> 2.92 (IDENTICAL; every
+earlier step a flat step of a chain probed at 2.92, most moved lines unreached and resting on reuse_check,
+case_tail_check and obj_modulo); 3103a9ffe I (switch form, flat, leaves Deep Nesting; reading plus obj_modulo).
+XPreferencesWidget leaves Deep Nesting (2 cases): 6d45f03ed H (pp_identical on cand-wide IDENTICAL), ebe5c5300 CN,
+b973b4193 D (a), 279cc6d40 E, d7786faf2 E `DoublePreferencesUndoCache` 2.97 (the file passes 110 functions, allowed
+by the 2026-11-07 ruling since the chain lifts the score). Recipe text: b177b2aab Recipe I step 2 (another
+helper's `const` targets struct read by the input-struct fill when the block only passes `&t` to that helper),
+Decided by `owner`; tool 2d415aac6 `case_tail_check.py`. Whole wide catalogue: 14,145 cases, 0 diverged. Not a
+plateau: Bumpy Road, Complex and Large Method remain in six widgets; no Deep Nesting is left in the file.
+Possible upstream: XPreferencesWidget's Cache press overwrites `width`, reused by the next layout update;
+XFileBrowserWidget's SelectionRequest leaves `notify.send_event` unset.
