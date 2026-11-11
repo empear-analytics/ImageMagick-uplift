@@ -6170,6 +6170,38 @@ static size_t ReleaseFontBrowserReset(const FontBrowserReset *reset,
   return(state);
 }
 
+typedef struct _FontBrowserMatch
+{
+  char
+    **fontlist;
+
+  int
+    fonts;
+
+  char
+    *reply;
+} FontBrowserMatch;
+
+static void MatchFontBrowserReply(const FontBrowserMatch *match,
+  XWidgetInfo *list_info,int *i)
+{
+  char
+    **const fontlist = match->fontlist;
+
+  const int
+    fonts = match->fonts;
+
+  char
+    *const reply = match->reply;
+
+  for ((*i)=0; (*i) < fonts; (*i)++)
+    if (LocaleCompare(fontlist[(*i)],reply) >= 0)
+      {
+        (*list_info).id=LocaleCompare(fontlist[(*i)],reply) == 0 ? (*i) : ~0;
+        break;
+      }
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6614,16 +6646,17 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
       }
     if (state & JumpListState)
       {
+        FontBrowserMatch
+          match;
+
         /*
           Jump scroll to match user font.
         */
         list_info.id=(~0);
-        for (i=0; i < fonts; i++)
-          if (LocaleCompare(fontlist[i],reply) >= 0)
-            {
-              list_info.id=LocaleCompare(fontlist[i],reply) == 0 ? i : ~0;
-              break;
-            }
+        match.fontlist=fontlist;
+        match.fonts=fonts;
+        match.reply=reply;
+        MatchFontBrowserReply(&match,&list_info,&i);
         if ((i < slider_info.id) || (i >= (slider_info.id+(int) visible_fonts)))
           slider_info.id=i-((int) visible_fonts >> 1);
         selection_info.id=(~0);
