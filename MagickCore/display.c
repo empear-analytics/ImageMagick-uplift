@@ -3325,6 +3325,25 @@ static void XReplaceRowColor(Image **image,Quantum *q,const PixelInfo target,
   }
 }
 
+static void XReplaceColormapColor(Image **image,const PixelInfo target,
+  const XColor color,ExceptionInfo *exception)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) (*image)->colors; i++)
+    if (IsFuzzyEquivalencePixelInfo((*image)->colormap+i,&target))
+      {
+        (*image)->colormap[i].red=(double) ScaleShortToQuantum(
+          color.red);
+        (*image)->colormap[i].green=(double) ScaleShortToQuantum(
+          color.green);
+        (*image)->colormap[i].blue=(double) ScaleShortToQuantum(
+          color.blue);
+      }
+  (void) SyncImage(*image,exception);
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3814,17 +3833,7 @@ static MagickBooleanType XColorEditImage(Display *display,
               }
             else
               {
-                for (i=0; i < (ssize_t) (*image)->colors; i++)
-                  if (IsFuzzyEquivalencePixelInfo((*image)->colormap+i,&target))
-                    {
-                      (*image)->colormap[i].red=(double) ScaleShortToQuantum(
-                        color.red);
-                      (*image)->colormap[i].green=(double) ScaleShortToQuantum(
-                        color.green);
-                      (*image)->colormap[i].blue=(double) ScaleShortToQuantum(
-                        color.blue);
-                    }
-                (void) SyncImage(*image,exception);
+                XReplaceColormapColor(image,target,color,exception);
               }
             break;
           }
