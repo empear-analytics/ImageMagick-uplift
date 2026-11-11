@@ -9881,6 +9881,482 @@ static void XReplaceRowAlpha(Image **image,Quantum *q,const PixelInfo target,
   }
 }
 
+static void XDiscardMagnifyKeys(Display *display,XWindows *windows,
+  XEvent *event)
+{
+  if ((*event).xkey.window == windows->magnify.id)
+    {
+      Window
+        window;
+
+      window=windows->magnify.id;
+      while (XCheckWindowEvent(display,window,KeyPressMask,event)) ;
+    }
+}
+
+typedef struct _EditMenuInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *MatteEditMenu;
+
+  int
+    id;
+
+  char
+    *command;
+} EditMenuInput;
+
+typedef struct _PaintMethodTargets
+{
+  PaintMethod
+    *method;
+} PaintMethodTargets;
+
+static void XSelectPaintMethod(const EditMenuInput *menu,
+  const PaintMethodTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const MatteEditMenu = menu->MatteEditMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  PaintMethod
+    *const method = targets->method;
+
+  char
+    **methods;
+
+  int
+    entry;
+
+  /*
+    Select a method from the pop-up menu.
+  */
+  methods=GetCommandOptions(MagickMethodOptions);
+  if (methods == (char **) NULL)
+    return;
+  entry=XMenuWidget(display,windows,MatteEditMenu[id],
+    (const char **) methods,command);
+  if (entry >= 0)
+    (*method)=(PaintMethod) ParseCommandOption(MagickMethodOptions,
+      MagickFalse,methods[entry]);
+  methods=DestroyStringList(methods);
+}
+
+static void XSelectFuzzFactor(const EditMenuInput *menu,
+  const char *const *FuzzMenu,char *fuzz,Image **image)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const MatteEditMenu = menu->MatteEditMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  int
+    entry;
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  entry=XMenuWidget(display,windows,MatteEditMenu[id],FuzzMenu,
+    command);
+  if (entry < 0)
+    return;
+  if (entry != 5)
+    {
+      (*image)->fuzz=StringToDoubleInterval(FuzzMenu[entry],(double)
+        QuantumRange+1.0);
+      return;
+    }
+  (void) CopyMagickString(fuzz,"20%",MagickPathExtent);
+  (void) XDialogWidget(display,windows,"Ok",
+    "Enter fuzz factor (0.0 - 99.9%):",fuzz);
+  if (*fuzz == '\0')
+    return;
+  (void) ConcatenateMagickString(fuzz,"%",MagickPathExtent);
+  (*image)->fuzz=StringToDoubleInterval(fuzz,(double) QuantumRange+
+    1.0);
+}
+
+typedef struct _MatteEditPixelInput
+{
+  Image
+    **image;
+
+  CacheView
+    *image_view;
+
+  int
+    x_offset,
+    y_offset;
+
+  const char
+    *matte;
+
+  ExceptionInfo
+    *exception;
+
+  XResourceInfo
+    *resource_info;
+
+  PaintMethod
+    method;
+
+  XColor
+    border_color;
+} MatteEditPixelInput;
+
+static void XMattePoint(const MatteEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  const char
+    *const matte = pixel_input->matte;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  Quantum
+    *q;
+
+  /*
+    Update matte information using point algorithm.
+  */
+  q=GetCacheViewAuthenticPixels(image_view,(ssize_t) x_offset,
+    (ssize_t) y_offset,1,1,exception);
+  if (q == (Quantum *) NULL)
+    return;
+  SetPixelAlpha(*image,(Quantum) StringToLong(matte),q);
+  (void) SyncCacheViewAuthenticPixels(image_view,exception);
+}
+
+static void XMatteReplace(const MatteEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  const char
+    *const matte = pixel_input->matte;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  int
+    y;
+
+  PixelInfo
+    target;
+
+  Quantum
+    *q;
+
+  /*
+    Update matte information using replace algorithm.
+  */
+  (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
+    x_offset,(ssize_t) y_offset,&target,exception);
+  for (y=0; y < (int) (*image)->rows; y++)
+  {
+    q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
+      (*image)->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    XReplaceRowAlpha(image,q,target,matte);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+}
+
+static void XMatteReset(const MatteEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  CacheView
+    *const image_view = pixel_input->image_view;
+
+  const char
+    *const matte = pixel_input->matte;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  int
+    x,
+    y;
+
+  Quantum
+    *q;
+
+  for (y=0; y < (int) (*image)->rows; y++)
+  {
+    q=QueueCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
+      (*image)->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (int) (*image)->columns; x++)
+    {
+      SetPixelAlpha(*image,(Quantum) StringToLong(matte),q);
+      q+=(ptrdiff_t) GetPixelChannels(*image);
+    }
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+  if (StringToLong(matte) == (long) OpaqueAlpha)
+    (*image)->alpha_trait=UndefinedPixelTrait;
+}
+
+static void XMatteFloodfill(const MatteEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  const char
+    *const matte = pixel_input->matte;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  XResourceInfo
+    *const resource_info = pixel_input->resource_info;
+
+  const PaintMethod
+    method = pixel_input->method;
+
+  const XColor
+    border_color = pixel_input->border_color;
+
+  ChannelType
+    channel_mask;
+
+  DrawInfo
+    *draw_info;
+
+  PixelInfo
+    target;
+
+  /*
+    Update matte information using floodfill algorithm.
+  */
+  (void) GetOneVirtualPixelInfo(*image,
+    GetPixelCacheVirtualMethod(*image),(ssize_t) x_offset,(ssize_t)
+    y_offset,&target,exception);
+  if (method == FillToBorderMethod)
+    {
+      target.red=(double) ScaleShortToQuantum(
+        border_color.red);
+      target.green=(double) ScaleShortToQuantum(
+        border_color.green);
+      target.blue=(double) ScaleShortToQuantum(
+        border_color.blue);
+    }
+  draw_info=CloneDrawInfo(resource_info->image_info,
+    (DrawInfo *) NULL);
+  draw_info->fill.alpha=(double) ClampToQuantum(
+    StringToDouble(matte,(char **) NULL));
+  channel_mask=SetImageChannelMask(*image,AlphaChannel);
+  (void) FloodfillPaintImage(*image,draw_info,&target,(ssize_t)
+    x_offset,(ssize_t) y_offset,
+    method != FloodfillMethod ? MagickTrue : MagickFalse,exception);
+  (void) SetPixelChannelMask(*image,channel_mask);
+  draw_info=DestroyDrawInfo(draw_info);
+}
+
+static MagickBooleanType XMatteEditPixels(
+  const MatteEditPixelInput pixel_input,const PaintMethod method,
+  Image **image,ExceptionInfo *exception)
+{
+  switch (method)
+  {
+    case PointMethod:
+    default:
+    {
+      XMattePoint(&pixel_input);
+      break;
+    }
+    case ReplaceMethod:
+    {
+      XMatteReplace(&pixel_input);
+      break;
+    }
+    case FloodfillMethod:
+    case FillToBorderMethod:
+    {
+      XMatteFloodfill(&pixel_input);
+      break;
+    }
+    case ResetMethod:
+    {
+      /*
+        Update matte information using reset algorithm.
+      */
+      if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+      XMatteReset(&pixel_input);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+typedef struct _BorderColorTargets
+{
+  XColor
+    *border_color;
+} BorderColorTargets;
+
+static void XSelectBorderColor(const EditMenuInput *menu,
+  XResourceInfo *resource_info,const BorderColorTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const MatteEditMenu = menu->MatteEditMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  XColor
+    *const border_color = targets->border_color;
+
+  const char
+    *ColorMenu[MaxNumberPens];
+
+  int
+    pen_number;
+
+  int
+    i;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="Browser...";
+  ColorMenu[MaxNumberPens-1]=(const char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,MatteEditMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  if (pen_number == (MaxNumberPens-2))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set border color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],border_color);
+}
+
+static void XSelectMatteValue(const EditMenuInput *menu,
+  const char *const *MatteMenu,char *message,char *matte)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const MatteEditMenu = menu->MatteEditMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  int
+    entry;
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  entry=XMenuWidget(display,windows,MatteEditMenu[id],MatteMenu,
+    command);
+  if (entry < 0)
+    return;
+  if (entry != 2)
+    {
+      (void) FormatLocaleString(matte,MagickPathExtent,"%g",
+        (double) OpaqueAlpha);
+      if (LocaleCompare(MatteMenu[entry],"Transparent") == 0)
+        (void) FormatLocaleString(matte,MagickPathExtent,"%g",
+          (double) TransparentAlpha);
+      return;
+    }
+  (void) FormatLocaleString(message,MagickPathExtent,
+    "Enter matte value (0 - " "%g" "):",(double) QuantumRange);
+  (void) XDialogWidget(display,windows,"Matte",message,matte);
+  if (*matte == '\0')
+    return;
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -9927,18 +10403,11 @@ static MagickBooleanType XMatteEditImage(Display *display,
     cursor;
 
   int
-    entry,
     id,
     x,
     x_offset,
     y,
     y_offset;
-
-  int
-    i;
-
-  Quantum
-    *q;
 
   unsigned int
     height,
@@ -9949,6 +10418,12 @@ static MagickBooleanType XMatteEditImage(Display *display,
 
   XEvent
     event;
+
+  const PaintMethodTargets
+    method_targets = { &method };
+
+  const BorderColorTargets
+    border_targets = { &border_color };
 
   /*
     Map Command widget.
@@ -9989,6 +10464,9 @@ static MagickBooleanType XMatteEditImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     if (event.xany.window == windows->command.id)
       {
+        EditMenuInput
+          menu_input;
+
         /*
           Select a command from the Command widget.
         */
@@ -10002,63 +10480,22 @@ static MagickBooleanType XMatteEditImage(Display *display,
         {
           case MatteEditMethod:
           {
-            char
-              **methods;
-
-            /*
-              Select a method from the pop-up menu.
-            */
-            methods=GetCommandOptions(MagickMethodOptions);
-            if (methods == (char **) NULL)
-              break;
-            entry=XMenuWidget(display,windows,MatteEditMenu[id],
-              (const char **) methods,command);
-            if (entry >= 0)
-              method=(PaintMethod) ParseCommandOption(MagickMethodOptions,
-                MagickFalse,methods[entry]);
-            methods=DestroyStringList(methods);
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=MatteEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectPaintMethod(&menu_input,&method_targets);
             break;
           }
           case MatteEditBorderCommand:
           {
-            const char
-              *ColorMenu[MaxNumberPens];
-
-            int
-              pen_number;
-
-            /*
-              Initialize menu selections.
-            */
-            for (i=0; i < (int) (MaxNumberPens-2); i++)
-              ColorMenu[i]=resource_info->pen_colors[i];
-            ColorMenu[MaxNumberPens-2]="Browser...";
-            ColorMenu[MaxNumberPens-1]=(const char *) NULL;
-            /*
-              Select a pen color from the pop-up menu.
-            */
-            pen_number=XMenuWidget(display,windows,MatteEditMenu[id],
-              (const char **) ColorMenu,command);
-            if (pen_number < 0)
-              break;
-            if (pen_number == (MaxNumberPens-2))
-              {
-                static char
-                  color_name[MagickPathExtent] = "gray";
-
-                /*
-                  Select a pen color from a dialog.
-                */
-                resource_info->pen_colors[pen_number]=color_name;
-                XColorBrowserWidget(display,windows,"Select",color_name);
-                if (*color_name == '\0')
-                  break;
-              }
-            /*
-              Set border color.
-            */
-            (void) XParseColor(display,windows->map_info->colormap,
-              resource_info->pen_colors[pen_number],&border_color);
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=MatteEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectBorderColor(&menu_input,resource_info,&border_targets);
             break;
           }
           case MatteEditFuzzCommand:
@@ -10078,27 +10515,12 @@ static MagickBooleanType XMatteEditImage(Display *display,
             static char
               fuzz[MagickPathExtent];
 
-            /*
-              Select a command from the pop-up menu.
-            */
-            entry=XMenuWidget(display,windows,MatteEditMenu[id],FuzzMenu,
-              command);
-            if (entry < 0)
-              break;
-            if (entry != 5)
-              {
-                (*image)->fuzz=StringToDoubleInterval(FuzzMenu[entry],(double)
-                  QuantumRange+1.0);
-                break;
-              }
-            (void) CopyMagickString(fuzz,"20%",MagickPathExtent);
-            (void) XDialogWidget(display,windows,"Ok",
-              "Enter fuzz factor (0.0 - 99.9%):",fuzz);
-            if (*fuzz == '\0')
-              break;
-            (void) ConcatenateMagickString(fuzz,"%",MagickPathExtent);
-            (*image)->fuzz=StringToDoubleInterval(fuzz,(double) QuantumRange+
-              1.0);
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=MatteEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,image);
             break;
           }
           case MatteEditValueCommand:
@@ -10115,27 +10537,12 @@ static MagickBooleanType XMatteEditImage(Display *display,
             static char
               message[MagickPathExtent];
 
-            /*
-              Select a command from the pop-up menu.
-            */
-            entry=XMenuWidget(display,windows,MatteEditMenu[id],MatteMenu,
-              command);
-            if (entry < 0)
-              break;
-            if (entry != 2)
-              {
-                (void) FormatLocaleString(matte,MagickPathExtent,"%g",
-                  (double) OpaqueAlpha);
-                if (LocaleCompare(MatteMenu[entry],"Transparent") == 0)
-                  (void) FormatLocaleString(matte,MagickPathExtent,"%g",
-                    (double) TransparentAlpha);
-                break;
-              }
-            (void) FormatLocaleString(message,MagickPathExtent,
-              "Enter matte value (0 - " "%g" "):",(double) QuantumRange);
-            (void) XDialogWidget(display,windows,"Matte",message,matte);
-            if (*matte == '\0')
-              break;
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=MatteEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectMatteValue(&menu_input,MatteMenu,message,matte);
             break;
           }
           case MatteEditUndoCommand:
@@ -10213,14 +10620,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
         KeySym
           key_symbol;
 
-        if (event.xkey.window == windows->magnify.id)
-          {
-            Window
-              window;
-
-            window=windows->magnify.id;
-            while (XCheckWindowEvent(display,window,KeyPressMask,&event)) ;
-          }
+        XDiscardMagnifyKeys(display,windows,&event);
         if (event.xkey.window != windows->image.id)
           break;
         /*
@@ -10261,17 +10661,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
         */
         x=event.xmotion.x;
         y=event.xmotion.y;
-        if (windows->info.mapped != MagickFalse)
-          {
-            if ((x < (windows->info.x+(int) windows->info.width)) &&
-                (y < (windows->info.y+(int) windows->info.height)))
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
-          }
-        else
-          if ((x > (windows->info.x+(int) windows->info.width)) ||
-              (y > (windows->info.y+(int) windows->info.height)))
-            (void) XMapWindow(display,windows->info.id);
+        XTrackInfoWidget(display,windows,x,y);
         break;
       }
       default:
@@ -10292,6 +10682,9 @@ static MagickBooleanType XMatteEditImage(Display *display,
         int
           x,
           y;
+
+        MatteEditPixelInput
+          pixel_input;
 
         /*
           Matte edit is relative to image configuration.
@@ -10321,109 +10714,17 @@ static MagickBooleanType XMatteEditImage(Display *display,
         if ((*image)->alpha_trait == UndefinedPixelTrait)
           (void) SetImageAlphaChannel(*image,OpaqueAlphaChannel,exception);
         image_view=AcquireAuthenticCacheView(*image,exception);
-        switch (method)
-        {
-          case PointMethod:
-          default:
-          {
-            /*
-              Update matte information using point algorithm.
-            */
-            q=GetCacheViewAuthenticPixels(image_view,(ssize_t) x_offset,
-              (ssize_t) y_offset,1,1,exception);
-            if (q == (Quantum *) NULL)
-              break;
-            SetPixelAlpha(*image,(Quantum) StringToLong(matte),q);
-            (void) SyncCacheViewAuthenticPixels(image_view,exception);
-            break;
-          }
-          case ReplaceMethod:
-          {
-            PixelInfo
-              target;
-
-            /*
-              Update matte information using replace algorithm.
-            */
-            (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
-              x_offset,(ssize_t) y_offset,&target,exception);
-            for (y=0; y < (int) (*image)->rows; y++)
-            {
-              q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
-                (*image)->columns,1,exception);
-              if (q == (Quantum *) NULL)
-                break;
-              XReplaceRowAlpha(image,q,target,matte);
-              if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-                break;
-            }
-            break;
-          }
-          case FloodfillMethod:
-          case FillToBorderMethod:
-          {
-            ChannelType
-              channel_mask;
-
-            DrawInfo
-              *draw_info;
-
-            PixelInfo
-              target;
-
-            /*
-              Update matte information using floodfill algorithm.
-            */
-            (void) GetOneVirtualPixelInfo(*image,
-              GetPixelCacheVirtualMethod(*image),(ssize_t) x_offset,(ssize_t)
-              y_offset,&target,exception);
-            if (method == FillToBorderMethod)
-              {
-                target.red=(double) ScaleShortToQuantum(
-                  border_color.red);
-                target.green=(double) ScaleShortToQuantum(
-                  border_color.green);
-                target.blue=(double) ScaleShortToQuantum(
-                  border_color.blue);
-              }
-            draw_info=CloneDrawInfo(resource_info->image_info,
-              (DrawInfo *) NULL);
-            draw_info->fill.alpha=(double) ClampToQuantum(
-              StringToDouble(matte,(char **) NULL));
-            channel_mask=SetImageChannelMask(*image,AlphaChannel);
-            (void) FloodfillPaintImage(*image,draw_info,&target,(ssize_t)
-              x_offset,(ssize_t) y_offset,
-              method != FloodfillMethod ? MagickTrue : MagickFalse,exception);
-            (void) SetPixelChannelMask(*image,channel_mask);
-            draw_info=DestroyDrawInfo(draw_info);
-            break;
-          }
-          case ResetMethod:
-          {
-            /*
-              Update matte information using reset algorithm.
-            */
-            if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
-              return(MagickFalse);
-            for (y=0; y < (int) (*image)->rows; y++)
-            {
-              q=QueueCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
-                (*image)->columns,1,exception);
-              if (q == (Quantum *) NULL)
-                break;
-              for (x=0; x < (int) (*image)->columns; x++)
-              {
-                SetPixelAlpha(*image,(Quantum) StringToLong(matte),q);
-                q+=(ptrdiff_t) GetPixelChannels(*image);
-              }
-              if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-                break;
-            }
-            if (StringToLong(matte) == (long) OpaqueAlpha)
-              (*image)->alpha_trait=UndefinedPixelTrait;
-            break;
-          }
-        }
+        pixel_input.image=image;
+        pixel_input.image_view=image_view;
+        pixel_input.x_offset=x_offset;
+        pixel_input.y_offset=y_offset;
+        pixel_input.matte=matte;
+        pixel_input.exception=exception;
+        pixel_input.resource_info=resource_info;
+        pixel_input.method=method;
+        pixel_input.border_color=border_color;
+        if (XMatteEditPixels(pixel_input,method,image,exception) == MagickFalse)
+          return(MagickFalse);
         image_view=DestroyCacheView(image_view);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
