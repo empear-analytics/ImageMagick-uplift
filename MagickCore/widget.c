@@ -6076,6 +6076,52 @@ static XWidgetInfo MoveFontBrowserSlider(XWidgetInfo slider_info,
   return(slider_info);
 }
 
+typedef struct _FontBrowserBack
+{
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  XWidgetInfo
+    back_info;
+
+  char
+    *glob_pattern;
+
+  const char
+    *back_pattern;
+} FontBrowserBack;
+
+static size_t ReleaseFontBrowserBack(const FontBrowserBack *back,
+  size_t state)
+{
+  XWindows
+    *const windows = back->windows;
+
+  const XEvent
+    event = back->event;
+
+  const XWidgetInfo
+    back_info = back->back_info;
+
+  char
+    *const glob_pattern = back->glob_pattern;
+
+  const char
+    *const back_pattern = back->back_pattern;
+
+  if ((event.xbutton.window == windows->widget.id) &&
+      (MatteIsActive(back_info,event.xbutton)))
+    {
+      (void) CopyMagickString(glob_pattern,back_pattern,
+        MagickPathExtent);
+      state|=UpdateListState;
+    }
+  return(state);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6800,13 +6846,15 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
           }
         if (back_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(back_info,event.xbutton)))
-              {
-                (void) CopyMagickString(glob_pattern,back_pattern,
-                  MagickPathExtent);
-                state|=UpdateListState;
-              }
+            FontBrowserBack
+              back;
+
+            back.windows=windows;
+            back.event=event;
+            back.back_info=back_info;
+            back.glob_pattern=glob_pattern;
+            back.back_pattern=back_pattern;
+            state=ReleaseFontBrowserBack(&back,state);
             back_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&back_info);
           }
