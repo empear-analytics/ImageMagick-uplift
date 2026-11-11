@@ -9326,6 +9326,93 @@ static XColor *XQueryServerColors(Display *display,const Colormap colormap,
   return(server_colors);
 }
 
+typedef struct _XDefaultColorSource
+{
+  Display
+    *display;
+
+  XVisualInfo
+    *visual_info;
+
+  Colormap
+    colormap;
+
+  Image
+    *image;
+
+  XPixelInfo
+    *pixel;
+
+  XColor
+    *colors;
+} XDefaultColorSource;
+
+static size_t XRetainDefaultColors(const XDefaultColorSource *default_source,
+  size_t number_colors)
+{
+  Display
+    *const display = default_source->display;
+
+  XVisualInfo
+    *const visual_info = default_source->visual_info;
+
+  const Colormap
+    colormap = default_source->colormap;
+
+  Image
+    *const image = default_source->image;
+
+  XPixelInfo
+    *const pixel = default_source->pixel;
+
+  XColor
+    *const colors = default_source->colors;
+
+  size_t
+    retain_colors;
+
+  ssize_t
+    i;
+
+  XColor
+    *p;
+
+  if ((int) image->colors < visual_info->colormap_size)
+    {
+      /*
+        Retain colors from the default colormap to help lessens the
+        effects of colormap flashing.
+      */
+      retain_colors=MagickMin((unsigned int)
+        (visual_info->colormap_size-(int) image->colors),256);
+      p=colors+image->colors;
+      for (i=0; i < (ssize_t) retain_colors; i++)
+      {
+        p->pixel=(unsigned long) i;
+        p++;
+      }
+      (void) XQueryColors(display,
+        XDefaultColormap(display,visual_info->screen),
+        colors+image->colors,(int) retain_colors);
+      /*
+        Transfer colors from default to private colormap.
+      */
+      (void) XAllocColorCells(display,colormap,MagickFalse,
+        (unsigned long *) NULL,0,pixel->pixels,(unsigned int)
+        retain_colors);
+      p=colors+image->colors;
+      for (i=0; i < (ssize_t) retain_colors; i++)
+      {
+        p->pixel=pixel->pixels[i];
+        p++;
+      }
+      (void) XStoreColors(display,colormap,colors+image->colors,
+        (int) retain_colors);
+      number_colors+=retain_colors;
+    }
+  return(number_colors);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9591,6 +9678,9 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       */
       if (status == False)
         {
+          XDefaultColorSource
+            default_source;
+
           /*
             Not enough colormap entries in the colormap-- Create a new colormap.
           */
@@ -9601,39 +9691,13 @@ MagickPrivate void XMakeStandardColormap(Display *display,
             ThrowXWindowFatalException(ResourceLimitFatalError,
               "UnableToCreateColormap",image->filename);
           map_info->colormap=colormap;
-          if ((int) image->colors < visual_info->colormap_size)
-            {
-              /*
-                Retain colors from the default colormap to help lessens the
-                effects of colormap flashing.
-              */
-              retain_colors=MagickMin((unsigned int)
-                (visual_info->colormap_size-(int) image->colors),256);
-              p=colors+image->colors;
-              for (i=0; i < (ssize_t) retain_colors; i++)
-              {
-                p->pixel=(unsigned long) i;
-                p++;
-              }
-              (void) XQueryColors(display,
-                XDefaultColormap(display,visual_info->screen),
-                colors+image->colors,(int) retain_colors);
-              /*
-                Transfer colors from default to private colormap.
-              */
-              (void) XAllocColorCells(display,colormap,MagickFalse,
-                (unsigned long *) NULL,0,pixel->pixels,(unsigned int)
-                retain_colors);
-              p=colors+image->colors;
-              for (i=0; i < (ssize_t) retain_colors; i++)
-              {
-                p->pixel=pixel->pixels[i];
-                p++;
-              }
-              (void) XStoreColors(display,colormap,colors+image->colors,
-                (int) retain_colors);
-              number_colors+=retain_colors;
-            }
+          default_source.display=display;
+          default_source.visual_info=visual_info;
+          default_source.colormap=colormap;
+          default_source.image=image;
+          default_source.pixel=pixel;
+          default_source.colors=colors;
+          number_colors=XRetainDefaultColors(&default_source,number_colors);
           (void) XAllocColorCells(display,colormap,MagickFalse,
             (unsigned long *) NULL,0,pixel->pixels,(unsigned int)
             image->colors);
