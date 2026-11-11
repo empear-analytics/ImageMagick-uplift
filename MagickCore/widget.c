@@ -1824,6 +1824,10 @@ static void
 static size_t
   ReleaseFontBrowserBack(const FontBrowserBack *,size_t);
 
+static void
+  MoveFontBrowserSliderByPage(const KeySym,const unsigned int,const int,
+    XWidgetInfo *);
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2674,22 +2678,10 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
                 slider_info.id++;
                 break;
               }
-              case XK_Prior:
-              case XK_KP_Prior:
+              default:
               {
-                slider_info.id-=(int) visible_colors;
-                break;
-              }
-              case XK_Next:
-              case XK_KP_Next:
-              {
-                slider_info.id+=(int) visible_colors;
-                break;
-              }
-              case XK_End:
-              case XK_KP_End:
-              {
-                slider_info.id=(int) colors;
+                MoveFontBrowserSliderByPage(key_symbol,visible_colors,
+                  (int) colors,&slider_info);
                 break;
               }
             }
