@@ -9697,6 +9697,24 @@ static void XMakePanImage(Display *display,XResourceInfo *resource_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XReplaceRowAlpha(Image **image,Quantum *q,const PixelInfo target,
+  const char *matte)
+{
+  int
+    x;
+
+  PixelInfo
+    pixel;
+
+  for (x=0; x < (int) (*image)->columns; x++)
+  {
+    GetPixelInfoPixel(*image,q,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,&target))
+      SetPixelAlpha(*image,(Quantum) StringToLong(matte),q);
+    q+=(ptrdiff_t) GetPixelChannels(*image);
+  }
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -10156,7 +10174,6 @@ static MagickBooleanType XMatteEditImage(Display *display,
           case ReplaceMethod:
           {
             PixelInfo
-              pixel,
               target;
 
             /*
@@ -10170,13 +10187,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
                 (*image)->columns,1,exception);
               if (q == (Quantum *) NULL)
                 break;
-              for (x=0; x < (int) (*image)->columns; x++)
-              {
-                GetPixelInfoPixel(*image,q,&pixel);
-                if (IsFuzzyEquivalencePixelInfo(&pixel,&target))
-                  SetPixelAlpha(*image,(Quantum) StringToLong(matte),q);
-                q+=(ptrdiff_t) GetPixelChannels(*image);
-              }
+              XReplaceRowAlpha(image,q,target,matte);
               if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
                 break;
             }
