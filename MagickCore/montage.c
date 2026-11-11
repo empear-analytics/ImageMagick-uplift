@@ -1371,6 +1371,63 @@ static MagickBooleanType CopyMontageTiles(const MontageTileCopy *copy,
   return(MagickTrue);
 }
 
+typedef struct _MontageNextPage
+{
+  ssize_t
+    i;
+
+  size_t
+    images_per_page;
+
+  ImageInfo
+    *clone_info;
+
+  ExceptionInfo
+    *exception;
+
+  const MontageInfo
+    *montage_info;
+
+  size_t
+    tiles_per_page;
+} MontageNextPage;
+
+typedef struct _MontagePageTargets
+{
+  Image
+    **montage,
+    ***image_list;
+
+  size_t
+    *number_images;
+} MontagePageTargets;
+
+static MagickBooleanType AdvanceMontagePage(const MontageNextPage *next,
+  const MontagePageTargets *targets)
+{
+  Image
+    **const montage = targets->montage,
+    ***const image_list = targets->image_list;
+
+  size_t
+    *const number_images = targets->number_images;
+
+  if ((next->i+1) < (ssize_t) next->images_per_page)
+    {
+      /*
+        Allocate next image structure.
+      */
+      if (AcquireNextMontage(next->clone_info,(*montage),next->exception) ==
+          MagickFalse)
+        return(MagickFalse);
+      (*montage)=GetNextImageInList((*montage));
+      (*montage)->background_color=next->montage_info->background_color;
+      (*image_list)+=next->tiles_per_page;
+      (*number_images)-=next->tiles_per_page;
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1441,6 +1498,9 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
 
   TypeMetric
     metrics;
+
+  const MontagePageTargets
+    page_targets = { (&montage), (&image_list), (&number_images) };
 
   /*
     Create image tiles.
@@ -1566,18 +1626,14 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
       if (CopyMontageTiles(&copy,&tile_targets) == MagickFalse)
         ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-    if ((i+1) < (ssize_t) images_per_page)
-      {
-        /*
-          Allocate next image structure.
-        */
-        if (AcquireNextMontage(clone_info,montage,exception) == MagickFalse)
-          return((Image *) NULL);
-        montage=GetNextImageInList(montage);
-        montage->background_color=montage_info->background_color;
-        image_list+=tiles_per_page;
-        number_images-=tiles_per_page;
-      }
+    {
+      const MontageNextPage
+        next = { i, images_per_page, clone_info, exception, montage_info,
+          tiles_per_page };
+
+      if (AdvanceMontagePage(&next,&page_targets) == MagickFalse)
+        return((Image *) NULL);
+    }
   }
   tile_image=DestroyImage(tile_image);
   if (texture != (Image *) NULL)
