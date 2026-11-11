@@ -148,11 +148,33 @@ static inline MagickBooleanType IsPixelChannelPairUndefined(
     (other_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
-static void AddNoisePixelChannels(const Image *image,
-  const Image *noise_image,const Quantum *magick_restrict p,
-  Quantum *magick_restrict q,RandomInfo *magick_restrict random_info,
-  const NoiseType noise_type,const double attenuate)
+typedef struct _AddNoisePixel
 {
+  const Image
+    *image,
+    *noise_image;
+
+  NoiseType
+    noise_type;
+
+  double
+    attenuate;
+} AddNoisePixel;
+
+static void AddNoisePixelChannels(const AddNoisePixel *noise_pixel,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,
+  RandomInfo *magick_restrict random_info)
+{
+  const Image
+    *const image = noise_pixel->image,
+    *const noise_image = noise_pixel->noise_image;
+
+  const NoiseType
+    noise_type = noise_pixel->noise_type;
+
+  const double
+    attenuate = noise_pixel->attenuate;
+
   ssize_t
     i;
 
@@ -224,6 +246,9 @@ static MagickBooleanType AddNoiseImageRow(const AddNoiseRow *noise_row,
   ExceptionInfo
     *const exception = noise_row->exception;
 
+  const AddNoisePixel
+    noise_pixel = { image, noise_image, noise_type, attenuate };
+
   const int
     id = GetOpenMPThreadId();
 
@@ -251,8 +276,7 @@ static MagickBooleanType AddNoiseImageRow(const AddNoiseRow *noise_row,
     }
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    AddNoisePixelChannels(image,noise_image,p,q,random_info[id],noise_type,
-      attenuate);
+    AddNoisePixelChannels(&noise_pixel,p,q,random_info[id]);
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(noise_image);
   }
