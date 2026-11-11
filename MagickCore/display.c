@@ -9959,6 +9959,50 @@ static void XSelectPaintMethod(const EditMenuInput *menu,
   methods=DestroyStringList(methods);
 }
 
+static void XSelectFuzzFactor(const EditMenuInput *menu,
+  const char *const *FuzzMenu,char *fuzz,Image **image)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const MatteEditMenu = menu->MatteEditMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  int
+    entry;
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  entry=XMenuWidget(display,windows,MatteEditMenu[id],FuzzMenu,
+    command);
+  if (entry < 0)
+    return;
+  if (entry != 5)
+    {
+      (*image)->fuzz=StringToDoubleInterval(FuzzMenu[entry],(double)
+        QuantumRange+1.0);
+      return;
+    }
+  (void) CopyMagickString(fuzz,"20%",MagickPathExtent);
+  (void) XDialogWidget(display,windows,"Ok",
+    "Enter fuzz factor (0.0 - 99.9%):",fuzz);
+  if (*fuzz == '\0')
+    return;
+  (void) ConcatenateMagickString(fuzz,"%",MagickPathExtent);
+  (*image)->fuzz=StringToDoubleInterval(fuzz,(double) QuantumRange+
+    1.0);
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -10153,27 +10197,12 @@ static MagickBooleanType XMatteEditImage(Display *display,
             static char
               fuzz[MagickPathExtent];
 
-            /*
-              Select a command from the pop-up menu.
-            */
-            entry=XMenuWidget(display,windows,MatteEditMenu[id],FuzzMenu,
-              command);
-            if (entry < 0)
-              break;
-            if (entry != 5)
-              {
-                (*image)->fuzz=StringToDoubleInterval(FuzzMenu[entry],(double)
-                  QuantumRange+1.0);
-                break;
-              }
-            (void) CopyMagickString(fuzz,"20%",MagickPathExtent);
-            (void) XDialogWidget(display,windows,"Ok",
-              "Enter fuzz factor (0.0 - 99.9%):",fuzz);
-            if (*fuzz == '\0')
-              break;
-            (void) ConcatenateMagickString(fuzz,"%",MagickPathExtent);
-            (*image)->fuzz=StringToDoubleInterval(fuzz,(double) QuantumRange+
-              1.0);
+            menu_input.display=display;
+            menu_input.windows=windows;
+            menu_input.MatteEditMenu=MatteEditMenu;
+            menu_input.id=id;
+            menu_input.command=command;
+            XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,image);
             break;
           }
           case MatteEditValueCommand:
