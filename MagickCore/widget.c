@@ -1805,6 +1805,10 @@ static XWidgetInfo
 static XWidgetInfo
   PlaceTextViewExpose(XWidgetInfo,const XWidgetInfo);
 
+static void
+  SelectFontBrowserEntry(const FontBrowserPress *,char *,
+    const FontBrowserTargets *);
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -1880,6 +1884,9 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
 
   XWindowChanges
     window_changes;
+
+  const FontBrowserTargets
+    targets = { &reply_info, &state, &selection_info, &list_info };
 
   /*
     Get color list and sort in ascending order.
@@ -2386,32 +2393,17 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
           }
         if (MatteIsActive(list_info,event.xbutton))
           {
-            int
-              id;
+            FontBrowserPress
+              press;
 
-            /*
-              User pressed list matte.
-            */
-            id=slider_info.id+(event.xbutton.y-(list_info.y+(int)
-              (height >> 1))+1)/(int) selection_info.height;
-            if (id >= (int) colors)
-              break;
-            (void) CopyMagickString(reply_info.text,colorlist[id],
-              MagickPathExtent);
-            reply_info.highlight=MagickFalse;
-            reply_info.marker=reply_info.text;
-            reply_info.cursor=reply_info.text+Extent(reply_info.text);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-            state|=RedrawActionState;
-            if (id == list_info.id)
-              {
-                (void) CopyMagickString(glob_pattern,reply_info.text,
-                  MagickPathExtent);
-                state|=UpdateListState;
-              }
-            selection_info.id=(~0);
-            list_info.id=id;
-            state|=RedrawListState;
+            press.display=display;
+            press.windows=windows;
+            press.fontlist=colorlist;
+            press.fonts=colors;
+            press.height=height;
+            press.event=event;
+            press.slider_info=slider_info;
+            SelectFontBrowserEntry(&press,glob_pattern,&targets);
             break;
           }
         if (MatteIsActive(grab_info,event.xbutton))
