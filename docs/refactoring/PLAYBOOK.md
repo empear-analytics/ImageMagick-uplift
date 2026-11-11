@@ -11180,6 +11180,131 @@ Ahead* and *Large Method*, 3.48 to 3.67 with the XSaveImage steps. Added by Clau
 
 ---
 
+## Recipe HT - Hoist the Exit Test Common to a Selection's Branches
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*) for a
+selection `if (C) P else Q` whose branches each test the same value and leave on failure
+with the same statement, `if (V == F) return(V);`, as `quantize.c`'s `KmeansImage` does after
+each way of seeding the clusters. Each such test is a nested conditional (a bump); one test
+after the selection is not. The branch that does not end in the test continues with
+statements that run only when the test passed.
+
+**Not covered by:** Recipe W, whose block leaves through `return(R);` with `R` a constant or
+a value the block leaves behind a pointer, and which moves the block's test into the helper
+rather than out of the selection; Recipe G, which inverts a guard and has no second branch
+with the same test; Recipe EI, which chains exiting guards of one `else` block; Recipe CN,
+whose outer `if` holds the inner one and nothing else; Recipe E, whose step 4 refuses a
+block with a `return` that is not a throw macro's; Recipe D, whose copies are moved whole.
+
+**How:**
+
+1. Find `if (C) P else Q` outside every OpenMP region, with no `#pragma` or preprocessor
+   line in it. `P` is one statement or a block that ends in the test `T`, which is
+   `if (V == F) return(V);`, `V` a local of type `MagickBooleanType` and `F` a constant,
+   written the same way in `Q`. Write `P` as `P0 T`.
+2. `Q` is one block `Q0 T Z`: `Q0` assigns `V` before it reads it, `T` occurs in it once, at
+   its top level, and `Z` is a run of statements that is not empty. `P0`, `Q0` and `Z`
+   contain no label, no `goto`, and no `break` or `continue` that leaves them; `Q0` and `Z`
+   contain no `return`; `Z` does not write `V` (no assignment, increment or `&V`).
+3. `Q` writes no variable of the caller except `V`: a temporary written before it is read
+   and read by nothing after the selection is declared in the new function (Recipe E step
+   4); writes through pointers stay as they are.
+4. Cut `Q` into a new `static MagickBooleanType` function directly above the caller. It
+   declares `MagickBooleanType V;`, then holds `Q` unchanged, and ends with `return(V);`.
+   It takes what `Q` reads, at most four parameters, each named as the caller's variable it
+   receives, so the call passes every argument by its own name.
+5. Write the selection as `if (C) P0 else V=Helper(args);`, with `P0` keeping its braces
+   when it is more than one statement, and write `T` once, unchanged, directly after it.
+6. When `Z` is empty, `Q` ends in `T` and no function is needed: the selection becomes
+   `if (C) P0 else Q0` followed by `T`; check it by reading, both branches ending in the
+   same text.
+7. Run `tools/tail_hoist_check.py <file> <Caller> <Helper>`: it must print
+   `IDENTICAL-MODULO-HOIST`. The checks it makes: before the step, the caller held
+   `if (C) { P0 T } else { Q }` where after it holds the new selection and `T`; `Q` is the
+   helper's body between its declaration and its closing `return(V);`; `Z` has no exit and
+   no write to `V`; nothing else in the caller changed. It leaves steps 1 to 3 to reading.
+8. Check by reading that both callees of the selection are reached by cases (casemap on
+   the function for each side), since the failure paths seldom are.
+
+**Before:**
+
+```c
+  if (colors == (const char *) NULL)
+    {
+      status=SeedKmeansFromQuantization(image,number_colors,exception);
+      if (status == MagickFalse)
+        return(status);
+    }
+  else
+    {
+      status=AcquireImageColormap(image,number_colors,exception);
+      if (status == MagickFalse)
+        return(status);
+      SeedKmeansFromColors(image,colors,exception);
+    }
+```
+
+**After:**
+
+```c
+static MagickBooleanType SeedKmeansFromColorList(Image *image,
+  const char *colors,const size_t number_colors,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=AcquireImageColormap(image,number_colors,exception);
+  if (status == MagickFalse)
+    return(status);
+  SeedKmeansFromColors(image,colors,exception);
+  return(status);
+}
+...
+  if (colors == (const char *) NULL)
+    status=SeedKmeansFromQuantization(image,number_colors,exception);
+  else
+    status=SeedKmeansFromColorList(image,colors,number_colors,exception);
+  if (status == MagickFalse)
+    return(status);
+```
+
+**Careful:**
+
+- Why the behaviour is the same, path by path. Branch `P`: the original ran `P0`, then `T`;
+  the new code runs `P0`, leaves the `if`, then runs `T`: the same statements in the same
+  order, nothing between (step 1: `T` was the last statement of `P`). Branch `Q`, `T` fires:
+  the original ran `Q0`, which left `V` equal to `F`, and returned `V`; the new helper runs
+  `Q0` and returns `V`, the caller stores it and its `T` returns `V`: the same value, and
+  `Z` ran in neither. Branch `Q`, `T` does not fire: the original ran `Z`, which does not
+  write `V` (step 2), and went on with `V` as `Q0` left it; the helper does the same on its
+  own `V` and returns it, the caller's `V` takes that value, `T` does not fire (the value is
+  not `F`, as the helper's own test showed), and the caller goes on with the same `V`.
+- The helper's `V` is a fresh local: step 2 has `Q0` assign it before reading it, so
+  nothing of the caller's `V` is read. Any other write of `Q` to the caller's variables is
+  step 3's refusal; everything `Q` reads is a parameter, so it reads the same values.
+- No `return`, `goto`, `break` or `continue` of `Q0` or `Z` stays in the helper (step 2),
+  so the only exit of `Q` is `T`, and leaving the helper is leaving the caller through the
+  hoisted `T`.
+- No statement of the original function is evaluated more often or less often than before:
+  `T` runs once on each path where it ran once.
+- This is not object-identical. The helper is `static` with one caller and is inlined; the
+  object code differs from the original's only by register allocation (measured on
+  `KmeansImage`), so the proof is the token-level check of step 7, the reading of steps 1
+  to 3, and the oracle on cases that reach both callees (step 8).
+- The step adds a function, which costs *Number of Functions in a Single Module* once
+  where the file is near its limit; it pays where the bumps it removes are the finding.
+
+**Evidence level:** oracle, with `tools/tail_hoist_check.py` printing
+`IDENTICAL-MODULO-HOIST` and `refactor_guard.py --calls` PASS; steps 1 to 3 checked by
+reading.
+
+**Provenance:** 2026-11-11, from `quantize.c`'s `KmeansImage` (campaign A, W18 lane d): the
+two seeding branches each test `status` and return; the file's score was held at 8.74 by
+this function's two bumps. A probe of the step: 8.74 to 8.81. Added by Claude Code (Claude
+Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -11566,3 +11691,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | MA | Step 2 (c): the lvalues of the copies may differ in a member of the chain before the last when each is a chain of member selections through one shared pointer variable (no call, no subscript), of one type; the block may only read or only assign it. *Careful* adds the argument (the address names the very object the copy named; nothing is read that the copy did not read) | `widget.c`'s `XScreenEvent` (campaign A, W18 lane a, wide build): the popup block's two `windows->popup.mapped` assignments and the existing helper `XScreenTrackWidgetMapping` (`windows->widget.mapped`) are twins differing in one member of the chain; one helper taking `MagickBooleanType *mapped` serves both. Probe: the function leaves Bumpy Road Ahead and drops from cc 15 to 13, 3.04 to 3.06, no new function | owner |
 | 2026-11-11 | AMEND | RV | Step 6 (new (d)): five or six written locals of the caller go by (c)'s one `const` struct of addresses, bound as `T *const v = name->v;` and written `(*v)`, so the helper keeps at most four parameters (the struct, the arrays or pointers it reads, `T *result`). *Careful* gives the argument: the locals stay the caller's, only addresses travel, and nothing else names them while the helper runs | `channel.c`'s `ChannelFxImage` (campaign A, W18 lane d): the token-separator `switch` writes six locals and leaves through two different `return`s (`return(destination_image)` after `DestroyImageList`, and `return((Image *) NULL)`), which I, V, W refuse; step 6 (b) stopped at four. A probe: the function cc 17 to 12, channel.c 9.31 to 9.46, no finding on the helper | owner |
 | 2026-11-11 | AMEND | RV | Step 6 (new (e)): the caller may pass the address of a local `w` that the block writes through (and that one exit returns) as `T *result`, and write `return(w);`, declaring no `returned`; the helper's text is unchanged. *Careful* gives the argument: `result` and the written pointer name one object, the paths that fall through never store, a path that returns stores into a local nothing reads but the return | `channel.c`'s `ChannelFxImage` (campaign A, W18 lane d): `destination_image` is what the separator helper's first exit returns and what it writes through; the `returned` local costs two lines of the loop helper that Recipe N moves, which then stands at 72 lines against the Large Method limit of 70 | owner |
+| 2026-11-11 | NEW | HT | Hoist the Exit Test Common to a Selection's Branches: in `if (C) P else Q` where `P` ends in `if (V == F) return(V);` and `Q` holds the same test followed by statements `Z` that run only when it passed, `Q` becomes a `static MagickBooleanType` helper returning `V`, the selection assigns `V` from it, and the test is written once after the selection; `tools/tail_hoist_check.py` checks the rewrite token by token | `quantize.c`'s `KmeansImage` (campaign A, W18 lane d): the two seeding branches each hold a nested `if (status == MagickFalse) return(status);`, the function's two bumps; Recipe W refuses (its `R` is a variable), nothing else reaches the shape. Probe: quantize.c 8.74 to 8.81, no finding on the helper | owner |
