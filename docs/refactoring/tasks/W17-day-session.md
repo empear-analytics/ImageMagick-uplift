@@ -407,3 +407,29 @@ inputs in an input struct and two to four written variables by a `const` struct 
 Wide oracle 30 and 9 cases; whole wide catalogue 14,145 cases, 1 diverged (`infra/0fd402f13a`, also times out on
 the baseline; 0 on rerun). Remaining plan: event-switch case tails (about 8 commits for +0.05), XMagickCommand's
 19-label switch by SD with XSaveImage (+0.29 in probes); XAnimateBackgroundImage's static-local blocks refused.
+
+## Lane b, fourth round: display.c 1.12 -> 1.33 (wide build, merged)
+
+Brain Methods 11 -> 7: XTileImage, XCompositeImage, XImageCache and XRotateImage leave Brain Method (depth 3 or
+less); XScreenEvent leaves Deep Nesting; XColorEditImage 7 -> 5, XAnnotateEditImage 6 -> 5, XROIImage 6 -> 5.
+Commits: 4dad7fec1 N XTileImage 1.15 (guard: struct_fill OK, MODULO-IDENTICAL); XCompositeImage 8f426cada D, 8b71f5d8a
+D (typedef move, IDENTICAL), 9d193ed7b D, f2a78f6a0 CT, aafc22d8b CT 1.17; 329455a1b O XImageCache (static
+`undo_image` by pointer) 1.21 (269 cases, MODULO-IDENTICAL); 4a0c8e454 D and 4a97e10d1 E XScreenEvent 1.22;
+XRotateImage 27b03a739 CT (block `static color_name`) 1.23, 7d0a2b21b D, b4ed65427 OC 1.24, 2fed0af65 CT, 8b42b9bf3
+CT 1.25, 57c6b5c57 N 1.29; 335a48036 CT XAnnotateEditImage; 0648d2451 E 1.31 and 0c299ba2a N 1.32 XColorEditImage;
+aa585a7a9 N + E step 3 XROIImage 1.33. Unreached lines rest on the guard form (obj_modulo MODULO-IDENTICAL plus
+struct_fill_check or case_tail_check). Whole wide catalogue: 14,145 cases, 0 diverged.
+
+Recipe text (Decided by `owner`, 2026-11-10 OK): ad9c8f911 CT step 2 (a block-scope `static` of arithmetic,
+enumeration or pointer type, its address taken nowhere but in the targets initialiser, may be a written variable,
+passed by pointer, never copied; a `static` the block itself declares moves with it unchanged; *Careful*: static
+storage duration, C11 6.2.4p3, `(*v)` designates the object, 6.5.3.2p4, so re-entry sensitivity is unchanged);
+ea4716e7b O step 2 (such a static counts as a plain local on CT's terms); 0301ce736 OC step 4 (read variables in one
+`const` input struct for any block when by-value inputs would make five or more parameters).
+
+Plateau: the seven near-identical pen-colour cases with per-site `static color_name` (one shared helper would merge
+the statics, a behaviour change; per-site helpers trip Code Duplication); XCropImage about 5 more steps;
+XDrawEditImage's stipple helper would be cc 9; XDisplayImage 9 depth-6 sites; a helper that does not lower a
+function's maximum depth costs score. Tool notes: `case_tail_check.py` rewrites identifiers inside string
+literals; `struct_fill_check.py` falsely matches a local named `info`. Possible upstream: XColorEditImage's
+`(void) (void) CopyMagickString`; its point and reset methods return without destroying `image_view`.
