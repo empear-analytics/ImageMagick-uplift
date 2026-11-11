@@ -7323,6 +7323,44 @@ static unsigned char *XPackContinuous2BitRowMSB(const Image *canvas,
   return(q);
 }
 
+static unsigned char *XPackContinuous4BitRowMSB(const Image *canvas,
+  XStandardColormap *map_info,const Quantum *p,unsigned char *q)
+{
+  int
+    x;
+
+  unsigned int
+    nibble;
+
+  unsigned long
+    pixel;
+
+  nibble=0;
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    pixel=XGammaPixel(canvas,map_info,p);
+    pixel&=0xf;
+    switch (nibble)
+    {
+      case 0:
+      {
+        *q=(unsigned char) (pixel << 4);
+        nibble++;
+        break;
+      }
+      case 1:
+      {
+        *q|=(unsigned char) pixel;
+        q++;
+        nibble=0;
+        break;
+      }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7582,9 +7620,6 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
         }
         case 4:
         {
-          unsigned int
-            nibble;
-
           /*
             Convert to 4 bit continuous-tone X canvas.
           */
@@ -7594,29 +7629,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
               canvas->columns,1,exception);
             if (p == (const Quantum *) NULL)
               break;
-            nibble=0;
-            for (x=(int) canvas->columns-1; x >= 0; x--)
-            {
-              pixel=XGammaPixel(canvas,map_info,p);
-              pixel&=0xf;
-              switch (nibble)
-              {
-                case 0:
-                {
-                  *q=(unsigned char) (pixel << 4);
-                  nibble++;
-                  break;
-                }
-                case 1:
-                {
-                  *q|=(unsigned char) pixel;
-                  q++;
-                  nibble=0;
-                  break;
-                }
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
+            q=XPackContinuous4BitRowMSB(canvas,map_info,p,q);
             q+=(ptrdiff_t) scanline_pad;
           }
           break;
