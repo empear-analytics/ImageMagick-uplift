@@ -12903,6 +12903,27 @@ static void XSetMagnifyPosition(XWindows *windows,int x,int y)
   windows->magnify.y=windows->image.y+y;
 }
 
+static void XMagnifyAtButton(Display *display,XWindows *windows,
+  XEvent *event,ExceptionInfo *exception)
+{
+  int
+    x,
+    y;
+
+  /*
+    Update magnified image.
+  */
+  x=event->xbutton.x;
+  y=event->xbutton.y;
+  XSetMagnifyPosition(windows,x,y);
+  if (windows->magnify.mapped == MagickFalse)
+    (void) XMapRaised(display,windows->magnify.id);
+  XMakeMagnifyImage(display,windows,exception);
+  if (event->type == ButtonRelease)
+    (void) XWithdrawWindow(display,windows->info.id,
+      windows->info.screen);
+}
+
 static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
@@ -12941,18 +12962,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
       if (event->xbutton.window == windows->image.id)
         if (event->xbutton.button == Button2)
           {
-            /*
-              Update magnified image.
-            */
-            x=event->xbutton.x;
-            y=event->xbutton.y;
-            XSetMagnifyPosition(windows,x,y);
-            if (windows->magnify.mapped == MagickFalse)
-              (void) XMapRaised(display,windows->magnify.id);
-            XMakeMagnifyImage(display,windows,exception);
-            if (event->type == ButtonRelease)
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
+            XMagnifyAtButton(display,windows,event,exception);
             break;
           }
       break;
