@@ -10139,6 +10139,15 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
 #define CancelButtonText  "Cancel"
 #define NumberPreferences  8
 
+static size_t ReleasePreferencesButton(XWindows *windows,const XEvent event,
+  const XWidgetInfo button_info,size_t state)
+{
+  if ((event.xbutton.window == windows->widget.id) &&
+      (MatteIsActive(button_info,event.xbutton)))
+    state|=ExitState;
+  return(state);
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -10387,18 +10396,14 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
           break;
         if (apply_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(apply_info,event.xbutton)))
-              state|=ExitState;
+            state=ReleasePreferencesButton(windows,event,apply_info,state);
             apply_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&apply_info);
             apply_info.raised=MagickFalse;
           }
         if (cancel_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(cancel_info,event.xbutton)))
-              state|=ExitState;
+            state=ReleasePreferencesButton(windows,event,cancel_info,state);
             cancel_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
           }
