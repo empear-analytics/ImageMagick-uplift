@@ -5870,6 +5870,33 @@ static XWidgetInfo
 static size_t
   ConfirmListBrowserReply(Display *,const XWidgetInfo,size_t);
 
+typedef struct _ListBrowserClick
+{
+  Display
+    *display;
+
+  XWindowInfo
+    *window_info;
+
+  XEvent
+    event;
+
+  Time
+    click_time;
+} ListBrowserClick;
+
+typedef struct _ListBrowserRelease
+{
+  Display
+    *display;
+
+  XWindowInfo
+    *window_info;
+
+  XEvent
+    event;
+} ListBrowserRelease;
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -7392,21 +7419,6 @@ static int FindListBrowserCursor(XFontStruct *font_info,
   return(i);
 }
 
-typedef struct _ListBrowserClick
-{
-  Display
-    *display;
-
-  XWindowInfo
-    *window_info;
-
-  XEvent
-    event;
-
-  Time
-    click_time;
-} ListBrowserClick;
-
 static XWidgetInfo HighlightListBrowserReply(const ListBrowserClick *click,
   char *primary_selection,XWidgetInfo reply_info)
 {
@@ -7448,18 +7460,6 @@ static size_t ConfirmListBrowserReply(Display *display,
     state|=ExitState;
   return(state);
 }
-
-typedef struct _ListBrowserRelease
-{
-  Display
-    *display;
-
-  XWindowInfo
-    *window_info;
-
-  XEvent
-    event;
-} ListBrowserRelease;
 
 static void ReleaseListBrowserAction(const ListBrowserRelease *release,
   const XWidgetInfo reply_info,XWidgetInfo *action_info,size_t *state)
