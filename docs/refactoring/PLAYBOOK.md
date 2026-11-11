@@ -186,6 +186,18 @@ before the commit and quoted in its message, which carries `Verified: guard`:
    reading stands in for it: the message quotes the old call and the fill side by side.
    The type of each member against the variable's declaration (N step 3, B
    *Careful*) is checked by reading.
+   Under N step 8's sibling forms (one local filled once, several calls after it) the
+   fill does not stand directly before each call and `struct_fill_check.py` cannot
+   pass; `python3 tools/sibling_fill_check.py <file> <Type> <local> <Helper>` stands in
+   for it and prints `OK` (one run of `local.m=m;` for every member, in member order, in
+   the one function that holds the helper's calls, every call after it, no write to a
+   member's variable from the run to the last call, the bindings by name, every
+   removed line among the added ones), or `FAIL` listing only lines the recipe's own
+   text rewrites: an inner call's `&local` that step 8 passes on as `name`, a case's
+   `break;` that became `return;` (Recipe E step 7's switch form), and a declarator of
+   the caller that leaves because nothing left in the caller names the variable (Recipe
+   E step 4; the compiler's `-Wunused-variable` would otherwise fail CI). The commit
+   message names each such line; any other line it lists stops the step.
 4. `sh tools/obj_modulo.sh <file> <Caller> <Helper>` prints `IDENTICAL` (the whole
    object file byte for byte, D's proof) or `MODULO-IDENTICAL`: every other function of
    the file compiles to the same instructions, addresses aside; the only new function
@@ -193,7 +205,11 @@ before the commit and quoted in its message, which carries `Verified: guard`:
    compiler now inlines into the helper instead of the caller, or ones the caller
    calls whose definition is the same text on both sides, which the shortened caller
    now inlines (the script prints `now inlined into <Caller> (its text unchanged)`;
-   added 2026-11-10 with *Unreached functions: Recipe I*). For B, `<Helper>` is the
+   added 2026-11-10 with *Unreached functions: Recipe I*). The trailing run of
+   alignment padding after each function's last instruction (the nop family, `int3`)
+   is left out of the comparison (2026-11-11): an out-of-line helper moves the next
+   function's boundary and with it the padding of the function before it, which no
+   path executes; padding inside a function stays compared. For B, `<Helper>` is the
    bundled function and `<Caller>` its one caller; with more than one caller only
    `IDENTICAL` passes. `DIFFERENT` stops the step.
 
@@ -1744,6 +1760,27 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    reads as step 4 does (a member the block reads and then writes, and that nothing
    after the block reads, as step 2's read-then-written local without `const`); no
    typedef, local or fill is added, and the call passes `&name` as the earlier one does.
+   Sibling blocks need not be the cases of one `switch` (2026-11-10): blocks of one
+   function that all lie after one point of it (the cases of two `switch` statements
+   in the branches of an `if`, the branches of an `if` chain inside a case, a loop
+   nested in such a case), each moved under this recipe in its own commit, may share
+   one `Name` and one local on the same terms. The local is declared among the
+   function's declarations and filled once, by step 6's assignments, at that point;
+   nothing on any path from the fill to any of the calls writes a member's variable,
+   checked by reading every path, the code that stays in the caller included. The
+   typedef and the fill hold the union of the groups moved so far, in one order (a
+   later commit adds a member and its assignment). A block that later moves around
+   such a call (the case holding a row loop whose column loop moved first) takes the
+   same `const Name *name` and passes it on, as the loop-body paragraph above says.
+   A second function of the file whose sibling blocks read the same group, each
+   variable of the same name and exact type as a member, may use the typedef an
+   earlier function's siblings declared (2026-11-11), instead of a second typedef that
+   would repeat it member for member (`XMakeImageMSBFirst` beside
+   `XMakeImageLSBFirst`): it declares its own local of that type among its
+   declarations and fills every member once, by step 6's assignments, on the terms
+   above; each helper binds only the members its block reads. The two functions share
+   the type alone: each fills and passes its own local, so no value crosses between
+   them.
 
 **Before:**
 
@@ -1975,6 +2012,15 @@ helper, whose struct holds thirteen other variables; with a struct of its own it
 bind them all and fill the inner struct again (*Large Method*, 72 lines, fx.c 3.99 to
 3.90 in a probe); passing the struct on, fx.c 3.99 to 4.04, no finding on any helper.
 Added by Claude Code (Claude Opus 5.5).
+Step 8's siblings across one function (2026-11-10, W16 lane b, owner's OK to evolve the
+recipes): `xwindow.c`'s `XMakeImageLSBFirst` and `XMakeImageMSBFirst`, whose pixel
+conversions sit in the cases of two `switch` statements (colour-mapped and
+continuous-tone) and in an `if` chain inside the second one's `default:`. Their column
+loops (canvas, colormap or pixel table, bytes per pixel, `p`, `q`: five inputs) and then
+the whole cases move as helpers reading one `XImageRowSource` filled once after the
+cache view is acquired; a struct per switch, or per row filled inside each row loop,
+would repeat the typedef or put eight assignments on every row. A probe of both chains:
+xwindow.c 1.57 to 1.64, no finding on any helper. Added by Claude Code (Claude Opus 5.5).
 
 ---
 
@@ -10823,6 +10869,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | N | Step 8: the statements of one function body are siblings as well: a later block that holds an earlier sibling's call and runs to the end of the function (E step 7's value form) may take that sibling's `const Name *name` and pass it on unchanged when none of its statements before the call writes a member's variable; the fill moves with the call to directly before the later block's call, and the variables the later block writes go by value (step 2's read-then-written form, nothing after reads them). *Careful* gives the argument | `fx.c`'s `GetFunction` (campaign A, W16 lane c): the argument-count tail writes `FndArgs` and `chLimit` and holds the call of the closing tail, whose struct holds thirteen variables; with its own struct the helper is a *Large Method* (72 lines, fx.c 3.99 to 3.90), passing the struct on 3.99 to 4.04 with no finding | owner |
 | 2026-11-10 | AMEND | BR | Step 8: a block writing two to four variables the caller reads after it passes their addresses in one `const` targets struct (Recipe LB step 8's form, each variable meeting Recipe I step 2); its inputs may come from at most two `const` structs the caller already fills (an earlier sibling helper's struct filled earlier in the same iteration with no member's variable written since, Recipe N step 8; and a struct the block passes by address to a callee, as a pointer, `&context` becoming `context`); input structs, targets, then `broke`, at most four parameters. *Careful* gives the argument | `fx.c`'s `TranslateExpression` (campaign A, W16 lane c): the operator loop's run from the ternary to the `++`/`--` check leaves through `break;` and `return MagickFalse;` and writes `ternary`, `UserSymbol` and `NewUserSymbol`; step 2 allowed one. A probe: 4.33 to 4.37 for the step, and the whole chain takes `TranslateExpression` out of *Complex Method* and *Large Method*, 4.21 to 4.61, no finding on any new function | owner |
 | 2026-11-10 | AMEND | N | Step 8: a struct the caller already fills for the call of another `static` function (a Recipe B bundle or another N helper) may serve a later block of the same function that reads only its members and runs only after that call (its `if` tests the call, or it follows it in the same block), nothing on any path from the fill to the new call writing a member's variable; the new function takes that `const Name *name` (read-then-written members as step 2's non-`const` locals), no typedef, local or fill added. *Careful* gives the argument. Still eight steps | `feature-texture.c`'s `GetImageFeatures` (campaign A, W16 lane c): the failed-allocation release of the six buffers (six `if (b != NULL) b=Relinquish...(b);`) reads exactly the members of the `FeatureBuffers buffers` that Recipe B made for `IsFeatureMemoryMissing`, whose `if` guards it; a struct of its own would repeat the typedef and the six-line fill. A probe 7.46 to 7.51, `GetImageFeatures` cc 29 to 23, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-10 | AMEND | N | Step 8: sibling blocks need not be the cases of one `switch`: blocks of one function that all lie after one point of it (cases of two `switch` statements, branches of an `if` chain inside a case, a loop nested in such a case), each moved in its own commit, may share one `Name` and one local declared among the function's declarations and filled once at that point, when nothing on any path from the fill to any call writes a member's variable (checked by reading every path); typedef and fill hold the union of the groups moved so far; a block later moved around such a call passes the same `const Name *name` on. Still eight steps | `xwindow.c`'s `XMakeImageLSBFirst`/`XMakeImageMSBFirst` (campaign A, W16 lane b): column loops with five inputs and then the whole conversion cases of two `switch` statements and an `if` chain read one `XImageRowSource` filled after the cache view is acquired; a struct per switch or a per-row fill would repeat the typedef or put eight assignments on every row. A probe of both chains: 1.57 to 1.64, no finding on any helper. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-10 | AMEND | MT | Step 8: copies in a function that already fills a Recipe N step 8 struct may read their inputs through it (`const Name *name` beside `side`, advanced members bound without `const`); a differing pair that is one call with a different callee takes CF's `method` parameter and designators; written variables go by pointer as in Recipe O, and a written variable whose name differs but whose role is the same passes its address in the selector struct. *Careful* gives the argument | `morphology.c`'s `MorphologyPrimitive` (campaign A, W16 lane d): the Erode/Dilate walks with a `?:` on the callee are a cc 9 *Complex Method*, cc 8 with the designator; the intensity walks write `quantum_pixels`, `pixel` and `minimum` or `maximum`, and every walk reads the channel body's one walk struct. Probes 3.16 to 3.22 and 3.28, no finding on a new function, no indirect call, timing within 1%. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-10 | AMEND | CF | Step 4: copies in a function that already fills a Recipe N step 8 struct may read their inputs through it (MT step 8 (a)), `method` staying a parameter of its own, within four | `morphology.c`'s `MorphologyPrimitive` (campaign A, W16 lane d): the Convolve and IterativeDistance walks differ only in the callee and read the walk struct; step 4's own struct would repeat it. A probe 3.30 to 3.33, no finding on a new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-10 | AMEND | N | Step 4: the choice between `const` locals and the member form may be made member by member, a member named by an OpenMP clause or a function-like macro keeping its `const` local and a written member its step 2 local | `morphology.c`'s `MorphologyPrimitive` (campaign A, W16 lane d): its column pass as a Recipe N step 1 helper must bind `image`, `morphology_image`, `status` and `progress` (the pragma names them) and the six members it writes, and is a 76-line *Large Method* with every member bound; with the four read-only members its fetch and fill read in the member form, 66 lines, no finding (4.32 to 4.48 in a probe). Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
@@ -10832,3 +10879,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | D | *Object code that differs only in the caller*: `reuse_check.py` (7394f75a1) also takes a helper returning the block's single output, called as the statement `v=Helper(...);` with `v` passed to a by-value parameter `p`, whose closing `return(p);` (the assignment back) is left out of the comparison, and compares a block whose lines break an expression at other tokens as one token stream | `widget.c`'s `XTextViewWidget` (campaign A, W16 lane a): its slider tracking and page press are `XListBrowserWidget`'s, which Recipe E made into `TrackListBrowserSlider` and `PageListBrowserSlider` (`slider_info=...(slider_info,...)`); the tracking lies on lines no case reaches and wraps its last expression at another token, so the check refused both; reusing them (instead of two look-alike helpers) is the step that measured 1.74 to 1.89 | owner |
 | 2026-11-10 | AMEND | I | Step 1: a block inside a `switch` case may leave only through `break;` statements that end that `switch` (the innermost `switch` or loop around it): each becomes `return(MagickFalse);` and the caller writes `if (Helper(...,&targets) == MagickFalse) break;` where the block stood, inside the same `switch`; the unreached level holds as written, `tools/targets_fill_check.py` counting `break;` as an exit (7c4c8a433) | `widget.c`'s `XMenuWidget` (campaign A, W16 lane a): its submenu test in the pointer-motion case sets `selection_info.id`, clears `*item` and sets ExitState, then leaves the `switch` by `break;` from two branches of nesting 5, on lines no case reaches; Recipe CT needs the case's tail, LB a loop, and I, V, Y and W a `return` or `goto` exit; with it the XMenuWidget chain measured 1.89 to 2.13 | owner |
 | 2026-11-11 | AMEND | S | Step 2: a file-scope `static const` table standing between the moved functions, and a one-line `#define` of the original that only the family uses, move with the family (the table verbatim where it stands, the macro to the new file's *Define declarations* block) instead of refusing it; a forward declaration of a moved `static` at the top of the original goes to a *Forward declarations* block of the new file, and a *Define* or *Forward declarations* comment left empty goes too; *Careful*: why the moved data and macro cannot change what either object computes. `tools/split_source.py` does all three and refuses a table or macro the kept part names; its output for earlier splits is unchanged (effect.c, visual-effects.c, transform.c, vision.c, enhance.c dry runs compared byte for byte) | `colorspace.c` (campaign A, W17 lane a): the TransformImageColorspace family (with SetImageColorspace, which shares four statics with it) uses the `GenericColorspaces[]` and `YCCMap` tables between its functions and the top-of-file `MaximumLogarithmicColorspace`; the split was refused for those alone (W16 owner question), and measures colorspace.c 9.38 to 10.0 with the new file at 9.38 | owner |
+| 2026-11-11 | AMEND | N | *Two levels of evidence*, *Unreached functions: B and N*, item 3: under N step 8's sibling forms, where one fill serves several calls and `struct_fill_check.py` cannot pass, `tools/sibling_fill_check.py` (dc4c85873) stands in for it: `OK`, or `FAIL` listing only lines the recipe's own text rewrites (an inner call's `&local` passed on as `name`, a case's `break;` become `return;`), each named in the commit message | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W17 lane b), reached by no case (the oracle's X server is LSB-first): its conversion cases are the twins of `XMakeImageLSBFirst`'s, which moved as step 8 siblings over one `XImageRowSource` with the oracle; at the guard level only item 3's tool stood in the way. A probe of the chain: 1.58 to 1.64, the function leaving nesting depth 6 for 4, no finding on any helper | owner |
+| 2026-11-11 | AMEND | N | Step 8: a second function of the file whose sibling blocks read the same group (same names, exact types) may use the typedef an earlier function's siblings declared, with its own local and its own one fill, instead of a second typedef repeating it member for member | `xwindow.c`'s `XMakeImageMSBFirst`, whose cases read `canvas`, `canvas_view`, `exception`, `resource_info`, `ximage`, `scanline_pad`, `pixels` and `map_info`, the eight members of `XMakeImageLSBFirst`'s `XImageRowSource`, with the same types (campaign A, W17 lane b) | owner |
+| 2026-11-11 | AMEND | N | *Unreached functions: B and N*, item 3 (as amended earlier today): `sibling_fill_check.py`'s move check may also list a declarator of the caller that leaves because nothing left in the caller names the variable (Recipe E step 4; `-Wunused-variable` would fail CI otherwise), named in the commit message | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W17 lane b): with its continuous-tone multi-byte column loop moved, nothing in the caller reads `pixel`, and the check lists the `pixel,` declarator that left | owner |
+| 2026-11-11 | AMEND | B, N, I | *Unreached functions: B and N*, item 4: `tools/obj_modulo.sh` leaves the trailing run of alignment padding after each function's last instruction (the nop family, `int3`) out of the comparison; padding inside a function stays compared. The tool change is a commit of its own | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W17 lane b): its blue-high branch moved to an out-of-line N helper, and the only difference in the 64 other functions was one `nopw` added after `XDitherImage`'s last instruction (the next function's boundary moved). A planted loop-bound change in `XDitherImage` is still reported `DIFFERENT` | owner |

@@ -6024,6 +6024,781 @@ static inline MagickBooleanType IsMutableAlphaImage(const XWindowInfo *window,
     (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _XImageRowSource
+{
+  Image
+    *canvas;
+
+  CacheView
+    *canvas_view;
+
+  ExceptionInfo
+    *exception;
+
+  const XResourceInfo
+    *resource_info;
+
+  XImage
+    *ximage;
+
+  unsigned int
+    scanline_pad;
+
+  unsigned long
+    *pixels;
+
+  XStandardColormap
+    *map_info;
+} XImageRowSource;
+
+static unsigned char *XPackColormapped2BitRowLSB(const Image *canvas,
+  const unsigned long *pixels,const Quantum *p,unsigned char *q)
+{
+  unsigned int
+    nibble;
+
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  nibble=0;
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)] & 0x0f;
+    switch (nibble)
+    {
+      case 0:
+      {
+        *q=(unsigned char) pixel;
+        nibble++;
+        break;
+      }
+      case 1:
+      {
+        *q|=(unsigned char) (pixel << 2);
+        nibble++;
+        break;
+      }
+      case 2:
+      {
+        *q|=(unsigned char) (pixel << 4);
+        nibble++;
+        break;
+      }
+      case 3:
+      {
+        *q|=(unsigned char) (pixel << 6);
+        q++;
+        nibble=0;
+        break;
+      }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackColormapped4BitRowLSB(const Image *canvas,
+  const unsigned long *pixels,const Quantum *p,unsigned char *q)
+{
+  unsigned int
+    nibble;
+
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  nibble=0;
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)] & 0xf;
+    switch (nibble)
+    {
+      case 0:
+      {
+        *q=(unsigned char) pixel;
+        nibble++;
+        break;
+      }
+      case 1:
+      {
+        *q|=(unsigned char) (pixel << 4);
+        q++;
+        nibble=0;
+        break;
+      }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackColormappedMultiByteRowLSB(
+  const XImageRowSource *source,const unsigned int bytes_per_pixel,
+  const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  int
+    k;
+
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)];
+    for (k=0; k < (int) bytes_per_pixel; k++)
+    {
+      *q++=(unsigned char) (pixel & 0xff);
+      pixel>>=8;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackContinuous2BitRowLSB(const XImageRowSource *source,
+  unsigned int nibble,const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=XGammaPixel(canvas,map_info,p);
+    pixel&=0xf;
+    switch (nibble)
+    {
+      case 0:
+      {
+        *q=(unsigned char) pixel;
+        nibble++;
+        break;
+      }
+      case 1:
+      {
+        *q|=(unsigned char) (pixel << 2);
+        nibble++;
+        break;
+      }
+      case 2:
+      {
+        *q|=(unsigned char) (pixel << 4);
+        nibble++;
+        break;
+      }
+      case 3:
+      {
+        *q|=(unsigned char) (pixel << 6);
+        q++;
+        nibble=0;
+        break;
+      }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackContinuous4BitRowLSB(const Image *canvas,
+  const XStandardColormap *map_info,const Quantum *p,unsigned char *q)
+{
+  unsigned int
+    nibble;
+
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  nibble=0;
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=XGammaPixel(canvas,map_info,p);
+    pixel&=0xf;
+    switch (nibble)
+    {
+      case 0:
+      {
+        *q=(unsigned char) pixel;
+        nibble++;
+        break;
+      }
+      case 1:
+      {
+        *q|=(unsigned char) (pixel << 4);
+        q++;
+        nibble=0;
+        break;
+      }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackGammaBGRARowLSB(const Image *canvas,const Quantum *p,
+  unsigned char *q)
+{
+  int
+    x;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    *q++=ScaleQuantumToChar(XBlueGamma(
+      GetPixelBlue(canvas,p)));
+    *q++=ScaleQuantumToChar(XGreenGamma(
+      GetPixelGreen(canvas,p)));
+    *q++=ScaleQuantumToChar(XRedGamma(
+      GetPixelRed(canvas,p)));
+    *q++=0;
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackBGRARowLSB(const Image *canvas,const Quantum *p,
+  unsigned char *q)
+{
+  int
+    x;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
+    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
+    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
+    *q++=0;
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackGammaRGBARowLSB(const Image *canvas,const Quantum *p,
+  unsigned char *q)
+{
+  int
+    x;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    *q++=ScaleQuantumToChar(XRedGamma(
+      GetPixelRed(canvas,p)));
+    *q++=ScaleQuantumToChar(XGreenGamma(
+      GetPixelGreen(canvas,p)));
+    *q++=ScaleQuantumToChar(XBlueGamma(
+      GetPixelBlue(canvas,p)));
+    *q++=0;
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackRGBARowLSB(const Image *canvas,const Quantum *p,
+  unsigned char *q)
+{
+  int
+    x;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
+    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
+    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
+    *q++=0;
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackContinuousMultiByteRowLSB(
+  const XImageRowSource *source,const unsigned int bytes_per_pixel,
+  const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  int
+    k;
+
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=XGammaPixel(canvas,map_info,p);
+    for (k=0; k < (int) bytes_per_pixel; k++)
+    {
+      *q++=(unsigned char) (pixel & 0xff);
+      pixel>>=8;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static void XPackColormapped2BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 2 bit color-mapped X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackColormapped2BitRowLSB(canvas,pixels,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackColormapped4BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 4 bit color-mapped X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackColormapped4BitRowLSB(canvas,pixels,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackColormapped8BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const XResourceInfo
+    *const resource_info = source->resource_info;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  const Quantum
+    *p;
+
+  int
+    x,
+    y;
+
+  unsigned long
+    pixel;
+
+  /*
+    Convert to 8 bit color-mapped X canvas.
+  */
+  if (resource_info->color_recovery &&
+      resource_info->quantize_info->dither_method != NoDitherMethod)
+    {
+      XDitherImage(canvas,ximage,exception);
+      return;
+    }
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (int) canvas->columns; x++)
+    {
+      pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)];
+      *q++=(unsigned char) pixel;
+      p+=(ptrdiff_t) GetPixelChannels(canvas);
+    }
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackColormappedMultiByteLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  unsigned int
+    bytes_per_pixel;
+
+  /*
+    Convert to multi-byte color-mapped X canvas.
+  */
+  bytes_per_pixel=(unsigned int) (ximage->bits_per_pixel >> 3);
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackColormappedMultiByteRowLSB(source,bytes_per_pixel,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackContinuous2BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  unsigned int
+    nibble;
+
+  /*
+    Convert to contiguous 2 bit continuous-tone X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    nibble=0;
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackContinuous2BitRowLSB(source,nibble,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackContinuous4BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to contiguous 4 bit continuous-tone X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackContinuous4BitRowLSB(canvas,map_info,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackContinuous8BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const XResourceInfo
+    *const resource_info = source->resource_info;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  const Quantum
+    *p;
+
+  int
+    x,
+    y;
+
+  unsigned long
+    pixel;
+
+  /*
+    Convert to contiguous 8 bit continuous-tone X canvas.
+  */
+  if (resource_info->color_recovery &&
+      resource_info->quantize_info->dither_method != NoDitherMethod)
+    {
+      XDitherImage(canvas,ximage,exception);
+      return;
+    }
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (int) canvas->columns; x++)
+    {
+      pixel=XGammaPixel(canvas,map_info,p);
+      *q++=(unsigned char) pixel;
+      p+=(ptrdiff_t) GetPixelChannels(canvas);
+    }
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackRedHigh32BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 32 bit continuous-tone X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    if (IsGammaCorrected() != MagickFalse)
+      {
+        /*
+          Gamma correct canvas.
+        */
+        q=XPackGammaBGRARowLSB(canvas,p,q);
+        continue;
+      }
+    q=XPackBGRARowLSB(canvas,p,q);
+  }
+}
+
+static void XPackBlueHigh32BitLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 32 bit continuous-tone X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    if (IsGammaCorrected() != MagickFalse)
+      {
+        /*
+          Gamma correct canvas.
+        */
+        q=XPackGammaRGBARowLSB(canvas,p,q);
+        continue;
+      }
+    q=XPackRGBARowLSB(canvas,p,q);
+  }
+}
+
+static void XPackContinuousMultiByteLSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  unsigned int
+    bytes_per_pixel;
+
+  /*
+    Convert to multi-byte continuous-tone X canvas.
+  */
+  bytes_per_pixel=(unsigned int) (ximage->bits_per_pixel >> 3);
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackContinuousMultiByteRowLSB(source,bytes_per_pixel,
+      p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -6062,11 +6837,13 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
     scanline_pad;
 
   unsigned long
-    pixel,
     *pixels;
 
   XStandardColormap
     *map_info;
+
+  XImageRowSource
+    row_source;
 
   assert(resource_info != (XResourceInfo *) NULL);
   assert(window != (XWindowInfo *) NULL);
@@ -6112,6 +6889,14 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   q=(unsigned char *) ximage->data;
   x=0;
   canvas_view=AcquireVirtualCacheView(canvas,exception);
+  row_source.canvas=canvas;
+  row_source.canvas_view=canvas_view;
+  row_source.exception=exception;
+  row_source.resource_info=resource_info;
+  row_source.ximage=ximage;
+  row_source.scanline_pad=scanline_pad;
+  row_source.pixels=pixels;
+  row_source.map_info=map_info;
   if (ximage->format == XYBitmap)
     {
       unsigned short
@@ -6170,154 +6955,23 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
       {
         case 2:
         {
-          unsigned int
-            nibble;
-
-          /*
-            Convert to 2 bit color-mapped X canvas.
-          */
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            nibble=0;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)] & 0x0f;
-              switch (nibble)
-              {
-                case 0:
-                {
-                  *q=(unsigned char) pixel;
-                  nibble++;
-                  break;
-                }
-                case 1:
-                {
-                  *q|=(unsigned char) (pixel << 2);
-                  nibble++;
-                  break;
-                }
-                case 2:
-                {
-                  *q|=(unsigned char) (pixel << 4);
-                  nibble++;
-                  break;
-                }
-                case 3:
-                {
-                  *q|=(unsigned char) (pixel << 6);
-                  q++;
-                  nibble=0;
-                  break;
-                }
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackColormapped2BitLSB(&row_source,q);
           break;
         }
         case 4:
         {
-          unsigned int
-            nibble;
-
-          /*
-            Convert to 4 bit color-mapped X canvas.
-          */
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            nibble=0;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)] & 0xf;
-              switch (nibble)
-              {
-                case 0:
-                {
-                  *q=(unsigned char) pixel;
-                  nibble++;
-                  break;
-                }
-                case 1:
-                {
-                  *q|=(unsigned char) (pixel << 4);
-                  q++;
-                  nibble=0;
-                  break;
-                }
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackColormapped4BitLSB(&row_source,q);
           break;
         }
         case 6:
         case 8:
         {
-          /*
-            Convert to 8 bit color-mapped X canvas.
-          */
-          if (resource_info->color_recovery &&
-              resource_info->quantize_info->dither_method != NoDitherMethod)
-            {
-              XDitherImage(canvas,ximage,exception);
-              break;
-            }
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)];
-              *q++=(unsigned char) pixel;
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackColormapped8BitLSB(&row_source,q);
           break;
         }
         default:
         {
-          int
-            k;
-
-          unsigned int
-            bytes_per_pixel;
-
-          /*
-            Convert to multi-byte color-mapped X canvas.
-          */
-          bytes_per_pixel=(unsigned int) (ximage->bits_per_pixel >> 3);
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)];
-              for (k=0; k < (int) bytes_per_pixel; k++)
-              {
-                *q++=(unsigned char) (pixel & 0xff);
-                pixel>>=8;
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackColormappedMultiByteLSB(&row_source,q);
           break;
         }
       }
@@ -6326,238 +6980,29 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
       {
         case 2:
         {
-          unsigned int
-            nibble;
-
-          /*
-            Convert to contiguous 2 bit continuous-tone X canvas.
-          */
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            nibble=0;
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=XGammaPixel(canvas,map_info,p);
-              pixel&=0xf;
-              switch (nibble)
-              {
-                case 0:
-                {
-                  *q=(unsigned char) pixel;
-                  nibble++;
-                  break;
-                }
-                case 1:
-                {
-                  *q|=(unsigned char) (pixel << 2);
-                  nibble++;
-                  break;
-                }
-                case 2:
-                {
-                  *q|=(unsigned char) (pixel << 4);
-                  nibble++;
-                  break;
-                }
-                case 3:
-                {
-                  *q|=(unsigned char) (pixel << 6);
-                  q++;
-                  nibble=0;
-                  break;
-                }
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackContinuous2BitLSB(&row_source,q);
           break;
         }
         case 4:
         {
-          unsigned int
-            nibble;
-
-          /*
-            Convert to contiguous 4 bit continuous-tone X canvas.
-          */
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            nibble=0;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=XGammaPixel(canvas,map_info,p);
-              pixel&=0xf;
-              switch (nibble)
-              {
-                case 0:
-                {
-                  *q=(unsigned char) pixel;
-                  nibble++;
-                  break;
-                }
-                case 1:
-                {
-                  *q|=(unsigned char) (pixel << 4);
-                  q++;
-                  nibble=0;
-                  break;
-                }
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackContinuous4BitLSB(&row_source,q);
           break;
         }
         case 6:
         case 8:
         {
-          /*
-            Convert to contiguous 8 bit continuous-tone X canvas.
-          */
-          if (resource_info->color_recovery &&
-              resource_info->quantize_info->dither_method != NoDitherMethod)
-            {
-              XDitherImage(canvas,ximage,exception);
-              break;
-            }
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=XGammaPixel(canvas,map_info,p);
-              *q++=(unsigned char) pixel;
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackContinuous8BitLSB(&row_source,q);
           break;
         }
         default:
         {
           if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-            {
-              /*
-                Convert to 32 bit continuous-tone X canvas.
-              */
-              for (y=0; y < (int) canvas->rows; y++)
-              {
-                p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-                  canvas->columns,1,exception);
-                if (p == (const Quantum *) NULL)
-                  break;
-                if (IsGammaCorrected() != MagickFalse)
-                  {
-                    /*
-                      Gamma correct canvas.
-                    */
-                    for (x=(int) canvas->columns-1; x >= 0; x--)
-                    {
-                      *q++=ScaleQuantumToChar(XBlueGamma(
-                        GetPixelBlue(canvas,p)));
-                      *q++=ScaleQuantumToChar(XGreenGamma(
-                        GetPixelGreen(canvas,p)));
-                      *q++=ScaleQuantumToChar(XRedGamma(
-                        GetPixelRed(canvas,p)));
-                      *q++=0;
-                      p+=(ptrdiff_t) GetPixelChannels(canvas);
-                    }
-                    continue;
-                  }
-                for (x=(int) canvas->columns-1; x >= 0; x--)
-                {
-                  *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
-                  *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
-                  *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
-                  *q++=0;
-                  p+=(ptrdiff_t) GetPixelChannels(canvas);
-                }
-              }
-            }
+            XPackRedHigh32BitLSB(&row_source,q);
           else
             if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
-              {
-                /*
-                  Convert to 32 bit continuous-tone X canvas.
-                */
-                for (y=0; y < (int) canvas->rows; y++)
-                {
-                  p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-                    canvas->columns,1,exception);
-                  if (p == (const Quantum *) NULL)
-                    break;
-                  if (IsGammaCorrected() != MagickFalse)
-                    {
-                      /*
-                        Gamma correct canvas.
-                      */
-                      for (x=(int) canvas->columns-1; x >= 0; x--)
-                      {
-                        *q++=ScaleQuantumToChar(XRedGamma(
-                          GetPixelRed(canvas,p)));
-                        *q++=ScaleQuantumToChar(XGreenGamma(
-                          GetPixelGreen(canvas,p)));
-                        *q++=ScaleQuantumToChar(XBlueGamma(
-                          GetPixelBlue(canvas,p)));
-                        *q++=0;
-                        p+=(ptrdiff_t) GetPixelChannels(canvas);
-                      }
-                      continue;
-                    }
-                  for (x=(int) canvas->columns-1; x >= 0; x--)
-                  {
-                    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
-                    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
-                    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
-                    *q++=0;
-                    p+=(ptrdiff_t) GetPixelChannels(canvas);
-                  }
-                }
-              }
+              XPackBlueHigh32BitLSB(&row_source,q);
             else
-              {
-                int
-                  k;
-
-                unsigned int
-                  bytes_per_pixel;
-
-                /*
-                  Convert to multi-byte continuous-tone X canvas.
-                */
-                bytes_per_pixel=(unsigned int) (ximage->bits_per_pixel >> 3);
-                for (y=0; y < (int) canvas->rows; y++)
-                {
-                  p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-                    canvas->columns,1,exception);
-                  if (p == (const Quantum *) NULL)
-                    break;
-                  for (x=0; x < (int) canvas->columns; x++)
-                  {
-                    pixel=XGammaPixel(canvas,map_info,p);
-                    for (k=0; k < (int) bytes_per_pixel; k++)
-                    {
-                      *q++=(unsigned char) (pixel & 0xff);
-                      pixel>>=8;
-                    }
-                    p+=(ptrdiff_t) GetPixelChannels(canvas);
-                  }
-                  q+=(ptrdiff_t) scanline_pad;
-                }
-              }
+              XPackContinuousMultiByteLSB(&row_source,q);
           break;
         }
       }
@@ -6648,6 +7093,781 @@ static inline MagickBooleanType IsImmutableAlphaImage(const XWindowInfo *window,
     (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
+static unsigned char *XPackGammaARGBRowMSB(const Image *canvas,const Quantum *p,
+  unsigned char *q)
+{
+  int
+    x;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    *q++=0;
+    *q++=ScaleQuantumToChar(XRedGamma(
+      GetPixelRed(canvas,p)));
+    *q++=ScaleQuantumToChar(XGreenGamma(
+      GetPixelGreen(canvas,p)));
+    *q++=ScaleQuantumToChar(XBlueGamma(
+      GetPixelBlue(canvas,p)));
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackARGBRowMSB(const Image *canvas,const Quantum *p,
+  unsigned char *q)
+{
+  int
+    x;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    *q++=0;
+    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
+    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
+    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackGammaABGRRowMSB(const Image *canvas,const Quantum *p,
+  unsigned char *q)
+{
+  int
+    x;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    *q++=0;
+    *q++=ScaleQuantumToChar(XBlueGamma(
+      GetPixelBlue(canvas,p)));
+    *q++=ScaleQuantumToChar(XGreenGamma(
+      GetPixelGreen(canvas,p)));
+    *q++=ScaleQuantumToChar(XRedGamma(
+      GetPixelRed(canvas,p)));
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackABGRRowMSB(const Image *canvas,const Quantum *p,
+  unsigned char *q)
+{
+  int
+    x;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    *q++=0;
+    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
+    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
+    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackColormapped2BitRowMSB(const Image *canvas,
+  const unsigned long *pixels,const Quantum *p,unsigned char *q)
+{
+  int
+    x;
+
+  unsigned int
+    nibble;
+
+  unsigned long
+    pixel;
+
+  nibble=0;
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=pixels[(ssize_t)
+      GetPixelIndex(canvas,p)] & 0xf;
+    switch (nibble)
+    {
+      case 0:
+      {
+        *q=(unsigned char) (pixel << 6);
+        nibble++;
+        break;
+      }
+      case 1:
+      {
+        *q|=(unsigned char) (pixel << 4);
+        nibble++;
+        break;
+      }
+      case 2:
+      {
+        *q|=(unsigned char) (pixel << 2);
+        nibble++;
+        break;
+      }
+      case 3:
+      {
+        *q|=(unsigned char) pixel;
+        q++;
+        nibble=0;
+        break;
+      }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackColormapped4BitRowMSB(const Image *canvas,
+  const unsigned long *pixels,const Quantum *p,unsigned char *q)
+{
+  int
+    x;
+
+  unsigned int
+    nibble;
+
+  unsigned long
+    pixel;
+
+  nibble=0;
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=pixels[(ssize_t)
+      GetPixelIndex(canvas,p)] & 0xf;
+    switch (nibble)
+    {
+      case 0:
+      {
+        *q=(unsigned char) (pixel << 4);
+        nibble++;
+        break;
+      }
+      case 1:
+      {
+        *q|=(unsigned char) pixel;
+        q++;
+        nibble=0;
+        break;
+      }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackColormapped8BitRowMSB(const Image *canvas,
+  const unsigned long *pixels,const Quantum *p,unsigned char *q)
+{
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)];
+    *q++=(unsigned char) pixel;
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackContinuous2BitRowMSB(const Image *canvas,
+  XStandardColormap *map_info,const Quantum *p,unsigned char *q)
+{
+  int
+    x;
+
+  unsigned int
+    nibble;
+
+  unsigned long
+    pixel;
+
+  nibble=0;
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    pixel=XGammaPixel(canvas,map_info,p);
+    pixel&=0xf;
+    switch (nibble)
+    {
+      case 0:
+      {
+        *q=(unsigned char) (pixel << 6);
+        nibble++;
+        break;
+      }
+      case 1:
+      {
+        *q|=(unsigned char) (pixel << 4);
+        nibble++;
+        break;
+      }
+      case 2:
+      {
+        *q|=(unsigned char) (pixel << 2);
+        nibble++;
+        break;
+      }
+      case 3:
+      {
+        *q|=(unsigned char) pixel;
+        q++;
+        nibble=0;
+        break;
+      }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackContinuous4BitRowMSB(const Image *canvas,
+  XStandardColormap *map_info,const Quantum *p,unsigned char *q)
+{
+  int
+    x;
+
+  unsigned int
+    nibble;
+
+  unsigned long
+    pixel;
+
+  nibble=0;
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    pixel=XGammaPixel(canvas,map_info,p);
+    pixel&=0xf;
+    switch (nibble)
+    {
+      case 0:
+      {
+        *q=(unsigned char) (pixel << 4);
+        nibble++;
+        break;
+      }
+      case 1:
+      {
+        *q|=(unsigned char) pixel;
+        q++;
+        nibble=0;
+        break;
+      }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackContinuous8BitRowMSB(const Image *canvas,
+  XStandardColormap *map_info,const Quantum *p,unsigned char *q)
+{
+  int
+    x;
+
+  unsigned long
+    pixel;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    pixel=XGammaPixel(canvas,map_info,p);
+    *q++=(unsigned char) pixel;
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackColormappedMultiByteRowMSB(
+  const XImageRowSource *source,const unsigned int bytes_per_pixel,
+  const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  int
+    k;
+
+  int
+    x;
+
+  unsigned char
+    channel[sizeof(size_t)];
+
+  unsigned long
+    pixel;
+
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    pixel=pixels[(ssize_t)
+      GetPixelIndex(canvas,p)];
+    for (k=(int) bytes_per_pixel-1; k >= 0; k--)
+    {
+      channel[k]=(unsigned char) pixel;
+      pixel>>=8;
+    }
+    for (k=0; k < (int) bytes_per_pixel; k++)
+      *q++=channel[k];
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static unsigned char *XPackContinuousMultiByteRowMSB(
+  const XImageRowSource *source,const unsigned int bytes_per_pixel,
+  const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  int
+    k;
+
+  int
+    x;
+
+  unsigned char
+    channel[sizeof(size_t)];
+
+  unsigned long
+    pixel;
+
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    pixel=XGammaPixel(canvas,map_info,p);
+    for (k=(int) bytes_per_pixel-1; k >= 0; k--)
+    {
+      channel[k]=(unsigned char) pixel;
+      pixel>>=8;
+    }
+    for (k=0; k < (int) bytes_per_pixel; k++)
+      *q++=channel[k];
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  return(q);
+}
+
+static void XPackColormapped2BitMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 2 bit color-mapped X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackColormapped2BitRowMSB(canvas,pixels,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackColormapped4BitMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 4 bit color-mapped X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackColormapped4BitRowMSB(canvas,pixels,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackColormapped8BitMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const XResourceInfo
+    *const resource_info = source->resource_info;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 8 bit color-mapped X canvas.
+  */
+  if ((resource_info->color_recovery != MagickFalse) &&
+      (resource_info->quantize_info->dither_method != NoDitherMethod))
+    {
+      XDitherImage(canvas,ximage,exception);
+      return;
+    }
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackColormapped8BitRowMSB(canvas,pixels,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackColormappedMultiByteMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  unsigned int
+    bytes_per_pixel;
+
+  /*
+    Convert to 8 bit color-mapped X canvas.
+  */
+  bytes_per_pixel=(unsigned int) (ximage->bits_per_pixel >> 3);
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackColormappedMultiByteRowMSB(source,bytes_per_pixel,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackContinuous2BitMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 4 bit continuous-tone X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackContinuous2BitRowMSB(canvas,map_info,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackContinuous4BitMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 4 bit continuous-tone X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackContinuous4BitRowMSB(canvas,map_info,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackContinuous8BitMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const XResourceInfo
+    *const resource_info = source->resource_info;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 8 bit continuous-tone X canvas.
+  */
+  if ((resource_info->color_recovery != MagickFalse) &&
+      (resource_info->quantize_info->dither_method != NoDitherMethod))
+    {
+      XDitherImage(canvas,ximage,exception);
+      return;
+    }
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackContinuous8BitRowMSB(canvas,map_info,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackRedHigh32BitMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 32 bit continuous-tone X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    if (IsGammaCorrected() != MagickFalse)
+      {
+        /*
+          Gamma correct canvas.
+        */
+        q=XPackGammaARGBRowMSB(canvas,p,q);
+        continue;
+      }
+    q=XPackARGBRowMSB(canvas,p,q);
+  }
+}
+
+static void XPackBlueHigh32BitMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 32 bit continuous-tone X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    if (IsGammaCorrected() != MagickFalse)
+      {
+        /*
+          Gamma correct canvas.
+        */
+        q=XPackGammaABGRRowMSB(canvas,p,q);
+        continue;
+      }
+    q=XPackABGRRowMSB(canvas,p,q);
+  }
+}
+
+static void XPackContinuousMultiByteMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  XImage
+    *const ximage = source->ximage;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  unsigned int
+    bytes_per_pixel;
+
+  /*
+    Convert to multi-byte continuous-tone X canvas.
+  */
+  bytes_per_pixel=(unsigned int) (ximage->bits_per_pixel >> 3);
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackContinuousMultiByteRowMSB(source,bytes_per_pixel,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -6686,11 +7906,13 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
     scanline_pad;
 
   unsigned long
-    pixel,
     *pixels;
 
   XStandardColormap
     *map_info;
+
+  XImageRowSource
+    row_source;
 
   assert(resource_info != (XResourceInfo *) NULL);
   assert(window != (XWindowInfo *) NULL);
@@ -6736,6 +7958,14 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   q=(unsigned char *) ximage->data;
   x=0;
   canvas_view=AcquireVirtualCacheView(canvas,exception);
+  row_source.canvas=canvas;
+  row_source.canvas_view=canvas_view;
+  row_source.exception=exception;
+  row_source.resource_info=resource_info;
+  row_source.ximage=ximage;
+  row_source.scanline_pad=scanline_pad;
+  row_source.pixels=pixels;
+  row_source.map_info=map_info;
   if (ximage->format == XYBitmap)
     {
       unsigned short
@@ -6794,162 +8024,23 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
       {
         case 2:
         {
-          unsigned int
-            nibble;
-
-          /*
-            Convert to 2 bit color-mapped X canvas.
-          */
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            nibble=0;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=pixels[(ssize_t)
-                GetPixelIndex(canvas,p)] & 0xf;
-              switch (nibble)
-              {
-                case 0:
-                {
-                  *q=(unsigned char) (pixel << 6);
-                  nibble++;
-                  break;
-                }
-                case 1:
-                {
-                  *q|=(unsigned char) (pixel << 4);
-                  nibble++;
-                  break;
-                }
-                case 2:
-                {
-                  *q|=(unsigned char) (pixel << 2);
-                  nibble++;
-                  break;
-                }
-                case 3:
-                {
-                  *q|=(unsigned char) pixel;
-                  q++;
-                  nibble=0;
-                  break;
-                }
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackColormapped2BitMSB(&row_source,q);
           break;
         }
         case 4:
         {
-          unsigned int
-            nibble;
-
-          /*
-            Convert to 4 bit color-mapped X canvas.
-          */
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            nibble=0;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=pixels[(ssize_t)
-                GetPixelIndex(canvas,p)] & 0xf;
-              switch (nibble)
-              {
-                case 0:
-                {
-                  *q=(unsigned char) (pixel << 4);
-                  nibble++;
-                  break;
-                }
-                case 1:
-                {
-                  *q|=(unsigned char) pixel;
-                  q++;
-                  nibble=0;
-                  break;
-                }
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackColormapped4BitMSB(&row_source,q);
           break;
         }
         case 6:
         case 8:
         {
-          /*
-            Convert to 8 bit color-mapped X canvas.
-          */
-          if ((resource_info->color_recovery != MagickFalse) &&
-              (resource_info->quantize_info->dither_method != NoDitherMethod))
-            {
-              XDitherImage(canvas,ximage,exception);
-              break;
-            }
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=pixels[(ssize_t) GetPixelIndex(canvas,p)];
-              *q++=(unsigned char) pixel;
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackColormapped8BitMSB(&row_source,q);
           break;
         }
         default:
         {
-          int
-            k;
-
-          unsigned int
-            bytes_per_pixel;
-
-          unsigned char
-            channel[sizeof(size_t)];
-
-          /*
-            Convert to 8 bit color-mapped X canvas.
-          */
-          bytes_per_pixel=(unsigned int) (ximage->bits_per_pixel >> 3);
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            for (x=0; x < (int) canvas->columns; x++)
-            {
-              pixel=pixels[(ssize_t)
-                GetPixelIndex(canvas,p)];
-              for (k=(int) bytes_per_pixel-1; k >= 0; k--)
-              {
-                channel[k]=(unsigned char) pixel;
-                pixel>>=8;
-              }
-              for (k=0; k < (int) bytes_per_pixel; k++)
-                *q++=channel[k];
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackColormappedMultiByteMSB(&row_source,q);
           break;
         }
       }
@@ -6958,243 +8049,29 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
       {
         case 2:
         {
-          unsigned int
-            nibble;
-
-          /*
-            Convert to 4 bit continuous-tone X canvas.
-          */
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            nibble=0;
-            for (x=(int) canvas->columns-1; x >= 0; x--)
-            {
-              pixel=XGammaPixel(canvas,map_info,p);
-              pixel&=0xf;
-              switch (nibble)
-              {
-                case 0:
-                {
-                  *q=(unsigned char) (pixel << 6);
-                  nibble++;
-                  break;
-                }
-                case 1:
-                {
-                  *q|=(unsigned char) (pixel << 4);
-                  nibble++;
-                  break;
-                }
-                case 2:
-                {
-                  *q|=(unsigned char) (pixel << 2);
-                  nibble++;
-                  break;
-                }
-                case 3:
-                {
-                  *q|=(unsigned char) pixel;
-                  q++;
-                  nibble=0;
-                  break;
-                }
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackContinuous2BitMSB(&row_source,q);
           break;
         }
         case 4:
         {
-          unsigned int
-            nibble;
-
-          /*
-            Convert to 4 bit continuous-tone X canvas.
-          */
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            nibble=0;
-            for (x=(int) canvas->columns-1; x >= 0; x--)
-            {
-              pixel=XGammaPixel(canvas,map_info,p);
-              pixel&=0xf;
-              switch (nibble)
-              {
-                case 0:
-                {
-                  *q=(unsigned char) (pixel << 4);
-                  nibble++;
-                  break;
-                }
-                case 1:
-                {
-                  *q|=(unsigned char) pixel;
-                  q++;
-                  nibble=0;
-                  break;
-                }
-              }
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackContinuous4BitMSB(&row_source,q);
           break;
         }
         case 6:
         case 8:
         {
-          /*
-            Convert to 8 bit continuous-tone X canvas.
-          */
-          if ((resource_info->color_recovery != MagickFalse) &&
-              (resource_info->quantize_info->dither_method != NoDitherMethod))
-            {
-              XDitherImage(canvas,ximage,exception);
-              break;
-            }
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            for (x=(int) canvas->columns-1; x >= 0; x--)
-            {
-              pixel=XGammaPixel(canvas,map_info,p);
-              *q++=(unsigned char) pixel;
-              p+=(ptrdiff_t) GetPixelChannels(canvas);
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackContinuous8BitMSB(&row_source,q);
           break;
         }
         default:
         {
           if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-            {
-              /*
-                Convert to 32 bit continuous-tone X canvas.
-              */
-              for (y=0; y < (int) canvas->rows; y++)
-              {
-                p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-                  canvas->columns,1,exception);
-                if (p == (const Quantum *) NULL)
-                  break;
-                if (IsGammaCorrected() != MagickFalse)
-                  {
-                    /*
-                      Gamma correct canvas.
-                    */
-                    for (x=(int) canvas->columns-1; x >= 0; x--)
-                    {
-                      *q++=0;
-                      *q++=ScaleQuantumToChar(XRedGamma(
-                        GetPixelRed(canvas,p)));
-                      *q++=ScaleQuantumToChar(XGreenGamma(
-                        GetPixelGreen(canvas,p)));
-                      *q++=ScaleQuantumToChar(XBlueGamma(
-                        GetPixelBlue(canvas,p)));
-                      p+=(ptrdiff_t) GetPixelChannels(canvas);
-                    }
-                    continue;
-                  }
-                for (x=(int) canvas->columns-1; x >= 0; x--)
-                {
-                  *q++=0;
-                  *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
-                  *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
-                  *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
-                  p+=(ptrdiff_t) GetPixelChannels(canvas);
-                }
-              }
-            }
+            XPackRedHigh32BitMSB(&row_source,q);
           else
             if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
-              {
-                /*
-                  Convert to 32 bit continuous-tone X canvas.
-                */
-                for (y=0; y < (int) canvas->rows; y++)
-                {
-                  p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-                    canvas->columns,1,exception);
-                  if (p == (const Quantum *) NULL)
-                    break;
-                  if (IsGammaCorrected() != MagickFalse)
-                    {
-                      /*
-                        Gamma correct canvas.
-                      */
-                      for (x=(int) canvas->columns-1; x >= 0; x--)
-                      {
-                        *q++=0;
-                        *q++=ScaleQuantumToChar(XBlueGamma(
-                          GetPixelBlue(canvas,p)));
-                        *q++=ScaleQuantumToChar(XGreenGamma(
-                          GetPixelGreen(canvas,p)));
-                        *q++=ScaleQuantumToChar(XRedGamma(
-                          GetPixelRed(canvas,p)));
-                        p+=(ptrdiff_t) GetPixelChannels(canvas);
-                      }
-                      continue;
-                    }
-                  for (x=(int) canvas->columns-1; x >= 0; x--)
-                  {
-                    *q++=0;
-                    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
-                    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
-                    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
-                    p+=(ptrdiff_t) GetPixelChannels(canvas);
-                  }
-                }
-              }
+              XPackBlueHigh32BitMSB(&row_source,q);
             else
-              {
-                int
-                  k;
-
-                unsigned int
-                  bytes_per_pixel;
-
-                unsigned char
-                  channel[sizeof(size_t)];
-
-                /*
-                  Convert to multi-byte continuous-tone X canvas.
-                */
-                bytes_per_pixel=(unsigned int) (ximage->bits_per_pixel >> 3);
-                for (y=0; y < (int) canvas->rows; y++)
-                {
-                  p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-                    canvas->columns,1,exception);
-                  if (p == (const Quantum *) NULL)
-                    break;
-                  for (x=(int) canvas->columns-1; x >= 0; x--)
-                  {
-                    pixel=XGammaPixel(canvas,map_info,p);
-                    for (k=(int) bytes_per_pixel-1; k >= 0; k--)
-                    {
-                      channel[k]=(unsigned char) pixel;
-                      pixel>>=8;
-                    }
-                    for (k=0; k < (int) bytes_per_pixel; k++)
-                      *q++=channel[k];
-                    p+=(ptrdiff_t) GetPixelChannels(canvas);
-                  }
-                  q+=(ptrdiff_t) scanline_pad;
-                }
-              }
+              XPackContinuousMultiByteMSB(&row_source,q);
           break;
         }
       }
