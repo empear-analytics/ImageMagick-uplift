@@ -2068,6 +2068,13 @@ static void XWrapSceneReverse(const AnimationSceneStep *scene_step,
     }
 }
 
+static inline MagickBooleanType IsAnimationPlaying(
+  const MagickStatusType state)
+{
+  return(((state & PlayAnimationState) || (state & StepAnimationState)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2865,7 +2872,7 @@ MagickExport Image *XAnimateImages(Display *display,
   do
   {
     if ((XEventsQueued(display,QueuedAfterFlush) == 0) &&
-        ((state & PlayAnimationState) || (state & StepAnimationState)))
+        (IsAnimationPlaying(state) != MagickFalse))
       {
         AnimationTitle
           animation_title;
