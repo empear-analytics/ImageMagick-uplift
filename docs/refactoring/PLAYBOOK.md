@@ -812,6 +812,52 @@ reaches the same code; moving a `typedef` changes no object code. The fill is th
 argument list written member by member: the helper sees each value the block read, at
 the same point, and writes nothing through the struct.
 
+**A case tail, a returned local, a split selection** (2026-11-11). Three more shapes of
+"the block is the helper's body" for form (b), *Unreached functions* and *Object code
+that differs only in the caller*, each checked by `tools/reuse_check.py`:
+
+- *Case tail:* the helper is a Recipe CT helper (`static void`, its last parameter a
+  `const T *` of targets) and the block is the tail of a `switch` case whose `break;`s
+  leaving the case are the helper's `return;`s (CT step 4). The call stands directly
+  before the case's own `break;`, which stays. The caller declares at the top of its
+  body CT's initialiser `const T name = { &v1, &v2, ... };`, naming in member order the
+  address of each caller variable the block writes (`&v`, one per member of `T`), and
+  passes `&name`; each member `m` the helper binds is then a pointer parameter
+  bound to `&v`, every `v` of the block `*m` (Recipe O's argument). A member's name need
+  not be its variable's: the binding is by position in the initialiser, as an argument
+  binds by position. A `break;` of a loop nested in the block, which would stay
+  `break;`, is checked by reading.
+- *Returned local:* the helper declares a local `v` of its own (a type line and `v;`)
+  and ends with `return(v);`; the block writes the caller's `v` before any read of it
+  (checked by reading), and the call is `v=Helper(...);` with `v` passed to no
+  parameter. The helper's `v` takes each value the block's `v` took, and the
+  assignment back leaves the caller's `v` with the last one, as Recipe E step 3's value
+  form does.
+- *Split selection:* a `switch` with no `default:` whose last groups, labels and bodies
+  in their order, are under the renaming the whole body of an existing `static void`
+  helper that consists of one `switch` on the same expression (with no `default:`
+  either): the groups leave as Recipe SD step 1 (as amended in 2e626175f) moves them,
+  the existing helper standing for SD's new function, and the caller gains `default:`
+  holding the call and `break;` as its last group. A value one of the moved labels names
+  runs the same body in the helper; any other value runs no group in either.
+
+`reuse_check.py` reads the initialiser's entries (`&v`, one per member of `T` in member
+order), compares each lost `break;` as `return;` when the call of a `void` helper
+stands directly before `break;`, leaves the local's declaration and `return(v);` out of
+the comparison, and for a split selection compares the helper's `switch (...)` line
+with the caller's `switch` under the bindings and allows the added `default:` and the
+`break;` after the call; every other condition of the forms above stands (forward
+declaration, fills, nothing else added, `obj_modulo.sh` or `obj_identical.sh`).
+
+Why: the case tail's helper returns where the block left the case, and the statement
+after the call is the case's `break;`, so control reaches the same place by the same
+path; through the targets the helper writes the caller's objects, at the same points.
+The returned local is the value form of Recipe E step 3 for a variable the block alone
+initialises. The split selection runs, for each value of the expression, the body the
+caller's own label ran: the moved labels now select it in the helper's `switch`, one
+level down, through `default:`, which no remaining label of the caller's `switch`
+shadows.
+
 **Careful:**
 
 - Why identical object code is proof: `obj_identical.sh` compiles the file as
@@ -11193,3 +11239,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | D | *A helper defined further down, or taking an input struct*: form (b), *Unreached functions* and *Object code that differs only in the caller* may call a helper the file defines below the caller, through a forward declaration directly above the caller (a typedef its parameters name moves up in a commit of its own, `obj_identical.sh` IDENTICAL), and a helper that binds its inputs from a `const` input struct, the caller filling every bound member directly before the call (`(&E)` binds `E.f` to `m->f`); `tools/reuse_check.py` checks the declaration's types and the fills | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Control-U, confirm, release, click and expose blocks are the bodies of `XListBrowserWidget`'s and `XTextViewWidget`'s helpers, defined about 1,500 to 4,000 lines below it, some taking `ListBrowserRelease` or `ListBrowserClick`; new look-alike helpers would repeat them, and they hold the function at nesting depth 4 to 6 (a probe of the chain, 2.26 to 2.43, the function leaving *Deep, Nested Complexity* and *Brain Method*) | owner |
 | 2026-11-11 | AMEND | SD | Step 1: a `switch` with no `default:` label may be split too: its last groups move to the new function's `switch`, which has no `default:` either, and the caller gains `default:` holding the call as its last group; a value no label names runs no group in either, and the caller keeps another label | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its key slider `switch` (Home, Up, Down, Prior, Next, End; no `default:`) holds the function at nesting depth 4; moved whole by Recipe E it is a *Complex Method* of its own (cc 13, measured), and SD refused it for want of a `default:`; split first, the Prior/Next/End groups and then the rest move with no finding, as `XListBrowserWidget`'s did | owner |
 | 2026-11-11 | AMEND | N | Step 2: an array the block names only as an argument of calls (contents written, if at all, only through calls that keep no copy: Recipe E step 4's array clause) may be one of the group, as a member of the pointer type it converts to (`char *`, or `const char *` when only read), filled `name.a=a;`; Recipes Y, Z, LB and CT, which take N's input struct, read it the same way | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Back and Reset releases and its list update copy between the `static` `glob_pattern` and the local `back_pattern`, `reset_pattern` and `reply` arrays; with each array a parameter the helpers take five to seven, and N's step 3 (the variable's exact type) refused an array member | owner |
+| 2026-11-11 | AMEND | D | *A case tail, a returned local, a split selection*: forms (b), *Unreached functions* and *Object code that differs only in the caller* may reuse a Recipe CT helper for a case tail (lost `break;`s are its `return;`s, the call before the case's `break;`, CT's `const` targets initialiser binding each member to `&v` by position), a helper that returns a local of its own (`v=Helper(...);`, `v` passed to no parameter, written by the block before any read), and an existing one-`switch` helper as SD's new function for the last groups of a `switch` with no `default:`; `tools/reuse_check.py` checks each | `widget.c`'s `XColorBrowserWidget` (campaign A, W17 lane a): its list press is `SelectFontBrowserEntry`'s body as a case tail, its reply cursor search is `FindListBrowserCursor`'s body returning the helper's own `i`, and its key slider's Prior, Next and End groups are `MoveFontBrowserSliderByPage`'s `switch`; without the forms each would be a new near-copy of an existing helper (the key slider moved whole by Recipe E measured cc 13, a *Complex Method*) | owner |
