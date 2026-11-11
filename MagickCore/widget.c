@@ -5208,24 +5208,23 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         XDelay(display,delay);
         delay=SuspendTime;
         (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if (north_info.raised == MagickFalse)
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              slider_info.id--;
-              state|=RedrawListState;
-            }
-        if (south_info.raised == MagickFalse)
-          if (slider_info.id < (int) files)
-            {
-              /*
-                Move slider down.
-              */
-              slider_info.id++;
-              state|=RedrawListState;
-            }
+        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            slider_info.id--;
+            state|=RedrawListState;
+          }
+        if ((south_info.raised == MagickFalse) &&
+            (slider_info.id < (int) files))
+          {
+            /*
+              Move slider down.
+            */
+            slider_info.id++;
+            state|=RedrawListState;
+          }
         if (event.type != ButtonRelease)
           continue;
       }
@@ -5241,28 +5240,27 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
             slider_info.active=MagickTrue;
             break;
           }
-        if (MatteIsActive(north_info,event.xbutton))
-          if (slider_info.id > 0)
-            {
-              /*
-                Move slider up.
-              */
-              north_info.raised=MagickFalse;
-              slider_info.id--;
-              state|=RedrawListState;
-              break;
-            }
-        if (MatteIsActive(south_info,event.xbutton))
-          if (slider_info.id < (int) files)
-            {
-              /*
-                Move slider down.
-              */
-              south_info.raised=MagickFalse;
-              slider_info.id++;
-              state|=RedrawListState;
-              break;
-            }
+        if ((MatteIsActive(north_info,event.xbutton)) && (slider_info.id > 0))
+          {
+            /*
+              Move slider up.
+            */
+            north_info.raised=MagickFalse;
+            slider_info.id--;
+            state|=RedrawListState;
+            break;
+          }
+        if ((MatteIsActive(south_info,event.xbutton)) &&
+            (slider_info.id < (int) files))
+          {
+            /*
+              Move slider down.
+            */
+            south_info.raised=MagickFalse;
+            slider_info.id++;
+            state|=RedrawListState;
+            break;
+          }
         if (MatteIsActive(scroll_info,event.xbutton))
           {
             /*
@@ -5429,27 +5427,27 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
           }
         if (up_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(up_info,event.xbutton))
-                {
-                  ChopPathComponents(working_path,1);
-                  if (*working_path == '\0')
-                    (void) CopyMagickString(working_path,DirectorySeparator,
-                      MagickPathExtent);
-                  state|=UpdateListState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(up_info,event.xbutton)))
+              {
+                ChopPathComponents(working_path,1);
+                if (*working_path == '\0')
+                  (void) CopyMagickString(working_path,DirectorySeparator,
+                    MagickPathExtent);
+                state|=UpdateListState;
+              }
             up_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&up_info);
           }
         if (home_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(home_info,event.xbutton))
-                {
-                  (void) CopyMagickString(working_path,home_directory,
-                    MagickPathExtent);
-                  state|=UpdateListState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(home_info,event.xbutton)))
+              {
+                (void) CopyMagickString(working_path,home_directory,
+                  MagickPathExtent);
+                state|=UpdateListState;
+              }
             home_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&home_info);
           }
@@ -5495,39 +5493,37 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
                 formats=(char **) RelinquishMagickMemory(formats);
                 break;
               }
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(special_info,event.xbutton))
-                {
-                  (void) CopyMagickString(working_path,"x:",MagickPathExtent);
-                  state|=ExitState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(special_info,event.xbutton)))
+              {
+                (void) CopyMagickString(working_path,"x:",MagickPathExtent);
+                state|=ExitState;
+              }
             special_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&special_info);
           }
         if (action_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(action_info,event.xbutton)))
               {
-                if (MatteIsActive(action_info,event.xbutton))
-                  {
-                    if (*reply_info.text == '\0')
-                      (void) XBell(display,0);
-                    else
-                      state|=ExitState;
-                  }
+                if (*reply_info.text == '\0')
+                  (void) XBell(display,0);
+                else
+                  state|=ExitState;
               }
             action_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&action_info);
           }
         if (cancel_info.raised == MagickFalse)
           {
-            if (event.xbutton.window == windows->widget.id)
-              if (MatteIsActive(cancel_info,event.xbutton))
-                {
-                  *reply_info.text='\0';
-                  *reply='\0';
-                  state|=ExitState;
-                }
+            if ((event.xbutton.window == windows->widget.id) &&
+                (MatteIsActive(cancel_info,event.xbutton)))
+              {
+                *reply_info.text='\0';
+                *reply='\0';
+                state|=ExitState;
+              }
             cancel_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
           }
