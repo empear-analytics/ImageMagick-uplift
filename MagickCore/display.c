@@ -3256,6 +3256,31 @@ static MagickBooleanType XChopImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XReplaceRowColor(Image **image,Quantum *q,const PixelInfo target,
+  const XColor color)
+{
+  int
+    x;
+
+  PixelInfo
+    pixel;
+
+  for (x=0; x < (int) (*image)->columns; x++)
+  {
+    GetPixelInfoPixel(*image,q,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,&target))
+      {
+        SetPixelRed(*image,ScaleShortToQuantum(
+          color.red),q);
+        SetPixelGreen(*image,ScaleShortToQuantum(
+          color.green),q);
+        SetPixelBlue(*image,ScaleShortToQuantum(
+          color.blue),q);
+      }
+    q+=(ptrdiff_t) GetPixelChannels(*image);
+  }
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3723,7 +3748,6 @@ static MagickBooleanType XColorEditImage(Display *display,
           case ReplaceMethod:
           {
             PixelInfo
-              pixel,
               target;
 
             /*
@@ -3739,20 +3763,7 @@ static MagickBooleanType XColorEditImage(Display *display,
                     (*image)->columns,1,exception);
                   if (q == (Quantum *) NULL)
                     break;
-                  for (x=0; x < (int) (*image)->columns; x++)
-                  {
-                    GetPixelInfoPixel(*image,q,&pixel);
-                    if (IsFuzzyEquivalencePixelInfo(&pixel,&target))
-                      {
-                        SetPixelRed(*image,ScaleShortToQuantum(
-                          color.red),q);
-                        SetPixelGreen(*image,ScaleShortToQuantum(
-                          color.green),q);
-                        SetPixelBlue(*image,ScaleShortToQuantum(
-                          color.blue),q);
-                      }
-                    q+=(ptrdiff_t) GetPixelChannels(*image);
-                  }
+                  XReplaceRowColor(image,q,target,color);
                   if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
                     break;
                 }
