@@ -10020,6 +10020,15 @@ typedef struct _MatteEditPixelInput
 
   ExceptionInfo
     *exception;
+
+  XResourceInfo
+    *resource_info;
+
+  PaintMethod
+    method;
+
+  XColor
+    border_color;
 } MatteEditPixelInput;
 
 static void XMattePoint(const MatteEditPixelInput *pixel_input)
@@ -10135,6 +10144,66 @@ static void XMatteReset(const MatteEditPixelInput *pixel_input)
   }
   if (StringToLong(matte) == (long) OpaqueAlpha)
     (*image)->alpha_trait=UndefinedPixelTrait;
+}
+
+static void XMatteFloodfill(const MatteEditPixelInput *pixel_input)
+{
+  Image
+    **const image = pixel_input->image;
+
+  const int
+    x_offset = pixel_input->x_offset,
+    y_offset = pixel_input->y_offset;
+
+  const char
+    *const matte = pixel_input->matte;
+
+  ExceptionInfo
+    *const exception = pixel_input->exception;
+
+  XResourceInfo
+    *const resource_info = pixel_input->resource_info;
+
+  const PaintMethod
+    method = pixel_input->method;
+
+  const XColor
+    border_color = pixel_input->border_color;
+
+  ChannelType
+    channel_mask;
+
+  DrawInfo
+    *draw_info;
+
+  PixelInfo
+    target;
+
+  /*
+    Update matte information using floodfill algorithm.
+  */
+  (void) GetOneVirtualPixelInfo(*image,
+    GetPixelCacheVirtualMethod(*image),(ssize_t) x_offset,(ssize_t)
+    y_offset,&target,exception);
+  if (method == FillToBorderMethod)
+    {
+      target.red=(double) ScaleShortToQuantum(
+        border_color.red);
+      target.green=(double) ScaleShortToQuantum(
+        border_color.green);
+      target.blue=(double) ScaleShortToQuantum(
+        border_color.blue);
+    }
+  draw_info=CloneDrawInfo(resource_info->image_info,
+    (DrawInfo *) NULL);
+  draw_info->fill.alpha=(double) ClampToQuantum(
+    StringToDouble(matte,(char **) NULL));
+  channel_mask=SetImageChannelMask(*image,AlphaChannel);
+  (void) FloodfillPaintImage(*image,draw_info,&target,(ssize_t)
+    x_offset,(ssize_t) y_offset,
+    method != FloodfillMethod ? MagickTrue : MagickFalse,exception);
+  (void) SetPixelChannelMask(*image,channel_mask);
+  draw_info=DestroyDrawInfo(draw_info);
 }
 
 static MagickBooleanType XMatteEditImage(Display *display,
@@ -10548,6 +10617,9 @@ static MagickBooleanType XMatteEditImage(Display *display,
         pixel_input.y_offset=y_offset;
         pixel_input.matte=matte;
         pixel_input.exception=exception;
+        pixel_input.resource_info=resource_info;
+        pixel_input.method=method;
+        pixel_input.border_color=border_color;
         switch (method)
         {
           case PointMethod:
@@ -10564,40 +10636,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
           case FloodfillMethod:
           case FillToBorderMethod:
           {
-            ChannelType
-              channel_mask;
-
-            DrawInfo
-              *draw_info;
-
-            PixelInfo
-              target;
-
-            /*
-              Update matte information using floodfill algorithm.
-            */
-            (void) GetOneVirtualPixelInfo(*image,
-              GetPixelCacheVirtualMethod(*image),(ssize_t) x_offset,(ssize_t)
-              y_offset,&target,exception);
-            if (method == FillToBorderMethod)
-              {
-                target.red=(double) ScaleShortToQuantum(
-                  border_color.red);
-                target.green=(double) ScaleShortToQuantum(
-                  border_color.green);
-                target.blue=(double) ScaleShortToQuantum(
-                  border_color.blue);
-              }
-            draw_info=CloneDrawInfo(resource_info->image_info,
-              (DrawInfo *) NULL);
-            draw_info->fill.alpha=(double) ClampToQuantum(
-              StringToDouble(matte,(char **) NULL));
-            channel_mask=SetImageChannelMask(*image,AlphaChannel);
-            (void) FloodfillPaintImage(*image,draw_info,&target,(ssize_t)
-              x_offset,(ssize_t) y_offset,
-              method != FloodfillMethod ? MagickTrue : MagickFalse,exception);
-            (void) SetPixelChannelMask(*image,channel_mask);
-            draw_info=DestroyDrawInfo(draw_info);
+            XMatteFloodfill(&pixel_input);
             break;
           }
           case ResetMethod:
