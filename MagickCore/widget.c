@@ -1809,6 +1809,9 @@ static void
   SelectFontBrowserEntry(const FontBrowserPress *,char *,
     const FontBrowserTargets *);
 
+static int
+  FindListBrowserCursor(XFontStruct *,const XWidgetInfo,const int);
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2475,9 +2478,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
               Move text cursor to position of button press.
             */
             x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            for (i=1; i <= Extent(reply_info.marker); i++)
-              if (XTextWidth(font_info,reply_info.marker,i) > x)
-                break;
+            i=FindListBrowserCursor(font_info,reply_info,x);
             reply_info.cursor=reply_info.marker+i-1;
             click.display=display;
             click.window_info=(&windows->widget);
