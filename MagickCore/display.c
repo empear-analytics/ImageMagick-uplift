@@ -5432,6 +5432,40 @@ static void XCropUpRightKey(const CropEventInput *event_input,
   }
 }
 
+static void XCropHomeLeftKey(const CropEventInput *event_input,
+  const CropTargets *targets,const KeySym key_symbol)
+{
+  XWindows
+    *const windows = event_input->windows;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Home:
+    case XK_KP_Home:
+    {
+      (*crop_info).x=(ssize_t) (windows->image.width/2L-(*crop_info).width/
+        2L);
+      (*crop_info).y=(ssize_t) (windows->image.height/2L-(*crop_info).height/
+        2L);
+      break;
+    }
+    case XK_Left:
+    case XK_KP_Left:
+    {
+      (*crop_info).x--;
+      break;
+    }
+    default:
+    {
+      XCropUpRightKey(event_input,targets,key_symbol);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -5845,24 +5879,9 @@ static MagickBooleanType XCropImage(Display *display,
               state|=ExitState;
               break;
             }
-            case XK_Home:
-            case XK_KP_Home:
-            {
-              crop_info.x=(ssize_t) (windows->image.width/2L-crop_info.width/
-                2L);
-              crop_info.y=(ssize_t) (windows->image.height/2L-crop_info.height/
-                2L);
-              break;
-            }
-            case XK_Left:
-            case XK_KP_Left:
-            {
-              crop_info.x--;
-              break;
-            }
             default:
             {
-              XCropUpRightKey(&event_input,&targets,key_symbol);
+              XCropHomeLeftKey(&event_input,&targets,key_symbol);
               break;
             }
           }
