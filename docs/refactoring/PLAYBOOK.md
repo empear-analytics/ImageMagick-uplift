@@ -802,7 +802,15 @@ is worth it.
    (`split_source.py --copy-macro NAME`), and the original keeps its definition. Both
    files then expand `NAME` to the same string literal, so no object code changes;
    `refactor_guard.py --combined` reports that string once more and nothing else, which
-   the commit message states.
+   the commit message states. Two kinds of file-scope data that only the family uses
+   move with it instead of refusing it (2026-11-11): a `static const` table standing
+   between the moved functions moves verbatim where it stands, and a one-line `#define`
+   of the original that no line of the kept part names (a numeric constant at the top of
+   the file, say) moves to the new file's *Define declarations* block, the original no
+   longer defining it. A forward declaration of a moved `static` at the top of the
+   original goes to the new file's *Forward declarations* block, and a *Define* or
+   *Forward declarations* comment left with nothing under it goes too. A table or macro
+   that the kept part also names still refuses the split.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -814,6 +822,12 @@ is worth it.
 
 **Careful:**
 
+- A table that moves under step 2 keeps its `static const` qualifiers, its type, its name
+  and every element; it has internal linkage, so the one file that names it is the one
+  that now defines it, and its bytes merely sit in the other object. A moved `#define`
+  expands to the same tokens in the one file that uses it, and the kept file used none.
+  `refactor_guard.py --combined` therefore counts every literal once, as before; say in
+  the message which tables and macros moved.
 - The pre-commit gate requires a new file to score 10.0, which a split-off family never
   does: it carries the original's findings with it. Commit after the gate has reported
   only that failure (its check that the original does not lose health has then passed),
@@ -10817,3 +10831,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-10 | AMEND | E | Step 3: the struct-pointer form also serves a struct local the block reads, or reads and assigns members of, when a copy of it draws clang's `-Wconditional-uninitialized` (CI) because the compiler cannot see it set on every path though every path sets it: `const T *v` when the block assigns no member (a write through a pointer member allowed), `T *v` in a `void` function when it does; `v.m` becomes `(*v).m`, `&v` becomes `v`, the call passes `&v`; N, Y and Z, which meet E's steps, read it the same way | `widget.c`'s `XDialogWidget` (campaign A, W16 lane a): its cancel release, reply-field press and Control-U blocks read or update `reply_info`, set by `XGetWidgetInfo` only inside the loop's configuration branch; passed by value (as `XListBrowserWidget`'s twins are, where the `targets` initialiser takes its address first) every copy failed `ci_warnings.sh`; with the pointer form the chain measured 1.59 to 1.70 | owner |
 | 2026-11-10 | AMEND | D | *Object code that differs only in the caller*: `reuse_check.py` (7394f75a1) also takes a helper returning the block's single output, called as the statement `v=Helper(...);` with `v` passed to a by-value parameter `p`, whose closing `return(p);` (the assignment back) is left out of the comparison, and compares a block whose lines break an expression at other tokens as one token stream | `widget.c`'s `XTextViewWidget` (campaign A, W16 lane a): its slider tracking and page press are `XListBrowserWidget`'s, which Recipe E made into `TrackListBrowserSlider` and `PageListBrowserSlider` (`slider_info=...(slider_info,...)`); the tracking lies on lines no case reaches and wraps its last expression at another token, so the check refused both; reusing them (instead of two look-alike helpers) is the step that measured 1.74 to 1.89 | owner |
 | 2026-11-10 | AMEND | I | Step 1: a block inside a `switch` case may leave only through `break;` statements that end that `switch` (the innermost `switch` or loop around it): each becomes `return(MagickFalse);` and the caller writes `if (Helper(...,&targets) == MagickFalse) break;` where the block stood, inside the same `switch`; the unreached level holds as written, `tools/targets_fill_check.py` counting `break;` as an exit (7c4c8a433) | `widget.c`'s `XMenuWidget` (campaign A, W16 lane a): its submenu test in the pointer-motion case sets `selection_info.id`, clears `*item` and sets ExitState, then leaves the `switch` by `break;` from two branches of nesting 5, on lines no case reaches; Recipe CT needs the case's tail, LB a loop, and I, V, Y and W a `return` or `goto` exit; with it the XMenuWidget chain measured 1.89 to 2.13 | owner |
+| 2026-11-11 | AMEND | S | Step 2: a file-scope `static const` table standing between the moved functions, and a one-line `#define` of the original that only the family uses, move with the family (the table verbatim where it stands, the macro to the new file's *Define declarations* block) instead of refusing it; a forward declaration of a moved `static` at the top of the original goes to a *Forward declarations* block of the new file, and a *Define* or *Forward declarations* comment left empty goes too; *Careful*: why the moved data and macro cannot change what either object computes. `tools/split_source.py` does all three and refuses a table or macro the kept part names; its output for earlier splits is unchanged (effect.c, visual-effects.c, transform.c, vision.c, enhance.c dry runs compared byte for byte) | `colorspace.c` (campaign A, W17 lane a): the TransformImageColorspace family (with SetImageColorspace, which shares four statics with it) uses the `GenericColorspaces[]` and `YCCMap` tables between its functions and the top-of-file `MaximumLogarithmicColorspace`; the split was refused for those alone (W16 owner question), and measures colorspace.c 9.38 to 10.0 with the new file at 9.38 | owner |
