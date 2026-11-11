@@ -1017,6 +1017,31 @@ static inline MagickBooleanType IsResizeSizeZero(const size_t columns,
   return(((columns == 0) || (rows == 0)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType TryApplyResizeFilterPass(const ResizeFilterPass *pass,
+  Image *resize_image,ExceptionInfo *exception,Image **result)
+{
+  ResizeFilter
+    *resize_filter = pass->resize_filter;
+
+  MagickStatusType
+    status;
+
+  if (ApplyResizeFilterPass(pass,&status,resize_image,exception) == MagickFalse)
+    {
+      resize_filter=DestroyResizeFilter(resize_filter);
+      (*result)=DestroyImage(resize_image);
+      return(MagickTrue);
+    }
+  resize_filter=DestroyResizeFilter(resize_filter);
+  if (status == MagickFalse)
+    {
+      resize_image=DestroyImage(resize_image);
+      (*result)=(Image *) NULL;
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   const size_t rows,const FilterType filter,ExceptionInfo *exception)
 {
@@ -1030,8 +1055,8 @@ MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   Image
     *resize_image;
 
-  MagickStatusType
-    status;
+  Image
+    *returned;
 
   ResizeFilter
     *resize_filter;
@@ -1080,17 +1105,9 @@ MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   pass.rows=rows;
   pass.x_factor=x_factor;
   pass.y_factor=y_factor;
-  if (ApplyResizeFilterPass(&pass,&status,resize_image,exception) == MagickFalse)
-    {
-      resize_filter=DestroyResizeFilter(resize_filter);
-      return(DestroyImage(resize_image));
-    }
-  resize_filter=DestroyResizeFilter(resize_filter);
-  if (status == MagickFalse)
-    {
-      resize_image=DestroyImage(resize_image);
-      return((Image *) NULL);
-    }
+  if (TryApplyResizeFilterPass(&pass,resize_image,exception,&returned) !=
+      MagickFalse)
+    return(returned);
   resize_image->type=image->type;
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 record_resize_transform:
