@@ -10693,6 +10693,52 @@ static void XPanImage(Display *display,XWindows *windows,XEvent *event,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _ComposeMenuInfo
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  int
+    id;
+} ComposeMenuInfo;
+
+static CompositeOperator XSelectPasteOperator(const ComposeMenuInfo *menu_info,
+  const char *const *PasteMenu,CompositeOperator compose)
+{
+  Display
+    *const display = menu_info->display;
+
+  XWindows
+    *const windows = menu_info->windows;
+
+  const int
+    id = menu_info->id;
+
+  char
+    command[MagickPathExtent],
+    **operators;
+
+  int
+    entry;
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  operators=GetCommandOptions(MagickComposeOptions);
+  if (operators == (char **) NULL)
+    return(compose);
+  entry=XMenuWidget(display,windows,PasteMenu[id],
+    (const char **) operators,command);
+  if (entry >= 0)
+    compose=(CompositeOperator) ParseCommandOption(
+      MagickComposeOptions,MagickFalse,operators[entry]);
+  operators=DestroyStringList(operators);
+  return(compose);
+}
+
 static MagickBooleanType XPasteImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -10727,7 +10773,6 @@ static MagickBooleanType XPasteImage(Display *display,
     *paste_image;
 
   int
-    entry,
     id,
     x,
     y;
@@ -10814,22 +10859,13 @@ static MagickBooleanType XPasteImage(Display *display,
         {
           case PasteOperatorsCommand:
           {
-            char
-              command[MagickPathExtent],
-              **operators;
+            ComposeMenuInfo
+              menu_info;
 
-            /*
-              Select a command from the pop-up menu.
-            */
-            operators=GetCommandOptions(MagickComposeOptions);
-            if (operators == (char **) NULL)
-              break;
-            entry=XMenuWidget(display,windows,PasteMenu[id],
-              (const char **) operators,command);
-            if (entry >= 0)
-              compose=(CompositeOperator) ParseCommandOption(
-                MagickComposeOptions,MagickFalse,operators[entry]);
-            operators=DestroyStringList(operators);
+            menu_info.display=display;
+            menu_info.windows=windows;
+            menu_info.id=id;
+            compose=XSelectPasteOperator(&menu_info,PasteMenu,compose);
             break;
           }
           case PasteHelpCommand:
