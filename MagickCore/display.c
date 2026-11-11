@@ -12146,6 +12146,73 @@ static DisplayCommand XSelectROIMenuEntry(const ROIMenuEntry *menu_entry,
 
 #define ApplyMenus  7
 
+typedef struct _ROITargets
+{
+  int
+    *x,
+    *y;
+
+  RectangleInfo
+    *roi_info;
+
+  size_t
+    *state;
+} ROITargets;
+
+static void XROIButtonPress(const CropEventInput *event_input,
+  const RectangleInfo crop_info,const ROITargets *targets)
+{
+  XWindows
+    *const windows = event_input->windows;
+
+  const XEvent
+    *const event = event_input->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  size_t
+    *const state = targets->state;
+
+  (*x)=windows->image.x;
+  (*y)=windows->image.y;
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  (*x)=windows->image.x+(*event).xbutton.x;
+  (*y)=windows->image.y+(*event).xbutton.y;
+  if (IsNearTopLeftCorner((*x),(*y),(*roi_info)) != MagickFalse)
+    {
+      (*roi_info).x=(*roi_info).x+(int) (*roi_info).width;
+      (*roi_info).y=(*roi_info).y+(int) (*roi_info).height;
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearBottomLeftCorner((*x),(*y),(*roi_info)) != MagickFalse)
+    {
+      (*roi_info).x=(*roi_info).x+(int) (*roi_info).width;
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearTopRightCorner((*x),(*y),(*roi_info)) != MagickFalse)
+    {
+      (*roi_info).y=(*roi_info).y+(int) (*roi_info).height;
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  if (IsNearBottomRightCorner((*x),(*y),(*roi_info)) != MagickFalse)
+    {
+      (*state)|=UpdateConfigurationState;
+      return;
+    }
+  XCropButtonRelease(event_input,crop_info);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12396,6 +12463,9 @@ static MagickBooleanType XROIImage(Display *display,
 
   XEvent
     event;
+
+  const ROITargets
+    targets = { &x, &y, &roi_info, &state };
 
   /*
     Map Command widget.
@@ -12802,39 +12872,7 @@ static MagickBooleanType XROIImage(Display *display,
       {
         case ButtonPress:
         {
-          x=windows->image.x;
-          y=windows->image.y;
-          if (event.xbutton.button != Button1)
-            break;
-          if (event.xbutton.window != windows->image.id)
-            break;
-          x=windows->image.x+event.xbutton.x;
-          y=windows->image.y+event.xbutton.y;
-          if (IsNearTopLeftCorner(x,y,roi_info) != MagickFalse)
-            {
-              roi_info.x=roi_info.x+(int) roi_info.width;
-              roi_info.y=roi_info.y+(int) roi_info.height;
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearBottomLeftCorner(x,y,roi_info) != MagickFalse)
-            {
-              roi_info.x=roi_info.x+(int) roi_info.width;
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearTopRightCorner(x,y,roi_info) != MagickFalse)
-            {
-              roi_info.y=roi_info.y+(int) roi_info.height;
-              state|=UpdateConfigurationState;
-              break;
-            }
-          if (IsNearBottomRightCorner(x,y,roi_info) != MagickFalse)
-            {
-              state|=UpdateConfigurationState;
-              break;
-            }
-          XCropButtonRelease(&event_input,crop_info);
+          XROIButtonPress(&event_input,crop_info,&targets);
           break;
         }
         case ButtonRelease:
