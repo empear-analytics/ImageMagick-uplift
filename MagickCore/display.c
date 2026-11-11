@@ -12441,6 +12441,9 @@ typedef struct _ROIRegionInput
 
   DisplayCommand
     display_command;
+
+  const char
+    *text;
 } ROIRegionInput;
 
 static MagickBooleanType XROIApplyRegion(const ROIRegionInput *region_input,
@@ -12528,6 +12531,65 @@ static MagickBooleanType XROIApplyRegion(const ROIRegionInput *region_input,
   roi_image=DestroyImage(roi_image);
   (void) SetImageProgressMonitor(*image,progress_monitor,
     (*image)->client_data);
+  return(MagickFalse);
+}
+
+static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
+  size_t *state,RectangleInfo *crop_info)
+{
+  Display
+    *const display = region_input->display;
+
+  XResourceInfo
+    *const resource_info = region_input->resource_info;
+
+  XWindows
+    *const windows = region_input->windows;
+
+  Image
+    **const image = region_input->image;
+
+  ExceptionInfo
+    *const exception = region_input->exception;
+
+  const DisplayCommand
+    display_command = region_input->display_command;
+
+  const char
+    *const text = region_input->text;
+
+  if (((*state) & UpdateRegionState) != 0)
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+      switch (display_command)
+      {
+        case UndoCommand:
+        case RedoCommand:
+        {
+          (void) XMagickCommand(display,resource_info,windows,
+            display_command,image,exception);
+          break;
+        }
+        default:
+        {
+          if (XROIApplyRegion(region_input,crop_info) != MagickFalse)
+            return(MagickTrue);
+          break;
+        }
+      }
+      if (display_command != InfoCommand)
+        {
+          XConfigureImageColormap(display,resource_info,windows,*image,
+            exception);
+          (void) XConfigureImage(display,resource_info,windows,*image,
+            exception);
+        }
+      XCheckRefreshWindows(display,windows);
+      XInfoWidget(display,windows,text);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      (*state)&=(unsigned int) (~UpdateRegionState);
+    }
   return(MagickFalse);
 }
 
@@ -13045,38 +13107,9 @@ static MagickBooleanType XROIImage(Display *display,
       region_input.exception=exception;
       region_input.roi_info=roi_info;
       region_input.display_command=display_command;
-      if ((state & UpdateRegionState) != 0)
-        {
-          (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-          switch (display_command)
-          {
-            case UndoCommand:
-            case RedoCommand:
-            {
-              (void) XMagickCommand(display,resource_info,windows,
-                display_command,image,exception);
-              break;
-            }
-            default:
-            {
-              if (XROIApplyRegion(&region_input,&crop_info) != MagickFalse)
-                continue;
-              break;
-            }
-          }
-          if (display_command != InfoCommand)
-            {
-              XConfigureImageColormap(display,resource_info,windows,*image,
-                exception);
-              (void) XConfigureImage(display,resource_info,windows,*image,
-                exception);
-            }
-          XCheckRefreshWindows(display,windows);
-          XInfoWidget(display,windows,text);
-          (void) XSetFunction(display,windows->image.highlight_context,
-            GXinvert);
-          state&=(unsigned int) (~UpdateRegionState);
-        }
+      region_input.text=text;
+      if (XROIUpdateRegion(&region_input,&state,&crop_info) != MagickFalse)
+        continue;
       XHighlightRectangle(display,windows->image.id,
         windows->image.highlight_context,&highlight_info);
       XScreenEvent(display,windows,&event,exception);
