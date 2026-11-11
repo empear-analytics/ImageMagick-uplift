@@ -4181,6 +4181,121 @@ cleanup:
   return(outputReady);
 }
 
+typedef struct _ResizeArmInfo
+{
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  const Image
+    *image;
+
+  Image
+    *filteredImage;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer,
+    cubicCoefficientsBuffer;
+
+  cl_uint
+    number_channels;
+
+  size_t
+    resizedColumns,
+    resizedRows;
+
+  const ResizeFilter
+    *resizeFilter;
+
+  float
+    xFactor,
+    yFactor;
+} ResizeArmInfo;
+
+typedef struct _ResizeArmTargets
+{
+  cl_mem
+    *tempImageBuffer;
+
+  MagickBooleanType
+    *outputReady;
+} ResizeArmTargets;
+
+static MagickBooleanType ResizeHorizontalThenVertical(
+  const ResizeArmInfo *info,ExceptionInfo *exception,
+  const ResizeArmTargets *targets)
+{
+  const Image
+    *const image = info->image;
+
+  const MagickCLDevice
+    device = info->device;
+
+  const cl_command_queue
+    queue = info->queue;
+
+  Image
+    *const filteredImage = info->filteredImage;
+
+  const cl_mem
+    cubicCoefficientsBuffer = info->cubicCoefficientsBuffer,
+    filteredImageBuffer = info->filteredImageBuffer,
+    imageBuffer = info->imageBuffer;
+
+  const cl_uint
+    number_channels = info->number_channels;
+
+  const size_t
+    resizedColumns = info->resizedColumns,
+    resizedRows = info->resizedRows;
+
+  const ResizeFilter
+    *const resizeFilter = info->resizeFilter;
+
+  const float
+    xFactor = info->xFactor,
+    yFactor = info->yFactor;
+
+  cl_mem
+    *const tempImageBuffer = targets->tempImageBuffer;
+
+  MagickBooleanType
+    *const outputReady = targets->outputReady;
+
+  size_t
+    length;
+
+  length=resizedColumns*image->rows*number_channels;
+  *tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
+    sizeof(CLQuantum),(void *) NULL);
+  if (*tempImageBuffer == (cl_mem) NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
+    return(MagickFalse);
+  }
+
+  *outputReady=resizeHorizontalFilter(device,queue,image,filteredImage,
+    imageBuffer,number_channels,(cl_uint) image->columns,
+    (cl_uint) image->rows,*tempImageBuffer,(cl_uint) resizedColumns,
+    (cl_uint) image->rows,resizeFilter,cubicCoefficientsBuffer,xFactor,
+    exception);
+  if (*outputReady == MagickFalse)
+    return(MagickFalse);
+
+  *outputReady=resizeVerticalFilter(device,queue,image,filteredImage,
+    *tempImageBuffer,number_channels,(cl_uint) resizedColumns,
+    (cl_uint) image->rows,filteredImageBuffer,(cl_uint) resizedColumns,
+    (cl_uint) resizedRows,resizeFilter,cubicCoefficientsBuffer,yFactor,
+    exception);
+  if (*outputReady == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   const size_t resizedColumns,const size_t resizedRows,
   const ResizeFilter *resizeFilter,ExceptionInfo *exception)
@@ -4213,6 +4328,12 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
 
   Image
     *filteredImage;
+
+  ResizeArmInfo
+    info;
+
+  ResizeArmTargets
+    targets;
 
   size_t
     i,
@@ -4262,30 +4383,22 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   yFactor=(float) resizedRows/(float) image->rows;
   if (xFactor > yFactor)
   {
-    length=resizedColumns*image->rows*number_channels;
-    tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
-      sizeof(CLQuantum),(void *) NULL);
-    if (tempImageBuffer == (cl_mem) NULL)
-    {
-      (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-        ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
-      goto cleanup;
-    }
-
-    outputReady=resizeHorizontalFilter(device,queue,image,filteredImage,
-      imageBuffer,number_channels,(cl_uint) image->columns,
-      (cl_uint) image->rows,tempImageBuffer,(cl_uint) resizedColumns,
-      (cl_uint) image->rows,resizeFilter,cubicCoefficientsBuffer,xFactor,
-      exception);
-    if (outputReady == MagickFalse)
-      goto cleanup;
-
-    outputReady=resizeVerticalFilter(device,queue,image,filteredImage,
-      tempImageBuffer,number_channels,(cl_uint) resizedColumns,
-      (cl_uint) image->rows,filteredImageBuffer,(cl_uint) resizedColumns,
-      (cl_uint) resizedRows,resizeFilter,cubicCoefficientsBuffer,yFactor,
-      exception);
-    if (outputReady == MagickFalse)
+    info.device=device;
+    info.queue=queue;
+    info.image=image;
+    info.filteredImage=filteredImage;
+    info.imageBuffer=imageBuffer;
+    info.filteredImageBuffer=filteredImageBuffer;
+    info.cubicCoefficientsBuffer=cubicCoefficientsBuffer;
+    info.number_channels=number_channels;
+    info.resizedColumns=resizedColumns;
+    info.resizedRows=resizedRows;
+    info.resizeFilter=resizeFilter;
+    info.xFactor=xFactor;
+    info.yFactor=yFactor;
+    targets.tempImageBuffer=(&tempImageBuffer);
+    targets.outputReady=(&outputReady);
+    if (ResizeHorizontalThenVertical(&info,exception,&targets) == MagickFalse)
       goto cleanup;
   }
   else
