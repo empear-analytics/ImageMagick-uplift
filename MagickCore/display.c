@@ -2262,6 +2262,58 @@ static void XEraseTextLine(Display *display,XWindows *windows,
   }
 }
 
+static MagickBooleanType XAdvanceTextLine(XWindows *windows,
+  XFontStruct *font_info,const AnnotateTargets *targets)
+{
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  /*
+    Advance to the next line of text.
+  */
+  *(*p)='\0';
+  (*annotate_info)->width=(unsigned int) XTextWidth(font_info,
+    (*annotate_info)->text,(int) strlen((*annotate_info)->text));
+  if ((*annotate_info)->next != (XAnnotateInfo *) NULL)
+    {
+      /*
+        Line of text already exists.
+      */
+      (*annotate_info)=(*annotate_info)->next;
+      (*x)=(*annotate_info)->x;
+      (*y)=(*annotate_info)->y;
+      (*p)=(*annotate_info)->text;
+      return(MagickTrue);
+    }
+  (*annotate_info)->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
+    sizeof(*(*annotate_info)->next));
+  if ((*annotate_info)->next == (XAnnotateInfo *) NULL)
+    return(MagickFalse);
+  *(*annotate_info)->next=(*(*annotate_info));
+  (*annotate_info)->next->previous=(*annotate_info);
+  (*annotate_info)=(*annotate_info)->next;
+  (*annotate_info)->text=(char *) AcquireQuantumMemory((size_t) (
+   (ssize_t)  windows->image.width/MagickMax((ssize_t)
+   font_info->min_bounds.width,1)+2L),sizeof(*(*annotate_info)->text));
+  if ((*annotate_info)->text == (char *) NULL)
+    return(MagickFalse);
+  (*annotate_info)->y+=(ssize_t) (*annotate_info)->height;
+  if ((*annotate_info)->y > (int) windows->image.height)
+    (*annotate_info)->y=(int) (*annotate_info)->height;
+  (*annotate_info)->next=(XAnnotateInfo *) NULL;
+  (*x)=(*annotate_info)->x;
+  (*y)=(*annotate_info)->y;
+  (*p)=(*annotate_info)->text;
+  return(MagickTrue);
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -2807,42 +2859,8 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
           case XK_Return:
           case XK_KP_Enter:
           {
-            /*
-              Advance to the next line of text.
-            */
-            *p='\0';
-            annotate_info->width=(unsigned int) XTextWidth(font_info,
-              annotate_info->text,(int) strlen(annotate_info->text));
-            if (annotate_info->next != (XAnnotateInfo *) NULL)
-              {
-                /*
-                  Line of text already exists.
-                */
-                annotate_info=annotate_info->next;
-                x=annotate_info->x;
-                y=annotate_info->y;
-                p=annotate_info->text;
-                break;
-              }
-            annotate_info->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
-              sizeof(*annotate_info->next));
-            if (annotate_info->next == (XAnnotateInfo *) NULL)
+            if (XAdvanceTextLine(windows,font_info,&targets) == MagickFalse)
               return(MagickFalse);
-            *annotate_info->next=(*annotate_info);
-            annotate_info->next->previous=annotate_info;
-            annotate_info=annotate_info->next;
-            annotate_info->text=(char *) AcquireQuantumMemory((size_t) (
-             (ssize_t)  windows->image.width/MagickMax((ssize_t)
-             font_info->min_bounds.width,1)+2L),sizeof(*annotate_info->text));
-            if (annotate_info->text == (char *) NULL)
-              return(MagickFalse);
-            annotate_info->y+=(ssize_t) annotate_info->height;
-            if (annotate_info->y > (int) windows->image.height)
-              annotate_info->y=(int) annotate_info->height;
-            annotate_info->next=(XAnnotateInfo *) NULL;
-            x=annotate_info->x;
-            y=annotate_info->y;
-            p=annotate_info->text;
             break;
           }
         }
