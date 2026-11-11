@@ -1919,6 +1919,114 @@ static void ReleaseColorBrowserGrab(const ColorBrowserGrab *grab,
     }
 }
 
+typedef struct _ColorBrowserUpdate
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    *reply,
+    *glob_pattern;
+
+  const char
+    *reset_pattern;
+
+  ExceptionInfo
+    *exception;
+} ColorBrowserUpdate;
+
+typedef struct _ColorBrowserUpdateTargets
+{
+  XWidgetInfo
+    *action_info;
+
+  char
+    ***colorlist;
+
+  size_t
+    *colors;
+} ColorBrowserUpdateTargets;
+
+static MagickBooleanType UpdateColorBrowserList(
+  const ColorBrowserUpdate *update,const ColorBrowserUpdateTargets *targets)
+{
+  Display
+    *const display = update->display;
+
+  XWindows
+    *const windows = update->windows;
+
+  char
+    *const reply = update->reply,
+    *const glob_pattern = update->glob_pattern;
+
+  const char
+    *const reset_pattern = update->reset_pattern;
+
+  ExceptionInfo
+    *const exception = update->exception;
+
+  XWidgetInfo
+    *const action_info = targets->action_info;
+
+  char
+    ***const colorlist = targets->colorlist;
+
+  size_t
+    *const colors = targets->colors;
+
+  char
+    **checklist;
+
+  int
+    i;
+
+  size_t
+    number_colors;
+
+  Status
+    status;
+
+  XColor
+    color;
+
+  status=XParseColor(display,windows->widget.map_info->colormap,
+    glob_pattern,&color);
+  if ((status != False) || (strchr(glob_pattern,'-') != (char *) NULL))
+    {
+      /*
+        Reply is a single color name-- exit.
+      */
+      (void) CopyMagickString(reply,glob_pattern,MagickPathExtent);
+      (void) CopyMagickString(glob_pattern,reset_pattern,MagickPathExtent);
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return(MagickFalse);
+    }
+  /*
+    Update color list.
+  */
+  checklist=GetColorList(glob_pattern,&number_colors,exception);
+  if (number_colors == 0)
+    {
+      (void) CopyMagickString(glob_pattern,reset_pattern,MagickPathExtent);
+      (void) XBell(display,0);
+    }
+  else
+    {
+      for (i=0; i < (int) (*colors); i++)
+        (*colorlist)[i]=DestroyString((*colorlist)[i]);
+      if ((*colorlist) != (char **) NULL)
+        (*colorlist)=(char **) RelinquishMagickMemory((*colorlist));
+      (*colorlist)=checklist;
+      (*colors)=number_colors;
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2260,43 +2368,20 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
     if (state & UpdateListState)
       {
-        char
-          **checklist;
+        const ColorBrowserUpdateTargets
+          update_targets = { &action_info, &colorlist, &colors };
+        
+        ColorBrowserUpdate
+          update;
 
-        size_t
-          number_colors;
-
-        status=XParseColor(display,windows->widget.map_info->colormap,
-          glob_pattern,&color);
-        if ((status != False) || (strchr(glob_pattern,'-') != (char *) NULL))
-          {
-            /*
-              Reply is a single color name-- exit.
-            */
-            (void) CopyMagickString(reply,glob_pattern,MagickPathExtent);
-            (void) CopyMagickString(glob_pattern,reset_pattern,MagickPathExtent);
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        /*
-          Update color list.
-        */
-        checklist=GetColorList(glob_pattern,&number_colors,exception);
-        if (number_colors == 0)
-          {
-            (void) CopyMagickString(glob_pattern,reset_pattern,MagickPathExtent);
-            (void) XBell(display,0);
-          }
-        else
-          {
-            for (i=0; i < (int) colors; i++)
-              colorlist[i]=DestroyString(colorlist[i]);
-            if (colorlist != (char **) NULL)
-              colorlist=(char **) RelinquishMagickMemory(colorlist);
-            colorlist=checklist;
-            colors=number_colors;
-          }
+        update.display=display;
+        update.windows=windows;
+        update.reply=reply;
+        update.glob_pattern=glob_pattern;
+        update.reset_pattern=reset_pattern;
+        update.exception=exception;
+        if (UpdateColorBrowserList(&update,&update_targets) == MagickFalse)
+          break;
         /*
           Sort color list in ascending order.
         */
