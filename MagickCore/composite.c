@@ -2143,27 +2143,42 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
   return(status);
 }
 
-static inline void SetVirtualCompositeChannels(const Image *image,
-  const Image *source_image,const CompositeOperator compose,
-  const Quantum *source,const MagickRealType canvas_dissolve,
-  const MagickBooleanType clamp,Quantum *magick_restrict q)
+typedef struct _VirtualCompositeInputs
+{
+  const Image
+    *image,
+    *source_image;
+
+  CompositeOperator
+    compose;
+
+  MagickRealType
+    canvas_dissolve;
+
+  MagickBooleanType
+    clamp;
+} VirtualCompositeInputs;
+
+static inline void SetVirtualCompositeChannels(
+  const VirtualCompositeInputs *composite,const Quantum *source,
+  Quantum *magick_restrict q)
 {
   ssize_t
     i;
 
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  for (i=0; i < (ssize_t) GetPixelChannels(composite->image); i++)
   {
     MagickRealType
       pixel = 0.0;
 
-    PixelChannel channel = GetPixelChannelChannel(image,i);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    PixelTrait source_traits = GetPixelChannelTraits(source_image,
+    PixelChannel channel = GetPixelChannelChannel(composite->image,i);
+    PixelTrait traits = GetPixelChannelTraits(composite->image,channel);
+    PixelTrait source_traits = GetPixelChannelTraits(composite->source_image,
       channel);
     if ((traits == UndefinedPixelTrait) ||
         (source_traits == UndefinedPixelTrait))
       continue;
-    switch (compose)
+    switch (composite->compose)
     {
       case AlphaCompositeOp:
       case ChangeMaskCompositeOp:
@@ -2195,8 +2210,8 @@ static inline void SetVirtualCompositeChannels(const Image *image,
       case DissolveCompositeOp:
       {
         if (channel == AlphaPixelChannel)
-          pixel=canvas_dissolve*(double) GetPixelAlpha(source_image,
-            source);
+          pixel=composite->canvas_dissolve*(double) GetPixelAlpha(
+            composite->source_image,source);
         else
           pixel=(MagickRealType) source[channel];
         break;
@@ -2207,7 +2222,7 @@ static inline void SetVirtualCompositeChannels(const Image *image,
         break;
       }
     }
-    q[i]=clamp != MagickFalse ? ClampPixel(pixel) :
+    q[i]=composite->clamp != MagickFalse ? ClampPixel(pixel) :
       ClampToQuantum(pixel);
   }
 }
@@ -4668,6 +4683,9 @@ static void CompositeImageRow(const CompositeRowInputs *row,
   const MagickBooleanType
     clamp = row->clamp;
 
+  const VirtualCompositeInputs
+    virtual_inputs = { image, source_image, compose, canvas_dissolve, clamp };
+
   PixelInfo
     canvas_pixel,
     source_pixel;
@@ -4702,8 +4720,7 @@ static void CompositeImageRow(const CompositeRowInputs *row,
         (void) GetOneVirtualPixel(source_image,
           CastDoubleToSsizeT((double) x-x_offset),
           CastDoubleToSsizeT((double) y-y_offset),source,exception);
-        SetVirtualCompositeChannels(image,source_image,compose,source,
-          canvas_dissolve,clamp,q);
+        SetVirtualCompositeChannels(&virtual_inputs,source,q);
         q+=(ptrdiff_t) GetPixelChannels(image);
         continue;
       }
