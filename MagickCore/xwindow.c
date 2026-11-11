@@ -7454,6 +7454,44 @@ static unsigned char *XPackContinuousMultiByteRowMSB(
   return(q);
 }
 
+static void XPackColormapped2BitMSB(const XImageRowSource *source,
+  unsigned char *q)
+{
+  Image
+    *const canvas = source->canvas;
+
+  CacheView
+    *const canvas_view = source->canvas_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    scanline_pad = source->scanline_pad;
+
+  unsigned long
+    *const pixels = source->pixels;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  /*
+    Convert to 2 bit color-mapped X canvas.
+  */
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
+      canvas->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackColormapped2BitRowMSB(canvas,pixels,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7610,18 +7648,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
       {
         case 2:
         {
-          /*
-            Convert to 2 bit color-mapped X canvas.
-          */
-          for (y=0; y < (int) canvas->rows; y++)
-          {
-            p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-              canvas->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            q=XPackColormapped2BitRowMSB(canvas,pixels,p,q);
-            q+=(ptrdiff_t) scanline_pad;
-          }
+          XPackColormapped2BitMSB(&row_source,q);
           break;
         }
         case 4:
