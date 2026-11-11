@@ -1622,6 +1622,15 @@ static void RelinquishAcquiredFeatureBuffers(const FeatureBuffers *buffers)
   density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
 }
 
+static ChannelFeatures *RelinquishFeatureGrays(PixelPacket *grays,
+  ChannelFeatures *channel_features)
+{
+  grays=(PixelPacket *) RelinquishMagickMemory(grays);
+  channel_features=(ChannelFeatures *) RelinquishMagickMemory(
+    channel_features);
+  return(channel_features);
+}
+
 typedef struct _FeatureGrayRow
 {
   const Image
@@ -1767,9 +1776,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   image_view=DestroyCacheView(image_view);
   if (status == MagickFalse)
     {
-      grays=(PixelPacket *) RelinquishMagickMemory(grays);
-      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
-        channel_features);
+      channel_features=RelinquishFeatureGrays(grays,channel_features);
       return(channel_features);
     }
   gray=CompactFeatureGrays(image,grays);
@@ -1796,9 +1803,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   if (IsFeatureMemoryMissing(&buffers) != MagickFalse)
     {
       RelinquishFeatureBuffers(&buffers);
-      grays=(PixelPacket *) RelinquishMagickMemory(grays);
-      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
-        channel_features);
+      channel_features=RelinquishFeatureGrays(grays,channel_features);
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
       return(channel_features);
@@ -1822,9 +1827,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     {
       RelinquishFeatureRows(cooccurrence,Q,i);
       RelinquishAcquiredFeatureBuffers(&buffers);
-      grays=(PixelPacket *) RelinquishMagickMemory(grays);
-      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
-        channel_features);
+      channel_features=RelinquishFeatureGrays(grays,channel_features);
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
       return(channel_features);
