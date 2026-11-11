@@ -131,3 +131,38 @@ address is also passed to calls), a LeaveNotify helper clones Enter (3.94), XSav
 unreached blocks), XAnimateImages cc 78 and about 780 lines in setup blocks naming statics or throw macros,
 XMagickCommand cc 9 and 7 arguments; opencl.c: LoadOpenCLDeviceBenchmark, GetOpenCLCacheDirectory (`#if` block), three
 twin groups (owner CF question), EnqueueOpenCLKernel (10 arguments).
+
+## Lane b, first round: display.c 1.41 -> 1.74 (wide build, merged)
+
+50 commits (46 refactor, 3 playbook, 1 tools); Brain Methods 6 -> 4 (XColorEditImage, XCropImage and XROIImage leave
+Brain Method and Deep Nesting); oracle cases 23 / 13 / 6 for ColorEdit / Crop / ROI, 0 diverged each step; whole wide
+catalogue on the final tip 14,145 cases, 0 diverged. The lane rewrote its commit messages once (trees identical) to
+drop cc numbers it had not measured. Unreached lines carry obj_modulo (MODULO-IDENTICAL or IDENTICAL) or `Verified:
+guard`.
+- **XColorEditImage 1.41 -> 1.49:** 1b5b74d05 playbook D amendment (a cast of a call to the exact type its function
+  returns, and a `(void)` cast of a `(void)` cast, are no differing value) with e95fa2948 `reuse_check.py` stripping
+  them; bd3ef9920 typedef move, 1d105895d D Method, 12f1a08be D Fuzz, c16b75ce5 D discard keys, 86665878c D motion
+  (1.41 -> 1.40, committed `--no-verify`, said so), 161c2dd80 CT pen colour, 9f8604610 CT border, 5bdbe79f9 N reset,
+  4c31cfc33 N flood, f6a25445e SR, c7f06689d W (1.49).
+- **XCropImage 1.49 -> 1.60:** dbc79fccb D, 71c5f34d9 E, ffe4a3bb0 E, e94c3ecb7 OC (1.50), 5410d6290 N, ccac76829
+  playbook, fe22e1069, 203ef8e42 CT, cbaefbadd N, 818678939 D, 3e2cc2050 CT, 8bd613c28 E, c21aac6ca E,
+  a16397680 / 8babd3401 / 783b6162a SD x3, d704856d1 CT (1.60).
+- **XROIImage 1.60 -> 1.74:** 60b51df0d, 224dcffa5, 5a0d8e8bb D x3; edde291e0 H (`ApplyMenus`, pp_identical wide
+  IDENTICAL); ec6b7fec3 D, f1272ef13, 60e266abf CT, 3cdb92a75 CT, 0b9fa672f D, 523b00b46 D; f31758109 SD (1.64),
+  0391d6ccc, 5fd1dd165 SD; 24bf31cec D; 8be13a1aa playbook, d6a6939f9 LC (1.64 -> 1.62, `--no-verify`, said so),
+  78a01ac35 LC; 54b712895, 809963a3f CT; 1565bf89a OC (1.74).
+- **New recipe text** (Decided by `owner`, 2026-11-10 OK): the D amendment above; **a Recipe named FT, Replace a
+  Fall-Through into a Call by the Call** (case A ends `magick_fallthrough;` into case B whose whole body is `Q(a...);
+  break;`; every argument names an object declared outside both cases; A gets the same call and `break;`; guard shows
+  +1 for Q); **Recipe LC, Extract Block Returning Whether It Continued** (a block in a sequential loop body, leaving
+  through `continue`, becomes a `static MagickBooleanType` helper whose `continue;` is `return(MagickTrue);` and whose
+  end is `return(MagickFalse);`; caller `if (Helper(...) != MagickFalse) continue;`). **Code clash:** this FT is a
+  different recipe from the held twin-fold recipe also named FT on `w18-ft-twin-fold` (not in main); if the owner
+  approves the twin fold it needs another code.
+- Score behaviour: the file sits at rounding boundaries (the first step of a chain dips 0.01-0.02); a step can lose
+  0.02 when *Lines of Code in a Single File* leaves the review while the file grows; near-twin helpers
+  (XROIMotion/XCropMotion, XROIKeyPress/XCropKeyPress) cost 0.02 each until the chain's last step.
+- Plateau: XAnnotateEditImage (depth 5; about 17 steps), XDrawEditImage (depth 6, about 60 depth-4+ sites),
+  XDisplayImage (depth 6, about 50 sites); XColorEditImage, XCropImage, XROIImage remain Complex/Large Method.
+  Possible upstream: XCropImage help titles; XROIImage/XCropImage MotionNotify tests `event.xbutton.window` (not
+  xmotion); SelectionRequest falls into `default:`; XROIImage ends `return(MagickTrue); return(MagickTrue);`.
