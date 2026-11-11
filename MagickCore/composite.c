@@ -1715,6 +1715,92 @@ static MagickBooleanType GetCompositeClamp(const Image *image)
   return(clamp);
 }
 
+typedef struct _OverRowHead
+{
+  OverSourceRow
+    source;
+
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    clamp;
+} OverRowHead;
+
+static MagickBooleanType CompositeOverRowHead(const OverRowHead *head,
+  MagickBooleanType *status)
+{
+  const OverSourceRow
+    source = head->source;
+
+  Image
+    *const image = head->image;
+
+  CacheView
+    *const image_view = head->image_view;
+
+  const MagickBooleanType
+    clamp = head->clamp;
+
+  const Image
+    *const source_image = source.source_image;
+
+  const MagickBooleanType
+    clip_to_self = source.clip_to_self;
+
+  const ssize_t
+    x_offset = source.x_offset,
+    y_offset = source.y_offset,
+    y = source.y;
+
+  ExceptionInfo
+    *const exception = source.exception;
+
+  const Quantum
+    *pixels;
+
+  PixelInfo
+    canvas_pixel,
+    source_pixel;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  OverRowInputs
+    row;
+
+  if (SkipOverRow(&source,status) == MagickFalse)
+    return(MagickFalse);
+  if (FetchOverSourceRow(&source,&pixels,&p,status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  GetPixelInfo(image,&canvas_pixel);
+  GetPixelInfo(source_image,&source_pixel);
+  row.image=image;
+  row.source_image=source_image;
+  row.pixels=pixels;
+  row.clip_to_self=clip_to_self;
+  row.x_offset=x_offset;
+  row.y_offset=y_offset;
+  row.y=y;
+  row.clamp=clamp;
+  row.exception=exception;
+  CompositeOverRow(&row,p,q);
+  SyncCompositeRow(image_view,exception,status);
+  return(MagickTrue);
+}
+
 static MagickBooleanType CompositeOverImage(Image *image,
   const Image *source_image,const CompositePlacement *placement,
   ExceptionInfo *exception)
@@ -1758,49 +1844,15 @@ static MagickBooleanType CompositeOverImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *pixels;
-
-    PixelInfo
-      canvas_pixel,
-      source_pixel;
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    OverRowInputs
-      row;
-
     const OverSourceRow
       source = { source_view, source_image, clip_to_self, x_offset, y_offset,
         y, exception };
 
-    if (SkipOverRow(&source,&status) == MagickFalse)
+    const OverRowHead
+      head = { source, image, image_view, clamp };
+
+    if (CompositeOverRowHead(&head,&status) == MagickFalse)
       continue;
-    if (FetchOverSourceRow(&source,&pixels,&p,&status) == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    GetPixelInfo(image,&canvas_pixel);
-    GetPixelInfo(source_image,&source_pixel);
-    row.image=image;
-    row.source_image=source_image;
-    row.pixels=pixels;
-    row.clip_to_self=clip_to_self;
-    row.x_offset=x_offset;
-    row.y_offset=y_offset;
-    row.y=y;
-    row.clamp=clamp;
-    row.exception=exception;
-    CompositeOverRow(&row,p,q);
-    SyncCompositeRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
