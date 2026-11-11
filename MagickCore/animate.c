@@ -1324,6 +1324,73 @@ static AnimateCommand XControlOpenCommand(const XEvent event,
   return(animate_command);
 }
 
+typedef struct _AnimateIconColormaps
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    *display_image;
+
+  ExceptionInfo
+    *exception;
+
+  XStandardColormap
+    *map_info;
+
+  XStandardColormap
+    *icon_map;
+
+  XVisualInfo
+    *icon_visual;
+
+  XPixelInfo
+    *icon_pixel;
+} AnimateIconColormaps;
+
+static void XReleaseIconColormap(const AnimateIconColormaps *icon_colormaps)
+{
+  Display
+    *const display = icon_colormaps->display;
+
+  XResourceInfo
+    *const resource_info = icon_colormaps->resource_info;
+
+  XWindows
+    *const windows = icon_colormaps->windows;
+
+  Image
+    *const display_image = icon_colormaps->display_image;
+
+  ExceptionInfo
+    *const exception = icon_colormaps->exception;
+
+  XStandardColormap
+    *const map_info = icon_colormaps->map_info;
+
+  XStandardColormap
+    *const icon_map = icon_colormaps->icon_map;
+
+  XVisualInfo
+    *const icon_visual = icon_colormaps->icon_visual;
+
+  XPixelInfo
+    *const icon_pixel = icon_colormaps->icon_pixel;
+
+  if (map_info->colormap == icon_map->colormap)
+    XConfigureImageColormap(display,resource_info,windows,
+      display_image,exception);
+  (void) XFreeStandardColormap(display,icon_visual,icon_map,
+    icon_pixel);
+  windows->icon.mapped=MagickFalse;
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2820,12 +2887,19 @@ MagickExport Image *XAnimateImages(Display *display,
           }
         if (event.xunmap.window == windows->icon.id)
           {
-            if (map_info->colormap == icon_map->colormap)
-              XConfigureImageColormap(display,resource_info,windows,
-                display_image,exception);
-            (void) XFreeStandardColormap(display,icon_visual,icon_map,
-              icon_pixel);
-            windows->icon.mapped=MagickFalse;
+            AnimateIconColormaps
+              icon_colormaps;
+
+            icon_colormaps.display=display;
+            icon_colormaps.resource_info=resource_info;
+            icon_colormaps.windows=windows;
+            icon_colormaps.display_image=display_image;
+            icon_colormaps.exception=exception;
+            icon_colormaps.map_info=map_info;
+            icon_colormaps.icon_map=icon_map;
+            icon_colormaps.icon_visual=icon_visual;
+            icon_colormaps.icon_pixel=icon_pixel;
+            XReleaseIconColormap(&icon_colormaps);
             break;
           }
         if (event.xunmap.window == windows->command.id)
