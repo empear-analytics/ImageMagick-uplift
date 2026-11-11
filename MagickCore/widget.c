@@ -5131,6 +5131,27 @@ static void SelectFileBrowserFormat(Display *display,XWindows *windows,
   formats=(char **) RelinquishMagickMemory(formats);
 }
 
+static size_t ReleaseFileBrowserGrab(const FileBrowserPathRelease *grab,
+  const XWidgetInfo special_info,size_t state)
+{
+  XWindows
+    *const windows = grab->windows;
+
+  const XEvent
+    event = grab->event;
+
+  char
+    *const working_path = grab->working_path;
+
+  if ((event.xbutton.window == windows->widget.id) &&
+      (MatteIsActive(special_info,event.xbutton)))
+    {
+      (void) CopyMagickString(working_path,"x:",MagickPathExtent);
+      state|=ExitState;
+    }
+  return(state);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -5835,18 +5856,19 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
           }
         if (special_info.raised == MagickFalse)
           {
+            FileBrowserPathRelease
+              grab;
+
             if (anomaly == MagickFalse)
               {
                 SelectFileBrowserFormat(display,windows,format,
                   &format_targets);
                 break;
               }
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(special_info,event.xbutton)))
-              {
-                (void) CopyMagickString(working_path,"x:",MagickPathExtent);
-                state|=ExitState;
-              }
+            grab.windows=windows;
+            grab.event=event;
+            grab.working_path=working_path;
+            state=ReleaseFileBrowserGrab(&grab,special_info,state);
             special_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&special_info);
           }
