@@ -2043,6 +2043,15 @@ static size_t ConfigureWidgetWindow(XWindows *windows,const XEvent event,
   return(state);
 }
 
+static size_t EnterWidgetWindow(XWindows *windows,const XEvent event,
+  size_t state)
+{
+  if (event.xcrossing.window != windows->widget.id)
+    return(state);
+  state&=(unsigned int) (~InactiveWidgetState);
+  return(state);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2794,9 +2803,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case EnterNotify:
       {
-        if (event.xcrossing.window != windows->widget.id)
-          break;
-        state&=(unsigned int) (~InactiveWidgetState);
+        state=EnterWidgetWindow(windows,event,state);
         break;
       }
       case Expose:
