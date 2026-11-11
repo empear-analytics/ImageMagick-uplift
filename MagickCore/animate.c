@@ -2026,6 +2026,48 @@ static void XWrapSceneForward(const AnimationSceneStep *scene_step,
     }
 }
 
+static void XWrapSceneReverse(const AnimationSceneStep *scene_step,
+  const AnimationSceneTargets *targets)
+{
+  const size_t
+    number_scenes = scene_step->number_scenes;
+
+  Image
+    **const image_list = scene_step->image_list;
+
+  const ssize_t
+    first_scene = scene_step->first_scene;
+
+  ssize_t
+    *const scene = targets->scene,
+    *const iterations = targets->iterations;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  MagickBooleanType
+    *const pause = targets->pause;
+
+  (*iterations)++;
+  if ((*iterations) == (ssize_t) image_list[0]->iterations)
+    {
+      (*iterations)=0;
+      (*state)&=(~RepeatAnimationState);
+    }
+  if ((*state) & AutoReverseAnimationState)
+    {
+      (*state)|=ForwardAnimationState;
+      (*scene)=first_scene;
+      (*pause)=MagickTrue;
+    }
+  else
+    {
+      if (((*state) & RepeatAnimationState) == MagickFalse)
+        (*state)&=(~PlayAnimationState);
+      (*scene)=(ssize_t) number_scenes-1;
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2865,24 +2907,10 @@ MagickExport Image *XAnimateImages(Display *display,
               scene--;
             else
               {
-                iterations++;
-                if (iterations == (ssize_t) image_list[0]->iterations)
-                  {
-                    iterations=0;
-                    state&=(~RepeatAnimationState);
-                  }
-                if (state & AutoReverseAnimationState)
-                  {
-                    state|=ForwardAnimationState;
-                    scene=first_scene;
-                    pause=MagickTrue;
-                  }
-                else
-                  {
-                    if ((state & RepeatAnimationState) == MagickFalse)
-                      state&=(~PlayAnimationState);
-                    scene=(ssize_t) number_scenes-1;
-                  }
+                scene_step.number_scenes=number_scenes;
+                scene_step.image_list=image_list;
+                scene_step.first_scene=first_scene;
+                XWrapSceneReverse(&scene_step,&scene_targets);
               }
           }
         scene=MagickMax(scene,0);
