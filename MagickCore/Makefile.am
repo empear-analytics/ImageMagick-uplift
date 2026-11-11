@@ -88,6 +88,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/attribute-hull.c \
   MagickCore/attribute-bounds.c \
   MagickCore/attribute-depth.c \
+  MagickCore/attribute-depth-measure.c \
   MagickCore/attribute.h \
   MagickCore/blob.c \
   MagickCore/blob.h \
