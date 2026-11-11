@@ -1916,6 +1916,39 @@ static MagickBooleanType EqualizesAlphaChannel(const Image *image,
     (white.w != black.w)) ? MagickTrue : MagickFalse);
 }
 
+static void EqualizeColormap(Image *image,PixelPacket *equalize_map,
+  const cl_float4 white,const cl_float4 black)
+{
+  cl_uint
+    i;
+
+  for (i=0; i < (cl_uint) image->colors; i++)
+  {
+    if ((image->channel_mask & SyncChannels) != 0)
+    {
+      EqualizeLevels
+        levels;
+
+      levels.white=white;
+      levels.black=black;
+      EqualizeColormapSync(image,equalize_map,i,&levels);
+      continue;
+    }
+    if (EqualizesRedChannel(image,white,black) != MagickFalse)
+      image->colormap[i].red=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
+    if (EqualizesGreenChannel(image,white,black) != MagickFalse)
+      image->colormap[i].green=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
+    if (EqualizesBlueChannel(image,white,black) != MagickFalse)
+      image->colormap[i].blue=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
+    if (EqualizesAlphaChannel(image,white,black) != MagickFalse)
+      image->colormap[i].alpha=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
+  }
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2124,31 +2157,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     /*
        Equalize colormap.
        */
-    for (i=0; i < (cl_uint) image->colors; i++)
-    {
-      if ((image->channel_mask & SyncChannels) != 0)
-      {
-        EqualizeLevels
-          levels;
-
-        levels.white=white;
-        levels.black=black;
-        EqualizeColormapSync(image,equalize_map,i,&levels);
-        continue;
-      }
-      if (EqualizesRedChannel(image,white,black) != MagickFalse)
-        image->colormap[i].red=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
-      if (EqualizesGreenChannel(image,white,black) != MagickFalse)
-        image->colormap[i].green=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
-      if (EqualizesBlueChannel(image,white,black) != MagickFalse)
-        image->colormap[i].blue=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
-      if (EqualizesAlphaChannel(image,white,black) != MagickFalse)
-        image->colormap[i].alpha=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
-    }
+    EqualizeColormap(image,equalize_map,white,black);
   }
 
   /*
