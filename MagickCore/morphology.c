@@ -2425,7 +2425,6 @@ static KernelInfo *AcquireLineOrThinningKernel(KernelInfo *kernel,
     default:
       return(AcquireDistanceKernel(kernel,type,args));
   }
-  return(kernel);
 }
 
 typedef struct _BuiltInKernelInputs
@@ -2470,7 +2469,6 @@ static KernelInfo *AcquireHitAndMissKernel(KernelInfo *kernel,
     default:
       return(AcquireLineOrThinningKernel(kernel,type,args,exception));
   }
-  return(kernel);
 }
 
 static KernelInfo *AcquireCrossShapedKernel(KernelInfo *kernel,
@@ -2490,7 +2488,6 @@ static KernelInfo *AcquireCrossShapedKernel(KernelInfo *kernel,
     default:
       return(AcquireHitAndMissKernel(kernel,type,inputs));
   }
-  return(kernel);
 }
 
 static KernelInfo *AcquireAreaShapedKernel(KernelInfo *kernel,
@@ -2518,7 +2515,6 @@ static KernelInfo *AcquireAreaShapedKernel(KernelInfo *kernel,
     default:
       return(AcquireCrossShapedKernel(kernel,type,inputs));
   }
-  return(kernel);
 }
 
 static KernelInfo *AcquireEdgeDetectionKernel(KernelInfo *kernel,
@@ -2550,7 +2546,6 @@ static KernelInfo *AcquireEdgeDetectionKernel(KernelInfo *kernel,
     default:
       return(AcquireAreaShapedKernel(kernel,type,inputs));
   }
-  return(kernel);
 }
 
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
