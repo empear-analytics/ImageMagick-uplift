@@ -5140,6 +5140,9 @@ typedef struct _CropEventInput
 
   RectangleInfo
     highlight_info;
+
+  const char
+    *text;
 } CropEventInput;
 
 static void XCropButtonRelease(const CropEventInput *event_input,
@@ -5178,6 +5181,34 @@ typedef struct _CropTargets
   size_t
     *state;
 } CropTargets;
+
+static void XCropExpose(const CropEventInput *event_input,XEvent *event)
+{
+  Display
+    *const display = event_input->display;
+
+  XWindows
+    *const windows = event_input->windows;
+
+  const RectangleInfo
+    highlight_info = event_input->highlight_info;
+
+  const char
+    *const text = event_input->text;
+
+  if ((*event).xexpose.window == windows->image.id)
+    if ((*event).xexpose.count == 0)
+      {
+        (*event).xexpose.x=(int) highlight_info.x;
+        (*event).xexpose.y=(int) highlight_info.y;
+        (*event).xexpose.width=(int) highlight_info.width;
+        (*event).xexpose.height=(int) highlight_info.height;
+        XRefreshWindow(display,&windows->image,event);
+      }
+  if ((*event).xexpose.window == windows->info.id)
+    if ((*event).xexpose.count == 0)
+      XInfoWidget(display,windows,text);
+}
 
 static void XCropButtonPress(const CropEventInput *event_input,
   const CropTargets *targets)
@@ -5602,6 +5633,7 @@ static MagickBooleanType XCropImage(Display *display,
       event_input.windows=windows;
       event_input.event=(&event);
       event_input.highlight_info=highlight_info;
+      event_input.text=text;
       switch (event.type)
       {
         case ButtonPress:
@@ -5616,18 +5648,7 @@ static MagickBooleanType XCropImage(Display *display,
         }
         case Expose:
         {
-          if (event.xexpose.window == windows->image.id)
-            if (event.xexpose.count == 0)
-              {
-                event.xexpose.x=(int) highlight_info.x;
-                event.xexpose.y=(int) highlight_info.y;
-                event.xexpose.width=(int) highlight_info.width;
-                event.xexpose.height=(int) highlight_info.height;
-                XRefreshWindow(display,&windows->image,&event);
-              }
-          if (event.xexpose.window == windows->info.id)
-            if (event.xexpose.count == 0)
-              XInfoWidget(display,windows,text);
+          XCropExpose(&event_input,&event);
           break;
         }
         case KeyPress:
