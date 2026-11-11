@@ -651,6 +651,34 @@ static void XRepeatSaveCommand(const AnimateCommandTile *tile,
   }
 }
 
+static void XStepCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  MagickStatusType
+    *const state = tile->state;
+
+  switch (animate_command)
+  {
+    case StepCommand:
+    case StepBackwardCommand:
+    case StepForwardCommand:
+    {
+      *state|=StepAnimationState;
+      *state&=(~PlayAnimationState);
+      if (animate_command == StepBackwardCommand)
+        *state&=(~ForwardAnimationState);
+      if (animate_command == StepForwardCommand)
+        *state|=ForwardAnimationState;
+      break;
+    }
+    default:
+    {
+      XRepeatSaveCommand(tile,animate_command);
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
@@ -805,21 +833,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       (void) XFree((void *) window_name.value);
       break;
     }
-    case StepCommand:
-    case StepBackwardCommand:
-    case StepForwardCommand:
-    {
-      *state|=StepAnimationState;
-      *state&=(~PlayAnimationState);
-      if (animate_command == StepBackwardCommand)
-        *state&=(~ForwardAnimationState);
-      if (animate_command == StepForwardCommand)
-        *state|=ForwardAnimationState;
-      break;
-    }
     default:
     {
-      XRepeatSaveCommand(&tile,animate_command);
+      XStepCommand(&tile,animate_command);
       break;
     }
   }
