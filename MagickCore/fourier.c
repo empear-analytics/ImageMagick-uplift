@@ -583,6 +583,13 @@ static MagickBooleanType TryCloneComplexImages(const Image *images,
   return(MagickFalse);
 }
 
+static void DestroyComplexViewPair(CacheView *real_view,
+  CacheView *imaginary_view)
+{
+  real_view=DestroyCacheView(real_view);
+  imaginary_view=DestroyCacheView(imaginary_view);
+}
+
 static Image *FinishComplexImages(Image *complex_images,
   const MagickBooleanType status)
 {
@@ -689,12 +696,9 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
         ReportComplexProgress(images,ComplexImageTag,progress,&status);
       }
   }
-  Cr_view=DestroyCacheView(Cr_view);
-  Ci_view=DestroyCacheView(Ci_view);
-  Br_view=DestroyCacheView(Br_view);
-  Bi_view=DestroyCacheView(Bi_view);
-  Ar_view=DestroyCacheView(Ar_view);
-  Ai_view=DestroyCacheView(Ai_view);
+  DestroyComplexViewPair(Cr_view,Ci_view);
+  DestroyComplexViewPair(Br_view,Bi_view);
+  DestroyComplexViewPair(Ar_view,Ai_view);
   return(FinishComplexImages(complex_images,status));
 }
 
