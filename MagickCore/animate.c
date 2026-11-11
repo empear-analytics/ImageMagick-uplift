@@ -3310,6 +3310,39 @@ static void XHelpKeyCommand(const KeySym key_symbol,
   }
 }
 
+static void XPlaybackKeyCommand(const KeySym key_symbol,
+  AnimateCommand *animate_command)
+{
+  switch (key_symbol)
+  {
+    case XK_BackSpace:
+    {
+      (*animate_command)=StepBackwardCommand;
+      break;
+    }
+    case XK_space:
+    {
+      (*animate_command)=StepForwardCommand;
+      break;
+    }
+    case XK_less:
+    {
+      (*animate_command)=FasterCommand;
+      break;
+    }
+    case XK_greater:
+    {
+      (*animate_command)=SlowerCommand;
+      break;
+    }
+    default:
+    {
+      XHelpKeyCommand(key_symbol,&(*animate_command));
+      break;
+    }
+  }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4263,29 +4296,9 @@ MagickExport Image *XAnimateImages(Display *display,
             animate_command=XControlOpenCommand(event,animate_command);
             break;
           }
-          case XK_BackSpace:
-          {
-            animate_command=StepBackwardCommand;
-            break;
-          }
-          case XK_space:
-          {
-            animate_command=StepForwardCommand;
-            break;
-          }
-          case XK_less:
-          {
-            animate_command=FasterCommand;
-            break;
-          }
-          case XK_greater:
-          {
-            animate_command=SlowerCommand;
-            break;
-          }
           default:
           {
-            XHelpKeyCommand(key_symbol,&animate_command);
+            XPlaybackKeyCommand(key_symbol,&animate_command);
             break;
           }
         }
