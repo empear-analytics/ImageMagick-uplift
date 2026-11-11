@@ -450,3 +450,73 @@ Decided by `owner`; tool 2d415aac6 `case_tail_check.py`. Whole wide catalogue: 1
 plateau: Bumpy Road, Complex and Large Method remain in six widgets; no Deep Nesting is left in the file.
 Possible upstream: XPreferencesWidget's Cache press overwrites `width`, reused by the next layout update;
 XFileBrowserWidget's SelectionRequest leaves `notify.send_event` unset.
+
+## Lane b, fifth round: display.c 1.33 -> 1.41 (wide build, merged at the pause)
+
+XMatteEditImage leaves Deep Nesting and Brain Method (depth 5 -> 3; Bumpy Road 11 -> 4; Large Method 451 -> 316
+lines; now Complex Method cc 45), so display.c has 6 Brain Methods. 9 cases, 0 diverged each step: cef7a900e D (b)
+`XTrackInfoWidget`; 6f937a915 O `XDiscardMagnifyKeys`; 8357321a3 CT `XSelectPaintMethod` (lone static `method`);
+20913bcaf N `XSelectFuzzFactor`; 0e1d368d4 playbook; 58670b6a5 N two blocks as one rule-1 set (`XMattePoint` and
+`XMatteReplace`, 1.32 each alone, flat together); 17f436542 N `XMatteReset`; 15e39cec4 N `XMatteFloodfill`;
+a9b11568f W `XMatteEditPixels`; e0448377d CT `XSelectBorderColor` (struct static); bfdab35f0 N `XSelectMatteValue`
+1.41. Unreached moved lines: obj_modulo IDENTICAL or MODULO-IDENTICAL. Recipe text (0e1d368d4, Decided by `owner`):
+CT step 2 (and O step 2 by reference) admits a block-scope `static` of structure type, written `(*v).m`, never an
+array of structures. Tool gaps: `case_tail_check.py` and `struct_fill_check.py` flag moved temporary declarations,
+rewritten comments and N step 8's shared fill before the switch; those parts were checked by reading, as each
+message says. Whole wide catalogue: 14,145 cases, 4 load timeouts while other lanes ran, 0 on rerun. Next:
+XColorEditImage (its `ssize_t i` loop counters differ from Matte's `int i`), the pen-colour sites (a hoisting
+amendment), XCropImage (a ButtonPress case falling into ButtonRelease).
+
+## Lane c, fifth round: animate.c 3.48 -> 3.53 (wide build, merged at the pause)
+
+XMagickCommand (cc 43 -> 9; leaves Large Method and Bumpy Road): 295266964 E `XConfirmAnimateExit`; cd059e412 E
+`XRemoteBrowseDocumentation`; fab1b92d7 playbook **new Recipe UX** (Unnest an Exit Implied by Its Guard: `if (A) {
+if (B) X; S }`-shaped guards become `if ((A) || (B)) { S }`, `if (B) X`, `if (A) { Y }` when X and Y leave on every
+path, A and B are side-effect-free reads of locals and S writes nothing they read), 47e9149b7 wording fix;
+aa4486559, e8683d28c, 34cd4ee5e, fe7ba22bd, 088f819b6, d9fb66172 SD step 8 (the 19-label switch as a chain of six
+helpers sharing `AnimateCommandTile`); 6e3fbc04c FI step 8 (IDENTICAL); 7e851020c N `XReadImageFileList`; afcd3a27a
+E `XDestroyFileList` 3.50; b877b6887 UX (flat; cc 10 -> 11 and back over 70 lines for one commit, as its message
+says); 784ac39eb E `XDestroyFailedFileList` 3.53. **Evidence gap:** all 299 wide cases reaching XMagickCommand take
+PlayCommand, so only the `XPlayCommand` step is checked by the oracle; the other moved groups rest on `refactor_guard
+--calls` (+2 only) and arguments checked by reading. Whole wide catalogue: 107 baseline load timeouts at load ~38,
+0 on a `--no-cache` rerun. Probed next: six E/P steps on the unreached XSaveImage to 3.67.
+
+## Lane d, sixth round: xwindow.c 1.83 -> 1.99 (wide build, merged at the pause)
+
+XMakeStandardColormap leaves Deep Nesting and Brain Method (514 cases, 0 diverged each): dea20eccb E
+`XRankColorDiversity`; 890c47298 E `XQueryServerColors`; f7d9f5448 N `XRetainDefaultColors` (unreached:
+struct_fill_check OK, obj_modulo MODULO-IDENTICAL); 725006500 N `XRetainServerColors`; dabe2eba9 N
+`XAllocSharedColors`; 4f2c07659 CN 1.99 (IDENTICAL). Flat steps were probed as one plan at 1.99. dabe2eba9 and
+890c47298 move the server-colour allocation's `ThrowXWindowFatalException` (unreached; its location now names the
+helper). Whole wide catalogue: 82 baseline load timeouts plus `infra/0fd402f13a`, 0 on a `--no-cache` rerun.
+Plateau: XMakeImage (shared-memory `#if` blocks), XMakeMagnifyImage (unreached depth-8 bitmap twins, Q only),
+XMakeImageLSB/MSBFirst (a dead `x=0;` store left alone), XGetWindowImage (function-static `colormap_info`),
+XBestVisualInfo and DestroyXResources (`#if` blocks), XDitherImage. Possible upstream: the unread `x=0;` stores.
+
+## Lane a, sixth round: widget.c, stopped at the pause with no commit
+
+widget.c stays at 2.97 (d4469a686). Probes on scratch copies, for the next batch: the file has 111 functions and
+going back to 110 (folding `XScreenTrackWidgetMapping` into its caller) scores 3.04; further functions cost
+nothing more once past 110. `XScreenEvent` leaving Bumpy Road (the FocusOut `if` by Recipe E, unreached, guard
+level) gives 2.99. A single widget leaving its findings is flat (each of Font, Command, Notice, TextView stubbed:
+2.97); the three browsers together 3.08, the eight other widgets 3.17, all eleven 6.55. Lowering bumps without
+leaving Bumpy Road is flat or falls (2.95); moving a whole switch out falls (2.79). The lever is getting back under
+110 functions: a Recipe S split of a widget family (e.g. `XCommandWidget` and its helpers) or merging twin helpers
+(none are identical today). Whole wide catalogue on d4469a686: 39 timeouts under four concurrent catalogue runs,
+rerun at `-j 2`: only `infra/0fd402f13a`, which passes alone.
+
+## Closing the W17 batch (2026-11-11)
+
+The owner paused the batch; each lane stopped on a commit that raised its file's score (no trailing flat plan
+steps), and all four lanes' final work is merged. Gate on the merged tip: 15,900 cases, 0 diverged;
+`tools/ci_linux_warnings.sh --campaign-a` OK on 84 files. Sweep of the merged tip (cs-mcp 1.5.16): campaign A 84
+files (76 at the start, eight new from Recipe S splits), mean 8.60 -> 8.80, files at 10.0 30 -> 35 (effect.c,
+visual-effects.c, colorspace.c, resize.c, fourier-complex.c). Part of the mean's rise comes from splits that leave a
+new file at the original's score (compare-similarity.c 2.97, effect-filter.c and visual-effects-pixel.c 9.09); the
+owner question on such splits is open.
+
+Open for the owner: splits that relabel most of a file (compare.c, effect.c, visual-effects.c); feature.c's
+three-family split needing its shared progress helper; FB fills differing only in stack-frame layout; composite.c's
+three asks (Copy/Intensity merge, I/ST with nine targets or a block tail, Recipe H on `FreeDivergentResources`); the
+LB `switch`-as-loop amendment for display.c; the recipe text added today (FB, UX, and the D, CT, I, MT, N, O, OC, S,
+SD, W, Z amendments), written under the 2026-11-10 OK and awaiting confirmation.
