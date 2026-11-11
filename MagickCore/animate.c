@@ -4300,6 +4300,13 @@ static void XRequestPageGeometry(Display *display,XWindows *windows,
     image_info->page=GetPageGeometry(geometry);
 }
 
+static MagickBooleanType IsJPEGFormat(const ImageInfo *image_info)
+{
+  return(((LocaleCompare(image_info->magick,"JPEG") == 0) ||
+    (LocaleCompare(image_info->magick,"JPG") == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType XSaveImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -4339,8 +4346,7 @@ static MagickBooleanType XSaveImage(Display *display,
   image_info=CloneImageInfo(resource_info->image_info);
   (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
   (void) SetImageInfo(image_info,1,exception);
-  if ((LocaleCompare(image_info->magick,"JPEG") == 0) ||
-      (LocaleCompare(image_info->magick,"JPG") == 0))
+  if (IsJPEGFormat(image_info) != MagickFalse)
     {
       char
         quality[MagickPathExtent];
