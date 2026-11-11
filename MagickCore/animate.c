@@ -3423,6 +3423,13 @@ static void XLogReparentNotify(XResourceInfo *resource_info,const XEvent event)
       event.xreparent.window);
 }
 
+static void XLogUnknownEvent(XResourceInfo *resource_info,const XEvent event)
+{
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
+      event.type);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4405,9 +4412,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       default:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
-            event.type);
+        XLogUnknownEvent(resource_info,event);
         break;
       }
     }
