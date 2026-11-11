@@ -1986,10 +1986,31 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _PolaroidCaption
+{
+  Image
+    **caption_image;
+
+  size_t
+    *height;
+
+  char
+    **text;
+} PolaroidCaption;
+
 static void AnnotatePolaroidCaption(const Image *image,
-  const DrawInfo *draw_info,Image **caption_image,size_t *height,char **text,
+  const DrawInfo *draw_info,const PolaroidCaption *targets,
   ExceptionInfo *exception)
 {
+  Image
+    **const caption_image = targets->caption_image;
+
+  size_t
+    *const height = targets->height;
+
+  char
+    **const text = targets->text;
+
   char
     geometry[MagickPathExtent];
 
@@ -2185,6 +2206,9 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
       char
         *text;
 
+      const PolaroidCaption
+        caption_targets = { (&caption_image), (&height), (&text) };
+
       /*
         Generate caption image.
       */
@@ -2194,8 +2218,7 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
       text=InterpretImageProperties((ImageInfo *) NULL,(Image *) image,caption,
         exception);
       if (text != (char *) NULL)
-        AnnotatePolaroidCaption(image,draw_info,&caption_image,&height,&text,
-          exception);
+        AnnotatePolaroidCaption(image,draw_info,&caption_targets,exception);
     }
   picture_image=CloneImage(image,(size_t) ((ssize_t) image->columns+2*quantum),
     height,MagickTrue,exception);
