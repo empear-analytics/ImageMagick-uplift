@@ -1245,6 +1245,13 @@ static MagickBooleanType IsColormapVisual(const XVisualInfo *visual_info)
     (visual_info->klass == DirectColor)) ? MagickTrue : MagickFalse);
 }
 
+static void XFocusBackdropImage(Display *display,XWindows *windows)
+{
+  if (windows->backdrop.id != (Window) NULL)
+    (void) XSetInputFocus(display,windows->image.id,RevertToParent,
+      CurrentTime);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2804,9 +2811,7 @@ MagickExport Image *XAnimateImages(Display *display,
           }
         if (event.xunmap.window == windows->popup.id)
           {
-            if (windows->backdrop.id != (Window) NULL)
-              (void) XSetInputFocus(display,windows->image.id,RevertToParent,
-                CurrentTime);
+            XFocusBackdropImage(display,windows);
             windows->popup.mapped=MagickFalse;
             break;
           }
