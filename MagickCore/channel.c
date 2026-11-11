@@ -822,32 +822,38 @@ static MagickBooleanType TryFxSeparator(
   return(MagickFalse);
 }
 
-MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
-  ExceptionInfo *exception)
+typedef struct _ChannelFxTokens
 {
+  const Image
+    *image;
+
+  const char
+    *expression;
+
+  ExceptionInfo
+    *exception;
+
+  ChannelType
+    channel_mask;
+} ChannelFxTokens;
+
+static Image *ParseChannelFxTokens(const ChannelFxTokens *tokens,
+  const char *p,const Image *source_image,Image *destination_image)
+{
+  ExceptionInfo
+    *const exception = tokens->exception;
+
   ChannelFx
     channel_op = ExtractChannelOp;
 
   ChannelType
-    channel_mask;
+    channel_mask = tokens->channel_mask;
 
   char
     token[MagickPathExtent] = "";
 
-  const char
-    *p;
-
-  const Image
-    *source_image;
-
   double
     pixel = 0.0;
-
-  Image
-    *destination_image;
-
-  MagickBooleanType
-    status = MagickTrue;
 
   PixelChannel
     source_channel,
@@ -856,26 +862,6 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   ssize_t
     channels = 0;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  p=expression;
-  source_image=image;
-  destination_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (destination_image == (Image *) NULL)
-    return((Image *) NULL);
-  if (expression == (const char *) NULL)
-    return(destination_image);
-  status=SetImageStorageClass(destination_image,DirectClass,exception);
-  if (status == MagickFalse)
-    {
-      destination_image=GetLastImageInList(destination_image);
-      return((Image *) NULL);
-    }
-  channel_mask=destination_image->channel_mask;
   (void) GetNextToken(p,&p,MagickPathExtent,token);
   while (*token != '\0')
   {
@@ -909,7 +895,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
     ParseChannelOperator(&channel_op,&p,token);
     {
       const ChannelFxDestination
-        parse = { channel_op, image, destination_image, exception };
+        parse = { channel_op, tokens->image, destination_image, exception };
 
       if (ParseChannelDestination(&parse,token,&destination_targets) ==
           MagickFalse)
@@ -927,7 +913,7 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
         break;
     }
     AdvanceDestinationChannel(channel_op,&channel_mask,&destination_channel);
-    if (SetChannelFxProgress(source_image,p,expression) == MagickFalse)
+    if (SetChannelFxProgress(source_image,p,tokens->expression) == MagickFalse)
       break;
   }
   if (destination_image == (Image *) NULL)
@@ -935,6 +921,54 @@ MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
   (void) SetPixelChannelMask(destination_image,channel_mask);
   SetGrayChannelImage(destination_image,channel_op,channels,exception);
   return(GetFirstImageInList(destination_image));
+}
+
+MagickExport Image *ChannelFxImage(const Image *image,const char *expression,
+  ExceptionInfo *exception)
+{
+  ChannelType
+    channel_mask;
+
+  const char
+    *p;
+
+  const Image
+    *source_image;
+
+  ChannelFxTokens
+    tokens;
+
+  Image
+    *destination_image;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  p=expression;
+  source_image=image;
+  destination_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (destination_image == (Image *) NULL)
+    return((Image *) NULL);
+  if (expression == (const char *) NULL)
+    return(destination_image);
+  status=SetImageStorageClass(destination_image,DirectClass,exception);
+  if (status == MagickFalse)
+    {
+      destination_image=GetLastImageInList(destination_image);
+      return((Image *) NULL);
+    }
+  channel_mask=destination_image->channel_mask;
+  tokens.image=image;
+  tokens.expression=expression;
+  tokens.exception=exception;
+  tokens.channel_mask=channel_mask;
+  return(ParseChannelFxTokens(&tokens,p,source_image,destination_image));
 }
 
 
