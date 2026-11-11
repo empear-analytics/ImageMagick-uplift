@@ -12263,6 +12263,100 @@ static void XROIButtonRelease(const ROIApplyInput *apply_input,
   (void) XCommandWidget(display,windows,ApplyMenu,(XEvent *) NULL);
 }
 
+typedef struct _ROIKeyInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const XEvent
+    *event;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+} ROIKeyInput;
+
+typedef struct _ROIKeyTargets
+{
+  RectangleInfo
+    *roi_info;
+
+  DisplayCommand
+    *display_command;
+
+  size_t
+    *state;
+} ROIKeyTargets;
+
+static void XROIDownHelpKey(const ROIKeyInput *key_input,
+  const ROIKeyTargets *targets,const KeySym key_symbol)
+{
+  Display
+    *const display = key_input->display;
+
+  XWindows
+    *const windows = key_input->windows;
+
+  XResourceInfo
+    *const resource_info = key_input->resource_info;
+
+  const XEvent
+    *const event = key_input->event;
+
+  Image
+    **const image = key_input->image;
+
+  ExceptionInfo
+    *const exception = key_input->exception;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  DisplayCommand
+    *const display_command = targets->display_command;
+
+  size_t
+    *const state = targets->state;
+
+  switch ((int) key_symbol)
+  {
+    case XK_Prior:
+    case XK_Down:
+    case XK_KP_Down:
+    {
+      (*roi_info).y++;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Region of Interest",ImageROIHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    default:
+    {
+      (*display_command)=XImageWindowCommand(display,resource_info,windows,
+        (*event).xkey.state,key_symbol,image,exception);
+      if ((*display_command) != NullCommand)
+        (*state)|=UpdateRegionState;
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12517,6 +12611,9 @@ static MagickBooleanType XROIImage(Display *display,
   const ROITargets
     targets = { &x, &y, &roi_info, &state };
 
+  const ROIKeyTargets
+    key_targets = { &roi_info, &display_command, &state };
+
   /*
     Map Command widget.
   */
@@ -12755,6 +12852,9 @@ static MagickBooleanType XROIImage(Display *display,
       CropEventInput
         event_input;
 
+      ROIKeyInput
+        key_input;
+
       if (windows->info.mapped != MagickFalse)
         {
           /*
@@ -12915,6 +13015,12 @@ static MagickBooleanType XROIImage(Display *display,
       event_input.event=(&event);
       event_input.highlight_info=highlight_info;
       event_input.text=text;
+      key_input.display=display;
+      key_input.resource_info=resource_info;
+      key_input.windows=windows;
+      key_input.event=(&event);
+      key_input.image=image;
+      key_input.exception=exception;
       switch (event.type)
       {
         case ButtonPress:
@@ -12987,30 +13093,9 @@ static MagickBooleanType XROIImage(Display *display,
               roi_info.x++;
               break;
             }
-            case XK_Prior:
-            case XK_Down:
-            case XK_KP_Down:
-            {
-              roi_info.y++;
-              break;
-            }
-            case XK_F1:
-            case XK_Help:
-            {
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXcopy);
-              XTextViewHelp(display,resource_info,windows,MagickFalse,
-                "Help Viewer - Region of Interest",ImageROIHelp);
-              (void) XSetFunction(display,windows->image.highlight_context,
-                GXinvert);
-              break;
-            }
             default:
             {
-              display_command=XImageWindowCommand(display,resource_info,windows,
-                event.xkey.state,key_symbol,image,exception);
-              if (display_command != NullCommand)
-                state|=UpdateRegionState;
+              XROIDownHelpKey(&key_input,&key_targets,key_symbol);
               break;
             }
           }
