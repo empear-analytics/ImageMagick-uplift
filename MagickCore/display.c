@@ -3344,6 +3344,66 @@ static void XReplaceColormapColor(Image **image,const PixelInfo target,
   (void) SyncImage(*image,exception);
 }
 
+typedef struct _XReplaceColorInput
+{
+  Image
+    **image;
+
+  CacheView
+    *image_view;
+
+  PixelInfo
+    target;
+
+  XColor
+    color;
+
+  ExceptionInfo
+    *exception;
+} XReplaceColorInput;
+
+static void XReplaceImageColor(const XReplaceColorInput *replace)
+{
+  Image
+    **const image = replace->image;
+
+  CacheView
+    *const image_view = replace->image_view;
+
+  const PixelInfo
+    target = replace->target;
+
+  const XColor
+    color = replace->color;
+
+  ExceptionInfo
+    *const exception = replace->exception;
+
+  int
+    y;
+
+  Quantum
+    *q;
+
+  if ((*image)->storage_class == DirectClass)
+    {
+      for (y=0; y < (int) (*image)->rows; y++)
+      {
+        q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
+          (*image)->columns,1,exception);
+        if (q == (Quantum *) NULL)
+          break;
+        XReplaceRowColor(image,q,target,color);
+        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+          break;
+      }
+    }
+  else
+    {
+      XReplaceColormapColor(image,target,color,exception);
+    }
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3813,28 +3873,20 @@ static MagickBooleanType XColorEditImage(Display *display,
             PixelInfo
               target;
 
+            XReplaceColorInput
+              replace;
+
             /*
               Update color information using replace algorithm.
             */
             (void) GetOneCacheViewVirtualPixelInfo(image_view,(ssize_t)
               x_offset,(ssize_t) y_offset,&target,exception);
-            if ((*image)->storage_class == DirectClass)
-              {
-                for (y=0; y < (int) (*image)->rows; y++)
-                {
-                  q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,
-                    (*image)->columns,1,exception);
-                  if (q == (Quantum *) NULL)
-                    break;
-                  XReplaceRowColor(image,q,target,color);
-                  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-                    break;
-                }
-              }
-            else
-              {
-                XReplaceColormapColor(image,target,color,exception);
-              }
+            replace.image=image;
+            replace.image_view=image_view;
+            replace.target=target;
+            replace.color=color;
+            replace.exception=exception;
+            XReplaceImageColor(&replace);
             break;
           }
           case FloodfillMethod:
