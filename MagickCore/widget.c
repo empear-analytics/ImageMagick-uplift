@@ -4849,6 +4849,18 @@ static void SelectFileBrowserEntry(const FileBrowserPress *press,
   (*state)|=RedrawListState;
 }
 
+static void CopyFileBrowserFormat(char *reply,char *format)
+{
+  char
+    *p;
+
+  p=reply+Extent(reply)-1;
+  while ((p > (reply+1)) && (*(p-1) != '.'))
+    p--;
+  if ((p > (reply+1)) && (*(p-1) == '.'))
+    (void) CopyMagickString(format,p,MagickPathExtent);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -5055,15 +5067,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         special_info.y=action_info.y;
         if (anomaly == MagickFalse)
           {
-            char
-              *p;
-
             special_info.text=(char *) FormatButtonText;
-            p=reply+Extent(reply)-1;
-            while ((p > (reply+1)) && (*(p-1) != '.'))
-              p--;
-            if ((p > (reply+1)) && (*(p-1) == '.'))
-              (void) CopyMagickString(format,p,MagickPathExtent);
+            CopyFileBrowserFormat(reply,format);
           }
         XGetWidgetInfo(UpButtonText,&up_info);
         up_info.width=width;
