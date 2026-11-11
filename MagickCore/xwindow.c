@@ -9270,6 +9270,41 @@ static void XApplyGrayVisual(const XVisualInfo *visual_info,
     }
 }
 
+static void XRankColorDiversity(Image *image,DiversityPacket *diversity,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    diversity[i].red=ClampToQuantum(image->colormap[i].red);
+    diversity[i].green=ClampToQuantum(image->colormap[i].green);
+    diversity[i].blue=ClampToQuantum(image->colormap[i].blue);
+    diversity[i].index=(unsigned short) i;
+    diversity[i].count=0;
+  }
+  image_view=AcquireAuthenticCacheView(image,exception);
+  XCountColorDiversity(image,image_view,diversity,exception);
+  image_view=DestroyCacheView(image_view);
+  /*
+    Sort colors by decreasing intensity.
+  */
+  qsort((void *) diversity,image->colors,sizeof(*diversity),
+    IntensityCompare);
+  for (i=0; i < (ssize_t) image->colors; )
+  {
+    diversity[i].count<<=4;  /* increase this colors popularity */
+    i+=MagickMax((int) (image->colors >> 4),2);
+  }
+  diversity[image->colors-1].count<<=4;
+  qsort((void *) diversity,image->colors,sizeof(*diversity),
+    PopularityCompare);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9454,9 +9489,6 @@ MagickPrivate void XMakeStandardColormap(Display *display,
         colormap_type=PrivateColormap;
       if (colormap_type == SharedColormap)
         {
-          CacheView
-            *image_view;
-
           DiversityPacket
             *diversity;
 
@@ -9477,30 +9509,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
           if (diversity == (DiversityPacket *) NULL)
             ThrowXWindowFatalException(ResourceLimitFatalError,
               "UnableToCreateColormap",image->filename);
-          for (i=0; i < (ssize_t) image->colors; i++)
-          {
-            diversity[i].red=ClampToQuantum(image->colormap[i].red);
-            diversity[i].green=ClampToQuantum(image->colormap[i].green);
-            diversity[i].blue=ClampToQuantum(image->colormap[i].blue);
-            diversity[i].index=(unsigned short) i;
-            diversity[i].count=0;
-          }
-          image_view=AcquireAuthenticCacheView(image,exception);
-          XCountColorDiversity(image,image_view,diversity,exception);
-          image_view=DestroyCacheView(image_view);
-          /*
-            Sort colors by decreasing intensity.
-          */
-          qsort((void *) diversity,image->colors,sizeof(*diversity),
-            IntensityCompare);
-          for (i=0; i < (ssize_t) image->colors; )
-          {
-            diversity[i].count<<=4;  /* increase this colors popularity */
-            i+=MagickMax((int) (image->colors >> 4),2);
-          }
-          diversity[image->colors-1].count<<=4;
-          qsort((void *) diversity,image->colors,sizeof(*diversity),
-            PopularityCompare);
+          XRankColorDiversity(image,diversity,exception);
           /*
             Allocate colors.
           */
