@@ -2565,6 +2565,16 @@ static void XCountSceneColors(Image *images,XResourceInfo *resource_info)
   }
 }
 
+static void XClearMagickWindowIds(XWindowInfo **magick_windows,
+  const size_t number_windows)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_windows; i++)
+    magick_windows[i]->id=(Window) NULL;
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2695,7 +2705,6 @@ MagickExport Image *XAnimateImages(Display *display,
 
   ssize_t
     first_scene,
-    i,
     iterations,
     scene;
 
@@ -2803,8 +2812,7 @@ MagickExport Image *XAnimateImages(Display *display,
       magick_windows[number_windows++]=(&windows->command);
       magick_windows[number_windows++]=(&windows->widget);
       magick_windows[number_windows++]=(&windows->popup);
-      for (i=0; i < (ssize_t) number_windows; i++)
-        magick_windows[i]->id=(Window) NULL;
+      XClearMagickWindowIds(magick_windows,number_windows);
     }
   /*
     Initialize font info.
