@@ -44,6 +44,7 @@ $call Make color.c
 $call Make color-equivalent.c
 $call Make colormap.c
 $call Make colorspace.c
+$call Make colorspace-transform.c
 $call Make colorspace-convert.c
 $call Make colorspace-generic-rgb.c
 $call Make compare.c

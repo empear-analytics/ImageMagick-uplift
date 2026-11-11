@@ -115,6 +115,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colormap.h \
   MagickCore/colormap-private.h \
   MagickCore/colorspace.c \
+  MagickCore/colorspace-transform.c \
   MagickCore/colorspace-convert.c \
   MagickCore/colorspace-generic-rgb.c \
   MagickCore/colorspace.h \
