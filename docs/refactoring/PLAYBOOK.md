@@ -7015,6 +7015,16 @@ Recipe LB (a `break;`, not a `return`).
    then moves with its call to directly before the new call, past statements that write
    none of the members' values (check by reading: an address `&v` is fixed for the
    caller's whole body).
+   (d) Five or six written locals (2026-11-11). When the block writes five or six plain
+   locals of the caller that the caller reads after it, (b)'s limit of four rises to six
+   if their addresses go in (c)'s one `const` struct: it is declared with its
+   initialiser (the addresses `&v`, and the block's read-only inputs as further members)
+   among the declarations at the top of the block that holds the call, no statement
+   between it and the call, so each input member holds the value the block read. The
+   helper binds each address as `T *const v = name->v;` and writes `(*v)` at every use,
+   so it still takes at most four parameters: the struct, the arrays or pointers it
+   reads (`char *token`), and `T *result`. A local the block writes only on paths that
+   leave through `return(R);` keeps (b)'s by-value form.
 
 **Before:**
 
@@ -7083,6 +7093,13 @@ static MagickBooleanType TryLeadingOperand (FxInfo * pfx,
   fill is allowed only past statements that write none of its members' values). A
   `const` struct is not written by any helper, so passing it on hands the inner helper
   exactly what its caller filled.
+- Under step 6 (d) the six locals stay the caller's own: only their addresses travel,
+  in a `const` struct nothing writes, and no other name for them is in use while the
+  helper runs, so every read and write through `(*v)` reaches the object the block named,
+  at the same point and in the same order. On the path that returns `MagickTrue` the
+  caller returns the stored `R` at once; on the fall-through path it reads each local as
+  the block left it. The count of four in (b) bounded the parameters, which (c)'s struct
+  already removes; the struct adds no read or write the block did not make.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new function,
 nothing else moved), and steps 1 and 2 checked by reading.
@@ -7102,6 +7119,15 @@ block returned. Step 4 refused the `ssize_t` result, step 2 the written `colour`
 both blocks need six or more parameters. A probe of both: the function leaves Complex
 Method, fx.c 3.73 to 3.78 to 3.88, no finding on either helper. Added by Claude Code
 (Claude Opus 5.5).
+Step 6 (d) (2026-11-11, W18 lane d, owner's OK to evolve the recipes): `channel.c`'s
+`ChannelFxImage`, whose token-separator `switch` (`,`, `|` and `;`) writes `p`,
+`source_image`, `destination_image`, `channels`, `destination_channel` and `channel_mask`
+(six locals), reads `channel_op` and `exception`, and leaves through
+`destination_image=DestroyImageList(destination_image); return(destination_image);` on
+one path and `return((Image *) NULL);` on another, which Recipes I, V and W refuse (two
+different exits) and step 6 (b) stopped at four locals. A probe of the helper: the
+function goes from cc 17 to 12, channel.c 9.31 to 9.46, no finding on the helper. Added
+by Claude Code (Claude Sonnet 5.5).
 
 ---
 
@@ -11508,3 +11534,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | CT | Step 2 (and O step 2 by reference): a block-scope `static` of structure type (not an array of structures), its address taken only in the targets initialiser, may be a written variable on the scalar static's terms; its member is a pointer to the structure, `v.m` becomes `(*v).m` and `&v` becomes `v`. *Careful* adds the argument (one object at one address, `(*v).m` is the member, nothing copied, a callee filling the structure through the pointer fills the static) | `display.c`'s `XMatteEditImage` (campaign A, W17 lane b, wide build): its Border Color case tail ends the case through `break;` from a depth-5 `if (*color_name == '\0')` and writes the function's `static XColor border_color` through `XParseColor(...,&border_color)`; CT step 2 admitted only arithmetic, enumeration and pointer statics. The case is one of the four whose move takes the function to depth 3 (probe: display.c 1.33 to 1.41, the function out of *Deep, Nested Complexity* and *Brain Method*, no finding on the helpers) | owner |
 | 2026-11-11 | NEW | UX | Unnest an Exit Implied by Its Guard: a guard on the disjunction of `A` and `B` whose body runs a clean-up `S`, then exits through `X` when `B` holds and through `Y` otherwise, becomes three statements: the guard holding `S` alone, `if (B) X`, and `if (A) { Y }`; `A` and `B` are side-effect-free reads of locals that `S` does not write | `animate.c`'s `XMagickCommand` (campaign A, W17 lane c, wide build): the Open command's failure guard releases the file list and then throws one of two `ThrowXWindowException`s, which record `GetMagickModule()` and must stay in the function; the nested test is the function's last bump after the SD splits. Probe of the chain: `XMagickCommand` leaves Bumpy Road Ahead and Large Method, 3.48 to 3.67 with the XSaveImage steps | owner |
 | 2026-11-11 | WORDING | UX | Step 5 and *Evidence level*: `refactor_guard.py` counts distinct values, so repeating `A` may leave it at PASS; a WARN is expected only when a literal of `A` is new to the count | The first use (`XMagickCommand`, `status == MagickFalse`) printed PASS, not the WARN the text predicted | owner |
+| 2026-11-11 | AMEND | RV | Step 6 (new (d)): five or six written locals of the caller go by (c)'s one `const` struct of addresses, bound as `T *const v = name->v;` and written `(*v)`, so the helper keeps at most four parameters (the struct, the arrays or pointers it reads, `T *result`). *Careful* gives the argument: the locals stay the caller's, only addresses travel, and nothing else names them while the helper runs | `channel.c`'s `ChannelFxImage` (campaign A, W18 lane d): the token-separator `switch` writes six locals and leaves through two different `return`s (`return(destination_image)` after `DestroyImageList`, and `return((Image *) NULL)`), which I, V, W refuse; step 6 (b) stopped at four. A probe: the function cc 17 to 12, channel.c 9.31 to 9.46, no finding on the helper | owner |
