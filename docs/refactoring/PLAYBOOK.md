@@ -781,6 +781,37 @@ with no new helper finding and no new *Code Duplication*; the commit names the f
 it removes and says that no *Code Duplication* was reported. A warning the block
 throws with `GetMagickModule()` now names the helper, which the oracle normalises.
 
+**A helper defined further down, or taking an input struct** (2026-11-11). Form (b),
+*Unreached functions* and *Object code that differs only in the caller* may call a
+helper that the file defines below the caller, and one whose block reads its inputs
+from a `const` input struct (Recipes N, Y and CT make such helpers):
+
+- *Further down:* a forward declaration of the helper, `static T` and on the next line
+  `Helper(<types>);`, the definition's parameter list with the parameter names left
+  out, stands directly above the caller's signature, once (a later caller further down
+  needs none). A `typedef` that the helper's parameter list names and that the file
+  declares below the caller moves, unchanged, to directly above that declaration, in a
+  commit of its own before the reuse, proven as Recipe L proves a moved type:
+  `obj_identical.sh` prints `IDENTICAL`.
+- *Input struct:* when the helper binds members at the top of its body from a
+  `const S *p` parameter (`T const m = p->m;`, each member under its own name), the
+  caller declares an `S` local at the top of the block that holds the call and fills,
+  directly before the call, every member the helper binds, `s.m=e;`; each binding then
+  counts as a parameter `m` bound to `e` under the renaming above (Recipe N's argument:
+  the helper reads `e`'s value through `m`). An `e` of the form `(&E)` (an address the
+  caller has no variable for, `(&windows->widget)`) binds the block's `E.f` to `m->f`
+  and its `&E` to `m`, the same objects; `&(*p)` in the helper is the pointer `p`.
+- `tools/reuse_check.py` checks both (one forward declaration whose types equal the
+  definition's, the fills one per bound member and before the call, nothing else
+  added) besides what it checked before; `--calls` moves as before, plus one for the
+  forward declaration. Types of the fills against the members are checked by reading
+  and by the build.
+
+The declaration only names the function the definition below defines, so every call
+reaches the same code; moving a `typedef` changes no object code. The fill is the
+argument list written member by member: the helper sees each value the block read, at
+the same point, and writes nothing through the struct.
+
 **Careful:**
 
 - Why identical object code is proof: `obj_identical.sh` compiles the file as
@@ -1747,6 +1778,17 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    (`x_offset = grid->x_offset`), and leave the block's text unchanged; the other
    members keep step 4's form. Its writes land in that local, as they would in a
    by-value parameter.
+   An array of the caller's (a local, a `static` or an array parameter) that the
+   block names only as an argument of calls, where it converts to a pointer to its
+   first element, and whose contents the block writes, if at all, only through calls
+   receiving it that keep no copy (Recipe E step 4's array clause, `CopyMagickString(
+   glob_pattern,back_pattern,MagickPathExtent)`), may be one of the group as well
+   (2026-11-11): its member has that pointer type (`char *glob_pattern` for `char
+   glob_pattern[MagickPathExtent]`, `const char *` when the block only reads the
+   contents), the fill is `name.a=a;` (the same conversion), and it is bound or
+   written `name->a` as any member; the block's text is unchanged. The member holds
+   the address each call received before, so every call reads and writes the same
+   bytes of the caller's array; the address does not change while the array lives.
 3. Declare `typedef struct _Name { ... } Name;` directly above the new function, one
    member per variable in the group, with the variable's exact type and name: no `size_t`
    for a `ssize_t`, no `const` added or dropped on what a pointer points to. Only a
@@ -3773,6 +3815,14 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    their order and adjacent; its groups may then also hold a `break;` of this `switch`
    inside a selection (`if (...) { ...; break; }`). The usual chain is
    quantum-import.c's `case 24:`, `case 64:`, `default:`.
+   A `switch` with no `default:` label may be split as well (2026-11-11): the groups
+   that move are the last groups of the `switch`, and they stay without a `default:` in
+   the new function; step 4's group `default:` holding the call is added in the caller
+   after the kept groups, its last group. A value of `e` that no label names ran no
+   group before; now it reaches the caller's `default:`, whose call runs the new
+   `switch`, where no label names it either, so again no group runs and nothing is
+   written. The caller keeps at least one other label (never a `default`-only
+   `switch`).
 2. Choose the groups that move: the group carrying `default:`, and others beside it.
    Together their bodies meet Recipe O steps 1 to 3 (OpenMP, written variables, exits),
    as one selection does.
@@ -11140,3 +11190,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-11 | AMEND | N | Step 2 (the array member added earlier today): a function-local `static` array qualifies whether or not the caller writes its elements elsewhere; the member is the address of the array's own storage, not a copy, so each `v[e]` reads the element as it stands at that point, written before the fill or not, exactly as the name did; the block itself still only reads it | `animate.c`'s `XAnimateImages` (campaign A, W17 lane c, wide build): its colormap-update loop reads `static XWindowInfo *magick_windows[MaXWindows]`, which the function fills once on its first call | owner |
 | 2026-11-11 | AMEND | MT | Steps 1, 4 and 6: copies in a function with no parallel region may differ by a statement in one copy only (written `if (side == NameB) S`), may hold an orphaned `#pragma omp atomic` construct moving whole, and may be sequential loop heads (moved in Recipe PC step 3's form); a pair of selector constants is written `side`; a nested pair (copies whose enclosing loops are copies too) merges in one commit when the inner function alone stays out of line and slows the step | `morphology.c`'s `MorphologyPrimitiveDirect` (campaign A, W17 lane d): the forward and reverse passes; the merged channel function alone timed +4.1% to +5.9% on Voronoi, with the pixel loops merged -3.4%; probes 4.82 to 5.27, 5.35 and 5.60 | owner |
 | 2026-11-11 | AMEND | S | *Preprocessor branches*: a file-level `#if defined(...)`/`#else`/`#endif` block holding whole functions of the family (a delegate's implementation and its stub of the same public function) moves whole, directives included, when its `#endif` follows the family's last function; every side compiled by an available build and checked there with `split_branch_check.py` | `resize.c`'s `LiquidRescaleImage` (LQR delegate and stub) in the split of the interpolative, liquid, minify, resample and thumbnail family: `ci-gcc-min` compiles the stub (31 functions, IDENTICAL-MODULO-LAYOUT: 59 `.rodata` references, 27 `__LINE__` immediates), `ci-gcc-dlg` the delegate side (39 functions: 53 and 28); the owner's ruling of 2026-11-11 names "a whole file-level conditional block of functions" | owner |
+| 2026-11-11 | AMEND | D | *A helper defined further down, or taking an input struct*: form (b), *Unreached functions* and *Object code that differs only in the caller* may call a helper the file defines below the caller, through a forward declaration directly above the caller (a typedef its parameters name moves up in a commit of its own, `obj_identical.sh` IDENTICAL), and a helper that binds its inputs from a `const` input struct, the caller filling every bound member directly before the call (`(&E)` binds `E.f` to `m->f`); `tools/reuse_check.py` checks the declaration's types and the fills | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Control-U, confirm, release, click and expose blocks are the bodies of `XListBrowserWidget`'s and `XTextViewWidget`'s helpers, defined about 1,500 to 4,000 lines below it, some taking `ListBrowserRelease` or `ListBrowserClick`; new look-alike helpers would repeat them, and they hold the function at nesting depth 4 to 6 (a probe of the chain, 2.26 to 2.43, the function leaving *Deep, Nested Complexity* and *Brain Method*) | owner |
+| 2026-11-11 | AMEND | SD | Step 1: a `switch` with no `default:` label may be split too: its last groups move to the new function's `switch`, which has no `default:` either, and the caller gains `default:` holding the call as its last group; a value no label names runs no group in either, and the caller keeps another label | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its key slider `switch` (Home, Up, Down, Prior, Next, End; no `default:`) holds the function at nesting depth 4; moved whole by Recipe E it is a *Complex Method* of its own (cc 13, measured), and SD refused it for want of a `default:`; split first, the Prior/Next/End groups and then the rest move with no finding, as `XListBrowserWidget`'s did | owner |
+| 2026-11-11 | AMEND | N | Step 2: an array the block names only as an argument of calls (contents written, if at all, only through calls that keep no copy: Recipe E step 4's array clause) may be one of the group, as a member of the pointer type it converts to (`char *`, or `const char *` when only read), filled `name.a=a;`; Recipes Y, Z, LB and CT, which take N's input struct, read it the same way | `widget.c`'s `XFontBrowserWidget` (campaign A, W17 lane a): its Back and Reset releases and its list update copy between the `static` `glob_pattern` and the local `back_pattern`, `reset_pattern` and `reply` arrays; with each array a parameter the helpers take five to seven, and N's step 3 (the variable's exact type) refused an array member | owner |

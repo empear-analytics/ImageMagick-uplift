@@ -29,6 +29,23 @@ compared. When the lines differ only in where they are broken (a wrapped express
 broken at another token), the rewritten block and HELPER's body are compared as one
 token stream, in order, whitespace removed, and the script says so.
 
+Two forms added 2026-11-11 (Recipe D, *A helper defined further down or taking an
+input struct*):
+
+  - a forward declaration of HELPER may be added above the caller when the helper is
+    defined below it: `static <type>` and `HELPER(<types>);`, whose parameter list
+    must be the definition's with the parameter names left out;
+  - a parameter `const S *p` passed `&s`, whose helper binds members at the top of its
+    body (`T const m = p->m;`, a declarator `m = p->m,` of a multi-name declaration,
+    each member bound once, under its own name): each binding is read as a parameter
+    `m` and is bound to the expression `e` of the fill `s.m=e;` that the step added
+    before the call; the fills, one per bound member and nothing else, and the
+    declaration of `s` (its type line and `s;`) are allowed added lines, and the
+    binding lines (with the type line that heads them) are left out of the body
+    compared. An argument or fill `&E` or `(&E)` of a non-identifier `E` (a member,
+    `&windows->widget`) also binds `E.` to `p->` (`(&E)->m` is `E.m`), and `&*p` is
+    compared as `p` (the address of the object `p` points to).
+
 It prints OK or FAIL with the line that broke the rule. Argument types against
 parameter types, and the OpenMP condition of the step, are checked by reading.
 """
@@ -57,15 +74,50 @@ def split_args(text):
 
 
 def helper_def(text, helper):
-    m = re.search(r"^static [^;{]*\b" + re.escape(helper) + r"\((.*?)\)\s*\n\{(.*?)\n\}",
+    m = re.search(r"^static [^;{]*\b" + re.escape(helper) + r"\(([^;{]*?)\)\s*\n\{(.*?)\n\}",
                   text, re.S | re.M)
     if not m:
         raise SystemExit(f"FAIL: helper {helper} not found")
     params = []
     for p in split_args(" ".join(m.group(1).split())):
         name = re.findall(r"\w+", p)[-1]
-        params.append((name, "*" in p))
+        params.append((name, "*" in p, p))
     return params, m.group(2)
+
+
+def prototype_types(params):
+    """The definition's parameter list with the names left out, spaces removed."""
+    out = []
+    for _, _, text in params:
+        out.append(re.sub(r"\w+$", "", text.strip()).replace(" ", ""))
+    return out
+
+
+def struct_bindings(body, param):
+    """Members bound at the top of the body from `param->m` under their own name.
+
+    Returns ({member: line index}, set of line indices to leave out: the bindings and
+    the type lines that head them)."""
+    lines = [b.strip() for b in body.splitlines()]
+    bound, drop = {}, set()
+    pat = re.compile(r"^(?:[\w\s]*?\*?\s*(?:const\s+)?)?(\w+)\s*=\s*" + param
+                     + r"->(\w+)\s*[,;]$")
+    for i, line in enumerate(lines):
+        m = pat.match(line)
+        if not m:
+            continue
+        if m.group(1) != m.group(2):
+            raise SystemExit(f"FAIL: {line} binds a member under another name")
+        if m.group(1) in bound:
+            raise SystemExit(f"FAIL: member {m.group(1)} bound twice")
+        bound[m.group(1)] = i
+        drop.add(i)
+        j = i - 1
+        while j >= 0 and lines[j] and not re.search(r"[=;(){}]", lines[j]) \
+                and j not in drop:
+            drop.add(j)
+            j -= 1
+    return bound, drop, lines
 
 
 def diff_lines(path):
@@ -107,6 +159,15 @@ def rewrite(line, binds):
         else:
             h = f"\0{k}c\0"
             holders[h] = param
+            addr = re.fullmatch(r"\(?&([^()]+?)\)?", arg)
+            if addr and not re.fullmatch(r"\w+", addr.group(1)):
+                e = addr.group(1)
+                hm = f"\0{k}m\0"
+                holders[hm] = param + "->"
+                line = re.sub(r"(?<![\w.>])" + re.escape(e) + r"\.", hm, line)
+                line = re.sub(r"\(&" + re.escape(e) + r"\)", h, line)
+                line = re.sub(r"(?<![\w.>])&" + re.escape(e) + r"\b", h, line)
+                continue
             pat = ident(arg)
             if re.fullmatch(r"\w+", arg):
                 pat = r"(?<![\w.>])" + pat
@@ -117,7 +178,8 @@ def rewrite(line, binds):
 
 
 def canonical(line):
-    return re.sub(r"\(\*(\w+)\)", r"*\1", line)
+    line = re.sub(r"\(\*(\w+)\)", r"*\1", line)
+    return re.sub(r"&\*(\w+)\b(?!\s*[\[.(]|->)", r"\1", line)
 
 
 def main(argv):
@@ -127,11 +189,29 @@ def main(argv):
     text = open(path).read()
     params, body = helper_def(text, helper)
     removed, added = diff_lines(path)
-    calls = [a for a in added if re.search(r"\b" + re.escape(helper) + r"\(", a)]
+    proto_lines = set()
+    for i, line in enumerate(added):
+        if not (re.fullmatch(r"static [\w\s\*]+", line) and i + 1 < len(added)
+                and added[i + 1].startswith(helper + "(")):
+            continue
+        j = i + 1
+        while j < len(added) and not added[j].endswith(");") and "{" not in added[j]:
+            j += 1
+        if j < len(added) and added[j].endswith(");"):
+            proto_lines |= set(added[i + 1:j + 1])
+    calls = [a for a in added if re.search(r"\b" + re.escape(helper) + r"\(", a)
+             and a not in proto_lines]
     problems = []
     if len(calls) != 1:
         raise SystemExit(f"FAIL: expected one added call of {helper}, found {len(calls)}")
     call = calls[0]
+    call_at = added.index(call)
+    call_parts = [call]
+    k = call_at
+    while call.count("(") > call.count(")") and k + 1 < len(added):
+        k += 1  # a call wrapped over several lines: join them
+        call_parts.append(added[k])
+        call += added[k]
     inner = call[call.index(helper + "(") + len(helper) + 1:]
     depth, end = 1, 0
     for end, ch in enumerate(inner):
@@ -142,17 +222,62 @@ def main(argv):
     args = split_args(inner[:end])
     if len(args) != len(params):
         raise SystemExit(f"FAIL: {len(args)} arguments for {len(params)} parameters")
-    binds = [(a, p, ptr) for a, (p, ptr) in zip(args, params)]
+    binds = []
+    allowed = set(call_parts)
+    dropped = set()
+    body_all = [b.strip() for b in body.splitlines()]
+    for a, (p, ptr, ptext) in zip(args, params):
+        s = re.fullmatch(r"&(\w+)", a)
+        if ptr and s and re.match(r"const \w+ \*\s*\w+$", ptext.strip()) \
+                and re.search(r"\b" + p + r"->\w+\s*[,;]", body):
+            local, stype = s.group(1), ptext.split()[1]
+            bound, drop, _ = struct_bindings(body, p)
+            dropped |= drop
+            fills = {}
+            for i, line in enumerate(added):
+                f = re.fullmatch(re.escape(local) + r"\.(\w+)=(.+);", line)
+                if not f:
+                    continue
+                if i > call_at:
+                    problems.append(f"fill after the call: {line}")
+                if f.group(1) in fills:
+                    problems.append(f"member {f.group(1)} filled twice")
+                if f.group(1) not in bound:
+                    problems.append(f"fill of a member {p} does not bind: {line}")
+                fills[f.group(1)] = f.group(2)
+                allowed.add(line)
+            for member in bound:
+                if member not in fills:
+                    problems.append(f"member {member} bound but not filled")
+                    continue
+                binds.append((fills[member], member, False))
+            allowed |= {stype, local + ";"}
+            continue
+        binds.append((a, p, ptr))
+    joined = " ".join(l for l in added if l not in allowed)
+    proto = re.search(r"static [\w\s\*]+?\b" + re.escape(helper) + r"\(([^()]*)\);",
+                      joined)
+    if proto:
+        types = [t.replace(" ", "") for t in split_args(proto.group(1))]
+        if types != prototype_types(params):
+            problems.append(f"forward declaration {types} is not the definition's "
+                            f"{prototype_types(params)}")
+        for line in added:
+            if line in proto.group(0) and line not in allowed:
+                allowed.add(line)
+        note_proto = ", forward declaration added"
+    else:
+        note_proto = ""
     for line in added:
-        if line != call:
+        if line not in allowed:
             problems.append(f"added besides the call: {line}")
     for line in removed:
         if line.startswith("#"):
             problems.append(f"preprocessor line removed: {line}")
-    body_lines = [canonical(b.strip()) for b in body.splitlines()
-                  if b.strip() not in TRIVIAL]
+    body_lines = [canonical(b) for i, b in enumerate(body_all)
+                  if b not in TRIVIAL and i not in dropped]
     returned = re.match(r"^(\w+)=" + re.escape(helper) + r"\(", call)
-    note = ""
+    note = note_proto
     if returned:
         target = returned.group(1)
         bound = [p for a, p, ptr in binds if a == target and not ptr]
@@ -165,7 +290,7 @@ def main(argv):
             problems.append(f"{helper} does not end with return({bound[0]});")
         else:
             body_lines = body_lines[:-1]
-            note = f", return({bound[0]}) assigned back to {target}"
+            note += f", return({bound[0]}) assigned back to {target}"
     elif re.match(r"^\w+\s*=", call):
         problems.append(f"the call assigns its result: {call}")
     rewritten = [rewrite(r, binds) for r in removed if not r.startswith("#")]
