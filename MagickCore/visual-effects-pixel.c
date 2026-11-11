@@ -148,11 +148,33 @@ static inline MagickBooleanType IsPixelChannelPairUndefined(
     (other_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
-static void AddNoisePixelChannels(const Image *image,
-  const Image *noise_image,const Quantum *magick_restrict p,
-  Quantum *magick_restrict q,RandomInfo *magick_restrict random_info,
-  const NoiseType noise_type,const double attenuate)
+typedef struct _AddNoisePixel
 {
+  const Image
+    *image,
+    *noise_image;
+
+  NoiseType
+    noise_type;
+
+  double
+    attenuate;
+} AddNoisePixel;
+
+static void AddNoisePixelChannels(const AddNoisePixel *noise_pixel,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,
+  RandomInfo *magick_restrict random_info)
+{
+  const Image
+    *const image = noise_pixel->image,
+    *const noise_image = noise_pixel->noise_image;
+
+  const NoiseType
+    noise_type = noise_pixel->noise_type;
+
+  const double
+    attenuate = noise_pixel->attenuate;
+
   ssize_t
     i;
 
@@ -224,6 +246,9 @@ static MagickBooleanType AddNoiseImageRow(const AddNoiseRow *noise_row,
   ExceptionInfo
     *const exception = noise_row->exception;
 
+  const AddNoisePixel
+    noise_pixel = { image, noise_image, noise_type, attenuate };
+
   const int
     id = GetOpenMPThreadId();
 
@@ -251,8 +276,7 @@ static MagickBooleanType AddNoiseImageRow(const AddNoiseRow *noise_row,
     }
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    AddNoisePixelChannels(image,noise_image,p,q,random_info[id],noise_type,
-      attenuate);
+    AddNoisePixelChannels(&noise_pixel,p,q,random_info[id]);
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(noise_image);
   }
@@ -1503,10 +1527,28 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void MorphPixelChannels(const Image *morph_image,
-  const Image *morph_images,const Quantum *magick_restrict p,
-  Quantum *magick_restrict q,const double alpha,const double beta)
+typedef struct _MorphPixel
 {
+  const Image
+    *morph_image,
+    *morph_images;
+
+  double
+    alpha,
+    beta;
+} MorphPixel;
+
+static void MorphPixelChannels(const MorphPixel *morph_pixel,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const morph_image = morph_pixel->morph_image,
+    *const morph_images = morph_pixel->morph_images;
+
+  const double
+    alpha = morph_pixel->alpha,
+    beta = morph_pixel->beta;
+
   ssize_t
     i;
 
@@ -1608,6 +1650,9 @@ static void MorphFrameRow(MagickBooleanType *status,
   const double
     beta = info->beta;
 
+  const MorphPixel
+    morph_pixel = { morph_image, morph_images, alpha, beta };
+
   MagickBooleanType
     sync;
 
@@ -1633,7 +1678,7 @@ static void MorphFrameRow(MagickBooleanType *status,
     }
   for (x=0; x < (ssize_t) morph_images->columns; x++)
   {
-    MorphPixelChannels(morph_image,morph_images,p,q,alpha,beta);
+    MorphPixelChannels(&morph_pixel,p,q);
     p+=(ptrdiff_t) GetPixelChannels(morph_image);
     q+=(ptrdiff_t) GetPixelChannels(morph_images);
   }
@@ -1941,10 +1986,31 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _PolaroidCaption
+{
+  Image
+    **caption_image;
+
+  size_t
+    *height;
+
+  char
+    **text;
+} PolaroidCaption;
+
 static void AnnotatePolaroidCaption(const Image *image,
-  const DrawInfo *draw_info,Image **caption_image,size_t *height,char **text,
+  const DrawInfo *draw_info,const PolaroidCaption *targets,
   ExceptionInfo *exception)
 {
+  Image
+    **const caption_image = targets->caption_image;
+
+  size_t
+    *const height = targets->height;
+
+  char
+    **const text = targets->text;
+
   char
     geometry[MagickPathExtent];
 
@@ -2140,6 +2206,9 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
       char
         *text;
 
+      const PolaroidCaption
+        caption_targets = { (&caption_image), (&height), (&text) };
+
       /*
         Generate caption image.
       */
@@ -2149,8 +2218,7 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
       text=InterpretImageProperties((ImageInfo *) NULL,(Image *) image,caption,
         exception);
       if (text != (char *) NULL)
-        AnnotatePolaroidCaption(image,draw_info,&caption_image,&height,&text,
-          exception);
+        AnnotatePolaroidCaption(image,draw_info,&caption_targets,exception);
     }
   picture_image=CloneImage(image,(size_t) ((ssize_t) image->columns+2*quantum),
     height,MagickTrue,exception);

@@ -522,10 +522,51 @@ static Image *FinishComplexImages(Image *complex_images,
   return(complex_images);
 }
 
-MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
-  ExceptionInfo *exception)
-{
 #define ComplexImageTag  "Complex/Image"
+
+typedef struct _ComplexImagesInputs
+{
+  const Image
+    *Ai_image,
+    *Ar_image,
+    *Bi_image,
+    *Br_image,
+    *images;
+
+  Image
+    *Ci_image,
+    *complex_images,
+    *Cr_image;
+
+  size_t
+    number_channels;
+
+  ComplexOperator
+    op;
+
+  double
+    snr;
+
+  ExceptionInfo
+    *exception;
+} ComplexImagesInputs;
+
+static Image *ApplyComplexImageRows(const ComplexImagesInputs *operands)
+{
+  const Image
+    *const Ai_image = operands->Ai_image,
+    *const Ar_image = operands->Ar_image,
+    *const Bi_image = operands->Bi_image,
+    *const Br_image = operands->Br_image,
+    *const images = operands->images;
+
+  Image
+    *const Ci_image = operands->Ci_image,
+    *const complex_images = operands->complex_images,
+    *const Cr_image = operands->Cr_image;
+
+  ExceptionInfo
+    *const exception = operands->exception;
 
   CacheView
     *Ai_view,
@@ -534,6 +575,63 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
     *Br_view,
     *Ci_view,
     *Cr_view;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  size_t
+    columns,
+    rows;
+
+  ssize_t
+    y;
+
+  Ar_view=AcquireVirtualCacheView(Ar_image,exception);
+  Ai_view=AcquireVirtualCacheView(Ai_image,exception);
+  Br_view=AcquireVirtualCacheView(Br_image,exception);
+  Bi_view=AcquireVirtualCacheView(Bi_image,exception);
+  Cr_view=AcquireAuthenticCacheView(Cr_image,exception);
+  Ci_view=AcquireAuthenticCacheView(Ci_image,exception);
+  status=MagickTrue;
+  progress=0;
+  columns=MagickMin(Cr_image->columns,Ci_image->columns);
+  rows=MagickMin(Cr_image->rows,Ci_image->rows);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(Cr_image,complex_images,rows,1L)
+#endif
+  for (y=0; y < (ssize_t) rows; y++)
+  {
+    const ComplexRowInputs
+      inputs = { Ai_view, Ar_view, Bi_view, Br_view, Ci_view, Cr_view,
+        Ai_image, Ar_image, Bi_image, Br_image, Ci_image, Cr_image, columns,
+        operands->number_channels, operands->op, operands->snr, exception };
+
+    if (ComplexImageRow(&inputs,y,&status) == MagickFalse)
+      continue;
+    if (images->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ReportComplexProgress(images,ComplexImageTag,progress,&status);
+      }
+  }
+  DestroyComplexViewPair(Cr_view,Ci_view);
+  DestroyComplexViewPair(Br_view,Bi_view);
+  DestroyComplexViewPair(Ar_view,Ai_view);
+  return(FinishComplexImages(complex_images,status));
+}
+
+MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
+  ExceptionInfo *exception)
+{
+  ComplexImagesInputs
+    inputs;
 
   const Image
     *Ai_image,
@@ -550,19 +648,8 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
     *Cr_image,
     *returned;
 
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
   size_t
-    columns,
-    number_channels,
-    rows;
-
-  ssize_t
-    y;
+    number_channels;
 
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
@@ -588,40 +675,17 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
     Ar_image->number_channels,Ai_image->number_channels),MagickMin(
     Br_image->number_channels,Bi_image->number_channels)),MagickMin(
     Cr_image->number_channels,Ci_image->number_channels));
-  Ar_view=AcquireVirtualCacheView(Ar_image,exception);
-  Ai_view=AcquireVirtualCacheView(Ai_image,exception);
-  Br_view=AcquireVirtualCacheView(Br_image,exception);
-  Bi_view=AcquireVirtualCacheView(Bi_image,exception);
-  Cr_view=AcquireAuthenticCacheView(Cr_image,exception);
-  Ci_view=AcquireAuthenticCacheView(Ci_image,exception);
-  status=MagickTrue;
-  progress=0;
-  columns=MagickMin(Cr_image->columns,Ci_image->columns);
-  rows=MagickMin(Cr_image->rows,Ci_image->rows);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(Cr_image,complex_images,rows,1L)
-#endif
-  for (y=0; y < (ssize_t) rows; y++)
-  {
-    const ComplexRowInputs
-      inputs = { Ai_view, Ar_view, Bi_view, Br_view, Ci_view, Cr_view,
-        Ai_image, Ar_image, Bi_image, Br_image, Ci_image, Cr_image, columns,
-        number_channels, op, snr, exception };
-
-    if (ComplexImageRow(&inputs,y,&status) == MagickFalse)
-      continue;
-    if (images->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        ReportComplexProgress(images,ComplexImageTag,progress,&status);
-      }
-  }
-  DestroyComplexViewPair(Cr_view,Ci_view);
-  DestroyComplexViewPair(Br_view,Bi_view);
-  DestroyComplexViewPair(Ar_view,Ai_view);
-  return(FinishComplexImages(complex_images,status));
+  inputs.Ai_image=Ai_image;
+  inputs.Ar_image=Ar_image;
+  inputs.Bi_image=Bi_image;
+  inputs.Br_image=Br_image;
+  inputs.images=images;
+  inputs.Ci_image=Ci_image;
+  inputs.complex_images=complex_images;
+  inputs.Cr_image=Cr_image;
+  inputs.number_channels=number_channels;
+  inputs.op=op;
+  inputs.snr=snr;
+  inputs.exception=exception;
+  return(ApplyComplexImageRows(&inputs));
 }
