@@ -123,6 +123,16 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void FillEdgeKernel(KernelInfo *kernel_info)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) (kernel_info->width*kernel_info->height); i++)
+    kernel_info->values[i]=(-1.0);
+  kernel_info->values[i/2]=(double) kernel_info->width*kernel_info->height-1.0;
+}
+
 MagickExport Image *EdgeImage(const Image *image,const double radius,
   ExceptionInfo *exception)
 {
@@ -131,9 +141,6 @@ MagickExport Image *EdgeImage(const Image *image,const double radius,
 
   KernelInfo
     *kernel_info;
-
-  ssize_t
-    i;
 
   size_t
     width;
@@ -162,9 +169,7 @@ MagickExport Image *EdgeImage(const Image *image,const double radius,
       kernel_info=DestroyKernelInfo(kernel_info);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  for (i=0; i < (ssize_t) (kernel_info->width*kernel_info->height); i++)
-    kernel_info->values[i]=(-1.0);
-  kernel_info->values[i/2]=(double) kernel_info->width*kernel_info->height-1.0;
+  FillEdgeKernel(kernel_info);
   edge_image=ConvolveImage(image,kernel_info,exception);
   kernel_info=DestroyKernelInfo(kernel_info);
   return(edge_image);
