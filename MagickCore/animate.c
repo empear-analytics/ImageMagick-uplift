@@ -3343,6 +3343,70 @@ static void XPlaybackKeyCommand(const KeySym key_symbol,
   }
 }
 
+static void XHandleKeyPress(const AnimateEventContext *event_context,
+  XEvent event,const AnimateCommandTargets *targets)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  ExceptionInfo
+    *const exception = event_context->exception;
+
+  Image
+    **const image = targets->image;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  Image
+    **const nexus = targets->nexus;
+
+  AnimateCommand
+    animate_command;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  static int
+    length;
+
+  /*
+    Respond to a user key press.
+  */
+  length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Key press: 0x%lx (%c)",(unsigned long) key_symbol,*command);
+  animate_command=NullCommand;
+  switch (key_symbol)
+  {
+    case XK_o:
+    {
+      animate_command=XControlOpenCommand(event,animate_command);
+      break;
+    }
+    default:
+    {
+      XPlaybackKeyCommand(key_symbol,&animate_command);
+      break;
+    }
+  }
+  if (animate_command != NullCommand)
+    (*nexus)=XMagickCommand(display,resource_info,windows,
+      animate_command,image,state,exception);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3441,9 +3505,6 @@ MagickExport Image *XAnimateImages(Display *display,
       DirectionCommands,
       HelpCommands
     };
-
-  AnimateCommand
-    animate_command;
 
   char
     command[MagickPathExtent],
@@ -4276,35 +4337,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case KeyPress:
       {
-        static int
-          length;
-
-        /*
-          Respond to a user key press.
-        */
-        length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Key press: 0x%lx (%c)",(unsigned long) key_symbol,*command);
-        animate_command=NullCommand;
-        switch (key_symbol)
-        {
-          case XK_o:
-          {
-            animate_command=XControlOpenCommand(event,animate_command);
-            break;
-          }
-          default:
-          {
-            XPlaybackKeyCommand(key_symbol,&animate_command);
-            break;
-          }
-        }
-        if (animate_command != NullCommand)
-          nexus=XMagickCommand(display,resource_info,windows,
-            animate_command,&image,&state,exception);
+        XHandleKeyPress(&event_context,event,&command_targets);
         break;
       }
       case KeyRelease:
