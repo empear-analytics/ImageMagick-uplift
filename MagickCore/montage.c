@@ -923,12 +923,10 @@ static Image *PlaceMontageTile(const MontageTilePlacement *placement,
 
   if (placement->border_width != 0)
     {
-      MontageTileExtent
-        extent;
+      const MontageTileExtent
+        extent = { placement->border_width, placement->width,
+          placement->height };
 
-      extent.border_width=placement->border_width;
-      extent.width=placement->width;
-      extent.height=placement->height;
       image=AddTileBorder(image,placement->montage_info,&extent,
         placement->exception);
     }
@@ -943,36 +941,23 @@ static Image *PlaceMontageTile(const MontageTilePlacement *placement,
   if ((placement->montage_info->frame != (char *) NULL) &&
       (placement->bevel_width > 0))
     {
-      MontageTileFrame
-        frame;
+      const MontageTileFrame
+        frame = { placement->frame_info, placement->width, placement->height };
 
-      frame.frame_info=placement->frame_info;
-      frame.width=placement->width;
-      frame.height=placement->height;
       image=AddTileFrame(image,&frame,placement->metrics,placement->exception);
       x=0;
       y=0;
     }
   if (LocaleCompare(image->magick,"NULL") != 0)
     {
-      MontageTileInfo
-        tile_info;
+      const MontageTileInfo
+        tile_info = { placement->montage_info, placement->montage,
+          placement->draw_info, placement->x_offset, placement->y_offset, x, y,
+          placement->bevel_width, placement->width, placement->height,
+          placement->border_width, placement->max_height,
+          placement->concatenate, placement->extract_info,
+          placement->metrics };
 
-      tile_info.montage_info=placement->montage_info;
-      tile_info.montage=placement->montage;
-      tile_info.draw_info=placement->draw_info;
-      tile_info.x_offset=placement->x_offset;
-      tile_info.y_offset=placement->y_offset;
-      tile_info.x=x;
-      tile_info.y=y;
-      tile_info.bevel_width=placement->bevel_width;
-      tile_info.width=placement->width;
-      tile_info.height=placement->height;
-      tile_info.border_width=placement->border_width;
-      tile_info.max_height=placement->max_height;
-      tile_info.concatenate=placement->concatenate;
-      tile_info.extract_info=placement->extract_info;
-      tile_info.metrics=placement->metrics;
       image=CompositeMontageTile(image,&tile_info,placement->exception);
     }
   return(image);
