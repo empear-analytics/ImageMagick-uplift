@@ -5772,6 +5772,16 @@ static size_t GetMorphologyKernelLimit(const Image *image,
   return(kernel_limit);
 }
 
+static CompositeOperator ResolveMultiKernelCompose(
+  const CompositeOperator compose,CompositeOperator rslt_compose)
+{
+  if ( compose != UndefinedCompositeOp )
+    rslt_compose = compose;  /* override default composition for method */
+  if ( rslt_compose == UndefinedCompositeOp )
+    rslt_compose = NoCompositeOp; /* still not defined! Then re-iterate */
+  return(rslt_compose);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -5913,10 +5923,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
     }
 
   /* Handle user (caller) specified multi-kernel composition method */
-  if ( compose != UndefinedCompositeOp )
-    rslt_compose = compose;  /* override default composition for method */
-  if ( rslt_compose == UndefinedCompositeOp )
-    rslt_compose = NoCompositeOp; /* still not defined! Then re-iterate */
+  rslt_compose=ResolveMultiKernelCompose(compose,rslt_compose);
 
   /* Some methods require a reflected kernel to use with primitives.
    * Create the reflected kernel for those methods. */
