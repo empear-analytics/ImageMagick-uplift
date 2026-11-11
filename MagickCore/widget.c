@@ -10690,24 +10690,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
       }
       case ClientMessage:
       {
-        /*
-          If client window delete message, exit.
-        */
-        if (event.xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event.xclient.data.l == (int) windows->wm_take_focus)
-          {
-            (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
-              (Time) event.xclient.data.l[1]);
-            break;
-          }
-        if (*event.xclient.data.l != (int) windows->wm_delete_window)
-          break;
-        if (event.xclient.window == windows->widget.id)
-          {
-            state|=ExitState;
-            break;
-          }
+        state=ClientWidgetMessage(display,windows,event,state);
         break;
       }
       case ConfigureNotify:
