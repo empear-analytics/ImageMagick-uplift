@@ -2706,6 +2706,24 @@ static void LoadOpenCLPlatformDevices(const OpenCLPlatformLoad *platform_load,
   *next=AddOpenCLPlatformDevices(&platform_devices,*next);
 }
 
+static MagickBooleanType AcquireOpenCLContexts(MagickCLEnv clEnv,
+  const cl_uint number_platforms,cl_device_id *devices,
+  cl_platform_id *platforms)
+{
+  clEnv->number_contexts=(size_t) number_platforms;
+  clEnv->contexts=(cl_context *) AcquireQuantumMemory(clEnv->number_contexts,
+    sizeof(cl_context));
+  if (clEnv->contexts == (cl_context *) NULL)
+    {
+      devices=(cl_device_id *) RelinquishMagickMemory(devices);
+      platforms=(cl_platform_id *) RelinquishMagickMemory(platforms);
+      RelinquishMagickCLDevices(clEnv);
+      return(MagickFalse);
+    }
+  (void) memset(clEnv->contexts,0,clEnv->number_contexts*sizeof(cl_context));
+  return(MagickTrue);
+}
+
 static void LoadOpenCLDevices(MagickCLEnv clEnv)
 {
   OpenCLPlatformLoad
@@ -2760,17 +2778,9 @@ static void LoadOpenCLDevices(MagickCLEnv clEnv)
       return;
     }
   (void) memset(devices,0,clEnv->number_devices*sizeof(cl_device_id));
-  clEnv->number_contexts=(size_t) number_platforms;
-  clEnv->contexts=(cl_context *) AcquireQuantumMemory(clEnv->number_contexts,
-    sizeof(cl_context));
-  if (clEnv->contexts == (cl_context *) NULL)
-    {
-      devices=(cl_device_id *) RelinquishMagickMemory(devices);
-      platforms=(cl_platform_id *) RelinquishMagickMemory(platforms);
-      RelinquishMagickCLDevices(clEnv);
-      return;
-    }
-  (void) memset(clEnv->contexts,0,clEnv->number_contexts*sizeof(cl_context));
+  if (AcquireOpenCLContexts(clEnv,number_platforms,devices,
+      platforms) == MagickFalse)
+    return;
   next=0;
   platform_load.clEnv=clEnv;
   platform_load.platforms=platforms;
