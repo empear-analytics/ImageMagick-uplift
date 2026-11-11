@@ -77,6 +77,19 @@ do
       if ($0 ~ /# <<[^>+]+>>$/) gsub(/-?0x[0-9a-f]+\(%rip\)/,"(%rip)");
       print > out }'
   ls "$tmp/$side.fn" | sort > "$tmp/$side.syms"
+  # Alignment padding after a function's last instruction (the nop family and
+  # int3 the assembler emits so that the next function starts on its boundary)
+  # is not code of the function: no path reaches it. A new out-of-line helper
+  # moves the next function's boundary and with it the padding of the function
+  # before it, so the trailing run of padding is dropped before comparing.
+  # Padding inside a function (a loop head's alignment) stays compared.
+  for fnf in "$tmp/$side.fn"/*
+  do
+    awk '{ l[NR]=$0 } END {
+      n=NR
+      while (n > 0 && l[n] ~ /^(data16 )*(cs )*(nop[wl]?|xchg +%ax,%ax|int3)( |$)/) n--
+      for (i=1; i<=n; i++) print l[i] }' "$fnf" > "$fnf.t" && mv "$fnf.t" "$fnf"
+  done
 done
 rc=0
 only_after=$(comm -13 "$tmp/before.syms" "$tmp/after.syms" | tr '\n' ' ')
