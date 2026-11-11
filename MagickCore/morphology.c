@@ -5782,6 +5782,74 @@ static CompositeOperator ResolveMultiKernelCompose(
   return(rslt_compose);
 }
 
+typedef struct _MorphologyDirectApply
+{
+  const Image
+    *image;
+
+  MorphologyMethod
+    method;
+
+  const KernelInfo
+    *kernel;
+
+  MagickBooleanType
+    verbose;
+
+  ExceptionInfo
+    *exception;
+} MorphologyDirectApply;
+
+static MagickBooleanType ApplyDirectMorphology(
+  const MorphologyDirectApply *direct,Image **rslt_image)
+{
+  const Image
+    *const image = direct->image;
+
+  const MorphologyMethod
+    method = direct->method;
+
+  const KernelInfo
+    *const kernel = direct->kernel;
+
+  const MagickBooleanType
+    verbose = direct->verbose;
+
+  ExceptionInfo
+    *const exception = direct->exception;
+
+  ssize_t
+    changed;        /* number pixels changed by last primitive operation */
+
+  (*rslt_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*rslt_image) == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass((*rslt_image),DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+
+  changed=MorphologyPrimitiveDirect((*rslt_image),method,kernel,exception);
+
+  if (verbose != MagickFalse)
+    (void) (void) FormatLocaleFile(stderr,
+      "%s:%.17g.%.17g #%.17g => Changed %.17g\n",
+      CommandOptionToMnemonic(MagickMorphologyOptions, method),
+      1.0,0.0,1.0, (double) changed);
+
+  if ( changed < 0 )
+    return(MagickFalse);
+
+  if ( method == VoronoiMorphology ) {
+    /* Preserve the alpha channel of input image - but turned it off */
+    (void) SetImageAlphaChannel((*rslt_image), DeactivateAlphaChannel,
+      exception);
+    (void) CompositeImage((*rslt_image),image,CopyAlphaCompositeOp,
+      MagickTrue,0,0,exception);
+    (void) SetImageAlphaChannel((*rslt_image), DeactivateAlphaChannel,
+      exception);
+  }
+  return(MagickTrue);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -5817,9 +5885,6 @@ MagickPrivate Image *MorphologyApply(const Image *image,
     kernel_limit,   /*         number of times to iterate kernel */
     count,          /* total count of primitive steps applied */
     method_changed; /* total count of changed over method iteration */
-
-  ssize_t
-    changed;        /* number pixels changed by last primitive operation */
 
   char
     v_info[MagickPathExtent];
@@ -5893,32 +5958,11 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   */
   if ( special != MagickFalse )
     {
-      rslt_image=CloneImage(image,0,0,MagickTrue,exception);
-      if (rslt_image == (Image *) NULL)
+      const MorphologyDirectApply
+        direct = { image, method, kernel, verbose, exception };
+
+      if (ApplyDirectMorphology(&direct,&rslt_image) == MagickFalse)
         goto error_cleanup;
-      if (SetImageStorageClass(rslt_image,DirectClass,exception) == MagickFalse)
-        goto error_cleanup;
-
-      changed=MorphologyPrimitiveDirect(rslt_image,method,kernel,exception);
-
-      if (verbose != MagickFalse)
-        (void) (void) FormatLocaleFile(stderr,
-          "%s:%.17g.%.17g #%.17g => Changed %.17g\n",
-          CommandOptionToMnemonic(MagickMorphologyOptions, method),
-          1.0,0.0,1.0, (double) changed);
-
-      if ( changed < 0 )
-        goto error_cleanup;
-
-      if ( method == VoronoiMorphology ) {
-        /* Preserve the alpha channel of input image - but turned it off */
-        (void) SetImageAlphaChannel(rslt_image, DeactivateAlphaChannel,
-          exception);
-        (void) CompositeImage(rslt_image,image,CopyAlphaCompositeOp,
-          MagickTrue,0,0,exception);
-        (void) SetImageAlphaChannel(rslt_image, DeactivateAlphaChannel,
-          exception);
-      }
       goto exit_cleanup;
     }
 
