@@ -2361,6 +2361,60 @@ static WarningHandler XSetAnimateWarningHandlers(
   return(warning_handler);
 }
 
+typedef struct _AnimateSceneList
+{
+  XResourceInfo
+    *resource_info;
+
+  XVisualInfo
+    *visual_info;
+
+  Image
+    **image_list;
+
+  size_t
+    number_scenes;
+
+  ExceptionInfo
+    *exception;
+} AnimateSceneList;
+
+static Image *XPrepareSceneImages(const AnimateSceneList *scene_list)
+{
+  XResourceInfo
+    *const resource_info = scene_list->resource_info;
+
+  XVisualInfo
+    *const visual_info = scene_list->visual_info;
+
+  Image
+    **const image_list = scene_list->image_list;
+
+  const size_t
+    number_scenes = scene_list->number_scenes;
+
+  ExceptionInfo
+    *const exception = scene_list->exception;
+
+  Image
+    *display_image;
+
+  ssize_t
+    scene;
+
+  display_image=image_list[0];
+  for (scene=0; scene < (ssize_t) number_scenes; scene++)
+  {
+    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
+      (void) SetImageType(image_list[scene],image_list[scene]->alpha_trait ==
+        BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
+    if ((display_image->columns < image_list[scene]->columns) &&
+        (display_image->rows < image_list[scene]->rows))
+      display_image=image_list[scene];
+  }
+  return(display_image);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -2557,6 +2611,9 @@ MagickExport Image *XAnimateImages(Display *display,
   XWMHints
     *manager_hints;
 
+  AnimateSceneList
+    scene_list;
+
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
@@ -2657,16 +2714,12 @@ MagickExport Image *XAnimateImages(Display *display,
     Initialize Standard Colormap.
   */
   nexus=NewImageList();
-  display_image=image_list[0];
-  for (scene=0; scene < (ssize_t) number_scenes; scene++)
-  {
-    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
-      (void) SetImageType(image_list[scene],image_list[scene]->alpha_trait ==
-        BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
-    if ((display_image->columns < image_list[scene]->columns) &&
-        (display_image->rows < image_list[scene]->rows))
-      display_image=image_list[scene];
-  }
+  scene_list.resource_info=resource_info;
+  scene_list.visual_info=visual_info;
+  scene_list.image_list=image_list;
+  scene_list.number_scenes=number_scenes;
+  scene_list.exception=exception;
+  display_image=XPrepareSceneImages(&scene_list);
   if (resource_info->debug != MagickFalse)
     {
       (void) LogMagickEvent(X11Event,GetMagickModule(),
