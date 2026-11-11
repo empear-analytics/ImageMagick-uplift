@@ -12144,12 +12144,12 @@ static DisplayCommand XSelectROIMenuEntry(const ROIMenuEntry *menu_entry,
   return(display_command);
 }
 
+#define ApplyMenus  7
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
-#define ApplyMenus  7
-
   const char
     *const ROIMenu[] =
     {
