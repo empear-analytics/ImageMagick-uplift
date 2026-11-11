@@ -583,6 +583,74 @@ static void XSpeedDirectionCommand(const AnimateCommandTile *tile,
   }
 }
 
+static void XRepeatSaveCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  Image
+    **const image = tile->image;
+
+  MagickStatusType
+    *const state = tile->state;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  MagickStatusType
+    status;
+
+  switch (animate_command)
+  {
+    case RepeatCommand:
+    {
+      *state|=RepeatAnimationState;
+      *state&=(~AutoReverseAnimationState);
+      *state|=PlayAnimationState;
+      break;
+    }
+    case AutoReverseCommand:
+    {
+      *state|=AutoReverseAnimationState;
+      *state&=(~RepeatAnimationState);
+      *state|=PlayAnimationState;
+      break;
+    }
+    case SaveCommand:
+    {
+      /*
+        Save image.
+      */
+      status=XSaveImage(display,resource_info,windows,*image,exception);
+      if (status == MagickFalse)
+        {
+          char
+            message[MagickPathExtent];
+
+          (void) FormatLocaleString(message,MagickPathExtent,"%s:%s",
+            exception->reason != (char *) NULL ? exception->reason : "",
+            exception->description != (char *) NULL ? exception->description :
+            "");
+          XNoticeWidget(display,windows,"Unable to save file:",message);
+          break;
+        }
+      break;
+    }
+    default:
+    {
+      XSpeedDirectionCommand(tile,animate_command);
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
@@ -749,43 +817,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
         *state|=ForwardAnimationState;
       break;
     }
-    case RepeatCommand:
-    {
-      *state|=RepeatAnimationState;
-      *state&=(~AutoReverseAnimationState);
-      *state|=PlayAnimationState;
-      break;
-    }
-    case AutoReverseCommand:
-    {
-      *state|=AutoReverseAnimationState;
-      *state&=(~RepeatAnimationState);
-      *state|=PlayAnimationState;
-      break;
-    }
-    case SaveCommand:
-    {
-      /*
-        Save image.
-      */
-      status=XSaveImage(display,resource_info,windows,*image,exception);
-      if (status == MagickFalse)
-        {
-          char
-            message[MagickPathExtent];
-
-          (void) FormatLocaleString(message,MagickPathExtent,"%s:%s",
-            exception->reason != (char *) NULL ? exception->reason : "",
-            exception->description != (char *) NULL ? exception->description :
-            "");
-          XNoticeWidget(display,windows,"Unable to save file:",message);
-          break;
-        }
-      break;
-    }
     default:
     {
-      XSpeedDirectionCommand(&tile,animate_command);
+      XRepeatSaveCommand(&tile,animate_command);
       break;
     }
   }
