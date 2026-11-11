@@ -419,6 +419,9 @@ typedef struct _AnimateCommandTile
   Image
     **image;
 
+  MagickStatusType
+    *state;
+
   ExceptionInfo
     *exception;
 } AnimateCommandTile;
@@ -537,6 +540,49 @@ static void XInfoHelpCommand(const AnimateCommandTile *tile,
   }
 }
 
+static void XSpeedDirectionCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  MagickStatusType
+    *const state = tile->state;
+
+  switch (animate_command)
+  {
+    case SlowerCommand:
+    {
+      resource_info->delay++;
+      break;
+    }
+    case FasterCommand:
+    {
+      if (resource_info->delay == 0)
+        break;
+      resource_info->delay--;
+      break;
+    }
+    case ForwardCommand:
+    {
+      *state=ForwardAnimationState;
+      *state&=(~AutoReverseAnimationState);
+      break;
+    }
+    case ReverseCommand:
+    {
+      *state&=(~ForwardAnimationState);
+      *state&=(~AutoReverseAnimationState);
+      break;
+    }
+    default:
+    {
+      XInfoHelpCommand(tile,animate_command);
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
@@ -564,6 +610,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   tile.resource_info=resource_info;
   tile.windows=windows;
   tile.image=image;
+  tile.state=state;
   tile.exception=exception;
   switch (animate_command)
   {
@@ -736,33 +783,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
         }
       break;
     }
-    case SlowerCommand:
-    {
-      resource_info->delay++;
-      break;
-    }
-    case FasterCommand:
-    {
-      if (resource_info->delay == 0)
-        break;
-      resource_info->delay--;
-      break;
-    }
-    case ForwardCommand:
-    {
-      *state=ForwardAnimationState;
-      *state&=(~AutoReverseAnimationState);
-      break;
-    }
-    case ReverseCommand:
-    {
-      *state&=(~ForwardAnimationState);
-      *state&=(~AutoReverseAnimationState);
-      break;
-    }
     default:
     {
-      XInfoHelpCommand(&tile,animate_command);
+      XSpeedDirectionCommand(&tile,animate_command);
       break;
     }
   }
