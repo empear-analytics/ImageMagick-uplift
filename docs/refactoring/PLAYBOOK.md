@@ -4216,7 +4216,11 @@ function).
 1. The `switch` has a `default:` label; its controlling expression `e` is a variable, or
    an expression of variables with no call, assignment or increment, that no statement
    inside the `switch` writes (checked by reading, aliasing included). It lies outside
-   every OpenMP region and contains no `#pragma` line.
+   every OpenMP region and contains no `#pragma` line. A statement of a *kept* group
+   may write a variable `e` (2026-11-12) when no group falls through into a moved group
+   (step 2): the `switch` evaluates `e` once, a kept group runs only on a path that
+   never reaches a moved group, so the value the new function's `switch` is given is
+   the one the original dispatched on.
 2. Choose the groups that move: the group carrying `default:`, and others beside it.
    Each moved group ends with a `break;` of this `switch` or with `return(R);`, holds no
    other exit (no `continue`, `goto`, other `return`, or `break` of an enclosing loop),
@@ -4232,7 +4236,14 @@ function).
    value, and declares one `const` local per member at the top (N step 4); the call
    group of step 5 declares the `Name` local at the top of its block and assigns every
    member from its variable, in declaration order, directly before the call (N steps 5
-   and 6). Splits of one `switch` may share one `Name` (N step 8, *Sibling blocks*).
+   and 6). Splits of one `switch` may share one `Name` (N step 8, *Sibling blocks*),
+   declared once at the top of the block that holds the `switch` and filled once directly
+   before it, as Recipe SD step 8 does (the moved groups then pass `&name` on, written
+   `name`). A `const` targets struct of Recipe CT that a moved group passes on to
+   helpers as `&targets` (it writes nothing itself) goes as one more parameter `const T
+   *targets`, after the input struct, each `&targets` of the groups written `targets`
+   (Recipe N step 2's pass-through of an address the block passes to a callee); the
+   groups' own text is otherwise unchanged (2026-11-12).
 4. Cut the moved groups, labels and bodies, in their order, into a new `static
    MagickBooleanType` function directly above the caller, whose body is `switch (e)
    { ... }` with the same text of `e`, followed by `return(MagickTrue);`. Each
@@ -12150,3 +12161,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | AMEND | CT | Step 3: a variable outside the targets struct may be added as a new last member (typedef and initialiser each gain one entry after the last) in the commit of the helper that writes it; the earlier helpers bind only the members they write and do not change. *Careful* gives the argument | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): `AnnotateTargets` (`annotate_info`, `p`, `x`, `y`) serves the text loop's line-advance blocks, and the BackSpace and Delete keys also write the cursor event `text_event`, which the step's "cannot be added later" refused; the text loop's key switch holds eleven depth-4 sites that need those helpers | owner |
 | 2026-11-12 | NEW | CR | Extract a Tail That Ends Its Case or Iteration or Returns Failure: the tail of a `switch` case or of a sequential loop's body that leaves through `break;` or `continue;` (the same as falling off its end) on some paths and through `return(c);` of one constant on others moves to a `static MagickBooleanType` function (each `break;`/`continue;` is `return(MagickTrue);`, each `return(c);` is `return(MagickFalse);`, the end `return(MagickTrue);`), written variables by Recipe CT's targets struct; the caller writes `if (Helper(...) == MagickFalse) return(c);`, followed by the case's `break;` | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's Return key and its selection-paste loop body leave through `break;`/`continue;` on some paths and `return(MagickFalse);` when an allocation fails, and write `annotate_info`, `p`, `x` and `y`; CT (no `return`), I and W (no mixed exits), E step 7 and LC refuse them | owner |
 | 2026-11-12 | AMEND | FT | Step 1 and step 3: the case `B` that `A` falls into may instead be the failure guard `if (Q(a1,...,an) == MagickFalse) return(c);` followed by `break;`, `Q` a `static MagickBooleanType` function made by Recipe CR, W or I and `c` a constant; `A` gets the guard's two lines and a `break;` in place of `magick_fallthrough;`. *Careful* gives the argument | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's default key group (draw a character, then `magick_fallthrough;` when the line is full) falls into the Return group, which Recipe CR made `if (XAdvanceTextLine(...) == MagickFalse) return(MagickFalse); break;`; FT's void-call form refuses it, so the default group's four depth-4 tests cannot move | owner |
+| 2026-11-12 | AMEND | SR | Step 1: a kept group may write the controlling variable `e` when no group falls through into a moved group (the `switch` evaluates `e` once and a kept group never reaches a moved one). Step 3: the input struct may be shared and filled once before the `switch` (SD step 8), and a `const` targets struct that a moved group passes on as `&targets` goes as one more parameter, written `targets`. *Not covered by* and *Careful* unchanged | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's key `switch` holds one group (`XK_bracketleft`: `key_symbol=XK_Escape;`) that writes `e`, which SR step 1 refused, beside the default and Return groups that call the failing helpers; a stub of the whole `switch` as one helper measures cc 9 (Complex Method), so those two groups go to a second one | owner |
