@@ -2945,13 +2945,10 @@ cleanup:
     ReleaseOpenCLCommandQueue(device, queue);
   if (device != NULL)
     ReleaseOpenCLDevice(device);
-  if (outputReady == MagickFalse)
+  if ((outputReady == MagickFalse) && (filteredImage != NULL))
   {
-    if (filteredImage != NULL)
-    {
-      DestroyImage(filteredImage);
-      filteredImage = NULL;
-    }
+    DestroyImage(filteredImage);
+    filteredImage = NULL;
   }
 
   return(filteredImage);
