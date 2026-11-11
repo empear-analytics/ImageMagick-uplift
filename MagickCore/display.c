@@ -12444,6 +12444,83 @@ static void XStartRotateLine(Display *display,XWindows *windows,
   (*state)|=ExitState;
 }
 
+typedef struct _RotateKeyInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+} RotateKeyInput;
+
+static void XRotateKeyPress(const RotateKeyInput *key_input,
+  const RotateLineTargets *targets)
+{
+  Display
+    *const display = key_input->display;
+
+  XResourceInfo
+    *const resource_info = key_input->resource_info;
+
+  XWindows
+    *const windows = key_input->windows;
+
+  XEvent
+    event = key_input->event;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  if (event.xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Rotation",ImageRotateHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -12576,48 +12653,14 @@ static MagickBooleanType XRotateImage(Display *display,
             break;
           case KeyPress:
           {
-            char
-              command[MagickPathExtent];
+            RotateKeyInput
+              key_input;
 
-            KeySym
-              key_symbol;
-
-            if (event.xkey.window != windows->image.id)
-              break;
-            /*
-              Respond to a user key press.
-            */
-            (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-              sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-            switch ((int) key_symbol)
-            {
-              case XK_Escape:
-              case XK_F20:
-              {
-                /*
-                  Prematurely exit.
-                */
-                state|=EscapeState;
-                state|=ExitState;
-                break;
-              }
-              case XK_F1:
-              case XK_Help:
-              {
-                (void) XSetFunction(display,windows->image.highlight_context,
-                  GXcopy);
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Rotation",ImageRotateHelp);
-                (void) XSetFunction(display,windows->image.highlight_context,
-                  GXinvert);
-                break;
-              }
-              default:
-              {
-                (void) XBell(display,0);
-                break;
-              }
-            }
+            key_input.display=display;
+            key_input.resource_info=resource_info;
+            key_input.windows=windows;
+            key_input.event=event;
+            XRotateKeyPress(&key_input,&line_targets);
             break;
           }
           case MotionNotify:
