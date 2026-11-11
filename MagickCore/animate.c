@@ -728,6 +728,34 @@ static int SceneCompare(const void *x,const void *y)
 }
 #endif
 
+static MagickBooleanType IsTrueColorMap(const char *map_type,
+  const XVisualInfo *visual_info)
+{
+  return(((map_type != (char *) NULL) ||
+    (visual_info->klass == TrueColor) ||
+    (visual_info->klass == DirectColor)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType IsColormapMismatch(const Image *next,
+  const Image *images,const XVisualInfo *visual_info)
+{
+  return(((next->storage_class == DirectClass) ||
+    (next->colors != images->colors) ||
+    (next->colors > (size_t) visual_info->colormap_size)) ? MagickTrue :
+    MagickFalse);
+}
+
+static ssize_t FindColormapDifference(const Image *next,const Image *images)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) images->colors; i++)
+    if (IsPixelInfoEquivalent(next->colormap+i,images->colormap+i) == MagickFalse)
+      break;
+  return(i);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -879,13 +907,9 @@ MagickExport void XAnimateBackgroundImage(Display *display,
         for (next=images; next != (Image *) NULL; )
         {
           next->alpha_trait=UndefinedPixelTrait;
-          if ((next->storage_class == DirectClass) ||
-              (next->colors != images->colors) ||
-              (next->colors > (size_t) visual_info->colormap_size))
+          if (IsColormapMismatch(next,images,visual_info) != MagickFalse)
             break;
-          for (i=0; i < (ssize_t) images->colors; i++)
-            if (IsPixelInfoEquivalent(next->colormap+i,images->colormap+i) == MagickFalse)
-              break;
+          i=FindColormapDifference(next,images);
           if (i < (ssize_t) images->colors)
             break;
           next=GetNextImageInList(next);
@@ -914,17 +938,14 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   display_image=image_list[0];
   for (scene=0; scene < (int) number_scenes; scene++)
   {
-    if ((resource_info->map_type != (char *) NULL) ||
-        (visual_info->klass == TrueColor) ||
-        (visual_info->klass == DirectColor))
+    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
       (void) SetImageType(image_list[scene],image_list[scene]->alpha_trait ==
         BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
     if ((display_image->columns < image_list[scene]->columns) &&
         (display_image->rows < image_list[scene]->rows))
       display_image=image_list[scene];
   }
-  if ((resource_info->map_type != (char *) NULL) ||
-      (visual_info->klass == TrueColor) || (visual_info->klass == DirectColor))
+  if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
     (void) SetImageType(display_image,display_image->alpha_trait !=
       BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
   XMakeStandardColormap(display,visual_info,&resources,display_image,map_info,
@@ -1078,9 +1099,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     */
     window_info.pixmap=(Pixmap) NULL;
     window_info.matte_pixmap=(Pixmap) NULL;
-    if ((resources.map_type != (char *) NULL) ||
-        (visual_info->klass == TrueColor) ||
-        (visual_info->klass == DirectColor))
+    if (IsTrueColorMap(resources.map_type,visual_info) != MagickFalse)
       if (image_list[scene]->storage_class == PseudoClass)
         XGetPixelInfo(display,visual_info,map_info,&resources,
           image_list[scene],window_info.pixel_info);
@@ -1204,6 +1223,13 @@ MagickExport void XAnimateBackgroundImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType IsColormapVisual(const XVisualInfo *visual_info)
+{
+  return(((visual_info->klass == GrayScale) ||
+    (visual_info->klass == PseudoColor) ||
+    (visual_info->klass == DirectColor)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -1503,9 +1529,7 @@ MagickExport Image *XAnimateImages(Display *display,
         for (next=images; next != (Image *) NULL; )
         {
           next->alpha_trait=UndefinedPixelTrait;
-          if ((next->storage_class == DirectClass) ||
-              (next->colors != images->colors) ||
-              (next->colors > (size_t) visual_info->colormap_size))
+          if (IsColormapMismatch(next,images,visual_info) != MagickFalse)
             break;
           for (i=0; i < (ssize_t) images->colors; i++)
             if (IsPixelInfoEquivalent(next->colormap+i,images->colormap+i) == MagickFalse)
@@ -1538,9 +1562,7 @@ MagickExport Image *XAnimateImages(Display *display,
   display_image=image_list[0];
   for (scene=0; scene < (ssize_t) number_scenes; scene++)
   {
-    if ((resource_info->map_type != (char *) NULL) ||
-        (visual_info->klass == TrueColor) ||
-        (visual_info->klass == DirectColor))
+    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
       (void) SetImageType(image_list[scene],image_list[scene]->alpha_trait ==
         BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
     if ((display_image->columns < image_list[scene]->columns) &&
@@ -1932,9 +1954,7 @@ MagickExport Image *XAnimateImages(Display *display,
     */
     windows->image.pixmap=(Pixmap) NULL;
     windows->image.matte_pixmap=(Pixmap) NULL;
-    if ((resource_info->map_type != (char *) NULL) ||
-        (visual_info->klass == TrueColor) ||
-        (visual_info->klass == DirectColor))
+    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
       if (image_list[scene]->storage_class == PseudoClass)
         XGetPixelInfo(display,visual_info,map_info,resource_info,
           image_list[scene],windows->image.pixel_info);
@@ -2795,9 +2815,7 @@ MagickExport Image *XAnimateImages(Display *display,
   while (!(state & ExitState));
   image_list=(Image **) RelinquishMagickMemory(image_list);
   images=DestroyImageList(images);
-  if ((windows->visual_info->klass == GrayScale) ||
-      (windows->visual_info->klass == PseudoColor) ||
-      (windows->visual_info->klass == DirectColor))
+  if (IsColormapVisual(windows->visual_info) != MagickFalse)
     {
       /*
         Withdraw windows.
@@ -2903,6 +2921,14 @@ MagickExport Image *XAnimateImages(Display *display,
 %    o image: the image.
 %
 */
+static MagickBooleanType IsPostscriptFormat(const ImageInfo *image_info)
+{
+  return(((LocaleCompare(image_info->magick,"EPS") == 0) ||
+    (LocaleCompare(image_info->magick,"PDF") == 0) ||
+    (LocaleCompare(image_info->magick,"PS") == 0) ||
+    (LocaleCompare(image_info->magick,"PS2") == 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType XSaveImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -2979,10 +3005,7 @@ static MagickBooleanType XSaveImage(Display *display,
       image_info->interlace=status != MagickFalse ?  NoInterlace :
         PlaneInterlace;
     }
-  if ((LocaleCompare(image_info->magick,"EPS") == 0) ||
-      (LocaleCompare(image_info->magick,"PDF") == 0) ||
-      (LocaleCompare(image_info->magick,"PS") == 0) ||
-      (LocaleCompare(image_info->magick,"PS2") == 0))
+  if (IsPostscriptFormat(image_info) != MagickFalse)
     {
       char
         geometry[MagickPathExtent];

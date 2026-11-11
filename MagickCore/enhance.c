@@ -952,55 +952,30 @@ MagickExport MagickBooleanType LinearStretchImage(Image *image,
 %
 */
 
-static inline void ModulateHCL(const ModulateInfo *modulate_info,
+typedef void
+  (*ModulateConvertMethod)(const double,const double,const double,double *,
+    double *,double *);
+
+typedef struct _ModulateConversion
+{
+  const ModulateInfo
+    *modulate_info;
+
+  ModulateConvertMethod
+    convert_from_rgb,
+    convert_to_rgb;
+} ModulateConversion;
+
+static inline void ModulateHueSpace(const ModulateConversion *conversion,
   double *red,double *green,double *blue)
 {
-  const double
-    percent_hue = modulate_info->percent_hue,
-    percent_chroma = modulate_info->percent_saturation,
-    percent_luma = modulate_info->percent_brightness;
+  const ModulateInfo
+    *modulate_info = conversion->modulate_info;
 
-  double
-    hue,
-    luma,
-    chroma;
+  const ModulateConvertMethod
+    convert_from_rgb = conversion->convert_from_rgb,
+    convert_to_rgb = conversion->convert_to_rgb;
 
-  /*
-    Increase or decrease color luma, chroma, or hue.
-  */
-  ConvertRGBToHCL(*red,*green,*blue,&hue,&chroma,&luma);
-  hue+=fmod((percent_hue-100.0),200.0)/200.0;
-  chroma*=0.01*percent_chroma;
-  luma*=0.01*percent_luma;
-  ConvertHCLToRGB(hue,chroma,luma,red,green,blue);
-}
-
-static inline void ModulateHCLp(const ModulateInfo *modulate_info,
-  double *red,double *green,double *blue)
-{
-  const double
-    percent_hue = modulate_info->percent_hue,
-    percent_chroma = modulate_info->percent_saturation,
-    percent_luma = modulate_info->percent_brightness;
-
-  double
-    hue,
-    luma,
-    chroma;
-
-  /*
-    Increase or decrease color luma, chroma, or hue.
-  */
-  ConvertRGBToHCLp(*red,*green,*blue,&hue,&chroma,&luma);
-  hue+=fmod((percent_hue-100.0),200.0)/200.0;
-  chroma*=0.01*percent_chroma;
-  luma*=0.01*percent_luma;
-  ConvertHCLpToRGB(hue,chroma,luma,red,green,blue);
-}
-
-static inline void ModulateHSB(const ModulateInfo *modulate_info,
-  double *red,double *green,double *blue)
-{
   const double
     percent_hue = modulate_info->percent_hue,
     percent_saturation = modulate_info->percent_saturation,
@@ -1014,80 +989,65 @@ static inline void ModulateHSB(const ModulateInfo *modulate_info,
   /*
     Increase or decrease color brightness, saturation, or hue.
   */
-  ConvertRGBToHSB(*red,*green,*blue,&hue,&saturation,&brightness);
+  convert_from_rgb(*red,*green,*blue,&hue,&saturation,&brightness);
   hue+=fmod((percent_hue-100.0),200.0)/200.0;
   saturation*=0.01*percent_saturation;
   brightness*=0.01*percent_brightness;
-  ConvertHSBToRGB(hue,saturation,brightness,red,green,blue);
+  convert_to_rgb(hue,saturation,brightness,red,green,blue);
+}
+
+static inline void ModulateHCL(const ModulateInfo *modulate_info,
+  double *red,double *green,double *blue)
+{
+  const ModulateConversion
+    conversion = { modulate_info,ConvertRGBToHCL,ConvertHCLToRGB };
+
+  ModulateHueSpace(&conversion,red,green,blue);
+}
+
+static inline void ModulateHCLp(const ModulateInfo *modulate_info,
+  double *red,double *green,double *blue)
+{
+  const ModulateConversion
+    conversion = { modulate_info,ConvertRGBToHCLp,ConvertHCLpToRGB };
+
+  ModulateHueSpace(&conversion,red,green,blue);
+}
+
+static inline void ModulateHSB(const ModulateInfo *modulate_info,
+  double *red,double *green,double *blue)
+{
+  const ModulateConversion
+    conversion = { modulate_info,ConvertRGBToHSB,ConvertHSBToRGB };
+
+  ModulateHueSpace(&conversion,red,green,blue);
 }
 
 static inline void ModulateHSI(const ModulateInfo *modulate_info,
   double *red,double *green,double *blue)
 {
-  const double
-    percent_hue = modulate_info->percent_hue,
-    percent_saturation = modulate_info->percent_saturation,
-    percent_intensity = modulate_info->percent_brightness;
+  const ModulateConversion
+    conversion = { modulate_info,ConvertRGBToHSI,ConvertHSIToRGB };
 
-  double
-    intensity,
-    hue,
-    saturation;
-
-  /*
-    Increase or decrease color intensity, saturation, or hue.
-  */
-  ConvertRGBToHSI(*red,*green,*blue,&hue,&saturation,&intensity);
-  hue+=fmod((percent_hue-100.0),200.0)/200.0;
-  saturation*=0.01*percent_saturation;
-  intensity*=0.01*percent_intensity;
-  ConvertHSIToRGB(hue,saturation,intensity,red,green,blue);
+  ModulateHueSpace(&conversion,red,green,blue);
 }
 
 static inline void ModulateHSL(const ModulateInfo *modulate_info,
   double *red,double *green,double *blue)
 {
-  const double
-    percent_hue = modulate_info->percent_hue,
-    percent_saturation = modulate_info->percent_saturation,
-    percent_lightness = modulate_info->percent_brightness;
+  const ModulateConversion
+    conversion = { modulate_info,ConvertRGBToHSL,ConvertHSLToRGB };
 
-  double
-    hue,
-    lightness,
-    saturation;
-
-  /*
-    Increase or decrease color lightness, saturation, or hue.
-  */
-  ConvertRGBToHSL(*red,*green,*blue,&hue,&saturation,&lightness);
-  hue+=fmod((percent_hue-100.0),200.0)/200.0;
-  saturation*=0.01*percent_saturation;
-  lightness*=0.01*percent_lightness;
-  ConvertHSLToRGB(hue,saturation,lightness,red,green,blue);
+  ModulateHueSpace(&conversion,red,green,blue);
 }
 
 static inline void ModulateHSV(const ModulateInfo *modulate_info,
   double *red,double *green,double *blue)
 {
-  const double
-    percent_hue = modulate_info->percent_hue,
-    percent_saturation = modulate_info->percent_saturation,
-    percent_value = modulate_info->percent_brightness;
+  const ModulateConversion
+    conversion = { modulate_info,ConvertRGBToHSV,ConvertHSVToRGB };
 
-  double
-    hue,
-    saturation,
-    value;
-
-  /*
-    Increase or decrease color value, saturation, or hue.
-  */
-  ConvertRGBToHSV(*red,*green,*blue,&hue,&saturation,&value);
-  hue+=fmod((percent_hue-100.0),200.0)/200.0;
-  saturation*=0.01*percent_saturation;
-  value*=0.01*percent_value;
-  ConvertHSVToRGB(hue,saturation,value,red,green,blue);
+  ModulateHueSpace(&conversion,red,green,blue);
 }
 
 static inline void ModulateHWB(const ModulateInfo *modulate_info,
@@ -1113,9 +1073,30 @@ static inline void ModulateHWB(const ModulateInfo *modulate_info,
   ConvertHWBToRGB(hue,whiteness,blackness,red,green,blue);
 }
 
-static inline void ModulateLCHab(const ModulateInfo *modulate_info,
+typedef void
+  (*ModulateLCHMethod)(const double,const double,const double,
+    const IlluminantType,double *,double *,double *);
+
+typedef struct _ModulateLCHConversion
+{
+  const ModulateInfo
+    *modulate_info;
+
+  ModulateLCHMethod
+    convert_from_rgb,
+    convert_to_rgb;
+} ModulateLCHConversion;
+
+static inline void ModulateLCHSpace(const ModulateLCHConversion *conversion,
   double *red,double *green,double *blue)
 {
+  const ModulateInfo
+    *modulate_info = conversion->modulate_info;
+
+  const ModulateLCHMethod
+    convert_from_rgb = conversion->convert_from_rgb,
+    convert_to_rgb = conversion->convert_to_rgb;
+
   const double
     percent_luma = modulate_info->percent_brightness,
     percent_chroma = modulate_info->percent_saturation,
@@ -1132,37 +1113,29 @@ static inline void ModulateLCHab(const ModulateInfo *modulate_info,
   /*
     Increase or decrease color luma, chroma, or hue.
   */
-  ConvertRGBToLCHab(*red,*green,*blue,illuminant,&luma,&chroma,&hue);
+  convert_from_rgb(*red,*green,*blue,illuminant,&luma,&chroma,&hue);
   luma*=0.01*percent_luma;
   chroma*=0.01*percent_chroma;
   hue+=fmod((percent_hue-100.0),200.0)/200.0;
-  ConvertLCHabToRGB(luma,chroma,hue,illuminant,red,green,blue);
+  convert_to_rgb(luma,chroma,hue,illuminant,red,green,blue);
+}
+
+static inline void ModulateLCHab(const ModulateInfo *modulate_info,
+  double *red,double *green,double *blue)
+{
+  const ModulateLCHConversion
+    conversion = { modulate_info,ConvertRGBToLCHab,ConvertLCHabToRGB };
+
+  ModulateLCHSpace(&conversion,red,green,blue);
 }
 
 static inline void ModulateLCHuv(const ModulateInfo *modulate_info,
   double *red,double *green,double *blue)
 {
-  const double
-    percent_luma = modulate_info->percent_brightness,
-    percent_chroma = modulate_info->percent_saturation,
-    percent_hue = modulate_info->percent_hue;
+  const ModulateLCHConversion
+    conversion = { modulate_info,ConvertRGBToLCHuv,ConvertLCHuvToRGB };
 
-  const IlluminantType
-    illuminant = modulate_info->illuminant;
-
-  double
-    hue,
-    luma,
-    chroma;
-
-  /*
-    Increase or decrease color luma, chroma, or hue.
-  */
-  ConvertRGBToLCHuv(*red,*green,*blue,illuminant,&luma,&chroma,&hue);
-  luma*=0.01*percent_luma;
-  chroma*=0.01*percent_chroma;
-  hue+=fmod((percent_hue-100.0),200.0)/200.0;
-  ConvertLCHuvToRGB(luma,chroma,hue,illuminant,red,green,blue);
+  ModulateLCHSpace(&conversion,red,green,blue);
 }
 
 static void ModulateDefaultColorspaces(const ModulateInfo *modulate_info,double *red,
@@ -1731,6 +1704,29 @@ static void InverseSigmoidalColormapEntry(Image *image,const ssize_t i,
       image->colormap[i].alpha);
 }
 
+static void ScaledSigmoidalColormap(Image *image,const double contrast,
+  const double midpoint)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].red=(MagickRealType) ScaledSig(
+        image->colormap[i].red);
+    if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].green=(MagickRealType) ScaledSig(
+        image->colormap[i].green);
+    if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].blue=(MagickRealType) ScaledSig(
+        image->colormap[i].blue);
+    if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].alpha=(MagickRealType) ScaledSig(
+        image->colormap[i].alpha);
+  }
+}
+
 static void SigmoidalContrastColormap(Image *image,
   const MagickBooleanType sharpen,const double contrast,const double midpoint)
 {
@@ -1738,21 +1734,7 @@ static void SigmoidalContrastColormap(Image *image,
     i;
 
   if( sharpen != MagickFalse )
-    for (i=0; i < (ssize_t) image->colors; i++)
-    {
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].red=(MagickRealType) ScaledSig(
-          image->colormap[i].red);
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].green=(MagickRealType) ScaledSig(
-          image->colormap[i].green);
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].blue=(MagickRealType) ScaledSig(
-          image->colormap[i].blue);
-      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].alpha=(MagickRealType) ScaledSig(
-          image->colormap[i].alpha);
-    }
+    ScaledSigmoidalColormap(image,contrast,midpoint);
   else
     for (i=0; i < (ssize_t) image->colors; i++)
       InverseSigmoidalColormapEntry(image,i,contrast,midpoint);

@@ -49,7 +49,7 @@ FIXED_MTIME = 1000000000       # 2001-09-09; file dates end up in properties
 # Prepended to every magick invocation by run_case, e.g. a sandbox (mutate.py).
 WRAPPER = []
 TIMEOUT = 30                   # the slowest legitimate case takes under 3s
-HARNESS_VERSION = "14"        # bump when normalisation or execution changes (13: OpenCL profile at this boot's clock; 14: X11 cases keep the fixed epoch on a build without X)
+HARNESS_VERSION = "15"        # bump when normalisation or execution changes (13: OpenCL profile at this boot's clock; 14: X11 cases keep the fixed epoch on a build without X; 15: the wide build trees normalised, env/x11/stdin in the baseline key)
 # WIDE=1, as for build.sh: the builds with X11 and OpenCL (base-wide, cov-wide, ...), with a
 # case map and line coverage of their own (casemap-wide.json, oracle-wide.profdata, ...).
 WIDE = "-wide" if os.environ.get("WIDE") else ""
@@ -288,8 +288,11 @@ NORMALISE = [
     (re.compile(rb"/(CreationDate|ModDate) \(D:[0-9]+[^)]*\)"), rb"/\1 (D:DATE)"),
     (re.compile(rb"<xmp:(CreateDate|ModifyDate|MetadataDate)>[^<]*<"), rb"<xmp:\1>DATE<"),
 ]
+# The WIDE builds (base-wide/<sha>, cand-wide, cov-wide, wide) too: without them every -list
+# that prints a configuration path diverged between two wide builds of one commit (2026-11-10).
 BUILD_TREE_RE = re.compile(re.escape(OUT.encode()) +
-                           rb"/(?:(?:src|base)/[0-9a-f]{40}|cand|cov|asan|mull-[A-Za-z0-9_]+)")
+                           rb"/(?:(?:src|base(?:-wide)?)/[0-9a-f]{40}|(?:cand|cov)(?:-wide)?|wide|"
+                           rb"asan|mull-[A-Za-z0-9_]+)")
 # conjure takes `-key value` script variables, not options; -version and -list
 # are accepted only as the first argument. None of them gets -seed.
 UNSEEDED = ("conjure", "-version", "-list")
@@ -461,7 +464,12 @@ def load_cases(binary):
     manifest = ensure_corpus(binary)
     lists, writable = build_lists(binary)
     lists["__decode_files__"] = manifest["decode_files"]
-    return manifest, catalogue.generate(lists, writable)
+    cases = catalogue.generate(lists, writable)
+    labels = {c["label"] for c in cases}
+    stale = sorted(set(getattr(catalogue, "LOAD_SENSITIVE", {})) - labels)
+    if stale:  # a renamed case would silently lose its listing
+        sys.exit("cases.LOAD_SENSITIVE names cases the catalogue does not have: %s" % "; ".join(stale))
+    return manifest, cases
 
 
 # ---------------------------------------------------------------------------
@@ -822,9 +830,17 @@ def cache_path(binary, manifest):
 
 def case_key(case):
     """Everything that determines a case's result: its commands and the files
-    it starts with (MSL cases share one command and differ only in script)."""
+    it starts with (MSL cases share one command and differ only in script), and
+    its stdin, environment and X server, which are part of its id as well. Without
+    the last three, an OpenCL case (MAGICK_OCL_DEVICE) and the plain case with the
+    same command, or one X11 case on several screens, shared one baseline entry,
+    which held whichever ran last: 129 false divergences between two wide builds of
+    one commit (2026-11-10). Cases without them keep the key they always had."""
     what = [case["steps"], sorted(case.get("files", {}).items())]
-    return hashlib.sha1(json.dumps(what).encode()).hexdigest()
+    extra = [case.get(k) for k in ("stdin", "env", "x11")]
+    if any(extra):
+        what.append(extra)
+    return hashlib.sha1(json.dumps(what, sort_keys=True).encode()).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -882,7 +898,8 @@ def parallel(fn, items, jobs, label):
 
 # One oracle run: the two binaries, the corpus manifest, the cases selected
 # and the baseline results by case_key.
-Run = collections.namedtuple("Run", "base_bin cand_bin manifest todo cache")
+# and the baseline results by case_key; settled: the load-sensitive cases a rerun alone settled.
+Run = collections.namedtuple("Run", "base_bin cand_bin manifest todo cache settled", defaults=((),))
 
 
 def cmd_run(args):
@@ -903,8 +920,48 @@ def cmd_run(args):
     cand_res = parallel(lambda c: run_case(cand_bin, "cand", c, manifest), todo,
                         args.jobs, "candidate")
     failures = compare(todo, cache, cand_res)
-    report(Run(base_bin, cand_bin, manifest, todo, cache), failures, time.time() - start, args)
+    run = Run(base_bin, cand_bin, manifest, todo, cache)
+    failures, settled = settle_load_sensitive(run, failures)
+    report(run._replace(settled=settled), failures, time.time() - start, args)
     return 1 if failures else 0
+
+
+def load_sensitive(case):
+    """Why a case's result depends on the machine's load (cases.LOAD_SENSITIVE), or None."""
+    return getattr(catalogue, "LOAD_SENSITIVE", {}).get(case["label"])
+
+
+SETTLE_TRIES = 3
+
+
+def settle_load_sensitive(run, failures):
+    """(failures, settled): a listed load-sensitive case that diverged is run again alone, baseline
+    and candidate one after the other, up to SETTLE_TRIES times. It is settled when a pair agrees;
+    one that never agrees stays a divergence: a change in behaviour diverges alone as well."""
+    kept, settled = [], []
+    for c, b, k in failures:
+        reason = load_sensitive(c)
+        rerun = rerun_alone(run, c) if reason is not None else None
+        if rerun is None:
+            kept.append((c, b, k))
+        elif same(*rerun):
+            settled.append({"id": c["id"], "label": c["label"], "why": explain(b, k), "reason": reason})
+        else:
+            kept.append((c,) + rerun)
+    return kept, settled
+
+
+def rerun_alone(run, c):
+    """(baseline, candidate) of the first of SETTLE_TRIES reruns of case c, one side after the
+    other, in which they agree, else of the last; only a divergence keeps its directory."""
+    for _ in range(SETTLE_TRIES):
+        rb = run_case(run.base_bin, "base", c, run.manifest)
+        rk = run_case(run.cand_bin, "cand", c, run.manifest)
+        if same(rb, rk):
+            shutil.rmtree(case_dir("cand", c), ignore_errors=True)
+            break
+    shutil.rmtree(case_dir("base", c), ignore_errors=True)
+    return rb, rk
 
 
 def select_run_cases(all_cases, args):
@@ -955,12 +1012,13 @@ def compare(todo, cache, cand_res):
 
 def report(run, failures, elapsed, args):
     print_summary(run, len(failures), elapsed)
+    print_load_sensitive(run)
     detail = [divergence(c, b, k, run.manifest) for c, b, k in failures]
     print_divergences(detail, args.show)
     if failures and args.explain:
         print_pixel_deltas(run, failures[:args.show])
     with open(os.path.join(WORK, "last-report.json"), "w") as f:
-        json.dump({"cases": len(run.todo), "diverged": detail}, f, indent=1)
+        json.dump({"cases": len(run.todo), "diverged": detail, "settled": list(run.settled)}, f, indent=1)
     if failures:
         print("\n  full report: %s" % os.path.relpath(os.path.join(WORK, "last-report.json"), ROOT))
         print("  candidate outputs kept in build-oracle/work/runs/cand/")
@@ -974,6 +1032,17 @@ def print_summary(run, diverged, elapsed):
     print("        %d cases exit non-zero on the baseline (error paths, compared too)"
           % failing_base)
     print_timeouts([c for c, rc in base_rcs if "timeout" in rc])
+
+
+def print_load_sensitive(run):
+    listed = [c for c in run.todo if load_sensitive(c) is not None]
+    if not listed:
+        return
+    print("        %d cases are load-sensitive (cases.LOAD_SENSITIVE): rerun alone when they diverge"
+          % len(listed))
+    for e in run.settled:
+        print("  SETTLED %s  %s: %s under load, the same when rerun alone (%s)"
+              % (e["id"], e["label"], "; ".join(e["why"]), e["reason"]))
 
 
 def print_timeouts(slow):
@@ -1031,15 +1100,25 @@ def cmd_selfcheck(args):
     # and passed. --repeat 4 would have caught it three times in four.
     runs = [parallel(lambda c: run_case(base_bin, "self%d" % n, c, manifest), todo, args.jobs,
                      "run %d" % n) for n in range(1, args.repeat + 1)]
-    flaky = [c for c in todo if disagreement(runs, c["id"]) is not None]
+    differing = [c for c in todo if disagreement(runs, c["id"]) is not None]
+    # The listed load-sensitive cases are known to differ under load; run reruns them alone.
+    flaky = [c for c in differing if load_sensitive(c) is None]
+    known = [c for c in differing if load_sensitive(c) is not None]
     print("selfcheck: %d cases, %d runs each, %d nondeterministic"
           % (len(todo), args.repeat, len(flaky)))
-    for c in flaky:
-        other = disagreement(runs, c["id"])
-        print("  %s  %s: %s" % (c["id"], c["label"], "; ".join(explain(runs[0][c["id"]], other))))
-    if not flaky:
+    print_disagreements(runs, flaky)
+    if known:
+        print("  and %d listed load-sensitive cases (cases.LOAD_SENSITIVE) differed too:" % len(known))
+        print_disagreements(runs, known)
+    if not differing:
         remove_self_runs(args.repeat)
     return 1 if flaky else 0
+
+
+def print_disagreements(runs, cases):
+    for c in cases:
+        other = disagreement(runs, c["id"])
+        print("  %s  %s: %s" % (c["id"], c["label"], "; ".join(explain(runs[0][c["id"]], other))))
 
 
 def disagreement(runs, cid):

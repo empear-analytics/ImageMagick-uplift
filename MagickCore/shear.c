@@ -424,7 +424,7 @@ typedef enum
   RIGHT
 } ShearDirection;
 
-typedef struct _XShearSpanInfo
+typedef struct _ShearTransfer
 {
   Image
     *image;
@@ -433,27 +433,33 @@ typedef struct _XShearSpanInfo
     background;
 
   size_t
-    width;
+    length;
 
   ssize_t
-    x_offset;
-} XShearSpanInfo;
+    offset;
 
-static void TransferXShearSpan(const XShearSpanInfo *span_info,
+  size_t
+    extent;
+} ShearTransfer;
+
+static void TransferShearSpan(const ShearTransfer *transfer,
   const ShearDirection direction,const double displacement,
   Quantum *magick_restrict p)
 {
   Image
-    *image = span_info->image;
+    *image = transfer->image;
 
   const PixelInfo
-    background = span_info->background;
+    background = transfer->background;
 
   const size_t
-    width = span_info->width;
+    length = transfer->length;
 
   const ssize_t
-    x_offset = span_info->x_offset;
+    offset = transfer->offset;
+
+  const size_t
+    extent = transfer->extent;
 
   double
     area;
@@ -485,9 +491,9 @@ static void TransferXShearSpan(const XShearSpanInfo *span_info,
       span.image=image;
       span.background=background;
       span.area=area;
-      span.length=width;
-      span.extent=image->columns;
-      span.offset=x_offset;
+      span.length=length;
+      span.extent=extent;
+      span.offset=offset;
       span.step=step;
       TransferPixelsForward(p,pixel,destination,&span);
       break;
@@ -500,14 +506,56 @@ static void TransferXShearSpan(const XShearSpanInfo *span_info,
       span.image=image;
       span.background=background;
       span.area=area;
-      span.length=width;
-      span.extent=image->columns;
-      span.offset=x_offset;
+      span.length=length;
+      span.extent=extent;
+      span.offset=offset;
       span.step=step;
       TransferPixelsBackward(p,pixel,destination,&span);
       break;
     }
   }
+}
+
+typedef struct _XShearSpanInfo
+{
+  Image
+    *image;
+
+  PixelInfo
+    background;
+
+  size_t
+    width;
+
+  ssize_t
+    x_offset;
+} XShearSpanInfo;
+
+static void TransferXShearSpan(const XShearSpanInfo *span_info,
+  const ShearDirection direction,const double displacement,
+  Quantum *magick_restrict p)
+{
+  Image
+    *image = span_info->image;
+
+  const PixelInfo
+    background = span_info->background;
+
+  const size_t
+    width = span_info->width;
+
+  const ssize_t
+    x_offset = span_info->x_offset;
+
+  ShearTransfer
+    transfer;
+
+  transfer.image=image;
+  transfer.background=background;
+  transfer.length=width;
+  transfer.offset=x_offset;
+  transfer.extent=image->columns;
+  TransferShearSpan(&transfer,direction,displacement,p);
 }
 
 typedef struct _XShearRow
@@ -546,6 +594,29 @@ static void SelectShearDirection(double *displacement,
       *displacement*=(-1.0);
       *direction=LEFT;
     }
+}
+
+typedef struct _ShearProgress
+{
+  Image
+    *image;
+
+  const char
+    *tag;
+
+  size_t
+    extent;
+} ShearProgress;
+
+static void SetShearProgress(const ShearProgress *info,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(info->image,info->tag,progress,info->extent);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
 }
 
 static MagickBooleanType XShearLine(const XShearRow *row,const ssize_t y,
@@ -661,16 +732,17 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
+        ShearProgress
+          info;
 
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,XShearImageTag,progress,height);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        info.image=image;
+        info.tag=XShearImageTag;
+        info.extent=height;
+        SetShearProgress(&info,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -712,6 +784,109 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _YShearColumn
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  PixelInfo
+    background;
+
+  double
+    degrees;
+
+  size_t
+    height,
+    width;
+
+  ssize_t
+    x_offset,
+    y_offset,
+    x;
+
+  ExceptionInfo
+    *exception;
+} YShearColumn;
+
+static MagickBooleanType YShearColumnHead(const YShearColumn *column,
+  Quantum *magick_restrict *p,double *displacement,MagickBooleanType *status)
+{
+  Image
+    *image = column->image;
+
+  CacheView
+    *image_view = column->image_view;
+
+  const double
+    degrees = column->degrees;
+
+  const size_t
+    width = column->width;
+
+  const ssize_t
+    x_offset = column->x_offset,
+    y_offset = column->y_offset,
+    x = column->x;
+
+  ExceptionInfo
+    *exception = column->exception;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*p)=GetCacheViewAuthenticPixels(image_view,x_offset+x,0,1,image->rows,
+    exception);
+  if ((*p) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  (*p)+=(ptrdiff_t) y_offset*(ssize_t) GetPixelChannels(image);
+  (*displacement)=degrees*(double) (x-width/2.0);
+  if ((*displacement) == 0.0)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static void TransferYShearColumn(const YShearColumn *column,
+  double displacement,Quantum *magick_restrict p,MagickBooleanType *status)
+{
+  Image
+    *image = column->image;
+
+  CacheView
+    *image_view = column->image_view;
+
+  const PixelInfo
+    background = column->background;
+
+  const size_t
+    height = column->height;
+
+  const ssize_t
+    y_offset = column->y_offset;
+
+  ExceptionInfo
+    *exception = column->exception;
+
+  ShearDirection
+    direction;
+
+  ShearTransfer
+    transfer;
+
+  SelectShearDirection(&displacement,&direction);
+  transfer.image=image;
+  transfer.background=background;
+  transfer.length=height;
+  transfer.offset=y_offset;
+  transfer.extent=image->rows;
+  TransferShearSpan(&transfer,direction,displacement,p);
+  SyncShearView(image_view,exception,status);
+}
+
 static MagickBooleanType YShearImage(Image *image,const double degrees,
   const ShearRegion *region,ExceptionInfo *exception)
 {
@@ -724,12 +899,6 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
   const ssize_t
     x_offset = region->x_offset,
     y_offset = region->y_offset;
-
-  typedef enum
-  {
-    UP,
-    DOWN
-  } ShearDirection;
 
   CacheView
     *image_view;
@@ -764,98 +933,30 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
   for (x=0; x < (ssize_t) width; x++)
   {
     double
-      area,
       displacement;
-
-    PixelInfo
-      pixel,
-      source,
-      destination;
 
     Quantum
       *magick_restrict p;
 
-    ShearDirection
-      direction;
+    const YShearColumn column = { image, image_view, background, degrees,
+      height, width, x_offset, y_offset, x, exception };
 
-    ShearSpan
-      span;
-
-    ssize_t
-      step;
-
-    if (status == MagickFalse)
+    if (YShearColumnHead(&column,&p,&displacement,&status) == MagickFalse)
       continue;
-    p=GetCacheViewAuthenticPixels(image_view,x_offset+x,0,1,image->rows,
-      exception);
-    if (p == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    p+=(ptrdiff_t) y_offset*(ssize_t) GetPixelChannels(image);
-    displacement=degrees*(double) (x-width/2.0);
-    if (displacement == 0.0)
-      continue;
-    if (displacement > 0.0)
-      direction=DOWN;
-    else
-      {
-        displacement*=(-1.0);
-        direction=UP;
-      }
-    step=CastDoubleToSsizeT(floor((double) displacement));
-    area=(double) (displacement-step);
-    step++;
-    pixel=background;
-    GetPixelInfo(image,&source);
-    GetPixelInfo(image,&destination);
-    switch (direction)
-    {
-      case UP:
-      {
-        /*
-          Transfer pixels top-to-bottom.
-        */
-        span.image=image;
-        span.background=background;
-        span.area=area;
-        span.length=height;
-        span.extent=image->rows;
-        span.offset=y_offset;
-        span.step=step;
-        TransferPixelsForward(p,pixel,destination,&span);
-        break;
-      }
-      case DOWN:
-      {
-        /*
-          Transfer pixels bottom-to-top.
-        */
-        span.image=image;
-        span.background=background;
-        span.area=area;
-        span.length=height;
-        span.extent=image->rows;
-        span.offset=y_offset;
-        span.step=step;
-        TransferPixelsBackward(p,pixel,destination,&span);
-        break;
-      }
-    }
-    SyncShearView(image_view,exception,&status);
+    TransferYShearColumn(&column,displacement,p,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
+        ShearProgress
+          info;
 
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,YShearImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        info.image=image;
+        info.tag=YShearImageTag;
+        info.extent=image->rows;
+        SetShearProgress(&info,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);

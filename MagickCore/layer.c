@@ -863,13 +863,51 @@ static ssize_t FindFirstDifferingColumn(const Image *alpha_image,
   return(x);
 }
 
-static RectangleInfo CompareImagesBounds(const Image *alpha_image,
-  const Image *beta_image,const LayerMethod method,ExceptionInfo *exception)
+typedef enum
 {
+  FirstDifferingRow,
+  LastDifferingRow
+} DifferingRowSide;
+
+static inline ssize_t FindDifferingRow(const DifferingLineScan *line,
+  const DifferingRowSide side)
+{
+  const Image
+    *const alpha_image = line->alpha_image,
+    *const beta_image = line->beta_image;
+
+  const DifferingPixelScan
+    scan = line->scan;
+
+  ExceptionInfo
+    *const exception = line->exception;
+
   const Quantum
     *p,
     *q;
 
+  ssize_t
+    x,
+    y;
+
+  for (y=((side == FirstDifferingRow) ? 0 : (ssize_t) alpha_image->rows-1);
+       ((side == FirstDifferingRow) ? y < (ssize_t) alpha_image->rows : y >= 0);
+       ((side == FirstDifferingRow) ? y++ : y--))
+  {
+    p=GetVirtualPixels(alpha_image,0,y,alpha_image->columns,1,exception);
+    q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
+    if (IsEitherRowMissing(p,q) != MagickFalse)
+      break;
+    x=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->columns);
+    if (x < (ssize_t) alpha_image->columns)
+      break;
+  }
+  return(y);
+}
+
+static RectangleInfo CompareImagesBounds(const Image *alpha_image,
+  const Image *beta_image,const LayerMethod method,ExceptionInfo *exception)
+{
   PixelInfo
     alpha_pixel,
     beta_pixel;
@@ -912,27 +950,9 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
     if (ContinueColumnScan(&line,x) == MagickFalse)
       break;
   bounds.width=(size_t) (x-bounds.x+1);
-  for (y=0; y < (ssize_t) alpha_image->rows; y++)
-  {
-    p=GetVirtualPixels(alpha_image,0,y,alpha_image->columns,1,exception);
-    q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
-    if (IsEitherRowMissing(p,q) != MagickFalse)
-      break;
-    x=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->columns);
-    if (x < (ssize_t) alpha_image->columns)
-      break;
-  }
+  y=FindDifferingRow(&line,FirstDifferingRow);
   bounds.y=y;
-  for (y=(ssize_t) alpha_image->rows-1; y >= 0; y--)
-  {
-    p=GetVirtualPixels(alpha_image,0,y,alpha_image->columns,1,exception);
-    q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
-    if (IsEitherRowMissing(p,q) != MagickFalse)
-      break;
-    x=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->columns);
-    if (x < (ssize_t) alpha_image->columns)
-      break;
-  }
+  y=FindDifferingRow(&line,LastDifferingRow);
   bounds.height=(size_t) (y-bounds.y+1);
   return(bounds);
 }
@@ -1618,6 +1638,33 @@ static MagickBooleanType AcquireBackgroundFrame(const Image *curr,
   return(MagickTrue);
 }
 
+static Image *ReleaseFrameLists(RectangleInfo *bounds,
+  DisposeType *disposals)
+{
+  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+  disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+  return((Image *) NULL);
+}
+
+static Image *ReleaseFrameListsAndPrevious(RectangleInfo *bounds,
+  DisposeType *disposals,Image *prev_image)
+{
+  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+  disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+  prev_image=DestroyImage(prev_image);
+  return((Image *) NULL);
+}
+
+static Image *ReleaseFrameListsAndImages(RectangleInfo *bounds,
+  DisposeType *disposals,Image *prev_image,Image *dup_image)
+{
+  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+  disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+  prev_image=DestroyImage(prev_image);
+  dup_image=DestroyImageIfSet(dup_image);
+  return((Image *) NULL);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1627,17 +1674,8 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   DisposeChoice
     choice;
 
-  DisposeChoiceTargets
-    choice_targets;
-
   DisposeType
     *disposals;
-
-  DuplicateFrameTargets
-    targets;
-
-  DuplicateFrameTrial
-    trial;
 
   Image
     *prev_image,
@@ -1657,6 +1695,12 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
 
   ssize_t
     i;
+
+  const DisposeChoiceTargets
+    choice_targets = { &bgnd_image, &prev_image, &dup_image, &i };
+
+  const DuplicateFrameTargets
+    targets = { &dup_image, &dup_bounds, &cleared };
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1704,11 +1748,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     Initialise Previous Image as fully transparent
   */
   if (AcquireTransparentFrame(curr,&prev_image,exception) == MagickFalse)
-    {
-      bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-      disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-      return((Image *) NULL);
-    }
+    return(ReleaseFrameLists(bounds,disposals));
   /*
     Figure out the area of overlay of the first frame
     No pixel could be cleared as all pixels are already cleared.
@@ -1768,6 +1808,9 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     }
     else
       {
+        const DuplicateFrameTrial
+          trial = { add_frames, curr, bounds, disposals, i, exception };
+
         /*
           Compare a none disposal against a previous disposal
         */
@@ -1798,33 +1841,13 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
           This method will always clear all the pixels that need to be cleared.
         */
         dup_bounds.width=dup_bounds.height=0; /* no dup, no pixel added */
-        trial.add_frames=add_frames;
-        trial.curr=curr;
-        trial.bounds=bounds;
-        trial.disposals=disposals;
-        trial.i=i;
-        trial.exception=exception;
-        targets.dup_image=(&dup_image);
-        targets.dup_bounds=(&dup_bounds);
-        targets.cleared=(&cleared);
         if (TryDuplicateFrame(&trial,&targets) == MagickFalse)
-          {
-            bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-            disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-            prev_image=DestroyImage(prev_image);
-            return((Image *) NULL);
-          }
+          return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
         /*
           Now compare against a simple background disposal
         */
         if (AcquireBackgroundFrame(curr,&bgnd_image,exception) == MagickFalse)
-          {
-            bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-            disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-            prev_image=DestroyImage(prev_image);
-            dup_image=DestroyImageIfSet(dup_image);
-            return((Image *) NULL);
-          }
+          return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,dup_image));
         bgnd_bounds=bounds[i-1]; /* interim bounds of the previous image */
         ClearBounds(bgnd_image,&bgnd_bounds,exception);
         try_bounds=CompareImagesBounds(bgnd_image,curr,CompareAnyLayer,exception);
@@ -1909,16 +1932,8 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     choice.bounds=bounds;
     choice.disposals=disposals;
     choice.dup_bounds=dup_bounds;
-    choice_targets.bgnd_image=(&bgnd_image);
-    choice_targets.prev_image=(&prev_image);
-    choice_targets.dup_image=(&dup_image);
-    choice_targets.i=(&i);
     if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse)
-      {
-        bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-        disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-        return((Image *) NULL);
-      }
+      return(ReleaseFrameLists(bounds,disposals));
     assert(prev_image != (Image *) NULL);
     disposals[i]=disposals[i-1];
 #if DEBUG_OPT_FRAME

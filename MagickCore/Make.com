@@ -150,6 +150,7 @@ $call Make token.c
 $call Make token-next.c
 $call Make token-glob.c
 $call Make transform.c
+$call Make transform-region.c
 $call Make transform-tiles.c
 $call Make threshold.c
 $call Make threshold-adaptive.c
@@ -158,6 +159,7 @@ $call Make type.c
 $call Make utility.c
 $call Make version.c
 $call Make vision.c
+$call Make vision-components.c
 $call Make vms.c
 $call Make widget.c
 $call Make xml-tree.c

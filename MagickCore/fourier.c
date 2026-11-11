@@ -544,6 +544,45 @@ static void ReportComplexProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
+static MagickBooleanType TryCloneComplexImages(const Image *images,
+  ExceptionInfo *exception,Image **complex_images,Image **result)
+{
+  Image
+    *image;
+
+  image=CloneImage(images,0,0,MagickTrue,exception);
+  if (image == (Image *) NULL)
+    {
+      (*result)=(Image *) NULL;
+      return(MagickTrue);
+    }
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    {
+      image=DestroyImageList(image);
+      (*result)=image;
+      return(MagickTrue);
+    }
+  image->depth=32UL;
+  *complex_images=NewImageList();
+  AppendImageToList(complex_images,image);
+  image=CloneImage(images->next,0,0,MagickTrue,exception);
+  if (image == (Image *) NULL)
+    {
+      *complex_images=DestroyImageList(*complex_images);
+      (*result)=*complex_images;
+      return(MagickTrue);
+    }
+  image->depth=32UL;
+  AppendImageToList(complex_images,image);
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    {
+      *complex_images=DestroyImageList(*complex_images);
+      (*result)=*complex_images;
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -570,7 +609,7 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
     *Ci_image,
     *complex_images,
     *Cr_image,
-    *image;
+    *returned;
 
   MagickBooleanType
     status;
@@ -594,30 +633,9 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   if (CheckComplexSequence(images,exception) == MagickFalse)
     return((Image *) NULL);
-  image=CloneImage(images,0,0,MagickTrue,exception);
-  if (image == (Image *) NULL)
-    return((Image *) NULL);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    {
-      image=DestroyImageList(image);
-      return(image);
-    }
-  image->depth=32UL;
-  complex_images=NewImageList();
-  AppendImageToList(&complex_images,image);
-  image=CloneImage(images->next,0,0,MagickTrue,exception);
-  if (image == (Image *) NULL)
-    {
-      complex_images=DestroyImageList(complex_images);
-      return(complex_images);
-    }
-  image->depth=32UL;
-  AppendImageToList(&complex_images,image);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    {
-      complex_images=DestroyImageList(complex_images);
-      return(complex_images);
-    }
+  if (TryCloneComplexImages(images,exception,&complex_images,&returned) !=
+      MagickFalse)
+    return(returned);
   /*
     Apply complex mathematics to image pixels.
   */
@@ -647,27 +665,12 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
 #endif
   for (y=0; y < (ssize_t) rows; y++)
   {
-    ComplexRowInputs
-      rows;
+    const ComplexRowInputs
+      inputs = { Ai_view, Ar_view, Bi_view, Br_view, Ci_view, Cr_view,
+        Ai_image, Ar_image, Bi_image, Br_image, Ci_image, Cr_image, columns,
+        number_channels, op, snr, exception };
 
-    rows.Ai_view=Ai_view;
-    rows.Ar_view=Ar_view;
-    rows.Bi_view=Bi_view;
-    rows.Br_view=Br_view;
-    rows.Ci_view=Ci_view;
-    rows.Cr_view=Cr_view;
-    rows.Ai_image=Ai_image;
-    rows.Ar_image=Ar_image;
-    rows.Bi_image=Bi_image;
-    rows.Br_image=Br_image;
-    rows.Ci_image=Ci_image;
-    rows.Cr_image=Cr_image;
-    rows.columns=columns;
-    rows.number_channels=number_channels;
-    rows.op=op;
-    rows.snr=snr;
-    rows.exception=exception;
-    if (ComplexImageRow(&rows,y,&status) == MagickFalse)
+    if (ComplexImageRow(&inputs,y,&status) == MagickFalse)
       continue;
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
       {
@@ -1636,63 +1639,43 @@ static void RelinquishInverseFourierMemory(MemoryInfo *magnitude_info,
     inverse_info=RelinquishVirtualMemory(inverse_info);
 }
 
-static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
-  const InverseImagePair *images,fftw_complex *fourier_pixels,
-  ExceptionInfo *exception)
+typedef struct _InverseFourierPhase
 {
   CacheView
     *phase_view;
 
+  FourierInfo
+    *fourier_info;
+
+  const InverseImagePair
+    *images;
+
+  ExceptionInfo
+    *exception;
+} InverseFourierPhase;
+
+static void GetInverseFourierPhase(const InverseFourierPhase *phase,
+  double *phase_pixels,ssize_t i)
+{
+  CacheView
+    *const phase_view = phase->phase_view;
+
+  FourierInfo
+    *const fourier_info = phase->fourier_info;
+
+  const InverseImagePair
+    *const images = phase->images;
+
+  ExceptionInfo
+    *const exception = phase->exception;
+
   const Quantum
     *p;
 
-  double
-    *inverse_pixels,
-    *magnitude_pixels,
-    *phase_pixels;
-
-  MagickBooleanType
-    status;
-
-  MemoryInfo
-    *inverse_info,
-    *magnitude_info,
-    *phase_info;
-
   ssize_t
-    i,
     x,
     y;
 
-  /*
-    Inverse fourier - read image and break down into a double array.
-  */
-  magnitude_info=AcquireVirtualMemory(fourier_info->width,fourier_info->height*
-    sizeof(*magnitude_pixels));
-  phase_info=AcquireVirtualMemory(fourier_info->width,fourier_info->height*
-    sizeof(*phase_pixels));
-  inverse_info=AcquireVirtualMemory(fourier_info->width,(fourier_info->height/2+
-    1)*sizeof(*inverse_pixels));
-  if (IsFourierMemoryMissing(magnitude_info,phase_info,inverse_info) !=
-      MagickFalse)
-    {
-      RelinquishInverseFourierMemory(magnitude_info,phase_info,inverse_info);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",
-        images->magnitude_image->filename);
-      return(MagickFalse);
-    }
-  magnitude_pixels=(double *) GetVirtualMemoryBlob(magnitude_info);
-  phase_pixels=(double *) GetVirtualMemoryBlob(phase_info);
-  inverse_pixels=(double *) GetVirtualMemoryBlob(inverse_info);
-  GetFourierChannelPixels(fourier_info,images->magnitude_image,magnitude_pixels,
-    exception);
-  status=InverseQuadrantSwap(fourier_info->width,fourier_info->height,
-    magnitude_pixels,inverse_pixels);
-  (void) memcpy(magnitude_pixels,inverse_pixels,fourier_info->height*
-    fourier_info->center*sizeof(*magnitude_pixels));
-  i=0L;
-  phase_view=AcquireVirtualCacheView(images->phase_image,exception);
   for (y=0L; y < (ssize_t) fourier_info->height; y++)
   {
     p=GetCacheViewVirtualPixels(phase_view,0,y,fourier_info->width,1,
@@ -1707,6 +1690,102 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
       p+=(ptrdiff_t) GetPixelChannels(images->phase_image);
     }
   }
+}
+
+typedef struct _InverseFourierMemory
+{
+  MemoryInfo
+    **magnitude_info,
+    **phase_info,
+    **inverse_info;
+} InverseFourierMemory;
+
+static MagickBooleanType AcquireInverseFourierMemory(
+  const FourierInfo *fourier_info,const InverseImagePair *images,
+  const InverseFourierMemory *targets,ExceptionInfo *exception)
+{
+  double
+    *inverse_pixels,
+    *magnitude_pixels,
+    *phase_pixels;
+
+  MemoryInfo
+    **const magnitude_info = targets->magnitude_info,
+    **const phase_info = targets->phase_info,
+    **const inverse_info = targets->inverse_info;
+
+  (*magnitude_info)=AcquireVirtualMemory(fourier_info->width,
+    fourier_info->height*sizeof(*magnitude_pixels));
+  (*phase_info)=AcquireVirtualMemory(fourier_info->width,fourier_info->height*
+    sizeof(*phase_pixels));
+  (*inverse_info)=AcquireVirtualMemory(fourier_info->width,
+    (fourier_info->height/2+1)*sizeof(*inverse_pixels));
+  if (IsFourierMemoryMissing((*magnitude_info),(*phase_info),
+      (*inverse_info)) != MagickFalse)
+    {
+      RelinquishInverseFourierMemory((*magnitude_info),(*phase_info),
+        (*inverse_info));
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",
+        images->magnitude_image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
+  const InverseImagePair *images,fftw_complex *fourier_pixels,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *phase_view;
+
+  double
+    *inverse_pixels,
+    *magnitude_pixels,
+    *phase_pixels;
+
+  MagickBooleanType
+    status;
+
+  MemoryInfo
+    *inverse_info,
+    *magnitude_info,
+    *phase_info;
+
+  InverseFourierPhase
+    phase;
+
+  const InverseFourierMemory
+    targets = { &magnitude_info, &phase_info, &inverse_info };
+
+  ssize_t
+    i,
+    x,
+    y;
+
+  /*
+    Inverse fourier - read image and break down into a double array.
+  */
+  if (AcquireInverseFourierMemory(fourier_info,images,&targets,exception) ==
+      MagickFalse)
+    return(MagickFalse);
+  magnitude_pixels=(double *) GetVirtualMemoryBlob(magnitude_info);
+  phase_pixels=(double *) GetVirtualMemoryBlob(phase_info);
+  inverse_pixels=(double *) GetVirtualMemoryBlob(inverse_info);
+  GetFourierChannelPixels(fourier_info,images->magnitude_image,magnitude_pixels,
+    exception);
+  status=InverseQuadrantSwap(fourier_info->width,fourier_info->height,
+    magnitude_pixels,inverse_pixels);
+  (void) memcpy(magnitude_pixels,inverse_pixels,fourier_info->height*
+    fourier_info->center*sizeof(*magnitude_pixels));
+  i=0L;
+  phase_view=AcquireVirtualCacheView(images->phase_image,exception);
+  phase.phase_view=phase_view;
+  phase.fourier_info=fourier_info;
+  phase.images=images;
+  phase.exception=exception;
+  GetInverseFourierPhase(&phase,phase_pixels,i);
   ScaleInverseFourierPhase(fourier_info,phase_pixels);
   phase_view=DestroyCacheView(phase_view);
   CorrectPhaseLHS(fourier_info->width,fourier_info->height,phase_pixels);

@@ -84,6 +84,7 @@ if ( ! GetOptions(
 	 'signature.c',
 	 'stream.c',
 	 'transform.c',
+	 'transform-region.c',
 	 'transform-tiles.c',
 	 'resize.c',
 	 'resize-sample.c',

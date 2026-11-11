@@ -1623,20 +1623,175 @@ static Cluster *AppendCluster(Cluster *cluster)
   return(cluster);
 }
 
+typedef struct _DynamicThresholdTail
+{
+  Cluster
+    *head;
+
+  double
+    cluster_threshold;
+
+  PixelInfo
+    *pixel;
+} DynamicThresholdTail;
+
+static void FinishDynamicThreshold(const DynamicThresholdTail *tail,
+  ssize_t **histogram,short **extrema)
+{
+  Cluster
+    *head = tail->head;
+
+  const double
+    cluster_threshold = tail->cluster_threshold;
+
+  PixelInfo
+    *const pixel = tail->pixel;
+
+  Cluster
+    *cluster,
+    *last_cluster,
+    *next_cluster;
+
+  ssize_t
+    count;
+
+  count=0;
+  last_cluster=head;
+  next_cluster=head;
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
+  {
+    next_cluster=cluster->next;
+    if (IsClusterAboveThreshold(cluster,count,cluster_threshold) != MagickFalse)
+      {
+        /*
+          Initialize cluster.
+        */
+        InitializeCluster(cluster,count);
+        count++;
+        last_cluster=cluster;
+        continue;
+      }
+    /*
+      Delete cluster.
+    */
+    head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
+    cluster=(Cluster *) RelinquishMagickMemory(cluster);
+  }
+  ChooseDynamicThreshold(count,head,pixel);
+  /*
+    Relinquish resources.
+  */
+  RelinquishDynamicThresholdResources(head,histogram,extrema);
+}
+
+typedef struct _DynamicClusterTargets
+{
+  Cluster
+    **cluster,
+    **head;
+
+  ExtentPacket
+    *green,
+    *blue;
+} DynamicClusterTargets;
+
+static MagickBooleanType FormDynamicClusters(short **extrema,
+  const ExtentPacket red,const DynamicClusterTargets *targets)
+{
+  Cluster
+    **const cluster = targets->cluster,
+    **const head = targets->head;
+
+  ExtentPacket
+    *const green = targets->green,
+    *const blue = targets->blue;
+
+  while (DefineRegion(extrema[Green],green) != 0)
+  {
+    (*blue).index=0;
+    while (DefineRegion(extrema[Blue],blue) != 0)
+    {
+      /*
+        Allocate a new class.
+      */
+      if (*head != (Cluster *) NULL)
+        {
+          *cluster=AppendCluster(*cluster);
+        }
+      else
+        {
+          *cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(**cluster));
+          *head=*cluster;
+        }
+      if (*cluster == (Cluster *) NULL)
+        return(MagickFalse);
+      /*
+        Initialize a new class.
+      */
+      InitializeNewCluster(*cluster,red,*green,*blue);
+    }
+  }
+  return(MagickTrue);
+}
+
+typedef struct _DynamicRegionTargets
+{
+  Cluster
+    **cluster,
+    **head;
+
+  ExtentPacket
+    *red,
+    *green,
+    *blue;
+} DynamicRegionTargets;
+
+static MagickBooleanType FormDynamicRegionClusters(short **extrema,
+  const DynamicRegionTargets *region)
+{
+  Cluster
+    **const cluster = region->cluster,
+    **const head = region->head;
+
+  ExtentPacket
+    *const red = region->red,
+    *const green = region->green,
+    *const blue = region->blue;
+
+  while (DefineRegion(extrema[Red],red) != 0)
+  {
+    DynamicClusterTargets
+      targets;
+
+    (*green).index=0;
+    targets.cluster=(cluster);
+    targets.head=(head);
+    targets.green=(green);
+    targets.blue=(blue);
+    if (FormDynamicClusters(extrema,*red,&targets) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
 {
   Cluster
     *cluster,
-    *head,
-    *last_cluster,
-    *next_cluster;
+    *head;
+
+  DynamicThresholdTail
+    tail;
 
   ExtentPacket
     blue,
     green,
     red;
+
+  const DynamicRegionTargets
+    region = { &cluster, &head, &red, &green, &blue };
 
   ssize_t
     i;
@@ -1681,35 +1836,8 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   (void) memset(&red,0,sizeof(red));
   (void) memset(&green,0,sizeof(green));
   (void) memset(&blue,0,sizeof(blue));
-  while (DefineRegion(extrema[Red],&red) != 0)
-  {
-    green.index=0;
-    while (DefineRegion(extrema[Green],&green) != 0)
-    {
-      blue.index=0;
-      while (DefineRegion(extrema[Blue],&blue) != 0)
-      {
-        /*
-          Allocate a new class.
-        */
-        if (head != (Cluster *) NULL)
-          {
-            cluster=AppendCluster(cluster);
-          }
-        else
-          {
-            cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(*cluster));
-            head=cluster;
-          }
-        if (cluster == (Cluster *) NULL)
-          return(ThrowClusterAllocationFailed(image,exception));
-        /*
-          Initialize a new class.
-        */
-        InitializeNewCluster(cluster,red,green,blue);
-      }
-    }
-  }
+  if (FormDynamicRegionClusters(extrema,&region) == MagickFalse)
+    return(ThrowClusterAllocationFailed(image,exception));
   if (head == (Cluster *) NULL)
     {
       /*
@@ -1736,33 +1864,10 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   /*
     Remove clusters that do not meet minimum cluster threshold.
   */
-  count=0;
-  last_cluster=head;
-  next_cluster=head;
-  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
-  {
-    next_cluster=cluster->next;
-    if (IsClusterAboveThreshold(cluster,count,cluster_threshold) != MagickFalse)
-      {
-        /*
-          Initialize cluster.
-        */
-        InitializeCluster(cluster,count);
-        count++;
-        last_cluster=cluster;
-        continue;
-      }
-    /*
-      Delete cluster.
-    */
-    head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
-    cluster=(Cluster *) RelinquishMagickMemory(cluster);
-  }
-  ChooseDynamicThreshold(count,head,pixel);
-  /*
-    Relinquish resources.
-  */
-  RelinquishDynamicThresholdResources(head,histogram,extrema);
+  tail.head=head;
+  tail.cluster_threshold=cluster_threshold;
+  tail.pixel=pixel;
+  FinishDynamicThreshold(&tail,histogram,extrema);
   return(MagickTrue);
 }
 

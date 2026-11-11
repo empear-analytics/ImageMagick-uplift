@@ -367,6 +367,53 @@ static MagickBooleanType ParseKernelSpecification(const char *kernel_string,
   return(MagickTrue);
 }
 
+static void ExpandKernelByFlags(KernelInfo *kernel,
+  const MagickStatusType flags)
+{
+  if ( (flags & AreaValue) != 0 )         /* '@' symbol in kernel size */
+    ExpandRotateKernelInfo(kernel, 45.0); /* cyclic rotate 3x3 kernels */
+  else if ( (flags & GreaterValue) != 0 ) /* '>' symbol in kernel args */
+    ExpandRotateKernelInfo(kernel, 90.0); /* 90 degree rotate of kernel */
+  else if ( (flags & LessValue) != 0 )    /* '<' symbol in kernel args */
+    ExpandMirrorKernelInfo(kernel);       /* 90 degree mirror rotate */
+}
+
+static const char *FindKernelEnd(const char *kernel_string)
+{
+  const char
+    *end;
+
+  end = strchr(kernel_string, ';');
+  if ( end == (char *) NULL )
+    end = strchr(kernel_string, '\0');
+  return(end);
+}
+
+static MagickBooleanType IsKernelArrayTokenLeft(const char *token)
+{
+  return(( *token != '\0' && *token != ';' && *token != '\'' ) ? MagickTrue :
+    MagickFalse);
+}
+
+static MagickBooleanType IsKernelArrayReading(const KernelInfo *kernel,
+  const ssize_t i,const char *p,const char *end)
+{
+  return(((i < (ssize_t) (kernel->width*kernel->height)) && (p < end)) ?
+    MagickTrue : MagickFalse);
+}
+
+static KernelInfo *FinishKernelArray(KernelInfo *kernel,
+  const MagickStatusType flags)
+{
+  /* check that we received at least one real (non-nan) value! */
+  if (kernel->minimum == MagickMaximumValue)
+    return(DestroyKernelInfo(kernel));
+
+  ExpandKernelByFlags(kernel,flags);
+
+  return(kernel);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -404,9 +451,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
     return(kernel);
 
   /* find end of this specific kernel definition string */
-  end = strchr(kernel_string, ';');
-  if ( end == (char *) NULL )
-    end = strchr(kernel_string, '\0');
+  end=FindKernelEnd(kernel_string);
 
   /* clear flags - for Expanding kernel lists through rotations */
    flags = NoValue;
@@ -426,7 +471,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   kernel->minimum=MagickMaximumValue;
   kernel->maximum=(-MagickMaximumValue);
   kernel->negative_range = kernel->positive_range = 0.0;
-  for (i=0; (i < (ssize_t) (kernel->width*kernel->height)) && (p < end); i++)
+  for (i=0; IsKernelArrayReading(kernel,i,p,end) != MagickFalse; i++)
   {
     p=ReadKernelArrayToken(p,token);
     SetKernelArrayValue(kernel,i,token,nan);
@@ -434,7 +479,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
 
   /* sanity check -- no more values in kernel definition */
   (void) GetNextToken(p,&p,MagickPathExtent,token);
-  if ( *token != '\0' && *token != ';' && *token != '\'' )
+  if (IsKernelArrayTokenLeft(token) != MagickFalse)
     return(DestroyKernelInfo(kernel));
 
 #if 0
@@ -451,18 +496,95 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
     return(DestroyKernelInfo(kernel));
 #endif
 
-  /* check that we received at least one real (non-nan) value! */
-  if (kernel->minimum == MagickMaximumValue)
-    return(DestroyKernelInfo(kernel));
+  return(FinishKernelArray(kernel,flags));
+}
 
-  if ( (flags & AreaValue) != 0 )         /* '@' symbol in kernel size */
-    ExpandRotateKernelInfo(kernel, 45.0); /* cyclic rotate 3x3 kernels */
-  else if ( (flags & GreaterValue) != 0 ) /* '>' symbol in kernel args */
-    ExpandRotateKernelInfo(kernel, 90.0); /* 90 degree rotate of kernel */
-  else if ( (flags & LessValue) != 0 )    /* '<' symbol in kernel args */
-    ExpandMirrorKernelInfo(kernel);       /* 90 degree mirror rotate */
+static GeometryInfo DefaultDistanceScale(const MagickStatusType flags,
+  GeometryInfo args)
+{
+  if ( (flags & HeightValue) == 0 )           /* no distance scale */
+    args.sigma = 100.0;                       /* default distance scaling */
+  else if ( (flags & AspectValue ) != 0 )     /* '!' flag */
+    args.sigma = (double) QuantumRange/(args.sigma+1); /* maximum pixel distance */
+  else if ( (flags & PercentValue ) != 0 )    /* '%' flag */
+    args.sigma *= (double) QuantumRange/100.0;         /* percentage of color range */
+  return(args);
+}
 
-  return(kernel);
+static GeometryInfo DefaultRectangleGeometry(const MagickStatusType flags,
+  GeometryInfo args)
+{
+  if ( (flags & WidthValue) == 0 ) /* if no width then */
+    args.rho = args.sigma;         /* then  width = height */
+  if ( args.rho < 1.0 )            /* if width too small */
+      args.rho = 3;                /* then  width = 3 */
+  if ( args.sigma < 1.0 )          /* if height too small */
+    args.sigma = args.rho;         /* then  height = width */
+  if ( (flags & XValue) == 0 )     /* center offset if not defined */
+    args.xi = (double)(((ssize_t)args.rho-1)/2);
+  if ( (flags & YValue) == 0 )
+    args.psi = (double)(((ssize_t)args.sigma-1)/2);
+  return(args);
+}
+
+static GeometryInfo DefaultShapeScale(const MagickStatusType flags,
+  GeometryInfo args)
+{
+  if ( (flags & HeightValue) == 0 )
+    args.sigma = 1.0;    /* Default scale = 1.0, zero is valid */
+  return(args);
+}
+
+static GeometryInfo SetDistanceKernelDefaults(const ssize_t type,
+  const MagickStatusType flags,GeometryInfo args)
+{
+  switch( type ) {
+    case ChebyshevKernel:
+    case ManhattanKernel:
+    case OctagonalKernel:
+    case EuclideanKernel:
+      args=DefaultDistanceScale(flags,args);
+      break;
+    default:
+      break;
+  }
+  return(args);
+}
+
+static GeometryInfo SetRingOrRectangleKernelDefaults(const ssize_t type,
+  const MagickStatusType flags,GeometryInfo args)
+{
+  switch( type ) {
+    case RingKernel:
+      if ( (flags & XValue) == 0 )
+        args.xi = 1.0;       /* Default scale = 1.0, zero is valid */
+      break;
+    case RectangleKernel:    /* Rectangle - set size defaults */
+      args=DefaultRectangleGeometry(flags,args);
+      break;
+    /* Distance Kernel Defaults */
+    default:
+      return(SetDistanceKernelDefaults(type,flags,args));
+  }
+  return(args);
+}
+
+static GeometryInfo SetShapeKernelDefaults(const ssize_t type,
+  const MagickStatusType flags,GeometryInfo args)
+{
+  switch( type ) {
+    case SquareKernel:
+    case DiamondKernel:
+    case OctagonKernel:
+    case DiskKernel:
+    case PlusKernel:
+    case CrossKernel:
+      args=DefaultShapeScale(flags,args);
+      break;
+    default:
+      return(SetRingOrRectangleKernelDefaults(type,flags,args));
+  }
+  return(args);
 }
 
 static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
@@ -474,47 +596,17 @@ static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
       if ( (flags & WidthValue) == 0 )
         args.rho = 1.0;    /* Default scale = 1.0, zero is valid */
       break;
-    case SquareKernel:
-    case DiamondKernel:
-    case OctagonKernel:
-    case DiskKernel:
-    case PlusKernel:
-    case CrossKernel:
-      if ( (flags & HeightValue) == 0 )
-        args.sigma = 1.0;    /* Default scale = 1.0, zero is valid */
-      break;
-    case RingKernel:
-      if ( (flags & XValue) == 0 )
-        args.xi = 1.0;       /* Default scale = 1.0, zero is valid */
-      break;
-    case RectangleKernel:    /* Rectangle - set size defaults */
-      if ( (flags & WidthValue) == 0 ) /* if no width then */
-        args.rho = args.sigma;         /* then  width = height */
-      if ( args.rho < 1.0 )            /* if width too small */
-          args.rho = 3;                /* then  width = 3 */
-      if ( args.sigma < 1.0 )          /* if height too small */
-        args.sigma = args.rho;         /* then  height = width */
-      if ( (flags & XValue) == 0 )     /* center offset if not defined */
-        args.xi = (double)(((ssize_t)args.rho-1)/2);
-      if ( (flags & YValue) == 0 )
-        args.psi = (double)(((ssize_t)args.sigma-1)/2);
-      break;
-    /* Distance Kernel Defaults */
-    case ChebyshevKernel:
-    case ManhattanKernel:
-    case OctagonalKernel:
-    case EuclideanKernel:
-      if ( (flags & HeightValue) == 0 )           /* no distance scale */
-        args.sigma = 100.0;                       /* default distance scaling */
-      else if ( (flags & AspectValue ) != 0 )     /* '!' flag */
-        args.sigma = (double) QuantumRange/(args.sigma+1); /* maximum pixel distance */
-      else if ( (flags & PercentValue ) != 0 )    /* '%' flag */
-        args.sigma *= (double) QuantumRange/100.0;         /* percentage of color range */
-      break;
     default:
-      break;
+      return(SetShapeKernelDefaults(type,flags,args));
   }
   return(args);
+}
+
+static MagickBooleanType IsKernelNameSeparator(const char *p)
+{
+  return((((isspace((int) ((unsigned char) *p)) != 0) ||
+          (*p == ',') || (*p == ':' )) && (*p != '\0') && (*p != ';')) ?
+    MagickTrue : MagickFalse);
 }
 
 static KernelInfo *ParseKernelName(const char *kernel_string,
@@ -548,13 +640,10 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
   if ( type < 0 || type == UserDefinedKernel )
     return((KernelInfo *) NULL);  /* not a valid named kernel */
 
-  while (((isspace((int) ((unsigned char) *p)) != 0) ||
-          (*p == ',') || (*p == ':' )) && (*p != '\0') && (*p != ';'))
+  while (IsKernelNameSeparator(p) != MagickFalse)
     p++;
 
-  end = strchr(p, ';'); /* end of this kernel definition */
-  if ( end == (char *) NULL )
-    end = strchr(p, '\0');
+  end=FindKernelEnd(p); /* end of this kernel definition */
 
   /* ParseGeometry() needs the geometry separated! -- Arrgghh */
   length=MagickMin((size_t) (end-p),sizeof(token)-1);
@@ -578,12 +667,7 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
 
   /* global expand to rotated kernel list - only for single kernels */
   if ( kernel->next == (KernelInfo *) NULL ) {
-    if ( (flags & AreaValue) != 0 )         /* '@' symbol in kernel args */
-      ExpandRotateKernelInfo(kernel, 45.0);
-    else if ( (flags & GreaterValue) != 0 ) /* '>' symbol in kernel args */
-      ExpandRotateKernelInfo(kernel, 90.0);
-    else if ( (flags & LessValue) != 0 )    /* '<' symbol in kernel args */
-      ExpandMirrorKernelInfo(kernel);
+    ExpandKernelByFlags(kernel,flags);
   }
 
   return(kernel);
@@ -1266,48 +1350,71 @@ static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+typedef struct _KeyedKernelArray
+{
+  int
+    key;
+
+  const char
+    *definition;
+} KeyedKernelArray;
+
+static const KeyedKernelArray
+  LaplacianKernelArrays[] =
+  {
+    { 1, "3: 0,-1,0  -1,4,-1  0,-1,0" }, /* laplacian diamond filter */
+    { 2, "3: -2,1,-2  1,4,1  -2,1,-2" },
+    { 3, "3: 1,-2,1  -2,4,-2  1,-2,1" },
+    /* a 5x5 laplacian */
+    { 5,
+      "5: -4,-1,0,-1,-4  -1,2,3,2,-1  0,3,4,3,0  -1,2,3,2,-1  -4,-1,0,-1,-4" },
+    /* a 7x7 laplacian */
+    { 7,
+      "7:-10,-5,-2,-1,-2,-5,-10 -5,0,3,4,3,0,-5 -2,3,6,7,6,3,-2 -1,4,7,8,7,4,-1 -2,3,6,7,6,3,-2 -5,0,3,4,3,0,-5 -10,-5,-2,-1,-2,-5,-10" },
+    /* a 5x5 LoG (sigma approx 1.4) */
+    { 15,
+      "5: 0,0,-1,0,0  0,-1,-2,-1,0  -1,-2,16,-2,-1  0,-1,-2,-1,0  0,0,-1,0,0" },
+    /* a 9x9 LoG (sigma approx 1.4) */
+    /* http://www.cscjournals.org/csc/manuscript/Journals/IJIP/volume3/Issue1/IJIP-15.pdf */
+    { 19,
+      "9: 0,-1,-1,-2,-2,-2,-1,-1,0  -1,-2,-4,-5,-5,-5,-4,-2,-1  -1,-4,-5,-3,-0,-3,-5,-4,-1  -2,-5,-3,12,24,12,-3,-5,-2  -2,-5,-0,24,40,24,-0,-5,-2  -2,-5,-3,12,24,12,-3,-5,-2  -1,-4,-5,-3,-0,-3,-5,-4,-1  -1,-2,-4,-5,-5,-5,-4,-2,-1  0,-1,-1,-2,-2,-2,-1,-1,0" },
+    /* laplacian square filter -- default */
+    { 0, "3: -1,-1,-1  -1,8,-1  -1,-1,-1" }
+  };
+
 static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
-  switch ( (int) args->rho ) {
-    case 0:
-    default: /* laplacian square filter -- default */
-      kernel=ParseKernelArray("3: -1,-1,-1  -1,8,-1  -1,-1,-1");
+  const int
+    key = (int) args->rho;
+
+  size_t
+    i;
+
+  for (i=0; i < ((sizeof(LaplacianKernelArrays)/
+       sizeof(*LaplacianKernelArrays))-1); i++)
+    if (LaplacianKernelArrays[i].key == key)
       break;
-    case 1:  /* laplacian diamond filter */
-      kernel=ParseKernelArray("3: 0,-1,0  -1,4,-1  0,-1,0");
-      break;
-    case 2:
-      kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
-      break;
-    case 3:
-      kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  1,-2,1");
-      break;
-    case 5:   /* a 5x5 laplacian */
-      kernel=ParseKernelArray(
-        "5: -4,-1,0,-1,-4  -1,2,3,2,-1  0,3,4,3,0  -1,2,3,2,-1  -4,-1,0,-1,-4");
-      break;
-    case 7:   /* a 7x7 laplacian */
-      kernel=ParseKernelArray(
-        "7:-10,-5,-2,-1,-2,-5,-10 -5,0,3,4,3,0,-5 -2,3,6,7,6,3,-2 -1,4,7,8,7,4,-1 -2,3,6,7,6,3,-2 -5,0,3,4,3,0,-5 -10,-5,-2,-1,-2,-5,-10" );
-      break;
-    case 15:  /* a 5x5 LoG (sigma approx 1.4) */
-      kernel=ParseKernelArray(
-        "5: 0,0,-1,0,0  0,-1,-2,-1,0  -1,-2,16,-2,-1  0,-1,-2,-1,0  0,0,-1,0,0");
-      break;
-    case 19:  /* a 9x9 LoG (sigma approx 1.4) */
-      /* http://www.cscjournals.org/csc/manuscript/Journals/IJIP/volume3/Issue1/IJIP-15.pdf */
-      kernel=ParseKernelArray(
-        "9: 0,-1,-1,-2,-2,-2,-1,-1,0  -1,-2,-4,-5,-5,-5,-4,-2,-1  -1,-4,-5,-3,-0,-3,-5,-4,-1  -2,-5,-3,12,24,12,-3,-5,-2  -2,-5,-0,24,40,24,-0,-5,-2  -2,-5,-3,12,24,12,-3,-5,-2  -1,-4,-5,-3,-0,-3,-5,-4,-1  -1,-2,-4,-5,-5,-5,-4,-2,-1  0,-1,-1,-2,-2,-2,-1,-1,0");
-      break;
-  }
+  kernel=ParseKernelArray(LaplacianKernelArrays[i].definition);
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
   kernel->type = type;
   return(kernel);
 }
 
-static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
+static KernelInfo *RotateFreiChenKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  if ( fabs(args->sigma) >= MagickEpsilon )
+    /* Rotate by correctly supplied 'angle' */
+    RotateKernelInfo(kernel, args->sigma);
+  else if ( args->rho > 30.0 || args->rho < -30.0 )
+    /* Rotate by out of bounds 'type' */
+    RotateKernelInfo(kernel, args->rho);
+  return(kernel);
+}
+
+static KernelInfo *AcquireFreiChenEdgeOrSetKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
   switch ( (int) args->rho ) {
@@ -1338,6 +1445,16 @@ static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
         return(kernel);
       break;
     }
+  }
+  return(RotateFreiChenKernel(kernel,args));
+}
+
+static KernelInfo *AcquireFreiChenEdgeBasisKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch ( (int) args->rho ) {
+    default:
+      return(AcquireFreiChenEdgeOrSetKernel(kernel,type,args,exception));
     case 1:
     case 11:
       kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
@@ -1359,6 +1476,16 @@ static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
       CalcKernelMetaData(kernel);
       ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
       break;
+  }
+  return(RotateFreiChenKernel(kernel,args));
+}
+
+static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch ( (int) args->rho ) {
+    default:
+      return(AcquireFreiChenEdgeBasisKernel(kernel,type,args,exception));
     case 13:
       kernel=ParseKernelArray("3: 2,-1,0  -1,0,1  0,1,-2");
       if (kernel == (KernelInfo *) NULL)
@@ -1415,13 +1542,7 @@ static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
       ScaleKernelInfo(kernel, 1.0/3.0, NoValue);
       break;
   }
-  if ( fabs(args->sigma) >= MagickEpsilon )
-    /* Rotate by correctly supplied 'angle' */
-    RotateKernelInfo(kernel, args->sigma);
-  else if ( args->rho > 30.0 || args->rho < -30.0 )
-    /* Rotate by out of bounds 'type' */
-    RotateKernelInfo(kernel, args->rho);
-  return(kernel);
+  return(RotateFreiChenKernel(kernel,args));
 }
 
 static double SetSquareKernelGeometry(KernelInfo *kernel,
@@ -1538,6 +1659,23 @@ static KernelInfo *AcquireDiskKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static MagickBooleanType IsWithinRingLimits(const ssize_t radius,
+  const ssize_t limit1,const ssize_t limit2)
+{
+  return((limit1 < radius && radius <= limit2) ? MagickTrue : MagickFalse);
+}
+
+static void SetPeaksKernelCenter(KernelInfo *kernel,
+  const KernelInfoType type)
+{
+  if ( type == PeaksKernel ) {
+    /* set the central point in the middle */
+    kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+    kernel->positive_range = 1.0;
+    kernel->maximum = 1.0;
+  }
+}
+
 static KernelInfo *AcquireRingKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,const double nan)
 {
@@ -1578,18 +1716,13 @@ static KernelInfo *AcquireRingKernel(KernelInfo *kernel,
   for ( i=0, v= -kernel->y; v <= (ssize_t)kernel->y; v++)
     for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
       { ssize_t radius=u*u+v*v;
-        if (limit1 < radius && radius <= limit2)
+        if (IsWithinRingLimits(radius,limit1,limit2) != MagickFalse)
           kernel->positive_range += kernel->values[i] = (double) scale;
         else
           kernel->values[i] = nan;
       }
   kernel->minimum = kernel->maximum = (double) scale;
-  if ( type == PeaksKernel ) {
-    /* set the central point in the middle */
-    kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-    kernel->positive_range = 1.0;
-    kernel->maximum = 1.0;
-  }
+  SetPeaksKernelCenter(kernel,type);
   return(kernel);
 }
 
@@ -1671,36 +1804,40 @@ static KernelInfo *AcquireLineEndsKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static const KeyedKernelArray
+  LineJunctionsKernelArrays[] =
+  {
+    /* Y Junction */
+    { 1, "3: 1,-,1  -,1,-  -,1,-" },
+    /* Diagonal T Junctions */
+    { 2, "3: 1,-,-  -,1,-  1,-,1" },
+    /* Orthogonal T Junctions */
+    { 3, "3: -,-,-  1,1,1  -,1,-" },
+    /* Diagonal X Junctions */
+    { 4, "3: 1,-,1  -,1,-  1,-,1" },
+    /* Orthogonal X Junctions - minimal diamond kernel */
+    { 5, "3: -,1,-  1,1,1  -,1,-" }
+  };
+
 static KernelInfo *AcquireLineJunctionsKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
+  const int
+    key = (int) args->rho;
+
+  size_t
+    i;
+
   /* kernels for finding the junctions of multiple lines */
-  switch ( (int) args->rho ) {
-    case 0:
-    default:
-      /* set of kernels to find all line junctions */
-      return(AcquireKernelInfo("LineJunctions:1@;LineJunctions:2>",exception));
-    case 1:
-      /* Y Junction */
-      kernel=ParseKernelArray("3: 1,-,1  -,1,-  -,1,-");
+  for (i=0; i < (sizeof(LineJunctionsKernelArrays)/
+       sizeof(*LineJunctionsKernelArrays)); i++)
+    if (LineJunctionsKernelArrays[i].key == key)
       break;
-    case 2:
-      /* Diagonal T Junctions */
-      kernel=ParseKernelArray("3: 1,-,-  -,1,-  1,-,1");
-      break;
-    case 3:
-      /* Orthogonal T Junctions */
-      kernel=ParseKernelArray("3: -,-,-  1,1,1  -,1,-");
-      break;
-    case 4:
-      /* Diagonal X Junctions */
-      kernel=ParseKernelArray("3: 1,-,1  -,1,-  1,-,1");
-      break;
-    case 5:
-      /* Orthogonal X Junctions - minimal diamond kernel */
-      kernel=ParseKernelArray("3: -,1,-  1,1,1  -,1,-");
-      break;
-  }
+  if (i == (sizeof(LineJunctionsKernelArrays)/
+       sizeof(*LineJunctionsKernelArrays)))
+    /* set of kernels to find all line junctions */
+    return(AcquireKernelInfo("LineJunctions:1@;LineJunctions:2>",exception));
+  kernel=ParseKernelArray(LineJunctionsKernelArrays[i].definition);
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
   kernel->type = type;
@@ -1708,12 +1845,44 @@ static KernelInfo *AcquireLineJunctionsKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static const char
+  *const ThickRidgeKernelArrays[] =
+  {
+    "4x3+1+1:0,1,1,- -,1,1,- -,1,1,0",
+    "4x3+2+1:0,1,1,- -,1,1,- -,1,1,0",
+    "4x3+1+1:-,1,1,0 -,1,1,- 0,1,1,-",
+    "4x3+2+1:-,1,1,0 -,1,1,- 0,1,1,-",
+    "3x4+1+1:0,-,- 1,1,1 1,1,1 -,-,0",
+    "3x4+1+2:0,-,- 1,1,1 1,1,1 -,-,0",
+    "3x4+1+1:-,-,0 1,1,1 1,1,1 0,-,-",
+    "3x4+1+2:-,-,0 1,1,1 1,1,1 0,-,-"
+  };
+
+static MagickBooleanType AppendThickRidgeKernels(KernelInfo *kernel,
+  const KernelInfoType type)
+{
+  KernelInfo
+    *new_kernel;
+
+  size_t
+    j;
+
+  for (j=0; j < (sizeof(ThickRidgeKernelArrays)/
+       sizeof(*ThickRidgeKernelArrays)); j++)
+  {
+    new_kernel=ParseKernelArray(ThickRidgeKernelArrays[j]);
+    if (new_kernel == (KernelInfo *) NULL)
+      return(MagickFalse);
+    new_kernel->type = type;
+    LastKernelInfo(kernel)->next = new_kernel;
+  }
+  return(MagickTrue);
+}
+
 static KernelInfo *AcquireRidgesKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
   /* Ridges - Ridge finding kernels */
-  KernelInfo
-    *new_kernel;
   switch ( (int) args->rho ) {
     case 1:
     default:
@@ -1733,46 +1902,8 @@ static KernelInfo *AcquireRidgesKernel(KernelInfo *kernel,
       /* Kernels to find a stepped 'thick' line, 4 rotates + mirrors */
       /* Unfortunately we can not yet rotate a non-square kernel */
       /* But then we can't flip a non-symmetrical kernel either */
-      new_kernel=ParseKernelArray("4x3+1+1:0,1,1,- -,1,1,- -,1,1,0");
-      if (new_kernel == (KernelInfo *) NULL)
+      if (AppendThickRidgeKernels(kernel,type) == MagickFalse)
         return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("4x3+2+1:0,1,1,- -,1,1,- -,1,1,0");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("4x3+1+1:-,1,1,0 -,1,1,- 0,1,1,-");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("4x3+2+1:-,1,1,0 -,1,1,- 0,1,1,-");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("3x4+1+1:0,-,- 1,1,1 1,1,1 -,-,0");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("3x4+1+2:0,-,- 1,1,1 1,1,1 -,-,0");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("3x4+1+1:-,-,0 1,1,1 1,1,1 0,-,-");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
-      new_kernel=ParseKernelArray("3x4+1+2:-,-,0 1,1,1 1,1,1 0,-,-");
-      if (new_kernel == (KernelInfo *) NULL)
-        return(DestroyKernelInfo(kernel));
-      new_kernel->type = type;
-      LastKernelInfo(kernel)->next = new_kernel;
       break;
   }
   return(kernel);
@@ -1799,7 +1930,7 @@ static KernelInfo *AcquireConvexHullKernel(KernelInfo *kernel,
   return(kernel);
 }
 
-static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
+static KernelInfo *AcquireCyclicSkeletonKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
   switch ( (int) args->rho ) {
@@ -1828,6 +1959,16 @@ static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
       kernel->next->type = type;
       ExpandRotateKernelInfo(kernel, 90.0); /* 4 rotations of the 2 kernels */
       break;
+   }
+  return(kernel);
+}
+
+static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch ( (int) args->rho ) {
+    default:
+      return(AcquireCyclicSkeletonKernel(kernel,type,args,exception));
     case 3:
       /* Dan Bloomberg Skeleton, from his paper on 3x3 thinning SE's
       ** "Connectivity-Preserving Morphological Image Transformations"
@@ -1851,9 +1992,46 @@ static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static const KeyedKernelArray
+  ThinSEKernelArrays[] =
+  {
+    /* SE for 4-connected thinning */
+    { 41, "3: -,-,1  0,-,1  -,-,1" }, /* SE_4_1 */
+    { 42, "3: -,-,1  0,-,1  -,0,-" }, /* SE_4_2 */
+    { 43, "3: -,0,-  0,-,1  -,-,1" }, /* SE_4_3 */
+    { 44, "3: -,0,-  0,-,1  -,0,-" }, /* SE_4_4 */
+    { 45, "3: -,0,1  0,-,1  -,0,-" }, /* SE_4_5 */
+    { 46, "3: -,0,-  0,-,1  -,0,1" }, /* SE_4_6 */
+    { 47, "3: -,1,1  0,-,1  -,0,-" }, /* SE_4_7 */
+    { 48, "3: -,-,1  0,-,1  0,-,1" }, /* SE_4_8 */
+    { 49, "3: 0,-,1  0,-,1  -,-,1" }, /* SE_4_9 */
+    /* SE for 8-connected thinning - negatives of the above */
+    { 81, "3: -,1,-  0,-,1  -,1,-" }, /* SE_8_0 */
+    { 82, "3: -,1,-  0,-,1  0,-,-" }, /* SE_8_2 */
+    { 83, "3: 0,-,-  0,-,1  -,1,-" }, /* SE_8_3 */
+    { 84, "3: 0,-,-  0,-,1  0,-,-" }, /* SE_8_4 */
+    { 85, "3: 0,-,1  0,-,1  0,-,-" }, /* SE_8_5 */
+    { 86, "3: 0,-,-  0,-,1  0,-,1" }, /* SE_8_6 */
+    { 87, "3: -,1,-  0,-,1  0,0,-" }, /* SE_8_7 */
+    { 88, "3: -,1,-  0,-,1  0,1,-" }, /* SE_8_8 */
+    { 89, "3: 0,1,-  0,-,1  -,1,-" }, /* SE_8_9 */
+    /* Special combined SE kernels */
+    { 423, "3: -,-,1  0,-,-  -,0,-" }, /* SE_4_2 , SE_4_3 Combined Kernel */
+    { 823, "3: -,1,-  -,-,1  0,-,-" }, /* SE_8_2 , SE_8_3 Combined Kernel */
+    /* SE_48_1 - General Connected Corner Kernel */
+    { 481, "3: -,1,1  0,-,1  0,0,-" },
+    { 482, "3: 0,-,1  0,-,1  0,-,1" } /* SE_48_2 - General Edge Kernel */
+  };
+
 static KernelInfo *AcquireThinSEKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
+  const int
+    key = (int) args->rho;
+
+  size_t
+    i;
+
   /* Special kernels for general thinning, while preserving connections
   ** "Connectivity-Preserving Morphological Image Transformations"
   ** by Dan S. Bloomberg, available on Leptonica, Selected Papers,
@@ -1864,78 +2042,11 @@ static KernelInfo *AcquireThinSEKernel(KernelInfo *kernel,
   ** Note kernels do not specify the origin pixel, allowing them
   ** to be used for both thickening and thinning operations.
   */
-  switch ( (int) args->rho ) {
-    /* SE for 4-connected thinning */
-    case 41: /* SE_4_1 */
-      kernel=ParseKernelArray("3: -,-,1  0,-,1  -,-,1");
+  for (i=0; i < ((sizeof(ThinSEKernelArrays)/
+       sizeof(*ThinSEKernelArrays))-1); i++)
+    if (ThinSEKernelArrays[i].key == key)
       break;
-    case 42: /* SE_4_2 */
-      kernel=ParseKernelArray("3: -,-,1  0,-,1  -,0,-");
-      break;
-    case 43: /* SE_4_3 */
-      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,-,1");
-      break;
-    case 44: /* SE_4_4 */
-      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,0,-");
-      break;
-    case 45: /* SE_4_5 */
-      kernel=ParseKernelArray("3: -,0,1  0,-,1  -,0,-");
-      break;
-    case 46: /* SE_4_6 */
-      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,0,1");
-      break;
-    case 47: /* SE_4_7 */
-      kernel=ParseKernelArray("3: -,1,1  0,-,1  -,0,-");
-      break;
-    case 48: /* SE_4_8 */
-      kernel=ParseKernelArray("3: -,-,1  0,-,1  0,-,1");
-      break;
-    case 49: /* SE_4_9 */
-      kernel=ParseKernelArray("3: 0,-,1  0,-,1  -,-,1");
-      break;
-    /* SE for 8-connected thinning - negatives of the above */
-    case 81: /* SE_8_0 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  -,1,-");
-      break;
-    case 82: /* SE_8_2 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,-,-");
-      break;
-    case 83: /* SE_8_3 */
-      kernel=ParseKernelArray("3: 0,-,-  0,-,1  -,1,-");
-      break;
-    case 84: /* SE_8_4 */
-      kernel=ParseKernelArray("3: 0,-,-  0,-,1  0,-,-");
-      break;
-    case 85: /* SE_8_5 */
-      kernel=ParseKernelArray("3: 0,-,1  0,-,1  0,-,-");
-      break;
-    case 86: /* SE_8_6 */
-      kernel=ParseKernelArray("3: 0,-,-  0,-,1  0,-,1");
-      break;
-    case 87: /* SE_8_7 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,0,-");
-      break;
-    case 88: /* SE_8_8 */
-      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,1,-");
-      break;
-    case 89: /* SE_8_9 */
-      kernel=ParseKernelArray("3: 0,1,-  0,-,1  -,1,-");
-      break;
-    /* Special combined SE kernels */
-    case 423: /* SE_4_2 , SE_4_3 Combined Kernel */
-      kernel=ParseKernelArray("3: -,-,1  0,-,-  -,0,-");
-      break;
-    case 823: /* SE_8_2 , SE_8_3 Combined Kernel */
-      kernel=ParseKernelArray("3: -,1,-  -,-,1  0,-,-");
-      break;
-    case 481: /* SE_48_1 - General Connected Corner Kernel */
-      kernel=ParseKernelArray("3: -,1,1  0,-,1  0,0,-");
-      break;
-    default:
-    case 482: /* SE_48_2 - General Edge Kernel */
-      kernel=ParseKernelArray("3: 0,-,1  0,-,1  0,-,1");
-      break;
-  }
+  kernel=ParseKernelArray(ThinSEKernelArrays[i].definition);
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
   kernel->type = type;
@@ -2048,6 +2159,13 @@ static void SetLoGOrUnityKernelValues(KernelInfo *kernel,const double sigma)
     }
 }
 
+static MagickBooleanType IsGaussianSigmaWidest(const KernelInfoType type,
+  const double sigma,const double sigma2)
+{
+  return(((type != DoGKernel) || (sigma >= sigma2)) ? MagickTrue :
+    MagickFalse);
+}
+
 static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -2057,7 +2175,7 @@ static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
 
   if ( args->rho >= 1.0 )
     kernel->width = CastDoubleToSizeT(args->rho)*2+1;
-  else if ( (type != DoGKernel) || (sigma >= sigma2) )
+  else if (IsGaussianSigmaWidest(type,sigma,sigma2) != MagickFalse)
     kernel->width = GetOptimalKernelWidth2D(args->rho,sigma);
   else
     kernel->width = GetOptimalKernelWidth2D(args->rho,sigma2);
@@ -2107,14 +2225,337 @@ static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
   return(kernel);
 }
 
-MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
-  const GeometryInfo *args,ExceptionInfo *exception)
+static KernelInfo *AcquireNamedEdgeKernel(const KernelInfoType type,
+  const GeometryInfo *args,const char *kernel_array)
 {
   KernelInfo
     *kernel;
 
+  kernel=ParseKernelArray(kernel_array);
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->rho);
+  return(kernel);
+}
+
+typedef struct _KernelRadius
+{
+  double
+    minimum;
+
+  size_t
+    default_width;
+} KernelRadius;
+
+static void SetKernelRadius(KernelInfo *kernel,const GeometryInfo *args,
+  const KernelRadius *radius)
+{
+  const double
+    minimum = radius->minimum;
+
+  const size_t
+    default_width = radius->default_width;
+
+  if (args->rho < minimum)
+    kernel->width = kernel->height = default_width;
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+}
+
+typedef enum
+{
+  PlusKernelShape,
+  CrossKernelShape
+} PlusKernelSide;
+
+static inline KernelInfo *AcquirePlusOrCrossKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan,const PlusKernelSide side)
+{
+  const KernelRadius
+    radius = { 1.0, 5 };  /* default radius 2 */
+
   ssize_t
     i;
+
+  ssize_t
+    u,
+    v;
+
+  SetKernelRadius(kernel,args,&radius);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* set all kernel values along axises to given scale */
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      kernel->values[i] = ((side == PlusKernelShape) ? (u == 0 || v == 0) :
+        (u == v || u == -v)) ? args->sigma : nan;
+  kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
+  kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
+  return(kernel);
+}
+
+typedef enum
+{
+  ManhattanKernelDistance,
+  EuclideanKernelDistance
+} DistanceKernelSide;
+
+static inline KernelInfo *AcquireManhattanOrEuclideanKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const DistanceKernelSide side)
+{
+  const KernelRadius
+    radius = { 1.0, 3 };  /* default radius = 1 */
+
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  SetKernelRadius(kernel,args,&radius);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      kernel->positive_range += ( kernel->values[i] =
+        ((side == ManhattanKernelDistance) ?
+        args->sigma*(labs((long) u)+labs((long) v)) :
+        args->sigma*sqrt((double) (u*u+v*v))) );
+  kernel->maximum = kernel->values[0];
+  return(kernel);
+}
+
+static KernelInfo *AcquireOctagonalKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  const KernelRadius
+    radius = { 2.0, 5 };  /* default/minimum radius = 2 */
+
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  SetKernelRadius(kernel,args,&radius);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      {
+        double
+          r1 = MagickMax(fabs((double)u),fabs((double)v)),
+          r2 = floor((double)(labs((long)u)+labs((long)v)+1)/1.5);
+        kernel->positive_range += kernel->values[i] =
+                  args->sigma*MagickMax(r1,r2);
+      }
+  kernel->maximum = kernel->values[0];
+  return(kernel);
+}
+
+static KernelInfo *AcquireCornersKernel(const KernelInfoType type,
+  ExceptionInfo *exception)
+{
+  KernelInfo
+    *kernel;
+
+  kernel=AcquireKernelInfo("ThinSE:87",exception);
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  ExpandRotateKernelInfo(kernel, 90.0); /* Expand 90 degree rotations */
+  return(kernel);
+}
+
+static KernelInfo *AcquireDistanceKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  switch(type) {
+      /*
+        Distance Measuring Kernels
+      */
+      case ChebyshevKernel:
+        return(AcquireChebyshevKernel(kernel,args));
+      case ManhattanKernel:
+        return(AcquireManhattanOrEuclideanKernel(kernel,args,
+          ManhattanKernelDistance));
+      case OctagonalKernel:
+        return(AcquireOctagonalKernel(kernel,args));
+    case EuclideanKernel:
+      return(AcquireManhattanOrEuclideanKernel(kernel,args,
+        EuclideanKernelDistance));
+    default:
+      {
+        /* No-Op Kernel - Basically just a single pixel on its own */
+        kernel=ParseKernelArray("1:1");
+        if (kernel == (KernelInfo *) NULL)
+          return(kernel);
+        kernel->type = UndefinedKernel;
+        break;
+      }
+      break;
+  }
+  return(kernel);
+}
+
+static KernelInfo *AcquireLineOrThinningKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch(type) {
+      case LineJunctionsKernel:
+        return(AcquireLineJunctionsKernel(kernel,type,args,exception));
+      case RidgesKernel:
+        return(AcquireRidgesKernel(kernel,type,args));
+      case ConvexHullKernel:
+        return(AcquireConvexHullKernel(kernel,type));
+      case SkeletonKernel:
+        return(AcquireSkeletonKernel(kernel,type,args,exception));
+      case ThinSEKernel:
+        return(AcquireThinSEKernel(kernel,type,args));
+    default:
+      return(AcquireDistanceKernel(kernel,type,args));
+  }
+}
+
+typedef struct _BuiltInKernelInputs
+{
+  const GeometryInfo
+    *args;
+
+  double
+    nan;
+
+  ExceptionInfo
+    *exception;
+} BuiltInKernelInputs;
+
+static KernelInfo *AcquireHitAndMissKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  const double
+    nan = inputs->nan;
+
+  ExceptionInfo
+    *exception = inputs->exception;
+
+  switch(type) {
+      /*
+        HitAndMiss Kernels
+      */
+      case RingKernel:
+      case PeaksKernel:
+        return(AcquireRingKernel(kernel,type,args,nan));
+      case EdgesKernel:
+        return(AcquireEdgesKernel(kernel,type,exception));
+      case CornersKernel:
+        return(AcquireCornersKernel(type,exception));
+      case DiagonalsKernel:
+        return(AcquireDiagonalsKernel(kernel,type,args));
+      case LineEndsKernel:
+        return(AcquireLineEndsKernel(kernel,type,args,exception));
+    default:
+      return(AcquireLineOrThinningKernel(kernel,type,args,exception));
+  }
+}
+
+static KernelInfo *AcquireCrossShapedKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  const double
+    nan = inputs->nan;
+
+  switch(type) {
+      case PlusKernel:
+        return(AcquirePlusOrCrossKernel(kernel,args,nan,PlusKernelShape));
+      case CrossKernel:
+        return(AcquirePlusOrCrossKernel(kernel,args,nan,CrossKernelShape));
+    default:
+      return(AcquireHitAndMissKernel(kernel,type,inputs));
+  }
+}
+
+static KernelInfo *AcquireAreaShapedKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  const double
+    nan = inputs->nan;
+
+  switch(type) {
+    /*
+      Boolean or Shaped Kernels
+    */
+    case DiamondKernel:
+      return(AcquireDiamondKernel(kernel,args,nan));
+    case SquareKernel:
+    case RectangleKernel:
+      return(AcquireRectangleKernel(kernel,type,args));
+      case OctagonKernel:
+        return(AcquireOctagonKernel(kernel,args,nan));
+      case DiskKernel:
+        return(AcquireDiskKernel(kernel,args,nan));
+    default:
+      return(AcquireCrossShapedKernel(kernel,type,inputs));
+  }
+}
+
+static KernelInfo *AcquireEdgeDetectionKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  ExceptionInfo
+    *exception = inputs->exception;
+
+  switch(type) {
+    case SobelKernel: /* Simple Sobel Kernel */
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,0,-1  2,0,-2  1,0,-1"));
+    case RobertsKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 0,0,0  1,-1,0  0,0,0"));
+    case PrewittKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,0,-1  1,0,-1  1,0,-1"));
+    case CompassKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 1,1,-1  1,-2,-1  1,1,-1"));
+    case KirschKernel:
+      return(AcquireNamedEdgeKernel(type,args,"3: 5,-3,-3  5,0,-3  5,-3,-3"));
+    case FreiChenKernel:
+      /* Direction is set to be left to right positive */
+      /* http://www.math.tau.ac.il/~turkel/notes/edge_detectors.pdf -- RIGHT? */
+      /* http://ltswww.epfl.ch/~courstiv/exos_labos/sol3.pdf -- WRONG? */
+      return(AcquireFreiChenKernel(kernel,type,args,exception));
+
+    default:
+      return(AcquireAreaShapedKernel(kernel,type,inputs));
+  }
+}
+
+MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
+  const GeometryInfo *args,ExceptionInfo *exception)
+{
+  BuiltInKernelInputs
+    inputs;
+
+  KernelInfo
+    *kernel;
 
   ssize_t
     u,
@@ -2291,212 +2732,11 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     */
     case LaplacianKernel:
       return(AcquireLaplacianKernel(kernel,type,args));
-    case SobelKernel:
-      { /* Simple Sobel Kernel */
-        kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
-    case RobertsKernel:
-      {
-        kernel=ParseKernelArray("3: 0,0,0  1,-1,0  0,0,0");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
-    case PrewittKernel:
-      {
-        kernel=ParseKernelArray("3: 1,0,-1  1,0,-1  1,0,-1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
-    case CompassKernel:
-      {
-        kernel=ParseKernelArray("3: 1,1,-1  1,-2,-1  1,1,-1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
-    case KirschKernel:
-      {
-        kernel=ParseKernelArray("3: 5,-3,-3  5,0,-3  5,-3,-3");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        RotateKernelInfo(kernel, args->rho);
-        break;
-      }
-    case FreiChenKernel:
-      /* Direction is set to be left to right positive */
-      /* http://www.math.tau.ac.il/~turkel/notes/edge_detectors.pdf -- RIGHT? */
-      /* http://ltswww.epfl.ch/~courstiv/exos_labos/sol3.pdf -- WRONG? */
-      return(AcquireFreiChenKernel(kernel,type,args,exception));
-
-    /*
-      Boolean or Shaped Kernels
-    */
-    case DiamondKernel:
-      return(AcquireDiamondKernel(kernel,args,nan));
-    case SquareKernel:
-    case RectangleKernel:
-      return(AcquireRectangleKernel(kernel,type,args));
-      case OctagonKernel:
-        return(AcquireOctagonKernel(kernel,args,nan));
-      case DiskKernel:
-        return(AcquireDiskKernel(kernel,args,nan));
-      case PlusKernel:
-        {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 5;  /* default radius 2 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          /* set all kernel values along axises to given scale */
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->values[i] = (u == 0 || v == 0) ? args->sigma : nan;
-          kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
-          kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
-          break;
-        }
-      case CrossKernel:
-        {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 5;  /* default radius 2 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          /* set all kernel values along axises to given scale */
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->values[i] = (u == v || u == -v) ? args->sigma : nan;
-          kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
-          kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
-          break;
-        }
-      /*
-        HitAndMiss Kernels
-      */
-      case RingKernel:
-      case PeaksKernel:
-        return(AcquireRingKernel(kernel,type,args,nan));
-      case EdgesKernel:
-        return(AcquireEdgesKernel(kernel,type,exception));
-      case CornersKernel:
-        {
-          kernel=AcquireKernelInfo("ThinSE:87",exception);
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          ExpandRotateKernelInfo(kernel, 90.0); /* Expand 90 degree rotations */
-          break;
-        }
-      case DiagonalsKernel:
-        return(AcquireDiagonalsKernel(kernel,type,args));
-      case LineEndsKernel:
-        return(AcquireLineEndsKernel(kernel,type,args,exception));
-      case LineJunctionsKernel:
-        return(AcquireLineJunctionsKernel(kernel,type,args,exception));
-      case RidgesKernel:
-        return(AcquireRidgesKernel(kernel,type,args));
-      case ConvexHullKernel:
-        return(AcquireConvexHullKernel(kernel,type));
-      case SkeletonKernel:
-        return(AcquireSkeletonKernel(kernel,type,args,exception));
-      case ThinSEKernel:
-        return(AcquireThinSEKernel(kernel,type,args));
-      /*
-        Distance Measuring Kernels
-      */
-      case ChebyshevKernel:
-        return(AcquireChebyshevKernel(kernel,args));
-      case ManhattanKernel:
-        {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 3;  /* default radius = 1 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->positive_range += ( kernel->values[i] =
-                  args->sigma*(labs((long) u)+labs((long) v)) );
-          kernel->maximum = kernel->values[0];
-          break;
-        }
-      case OctagonalKernel:
-      {
-        if (args->rho < 2.0)
-          kernel->width = kernel->height = 5;  /* default/minimum radius = 2 */
-        else
-          kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-        kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-          for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-            {
-              double
-                r1 = MagickMax(fabs((double)u),fabs((double)v)),
-                r2 = floor((double)(labs((long)u)+labs((long)v)+1)/1.5);
-              kernel->positive_range += kernel->values[i] =
-                        args->sigma*MagickMax(r1,r2);
-            }
-        kernel->maximum = kernel->values[0];
-        break;
-      }
-    case EuclideanKernel:
-      {
-        if (args->rho < 1.0)
-          kernel->width = kernel->height = 3;  /* default radius = 1 */
-        else
-          kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-        kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-          for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-            kernel->positive_range += ( kernel->values[i] =
-              args->sigma*sqrt((double) (u*u+v*v)) );
-        kernel->maximum = kernel->values[0];
-        break;
-      }
     default:
-      {
-        /* No-Op Kernel - Basically just a single pixel on its own */
-        kernel=ParseKernelArray("1:1");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = UndefinedKernel;
-        break;
-      }
-      break;
+      inputs.args=args;
+      inputs.nan=nan;
+      inputs.exception=exception;
+      return(AcquireEdgeDetectionKernel(kernel,type,&inputs));
   }
   return(kernel);
 }
@@ -2969,11 +3209,1301 @@ static double ConvolveChannelValue(const MagickRealType *magick_restrict k,
   return(pixel);
 }
 
+typedef struct _MorphologyKernelWalk
+{
+  MorphologyMethod
+    method;
+
+  const Image
+    *image;
+
+  PixelTrait
+    morphology_traits;
+
+  const KernelInfo
+    *kernel;
+
+  const Quantum
+    *magick_restrict p,
+    *magick_restrict pixels;
+
+  double
+    bias,
+    maximum,
+    minimum;
+
+  ssize_t
+    center,
+    i;
+} MorphologyKernelWalk;
+
+typedef enum
+{
+  ForwardKernelWalk,
+  ReflectedKernelWalk
+} MorphologyKernelWalkSide;
+
+typedef double
+  (*MorphologyExtremumMethod)(const Quantum *magick_restrict,const ssize_t,
+    double);
+
+static inline double WalkErodeOrDilateKernel(const MorphologyKernelWalk *walk,
+  const MorphologyKernelWalkSide side,const MorphologyExtremumMethod method,
+  double pixel)
+{
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  ssize_t
+    u,
+    v;
+
+  k=((side == ForwardKernelWalk) ? kernel->values :
+    (&kernel->values[kernel->width*kernel->height-1]));
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      if (!IsNaN(*k) && ((side == ForwardKernelWalk) ? (*k >= 0.5) :
+          (*k > 0.5)))
+        {
+          pixel=method(pixels,i,pixel);
+        }
+      ((side == ForwardKernelWalk) ? k++ : k--);
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+  return(pixel);
+}
+
+typedef struct _MorphologyIntensityWalk
+{
+  MorphologyKernelWalkSide
+    side;
+
+  double
+    *extremum;
+} MorphologyIntensityWalk;
+
+static inline void WalkIntensityKernel(const MorphologyKernelWalk *walk,
+  const MorphologyIntensityWalk *select,
+  const Quantum *magick_restrict *quantum_pixels,double *pixel)
+{
+  const MorphologyKernelWalkSide
+    side = select->side;
+
+  double
+    *const extremum = select->extremum;
+
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  double
+    intensity;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  MorphologyIntensityTap
+    intensity_tap;
+
+  ssize_t
+    u,
+    v;
+
+  k=((side == ForwardKernelWalk) ? kernel->values :
+    (&kernel->values[kernel->width*kernel->height-1]));
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      if (!IsNaN(*k) && (*k >= 0.5))
+        {
+          intensity=(double) GetPixelIntensity(image,pixels);
+          intensity_tap.pixels=pixels;
+          intensity_tap.intensity=intensity;
+          intensity_tap.i=i;
+          ((side == ForwardKernelWalk) ?
+            SelectMinimumIntensityPixel(&intensity_tap,quantum_pixels,
+              pixel,extremum) :
+            SelectMaximumIntensityPixel(&intensity_tap,pixel,
+              quantum_pixels,extremum));
+        }
+      ((side == ForwardKernelWalk) ? k++ : k--);
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+}
+
+static void WalkHitAndMissKernel(const MorphologyKernelWalk *walk,
+  double *minimum,double *maximum)
+{
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  MorphologyKernelTap
+    kernel_tap;
+
+  ssize_t
+    u,
+    v;
+
+  k=kernel->values;
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      if (!IsNaN(*k))
+        {
+          kernel_tap.k=k;
+          kernel_tap.pixels=pixels;
+          kernel_tap.i=i;
+          UpdateHitAndMissExtrema(&kernel_tap,minimum,maximum);
+        }
+      k++;
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+}
+
+typedef double
+  (*MorphologyKernelMethod)(const MagickRealType *magick_restrict,
+    const Quantum *magick_restrict,const ssize_t,double);
+
+static inline double WalkReflectedKernel(const MorphologyKernelWalk *walk,
+  const MorphologyKernelMethod method,const MagickRealType *magick_restrict k,
+  double pixel)
+{
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  ssize_t
+    u,
+    v;
+
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      pixel=method(k,pixels,i,pixel);
+      k--;
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+  return(pixel);
+}
+
+static void BlendReflectedKernel(const MorphologyKernelWalk *walk,
+  const MagickRealType *magick_restrict k,double *pixel,double *gamma)
+{
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  double
+    alpha;
+
+  ssize_t
+    u,
+    v;
+
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      if (!IsNaN(*k))
+        {
+          alpha=(double) (QuantumScale*(double)
+            GetPixelAlpha(image,pixels));
+          (*pixel)+=alpha*(*k)*(double) pixels[i];
+          (*gamma)+=alpha*(*k);
+        }
+      k--;
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+}
+
+static double GetMorphologyInitialPixel(const MorphologyKernelWalk *walk)
+{
+  const MorphologyMethod
+    method = walk->method;
+
+  const Quantum
+    *magick_restrict p = walk->p;
+
+  const double
+    bias = walk->bias;
+
+  const ssize_t
+    center = walk->center,
+    i = walk->i;
+
+  double
+    pixel;
+
+  switch (method)
+  {
+    case ConvolveMorphology:
+    {
+      pixel=bias;
+      break;
+    }
+    case DilateMorphology:
+    case ErodeIntensityMorphology:
+    {
+      pixel=0.0;
+      break;
+    }
+    default:
+    {
+      pixel=(double) p[center+i];
+      break;
+    }
+  }
+  return(pixel);
+}
+
+static void ApplyMorphologyIntensity(const MorphologyKernelWalk *walk,
+  const Quantum *magick_restrict *quantum_pixels,double *pixel)
+{
+  const MorphologyMethod
+    method = walk->method;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  double
+    maximum = walk->maximum,
+    minimum = walk->minimum;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  switch (method)
+  {
+    case ErodeIntensityMorphology:
+    {
+      const MorphologyIntensityWalk
+        select = { ForwardKernelWalk, &minimum };
+
+      /*
+        Select (*pixel) with minimum intensity within kernel neighbourhood.
+
+        The kernel is not reflected for this operation.
+      */
+      WalkIntensityKernel(walk,&select,quantum_pixels,pixel);
+      break;
+    }
+    case DilateIntensityMorphology:
+    {
+      const MorphologyIntensityWalk
+        select = { ReflectedKernelWalk, &maximum };
+
+      /*
+        Select (*pixel) with maximum intensity within kernel neighbourhood.
+
+        The kernel is not reflected for this operation.
+      */
+      WalkIntensityKernel(walk,&select,quantum_pixels,pixel);
+      break;
+    }
+    case IterativeDistanceMorphology:
+    {
+      /*
+         Compute th iterative distance from black edge of a white image
+         shape.  Essentially white values are decreased to the smallest
+         'distance from edge' it can find.
+
+         It works by adding kernel values to the neighbourhood, and
+         select the minimum value found. The kernel is rotated before
+         use, so kernel distances match resulting distances, when a user
+         provided asymmetric kernel is applied.
+
+         This code is nearly identical to True GrayScale Morphology but
+         not quite.
+
+         GreyDilate Kernel values added, maximum value found Kernel is
+         rotated before use.
+
+         GrayErode:  Kernel values subtracted and minimum value found No
+         kernel rotation used.
+
+         Note the Iterative Distance method is essentially a
+         GrayErode, but with negative kernel values, and kernel rotation
+         applied.
+      */
+      k=(&kernel->values[kernel->width*kernel->height-1]);
+      (*pixel)=WalkReflectedKernel(walk,MinimizeKernelDistance,k,(*pixel));
+      break;
+    }
+    case UndefinedMorphology:
+    default:
+      break;
+  }
+}
+
+static void ApplyMorphologyHitAndMiss(const MorphologyKernelWalk *walk,
+  const Quantum *magick_restrict *quantum_pixels,double *pixel)
+{
+  const MorphologyMethod
+    method = walk->method;
+
+  const Quantum
+    *magick_restrict p = walk->p;
+
+  const ssize_t
+    center = walk->center,
+    i = walk->i;
+
+  double
+    maximum = walk->maximum,
+    minimum = walk->minimum;
+
+  switch (method)
+  {
+    case HitAndMissMorphology:
+    case ThinningMorphology:
+    case ThickenMorphology:
+    {
+      /*
+         Minimum of foreground (*pixel) minus maximum of background pixels.
+
+         The kernel is not reflected for this operation, and consists
+         of both foreground and background (*pixel) neighbourhoods, 0.0 for
+         background, and 1.0 for foreground with either Nan or 0.5 values
+         for don't care.
+
+         This never produces a meaningless negative result.  Such results
+         cause Thinning/Thicken to not work correctly when used against a
+         greyscale image.
+      */
+      WalkHitAndMissKernel(walk,&minimum,&maximum);
+      minimum-=maximum;
+      if (minimum < 0.0)
+        minimum=0.0;
+      (*pixel)=minimum;
+      if (method == ThinningMorphology)
+        (*pixel)=(double) p[center+i]-minimum;
+      else
+        if (method == ThickenMorphology)
+          (*pixel)=(double) p[center+i]+minimum;
+      break;
+    }
+    default:
+    {
+      ApplyMorphologyIntensity(walk,quantum_pixels,pixel);
+      break;
+    }
+  }
+}
+
+static void ApplyMorphologyMethod(const MorphologyKernelWalk *walk,
+  double *pixel,double *gamma,const Quantum *magick_restrict *quantum_pixels)
+{
+  const MorphologyMethod
+    method = walk->method;
+
+  const Image
+    *image = walk->image;
+
+  const PixelTrait
+    morphology_traits = walk->morphology_traits;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  switch (method)
+  {
+    case ConvolveMorphology:
+    {
+      /*
+         Weighted Average of pixels using reflected kernel
+
+         For correct working of this operation for asymmetrical kernels,
+         the kernel needs to be applied in its reflected form.  That is
+         its values needs to be reversed.
+
+         Correlation is actually the same as this but without reflecting
+         the kernel, and thus 'lower-level' that Convolution.  However as
+         Convolution is the more common method used, and it does not
+         really cost us much in terms of processing to use a reflected
+         kernel, so it is Convolution that is implemented.
+
+         Correlation will have its kernel reflected before calling this
+         function to do a Convolve.
+
+         For more details of Correlation vs Convolution see
+           http://www.cs.umd.edu/~djacobs/CMSC426/Convolution.pdf
+      */
+      k=(&kernel->values[kernel->width*kernel->height-1]);
+      if (((image->alpha_trait & BlendPixelTrait) == 0) ||
+          ((morphology_traits & BlendPixelTrait) == 0))
+        {
+          /*
+            No alpha blending.
+          */
+          (*pixel)=WalkReflectedKernel(walk,ConvolveChannelValue,k,(*pixel));
+          break;
+        }
+      /*
+        Alpha blending.
+      */
+      (*gamma)=0.0;
+      BlendReflectedKernel(walk,k,pixel,gamma);
+      break;
+    }
+    case ErodeMorphology:
+    {
+      /*
+        Minimum value within kernel neighbourhood.
+
+        The kernel is not reflected for this operation.  In normal
+        Greyscale Morphology, the kernel value should be added
+        to the real value, this is currently not done, due to the
+        nature of the boolean kernels being used.
+      */
+      (*pixel)=WalkErodeOrDilateKernel(walk,ForwardKernelWalk,
+        MinimizeChannelValue,(*pixel));
+      break;
+    }
+    case DilateMorphology:
+    {
+      /*
+         Maximum value within kernel neighbourhood.
+
+         For correct working of this operation for asymmetrical kernels,
+         the kernel needs to be applied in its reflected form.  That is
+         its values needs to be reversed.
+
+         In normal Greyscale Morphology, the kernel value should be
+         added to the real value, this is currently not done, due to the
+         nature of the boolean kernels being used.
+      */
+      (*pixel)=WalkErodeOrDilateKernel(walk,ReflectedKernelWalk,
+        MaximizeChannelValue,(*pixel));
+      break;
+    }
+    default:
+    {
+      ApplyMorphologyHitAndMiss(walk,quantum_pixels,pixel);
+      break;
+    }
+  }
+}
+
+typedef struct _MorphologyRow
+{
+  MorphologyMethod
+    method;
+
+  const Image
+    *image;
+
+  Image
+    *morphology_image;
+
+  const KernelInfo
+    *kernel;
+
+  double
+    bias;
+
+  size_t
+    *changes;
+
+  ssize_t
+    center;
+
+  int
+    id;
+} MorphologyRow;
+
+static void MorphologyRowChannel(const MorphologyRow *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,const ssize_t i)
+{
+  double
+    gamma,
+    maximum,
+    minimum,
+    pixel;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    morphology_traits,
+    traits;
+
+  const Quantum
+    *magick_restrict pixels,
+    *magick_restrict quantum_pixels;
+
+  MorphologyKernelWalk
+    walk;
+
+  channel=GetPixelChannelChannel(row->image,i);
+  traits=GetPixelChannelTraits(row->image,channel);
+  morphology_traits=GetPixelChannelTraits(row->morphology_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (morphology_traits == UndefinedPixelTrait))
+    return;
+  if ((traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(row->morphology_image,channel,p[row->center+i],q);
+      return;
+    }
+  pixels=p;
+  quantum_pixels=(const Quantum *) NULL;
+  maximum=0.0;
+  minimum=(double) QuantumRange;
+  walk.method=row->method;
+  walk.image=row->image;
+  walk.morphology_traits=morphology_traits;
+  walk.kernel=row->kernel;
+  walk.p=p;
+  walk.pixels=pixels;
+  walk.bias=row->bias;
+  walk.maximum=maximum;
+  walk.minimum=minimum;
+  walk.center=row->center;
+  walk.i=i;
+  pixel=GetMorphologyInitialPixel(&walk);
+  gamma=1.0;
+  ApplyMorphologyMethod(&walk,&pixel,&gamma,&quantum_pixels);
+  if (quantum_pixels != (const Quantum *) NULL)
+    {
+      SetPixelChannel(row->morphology_image,channel,quantum_pixels[i],q);
+      return;
+    }
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(row->morphology_image,channel,ClampToQuantum(gamma*pixel),q);
+  if (fabs(pixel-(double) p[row->center+i]) >= MagickEpsilon)
+    row->changes[row->id]++;
+}
+
+typedef struct _MorphologyColumnWalk
+{
+  const Image
+    *image;
+
+  PixelTrait
+    morphology_traits;
+
+  const KernelInfo
+    *kernel;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  ssize_t
+    i;
+} MorphologyColumnWalk;
+
+static void BlendKernelColumn(const MorphologyColumnWalk *walk,
+  double *pixel,double *gamma,size_t *count)
+{
+  const Image
+    *image = walk->image;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const MagickRealType
+    *magick_restrict k = walk->k;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  double
+    alpha;
+
+  ssize_t
+    v;
+
+  for (v=0; v < (ssize_t) kernel->height; v++)
+  {
+    if (!IsNaN(*k))
+      {
+        alpha=(double) (QuantumScale*(double)
+          GetPixelAlpha(image,pixels));
+        (*pixel)+=alpha*(*k)*(double) pixels[i];
+        (*gamma)+=alpha*(*k);
+        (*count)++;
+      }
+    k--;
+    pixels+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void ConvolveColumnChannelValue(const MorphologyColumnWalk *walk,
+  double *pixel,double *gamma,size_t *count)
+{
+  const Image
+    *image = walk->image;
+
+  const PixelTrait
+    morphology_traits = walk->morphology_traits;
+
+  const KernelInfo
+    *kernel = walk->kernel;
+
+  const MagickRealType
+    *magick_restrict k = walk->k;
+
+  const Quantum
+    *magick_restrict pixels = walk->pixels;
+
+  const ssize_t
+    i = walk->i;
+
+  ssize_t
+    v;
+
+  if (((image->alpha_trait & BlendPixelTrait) == 0) ||
+      ((morphology_traits & BlendPixelTrait) == 0))
+    for (v=0; v < (ssize_t) kernel->height; v++)
+    {
+      if (!IsNaN(*k))
+        {
+          (*pixel)+=(*k)*(double) pixels[i];
+          (*count)++;
+        }
+      k--;
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  else
+    {
+      (*gamma)=0.0;
+      BlendKernelColumn(walk,pixel,gamma,count);
+    }
+}
+
+typedef struct _MorphologyColumn
+{
+  const Image
+    *image;
+
+  Image
+    *morphology_image;
+
+  const KernelInfo
+    *kernel;
+
+  double
+    bias;
+
+  size_t
+    *changes;
+
+  ssize_t
+    center;
+
+  int
+    id;
+} MorphologyColumn;
+
+static void ConvolveMorphologyColumnChannel(const MorphologyColumn *column,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,const ssize_t i)
+{
+  double
+    gamma,
+    pixel;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    morphology_traits,
+    traits;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  size_t
+    count;
+
+  MorphologyColumnWalk
+    walk;
+
+  channel=GetPixelChannelChannel(column->image,i);
+  traits=GetPixelChannelTraits(column->image,channel);
+  morphology_traits=GetPixelChannelTraits(column->morphology_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (morphology_traits == UndefinedPixelTrait))
+    return;
+  if ((traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(column->morphology_image,channel,p[column->center+i],q);
+      return;
+    }
+  k=(&column->kernel->values[column->kernel->height-1]);
+  pixels=p;
+  pixel=column->bias;
+  gamma=1.0;
+  count=0;
+  walk.image=column->image;
+  walk.morphology_traits=morphology_traits;
+  walk.kernel=column->kernel;
+  walk.k=k;
+  walk.pixels=pixels;
+  walk.i=i;
+  ConvolveColumnChannelValue(&walk,&pixel,&gamma,&count);
+  if (fabs(pixel-(double) p[column->center+i]) >= MagickEpsilon)
+    column->changes[column->id]++;
+  gamma=MagickSafeReciprocal(gamma);
+  if (count != 0)
+    gamma*=(double) column->kernel->height/count;
+  SetPixelChannel(column->morphology_image,channel,ClampToQuantum(gamma*
+    pixel),q);
+}
+
+static void ConvolveMorphologyColumnPixels(const MorphologyColumn *column,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *image = column->image;
+
+  Image
+    *morphology_image = column->morphology_image;
+
+  ssize_t
+    r;
+
+  for (r=0; r < (ssize_t) image->rows; r++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      ConvolveMorphologyColumnChannel(column,p,q,i);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(morphology_image);
+  }
+}
+
+#define MorphologyTag  "Morphology/Image"
+
+static void ReportMorphologyProgress(const Image *image,
+  const MagickOffsetType progress,const size_t span,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,MorphologyTag,progress,span);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+typedef struct _MorphologyRowInput
+{
+  MorphologyMethod
+    method;
+
+  const Image
+    *image;
+
+  Image
+    *morphology_image;
+
+  const KernelInfo
+    *kernel;
+
+  double
+    bias;
+
+  CacheView
+    *image_view,
+    *morphology_view;
+
+  OffsetInfo
+    offset;
+
+  size_t
+    *changes,
+    width;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    y;
+
+  int
+    id;
+} MorphologyRowInput;
+
+static MagickBooleanType ProcessMorphologyRow(const MorphologyRowInput *input,
+  MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  ssize_t
+    center;
+
+  MorphologyRow
+    row;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(input->image_view,-input->offset.x,input->y-
+    input->offset.y,input->width,input->kernel->height,input->exception);
+  q=GetCacheViewAuthenticPixels(input->morphology_view,0,input->y,
+    input->morphology_image->columns,1,input->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  center=(ssize_t) ((ssize_t) GetPixelChannels(input->image)*(ssize_t)
+    input->width*input->offset.y+(ssize_t) GetPixelChannels(input->image)*
+    input->offset.x);
+  row.method=input->method;
+  row.image=input->image;
+  row.morphology_image=input->morphology_image;
+  row.kernel=input->kernel;
+  row.bias=input->bias;
+  row.changes=input->changes;
+  row.center=center;
+  row.id=input->id;
+  for (x=0; x < (ssize_t) input->image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(input->image); i++)
+    {
+      MorphologyRowChannel(&row,p,q,i);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(input->image);
+    q+=(ptrdiff_t) GetPixelChannels(input->morphology_image);
+  }
+  if (SyncCacheViewAuthenticPixels(input->morphology_view,input->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+typedef struct _MorphologyColumnFetch
+{
+  const Image
+    *image;
+
+  Image
+    *morphology_image;
+
+  const KernelInfo
+    *kernel;
+
+  CacheView
+    *image_view,
+    *morphology_view;
+
+  OffsetInfo
+    offset;
+
+  ExceptionInfo
+    *exception;
+
+  ssize_t
+    x;
+} MorphologyColumnFetch;
+
+static MagickBooleanType FetchMorphologyColumn(
+  const MorphologyColumnFetch *fetch,const Quantum *magick_restrict *p,
+  Quantum *magick_restrict *q,MagickBooleanType *status)
+{
+  const Image
+    *image = fetch->image;
+
+  Image
+    *morphology_image = fetch->morphology_image;
+
+  const KernelInfo
+    *kernel = fetch->kernel;
+
+  CacheView
+    *image_view = fetch->image_view,
+    *morphology_view = fetch->morphology_view;
+
+  const OffsetInfo
+    offset = fetch->offset;
+
+  ExceptionInfo
+    *exception = fetch->exception;
+
+  const ssize_t
+    x = fetch->x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*p)=GetCacheViewVirtualPixels(image_view,x,-offset.y,1,image->rows+
+    kernel->height-1,exception);
+  (*q)=GetCacheViewAuthenticPixels(morphology_view,x,0,1,
+    morphology_image->rows,exception);
+  if (((*p) == (const Quantum *) NULL) || ((*q) == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void SetMorphologyKernelOrigin(const MorphologyMethod method,
+  const KernelInfo *kernel,OffsetInfo *offset,ExceptionInfo *exception)
+{
+  switch (method)
+  {
+    case ErodeMorphology:
+    case ErodeIntensityMorphology:
+    case HitAndMissMorphology:
+    case ThinningMorphology:
+    case ThickenMorphology:
+    {
+      /*
+        Use kernel as is, not reflection required.
+      */
+      (*offset).x=kernel->x;
+      (*offset).y=kernel->y;
+      break;
+    }
+    default:
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "InvalidOption","`%s'","not a primitive morphology method");
+      break;
+    }
+  }
+}
+
+static void SetMorphologyKernelOffset(const MorphologyMethod method,
+  const KernelInfo *kernel,OffsetInfo *offset,ExceptionInfo *exception)
+{
+  switch (method)
+  {
+    case ConvolveMorphology:
+    case DilateMorphology:
+    case DilateIntensityMorphology:
+    case IterativeDistanceMorphology:
+    {
+      /*
+        Kernel needs to use a reflection about origin.
+      */
+      (*offset).x=(ssize_t) kernel->width-kernel->x-1;
+      (*offset).y=(ssize_t) kernel->height-kernel->y-1;
+      break;
+    }
+    default:
+    {
+      SetMorphologyKernelOrigin(method,kernel,offset,exception);
+      break;
+    }
+  }
+}
+
+static size_t *AcquireMorphologyChanges(void)
+{
+  size_t
+    *changes;
+
+  ssize_t
+    j;
+
+  changes=(size_t *) AcquireQuantumMemory(GetOpenMPMaximumThreads(),
+    sizeof(*changes));
+  if (changes == (size_t *) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    changes[j]=0;
+  return(changes);
+}
+
+typedef struct _MorphologyPrimitiveSetup
+{
+  MorphologyMethod
+    method;
+
+  const Image
+    *image;
+
+  Image
+    *morphology_image;
+
+  const KernelInfo
+    *kernel;
+
+  double
+    bias;
+
+  CacheView
+    *image_view,
+    *morphology_view;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  OffsetInfo
+    offset;
+
+  size_t
+    changed,
+    *changes,
+    width;
+
+  ExceptionInfo
+    *exception;
+} MorphologyPrimitiveSetup;
+
+static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
+{
+  const MorphologyMethod
+    method = setup->method;
+
+  const Image
+    *image = setup->image;
+
+  Image
+    *morphology_image = setup->morphology_image;
+
+  const KernelInfo
+    *kernel = setup->kernel;
+
+  const double
+    bias = setup->bias;
+
+  CacheView
+    *image_view = setup->image_view,
+    *morphology_view = setup->morphology_view;
+
+  MagickBooleanType
+    status = setup->status;
+
+  MagickOffsetType
+    progress = setup->progress;
+
+  const OffsetInfo
+    offset = setup->offset;
+
+  size_t
+    changed = setup->changed,
+    *changes = setup->changes;
+
+  const size_t
+    width = setup->width;
+
+  ExceptionInfo
+    *exception = setup->exception;
+
+  ssize_t
+    j,
+    y;
+
+  /*
+    Normal handling of horizontal or rectangular kernels (row by row).
+  */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,morphology_image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    const MorphologyRowInput
+      input = { method, image, morphology_image, kernel, bias, image_view,
+        morphology_view, offset, changes, width, exception, y, id };
+
+    if (ProcessMorphologyRow(&input,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ReportMorphologyProgress(image,progress,image->rows,&status);
+      }
+  }
+  morphology_view=DestroyCacheView(morphology_view);
+  image_view=DestroyCacheView(image_view);
+  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    changed+=changes[j];
+  changes=(size_t *) RelinquishMagickMemory(changes);
+  return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
+}
+
+static ssize_t ConvolveMorphologyColumns(const MorphologyPrimitiveSetup *setup)
+{
+  const Image
+    *image = setup->image;
+
+  Image
+    *morphology_image = setup->morphology_image;
+
+  CacheView
+    *image_view = setup->image_view,
+    *morphology_view = setup->morphology_view;
+
+  MagickBooleanType
+    status = setup->status;
+
+  MagickOffsetType
+    progress = setup->progress;
+
+  size_t
+    changed = setup->changed,
+    *changes = setup->changes;
+
+  ssize_t
+    j,
+    x;
+
+  /*
+    Special handling (for speed) of vertical (blur) kernels.  This performs
+    its handling in columns rather than in rows.  This is only done
+    for convolve as it is the only method that generates very large 1-D
+    vertical kernels (such as a 'BlurKernel')
+ */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,morphology_image,image->columns,1)
+#endif
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    const Quantum
+      *magick_restrict p;
+
+    Quantum
+      *magick_restrict q;
+
+    ssize_t
+      center;
+
+    MorphologyColumn
+      column;
+
+    const MorphologyColumnFetch
+      fetch = { image, morphology_image, setup->kernel, image_view,
+        morphology_view, setup->offset, setup->exception, x };
+
+    if (FetchMorphologyColumn(&fetch,&p,&q,&status) == MagickFalse)
+      continue;
+    center=(ssize_t) GetPixelChannels(image)*setup->offset.y;
+    column.image=image;
+    column.morphology_image=morphology_image;
+    column.kernel=setup->kernel;
+    column.bias=setup->bias;
+    column.changes=changes;
+    column.center=center;
+    column.id=id;
+    ConvolveMorphologyColumnPixels(&column,p,q);
+    if (SyncCacheViewAuthenticPixels(morphology_view,setup->exception) ==
+        MagickFalse)
+      status=MagickFalse;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ReportMorphologyProgress(image,progress,image->columns,&status);
+      }
+  }
+  morphology_image->type=image->type;
+  morphology_view=DestroyCacheView(morphology_view);
+  image_view=DestroyCacheView(image_view);
+  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    changed+=changes[j];
+  changes=(size_t *) RelinquishMagickMemory(changes);
+  return(status ? (ssize_t) (changed/GetImageChannels(image)) : 0);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
-#define MorphologyTag  "Morphology/Image"
-
   const MorphologyMethod
     method = pass->method;
 
@@ -2993,12 +4523,11 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   MagickOffsetType
     progress;
 
+  MorphologyPrimitiveSetup
+    setup;
+
   OffsetInfo
     offset;
-
-  ssize_t
-    j,
-    y;
 
   size_t
     changed,
@@ -3024,610 +4553,26 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   width=image->columns+kernel->width-1;
   offset.x=0;
   offset.y=0;
-  switch (method)
-  {
-    case ConvolveMorphology:
-    case DilateMorphology:
-    case DilateIntensityMorphology:
-    case IterativeDistanceMorphology:
-    {
-      /*
-        Kernel needs to use a reflection about origin.
-      */
-      offset.x=(ssize_t) kernel->width-kernel->x-1;
-      offset.y=(ssize_t) kernel->height-kernel->y-1;
-      break;
-    }
-    case ErodeMorphology:
-    case ErodeIntensityMorphology:
-    case HitAndMissMorphology:
-    case ThinningMorphology:
-    case ThickenMorphology:
-    {
-      /*
-        Use kernel as is, not reflection required.
-      */
-      offset.x=kernel->x;
-      offset.y=kernel->y;
-      break;
-    }
-    default:
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "InvalidOption","`%s'","not a primitive morphology method");
-      break;
-    }
-  }
+  SetMorphologyKernelOffset(method,kernel,&offset,exception);
   changed=0;
-  changes=(size_t *) AcquireQuantumMemory(GetOpenMPMaximumThreads(),
-    sizeof(*changes));
-  if (changes == (size_t *) NULL)
-    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
-    changes[j]=0;
+  changes=AcquireMorphologyChanges();
+  setup.method=method;
+  setup.image=image;
+  setup.morphology_image=morphology_image;
+  setup.kernel=kernel;
+  setup.bias=bias;
+  setup.image_view=image_view;
+  setup.morphology_view=morphology_view;
+  setup.status=status;
+  setup.progress=progress;
+  setup.offset=offset;
+  setup.changed=changed;
+  setup.changes=changes;
+  setup.width=width;
+  setup.exception=exception;
   if ((method == ConvolveMorphology) && (kernel->width == 1))
-    {
-      ssize_t
-        x;
-
-      /*
-        Special handling (for speed) of vertical (blur) kernels.  This performs
-        its handling in columns rather than in rows.  This is only done
-        for convolve as it is the only method that generates very large 1-D
-        vertical kernels (such as a 'BlurKernel')
-     */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(progress,status) \
-        magick_number_threads(image,morphology_image,image->columns,1)
-#endif
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        const int
-          id = GetOpenMPThreadId();
-
-        const Quantum
-          *magick_restrict p;
-
-        Quantum
-          *magick_restrict q;
-
-        ssize_t
-          center,
-          r;
-
-        if (status == MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(image_view,x,-offset.y,1,image->rows+
-          kernel->height-1,exception);
-        q=GetCacheViewAuthenticPixels(morphology_view,x,0,1,
-          morphology_image->rows,exception);
-        if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
-        center=(ssize_t) GetPixelChannels(image)*offset.y;
-        for (r=0; r < (ssize_t) image->rows; r++)
-        {
-          ssize_t
-            i;
-
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            double
-              alpha,
-              gamma,
-              pixel;
-
-            PixelChannel
-              channel;
-
-            PixelTrait
-              morphology_traits,
-              traits;
-
-            const MagickRealType
-              *magick_restrict k;
-
-            const Quantum
-              *magick_restrict pixels;
-
-            ssize_t
-              v;
-
-            size_t
-              count;
-
-            channel=GetPixelChannelChannel(image,i);
-            traits=GetPixelChannelTraits(image,channel);
-            morphology_traits=GetPixelChannelTraits(morphology_image,channel);
-            if ((traits == UndefinedPixelTrait) ||
-                (morphology_traits == UndefinedPixelTrait))
-              continue;
-            if ((traits & CopyPixelTrait) != 0)
-              {
-                SetPixelChannel(morphology_image,channel,p[center+i],q);
-                continue;
-              }
-            k=(&kernel->values[kernel->height-1]);
-            pixels=p;
-            pixel=bias;
-            gamma=1.0;
-            count=0;
-            if (((image->alpha_trait & BlendPixelTrait) == 0) ||
-                ((morphology_traits & BlendPixelTrait) == 0))
-              for (v=0; v < (ssize_t) kernel->height; v++)
-              {
-                if (!IsNaN(*k))
-                  {
-                    pixel+=(*k)*(double) pixels[i];
-                    count++;
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-            else
-              {
-                gamma=0.0;
-                for (v=0; v < (ssize_t) kernel->height; v++)
-                {
-                  if (!IsNaN(*k))
-                    {
-                      alpha=(double) (QuantumScale*(double)
-                        GetPixelAlpha(image,pixels));
-                      pixel+=alpha*(*k)*(double) pixels[i];
-                      gamma+=alpha*(*k);
-                      count++;
-                    }
-                  k--;
-                  pixels+=(ptrdiff_t) GetPixelChannels(image);
-                }
-              }
-            if (fabs(pixel-(double) p[center+i]) >= MagickEpsilon)
-              changes[id]++;
-            gamma=MagickSafeReciprocal(gamma);
-            if (count != 0)
-              gamma*=(double) kernel->height/count;
-            SetPixelChannel(morphology_image,channel,ClampToQuantum(gamma*
-              pixel),q);
-          }
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(morphology_image);
-        }
-        if (SyncCacheViewAuthenticPixels(morphology_view,exception) == MagickFalse)
-          status=MagickFalse;
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            MagickBooleanType
-              proceed;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp atomic
-#endif
-            progress++;
-            proceed=SetImageProgress(image,MorphologyTag,progress,
-              image->columns);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
-          }
-      }
-      morphology_image->type=image->type;
-      morphology_view=DestroyCacheView(morphology_view);
-      image_view=DestroyCacheView(image_view);
-      for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
-        changed+=changes[j];
-      changes=(size_t *) RelinquishMagickMemory(changes);
-      return(status ? (ssize_t) (changed/GetImageChannels(image)) : 0);
-    }
-  /*
-    Normal handling of horizontal or rectangular kernels (row by row).
-  */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,morphology_image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const int
-      id = GetOpenMPThreadId();
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    ssize_t
-      center;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,-offset.x,y-offset.y,width,
-      kernel->height,exception);
-    q=GetCacheViewAuthenticPixels(morphology_view,0,y,morphology_image->columns,
-      1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    center=(ssize_t) ((ssize_t) GetPixelChannels(image)*(ssize_t) width*
-      offset.y+(ssize_t) GetPixelChannels(image)*offset.x);
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          alpha,
-          gamma,
-          intensity,
-          maximum,
-          minimum,
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          morphology_traits,
-          traits;
-
-        const MagickRealType
-          *magick_restrict k;
-
-        const Quantum
-          *magick_restrict pixels,
-          *magick_restrict quantum_pixels;
-
-        ssize_t
-          u;
-
-        ssize_t
-          v;
-
-        MorphologyIntensityTap
-          intensity_tap;
-
-        MorphologyKernelTap
-          kernel_tap;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        morphology_traits=GetPixelChannelTraits(morphology_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (morphology_traits == UndefinedPixelTrait))
-          continue;
-        if ((traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(morphology_image,channel,p[center+i],q);
-            continue;
-          }
-        pixels=p;
-        quantum_pixels=(const Quantum *) NULL;
-        maximum=0.0;
-        minimum=(double) QuantumRange;
-        switch (method)
-        {
-          case ConvolveMorphology:
-          {
-            pixel=bias;
-            break;
-          }
-          case DilateMorphology:
-          case ErodeIntensityMorphology:
-          {
-            pixel=0.0;
-            break;
-          }
-          default:
-          {
-            pixel=(double) p[center+i];
-            break;
-          }
-        }
-        gamma=1.0;
-        switch (method)
-        {
-          case ConvolveMorphology:
-          {
-            /*
-               Weighted Average of pixels using reflected kernel
-
-               For correct working of this operation for asymmetrical kernels,
-               the kernel needs to be applied in its reflected form.  That is
-               its values needs to be reversed.
-
-               Correlation is actually the same as this but without reflecting
-               the kernel, and thus 'lower-level' that Convolution.  However as
-               Convolution is the more common method used, and it does not
-               really cost us much in terms of processing to use a reflected
-               kernel, so it is Convolution that is implemented.
-
-               Correlation will have its kernel reflected before calling this
-               function to do a Convolve.
-
-               For more details of Correlation vs Convolution see
-                 http://www.cs.umd.edu/~djacobs/CMSC426/Convolution.pdf
-            */
-            k=(&kernel->values[kernel->width*kernel->height-1]);
-            if (((image->alpha_trait & BlendPixelTrait) == 0) ||
-                ((morphology_traits & BlendPixelTrait) == 0))
-              {
-                /*
-                  No alpha blending.
-                */
-                for (v=0; v < (ssize_t) kernel->height; v++)
-                {
-                  for (u=0; u < (ssize_t) kernel->width; u++)
-                  {
-                    pixel=ConvolveChannelValue(k,pixels,i,pixel);
-                    k--;
-                    pixels+=(ptrdiff_t) GetPixelChannels(image);
-                  }
-                  pixels+=(image->columns-1)*GetPixelChannels(image);
-                }
-                break;
-              }
-            /*
-              Alpha blending.
-            */
-            gamma=0.0;
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k))
-                  {
-                    alpha=(double) (QuantumScale*(double)
-                      GetPixelAlpha(image,pixels));
-                    pixel+=alpha*(*k)*(double) pixels[i];
-                    gamma+=alpha*(*k);
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
-            break;
-          }
-          case ErodeMorphology:
-          {
-            /*
-              Minimum value within kernel neighbourhood.
-
-              The kernel is not reflected for this operation.  In normal
-              Greyscale Morphology, the kernel value should be added
-              to the real value, this is currently not done, due to the
-              nature of the boolean kernels being used.
-            */
-            k=kernel->values;
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k) && (*k >= 0.5))
-                  {
-                    pixel=MinimizeChannelValue(pixels,i,pixel);
-                  }
-                k++;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
-            break;
-          }
-          case DilateMorphology:
-          {
-            /*
-               Maximum value within kernel neighbourhood.
-
-               For correct working of this operation for asymmetrical kernels,
-               the kernel needs to be applied in its reflected form.  That is
-               its values needs to be reversed.
-
-               In normal Greyscale Morphology, the kernel value should be
-               added to the real value, this is currently not done, due to the
-               nature of the boolean kernels being used.
-            */
-            k=(&kernel->values[kernel->width*kernel->height-1]);
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k) && (*k > 0.5))
-                  {
-                    pixel=MaximizeChannelValue(pixels,i,pixel);
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
-            break;
-          }
-          case HitAndMissMorphology:
-          case ThinningMorphology:
-          case ThickenMorphology:
-          {
-            /*
-               Minimum of foreground pixel minus maximum of background pixels.
-
-               The kernel is not reflected for this operation, and consists
-               of both foreground and background pixel neighbourhoods, 0.0 for
-               background, and 1.0 for foreground with either Nan or 0.5 values
-               for don't care.
-
-               This never produces a meaningless negative result.  Such results
-               cause Thinning/Thicken to not work correctly when used against a
-               greyscale image.
-            */
-            k=kernel->values;
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k))
-                  {
-                    kernel_tap.k=k;
-                    kernel_tap.pixels=pixels;
-                    kernel_tap.i=i;
-                    UpdateHitAndMissExtrema(&kernel_tap,&minimum,&maximum);
-                  }
-                k++;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
-            minimum-=maximum;
-            if (minimum < 0.0)
-              minimum=0.0;
-            pixel=minimum;
-            if (method == ThinningMorphology)
-              pixel=(double) p[center+i]-minimum;
-            else
-              if (method == ThickenMorphology)
-                pixel=(double) p[center+i]+minimum;
-            break;
-          }
-          case ErodeIntensityMorphology:
-          {
-            /*
-              Select pixel with minimum intensity within kernel neighbourhood.
-
-              The kernel is not reflected for this operation.
-            */
-            k=kernel->values;
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k) && (*k >= 0.5))
-                  {
-                    intensity=(double) GetPixelIntensity(image,pixels);
-                    intensity_tap.pixels=pixels;
-                    intensity_tap.intensity=intensity;
-                    intensity_tap.i=i;
-                    SelectMinimumIntensityPixel(&intensity_tap,&quantum_pixels,
-                      &pixel,&minimum);
-                  }
-                k++;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
-            break;
-          }
-          case DilateIntensityMorphology:
-          {
-            /*
-              Select pixel with maximum intensity within kernel neighbourhood.
-
-              The kernel is not reflected for this operation.
-            */
-            k=(&kernel->values[kernel->width*kernel->height-1]);
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k) && (*k >= 0.5))
-                  {
-                    intensity=(double) GetPixelIntensity(image,pixels);
-                    intensity_tap.pixels=pixels;
-                    intensity_tap.intensity=intensity;
-                    intensity_tap.i=i;
-                    SelectMaximumIntensityPixel(&intensity_tap,&pixel,
-                      &quantum_pixels,&maximum);
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
-            break;
-          }
-          case IterativeDistanceMorphology:
-          {
-            /*
-               Compute th iterative distance from black edge of a white image
-               shape.  Essentially white values are decreased to the smallest
-               'distance from edge' it can find.
-
-               It works by adding kernel values to the neighbourhood, and
-               select the minimum value found. The kernel is rotated before
-               use, so kernel distances match resulting distances, when a user
-               provided asymmetric kernel is applied.
-
-               This code is nearly identical to True GrayScale Morphology but
-               not quite.
-
-               GreyDilate Kernel values added, maximum value found Kernel is
-               rotated before use.
-
-               GrayErode:  Kernel values subtracted and minimum value found No
-               kernel rotation used.
-
-               Note the Iterative Distance method is essentially a
-               GrayErode, but with negative kernel values, and kernel rotation
-               applied.
-            */
-            k=(&kernel->values[kernel->width*kernel->height-1]);
-            for (v=0; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                pixel=MinimizeKernelDistance(k,pixels,i,pixel);
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
-            break;
-          }
-          case UndefinedMorphology:
-          default:
-            break;
-        }
-        if (quantum_pixels != (const Quantum *) NULL)
-          {
-            SetPixelChannel(morphology_image,channel,quantum_pixels[i],q);
-            continue;
-          }
-        gamma=MagickSafeReciprocal(gamma);
-        SetPixelChannel(morphology_image,channel,ClampToQuantum(gamma*pixel),q);
-        if (fabs(pixel-(double) p[center+i]) >= MagickEpsilon)
-          changes[id]++;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(morphology_image);
-    }
-    if (SyncCacheViewAuthenticPixels(morphology_view,exception) == MagickFalse)
-      status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        proceed=SetImageProgress(image,MorphologyTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
-  }
-  morphology_view=DestroyCacheView(morphology_view);
-  image_view=DestroyCacheView(image_view);
-  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
-    changed+=changes[j];
-  changes=(size_t *) RelinquishMagickMemory(changes);
-  return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
+    return(ConvolveMorphologyColumns(&setup));
+  return(MorphologyRows(&setup));
 }
 
 /*
@@ -5309,6 +6254,73 @@ static double AttemptKernelRotationBy90Degrees(KernelInfo *kernel,
   return(angle);
 }
 
+static void AttemptKernelRotations(KernelInfo *kernel,double angle)
+{
+  /* Attempt rotations by 45 degrees  -- 3x3 kernels only */
+  if ( 22.5 < fmod(angle,90.0) && fmod(angle,90.0) <= 67.5 )
+    angle=AttemptKernelRotationBy45Degrees(kernel,angle);
+  if ( 45.0 < fmod(angle, 180.0)  && fmod(angle,180.0) <= 135.0 )
+    angle=AttemptKernelRotationBy90Degrees(kernel,angle);
+  if ( 135.0 < angle && angle <= 225.0 )
+    angle=ReflectKernel(kernel,angle);
+}
+
+static const KernelInfoType
+  RotationUselessKernels[] =
+  {
+    /* These built-in kernels are cylindrical kernels, rotating is useless */
+    GaussianKernel,
+    DoGKernel,
+    LoGKernel,
+    DiskKernel,
+    PeaksKernel,
+    LaplacianKernel,
+    ChebyshevKernel,
+    ManhattanKernel,
+    EuclideanKernel,
+    /* These may be rotatable at non-90 angles in the future */
+    /* but simply rotating them in multiples of 90 degrees is useless */
+    SquareKernel,
+    DiamondKernel,
+    PlusKernel,
+    CrossKernel
+  };
+
+static MagickBooleanType IsRotationUselessKernel(const KernelInfoType type)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(RotationUselessKernels)/
+       sizeof(*RotationUselessKernels)); i++)
+    if (RotationUselessKernels[i] == type)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
+static MagickBooleanType IsNearZeroAngle(const double angle)
+{
+  return((337.5 < angle || angle <= 22.5) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType IsNearHalfTurnAngle(const double angle)
+{
+  return((135.0 < angle && angle <= 225.0) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType IsNearThreeQuarterTurnAngle(const double angle)
+{
+  return((225.0 < angle && angle <= 315.0) ? MagickTrue : MagickFalse);
+}
+
+static double NormalizeKernelAngle(double angle)
+{
+  angle = fmod(angle, 360.0);
+  if ( angle < 0 )
+    angle += 360.0;
+  return(angle);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -5321,54 +6333,28 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
   */
 
   /* Modulus the angle */
-  angle = fmod(angle, 360.0);
-  if ( angle < 0 )
-    angle += 360.0;
+  angle=NormalizeKernelAngle(angle);
 
-  if ( 337.5 < angle || angle <= 22.5 )
+  if (IsNearZeroAngle(angle) != MagickFalse)
     return;   /* Near zero angle - no change! - At least not at this time */
 
   /* Handle special cases */
+  if (IsRotationUselessKernel(kernel->type) != MagickFalse)
+    return;
   switch (kernel->type) {
-    /* These built-in kernels are cylindrical kernels, rotating is useless */
-    case GaussianKernel:
-    case DoGKernel:
-    case LoGKernel:
-    case DiskKernel:
-    case PeaksKernel:
-    case LaplacianKernel:
-    case ChebyshevKernel:
-    case ManhattanKernel:
-    case EuclideanKernel:
-      return;
-
-    /* These may be rotatable at non-90 angles in the future */
-    /* but simply rotating them in multiples of 90 degrees is useless */
-    case SquareKernel:
-    case DiamondKernel:
-    case PlusKernel:
-    case CrossKernel:
-      return;
-
     /* These only allows a +/-90 degree rotation (by transpose) */
     /* A 180 degree rotation is useless */
     case BlurKernel:
-      if ( 135.0 < angle && angle <= 225.0 )
+      if (IsNearHalfTurnAngle(angle) != MagickFalse)
         return;
-      if ( 225.0 < angle && angle <= 315.0 )
+      if (IsNearThreeQuarterTurnAngle(angle) != MagickFalse)
         angle -= 180;
       break;
 
     default:
       break;
   }
-  /* Attempt rotations by 45 degrees  -- 3x3 kernels only */
-  if ( 22.5 < fmod(angle,90.0) && fmod(angle,90.0) <= 67.5 )
-    angle=AttemptKernelRotationBy45Degrees(kernel,angle);
-  if ( 45.0 < fmod(angle, 180.0)  && fmod(angle,180.0) <= 135.0 )
-    angle=AttemptKernelRotationBy90Degrees(kernel,angle);
-  if ( 135.0 < angle && angle <= 225.0 )
-    angle=ReflectKernel(kernel,angle);
+  AttemptKernelRotations(kernel,angle);
   /* At this point angle should at least between -45 (315) and +45 degrees
    * In the future some form of non-orthogonal angled rotates could be
    * performed here, possibly with a linear kernel restriction.
@@ -5531,38 +6517,11 @@ static double GetKernelNormalizeScale(const KernelInfo *kernel)
   return(pos_scale);
 }
 
-MagickExport void ScaleKernelInfo(KernelInfo *kernel,
-  const double scaling_factor,const GeometryFlags normalize_flags)
+static void ApplyKernelScaling(KernelInfo *kernel,
+  const double scaling_factor,const double pos_scale,const double neg_scale)
 {
-  double
-    pos_scale,
-    neg_scale;
-
   ssize_t
     i;
-
-  /* do the other kernels in a multi-kernel list first */
-  if ( kernel->next != (KernelInfo *) NULL)
-    ScaleKernelInfo(kernel->next, scaling_factor, normalize_flags);
-
-  /* Normalization of Kernel */
-  pos_scale = 1.0;
-  if ( (normalize_flags&NormalizeValue) != 0 ) {
-    pos_scale = GetKernelNormalizeScale(kernel);
-  }
-  /* Force kernel into a normalized zero-summing kernel */
-  if ( (normalize_flags&CorrelateNormalizeValue) != 0 ) {
-    pos_scale = ( fabs(kernel->positive_range) >= MagickEpsilon )
-                 ? kernel->positive_range : 1.0;
-    neg_scale = ( fabs(kernel->negative_range) >= MagickEpsilon )
-                 ? -kernel->negative_range : 1.0;
-  }
-  else
-    neg_scale = pos_scale;
-
-  /* finalize scaling_factor for positive and negative components */
-  pos_scale = scaling_factor/pos_scale;
-  neg_scale = scaling_factor/neg_scale;
 
   for (i=0; i < (ssize_t) (kernel->width*kernel->height); i++)
     if (!IsNaN(kernel->values[i]))
@@ -5587,6 +6546,39 @@ MagickExport void ScaleKernelInfo(KernelInfo *kernel,
   }
 
   return;
+}
+
+MagickExport void ScaleKernelInfo(KernelInfo *kernel,
+  const double scaling_factor,const GeometryFlags normalize_flags)
+{
+  double
+    pos_scale,
+    neg_scale;
+
+  /* do the other kernels in a multi-kernel list first */
+  if ( kernel->next != (KernelInfo *) NULL)
+    ScaleKernelInfo(kernel->next, scaling_factor, normalize_flags);
+
+  /* Normalization of Kernel */
+  pos_scale = 1.0;
+  if ( (normalize_flags&NormalizeValue) != 0 ) {
+    pos_scale = GetKernelNormalizeScale(kernel);
+  }
+  /* Force kernel into a normalized zero-summing kernel */
+  if ( (normalize_flags&CorrelateNormalizeValue) != 0 ) {
+    pos_scale = ( fabs(kernel->positive_range) >= MagickEpsilon )
+                 ? kernel->positive_range : 1.0;
+    neg_scale = ( fabs(kernel->negative_range) >= MagickEpsilon )
+                 ? -kernel->negative_range : 1.0;
+  }
+  else
+    neg_scale = pos_scale;
+
+  /* finalize scaling_factor for positive and negative components */
+  pos_scale = scaling_factor/pos_scale;
+  neg_scale = scaling_factor/neg_scale;
+
+  ApplyKernelScaling(kernel,scaling_factor,pos_scale,neg_scale);
 }
 
 /*
