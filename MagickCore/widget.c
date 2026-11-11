@@ -9381,6 +9381,27 @@ static MagickBooleanType StayInMenuOnCommand(XWindows *windows,
   return(MagickTrue);
 }
 
+static void MapMenuWidget(Display *display,XWindows *windows)
+{
+  XSetWindowAttributes
+    window_attributes;
+
+  XWindowChanges
+    window_changes;
+
+  window_attributes.override_redirect=MagickTrue;
+  (void) XChangeWindowAttributes(display,windows->widget.id,
+    (size_t) CWOverrideRedirect,&window_attributes);
+  window_changes.width=(int) windows->widget.width;
+  window_changes.height=(int) windows->widget.height;
+  window_changes.x=windows->widget.x;
+  window_changes.y=windows->widget.y;
+  (void) XReconfigureWMWindow(display,windows->widget.id,windows->widget.screen,
+    (unsigned int) (CWWidth | CWHeight | CWX | CWY),&window_changes);
+  (void) XMapRaised(display,windows->widget.id);
+  windows->widget.mapped=MagickFalse;
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9415,9 +9436,6 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
     highlight_info,
     menu_info,
     selection_info;
-
-  XWindowChanges
-    window_changes;
 
   const MenuTargets
     targets = { &selection_info, &highlight_info };
@@ -9472,17 +9490,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   /*
     Map Menu widget.
   */
-  window_attributes.override_redirect=MagickTrue;
-  (void) XChangeWindowAttributes(display,windows->widget.id,
-    (size_t) CWOverrideRedirect,&window_attributes);
-  window_changes.width=(int) windows->widget.width;
-  window_changes.height=(int) windows->widget.height;
-  window_changes.x=windows->widget.x;
-  window_changes.y=windows->widget.y;
-  (void) XReconfigureWMWindow(display,windows->widget.id,windows->widget.screen,
-    (unsigned int) (CWWidth | CWHeight | CWX | CWY),&window_changes);
-  (void) XMapRaised(display,windows->widget.id);
-  windows->widget.mapped=MagickFalse;
+  MapMenuWidget(display,windows);
   /*
     Respond to X events.
   */
