@@ -9550,6 +9550,46 @@ static void ExposeMenuWindow(const MenuEventContext *context,
   (*state)|=RedrawWidgetState;
 }
 
+static void LeaveMenuWindow(const MenuEventContext *context,
+  const XEvent event,const MenuTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const selections = context->selections;
+
+  const unsigned int
+    number_selections = context->number_selections,
+    top_offset = context->top_offset;
+
+  XWidgetInfo
+    *const selection_info = targets->selection_info;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    id;
+
+  if (event.xcrossing.window != windows->widget.id)
+    return;
+  (*state)|=InactiveWidgetState;
+  id=(*selection_info).id;
+  if ((id < 0) || (id >= (int) number_selections))
+    return;
+  /*
+    Unhighlight last selection.
+  */
+  (*selection_info).y=((int) top_offset+id*(int) (*selection_info).height);
+  (*selection_info).id=(~0);
+  (*selection_info).text=(char *) selections[id];
+  XDrawWidgetText(display,&windows->widget,selection_info);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -9789,19 +9829,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       }
       case LeaveNotify:
       {
-        if (event.xcrossing.window != windows->widget.id)
-          break;
-        state|=InactiveWidgetState;
-        id=selection_info.id;
-        if ((id < 0) || (id >= (int) number_selections))
-          break;
-        /*
-          Unhighlight last selection.
-        */
-        selection_info.y=((int) top_offset+id*(int) selection_info.height);
-        selection_info.id=(~0);
-        selection_info.text=(char *) selections[id];
-        XDrawWidgetText(display,&windows->widget,&selection_info);
+        LeaveMenuWindow(&event_context,event,&targets);
         break;
       }
       case MotionNotify:
