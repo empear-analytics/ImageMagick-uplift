@@ -2205,6 +2205,19 @@ static void SetVirtualSourcePixel(const VirtualCompositeInputs *composite,
   }
 }
 
+static MagickRealType GetVirtualCanvasPixel(const PixelChannel channel,
+  const Quantum *magick_restrict q,const ssize_t i)
+{
+  MagickRealType
+    pixel;
+
+  if (channel == AlphaPixelChannel)
+    pixel=(MagickRealType) TransparentAlpha;
+  else
+    pixel=(MagickRealType) q[i];
+  return(pixel);
+}
+
 static inline void SetVirtualCompositeChannels(
   const VirtualCompositeInputs *composite,const Quantum *source,
   Quantum *magick_restrict q)
@@ -2236,10 +2249,7 @@ static inline void SetVirtualCompositeChannels(
       case SrcInCompositeOp:
       case SrcOutCompositeOp:
       {
-        if (channel == AlphaPixelChannel)
-          pixel=(MagickRealType) TransparentAlpha;
-        else
-          pixel=(MagickRealType) q[i];
+        pixel=GetVirtualCanvasPixel(channel,q,i);
         break;
       }
       default:
