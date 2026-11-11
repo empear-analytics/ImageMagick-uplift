@@ -5921,6 +5921,62 @@ static int FindFontBrowserCursor(XFontStruct *font_info,
 static XWidgetInfo
   PlaceTextViewExpose(XWidgetInfo,const XWidgetInfo);
 
+typedef struct _FontBrowserNames
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    **fontlist;
+
+  int
+    fonts;
+
+  unsigned int
+    visible_fonts;
+
+  XWidgetInfo
+    list_info,
+    slider_info;
+} FontBrowserNames;
+
+static void DrawFontBrowserNames(const FontBrowserNames *names,
+  XWidgetInfo *selection_info,int *i)
+{
+  Display
+    *const display = names->display;
+
+  XWindows
+    *const windows = names->windows;
+
+  char
+    **const fontlist = names->fontlist;
+
+  const int
+    fonts = names->fonts;
+
+  const unsigned int
+    visible_fonts = names->visible_fonts;
+
+  const XWidgetInfo
+    list_info = names->list_info,
+    slider_info = names->slider_info;
+
+  for ((*i)=0; (*i) < (int) visible_fonts; (*i)++)
+  {
+    (*selection_info).raised=(slider_info.id+(*i)) != list_info.id ?
+      MagickTrue : MagickFalse;
+    (*selection_info).text=(char *) NULL;
+    if ((slider_info.id+(*i)) < fonts)
+      (*selection_info).text=fontlist[slider_info.id+(*i)];
+    XDrawWidgetText(display,&windows->widget,selection_info);
+    (*selection_info).y+=(int) (*selection_info).height;
+  }
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6396,21 +6452,22 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
             slider_info.id*(slider_info.max_y-slider_info.min_y+1)/fonts;
         if (slider_info.id != selection_info.id)
           {
+            FontBrowserNames
+              names;
+
             /*
               Redraw scroll bar and file names.
             */
             selection_info.id=slider_info.id;
             selection_info.y=list_info.y+(int) (height >> 3)+2;
-            for (i=0; i < (int) visible_fonts; i++)
-            {
-              selection_info.raised=(slider_info.id+i) != list_info.id ?
-                MagickTrue : MagickFalse;
-              selection_info.text=(char *) NULL;
-              if ((slider_info.id+i) < fonts)
-                selection_info.text=fontlist[slider_info.id+i];
-              XDrawWidgetText(display,&windows->widget,&selection_info);
-              selection_info.y+=(int) selection_info.height;
-            }
+            names.display=display;
+            names.windows=windows;
+            names.fontlist=fontlist;
+            names.fonts=fonts;
+            names.visible_fonts=visible_fonts;
+            names.list_info=list_info;
+            names.slider_info=slider_info;
+            DrawFontBrowserNames(&names,&selection_info,&i);
             /*
               Update slider.
             */
