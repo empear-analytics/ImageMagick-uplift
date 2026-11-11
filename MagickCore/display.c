@@ -3955,6 +3955,26 @@ static void XSelectDissolveBlend(Display *display,XWindows *windows,
   (*compose)=DissolveCompositeOp;
 }
 
+static void XSelectDisplaceGeometry(Display *display,XWindows *windows,
+  char *displacement_geometry,const CompositeTargets *targets)
+{
+  CompositeOperator
+    *const compose = targets->compose;
+
+  /*
+    Get horizontal and vertical scale displacement geometry.
+  */
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXcopy);
+  (void) XDialogWidget(display,windows,"Displace",
+    "Enter the horizontal and vertical scale:",displacement_geometry);
+  (void) XSetFunction(display,windows->image.highlight_context,
+    GXinvert);
+  if (*displacement_geometry == '\0')
+    return;
+  (*compose)=DisplaceCompositeOp;
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -4113,18 +4133,8 @@ static MagickBooleanType XCompositeImage(Display *display,
           }
           case CompositeDisplaceCommand:
           {
-            /*
-              Get horizontal and vertical scale displacement geometry.
-            */
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            (void) XDialogWidget(display,windows,"Displace",
-              "Enter the horizontal and vertical scale:",displacement_geometry);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            if (*displacement_geometry == '\0')
-              break;
-            compose=DisplaceCompositeOp;
+            XSelectDisplaceGeometry(display,windows,displacement_geometry,
+              &targets);
             break;
           }
           case CompositeHelpCommand:
