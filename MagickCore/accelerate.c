@@ -1895,6 +1895,13 @@ static MagickBooleanType EqualizesRedChannel(const Image *image,
     (white.x != black.x)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType EqualizesGreenChannel(const Image *image,
+  const cl_float4 white,const cl_float4 black)
+{
+  return((((image->channel_mask & GreenChannel) != 0) &&
+    (white.y != black.y)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2087,7 +2094,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     if (EqualizesRedChannel(image,white,black) != MagickFalse)
       equalize_map[i].red=(unsigned int) ScaleMapToQuantum(
         (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
-    if (((image->channel_mask & GreenChannel) != 0) && (white.y != black.y))
+    if (EqualizesGreenChannel(image,white,black) != MagickFalse)
       equalize_map[i].green=(unsigned int) ScaleMapToQuantum(
         (MagickRealType) ((MaxMap*(map[i].y-black.y))/(white.y-black.y)));
     if (((image->channel_mask & BlueChannel) != 0) && (white.z != black.z))
@@ -2118,7 +2125,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
       if (EqualizesRedChannel(image,white,black) != MagickFalse)
         image->colormap[i].red=equalize_map[
           ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
-      if (((image->channel_mask & GreenChannel) != 0) && (white.y != black.y))
+      if (EqualizesGreenChannel(image,white,black) != MagickFalse)
         image->colormap[i].green=equalize_map[
           ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
       if (((image->channel_mask & BlueChannel) != 0) && (white.z != black.z))
