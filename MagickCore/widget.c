@@ -1812,6 +1812,9 @@ static void
 static int
   FindListBrowserCursor(XFontStruct *,const XWidgetInfo,const int);
 
+static XWidgetInfo
+  PageListBrowserSlider(XWidgetInfo,const XEvent,const unsigned int);
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2376,10 +2379,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             /*
               Move slider.
             */
-            if (event.xbutton.y < slider_info.y)
-              slider_info.id-=(int) (visible_colors-1);
-            else
-              slider_info.id+=(int) (visible_colors-1);
+            slider_info=PageListBrowserSlider(slider_info,event,visible_colors);
             state|=RedrawListState;
             break;
           }
