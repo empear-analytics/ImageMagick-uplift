@@ -31,6 +31,7 @@ if ( ! GetOptions(
 	 'attribute-hull.c',
 	 'attribute-bounds.c',
 	 'attribute-depth.c',
+	 'attribute-depth-measure.c',
 	 'blob.c',
 	 'cache.c',
 	 'cache-view.c',
