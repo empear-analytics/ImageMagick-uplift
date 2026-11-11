@@ -9892,6 +9892,39 @@ static void HandleMenuPointerEvent(const MenuEventContext *context,
   }
 }
 
+static void HandleMenuEvent(const MenuEventContext *context,const XEvent event,
+  const MenuTargets *targets)
+{
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      PressMenuSelection(context,event,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      ReleaseMenuSelection(context,event,targets);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      ConfigureMenuWindow(context,event,targets);
+      break;
+    }
+    case EnterNotify:
+    {
+      EnterMenuWindow(context,event,targets);
+      break;
+    }
+    default:
+    {
+      HandleMenuPointerEvent(context,event,targets);
+      break;
+    }
+  }
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -10011,34 +10044,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
       Wait for next event.
     */
     (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        PressMenuSelection(&event_context,event,&targets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        ReleaseMenuSelection(&event_context,event,&targets);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        ConfigureMenuWindow(&event_context,event,&targets);
-        break;
-      }
-      case EnterNotify:
-      {
-        EnterMenuWindow(&event_context,event,&targets);
-        break;
-      }
-      default:
-      {
-        HandleMenuPointerEvent(&event_context,event,&targets);
-        break;
-      }
-    }
+    HandleMenuEvent(&event_context,event,&targets);
   } while ((state & ExitState) == 0);
   (void) XFreeCursor(display,cursor);
   window_attributes.override_redirect=MagickFalse;
