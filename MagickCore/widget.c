@@ -1831,6 +1831,14 @@ static void
 static XWidgetInfo
   MoveFontBrowserSlider(XWidgetInfo,const KeySym,const unsigned int,const int);
 
+static void CopyColorBrowserMode(const XWidgetInfo mode_info,
+  const XWidgetInfo reply_info)
+{
+  if (mode_info.text != (char *) NULL)
+    (void) CopyMagickString(reply_info.text,mode_info.text,
+      MagickPathExtent);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2439,9 +2447,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             /*
               User pressed mode button.
             */
-            if (mode_info.text != (char *) NULL)
-              (void) CopyMagickString(reply_info.text,mode_info.text,
-                MagickPathExtent);
+            CopyColorBrowserMode(mode_info,reply_info);
             (void) CopyMagickString(primary_selection,reply_info.text,
               MagickPathExtent);
             (void) XSetSelectionOwner(display,XA_PRIMARY,windows->widget.id,
