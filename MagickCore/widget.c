@@ -5977,6 +5977,16 @@ static void DrawFontBrowserNames(const FontBrowserNames *names,
   }
 }
 
+static XWidgetInfo PageFontBrowserSlider(XWidgetInfo slider_info,
+  const XEvent event,const unsigned int visible_fonts)
+{
+  if (event.xbutton.y < slider_info.y)
+    slider_info.id-=((int) visible_fonts-1);
+  else
+    slider_info.id+=((int) visible_fonts-1);
+  return(slider_info);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -6578,10 +6588,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
             /*
               Move slider.
             */
-            if (event.xbutton.y < slider_info.y)
-              slider_info.id-=((int) visible_fonts-1);
-            else
-              slider_info.id+=((int) visible_fonts-1);
+            slider_info=PageFontBrowserSlider(slider_info,event,visible_fonts);
             state|=RedrawListState;
             break;
           }
