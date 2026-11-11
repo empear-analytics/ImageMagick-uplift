@@ -75,6 +75,7 @@ $call Make exception.c
 $call Make feature.c
 $call Make feature-texture.c
 $call Make fourier.c
+$call Make fourier-complex.c
 $call Make fx.c
 $call Make gem.c
 $call Make geometry.c
