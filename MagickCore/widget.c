@@ -4864,6 +4864,18 @@ static void CopyFileBrowserFormat(char *reply,char *format)
 static XWidgetInfo
   TrackFontBrowserSlider(XWidgetInfo,const XEvent,const int);
 
+static ssize_t FindFileBrowserCursor(XFontStruct *font_info,
+  const XWidgetInfo reply_info,const int x)
+{
+  ssize_t
+    i;
+
+  for (i=1; i <= (ssize_t) Extent(reply_info.marker); i++)
+    if (XTextWidth(font_info,reply_info.marker,(int) i) > x)
+      break;
+  return(i);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -5495,9 +5507,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
               Move text cursor to position of button press.
             */
             x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            for (i=1; i <= (ssize_t) Extent(reply_info.marker); i++)
-              if (XTextWidth(font_info,reply_info.marker,(int) i) > x)
-                break;
+            i=FindFileBrowserCursor(font_info,reply_info,x);
             reply_info.cursor=reply_info.marker+i-1;
             click.display=display;
             click.window_info=(&windows->widget);
