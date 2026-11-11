@@ -8968,6 +8968,21 @@ static void SetAffinityColormap(Image *affinity_image,
   }
 }
 
+static void XCountRowDiversity(const Image *image,
+  const Quantum *magick_restrict p,DiversityPacket *diversity)
+{
+  int
+    x;
+
+  for (x=(int) image->columns-1; x >= 0; x--)
+  {
+    ssize_t index = (ssize_t) GetPixelIndex(image,p);
+    if (index < image->colors)
+      diversity[index].count++;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9208,9 +9223,6 @@ MagickPrivate void XMakeStandardColormap(Display *display,
           image_view=AcquireAuthenticCacheView(image,exception);
           for (y=0; y < (int) image->rows; y++)
           {
-            int
-              x;
-
             const Quantum
               *magick_restrict p;
 
@@ -9218,13 +9230,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
               image->columns,1,exception);
             if (p == (const Quantum *) NULL)
               break;
-            for (x=(int) image->columns-1; x >= 0; x--)
-            {
-              ssize_t index = (ssize_t) GetPixelIndex(image,p);
-              if (index < image->colors)
-                diversity[index].count++;
-              p+=(ptrdiff_t) GetPixelChannels(image);
-            }
+            XCountRowDiversity(image,p,diversity);
           }
           image_view=DestroyCacheView(image_view);
           /*
