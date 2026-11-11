@@ -5981,35 +5981,17 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       case ConfigureNotify:
       {
-        /*
-          Update widget configuration.
-        */
-        if (event.xconfigure.window != windows->widget.id)
-          break;
-        if ((event.xconfigure.width == (int) windows->widget.width) &&
-            (event.xconfigure.height == (int) windows->widget.height))
-          break;
-        windows->widget.width=(unsigned int)
-          MagickMax(event.xconfigure.width,(int) windows->widget.min_width);
-        windows->widget.height=(unsigned int)
-          MagickMax(event.xconfigure.height,(int) windows->widget.min_height);
-        state|=UpdateConfigurationState;
+        state=ConfigureWidgetWindow(windows,event,state);
         break;
       }
       case EnterNotify:
       {
-        if (event.xcrossing.window != windows->widget.id)
-          break;
-        state&=(unsigned int) (~InactiveWidgetState);
+        state=EnterWidgetWindow(windows,event,state);
         break;
       }
       case Expose:
       {
-        if (event.xexpose.window != windows->widget.id)
-          break;
-        if (event.xexpose.count != 0)
-          break;
-        state|=RedrawWidgetState;
+        state=ExposeWidgetWindow(windows,event,state);
         break;
       }
       case KeyPress:
@@ -6084,9 +6066,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       case LeaveNotify:
       {
-        if (event.xcrossing.window != windows->widget.id)
-          break;
-        state|=InactiveWidgetState;
+        state=LeaveWidgetWindow(windows,event,state);
         break;
       }
       case MapNotify:
