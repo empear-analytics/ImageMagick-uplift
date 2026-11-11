@@ -3632,6 +3632,39 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
 %    o description: Specifies any description to the message.
 %
 */
+typedef struct _ConfirmRelease
+{
+  XWindows
+    *windows;
+
+  XEvent
+    event;
+
+  int
+    *confirm;
+} ConfirmRelease;
+
+static size_t ReleaseConfirmChoice(const ConfirmRelease *release,
+  const XWidgetInfo button_info,const int choice,size_t state)
+{
+  XWindows
+    *const windows = release->windows;
+
+  const XEvent
+    event = release->event;
+
+  int
+    *const confirm = release->confirm;
+
+  if ((event.xbutton.window == windows->widget.id) &&
+      (MatteIsActive(button_info,event.xbutton)))
+    {
+      (*confirm)=choice;
+      state|=ExitState;
+    }
+  return(state);
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -3833,38 +3866,29 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
+        ConfirmRelease
+          release;
+
         if (windows->widget.mapped == MagickFalse)
           break;
+        release.windows=windows;
+        release.event=event;
+        release.confirm=(&confirm);
         if (cancel_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(cancel_info,event.xbutton)))
-              {
-                confirm=0;
-                state|=ExitState;
-              }
+            state=ReleaseConfirmChoice(&release,cancel_info,0,state);
             cancel_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
           }
         if (dismiss_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(dismiss_info,event.xbutton)))
-              {
-                confirm=(-1);
-                state|=ExitState;
-              }
+            state=ReleaseConfirmChoice(&release,dismiss_info,(-1),state);
             dismiss_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&dismiss_info);
           }
         if (yes_info.raised == MagickFalse)
           {
-            if ((event.xbutton.window == windows->widget.id) &&
-                (MatteIsActive(yes_info,event.xbutton)))
-              {
-                confirm=1;
-                state|=ExitState;
-              }
+            state=ReleaseConfirmChoice(&release,yes_info,1,state);
             yes_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&yes_info);
           }
