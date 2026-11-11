@@ -3043,6 +3043,21 @@ typedef struct _AnimateEventContext
 
   const char
     *const *CommandMenu;
+
+  XPixelInfo
+    *pixel;
+
+  MagickStatusType
+    context_mask;
+
+  Window
+    root_window;
+
+  XWindowInfo
+    **magick_windows;
+
+  size_t
+    number_windows;
 } AnimateEventContext;
 
 static void XHandleUnmapNotify(const AnimateEventContext *event_context,
@@ -3521,6 +3536,85 @@ static void XHandleButtonPress(const AnimateEventContext *event_context,
     }
 }
 
+typedef struct _AnimateClientTargets
+{
+  MagickStatusType
+    *state;
+
+  XGCValues
+    *context_values;
+
+  Image
+    **nexus;
+} AnimateClientTargets;
+
+static void XHandleClientMessage(const AnimateEventContext *event_context,
+  const XEvent event,const AnimateClientTargets *client_targets)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  ExceptionInfo
+    *const exception = event_context->exception;
+
+  MagickStatusType
+    *const state = client_targets->state;
+
+  XGCValues
+    *const context_values = client_targets->context_values;
+
+  Image
+    **const nexus = client_targets->nexus;
+
+  AnimateDropSource
+    drop_source;
+
+  AnimateDropTargets
+    targets;
+
+  AnimateProtocolTargets
+    protocol_targets;
+
+  AnimateWindowColormaps
+    window_colormaps;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Client Message: 0x%lx 0x%lx %d 0x%lx",(unsigned long)
+      event.xclient.window,(unsigned long) event.xclient.message_type,
+      event.xclient.format,(unsigned long) event.xclient.data.l[0]);
+  window_colormaps.display=display;
+  window_colormaps.windows=windows;
+  window_colormaps.map_info=event_context->map_info;
+  window_colormaps.pixel=event_context->pixel;
+  window_colormaps.magick_windows=event_context->magick_windows;
+  window_colormaps.number_windows=event_context->number_windows;
+  window_colormaps.context_mask=event_context->context_mask;
+  window_colormaps.event=event;
+  protocol_targets.state=(state);
+  protocol_targets.context_values=(context_values);
+  if (XHandleMagickProtocol(&window_colormaps,&protocol_targets) ==
+      MagickFalse)
+    return;
+  drop_source.display=display;
+  drop_source.root_window=event_context->root_window;
+  drop_source.resource_info=resource_info;
+  drop_source.exception=exception;
+  drop_source.event=event;
+  drop_source.windows=windows;
+  targets.nexus=(nexus);
+  targets.state=(state);
+  if (XHandleDropProtocol(&drop_source,&targets) == MagickFalse)
+    return;
+  (*state)=XHandleDeleteMessage(event_context,event,(*state));
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3714,6 +3808,9 @@ MagickExport Image *XAnimateImages(Display *display,
 
   const AnimateCommandTargets
     command_targets = { &event, &image, &state, &nexus };
+
+  const AnimateClientTargets
+    client_targets = { &state, &context_values, &nexus };
 
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
@@ -4240,6 +4337,11 @@ MagickExport Image *XAnimateImages(Display *display,
   event_context.icon_map=icon_map;
   event_context.icon_pixel=icon_pixel;
   event_context.CommandMenu=CommandMenu;
+  event_context.pixel=pixel;
+  event_context.context_mask=context_mask;
+  event_context.root_window=root_window;
+  event_context.magick_windows=magick_windows;
+  event_context.number_windows=number_windows;
   (void) XMagickCommand(display,resource_info,windows,PlayCommand,&images,
     &state,exception);
   do
@@ -4341,47 +4443,7 @@ MagickExport Image *XAnimateImages(Display *display,
       }
       case ClientMessage:
       {
-        AnimateDropSource
-          drop_source;
-
-        AnimateDropTargets
-          targets;
-
-        AnimateProtocolTargets
-          protocol_targets;
-
-        AnimateWindowColormaps
-          window_colormaps;
-
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Client Message: 0x%lx 0x%lx %d 0x%lx",(unsigned long)
-            event.xclient.window,(unsigned long) event.xclient.message_type,
-            event.xclient.format,(unsigned long) event.xclient.data.l[0]);
-        window_colormaps.display=display;
-        window_colormaps.windows=windows;
-        window_colormaps.map_info=map_info;
-        window_colormaps.pixel=pixel;
-        window_colormaps.magick_windows=magick_windows;
-        window_colormaps.number_windows=number_windows;
-        window_colormaps.context_mask=context_mask;
-        window_colormaps.event=event;
-        protocol_targets.state=(&state);
-        protocol_targets.context_values=(&context_values);
-        if (XHandleMagickProtocol(&window_colormaps,&protocol_targets) ==
-            MagickFalse)
-          break;
-        drop_source.display=display;
-        drop_source.root_window=root_window;
-        drop_source.resource_info=resource_info;
-        drop_source.exception=exception;
-        drop_source.event=event;
-        drop_source.windows=windows;
-        targets.nexus=(&nexus);
-        targets.state=(&state);
-        if (XHandleDropProtocol(&drop_source,&targets) == MagickFalse)
-          break;
-        state=XHandleDeleteMessage(&event_context,event,state);
+        XHandleClientMessage(&event_context,event,&client_targets);
         break;
       }
       case ConfigureNotify:
