@@ -1622,6 +1622,15 @@ static void RelinquishAcquiredFeatureBuffers(const FeatureBuffers *buffers)
   density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
 }
 
+static void ZeroFeatureDensities(FeatureStatistics *density_x,
+  FeatureStatistics *density_xy,FeatureStatistics *density_y,
+  const unsigned int number_grays)
+{
+  (void) memset(density_x,0,2*(number_grays+1)*sizeof(*density_x));
+  (void) memset(density_xy,0,2*(number_grays+1)*sizeof(*density_xy));
+  (void) memset(density_y,0,2*(number_grays+1)*sizeof(*density_y));
+}
+
 static void DestroyFeatureMatrix(FeatureStatistics **matrix,
   const unsigned int number_grays)
 {
@@ -1816,9 +1825,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
       return(channel_features);
     }
   (void) memset(&correlation,0,sizeof(correlation));
-  (void) memset(density_x,0,2*(number_grays+1)*sizeof(*density_x));
-  (void) memset(density_xy,0,2*(number_grays+1)*sizeof(*density_xy));
-  (void) memset(density_y,0,2*(number_grays+1)*sizeof(*density_y));
+  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
   (void) memset(&mean,0,sizeof(mean));
   (void) memset(sum,0,number_grays*sizeof(*sum));
   (void) memset(&sum_squares,0,sizeof(sum_squares));
