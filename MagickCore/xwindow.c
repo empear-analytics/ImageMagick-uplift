@@ -2184,6 +2184,12 @@ typedef struct _XDitherTables
 
   unsigned char
     *(*green_map)[16];
+
+  const short
+    (*dither_blue)[16];
+
+  unsigned char
+    *(*blue_map)[16];
 } XDitherTables;
 
 static void SetRedDitherEntry(const XDitherTables *tables,const int x)
@@ -2232,6 +2238,29 @@ static void SetGreenDitherEntry(const XDitherTables *tables,const int x)
     ((value < 0) ? 0 : (value > 255) ? 255 : value);
 }
 
+static void SetBlueDitherEntry(const XDitherTables *tables,const int x)
+{
+  const int
+    i = tables->i,
+    j = tables->j;
+
+  const short
+    (*dither_blue)[16] = tables->dither_blue;
+
+  unsigned char
+    *(*blue_map)[16] = tables->blue_map;
+
+  int
+    value;
+
+  value=x-32;
+  if (x < 112)
+    value=x/2+24;
+  value+=(int) (dither_blue[i][j] << 1);
+  blue_map[i][j][x]=(unsigned char)
+    ((value < 0) ? 0 : (value > 255) ? 255 : value);
+}
+
 static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
 {
   static const short int
@@ -2263,7 +2292,6 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   int
     i,
     j,
-    value,
     x,
     y;
 
@@ -2309,16 +2337,13 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
       tables.red_map=red_map;
       tables.dither_green=dither_green;
       tables.green_map=green_map;
+      tables.dither_blue=dither_blue;
+      tables.blue_map=blue_map;
       for (x=0; x < 256; x++)
       {
         SetRedDitherEntry(&tables,x);
         SetGreenDitherEntry(&tables,x);
-        value=x-32;
-        if (x < 112)
-          value=x/2+24;
-        value+=(int) (dither_blue[i][j] << 1);
-        blue_map[i][j][x]=(unsigned char)
-          ((value < 0) ? 0 : (value > 255) ? 255 : value);
+        SetBlueDitherEntry(&tables,x);
       }
     }
   /*
