@@ -3706,6 +3706,23 @@ MagickExport char *XGetResourceClass(XrmDatabase database,
 %      info from the X server database.
 %
 */
+static int XResourceClassCharacter(const char *name)
+{
+  int
+    c;
+
+  c=(int) (*name);
+  if ((c >= XK_a) && (c <= XK_z))
+    c-=(XK_a-XK_A);
+  else
+    if ((c >= XK_agrave) && (c <= XK_odiaeresis))
+      c-=(XK_agrave-XK_Agrave);
+    else
+      if ((c >= XK_oslash) && (c <= XK_thorn))
+        c-=(XK_oslash-XK_Ooblique);
+  return(c);
+}
+
 MagickExport XrmDatabase XGetResourceDatabase(Display *display,
   const char *client_name)
 {
@@ -3739,15 +3756,7 @@ MagickExport XrmDatabase XGetResourceDatabase(Display *display,
     p--;
   if (*p == '/')
     client_name=p+1;
-  c=(int) (*client_name);
-  if ((c >= XK_a) && (c <= XK_z))
-    c-=(XK_a-XK_A);
-  else
-    if ((c >= XK_agrave) && (c <= XK_odiaeresis))
-      c-=(XK_agrave-XK_Agrave);
-    else
-      if ((c >= XK_oslash) && (c <= XK_thorn))
-        c-=(XK_oslash-XK_Ooblique);
+  c=XResourceClassCharacter(client_name);
 #if defined(X11_APPLICATION_PATH)
   (void) FormatLocaleString(filename,MagickPathExtent,"%s%c%s",
     X11_APPLICATION_PATH,c,client_name+1);
