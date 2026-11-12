@@ -16893,6 +16893,41 @@ static void XPositionCommandAndWidget(Display *display,XWindows *windows,
         &window_changes);
     }
 }
+
+static void XPositionMagnifyAndPan(Display *display,XWindows *windows,
+  const XEvent event)
+{
+  XWindowChanges
+    window_changes;
+
+  if ((windows->magnify.geometry == (char *) NULL) &&
+      (windows->magnify.mapped == MagickFalse))
+    {
+      windows->magnify.x=event.xconfigure.x+
+        event.xconfigure.width+25;
+      windows->magnify.y=event.xconfigure.y;
+      XConstrainWindowPosition(display,&windows->magnify);
+      window_changes.x=windows->magnify.x;
+      window_changes.y=windows->magnify.y;
+      (void) XReconfigureWMWindow(display,windows->magnify.id,
+        windows->magnify.screen,(unsigned int) (CWX | CWY),
+        &window_changes);
+    }
+  if ((windows->pan.geometry == (char *) NULL) &&
+      (windows->pan.mapped == MagickFalse))
+    {
+      windows->pan.x=event.xconfigure.x+(int)
+        event.xconfigure.width+25;
+      windows->pan.y=event.xconfigure.y+(int)
+        windows->magnify.height+50;
+      XConstrainWindowPosition(display,&windows->pan);
+      window_changes.x=windows->pan.x;
+      window_changes.y=windows->pan.y;
+      (void) XReconfigureWMWindow(display,windows->pan.id,
+        windows->pan.screen,(unsigned int) (CWX | CWY),
+        &window_changes);
+    }
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18441,40 +18476,11 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             */
             if (event.xconfigure.send_event != 0)
               {
-                XWindowChanges
-                  window_changes;
-
                 /*
                   Position the transient windows relative of the Image window.
                 */
                 XPositionCommandAndWidget(display,windows,event);
-                if ((windows->magnify.geometry == (char *) NULL) &&
-                    (windows->magnify.mapped == MagickFalse))
-                  {
-                    windows->magnify.x=event.xconfigure.x+
-                      event.xconfigure.width+25;
-                    windows->magnify.y=event.xconfigure.y;
-                    XConstrainWindowPosition(display,&windows->magnify);
-                    window_changes.x=windows->magnify.x;
-                    window_changes.y=windows->magnify.y;
-                    (void) XReconfigureWMWindow(display,windows->magnify.id,
-                      windows->magnify.screen,(unsigned int) (CWX | CWY),
-                      &window_changes);
-                  }
-                if ((windows->pan.geometry == (char *) NULL) &&
-                    (windows->pan.mapped == MagickFalse))
-                  {
-                    windows->pan.x=event.xconfigure.x+(int)
-                      event.xconfigure.width+25;
-                    windows->pan.y=event.xconfigure.y+(int)
-                      windows->magnify.height+50;
-                    XConstrainWindowPosition(display,&windows->pan);
-                    window_changes.x=windows->pan.x;
-                    window_changes.y=windows->pan.y;
-                    (void) XReconfigureWMWindow(display,windows->pan.id,
-                      windows->pan.screen,(unsigned int) (CWX | CWY),
-                      &window_changes);
-                  }
+                XPositionMagnifyAndPan(display,windows,event);
               }
             if ((event.xconfigure.width == (int) windows->image.width) &&
                 (event.xconfigure.height == (int) windows->image.height))
