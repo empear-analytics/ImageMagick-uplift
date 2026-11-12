@@ -3714,6 +3714,51 @@ static size_t ClientWidgetMessage(Display *display,XWindows *windows,
   return(state);
 }
 
+typedef struct _ConfirmTargets
+{
+  XWidgetInfo
+    *cancel_info,
+    *dismiss_info,
+    *yes_info;
+} ConfirmTargets;
+
+static void PressConfirmButton(Display *display,XWindows *windows,
+  const XEvent event,const ConfirmTargets *targets)
+{
+  XWidgetInfo
+    *const cancel_info = targets->cancel_info,
+    *const dismiss_info = targets->dismiss_info,
+    *const yes_info = targets->yes_info;
+
+  if (MatteIsActive((*cancel_info),event.xbutton))
+    {
+      /*
+        User pressed No button.
+      */
+      (*cancel_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+  if (MatteIsActive((*dismiss_info),event.xbutton))
+    {
+      /*
+        User pressed Dismiss button.
+      */
+      (*dismiss_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      return;
+    }
+  if (MatteIsActive((*yes_info),event.xbutton))
+    {
+      /*
+        User pressed Yes button.
+      */
+      (*yes_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,yes_info);
+      return;
+    }
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -3753,6 +3798,8 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   XWindowChanges
     window_changes;
 
+  const ConfirmTargets
+    targets = { &cancel_info, &dismiss_info, &yes_info };
   /*
     Determine Confirm widget attributes.
   */
@@ -3884,33 +3931,7 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
     {
       case ButtonPress:
       {
-        if (MatteIsActive(cancel_info,event.xbutton))
-          {
-            /*
-              User pressed No button.
-            */
-            cancel_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        if (MatteIsActive(dismiss_info,event.xbutton))
-          {
-            /*
-              User pressed Dismiss button.
-            */
-            dismiss_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-            break;
-          }
-        if (MatteIsActive(yes_info,event.xbutton))
-          {
-            /*
-              User pressed Yes button.
-            */
-            yes_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&yes_info);
-            break;
-          }
+        PressConfirmButton(display,windows,event,&targets);
         break;
       }
       case ButtonRelease:
