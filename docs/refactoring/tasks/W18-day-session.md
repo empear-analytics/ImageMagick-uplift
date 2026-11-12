@@ -203,3 +203,62 @@ cases, 0 diverged (one load-sensitive case settled). Each step ran `verify_wt` (
   clone group), four per-channel stretch helpers (clones, 3.01), arm helpers for Resize with a nested exit test, a
   typedef move for `ReadHistogramBuffer` (reverted). Possible upstream: ComputeEqualizeImage's PseudoClass block is
   dead; ComputeContrastStretchImage has no caller anywhere in the tree.
+
+## Lane b, second round: display.c 1.74 -> 1.97 (wide build, merged)
+
+26 commits on 3a1ec92e8 (18 refactor, 5 playbook, 3 tools); no `--no-verify`. `XAnnotateEditImage` leaves Brain Method
+and Deep, Nested Complexity (bumps 17 -> 6, 742 -> 470 lines; it keeps Complex cc 67, Large, Excess Arguments 5); the 22
+cases reaching it ran every step, 0 diverged; whole wide catalogue 14,145 cases, 0 diverged. Steps were flat until the
+last two: e6db624c5 D `XTrackInfoWidget`; CT c369647c9 font (1.76), a163e79f0 pen colour, 9da754cd0 box colour,
+755d2c72c rotation (statics via targets, per-case `AnnotateMenuInput` fill); eaba8fb4f E `XRedrawTextLines`;
+f9e195d98 and 258b02af3 CT BackSpace and Delete; 4191048fb CR `XAdvanceTextLine`; e929ae695 FT guard form; dd9634f3e CR
+`XInsertTextCharacter`; afbea91be E `XModifyKeySymbol`; dc2c7a0ff SR `XTypeTextKey`; 2fb62d444 CR `XAnnotateKeyPress`
+(1.81); 914f36a32, c7b79db40 CR paste; 15da51c9d E `XSetBoxPixelIndex`; eeb700e50 E `XSetPenPixelIndex` (1.97, the stub
+ceiling). Evidence: oracle plus obj_modulo (last one IDENTICAL), CT/CR steps also case_tail_check OK. Recipe text
+(Decided by `owner`, 2026-11-10 OK): 23b56bca5 **new Recipe CR, Extract a Tail That Ends Its Case or Iteration or
+Returns Failure** (a switch case's tail or a sequential loop body's tail leaving by `break;`/`continue;` or falling
+off, every `return` returning one constant; written variables by CT's targets struct; a `static MagickBooleanType`
+helper returning `MagickTrue` on the normal end and `MagickFalse` for the early return; the caller `if (Helper(...) ==
+MagickFalse) return(c);` then the case's `break;`); 349fe2a4c CT step 3 (a member may be added later as a new last
+member when its helper writes it); 317a2b8fa FT (the next case may be the guard `if (Q(...) == MagickFalse)
+return(c); break;`); 7bf74b70e SR (a kept group may write the controlling variable if no group falls through into a
+moved group; a shared input struct filled once before the switch); e8381f5b8 CR step 4 wording; tools:
+`case_tail_check.py` (pointer and array temporaries, comment lines, `--returns`). Plateau: XDrawEditImage and
+XDisplayImage need a 20-25 step chain each (all depth-4 sites under two or three loops; a raw probe moving both
+do-loops and the polygon bounding box scores 2.19 for XDrawEditImage but those helpers would carry findings of their
+own; the finding-free chain needs one new recipe, a void block with a targets struct of 7-8 written variables, plus SD
+splits of two 11-label element switches). **display.c has 14,493 code lines: adding about 8 or more lines anywhere drops
+the score 0.03 once** (a 5-statement dummy function 1.97 -> 1.94, 60 statements also 1.94; probably a Lines of Code
+step near 14,500), so any further chain pays that once. Possible upstream: `XAnnotateEditImage`'s `XK_bracketleft` group
+assigns `XK_Escape` then breaks (a dead store); the selection-paste loop and the Return key allocate the line with
+differently cast expressions; both allocation-failure returns leak `annotate_info`; `cursor` is not freed on the early
+returns.
+
+## Lane c, second round: widget.c 2.99 -> 3.02 (wide build, merged)
+
+43 commits on d71ca3694; only two raised the score, none dropped it; whole wide catalogue 14,145 cases, 0 diverged (one
+load-sensitive xevents case settled). **XMenuWidget** (162 cases, 0 diverged each; cc 49 -> 10, LoC 304 -> 96): CT
+1bed49df5 Press, 5f170ef64 Release, 205e39716 Configure, 641144ba2 Expose, 07b38dc0f Leave, fd056c408 Enter, 883df5554
+Move; O step 7 b3e4f9b77 Update, 6b2d946ed Redraw, 7b1f7b09d DrawMenuLine; SD 4e1e40189 then N d78420903 **2.99 ->
+3.01** (bumps 4 -> 0; no helper has a finding); E b1f2aeb0d CloseMenuWidget; b52f13192 MapMenuWidget. **Shared
+handlers** (flat, IDENTICAL): extracted once in XColorBrowserWidget (ConfigureWidgetWindow 8e03f6540,
+EnterWidgetWindow abfedfcc4, ExposeWidgetWindow 806e38736, LeaveWidgetWindow 63f28c3f5) and XConfirmWidget
+(ClientWidgetMessage 8082c137b), reused by D (b) in Confirm, Dialog, File, Font, Notice, Preferences and TextView
+(fc13557f1, e94eed72d, 8da715ca4, 511db6120, 1341ef74a, 55ef36ecf, ca5f4e737; ClientWidgetMessage in Notice,
+Preferences, TextView: f89bb116a, a1707fda9, e651b2ed2; reuse_check reports only the break/return rewrite lines).
+**XNoticeWidget** (unreached; `Verified: guard`; obj_modulo IDENTICAL or MODULO-IDENTICAL): CT ab9c678cb, 31ebdc634,
+458934724 (cc 47 -> 28). **XConfirmWidget** (5 cases): CT b81e86d93, 7465491c6, 7c9c30b5e, 487679bce (Move as two CTs so
+the helper stays under cc 9); H cdf5ed3d2 (macros hoisted; pp_identical on cand-wide IDENTICAL); O step 7 a089ba207,
+9417aae84; SD d54e9030d; N 79f56f93b **3.01 -> 3.02** (bumps 4 -> 0, cc 10, LoC 95). **Playbook:** the lane's own CT
+step 3 amendment (5978a05a5: a variable outside the struct may be added by a later block) duplicated lane b's
+349fe2a4c (merged first); the merge kept lane b's wording and dropped the duplicate; the code commits that use it
+(`MenuTargets`, `ConfirmTargets`) are unchanged. Plateau: flat or non-monotone until a function leaves a category: a
+lone bump drop 5 -> 4 in XNoticeWidget costs -0.02 (XTextViewWidget at 5 bumps likewise; both lowered it is back at 3.01;
+not committed); XMenuWidget leaving Complex Method alone (cc 10 -> 8) costs about -0.11 (left at cc 10); from the current
+HEAD any single widget stubbed gives at most +0.01, the eight smaller ones +0.18 over 3.01, with the browsers 6.30.
+Next if continued: Dialog, Preferences, Command and List with the same pattern; Notice and TextView as one same-recipe
+set. Possible upstream: XMenuWidget `width=WidgetTextWidth(...title)` is a dead store (moving the width loop leaves
+`width` set but unused: `-Wunused-but-set-variable` in CI); XPreferencesWidget's Cache press overwrites `width`. Tool
+gaps: `case_tail_check.py` fails on an extended targets initialiser and on `&targets` becoming `targets`. Message slips
+(amended): the Notice Move commit now says `dismiss_info` is the only written variable; the TextView reuse commit first
+carried the Preferences message after a race with a background run.
