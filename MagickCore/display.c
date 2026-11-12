@@ -15534,6 +15534,37 @@ static void XMagnifyAtButton(Display *display,XWindows *windows,
       windows->info.screen);
 }
 
+static void XScreenButton(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  if ((event->xbutton.button == Button3) &&
+      (event->xbutton.state & Mod1Mask))
+    {
+      /*
+        Convert Alt-Button3 to Button2.
+      */
+      event->xbutton.button=Button2;
+      event->xbutton.state&=(unsigned int) (~Mod1Mask);
+    }
+  if (event->xbutton.window == windows->backdrop.id)
+    {
+      (void) XSetInputFocus(display,event->xbutton.window,RevertToParent,
+        event->xbutton.time);
+      return;
+    }
+  if (event->xbutton.window == windows->pan.id)
+    {
+      XPanImage(display,windows,event,exception);
+      return;
+    }
+  if ((event->xbutton.window == windows->image.id) &&
+      (event->xbutton.button == Button2))
+    {
+      XMagnifyAtButton(display,windows,event,exception);
+      return;
+    }
+}
+
 static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
@@ -15549,32 +15580,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
     case ButtonPress:
     case ButtonRelease:
     {
-      if ((event->xbutton.button == Button3) &&
-          (event->xbutton.state & Mod1Mask))
-        {
-          /*
-            Convert Alt-Button3 to Button2.
-          */
-          event->xbutton.button=Button2;
-          event->xbutton.state&=(unsigned int) (~Mod1Mask);
-        }
-      if (event->xbutton.window == windows->backdrop.id)
-        {
-          (void) XSetInputFocus(display,event->xbutton.window,RevertToParent,
-            event->xbutton.time);
-          break;
-        }
-      if (event->xbutton.window == windows->pan.id)
-        {
-          XPanImage(display,windows,event,exception);
-          break;
-        }
-      if ((event->xbutton.window == windows->image.id) &&
-          (event->xbutton.button == Button2))
-        {
-          XMagnifyAtButton(display,windows,event,exception);
-          break;
-        }
+      XScreenButton(display,windows,event,exception);
       break;
     }
     case ClientMessage:
