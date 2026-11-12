@@ -12493,6 +12493,25 @@ static Image *XOpenImage(Display *display,XResourceInfo *resource_info,
   image_info=DestroyImageInfo(image_info);
   return(nexus);
 }
+
+static Cursor XSelectPanCursor(Display *display,XWindows *windows)
+{
+  Cursor
+    cursor;
+
+  if ((windows->image.ximage->width > (int) windows->image.width) &&
+      (windows->image.ximage->height > (int) windows->image.height))
+    cursor=XCreateFontCursor(display,XC_fleur);
+  else
+    if (windows->image.ximage->width > (int) windows->image.width)
+      cursor=XCreateFontCursor(display,XC_sb_h_double_arrow);
+    else
+      if (windows->image.ximage->height > (int) windows->image.height)
+        cursor=XCreateFontCursor(display,XC_sb_v_double_arrow);
+      else
+        cursor=XCreateFontCursor(display,XC_arrow);
+  return(cursor);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12547,17 +12566,7 @@ static void XPanImage(Display *display,XWindows *windows,XEvent *event,
   /*
     Define cursor.
   */
-  if ((windows->image.ximage->width > (int) windows->image.width) &&
-      (windows->image.ximage->height > (int) windows->image.height))
-    cursor=XCreateFontCursor(display,XC_fleur);
-  else
-    if (windows->image.ximage->width > (int) windows->image.width)
-      cursor=XCreateFontCursor(display,XC_sb_h_double_arrow);
-    else
-      if (windows->image.ximage->height > (int) windows->image.height)
-        cursor=XCreateFontCursor(display,XC_sb_v_double_arrow);
-      else
-        cursor=XCreateFontCursor(display,XC_arrow);
+  cursor=XSelectPanCursor(display,windows);
   (void) XCheckDefineCursor(display,windows->pan.id,cursor);
   /*
     Pan image as pointer moves until the mouse button is released.
