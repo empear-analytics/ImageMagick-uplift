@@ -1948,6 +1948,31 @@ static const char *SkipValueSeparator(const char *p)
   return(p);
 }
 
+static ssize_t CountDoubleValues(const char *string)
+{
+  char
+    *q;
+
+  const char
+    *p;
+
+  ssize_t
+    count;
+
+  count=0;
+  p=string;
+  while (*p != '\0')
+  {
+    (void) StringToDouble(p,&q);  /* get value - ignores leading space */
+    if (p == q)
+      return(-1);  /* no value found */
+    p=q;
+    count++;  /* increment value count */
+    p=SkipValueSeparator(p);
+  }
+  return(count);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2006,17 +2031,9 @@ MagickExport double *StringToArrayOfDoubles(const char *string,ssize_t *count,
   *count=0;
   if (string == (char *) NULL)
     return((double *) NULL);  /* no value found */
-  i=0;
-  p=string;
-  while (*p != '\0')
-  {
-    (void) StringToDouble(p,&q);  /* get value - ignores leading space */
-    if (p == q)
-      return((double *) NULL);  /* no value found */
-    p=q;
-    i++;  /* increment value count */
-    p=SkipValueSeparator(p);
-  }
+  i=CountDoubleValues(string);
+  if (i < 0)
+    return((double *) NULL);  /* no value found */
   /*
     Allocate floating point argument list.
   */
