@@ -17734,6 +17734,22 @@ static void XUnmapIconWindow(const DisplayEventContext *context,
     icon_pixel);
   windows->icon.mapped=MagickFalse;
 }
+
+static void XLogDisplayImage(XResourceInfo *resource_info,Image *display_image)
+{
+  if (resource_info->debug != MagickFalse)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "Image: %s[%.17g] %.17gx%.17g ",display_image->filename,
+        (double) display_image->scene,(double) display_image->columns,
+        (double) display_image->rows);
+      if (display_image->colors != 0)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
+          display_image->colors);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
+        display_image->magick);
+    }
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18509,18 +18525,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   manager_hints=windows->manager_hints;
   root_window=XRootWindow(display,visual_info->screen);
   nexus=NewImageList();
-  if (resource_info->debug != MagickFalse)
-    {
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "Image: %s[%.17g] %.17gx%.17g ",display_image->filename,
-        (double) display_image->scene,(double) display_image->columns,
-        (double) display_image->rows);
-      if (display_image->colors != 0)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
-          display_image->colors);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
-        display_image->magick);
-    }
+  XLogDisplayImage(resource_info,display_image);
   XMakeStandardColormap(display,visual_info,resource_info,display_image,
     map_info,pixel,exception);
   display_image->taint=MagickFalse;
