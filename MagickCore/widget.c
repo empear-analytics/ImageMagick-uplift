@@ -3521,12 +3521,12 @@ static void HandleCommandEvent(const CommandWidgetEvent *tile,int *id,
     }
 }
 
-MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
-  const char *const *selections,XEvent *event)
-{
 #define tile_width 112
 #define tile_height 70
 
+MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
+  const char *const *selections,XEvent *event)
+{
   int
     id,
     y;
