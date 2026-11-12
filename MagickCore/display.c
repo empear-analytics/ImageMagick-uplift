@@ -17013,6 +17013,62 @@ static void XConfigureImageWindow(const DisplayEventContext *context,
   */
   XUpdatePanWindow(display,windows,event);
 }
+
+static MagickStatusType XConfigureMagnifyWindow(
+  const DisplayEventContext *context,const XEvent event,Image *display_image,
+  MagickStatusType status)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  unsigned int
+    magnify;
+
+  XWindowChanges
+    window_changes;
+
+  /*
+    Magnify window has a new configuration.
+  */
+  windows->magnify.width=(unsigned int) event.xconfigure.width;
+  windows->magnify.height=(unsigned int) event.xconfigure.height;
+  if (windows->magnify.mapped == MagickFalse)
+    return(status);
+  magnify=1;
+  while ((int) magnify <= event.xconfigure.width)
+    magnify<<=1;
+  while ((int) magnify <= event.xconfigure.height)
+    magnify<<=1;
+  magnify>>=1;
+  if (((int) magnify != event.xconfigure.width) ||
+      ((int) magnify != event.xconfigure.height))
+    {
+      window_changes.width=(int) magnify;
+      window_changes.height=(int) magnify;
+      (void) XReconfigureWMWindow(display,windows->magnify.id,
+        windows->magnify.screen,(unsigned int) (CWWidth | CWHeight),
+        &window_changes);
+      return(status);
+    }
+  if (windows->magnify.mapped != MagickFalse &&
+      windows->magnify.stasis != MagickFalse)
+    {
+      status=XMakeImage(display,resource_info,&windows->magnify,
+        display_image,windows->magnify.width,windows->magnify.height,
+        exception);
+      XMakeMagnifyImage(display,windows,exception);
+    }
+  return(status);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -17525,9 +17581,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   XVisualInfo
     *icon_visual,
     *visual_info;
-
-  XWindowChanges
-    window_changes;
 
   XWindows
     *windows;
@@ -18568,40 +18621,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xconfigure.window == windows->magnify.id)
           {
-            unsigned int
-              magnify;
-
-            /*
-              Magnify window has a new configuration.
-            */
-            windows->magnify.width=(unsigned int) event.xconfigure.width;
-            windows->magnify.height=(unsigned int) event.xconfigure.height;
-            if (windows->magnify.mapped == MagickFalse)
-              break;
-            magnify=1;
-            while ((int) magnify <= event.xconfigure.width)
-              magnify<<=1;
-            while ((int) magnify <= event.xconfigure.height)
-              magnify<<=1;
-            magnify>>=1;
-            if (((int) magnify != event.xconfigure.width) ||
-                ((int) magnify != event.xconfigure.height))
-              {
-                window_changes.width=(int) magnify;
-                window_changes.height=(int) magnify;
-                (void) XReconfigureWMWindow(display,windows->magnify.id,
-                  windows->magnify.screen,(unsigned int) (CWWidth | CWHeight),
-                  &window_changes);
-                break;
-              }
-            if (windows->magnify.mapped != MagickFalse &&
-                windows->magnify.stasis != MagickFalse)
-              {
-                status=XMakeImage(display,resource_info,&windows->magnify,
-                  display_image,windows->magnify.width,windows->magnify.height,
-                  exception);
-                XMakeMagnifyImage(display,windows,exception);
-              }
+            status=XConfigureMagnifyWindow(&event_context,event,display_image,
+              status);
             break;
           }
         if (windows->magnify.mapped != MagickFalse &&
