@@ -1154,6 +1154,33 @@ static void DecodeDelegateEntity(const char **p,char **q)
   q+=(ptrdiff_t) length; \
 }
 
+static MagickBooleanType DecodeDelegatePercent(const char **p,char **q,
+  const MagickBooleanType number)
+{
+  /*
+    Doubled percent - or percent at end of string - and a percent that follows
+    a number are literal.
+  */
+  (*p)++; /* advance beyond the percent */
+  if (IsPropertyEnd(*p) != MagickFalse)
+    (*p)--;
+  if (**p == '%')
+    {
+      *(*q)++='%';
+      return(MagickTrue);
+    }
+  if (number != MagickFalse)
+    {
+      /*
+        But only if not preceded by a number!
+      */
+      *(*q)++='%'; /* do NOT substitute the percent */
+      (*p)--;      /* back up one */
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
@@ -1221,29 +1248,8 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
         continue;
       }
     }
-    p++; /* advance beyond the percent */
-    /*
-      Doubled Percent - or percent at end of string.
-    */
-    if (IsPropertyEnd(p) != MagickFalse)
-      p--;
-    if (*p == '%')
-      {
-        *q++='%';
-        continue;
-      }
-    /*
-      Single letter escapes %c.
-    */
-    if (number != MagickFalse)
-      {
-        /*
-          But only if not preceded by a number!
-        */
-        *q++='%'; /* do NOT substitute the percent */
-        p--;      /* back up one */
-        continue;
-      }
+    if (DecodeDelegatePercent(&p,&q,number) != MagickFalse)
+      continue;
     string=GetMagickPropertyLetter(image_info,image,*p,exception);
     if (string != (char *) NULL)
       {
