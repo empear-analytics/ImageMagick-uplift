@@ -565,13 +565,46 @@ static void XSetAnnotateRow(const AnnotatePixels *annotate_pixels,
   }
 }
 
+static int XTransferAnnotatePixels(const AnnotatePixels *annotate_pixels)
+{
+  Image
+    *const annotate_image = annotate_pixels->annotate_image;
+
+  XImage
+    *const annotate_ximage = annotate_pixels->annotate_ximage;
+
+  ExceptionInfo
+    *const exception = annotate_pixels->exception;
+
+  CacheView
+    *annotate_view;
+
+  int
+    y;
+
+  annotate_view=AcquireAuthenticCacheView(annotate_image,exception);
+  for (y=0; y < (int) annotate_image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    q=GetCacheViewAuthenticPixels(annotate_view,0,(ssize_t) y,
+      annotate_image->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    XSetAnnotateRow(annotate_pixels,q,y);
+    if (SyncCacheViewAuthenticPixels(annotate_view,exception) == MagickFalse)
+      break;
+  }
+  annotate_view=DestroyCacheView(annotate_view);
+  XDestroyImage(annotate_ximage);
+  return(y);
+}
+
 MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
   ExceptionInfo *exception)
 {
-  CacheView
-    *annotate_view;
-
   AnnotatePixels
     annotate_pixels;
 
@@ -673,22 +706,7 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   annotate_pixels.pixel=pixel;
   annotate_pixels.annotate_info=annotate_info;
   annotate_pixels.exception=exception;
-  annotate_view=AcquireAuthenticCacheView(annotate_image,exception);
-  for (y=0; y < (int) annotate_image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    q=GetCacheViewAuthenticPixels(annotate_view,0,(ssize_t) y,
-      annotate_image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    XSetAnnotateRow(&annotate_pixels,q,y);
-    if (SyncCacheViewAuthenticPixels(annotate_view,exception) == MagickFalse)
-      break;
-  }
-  annotate_view=DestroyCacheView(annotate_view);
-  XDestroyImage(annotate_ximage);
+  y=XTransferAnnotatePixels(&annotate_pixels);
   /*
     Determine annotate geometry.
   */
