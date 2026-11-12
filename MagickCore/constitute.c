@@ -630,10 +630,9 @@ static inline MagickBooleanType IsTIFFResolutionFallback(
   const char *resolution_x,const char *resolution_y,
   const ConstituteInfo *constitute_info)
 {
-  return(((resolution_x == (const char *) NULL) &&
+  return((resolution_x == (const char *) NULL) &&
     (resolution_y == (const char *) NULL) &&
-    (constitute_info->sync_from_tiff != MagickFalse)) ? MagickTrue :
-    MagickFalse);
+    (constitute_info->sync_from_tiff != MagickFalse));
 }
 
 static void SetResolutionFromStrings(Image *image,const char *resolution_x,
@@ -1382,20 +1381,19 @@ static MagickBooleanType CopyTemporaryImageFile(ImageInfo *write_info,
 static inline MagickBooleanType IsSingleImageDelegateCopy(const char *option,
   const ImageInfo *write_info,const Image *image)
 {
-  return(((IsStringTrue(option) != MagickFalse) &&
+  return((IsStringTrue(option) != MagickFalse) &&
     (write_info->page == (char *) NULL) &&
     (GetPreviousImageInList(image) == (Image *) NULL) &&
     (GetNextImageInList(image) == (Image *) NULL) &&
-    (IsTaintImage(image) == MagickFalse) ) ? MagickTrue : MagickFalse);
+    (IsTaintImage(image) == MagickFalse));
 }
 
 static inline MagickBooleanType IsDirectDelegate(
   const DelegateInfo *delegate_info,const Image *image)
 {
-  return(((delegate_info != (const DelegateInfo *) NULL) &&
+  return((delegate_info != (const DelegateInfo *) NULL) &&
     (GetDelegateMode(delegate_info) == 0) &&
-    (IsPathAccessible(image->magick_filename) != MagickFalse)) ? MagickTrue :
-    MagickFalse);
+    (IsPathAccessible(image->magick_filename) != MagickFalse));
 }
 
 static void SyncEndianFromMagickInfo(const ImageInfo *image_info,Image *image,
@@ -1768,5 +1766,5 @@ MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
       }
   }
   write_info=DestroyImageInfo(write_info);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return(status != 0);
 }
