@@ -17750,6 +17750,30 @@ static void XLogDisplayImage(XResourceInfo *resource_info,Image *display_image)
         display_image->magick);
     }
 }
+
+static time_t XGetUpdateTime(XResourceInfo *resource_info,Image *display_image)
+{
+  struct stat
+    attributes;
+
+  time_t
+    update_time;
+
+  update_time=0;
+  if (resource_info->update != MagickFalse)
+    {
+      MagickBooleanType
+        status;
+
+      /*
+        Determine when file data was last modified.
+      */
+      status=GetPathAttributes(display_image->filename,&attributes);
+      if (status != MagickFalse)
+        update_time=attributes.st_mtime;
+    }
+  return(update_time);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18390,9 +18414,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   static unsigned int
     number_windows;
 
-  struct stat
-    attributes;
-
   time_t
     timer,
     timestamp,
@@ -18985,19 +19006,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   delay=display_image->delay/(size_t)
     MagickMax(display_image->ticks_per_second,1L);
   timer=GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1;
-  update_time=0;
-  if (resource_info->update != MagickFalse)
-    {
-      MagickBooleanType
-        status;
-
-      /*
-        Determine when file data was last modified.
-      */
-      status=GetPathAttributes(display_image->filename,&attributes);
-      if (status != MagickFalse)
-        update_time=attributes.st_mtime;
-    }
+  update_time=XGetUpdateTime(resource_info,display_image);
   *state&=(unsigned int) (~FormerImageState);
   *state&=(unsigned int) (~MontageImageState);
   *state&=(unsigned int) (~NextImageState);
