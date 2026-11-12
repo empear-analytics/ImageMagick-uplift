@@ -836,6 +836,16 @@ static MagickBooleanType IsCanonicalRightsAuthorized(
   return(status);
 }
 
+static MagickBooleanType IsPolicyForName(const PolicyInfo *policy,
+  const PolicyDomain domain,const char *name)
+{
+  if (policy->domain != domain)
+    return(MagickFalse);
+  if ((name != (char *) NULL) && (LocaleCompare(name,policy->name) != 0))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static char *AcquireCanonicalCandidate(const char *canonical_directory,
   const char *filename)
 {
@@ -936,9 +946,7 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
       match = MagickFalse,
       matched_canonical = MagickFalse;
 
-    if (policy->domain != domain)
-      continue;
-    if ((name != (char *) NULL) && (LocaleCompare(name,policy->name) != 0))
+    if (IsPolicyForName(policy,domain,name) == MagickFalse)
       continue;
     match=GlobExpression(pattern,policy->pattern,MagickFalse);
     if (policy->domain == PathPolicyDomain)
