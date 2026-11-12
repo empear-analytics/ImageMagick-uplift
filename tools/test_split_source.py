@@ -120,6 +120,20 @@ class SplitSource(unittest.TestCase):
         self.assertNotIn("return(-1);", old)
         self.assert_both_compile()
 
+    def test_original_keeps_its_else_when_the_stub_moves_and_another_stub_stays(self):
+        stub = "\nMagickExport int FamilyRoot(int x)\n{\n  return(-1);\n}\n"
+        kept_stub = KEPT.replace("x*2", "0")
+        r = self.split("#if defined(DELEGATE)\n" + FAMILY + "#else" + stub + kept_stub + "#endif\n")
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        old = open(os.path.join(self.out, "synth.c")).read()
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        self.assertEqual(old.count("#else"), 1)
+        self.assertEqual(old.count("MagickExport int KeptRoot"), 1)
+        self.assertEqual(new.count("#else"), 1)
+        self.assertNotIn("KeptRoot", new)
+        self.assertNotIn("FamilyRoot", old)
+        self.assert_both_compile()
+
     def test_planted_defect_unclosed_conditional_does_not_compile(self):
         r = self.split("#if defined(DELEGATE)\n" + FAMILY + KEPT + "#endif\n")
         self.assertEqual(r.returncode, 0, r.stderr + r.stdout)

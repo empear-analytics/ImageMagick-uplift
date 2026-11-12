@@ -280,7 +280,16 @@ for run in runs:
 first = order[idx[0]]
 region = "\n\n".join("\n".join(L[a:b]) for a, b in cuts)
 rest_lines = list(L)
-for a, b in reversed(cuts):
+# the #else of the conditional that a whole run stands in (a moved function and its stub, side by side) stays in FILE:
+# the run is cut in two around it, and NEW takes the whole run, #else included
+stays = {n for a, b in cuts for r in recs if r["if"] < a and r["end"] >= b for n in r["else"] if a <= n < b}
+deletions = []
+for a, b in cuts:
+    start = a
+    for n in sorted(x for x in stays if a <= x < b):
+        deletions.append((start, n)); start = n + 1
+    deletions.append((start, b))
+for a, b in reversed(deletions):
     del rest_lines[a:b]
     # drop one of the two blank lines left at the seam
     while 1 < a < len(rest_lines) and rest_lines[a - 1] == "" and rest_lines[a] == "" and rest_lines[a - 2] == "":
