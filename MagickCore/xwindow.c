@@ -5739,6 +5739,29 @@ static void LogXWindowProtocols(Display *display,const XWindows *windows)
     }
 }
 
+static void LogXWindowVisual(const XWindows *windows)
+{
+  if ((GetLogEventMask() & X11Event) != 0)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"Visual:");
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"  visual id: 0x%lx",
+        windows->visual_info->visualid);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"  class: %s",
+        XVisualClassName(windows->visual_info->klass));
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"  depth: %d planes",
+        windows->visual_info->depth);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "  size of colormap: %d entries",windows->visual_info->colormap_size);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "  red, green, blue masks: 0x%lx 0x%lx 0x%lx",
+        windows->visual_info->red_mask,windows->visual_info->green_mask,
+        windows->visual_info->blue_mask);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "  significant bits in color: %d bits",
+        windows->visual_info->bits_per_rgb);
+    }
+}
+
 MagickPrivate XWindows *XInitializeWindows(Display *display,
   XResourceInfo *resource_info)
 {
@@ -5827,25 +5850,7 @@ MagickPrivate XWindows *XInitializeWindows(Display *display,
       (windows->icon_visual == (XVisualInfo *) NULL))
     ThrowXWindowFatalException(XServerFatalError,"UnableToGetVisual",
       resource_info->visual_type);
-  if ((GetLogEventMask() & X11Event) != 0)
-    {
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"Visual:");
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  visual id: 0x%lx",
-        windows->visual_info->visualid);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  class: %s",
-        XVisualClassName(windows->visual_info->klass));
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  depth: %d planes",
-        windows->visual_info->depth);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "  size of colormap: %d entries",windows->visual_info->colormap_size);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "  red, green, blue masks: 0x%lx 0x%lx 0x%lx",
-        windows->visual_info->red_mask,windows->visual_info->green_mask,
-        windows->visual_info->blue_mask);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "  significant bits in color: %d bits",
-        windows->visual_info->bits_per_rgb);
-    }
+  LogXWindowVisual(windows);
   /*
     Allocate class and manager hints.
   */
