@@ -9341,6 +9341,42 @@ static void InitializeFontBrowserScroll(const FontBrowserContext *context,
   (*expose_info).y=(*slider_info).y;
 }
 
+static void InitializeFontBrowserList(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  XFontStruct
+    *const font_info = *widgets->font_info;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  /*
+    Initialize list information.
+  */
+  XGetWidgetInfo((char *) NULL,list_info);
+  (*list_info).raised=MagickFalse;
+  (*list_info).bevel_width--;
+  (*list_info).width=(unsigned int) ((*scroll_info).x-(*reply_info).x-
+    (QuantumMargin >> 1));
+  (*list_info).height=(*scroll_info).height;
+  (*list_info).x=(*reply_info).x;
+  (*list_info).y=(*scroll_info).y;
+  if (windows->widget.mapped == MagickFalse)
+    (*state)|=JumpListState;
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9547,19 +9583,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
         InitializeFontBrowserButtons(&font_context,&font_widgets);
         InitializeFontBrowserReply(&font_context,&font_widgets);
         InitializeFontBrowserScroll(&font_context,&font_widgets);
-        /*
-          Initialize list information.
-        */
-        XGetWidgetInfo((char *) NULL,&list_info);
-        list_info.raised=MagickFalse;
-        list_info.bevel_width--;
-        list_info.width=(unsigned int) (scroll_info.x-reply_info.x-
-          (QuantumMargin >> 1));
-        list_info.height=scroll_info.height;
-        list_info.x=reply_info.x;
-        list_info.y=scroll_info.y;
-        if (windows->widget.mapped == MagickFalse)
-          state|=JumpListState;
+        InitializeFontBrowserList(&font_context,&font_widgets);
         /*
           Initialize text information.
         */
