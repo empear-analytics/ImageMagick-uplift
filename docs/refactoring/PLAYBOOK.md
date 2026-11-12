@@ -5387,6 +5387,26 @@ helper returns a status the caller tests, which here would always lead to the sa
    order (Recipe Z step 7, Recipe I); every path out of the helper returns to the
    `continue;`, as every path out of the block reached one (*Careful*). Checked by
    reading.
+   Calls of earlier helpers inside the block, and two targets structs (2026-11-12, later):
+   the block may hold calls of helpers that Recipe CT, SD or Z made earlier for the same
+   caller, written `Inner(&name,...,&targets);` with the caller's own shared input struct
+   `name` (N step 8) and its `const` targets struct. In the new helper such a call is
+   written `Inner(name,...,targets);`, passing on the `const` pointers the helper
+   received, as CT step 5 says; a block-local variable the call reads (`id`) goes by value
+   as it did, and is declared in the helper (E step 4). The variables the block writes
+   itself go in one targets struct, and those that only the inner calls write stay in the
+   targets struct the inner helpers took; the new helper takes `const Name *name` and
+   then each targets struct it binds from or passes on, in the order the caller declares
+   them (at most two), at most four parameters in all, and binds only the members its own
+   text writes (`T *const v = targets->v;`, `(*v)` at every use). A variable that stands in
+   both structs is bound from one of them only, so no two bound pointers name one object.
+   Why the behaviour is the same: each inner call receives the very pointers the caller's
+   call passed (the new helper's parameters are `&name` and `&targets` of the caller, the
+   same objects, `const`), the call stands where it stood in the block with the same other
+   arguments, so the same statements run in the same order, and the inner helpers write the
+   caller's variables through the addresses their struct holds; the new helper's own writes
+   go through its bound pointers, to variables no inner call writes at that point. Checked by
+   reading; `tools/case_tail_check.py` does not read this form.
 
 **Before:**
 
@@ -5492,7 +5512,13 @@ finding on the helper. Added by Claude Code (Claude Sonnet 5.5) under the mandat
 menu tables, the `command` buffer, resource info, exception) and writes `event`,
 `image`, `state` and `nexus`; the probe takes the function from 10 bumps to 9, 3.42 to
 3.48. Added by Claude Code (Claude Opus 5.5) under the owner's OK to evolve the recipes
-(2026-11-10).
+(2026-11-10). Step 7's calls of earlier helpers and two targets structs (2026-11-12, later,
+campaign A, W18 lane b, wide build): `display.c`'s `XDrawEditImage`, whose command-widget
+block in the first event loop calls five case helpers (colour, stipple, width, and the
+Undo, Help and Dismiss groups) with its two targets structs, and writes the element and
+the event itself; a stub of the block as one helper took the function out of *Deep,
+Nested Complexity* and *Brain Method* on a probe; added by
+Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -12326,3 +12352,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | AMEND | SR | Step 1: a kept group may write the controlling variable `e` when no group falls through into a moved group (the `switch` evaluates `e` once and a kept group never reaches a moved one). Step 3: the input struct may be shared and filled once before the `switch` (SD step 8), and a `const` targets struct that a moved group passes on as `&targets` goes as one more parameter, written `targets`. *Not covered by* and *Careful* unchanged | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's key `switch` holds one group (`XK_bracketleft`: `key_symbol=XK_Escape;`) that writes `e`, which SR step 1 refused, beside the default and Return groups that call the failing helpers; a stub of the whole `switch` as one helper measures cc 9 (Complex Method), so those two groups go to a second one | owner |
 | 2026-11-12 | WORDING | CR | Step 4: the targets struct comes after the input struct and before a by-value parameter that the block reads and then writes (`XAnnotateKeyPress`'s `key_symbol`, assigned by its `XK_bracketleft` group), instead of "last" | `display.c`'s `XAnnotateEditImage`: its CR helpers take `(text_input, targets, value)`; the first wording would have put `key_symbol` before `targets` | owner |
 | 2026-11-12 | AMEND | CT | Step 5: a call in the block of a helper this recipe made earlier for the same caller, `Inner(&name,...,&targets);`, is written `Inner(name,...,targets);` in the helper (the two `const` pointers passed on, as SR step 3 passes a `targets` on); the helper binds only the members its own text writes. *Careful* gives the argument | `display.c`'s `XDrawEditImage` (campaign A, W18 lane b, wide build): the stipple case as one helper is a Large Method (86 lines); its file-reading tail and its menu head are two helpers of this recipe, the head calling the tail, and the command-widget block (a later recipe's step) calls all the case helpers with the same two structs | owner |
+| 2026-11-12 | AMEND | OC | Step 7: the block may hold calls of helpers that Recipe CT, SD or Z made earlier for the same caller (`Inner(&name,...,&targets);`), written `Inner(name,...,targets);` in the new helper; the helper takes the shared input struct and up to two targets structs (those it binds from or passes on), at most four parameters, and binds only the members its own text writes. *Careful* (step 7) gives the argument | `display.c`'s `XDrawEditImage` (campaign A, W18 lane b, wide build): the command-widget block of the first event loop (`if (id < 0) continue;` and a `switch` of seven labels, whose colour, stipple, width and Undo/Help/Dismiss groups are helpers of CT and SD taking two structs) holds the function's last depth-4 sites and writes `element` and the event itself; step 7 allowed two to four written variables in one struct, and the groups' writes number eight in two structs. A probe of the block as one helper: the function leaves Deep, Nested Complexity and Brain Method | owner |
