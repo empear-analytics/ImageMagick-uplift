@@ -4594,6 +4594,56 @@ static void ClientDialogMessage(const DialogContext *context,
     }
 }
 
+static void KeyDialogPress(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const action_info = targets->action_info,
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
+
+  static char
+    command[MagickPathExtent];
+
+  static int
+    length;
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  length=XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      (*state)|=ExitState;
+      return;
+    }
+  if (key_symbol == XK_Control_L)
+    {
+      (*state)|=ControlState;
+      return;
+    }
+  ApplyDialogControlKey(key_symbol,(*state),reply_info);
+  XEditText(display,reply_info,key_symbol,command,(*state));
+  XDrawMatteText(display,&windows->widget,reply_info);
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -4825,38 +4875,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
       }
       case KeyPress:
       {
-        static char
-          command[MagickPathExtent];
-
-        static int
-          length;
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        length=XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            state|=ExitState;
-            break;
-          }
-        if (key_symbol == XK_Control_L)
-          {
-            state|=ControlState;
-            break;
-          }
-        ApplyDialogControlKey(key_symbol,state,&reply_info);
-        XEditText(display,&reply_info,key_symbol,command,state);
-        XDrawMatteText(display,&windows->widget,&reply_info);
+        KeyDialogPress(&context,event,&targets);
         break;
       }
       case KeyRelease:
