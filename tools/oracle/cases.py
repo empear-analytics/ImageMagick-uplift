@@ -6990,6 +6990,21 @@ def _windrv_cases():
         for degrees in ("17", "45", "-33", "95", "180", "212.5", "310", "-100"):
             yield _windrv("shearrotate %s %s" % (name, degrees),
                           ("shearrotate", img(name), degrees, "out.miff"), ["out.miff"])
+    # compare.c: IsImagesEqual, which only the API reaches: equal images, a difference in the
+    # first pixels, a difference only in the alpha channel (seen or masked out by a channel
+    # mask, so that channels without an update trait are skipped), images of different size
+    # and of different channel counts
+    for first, second, channels in (
+            ("rose", "rose", None), ("rose", "rose_blur", None), ("rose", "rose_alpha", None),
+            ("rose_alpha", "rose", None), ("rose", "rose_alpha", "RGB"), ("rose_alpha", "rose", "RGB"),
+            ("rose_alpha", "rose_alpha", "Alpha"), ("rose", "rose_alpha", "Alpha"),
+            ("rose", "rose_blur", "Blue"), ("rose", "hdri", None), ("hdri", "rose", "Green"),
+            ("gray16", "rose", None), ("rose", "gray16", None), ("cmyk", "rose", None),
+            ("rose", "tall", None), ("tall", "rose", None), ("tall", "tall", None),
+            ("rose", "wide", None), ("wide", "rose", None), ("tiny", "rose", None), ("tiny", "tiny", None),
+            ("wide", "wide", "Red")):
+        yield _windrv("imagesequal %s %s %s" % (first, second, channels or "all"),
+                      tuple(["imagesequal", img(first), img(second)] + ([channels] if channels else [])))
     # timer.c: -bench (AcquireTimerInfo) and -duration (ContinueTimer) in magick-cli.c; the
     # oracle masks the report's timings (owner's decision, 2026-10-04). A duration far longer
     # than the run keeps every iteration, so the output is the same each time.
