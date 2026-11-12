@@ -1122,6 +1122,34 @@ MagickExport MagickBooleanType RelinquishUniqueFileResource(const char *path)
 %
 */
 
+static ssize_t GetOpenFileLimit(void)
+{
+  ssize_t
+    files;
+
+  files=(-1);
+#if defined(MAGICKCORE_HAVE_SYSCONF) && defined(_SC_OPEN_MAX)
+  files=(ssize_t) sysconf(_SC_OPEN_MAX);
+#endif
+#if defined(MAGICKCORE_HAVE_GETRLIMIT) && defined(RLIMIT_NOFILE)
+  if (files < 0)
+    {
+      struct rlimit
+        resources;
+
+      if (getrlimit(RLIMIT_NOFILE,&resources) != -1)
+        files=(ssize_t) resources.rlim_cur;
+  }
+#endif
+#if defined(MAGICKCORE_HAVE_GETDTABLESIZE) && defined(MAGICKCORE_POSIX_SUPPORT)
+  if (files < 0)
+    files=(ssize_t) getdtablesize();
+#endif
+  if (files < 0)
+    files=64;
+  return(files);
+}
+
 static void SetResourceLimitFromEnvironment(const ResourceType type,
   const char *name)
 {
@@ -1183,26 +1211,7 @@ MagickPrivate MagickBooleanType ResourceComponentGenesis(void)
   SetResourceLimitFromEnvironment(MapResource,"MAGICK_MAP_LIMIT");
   (void) SetMagickResourceLimit(DiskResource,MagickResourceInfinity);
   SetResourceLimitFromEnvironment(DiskResource,"MAGICK_DISK_LIMIT");
-  files=(-1);
-#if defined(MAGICKCORE_HAVE_SYSCONF) && defined(_SC_OPEN_MAX)
-  files=(ssize_t) sysconf(_SC_OPEN_MAX);
-#endif
-#if defined(MAGICKCORE_HAVE_GETRLIMIT) && defined(RLIMIT_NOFILE)
-  if (files < 0)
-    {
-      struct rlimit
-        resources;
-
-      if (getrlimit(RLIMIT_NOFILE,&resources) != -1)
-        files=(ssize_t) resources.rlim_cur;
-  }
-#endif
-#if defined(MAGICKCORE_HAVE_GETDTABLESIZE) && defined(MAGICKCORE_POSIX_SUPPORT)
-  if (files < 0)
-    files=(ssize_t) getdtablesize();
-#endif
-  if (files < 0)
-    files=64;
+  files=GetOpenFileLimit();
   (void) SetMagickResourceLimit(FileResource,MagickMax((size_t)
     (3*files/4),64));
   SetResourceLimitFromEnvironment(FileResource,"MAGICK_FILE_LIMIT");
