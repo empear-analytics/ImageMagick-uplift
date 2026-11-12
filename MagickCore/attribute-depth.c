@@ -294,6 +294,38 @@ typedef struct _DitherImageInfo
     *exception;
 } DitherImageInfo;
 
+static void DitherImageRowStatus(const DitherImageInfo *rows,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  DitherRow
+    row;
+
+  if (*status == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(rows->image_view,0,y,rows->image->columns,1,
+    rows->exception);
+  if (q == (Quantum *) NULL)
+    {
+      *status=MagickFalse;
+      return;
+    }
+  row.image=rows->image;
+  row.distortion=rows->distortion;
+  row.range=rows->range;
+  row.channels=rows->channels;
+  row.y=y;
+  DitherImageRow(&row,q);
+  if (SyncCacheViewAuthenticPixels(rows->image_view,rows->exception) ==
+      MagickFalse)
+    {
+      *status=MagickFalse;
+      return;
+    }
+}
+
 static void DitherImageRows(const DitherImageInfo *rows,
   MagickBooleanType *status)
 {
@@ -301,35 +333,7 @@ static void DitherImageRows(const DitherImageInfo *rows,
     y;
 
   for (y=0; y < (ssize_t) rows->image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    DitherRow
-      row;
-
-    if (*status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(rows->image_view,0,y,rows->image->columns,1,
-      rows->exception);
-    if (q == (Quantum *) NULL)
-      {
-        *status=MagickFalse;
-        continue;
-      }
-    row.image=rows->image;
-    row.distortion=rows->distortion;
-    row.range=rows->range;
-    row.channels=rows->channels;
-    row.y=y;
-    DitherImageRow(&row,q);
-    if (SyncCacheViewAuthenticPixels(rows->image_view,rows->exception) ==
-        MagickFalse)
-      {
-        *status=MagickFalse;
-        continue;
-      }
-  }
+    DitherImageRowStatus(rows,y,status);
 }
 
 static MagickBooleanType FloydSteinbergImageDepth(Image *image,
