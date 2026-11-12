@@ -1358,21 +1358,7 @@ MagickExport MagickBooleanType SetMagickResourceLimit(const ResourceType type,
 
   status=MagickTrue;
   value=(char *) NULL;
-  switch (type)
-  {
-    case DiskResource:
-    case FileResource:
-    case MapResource:
-    case MemoryResource:
-    case TimeResource:
-    {
-      if (resource_semaphore[type] == (SemaphoreInfo *) NULL)
-        ActivateSemaphoreInfo(&resource_semaphore[type]);
-      LockSemaphoreInfo(resource_semaphore[type]);
-      break;
-    }
-    default: ;
-  }
+  LockResourceSemaphore(type);
   switch (type)
   {
     case AreaResource:
@@ -1500,19 +1486,7 @@ MagickExport MagickBooleanType SetMagickResourceLimit(const ResourceType type,
       break;
     }
   }
-  switch (type)
-  {
-    case DiskResource:
-    case FileResource:
-    case MapResource:
-    case MemoryResource:
-    case TimeResource:
-    {
-      UnlockSemaphoreInfo(resource_semaphore[type]);
-      break;
-    }
-    default: ;
-  }
+  UnlockResourceSemaphore(type);
   if (value != (char *) NULL)
     value=DestroyString(value);
   return(status);
