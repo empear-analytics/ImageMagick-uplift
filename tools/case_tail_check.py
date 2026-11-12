@@ -6,6 +6,12 @@
 With `--shared` the INPUT local is the shared struct of Recipe N step 8: its fill is one run
 of `LOCAL.m=m;` anywhere before the calls, not directly before this helper's call.
 
+Two forms of Recipe CT as amended on 2026-11-12 (later): a targets initialiser that grows by a
+new last member (its old lines leave the diff and are not part of the block), and a block that
+passes the context and the targets struct on to a helper of the same struct (`&LOCAL` of the
+input struct and `&targets_local` of the targets struct, in a removed line, are the parameters
+the helper holds, `context` and `widgets`).
+
 With `--returns` the helper is the `static MagickBooleanType` function of Recipe CR (a
 tail that ends its case or iteration or returns failure): each `break;` or `continue;`
 the block lost is read as `return(MagickTrue);`, each `return(c);` as
@@ -350,6 +356,14 @@ def main(argv):
             # the diff aligned the caller's `return(c);` with one of the block's: it is
             # context, so the block's copy is missing from the removed lines
             removed.append(call.group(1))
+    if tlocal:
+        # an extended targets initialiser (Recipe CT step 3: a new last member) replaces the
+        # old declaration's lines: they are not part of the block
+        removed = [l for l in removed
+                   if not (re.fullmatch(re.escape(tlocal) + r"\s*=\s*\{.*", l) or
+                           re.fullmatch(r"(?:&\w+,\s*)*&\w+\s*\};?", l) or
+                           (re.fullmatch(r"\**(\w+)[;,]", l) and
+                            re.fullmatch(r"\**(\w+)[;,]", l).group(1) in target_names + input_names))]
     removed_c = Counter(removed)
     for line in list(removed_c):
         same = min(removed_c[line], max(outside[line], 0))
@@ -363,6 +377,12 @@ def main(argv):
         if n > 0:
             # a line of a comment moves as it is: the rewrite does not apply to text
             moved_line = line if line in comments else forward(line, bound_t)
+            # a context or targets struct the block passes on (`&color_context`, `&color_widgets`
+            # to a helper called from the block) is the parameter the helper holds (2026-11-12)
+            if SHARED and local and iptr:
+                moved_line = re.sub(r"&" + re.escape(local) + r"\b", iptr, moved_line)
+            if tlocal and tptr:
+                moved_line = re.sub(r"&" + re.escape(tlocal) + r"\b", tptr, moved_line)
             want[canonical(moved_line, bound_t)] += n
     have = Counter(canonical(b, bound_t) for b in moved)
     for line, n in (want - have).items():
