@@ -902,6 +902,74 @@ static MagickBooleanType LoadMimeInclude(const MimeLoadTarget *target,
   return(status);
 }
 
+static void SetMimeTypeAttributes(MimeInfo *mime_info,XMLTreeInfo *mime)
+{
+  const char
+    *attribute;
+
+  attribute=GetXMLTreeAttribute(mime,"data-type");
+  if (attribute != (const char *) NULL)
+    mime_info->data_type=(DataType) ParseCommandOption(MagickDataTypeOptions,
+      MagickTrue,attribute);
+  attribute=GetXMLTreeAttribute(mime,"description");
+  if (attribute != (const char *) NULL)
+    mime_info->description=ConstantString(attribute);
+  attribute=GetXMLTreeAttribute(mime,"endian");
+  if (attribute != (const char *) NULL)
+    mime_info->endian=(EndianType) ParseCommandOption(MagickEndianOptions,
+      MagickTrue,attribute);
+  attribute=GetXMLTreeAttribute(mime,"magic");
+  if (attribute != (const char *) NULL)
+    ParseMimeMagic(mime_info,attribute);
+}
+
+static void SetMimeMatchAttributes(MimeInfo *mime_info,XMLTreeInfo *mime)
+{
+  const char
+    *attribute;
+
+  attribute=GetXMLTreeAttribute(mime,"mask");
+  if (attribute != (const char *) NULL)
+    mime_info->mask=(ssize_t) strtoul(attribute,(char **) NULL,0);
+  attribute=GetXMLTreeAttribute(mime,"offset");
+  if (attribute != (const char *) NULL)
+    {
+      char
+        *c;
+
+      mime_info->offset=(MagickOffsetType) strtol(attribute,&c,0);
+      if (*c == ':')
+        mime_info->extent=(size_t) strtol(c+1,(char **) NULL,0);
+    }
+  attribute=GetXMLTreeAttribute(mime,"pattern");
+  if (attribute != (const char *) NULL)
+    mime_info->pattern=ConstantString(attribute);
+  attribute=GetXMLTreeAttribute(mime,"priority");
+  if (attribute != (const char *) NULL)
+    mime_info->priority=(ssize_t) strtol(attribute,(char **) NULL,0);
+  attribute=GetXMLTreeAttribute(mime,"stealth");
+  if (attribute != (const char *) NULL)
+    mime_info->stealth=IsStringTrue(attribute);
+  attribute=GetXMLTreeAttribute(mime,"type");
+  if (attribute != (const char *) NULL)
+    mime_info->type=ConstantString(attribute);
+}
+
+static MimeInfo *AcquireMimeElement(XMLTreeInfo *mime,
+  const char *filename)
+{
+  MimeInfo
+    *mime_info;
+
+  mime_info=(MimeInfo *) AcquireCriticalMemory(sizeof(*mime_info));
+  (void) memset(mime_info,0,sizeof(*mime_info));
+  mime_info->path=ConstantString(filename);
+  mime_info->signature=MagickCoreSignature;
+  SetMimeTypeAttributes(mime_info,mime);
+  SetMimeMatchAttributes(mime_info,mime);
+  return(mime_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -991,49 +1059,7 @@ static MagickBooleanType LoadMimeCache(const MimeLoadTarget *target,
     /*
       Process mime element.
     */
-    mime_info=(MimeInfo *) AcquireCriticalMemory(sizeof(*mime_info));
-    (void) memset(mime_info,0,sizeof(*mime_info));
-    mime_info->path=ConstantString(filename);
-    mime_info->signature=MagickCoreSignature;
-    attribute=GetXMLTreeAttribute(mime,"data-type");
-    if (attribute != (const char *) NULL)
-      mime_info->data_type=(DataType) ParseCommandOption(MagickDataTypeOptions,
-        MagickTrue,attribute);
-    attribute=GetXMLTreeAttribute(mime,"description");
-    if (attribute != (const char *) NULL)
-      mime_info->description=ConstantString(attribute);
-    attribute=GetXMLTreeAttribute(mime,"endian");
-    if (attribute != (const char *) NULL)
-      mime_info->endian=(EndianType) ParseCommandOption(MagickEndianOptions,
-        MagickTrue,attribute);
-    attribute=GetXMLTreeAttribute(mime,"magic");
-    if (attribute != (const char *) NULL)
-      ParseMimeMagic(mime_info,attribute);
-    attribute=GetXMLTreeAttribute(mime,"mask");
-    if (attribute != (const char *) NULL)
-      mime_info->mask=(ssize_t) strtoul(attribute,(char **) NULL,0);
-    attribute=GetXMLTreeAttribute(mime,"offset");
-    if (attribute != (const char *) NULL)
-      {
-        char
-          *c;
-
-        mime_info->offset=(MagickOffsetType) strtol(attribute,&c,0);
-        if (*c == ':')
-          mime_info->extent=(size_t) strtol(c+1,(char **) NULL,0);
-      }
-    attribute=GetXMLTreeAttribute(mime,"pattern");
-    if (attribute != (const char *) NULL)
-      mime_info->pattern=ConstantString(attribute);
-    attribute=GetXMLTreeAttribute(mime,"priority");
-    if (attribute != (const char *) NULL)
-      mime_info->priority=(ssize_t) strtol(attribute,(char **) NULL,0);
-    attribute=GetXMLTreeAttribute(mime,"stealth");
-    if (attribute != (const char *) NULL)
-      mime_info->stealth=IsStringTrue(attribute);
-    attribute=GetXMLTreeAttribute(mime,"type");
-    if (attribute != (const char *) NULL)
-      mime_info->type=ConstantString(attribute);
+    mime_info=AcquireMimeElement(mime,filename);
     status=AppendValueToLinkedList(cache,mime_info);
     if (status == MagickFalse)
       (void) ThrowMagickException(exception,GetMagickModule(),
