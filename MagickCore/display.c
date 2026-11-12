@@ -15714,30 +15714,11 @@ static void XScreenUnmap(Display *display,XWindows *windows,XEvent *event)
     }
 }
 
-static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
+static void XScreenOtherEvent(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
-  (void) XIfEvent(display,event,XPredicate,(char *) windows);
-  if (event->xany.window == windows->command.id)
-    return;
   switch (event->type)
   {
-    case ButtonPress:
-    case ButtonRelease:
-    {
-      XScreenButton(display,windows,event,exception);
-      break;
-    }
-    case ClientMessage:
-    {
-      XScreenClientMessage(display,windows,event);
-      break;
-    }
-    case ConfigureNotify:
-    {
-      XScreenConfigure(display,windows,event,exception);
-      break;
-    }
     case Expose:
     {
       XScreenExpose(display,windows,event,exception);
@@ -15765,6 +15746,38 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
     }
     default:
       break;
+  }
+}
+
+static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  (void) XIfEvent(display,event,XPredicate,(char *) windows);
+  if (event->xany.window == windows->command.id)
+    return;
+  switch (event->type)
+  {
+    case ButtonPress:
+    case ButtonRelease:
+    {
+      XScreenButton(display,windows,event,exception);
+      break;
+    }
+    case ClientMessage:
+    {
+      XScreenClientMessage(display,windows,event);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      XScreenConfigure(display,windows,event,exception);
+      break;
+    }
+    default:
+    {
+      XScreenOtherEvent(display,windows,event,exception);
+      break;
+    }
   }
 }
 
