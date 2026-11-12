@@ -2788,15 +2788,15 @@ static void PressColorBrowserScroll(const ColorBrowserContext *context,
   PressColorBrowserButtons(context,event,widgets);
 }
 
-MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
-  const char *action,char *reply)
-{
 #define CancelButtonText  "Cancel"
 #define ColornameText  "Name:"
 #define ColorPatternText  "Pattern:"
 #define GrabButtonText  "Grab"
 #define ResetButtonText  "Reset"
 
+MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
+  const char *action,char *reply)
+{
   char
     **colorlist,
     primary_selection[MagickPathExtent],
