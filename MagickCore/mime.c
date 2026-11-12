@@ -808,6 +808,22 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
 }
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
+static unsigned char GetMimeEscape(const char c)
+{
+  switch (c)
+  {
+    case 'b': return('\b');
+    case 'f': return('\f');
+    case 'n': return('\n');
+    case 'r': return('\r');
+    case 't': return('\t');
+    case 'v': return('\v');
+    case 'a': return('a');
+    case '?': return('\?');
+    default: return((unsigned char) c);
+  }
+}
+
 static void ParseMimeMagic(MimeInfo *mime_info,const char *attribute)
 {
   char
@@ -842,18 +858,7 @@ static void ParseMimeMagic(MimeInfo *mime_info,const char *attribute)
             mime_info->length++;
             continue;
           }
-        switch (*p)
-        {
-          case 'b': *q='\b'; break;
-          case 'f': *q='\f'; break;
-          case 'n': *q='\n'; break;
-          case 'r': *q='\r'; break;
-          case 't': *q='\t'; break;
-          case 'v': *q='\v'; break;
-          case 'a': *q='a'; break;
-          case '?': *q='\?'; break;
-          default: *q=(unsigned char) (*p); break;
-        }
+        *q=GetMimeEscape(*p);
         p++;
         q++;
         mime_info->length++;
