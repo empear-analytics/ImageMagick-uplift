@@ -769,6 +769,21 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
 %
 */
 
+static unsigned int CountFonts(const char *font)
+{
+  const char
+    *p;
+
+  unsigned int
+    fonts;
+
+  fonts=1U;
+  for (p=font; *p != '\0'; p++)
+    if ((*p == ':') || (*p == ';') || (*p == ','))
+      fonts++;
+  return(fonts);
+}
+
 static char **FontToList(char *font)
 {
   char
@@ -789,10 +804,7 @@ static char **FontToList(char *font)
   /*
     Convert string to an ASCII list.
   */
-  fonts=1U;
-  for (p=font; *p != '\0'; p++)
-    if ((*p == ':') || (*p == ';') || (*p == ','))
-      fonts++;
+  fonts=CountFonts(font);
   fontlist=(char **) AcquireQuantumMemory((size_t) fonts+1UL,sizeof(*fontlist));
   if (fontlist == (char **) NULL)
     {
