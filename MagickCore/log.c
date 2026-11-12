@@ -798,6 +798,51 @@ MagickExport MagickBooleanType IsEventLogging(void)
   return(event_logging);
 }
 
+static void ListLogHeader(FILE *file,const LogInfo *log_info)
+{
+  ssize_t
+    j;
+
+  if (log_info->path != (char *) NULL)
+    (void) FormatLocaleFile(file,"\nPath: %s\nHandler: ",log_info->path);
+  for (j=0; j < (ssize_t) (8*sizeof(LogHandlerType)); j++)
+  {
+    size_t
+      mask;
+
+    if (*LogHandlers[j].name == '\0')
+      break;
+    mask=1;
+    mask<<=j;
+    if (((size_t) log_info->handler_mask & mask) != 0)
+      (void) FormatLocaleFile(file,"%s ",LogHandlers[j].name);
+  }
+  (void) FormatLocaleFile(file,"\n\n");
+}
+
+static void ListLogEntry(FILE *file,const LogInfo *log_info)
+{
+  char
+    limit[MagickPathExtent];
+
+  (void) FormatLocaleFile(file,
+    "Generations  Limit  Filename\n");
+  (void) FormatLocaleFile(file,"---------------------------------------------"
+    "----------------------------------\n");
+  (void) FormatLocaleFile(file,"%g      ",(double) log_info->generations);
+  (void) CopyMagickString(limit,"unlimited",MagickPathExtent);
+  if (log_info->limit > 0)
+    (void) FormatMagickSize(log_info->limit,MagickTrue,"B",MagickFormatExtent,
+      limit);
+  (void) FormatLocaleFile(file,"  %9s",limit);
+  if (log_info->filename != (char *) NULL)
+    (void) FormatLocaleFile(file,"  %s",log_info->filename);
+  (void) FormatLocaleFile(file,"\n");
+  if (log_info->format != (char *) NULL)
+    (void) FormatLocaleFile(file,"  Format: %s\n",log_info->format);
+  (void) FormatLocaleFile(file,"\n");
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -838,59 +883,20 @@ MagickExport MagickBooleanType ListLogInfo(FILE *file,ExceptionInfo *exception)
   size_t
     number_aliases;
 
-  ssize_t
-    j;
-
   if (file == (const FILE *) NULL)
     file=stdout;
   log_info=GetLogInfoList("*",&number_aliases,exception);
   if (log_info == (const LogInfo **) NULL)
     return(MagickFalse);
-  j=0;
   path=(const char *) NULL;
   for (i=0; i < (ssize_t) number_aliases; i++)
   {
-    char
-      limit[MagickPathExtent];
-
     if (log_info[i]->stealth != MagickFalse)
       continue;
     if ((path == (const char *) NULL) ||
         (LocaleCompare(path,log_info[i]->path) != 0))
-      {
-        if (log_info[i]->path != (char *) NULL)
-          (void) FormatLocaleFile(file,"\nPath: %s\nHandler: ",
-            log_info[i]->path);
-        for (j=0; j < (ssize_t) (8*sizeof(LogHandlerType)); j++)
-        {
-          size_t
-            mask;
-
-          if (*LogHandlers[j].name == '\0')
-            break;
-          mask=1;
-          mask<<=j;
-          if (((size_t) log_info[i]->handler_mask & mask) != 0)
-            (void) FormatLocaleFile(file,"%s ",LogHandlers[j].name);
-        }
-        (void) FormatLocaleFile(file,"\n\n");
-      }
-    (void) FormatLocaleFile(file,
-      "Generations  Limit  Filename\n");
-    (void) FormatLocaleFile(file,"---------------------------------------------"
-      "----------------------------------\n");
-    (void) FormatLocaleFile(file,"%g      ",(double) log_info[i]->generations);
-    (void) CopyMagickString(limit,"unlimited",MagickPathExtent);
-    if (log_info[i]->limit > 0)
-      (void) FormatMagickSize(log_info[i]->limit,MagickTrue,"B",
-        MagickFormatExtent,limit);
-    (void) FormatLocaleFile(file,"  %9s",limit);
-    if (log_info[i]->filename != (char *) NULL)
-      (void) FormatLocaleFile(file,"  %s",log_info[i]->filename);
-    (void) FormatLocaleFile(file,"\n");
-    if (log_info[i]->format != (char *) NULL)
-      (void) FormatLocaleFile(file,"  Format: %s\n",log_info[i]->format);
-    (void) FormatLocaleFile(file,"\n");
+      ListLogHeader(file,log_info[i]);
+    ListLogEntry(file,log_info[i]);
     path=log_info[i]->path;
   }
   (void) fflush(file);
