@@ -1359,6 +1359,22 @@ static const char *SkipLocaleAttributes(const char *q,const size_t extent,
   return(q);
 }
 
+static MagickBooleanType HandleStructuralElement(const char *keyword,char *tag)
+{
+  if ((LocaleCompare(keyword,"<localemap>") == 0) ||
+      (LocaleCompare(keyword,"</localemap>") == 0))
+    return(MagickTrue);
+  if (LocaleCompare(keyword,"</locale>") == 0)
+    ChopLocaleComponents(tag,1);
+  else
+    if (LocaleCompare(keyword,"</message>") == 0)
+      ChopLocaleComponents(tag,2);
+    else
+      return(MagickFalse);
+  (void) ConcatenateMagickString(tag,"/",MagickLocaleExtent);
+  return(MagickTrue);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1466,15 +1482,7 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         q=SkipLocaleAttributes(q,extent,token);
         continue;
       }
-    if (LocaleCompare(keyword,"</locale>") == 0)
-      {
-        ChopLocaleComponents(tag,1);
-        (void) ConcatenateMagickString(tag,"/",MagickLocaleExtent);
-        continue;
-      }
-    if (LocaleCompare(keyword,"<localemap>") == 0)
-      continue;
-    if (LocaleCompare(keyword,"</localemap>") == 0)
+    if (HandleStructuralElement(keyword,tag) != MagickFalse)
       continue;
     if (LocaleCompare(keyword,"<message") == 0)
       {
@@ -1497,12 +1505,6 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         (void) ConcatenateMagickString(tag,message,MagickLocaleExtent);
         (void) ConcatenateMagickString(tag,"\n",MagickLocaleExtent);
         q++;
-        continue;
-      }
-    if (LocaleCompare(keyword,"</message>") == 0)
-      {
-        ChopLocaleComponents(tag,2);
-        (void) ConcatenateMagickString(tag,"/",MagickLocaleExtent);
         continue;
       }
     if (*keyword == '<')
