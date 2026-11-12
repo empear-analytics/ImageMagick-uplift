@@ -15679,13 +15679,30 @@ static void XScreenMap(Display *display,XWindows *windows,XEvent *event)
     }
 }
 
-static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
+static void XScreenMotion(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
   int
     x,
     y;
 
+  while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
+  if ((event->xmotion.window == windows->image.id) &&
+      (windows->magnify.mapped != MagickFalse))
+    {
+      /*
+        Update magnified image.
+      */
+      x=event->xmotion.x;
+      y=event->xmotion.y;
+      XSetMagnifyPosition(windows,x,y);
+      XMakeMagnifyImage(display,windows,exception);
+    }
+}
+
+static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
   (void) XIfEvent(display,event,XPredicate,(char *) windows);
   if (event->xany.window == windows->command.id)
     return;
@@ -15724,18 +15741,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
     }
     case MotionNotify:
     {
-      while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
-      if ((event->xmotion.window == windows->image.id) &&
-          (windows->magnify.mapped != MagickFalse))
-        {
-          /*
-            Update magnified image.
-          */
-          x=event->xmotion.x;
-          y=event->xmotion.y;
-          XSetMagnifyPosition(windows,x,y);
-          XMakeMagnifyImage(display,windows,exception);
-        }
+      XScreenMotion(display,windows,event,exception);
       break;
     }
     case UnmapNotify:
