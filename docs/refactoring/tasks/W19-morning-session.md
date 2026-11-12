@@ -103,7 +103,7 @@ would put enhance.c at 10.0 (kept under about 500 lines, new about 9.68); two bl
 functions (a six-line patch to the tool, tested on a scratch copy and not committed) and the multi-definition `#if/#else`
 macros of Sigmoidal and ScaledSigmoidal.
 
-**The effect-blur.c split (6817fef41), held on branch `w19-effect-blur-split` (in `~/im-w14a`) for the owner:** moves 9 publics
+**The effect-blur.c split (6817fef41; first held on branch `w19-effect-blur-split`, merged after the owner's OK, see the end of this section):** moves 9 publics
 (AdaptiveBlur, AdaptiveSharpen, BilateralBlur, Convolve, Emboss, MotionBlur, RotationalBlur, SelectiveBlur, Sharpen), 69
 statics and typedefs (78 functions, 4,235 lines) to a new `effect-blur-adaptive.c` (9.09, the original's score); the kept
 file holds `BlurImage` and `GaussianBlurImage` with one static (236 lines) and scores 10.00. Only a union works: single roots are
@@ -118,3 +118,12 @@ tool's routines) is identical at -O2 (10 functions) and -O0 (90 functions): the 
 open owner question on splits that relabel most of a file), and (2) the 2026-11-11 ruling's check does not pass as written in
 the two builds that compile the OpenCL branches. If the owner allows relabelling splits and a by-name comparison in
 `split_branch_check.py`, it merges as is.
+
+**Owner OK ("I say ok", 2026-11-12) and merge.** The owner allowed the effect-blur.c split together with the tool fix. 3d87d0d6a
+changes `tools/split_branch_check.py` to group each object's disassembly per function and compare the two objects name by
+name (a name in one object only, or a different line count, still prints DIFFERENT); the allowed-difference kinds are
+unchanged. 6817fef41 merged as 0d7db9701. Checked on the merged tree: IDENTICAL-MODULO-LAYOUT in `cand` (10 functions, 5,196
+lines each), `cand-wide` (10, 5,232), `ci-gcc-min` and `ci-gcc-dlg` (98 functions, 10,286 lines each); a planted change inside
+the moved code (`MagickSigma` doubling `MagickEpsilon`) prints DIFFERENT again; the tree was restored. `ci_linux_warnings.sh
+--campaign-a` OK on 85 files in six configurations; whole catalogue 15,955 cases, 0 diverged (164 s). The open question on
+splits that relabel most of a file is still the owner's; this one went in under the OK given for it.
