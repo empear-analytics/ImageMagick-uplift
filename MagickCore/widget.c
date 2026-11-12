@@ -3762,6 +3762,22 @@ static void MapColorBrowserWidget(Display *display,XWindows *windows,
   windows->widget.mapped=MagickFalse;
 }
 
+static unsigned int WidestColorBrowserName(XFontStruct *font_info,
+  char **colorlist,size_t colors)
+{
+  int
+    i;
+
+  unsigned int
+    text_width;
+
+  text_width=0;
+  for (i=0; i < (int) colors; i++)
+    if (WidgetTextWidth(font_info,colorlist[i]) > text_width)
+      text_width=WidgetTextWidth(font_info,colorlist[i]);
+  return(text_width);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3773,9 +3789,6 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
 
   ExceptionInfo
     *exception;
-
-  int
-    i;
 
   static char
     glob_pattern[MagickPathExtent] = "*";
@@ -3860,10 +3873,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     Determine Color Browser widget attributes.
   */
   font_info=windows->widget.font_info;
-  text_width=0;
-  for (i=0; i < (int) colors; i++)
-    if (WidgetTextWidth(font_info,colorlist[i]) > text_width)
-      text_width=WidgetTextWidth(font_info,colorlist[i]);
+  text_width=WidestColorBrowserName(font_info,colorlist,colors);
   width=WidgetTextWidth(font_info,(char *) action);
   if (WidgetTextWidth(font_info,CancelButtonText) > width)
     width=WidgetTextWidth(font_info,CancelButtonText);
