@@ -1532,28 +1532,38 @@ static MagickBooleanType CheckResampleAreaLimit(ResampleFilter *resample_filter)
 %         in terms of scaling vectors.
 %
 */
-MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
-  const double dux,const double duy,const double dvx,const double dvy)
+typedef struct _EllipseDerivatives
 {
-  double A,B,C,F;
+  double
+    dux,
+    duy,
+    dvx,
+    dvy;
+} EllipseDerivatives;
 
-  ResampleEllipse
-    ellipse;
+typedef struct _EllipseCoefficients
+{
+  double
+    *A,
+    *B,
+    *C,
+    *F;
+} EllipseCoefficients;
 
-  assert(resample_filter != (ResampleFilter *) NULL);
-  assert(resample_filter->signature == MagickCoreSignature);
+static void SetEllipseCoefficients(const EllipseDerivatives *derivatives,
+  const EllipseCoefficients *coefficients)
+{
+  const double
+    dux = derivatives->dux,
+    duy = derivatives->duy,
+    dvx = derivatives->dvx,
+    dvy = derivatives->dvy;
 
-  resample_filter->limit_reached = MagickFalse;
-
-  /* A 'point' filter forces use of interpolation instead of area sampling */
-  if ( resample_filter->filter == PointFilter )
-    return; /* EWA turned off - nothing to do */
-
-#if DEBUG_ELLIPSE
-  (void) FormatLocaleFile(stderr, "# -----\n" );
-  (void) FormatLocaleFile(stderr, "dux=%lf; dvx=%lf;   duy=%lf; dvy=%lf;\n",
-       dux, dvx, duy, dvy);
-#endif
+  double
+    *const A = coefficients->A,
+    *const B = coefficients->B,
+    *const C = coefficients->C,
+    *const F = coefficients->F;
 
   /* Find Ellipse Coefficients such that
         A*u^2 + B*u*v + C*v^2 = F
@@ -1584,11 +1594,11 @@ MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
   (void) FormatLocaleFile(stderr, "major_x=%lf; major_y=%lf;  minor_x=%lf; minor_y=%lf;\n",
         major_x, major_y, minor_x, minor_y);
 #endif
-  A = major_y*major_y+minor_y*minor_y;
-  B = -2.0*(major_x*major_y+minor_x*minor_y);
-  C = major_x*major_x+minor_x*minor_x;
-  F = major_mag*minor_mag;
-  F *= F; /* square it */
+  (*A) = major_y*major_y+minor_y*minor_y;
+  (*B) = -2.0*(major_x*major_y+minor_x*minor_y);
+  (*C) = major_x*major_x+minor_x*minor_x;
+  (*F) = major_mag*minor_mag;
+  (*F) *= (*F); /* square it */
   }
 #else /* raw unclamped EWA */
   A = dvx*dvx+dvy*dvy;
@@ -1652,6 +1662,40 @@ MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
          (double) RadiansToDegrees(Ellipse_Angle), Ellipse_Area);
   }
 #endif
+}
+
+MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
+  const double dux,const double duy,const double dvx,const double dvy)
+{
+  double A,B,C,F;
+
+  ResampleEllipse
+    ellipse;
+
+  const EllipseCoefficients
+    coefficients = { &A, &B, &C, &F };
+
+  assert(resample_filter != (ResampleFilter *) NULL);
+  assert(resample_filter->signature == MagickCoreSignature);
+
+  resample_filter->limit_reached = MagickFalse;
+
+  /* A 'point' filter forces use of interpolation instead of area sampling */
+  if ( resample_filter->filter == PointFilter )
+    return; /* EWA turned off - nothing to do */
+
+#if DEBUG_ELLIPSE
+  (void) FormatLocaleFile(stderr, "# -----\n" );
+  (void) FormatLocaleFile(stderr, "dux=%lf; dvx=%lf;   duy=%lf; dvy=%lf;\n",
+       dux, dvx, duy, dvy);
+#endif
+
+  {
+    const EllipseDerivatives
+      derivatives = { dux, duy, dvx, dvy };
+
+    SetEllipseCoefficients(&derivatives,&coefficients);
+  }
 
   /* If one or both of the scaling vectors is impossibly large
      (producing a very large raw F value), we may as well not bother
