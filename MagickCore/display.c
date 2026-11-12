@@ -16978,6 +16978,9 @@ typedef struct _DisplayEventContext
 
   Window
     root_window;
+
+  const char
+    *const *CommandMenu;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -17318,6 +17321,56 @@ static Image *XReloadModifiedImage(XResourceInfo *resource_info,
 #define MagnifySize  256  /* must be a power of 2 */
 #define MagickMenus  10
 #define MagickTitle  "Commands"
+
+static void XHandleProtocolMessage(const DisplayEventContext *context,
+  const XEvent event,XGCValues *context_values)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = context->state;
+
+  const char
+    *const *const CommandMenu = context->CommandMenu;
+
+  if (*event.xclient.data.l == (long) windows->im_update_widget)
+    {
+      (void) CloneString(&windows->command.name,MagickTitle);
+      windows->command.data=MagickMenus;
+      (void) XCommandWidget(display,windows,CommandMenu,
+        (XEvent *) NULL);
+      return;
+    }
+  if (*event.xclient.data.l == (long) windows->im_update_colormap)
+    {
+      XUpdateWindowColormaps(context,context_values);
+      return;
+    }
+  if (*event.xclient.data.l == (long) windows->im_former_image)
+    {
+      *state|=FormerImageState | ExitState;
+      return;
+    }
+  if (*event.xclient.data.l == (long) windows->im_next_image)
+    {
+      *state|=NextImageState | ExitState;
+      return;
+    }
+  if (*event.xclient.data.l == (long) windows->im_retain_colors)
+    {
+      *state|=RetainColorsState;
+      return;
+    }
+  if (*event.xclient.data.l == (long) windows->im_exit)
+    {
+      *state|=ExitState;
+      return;
+    }
+}
 
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
@@ -18339,6 +18392,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.context_mask=context_mask;
   event_context.state=state;
   event_context.root_window=root_window;
+  event_context.CommandMenu=CommandMenu;
   do
   {
     /*
@@ -18635,39 +18689,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             event.xclient.data.l[0]);
         if (event.xclient.message_type == windows->im_protocols)
           {
-            if (*event.xclient.data.l == (long) windows->im_update_widget)
-              {
-                (void) CloneString(&windows->command.name,MagickTitle);
-                windows->command.data=MagickMenus;
-                (void) XCommandWidget(display,windows,CommandMenu,
-                  (XEvent *) NULL);
-                break;
-              }
-            if (*event.xclient.data.l == (long) windows->im_update_colormap)
-              {
-                XUpdateWindowColormaps(&event_context,&context_values);
-                break;
-              }
-            if (*event.xclient.data.l == (long) windows->im_former_image)
-              {
-                *state|=FormerImageState | ExitState;
-                break;
-              }
-            if (*event.xclient.data.l == (long) windows->im_next_image)
-              {
-                *state|=NextImageState | ExitState;
-                break;
-              }
-            if (*event.xclient.data.l == (long) windows->im_retain_colors)
-              {
-                *state|=RetainColorsState;
-                break;
-              }
-            if (*event.xclient.data.l == (long) windows->im_exit)
-              {
-                *state|=ExitState;
-                break;
-              }
+            XHandleProtocolMessage(&event_context,event,&context_values);
             break;
           }
         if (event.xclient.message_type == windows->dnd_protocols)
