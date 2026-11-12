@@ -383,6 +383,43 @@ static ssize_t FindUnequalPixelChannel(const Image *image,
   return(i);
 }
 
+typedef struct _CompareColumnScan
+{
+  const Image
+    *image,
+    *reconstruct_image;
+
+  size_t
+    columns;
+} CompareColumnScan;
+
+static MagickBooleanType IsCompareRowEqual(const CompareColumnScan *scan,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict q)
+{
+  const Image
+    *const image = scan->image,
+    *const reconstruct_image = scan->reconstruct_image;
+
+  const size_t
+    columns = scan->columns;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) columns; x++)
+  {
+    ssize_t
+      i;
+
+    i=FindUnequalPixelChannel(image,reconstruct_image,p,q);
+    if (i < (ssize_t) GetPixelChannels(image))
+      return(MagickFalse);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType IsImagesEqual(const Image *image,
   const Image *reconstruct_image,ExceptionInfo *exception)
 {
@@ -410,25 +447,17 @@ MagickExport MagickBooleanType IsImagesEqual(const Image *image,
       *magick_restrict p,
       *magick_restrict q;
 
-    ssize_t
-      x;
+    CompareColumnScan
+      scan;
 
     p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
     q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
     if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL))
       break;
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      ssize_t
-        i;
-
-      i=FindUnequalPixelChannel(image,reconstruct_image,p,q);
-      if (i < (ssize_t) GetPixelChannels(image))
-        break;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-    }
-    if (x < (ssize_t) columns)
+    scan.image=image;
+    scan.reconstruct_image=reconstruct_image;
+    scan.columns=columns;
+    if (IsCompareRowEqual(&scan,p,q) == MagickFalse)
       break;
   }
   reconstruct_view=DestroyCacheView(reconstruct_view);
