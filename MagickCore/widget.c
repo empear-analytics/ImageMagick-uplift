@@ -3398,6 +3398,17 @@ static size_t ConfigureCommandWindow(XWindows *windows,XEvent *event,
   return(state);
 }
 
+static size_t ExposeCommandWindow(XWindows *windows,XEvent *event,
+  size_t state)
+{
+  if (event->xexpose.window != windows->command.id)
+    return(state);
+  if (event->xexpose.count != 0)
+    return(state);
+  state|=RedrawWidgetState;
+  return(state);
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -3541,11 +3552,7 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
       }
       case Expose:
       {
-        if (event->xexpose.window != windows->command.id)
-          break;
-        if (event->xexpose.count != 0)
-          break;
-        state|=RedrawWidgetState;
+        state=ExposeCommandWindow(windows,event,state);
         break;
       }
       case MotionNotify:
