@@ -586,3 +586,31 @@ e345a3177 E (most of its lines are unreached: evidence is obj_modulo); 6529df770
   on `text == NULL` (its early returns also skip the final `DestroyExceptionInfo` and `DestroyImageInfo`); `XDisplayImage`'s
   setup `status=XMakeImage(...)` for the magnify window is read only by the first ConfigureNotify, so an extracted
   `XMakeDisplayImages` must keep returning it.
+
+## Lane c, fifth round: widget.c 3.08 -> 3.15 (wide build, merged); the File browser stops at a Code Duplication cliff
+
+17 refactor commits on `XFontBrowserWidget`, none dropped the score; each passed `verify_wt` (wide oracle on the function,
+guard, CI warnings) and obj_modulo; whole wide catalogue 14,200 cases, 0 diverged. **XFontBrowserWidget is finished** (cc 49 /
+LoC 365 / 6 bumps -> no finding): 5aea5c761 O `RedrawFontBrowserAction` (pointer form for `font_info`); 29acf19c4 LB
+`ReloadFontList`; 95d833217 I `SortFontList` (`void` form); 0ea0ea70c O `UpdateFontBrowserSlider`; 091c71bd4 LC `WaitFontEvent`
+**3.08 -> 3.13** (bumps 5 -> 4); 2f9ac19ab, 0440c57fb SD x2; b314750d3 N on the switch; 0395341ae W step 8
+`RespondToFontEvents` (its `return;` becomes MagickFalse); 84198e10f D reuse of `WithdrawBrowserWidget`; fade5d06a, e759adbb4,
+5f17c0ef9 E (`FreeFontBrowserList`, `GetFontBrowserWidth`, `WidestFontBrowserName`; the last **3.13 -> 3.15**, bumps 2 -> none);
+bfc550804 E `MapFontBrowserWidget`; 8b9de551a I `RunFontBrowser` (const six-pointer struct); db7e4e3bc FB; 9ec1119ed I
+`AcquireFontList` (cc 9 and LoC 89 to no finding in one step: Complex and Large Method crossed together, flat as for Color).
+The ordering lesson held: no step dipped. Message hygiene: two messages amended (the LC message now says it raised the
+score; the Widest message credits the bumps-to-none step; an unsubstantiated coverage claim removed).
+- **File browser stopped mid-way and is NOT merged:** 17 verified, flat commits (cc 109 -> 65, LoC 809 -> 477) are kept on the
+  local branch `w18c-file-wip` (tip b5a74188c) in `~/im-w14c`; `campaign/W18-c` was reset past them. **Why: a Code Duplication
+  cliff.** A File helper that is a twin of an existing Font helper costs -0.14 with no new finding listed
+  (`InitializeFileBrowserScroll` cc 66 -> 65 and `InitializeFileBrowserText`); with Font's `InitializeFontBrowserText` stubbed,
+  File's twin stays at 3.15. Two other `InitializeFile*` helpers (buttons, reply) are not twins and cost nothing. Without
+  Scroll and Text extracted the layout helper is 88 lines (Large Method); no split avoids both. The remaining File and List
+  helpers have the same twin problem against Font and Color, so the browsers' stub ceiling (3.66) is not reachable by helpers
+  alone. **For the owner:** finishing needs a ruling on clone-neutral boundaries or on the held twin-fold recipe (Recipe FT
+  on `w18-ft-twin-fold`); the lane did not use it. XListBrowserWidget: not tried (it matches File's shape except
+  `window_info` replaces `windows->widget`).
+- Tooling: `casemap.json` is stale (`--function` exits; a local bypass in `casemap.py` was never committed and is reverted);
+  a masking helper in a scratch script rewrote a name inside a string, caught by the guard before any commit. Possible
+  upstream: File's SelectionRequest has no `break;` and falls into `default:`; File's `directory=getcwd(...); (void)
+  directory;` is a dead store; Font's RedrawAction still frees `font_info` and never restores it.
