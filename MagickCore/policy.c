@@ -822,6 +822,24 @@ static MagickBooleanType IsCanonicalRightsAuthorized(
   return(status);
 }
 
+static char *AcquireCanonicalCandidate(const char *canonical_directory,
+  const char *filename)
+{
+  char
+    *canonical_candidate;
+
+  size_t
+    length;
+
+  length=strlen(canonical_directory)+strlen(filename)+2;
+  canonical_candidate=(char *) AcquireCriticalMemory(length*
+    sizeof(*canonical_candidate));
+  if (canonical_candidate != (char *) NULL)
+    (void) FormatLocaleString(canonical_candidate,length,"%s%s%s",
+      canonical_directory,DirectorySeparator,filename);
+  return(canonical_candidate);
+}
+
 MagickExport MagickBooleanType IsRightsAuthorizedByName(
   const PolicyDomain domain,const char *name,const PolicyRights rights,
   const char *pattern)
@@ -902,17 +920,8 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
             GetPathComponent(pattern,TailPath,filename);
             canonical_directory=realpath_utf8(directory);
             if ((canonical_directory != (char *) NULL) && (*filename != '\0'))
-              {
-                size_t
-                  length;
-
-                length=strlen(canonical_directory)+strlen(filename)+2;
-                canonical_candidate=(char *) AcquireCriticalMemory(length*
-                  sizeof(*canonical_candidate));
-                if (canonical_candidate != (char *) NULL)
-                  (void) FormatLocaleString(canonical_candidate,length,"%s%s%s",
-                    canonical_directory,DirectorySeparator,filename);
-              }
+              canonical_candidate=AcquireCanonicalCandidate(canonical_directory,
+                filename);
             canonical_path=realpath_utf8(pattern);
           }
         /*
