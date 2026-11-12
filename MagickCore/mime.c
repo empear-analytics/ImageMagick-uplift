@@ -879,6 +879,29 @@ static void GetIncludePath(const char *filename,const char *attribute,
     (void) ConcatenateMagickString(path,attribute,MagickPathExtent);
 }
 
+static MagickBooleanType LoadMimeInclude(const MimeLoadTarget *target,
+  const char *filename,const char *attribute,const size_t depth)
+{
+  const MimeLoadTarget include_target = { target->cache, target->exception };
+
+  char
+    path[MagickPathExtent],
+    *file_xml;
+
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  GetIncludePath(filename,attribute,path);
+  file_xml=FileToXML(path,~0UL);
+  if (file_xml != (char *) NULL)
+    {
+      status=LoadMimeCache(&include_target,file_xml,path,depth+1);
+      file_xml=DestroyString(file_xml);
+    }
+  return(status);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -957,22 +980,8 @@ static MagickBooleanType LoadMimeCache(const MimeLoadTarget *target,
           (void) ThrowMagickException(exception,GetMagickModule(),
             ConfigureError,"IncludeElementNestedTooDeeply","`%s'",filename);
         else
-          {
-            const MimeLoadTarget include_target = { cache, exception };
-
-            char
-              path[MagickPathExtent],
-              *file_xml;
-
-            GetIncludePath(filename,attribute,path);
-            file_xml=FileToXML(path,~0UL);
-            if (file_xml != (char *) NULL)
-              {
-                status&=(MagickStatusType) LoadMimeCache(&include_target,
-                  file_xml,path,depth+1);
-                file_xml=DestroyString(file_xml);
-              }
-          }
+          status&=(MagickStatusType) LoadMimeInclude(target,filename,
+            attribute,depth);
       }
     include=GetNextXMLTreeTag(include);
   }
