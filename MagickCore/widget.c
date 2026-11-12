@@ -8495,6 +8495,12 @@ typedef struct _FontBrowserWidgets
 
   size_t
     *state;
+
+  XWidgetInfo
+    *back_info,
+    *reset_info,
+    *action_info,
+    *cancel_info;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -8600,6 +8606,61 @@ static void SelectFontBrowserReply(const FontBrowserContext *context,
   (void) XFree((void *) data);
 }
 
+static void ToggleFontBrowserButtons(const FontBrowserContext *context,
+  const XEvent event,const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const back_info = widgets->back_info,
+    *const reset_info = widgets->reset_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  if ((*back_info).raised == MatteIsActive((*back_info),event.xmotion))
+    {
+      /*
+        Back button status changed.
+      */
+      (*back_info).raised=!(*back_info).raised;
+      XDrawBeveledButton(display,&windows->widget,back_info);
+      return;
+    }
+  if ((*reset_info).raised == MatteIsActive((*reset_info),event.xmotion))
+    {
+      /*
+        Reset button status changed.
+      */
+      (*reset_info).raised=!(*reset_info).raised;
+      XDrawBeveledButton(display,&windows->widget,reset_info);
+      return;
+    }
+  if ((*action_info).raised == MatteIsActive((*action_info),event.xmotion))
+    {
+      /*
+        Action button status changed.
+      */
+      (*action_info).raised=(*action_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if ((*cancel_info).raised == MatteIsActive((*cancel_info),event.xmotion))
+    {
+      /*
+        Cancel button status changed.
+      */
+      (*cancel_info).raised=(*cancel_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8676,7 +8737,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     targets = { &reply_info, &state, &selection_info, &list_info };
 
   const FontBrowserWidgets
-    font_widgets = { &reply_info, &state };
+    font_widgets = { &reply_info, &state, &back_info,
+      &reset_info, &action_info, &cancel_info };
 
   FontBrowserContext
     font_context;
@@ -9439,44 +9501,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
           }
         if (state & InactiveWidgetState)
           break;
-        if (back_info.raised == MatteIsActive(back_info,event.xmotion))
-          {
-            /*
-              Back button status changed.
-            */
-            back_info.raised=!back_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&back_info);
-            break;
-          }
-        if (reset_info.raised == MatteIsActive(reset_info,event.xmotion))
-          {
-            /*
-              Reset button status changed.
-            */
-            reset_info.raised=!reset_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&reset_info);
-            break;
-          }
-        if (action_info.raised == MatteIsActive(action_info,event.xmotion))
-          {
-            /*
-              Action button status changed.
-            */
-            action_info.raised=action_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        if (cancel_info.raised == MatteIsActive(cancel_info,event.xmotion))
-          {
-            /*
-              Cancel button status changed.
-            */
-            cancel_info.raised=cancel_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
+        ToggleFontBrowserButtons(&font_context,event,&font_widgets);
         break;
       }
       case SelectionClear:
