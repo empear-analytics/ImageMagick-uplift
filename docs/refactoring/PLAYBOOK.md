@@ -10875,7 +10875,15 @@ whole groups and keeps their nesting in the new function.
    `V *const v = targets->v;` (and the input struct's members as Recipe N step 4 does).
    Write each written variable `v` as `(*v)` at every use, reads included, `&v` as `v`;
    each `break;` that ended the `switch` becomes `return;`. Nothing else in the text
-   changes.
+   changes, with one exception (2026-11-12, later): a call in the block of a helper
+   this recipe made earlier for the same caller, `Inner(&name,...,&targets);` with the
+   caller's own shared input struct `name` (step 4) and targets struct `targets`, is
+   written in the helper `Inner(name,...,targets);`, passing on the two `const`
+   pointers it received, which hold those addresses (as Recipe SR step 3 passes a
+   `targets` on); its other arguments stay as they are. The helper binds from the
+   targets only the members its own text writes: a member that only the inner call
+   writes is not bound (the inner helper writes it through the same address), and a
+   member only the inner call reads from the input struct is not bound either.
 6. Where the block stood write the input struct's fill, if any, then the call
    `Helper(...,&targets);`, directly before the case's closing `break;`, which stays.
    Declare the input local at the top of the block that holds the call.
@@ -10959,6 +10967,14 @@ static void SelectListBrowserEntry(const ListBrowserPress *press,
   and the second falls off its end; either way the caller runs the case's own `break;`
   next, so the `switch` ends at the same point after the same statements, as in Recipe
   E step 7's `void` form.
+- Pass-through (step 5). The inner helper is handed `context` and `targets`, the
+  pointers its caller received, which are `&name` and `&targets` of the function that
+  stood where the block did: the same two objects, `const` for the inner helper as they
+  were. The call stays where it stood in the block, with the same other arguments, so
+  the same statements run before and after it in the same order; the inner helper
+  writes the caller's variables through the addresses the targets struct holds, the
+  outer helper writes only the members it binds, and no two of those name one object
+  (the members of one struct are distinct variables, step 2).
 - A member added to the targets struct by a later commit (step 3) changes no earlier
   helper: each binds `V *const v = targets->v;` by member name, so a member after its
   own is never read by it, and the initialiser's earlier entries stand where they stood;
@@ -11015,7 +11031,11 @@ LB and BR refuse them (see *Not covered by*), and both lie partly on lines no ca
 reaches. A probe of the whole chain: widget.c 1.44 to 1.59, `XListBrowserWidget`
 leaving *Brain Method* and *Deep, Nested Complexity*, no finding on either helper; with
 either step left out the function keeps both (1.48). Added by Claude Code (Claude Opus
-5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+5.5) under the owner's OK of 2026-11-10 to evolve the recipes. Step 5's pass-through
+(2026-11-12, later, campaign A, W18 lane b, wide build): `display.c`'s `XDrawEditImage`,
+whose stipple case (86 lines, Large Method as one helper) splits into a tail that reads
+the bitmap file and a head that calls it, and whose command-widget block calls the case
+helpers; added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10.
 
 ---
 
@@ -12305,3 +12325,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | AMEND | FT | Step 1 and step 3: the case `B` that `A` falls into may instead be the failure guard `if (Q(a1,...,an) == MagickFalse) return(c);` followed by `break;`, `Q` a `static MagickBooleanType` function made by Recipe CR, W or I and `c` a constant; `A` gets the guard's two lines and a `break;` in place of `magick_fallthrough;`. *Careful* gives the argument | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's default key group (draw a character, then `magick_fallthrough;` when the line is full) falls into the Return group, which Recipe CR made `if (XAdvanceTextLine(...) == MagickFalse) return(MagickFalse); break;`; FT's void-call form refuses it, so the default group's four depth-4 tests cannot move | owner |
 | 2026-11-12 | AMEND | SR | Step 1: a kept group may write the controlling variable `e` when no group falls through into a moved group (the `switch` evaluates `e` once and a kept group never reaches a moved one). Step 3: the input struct may be shared and filled once before the `switch` (SD step 8), and a `const` targets struct that a moved group passes on as `&targets` goes as one more parameter, written `targets`. *Not covered by* and *Careful* unchanged | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's key `switch` holds one group (`XK_bracketleft`: `key_symbol=XK_Escape;`) that writes `e`, which SR step 1 refused, beside the default and Return groups that call the failing helpers; a stub of the whole `switch` as one helper measures cc 9 (Complex Method), so those two groups go to a second one | owner |
 | 2026-11-12 | WORDING | CR | Step 4: the targets struct comes after the input struct and before a by-value parameter that the block reads and then writes (`XAnnotateKeyPress`'s `key_symbol`, assigned by its `XK_bracketleft` group), instead of "last" | `display.c`'s `XAnnotateEditImage`: its CR helpers take `(text_input, targets, value)`; the first wording would have put `key_symbol` before `targets` | owner |
+| 2026-11-12 | AMEND | CT | Step 5: a call in the block of a helper this recipe made earlier for the same caller, `Inner(&name,...,&targets);`, is written `Inner(name,...,targets);` in the helper (the two `const` pointers passed on, as SR step 3 passes a `targets` on); the helper binds only the members its own text writes. *Careful* gives the argument | `display.c`'s `XDrawEditImage` (campaign A, W18 lane b, wide build): the stipple case as one helper is a Large Method (86 lines); its file-reading tail and its menu head are two helpers of this recipe, the head calling the tail, and the command-widget block (a later recipe's step) calls all the case helpers with the same two structs | owner |
