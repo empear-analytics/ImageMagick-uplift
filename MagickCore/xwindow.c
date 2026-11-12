@@ -2087,6 +2087,14 @@ static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
   (void) FormatLocaleFile(file,"\n");
 }
 
+static void XWriteFontInfo(FILE *file,const XResourceInfo *resource_info)
+{
+  if (resource_info->font != (char *) NULL)
+    (void) FormatLocaleFile(file,"Font: %s\n\n",resource_info->font);
+  if (resource_info->text_font != (char *) NULL)
+    (void) FormatLocaleFile(file,"Text font: %s\n\n",resource_info->text_font);
+}
+
 MagickPrivate void XDisplayImageInfo(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,Image *undo_image,
   Image *image,ExceptionInfo *exception)
@@ -2140,10 +2148,7 @@ MagickPrivate void XDisplayImageInfo(Display *display,
     Write info about the X image to a file.
   */
   XWriteVisualInfo(file,resource_info,windows);
-  if (resource_info->font != (char *) NULL)
-    (void) FormatLocaleFile(file,"Font: %s\n\n",resource_info->font);
-  if (resource_info->text_font != (char *) NULL)
-    (void) FormatLocaleFile(file,"Text font: %s\n\n",resource_info->text_font);
+  XWriteFontInfo(file,resource_info);
   /*
     Write info about the undo cache to a file.
   */
