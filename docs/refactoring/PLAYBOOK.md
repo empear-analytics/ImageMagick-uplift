@@ -7538,6 +7538,95 @@ cc 27 to 24. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-
 
 ---
 
+## Recipe SF - Flatten a First-Letter Switch
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function that
+reads one keyword and dispatches on its first character, as the `Load*Cache` and
+`Set*Attribute` code of the configuration files do (`policy.c`'s `SetPolicyInfoAttribute`:
+`switch (*keyword)` with `case 'D': case 'd':` holding `if (LocaleCompare(keyword,
+"domain") == 0) {...; break;} break;`). Every group costs a label pair, an `if`, a brace
+pair and two `break`s for one comparison.
+
+**Not covered by:** Recipe SD, which splits a `switch` into functions and keeps it; Recipe
+EJ, which joins an `else` and its `if`; Recipe Z, which moves a `case` body. None
+replaces the `switch` by tests.
+
+**How:**
+
+1. The `switch` is on `*keyword` (or the same first-character read of one string), and
+   each group is a label pair (`case 'X':` `case 'x':`) or one label, then braces holding
+   only `if (LocaleCompare(keyword,"<word>") == 0)` followed by one statement and
+   `break;`, and a final `break;`. The `default:` group holds only `break;`.
+2. Check by script that each label pair is the first letter of `<word>` in both cases,
+   and that `LocaleCompare` (`MagickCore/locale.c`) compares through
+   `LocaleToLowercase`, so that equal strings have first characters with the same
+   lowercase, which for an ASCII letter means the two labels. Then a string equal to
+   `<word>` has a first character that selects exactly that group, and the `switch` only
+   skipped comparisons that would have failed. A word whose first letter differs from its label,
+   or two statements, or a group that does more than the comparison, refuses the step.
+3. Replace the `switch` by `if (LocaleCompare(keyword,"<word>") == 0)` followed by the
+   statement, then `else if` for each next group in the order of the source, braces only
+   where a statement already had them. Groups with the same first letter stay in their
+   order.
+4. The `break;` of a group that matched leaves the `switch`, and code after the `switch`
+   runs; the chain gives the same, by falling off its last `else if`. A `switch` followed
+   by code that reads which group ran refuses the step.
+
+**Before:**
+
+```c
+  switch (*keyword)
+  {
+    case 'N':
+    case 'n':
+    {
+      if (LocaleCompare((char *) keyword,"name") == 0)
+        {
+          policy_info->name=AcquirePolicyString(token,1);
+          break;
+        }
+      break;
+    }
+    case 'P':
+    case 'p':
+    {
+      if (LocaleCompare((char *) keyword,"pattern") == 0)
+        {
+          policy_info->pattern=AcquirePolicyString(token,1);
+          break;
+        }
+      break;
+    }
+    default:
+      break;
+  }
+```
+
+**After:**
+
+```c
+  if (LocaleCompare((char *) keyword,"name") == 0)
+    policy_info->name=AcquirePolicyString(token,1);
+  else if (LocaleCompare((char *) keyword,"pattern") == 0)
+    policy_info->pattern=AcquirePolicyString(token,1);
+```
+
+**Careful:**
+
+- Why the behaviour is the same: see step 2. The only difference is that a keyword whose
+  first letter has no group now meets up to six comparisons instead of none; each fails
+  at once, and `LocaleCompare` has no side effects.
+- The object code differs, so `obj_identical.sh` does not apply.
+
+**Evidence level:** oracle, for the functions the step changes (`casemap.py` first).
+
+**Provenance:** 2026-11-12, from `policy.c`'s `SetPolicyInfoAttribute` (campaign B,
+M120): cc 20 to 7 and 71 to 18 lines, the file 5.02 to 5.29. The same shape stands at
+`color.c`, `configure.c`, `delegate.c`, `draw.c`, `log.c`, `opencl.c` and `type.c`.
+Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -7841,3 +7930,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-07 | AMEND | N | Step 8: the sibling and later-block forms also join a PS step 7 nested-loop helper and the parallel body's head moved by PC: the head takes the PS struct (declared `const` with its initialiser among the body's declarations, which stays), the typedef and initialiser gain the members the head reads, the head binds them as `const` locals (PC keeps its text), and the inner call passes `name`. Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): PC before the column body moves gives a *Complex* and *Large* helper (6.30 to 6.21); after it, with its own struct, about 80 lines; sharing the PS struct, 52 lines and no finding, 6.51 to 6.62 | mandate (2026-10-24) |
 | 2026-11-09 | NEW | EJ | Join an Else and its Sole If: `else` and the `if` on the next line become `else if` on one line, whitespace only; proof `obj_identical.sh` | `color.c`'s DOCTYPE skipper (extraction verbatim 4.24 to 4.09; with the chain joined 4.42) and the hex-digit loops of `QueryColorCompliance`; unbraced `else`/`if` nesting counts as a level for CodeScene | mandate (2026-10-24) |
 | 2026-11-12 | NEW | NG | Drop the `NULL` guard before a release routine that returns at once on `NULL` (`x=DestroyString(x)`); proof by reading the callee, evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (3 guards) and `DestroyPolicyElement` (4): a file at the 1,000-line limit loses 0.25 to *Lines of Code in a Single File* when an extraction adds lines; 4.58 to 4.88 with the guards gone | mandate (2026-10-24) |
+| 2026-11-12 | NEW | SF | Flatten a first-letter `switch` over `LocaleCompare` groups into an `if`/`else if` chain; evidence oracle | `policy.c`'s `SetPolicyInfoAttribute` (cc 20 to 7, 5.02 to 5.29); the same shape stands in seven other files | mandate (2026-10-24) |
