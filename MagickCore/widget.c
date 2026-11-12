@@ -4424,6 +4424,105 @@ static void ApplyDialogControlKey(const KeySym key_symbol,const size_t state,
 
 #define CancelButtonText  "Cancel"
 
+typedef struct _DialogTargets
+{
+  XWidgetInfo
+    *special_info,
+    *action_info,
+    *cancel_info,
+    *reply_info;
+} DialogTargets;
+
+typedef struct _DialogContext
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    anomaly;
+
+  char
+    *primary_selection;
+} DialogContext;
+
+static void PressDialogButton(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    anomaly = context->anomaly;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const special_info = targets->special_info,
+    *const action_info = targets->action_info,
+    *const cancel_info = targets->cancel_info,
+    *const reply_info = targets->reply_info;
+
+  if ((anomaly) && (MatteIsActive((*special_info),event.xbutton)))
+    {
+      /*
+        Option button status changed.
+      */
+      (*special_info).raised=!(*special_info).raised;
+      XDrawBeveledButton(display,&windows->widget,special_info);
+      return;
+    }
+  if (MatteIsActive((*action_info),event.xbutton))
+    {
+      /*
+        User pressed Action button.
+      */
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if (MatteIsActive((*cancel_info),event.xbutton))
+    {
+      /*
+        User pressed Cancel button.
+      */
+      (*cancel_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+  if (MatteIsActive((*reply_info),event.xbutton) == MagickFalse)
+    return;
+  if (event.xbutton.button != Button2)
+    {
+      DialogPress
+        press;
+
+      press.display=display;
+      press.windows=windows;
+      press.event=event;
+      press.font_info=font_info;
+      PressDialogReply(&press,primary_selection,reply_info);
+      return;
+    }
+  /*
+    Request primary selection.
+  */
+  (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
+    windows->widget.id,event.xbutton.time);
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -4462,6 +4561,12 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
 
   XWindowChanges
     window_changes;
+
+  const DialogTargets
+    targets = { &special_info, &action_info, &cancel_info, &reply_info };
+
+  DialogContext
+    context;
 
   /*
     Determine Dialog widget attributes.
@@ -4527,6 +4632,11 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
     (LocaleCompare(action,"Shade") == 0);
   state=UpdateConfigurationState;
   XSetCursorState(display,windows,MagickTrue);
+  context.display=display;
+  context.windows=windows;
+  context.font_info=font_info;
+  context.anomaly=anomaly;
+  context.primary_selection=primary_selection;
   do
   {
     if (state & UpdateConfigurationState)
@@ -4613,52 +4723,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
     {
       case ButtonPress:
       {
-        if ((anomaly) && (MatteIsActive(special_info,event.xbutton)))
-          {
-            /*
-              Option button status changed.
-            */
-            special_info.raised=!special_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&special_info);
-            break;
-          }
-        if (MatteIsActive(action_info,event.xbutton))
-          {
-            /*
-              User pressed Action button.
-            */
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        if (MatteIsActive(cancel_info,event.xbutton))
-          {
-            /*
-              User pressed Cancel button.
-            */
-            cancel_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
-          break;
-        if (event.xbutton.button != Button2)
-          {
-            DialogPress
-              press;
-
-            press.display=display;
-            press.windows=windows;
-            press.event=event;
-            press.font_info=font_info;
-            PressDialogReply(&press,primary_selection,&reply_info);
-            break;
-          }
-        /*
-          Request primary selection.
-        */
-        (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
-          windows->widget.id,event.xbutton.time);
+        PressDialogButton(&context,event,&targets);
         break;
       }
       case ButtonRelease:
