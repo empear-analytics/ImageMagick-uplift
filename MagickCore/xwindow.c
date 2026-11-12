@@ -4495,6 +4495,18 @@ static MagickBooleanType IsWindowImported(const WindowInfo *window_info,
   return(import);
 }
 
+static ColormapInfo *FindWindowColormap(ColormapInfo *colormap_info,
+  const WindowInfo *window_info,const int id)
+{
+  ColormapInfo
+    *p;
+
+  for (p=colormap_info; p != (ColormapInfo *) NULL; p=p->next)
+    if (p->colormap == window_info[id].colormap)
+      break;
+  return(p);
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4712,9 +4724,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
               Search colormap list for window colormap.
             */
             number_colors=(unsigned int) window_info[id].visual->map_entries;
-            for (p=colormap_info; p != (ColormapInfo *) NULL; p=p->next)
-              if (p->colormap == window_info[id].colormap)
-                break;
+            p=FindWindowColormap(colormap_info,window_info,id);
             if (p == (ColormapInfo *) NULL)
               {
                 /*
