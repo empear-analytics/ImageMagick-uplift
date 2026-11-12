@@ -8511,6 +8511,15 @@ typedef struct _FontBrowserWidgets
 
   unsigned int
     *visible_fonts;
+
+  XWidgetInfo
+    *north_info;
+
+  size_t
+    *delay;
+
+  XWidgetInfo
+    *south_info;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -8852,6 +8861,56 @@ static void ReleaseFontBrowserButtons(const FontBrowserContext *context,
   ReleaseListBrowserCancel(&release,(*reply_info),cancel_info,state);
 }
 
+static void ReleaseFontBrowserScroll(const FontBrowserContext *context,
+  const XEvent event,const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info,
+    *const north_info = widgets->north_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  if ((*north_info).raised == MagickFalse)
+    {
+      /*
+        User released up button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*north_info).raised=MagickTrue;
+      XDrawTriangleNorth(display,&windows->widget,north_info);
+    }
+  if ((*south_info).raised == MagickFalse)
+    {
+      /*
+        User released down button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*south_info).raised=MagickTrue;
+      XDrawTriangleSouth(display,&windows->widget,south_info);
+    }
+  if ((*slider_info).active)
+    {
+      /*
+        Stop tracking slider.
+      */
+      (*slider_info).active=MagickFalse;
+      return;
+    }
+  ReleaseFontBrowserButtons(context,event,widgets);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8930,7 +8989,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const FontBrowserWidgets
     font_widgets = { &reply_info, &state, &back_info,
       &reset_info, &action_info, &cancel_info, &slider_info, &fonts,
-      &scroll_info, &visible_fonts };
+      &scroll_info, &visible_fonts, &north_info, &delay, &south_info };
 
   FontBrowserContext
     font_context;
@@ -9527,35 +9586,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        if (north_info.raised == MagickFalse)
-          {
-            /*
-              User released up button.
-            */
-            delay=SuspendTime << 2;
-            north_info.raised=MagickTrue;
-            XDrawTriangleNorth(display,&windows->widget,&north_info);
-          }
-        if (south_info.raised == MagickFalse)
-          {
-            /*
-              User released down button.
-            */
-            delay=SuspendTime << 2;
-            south_info.raised=MagickTrue;
-            XDrawTriangleSouth(display,&windows->widget,&south_info);
-          }
-        if (slider_info.active)
-          {
-            /*
-              Stop tracking slider.
-            */
-            slider_info.active=MagickFalse;
-            break;
-          }
-        ReleaseFontBrowserButtons(&font_context,event,&font_widgets);
+        ReleaseFontBrowserScroll(&font_context,event,&font_widgets);
         break;
       }
       case ClientMessage:
