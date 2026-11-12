@@ -8520,6 +8520,12 @@ typedef struct _FontBrowserWidgets
 
   XWidgetInfo
     *south_info;
+
+  int
+    *i;
+
+  XFontStruct
+    **font_info;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -8533,7 +8539,8 @@ typedef struct _FontBrowserContext
   char
     *glob_pattern,
     *back_pattern,
-    *reset_pattern;
+    *reset_pattern,
+    *primary_selection;
 } FontBrowserContext;
 
 static void ClientFontBrowserMessage(const FontBrowserContext *context,
@@ -8911,6 +8918,83 @@ static void ReleaseFontBrowserScroll(const FontBrowserContext *context,
   ReleaseFontBrowserButtons(context,event,widgets);
 }
 
+static void PressFontBrowserReply(const FontBrowserContext *context,
+  const XEvent event,const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  int
+    *const i = widgets->i;
+
+  XFontStruct
+    *const font_info = *widgets->font_info;
+
+  int
+    x;
+
+  if (MatteIsActive((*action_info),event.xbutton))
+    {
+      /*
+        User pressed action button.
+      */
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if (MatteIsActive((*cancel_info),event.xbutton))
+    {
+      /*
+        User pressed Cancel button.
+      */
+      (*cancel_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+  if (MatteIsActive((*reply_info),event.xbutton) == MagickFalse)
+    return;
+  if (event.xbutton.button != Button2)
+    {
+      static Time
+        click_time;
+
+      ListBrowserClick
+        click;
+
+      /*
+        Move text cursor to position of button press.
+      */
+      x=event.xbutton.x-(*reply_info).x-(int) (QuantumMargin >> 2);
+      (*i)=FindFontBrowserCursor(font_info,(*reply_info),x,(*i));
+      (*reply_info).cursor=(*reply_info).marker+(*i)-1;
+      click.display=display;
+      click.window_info=(&windows->widget);
+      click.event=event;
+      click.click_time=click_time;
+      (*reply_info)=HighlightListBrowserReply(&click,primary_selection,
+        (*reply_info));
+      XDrawMatteText(display,&windows->widget,reply_info);
+      click_time=event.xbutton.time;
+      return;
+    }
+  /*
+    Request primary selection.
+  */
+  (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
+    windows->widget.id,event.xbutton.time);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8989,7 +9073,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const FontBrowserWidgets
     font_widgets = { &reply_info, &state, &back_info,
       &reset_info, &action_info, &cancel_info, &slider_info, &fonts,
-      &scroll_info, &visible_fonts, &north_info, &delay, &south_info };
+      &scroll_info, &visible_fonts, &north_info, &delay, &south_info, &i,
+      &font_info };
 
   FontBrowserContext
     font_context;
@@ -9110,6 +9195,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   font_context.glob_pattern=glob_pattern;
   font_context.back_pattern=back_pattern;
   font_context.reset_pattern=reset_pattern;
+  font_context.primary_selection=primary_selection;
   do
   {
     if (state & UpdateConfigurationState)
@@ -9533,55 +9619,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
             XDrawBeveledButton(display,&windows->widget,&reset_info);
             break;
           }
-        if (MatteIsActive(action_info,event.xbutton))
-          {
-            /*
-              User pressed action button.
-            */
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        if (MatteIsActive(cancel_info,event.xbutton))
-          {
-            /*
-              User pressed Cancel button.
-            */
-            cancel_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
-          break;
-        if (event.xbutton.button != Button2)
-          {
-            static Time
-              click_time;
-
-            ListBrowserClick
-              click;
-
-            /*
-              Move text cursor to position of button press.
-            */
-            x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            i=FindFontBrowserCursor(font_info,reply_info,x,i);
-            reply_info.cursor=reply_info.marker+i-1;
-            click.display=display;
-            click.window_info=(&windows->widget);
-            click.event=event;
-            click.click_time=click_time;
-            reply_info=HighlightListBrowserReply(&click,primary_selection,
-              reply_info);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-            click_time=event.xbutton.time;
-            break;
-          }
-        /*
-          Request primary selection.
-        */
-        (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
-          windows->widget.id,event.xbutton.time);
+        PressFontBrowserReply(&font_context,event,&font_widgets);
         break;
       }
       case ButtonRelease:
