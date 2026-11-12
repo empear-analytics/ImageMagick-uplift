@@ -4726,17 +4726,6 @@ static const CompositeOperator
     SaturateCompositeOp
   };
 
-static MagickBooleanType IsPixelInfoInputOperator(const CompositeOperator compose)
-{
-  size_t
-    i;
-
-  for (i=0; i < (sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators)); i++)
-    if (PixelInfoInputOperators[i] == compose)
-      return(MagickTrue);
-  return(MagickFalse);
-}
-
 static const CompositeOperator
   IntensityInputOperators[] =
   {
@@ -5441,7 +5430,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
     row.source_alpha=IsListedOperator(SourceAlphaOperators,
       sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
-    row.pixel_info_inputs=IsPixelInfoInputOperator(compose);
+    row.pixel_info_inputs=IsListedOperator(PixelInfoInputOperators,
+      sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators),compose);
     row.intensity_inputs=IsIntensityInputOperator(compose);
     row.clip_to_self=clip_to_self;
     row.x_offset=x_offset;
