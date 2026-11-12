@@ -8550,6 +8550,12 @@ typedef struct _FontBrowserContext
 
   unsigned int
     height;
+
+  const char
+    *action;
+
+  unsigned int
+    width;
 } FontBrowserContext;
 
 static void ClientFontBrowserMessage(const FontBrowserContext *context,
@@ -9153,6 +9159,58 @@ static void PressFontBrowserScroll(const FontBrowserContext *context,
 #define FontPatternText  "Pattern:"
 #define ResetButtonText  "Reset"
 
+static void InitializeFontBrowserButtons(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height;
+
+  const char
+    *const action = context->action;
+
+  const unsigned int
+    width = context->width;
+
+  XWidgetInfo
+    *const back_info = widgets->back_info,
+    *const reset_info = widgets->reset_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  XFontStruct
+    *const font_info = *widgets->font_info;
+
+  /*
+    Initialize button information.
+  */
+  XGetWidgetInfo(CancelButtonText,cancel_info);
+  (*cancel_info).width=width;
+  (*cancel_info).height=(unsigned int) ((3*height) >> 1);
+  (*cancel_info).x=(int) windows->widget.width-(int) (*cancel_info).width-
+    QuantumMargin-2;
+  (*cancel_info).y=(int) windows->widget.height-(int) (*cancel_info).height-
+    QuantumMargin;
+  XGetWidgetInfo(action,action_info);
+  (*action_info).width=width;
+  (*action_info).height=(unsigned int) ((3*height) >> 1);
+  (*action_info).x=(int) windows->widget.width-(int) (*action_info).width-
+    (int) (*cancel_info).width-2*QuantumMargin-2;
+  (*action_info).y=(*cancel_info).y;
+  XGetWidgetInfo(BackButtonText,back_info);
+  (*back_info).width=width;
+  (*back_info).height=(unsigned int) ((3*height) >> 1);
+  (*back_info).x=QuantumMargin;
+  (*back_info).y=((5*QuantumMargin) >> 1)+(int) height;
+  XGetWidgetInfo(ResetButtonText,reset_info);
+  (*reset_info).width=width;
+  (*reset_info).height=(unsigned int) ((3*height) >> 1);
+  (*reset_info).x=QuantumMargin;
+  (*reset_info).y=(*back_info).y+(int) (*back_info).height+QuantumMargin;
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9349,6 +9407,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   font_context.reset_pattern=reset_pattern;
   font_context.primary_selection=primary_selection;
   font_context.height=height;
+  font_context.action=action;
+  font_context.width=width;
   do
   {
     if (state & UpdateConfigurationState)
@@ -9356,32 +9416,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
         int
           id;
 
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(CancelButtonText,&cancel_info);
-        cancel_info.width=width;
-        cancel_info.height=(unsigned int) ((3*height) >> 1);
-        cancel_info.x=(int) windows->widget.width-(int) cancel_info.width-
-          QuantumMargin-2;
-        cancel_info.y=(int) windows->widget.height-(int) cancel_info.height-
-          QuantumMargin;
-        XGetWidgetInfo(action,&action_info);
-        action_info.width=width;
-        action_info.height=(unsigned int) ((3*height) >> 1);
-        action_info.x=(int) windows->widget.width-(int) action_info.width-
-          (int) cancel_info.width-2*QuantumMargin-2;
-        action_info.y=cancel_info.y;
-        XGetWidgetInfo(BackButtonText,&back_info);
-        back_info.width=width;
-        back_info.height=(unsigned int) ((3*height) >> 1);
-        back_info.x=QuantumMargin;
-        back_info.y=((5*QuantumMargin) >> 1)+(int) height;
-        XGetWidgetInfo(ResetButtonText,&reset_info);
-        reset_info.width=width;
-        reset_info.height=(unsigned int) ((3*height) >> 1);
-        reset_info.x=QuantumMargin;
-        reset_info.y=back_info.y+(int) back_info.height+QuantumMargin;
+        InitializeFontBrowserButtons(&font_context,&font_widgets);
         /*
           Initialize reply information.
         */
