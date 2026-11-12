@@ -518,6 +518,23 @@ static void MapPixelToDepth(const Image *image,const Quantum *depth_map,
     q[j]=depth_map[ScaleQuantumToMap(q[j])];
   }
 }
+
+static Quantum *AcquireDepthMap(const QuantumAny range)
+{
+  Quantum
+    *depth_map;
+
+  ssize_t
+    i;
+
+  depth_map=(Quantum *) AcquireQuantumMemory(MaxMap+1,sizeof(*depth_map));
+  if (depth_map == (Quantum *) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+    depth_map[i]=ScaleAnyToQuantum(ScaleQuantumToAny((Quantum) i,range),
+      range);
+  return(depth_map);
+}
 #endif
 
 MagickExport MagickBooleanType SetImageDepth(Image *image,
@@ -575,18 +592,10 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
       Quantum
         *depth_map;
 
-      ssize_t
-        i;
-
       /*
         Scale pixels to desired (optimized with depth map).
       */
-      depth_map=(Quantum *) AcquireQuantumMemory(MaxMap+1,sizeof(*depth_map));
-      if (depth_map == (Quantum *) NULL)
-        ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-        depth_map[i]=ScaleAnyToQuantum(ScaleQuantumToAny((Quantum) i,range),
-          range);
+      depth_map=AcquireDepthMap(range);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp parallel for schedule(static) shared(status) \
         magick_number_threads(image,image,image->rows,2)
