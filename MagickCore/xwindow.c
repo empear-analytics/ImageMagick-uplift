@@ -3002,13 +3002,8 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
 extern "C" {
 #endif
 
-MagickExport int XError(Display *display,XErrorEvent *error)
+static int XErrorStatus(const XErrorEvent *error)
 {
-  assert(display != (Display *) NULL);
-  assert(error != (XErrorEvent *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  xerror_alert=MagickTrue;
   switch (error->request_code)
   {
     case X_GetGeometry:
@@ -3032,6 +3027,16 @@ MagickExport int XError(Display *display,XErrorEvent *error)
     }
   }
   return(MagickTrue);
+}
+
+MagickExport int XError(Display *display,XErrorEvent *error)
+{
+  assert(display != (Display *) NULL);
+  assert(error != (XErrorEvent *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  xerror_alert=MagickTrue;
+  return(XErrorStatus(error));
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)
