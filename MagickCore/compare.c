@@ -265,6 +265,18 @@ typedef struct _CompareColorTargets
     *masklight;
 } CompareColorTargets;
 
+static void GetCompareHighlight(const Image *image,PixelInfo *highlight,
+  ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  (void) QueryColorCompliance("#f1001ecc",AllCompliance,highlight,exception);
+  artifact=GetImageArtifact(image,"compare:highlight-color");
+  if (artifact != (const char *) NULL)
+    (void) QueryColorCompliance(artifact,AllCompliance,highlight,exception);
+}
+
 static void GetCompareColors(const Image *image,ExceptionInfo *exception,
   const CompareColorTargets *targets)
 {
@@ -276,10 +288,7 @@ static void GetCompareColors(const Image *image,ExceptionInfo *exception,
     *const lowlight = targets->lowlight,
     *const masklight = targets->masklight;
 
-  (void) QueryColorCompliance("#f1001ecc",AllCompliance,highlight,exception);
-  artifact=GetImageArtifact(image,"compare:highlight-color");
-  if (artifact != (const char *) NULL)
-    (void) QueryColorCompliance(artifact,AllCompliance,highlight,exception);
+  GetCompareHighlight(image,highlight,exception);
   (void) QueryColorCompliance("#ffffffcc",AllCompliance,lowlight,exception);
   artifact=GetImageArtifact(image,"compare:lowlight-color");
   if (artifact != (const char *) NULL)
