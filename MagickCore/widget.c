@@ -3874,6 +3874,13 @@ static void PositionColorBrowserWidget(XWindows *windows,
   XConstrainWindowPosition(display,&windows->widget);
 }
 
+static void WithdrawBrowserWidget(Display *display,XWindows *windows)
+{
+  XSetCursorState(display,windows,MagickFalse);
+  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
+  XCheckRefreshWindows(display,windows);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3970,9 +3977,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
 
     RunColorBrowser(&color_context,&colorlist,&colors,&mask);
   }
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
-  XCheckRefreshWindows(display,windows);
+  WithdrawBrowserWidget(display,windows);
   FreeColorBrowserList(colorlist,colors,exception);
   CheckColorBrowserReply(display,windows,reply);
 }
