@@ -12388,6 +12388,27 @@ static MagickBooleanType XGrabDelay(Display *display,XWindows *windows,
     }
   return(MagickTrue);
 }
+
+static void XRequestImageSize(Display *display,XWindows *windows,
+  ImageInfo *image_info,const MagickInfo *magick_info)
+{
+  if ((magick_info != (const MagickInfo *) NULL) &&
+      GetMagickRawSupport(magick_info) == MagickTrue)
+    {
+      char
+        geometry[MagickPathExtent];
+
+      /*
+        Request image size from the user.
+      */
+      (void) CopyMagickString(geometry,"512x512",MagickPathExtent);
+      if (image_info->size != (char *) NULL)
+        (void) CopyMagickString(geometry,image_info->size,MagickPathExtent);
+      (void) XDialogWidget(display,windows,"Load","Enter the image geometry:",
+        geometry);
+      (void) CloneString(&image_info->size,geometry);
+    }
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12454,22 +12475,7 @@ static Image *XOpenImage(Display *display,XResourceInfo *resource_info,
   if (XGrabDelay(display,windows,image_info) == MagickFalse)
     return((Image *) NULL);
   magick_info=GetMagickInfo(image_info->magick,exception);
-  if ((magick_info != (const MagickInfo *) NULL) &&
-      GetMagickRawSupport(magick_info) == MagickTrue)
-    {
-      char
-        geometry[MagickPathExtent];
-
-      /*
-        Request image size from the user.
-      */
-      (void) CopyMagickString(geometry,"512x512",MagickPathExtent);
-      if (image_info->size != (char *) NULL)
-        (void) CopyMagickString(geometry,image_info->size,MagickPathExtent);
-      (void) XDialogWidget(display,windows,"Load","Enter the image geometry:",
-        geometry);
-      (void) CloneString(&image_info->size,geometry);
-    }
+  XRequestImageSize(display,windows,image_info,magick_info);
   /*
     Load the image.
   */
