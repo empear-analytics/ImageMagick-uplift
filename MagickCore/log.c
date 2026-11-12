@@ -436,6 +436,21 @@ MagickExport LogEventType GetLogEventMask(void)
   return(log_info->event_mask);
 }
 
+static ElementInfo *FindLogElement(ElementInfo *p,const char *name)
+{
+  const LogInfo
+    *log_info;
+
+  while (p != (ElementInfo *) NULL)
+  {
+    log_info=(const LogInfo *) p->value;
+    if (LocaleCompare(name,log_info->name) == 0)
+      break;
+    p=p->next;
+  }
+  return(p);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -485,17 +500,14 @@ static LogInfo *GetLogInfo(const char *name,ExceptionInfo *exception)
       UnlockSemaphoreInfo(log_semaphore);
       return(log_info);
     }
-  while (p != (ElementInfo *) NULL)
-  {
-    log_info=(LogInfo* ) p->value;
-    if (LocaleCompare(name,log_info->name) == 0)
-      break;
-    p=p->next;
-  }
+  p=FindLogElement(p,name);
   if (p == (ElementInfo *) NULL)
     log_info=(LogInfo *) NULL;
   else
-    SetHeadElementInLinkedList(log_cache,p);
+    {
+      log_info=(LogInfo *) p->value;
+      SetHeadElementInLinkedList(log_cache,p);
+    }
   UnlockSemaphoreInfo(log_semaphore);
   return(log_info);
 }
