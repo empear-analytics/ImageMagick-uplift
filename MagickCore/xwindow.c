@@ -6992,6 +6992,15 @@ typedef struct _XBitmapPacking
   unsigned char
     background,
     foreground;
+
+  CacheView
+    *canvas_view;
+
+  ExceptionInfo
+    *exception;
+
+  unsigned int
+    scanline_pad;
 } XBitmapPacking;
 
 static unsigned char *XPackBitmapRowLSB(const XBitmapPacking *bitmap,
@@ -7035,6 +7044,37 @@ static unsigned char *XPackBitmapRowLSB(const XBitmapPacking *bitmap,
   if (bit != 0)
     *q=byte >> (8-bit);
   return(q);
+}
+
+static void XPackBitmapLSB(const XBitmapPacking *bitmap,unsigned char *q)
+{
+  Image
+    *const canvas = bitmap->canvas;
+
+  CacheView
+    *const canvas_view = bitmap->canvas_view;
+
+  ExceptionInfo
+    *const exception = bitmap->exception;
+
+  const unsigned int
+    scanline_pad = bitmap->scanline_pad;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
+      exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackBitmapRowLSB(bitmap,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
 }
 
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
@@ -7165,15 +7205,10 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
       bitmap.polarity=polarity;
       bitmap.background=background;
       bitmap.foreground=foreground;
-      for (y=0; y < (int) canvas->rows; y++)
-      {
-        p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
-          exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        q=XPackBitmapRowLSB(&bitmap,p,q);
-        q+=(ptrdiff_t) scanline_pad;
-      }
+      bitmap.canvas_view=canvas_view;
+      bitmap.exception=exception;
+      bitmap.scanline_pad=scanline_pad;
+      XPackBitmapLSB(&bitmap,q);
     }
   else
     if (window->pixel_info->colors != 0)
