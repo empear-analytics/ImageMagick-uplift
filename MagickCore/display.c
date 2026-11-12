@@ -16993,6 +16993,12 @@ typedef struct _DisplayEventContext
 
   DisplayCommand
     *VirtualCommands;
+
+  const char
+    *const *ShortCutsMenu;
+
+  DisplayCommand
+    *ShortCutsCommands;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -17267,6 +17273,12 @@ typedef struct _DisplayEventTargets
 
   Image
     **display_image;
+
+  XEvent
+    *event;
+
+  XPoint
+    *vid_info;
 } DisplayEventTargets;
 
 static void XSelectVirtualCommand(const DisplayEventContext *context,
@@ -17344,6 +17356,76 @@ static void XPressImageButton1(const DisplayEventContext *context,
         (XEvent *) NULL);
       (void) XMapRaised(display,windows->command.id);
     }
+}
+
+static void XPressImageButton3(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  size_t
+    *const state = context->state;
+
+  char
+    *const command = context->command;
+
+  const char
+    *const *const ShortCutsMenu = context->ShortCutsMenu;
+
+  DisplayCommand
+    *const ShortCutsCommands = context->ShortCutsCommands;
+
+  Image
+    **const nexus = targets->nexus;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  XPoint
+    *const vid_info = targets->vid_info;
+
+  int
+    entry;
+
+  if (resource_info->immutable)
+    {
+      XSelectVirtualCommand(context,targets);
+      return;
+    }
+  if ((*display_image)->montage != (char *) NULL)
+    {
+      /*
+        Open or delete a tile from a visual image directory.
+      */
+      (*nexus)=XTileImage(display,resource_info,windows,
+        (*display_image),event,exception);
+      if ((*nexus) != (Image *) NULL)
+        *state|=MontageImageState | NextImageState | ExitState;
+      (*vid_info).x=(short int) windows->image.x;
+      (*vid_info).y=(short int) windows->image.y;
+      return;
+    }
+  /*
+    Select a command from the Short Cuts menu.
+  */
+  entry=XMenuWidget(display,windows,"Short Cuts",ShortCutsMenu,
+    command);
+  if (entry >= 0)
+    (*nexus)=XMagickCommand(display,resource_info,windows,
+      ShortCutsCommands[entry],display_image,exception);
 }
 
 /*
@@ -17918,7 +18000,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     event_context;
 
   const DisplayEventTargets
-    event_targets = { &nexus, &display_image };
+    event_targets = { &nexus, &display_image, &event, &vid_info };
 
   assert(image != (Image **) NULL);
   assert((*image)->signature == MagickCoreSignature);
@@ -18498,6 +18580,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.visual_info=visual_info;
   event_context.VirtualMenu=VirtualMenu;
   event_context.VirtualCommands=VirtualCommands;
+  event_context.ShortCutsMenu=ShortCutsMenu;
+  event_context.ShortCutsCommands=ShortCutsCommands;
   do
   {
     /*
@@ -18624,32 +18708,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
               }
               case Button3:
               {
-                if (resource_info->immutable)
-                  {
-                    XSelectVirtualCommand(&event_context,&event_targets);
-                    break;
-                  }
-                if (display_image->montage != (char *) NULL)
-                  {
-                    /*
-                      Open or delete a tile from a visual image directory.
-                    */
-                    nexus=XTileImage(display,resource_info,windows,
-                      display_image,&event,exception);
-                    if (nexus != (Image *) NULL)
-                      *state|=MontageImageState | NextImageState | ExitState;
-                    vid_info.x=(short int) windows->image.x;
-                    vid_info.y=(short int) windows->image.y;
-                    break;
-                  }
-                /*
-                  Select a command from the Short Cuts menu.
-                */
-                entry=XMenuWidget(display,windows,"Short Cuts",ShortCutsMenu,
-                  command);
-                if (entry >= 0)
-                  nexus=XMagickCommand(display,resource_info,windows,
-                    ShortCutsCommands[entry],&display_image,exception);
+                XPressImageButton3(&event_context,&event_targets);
                 break;
               }
               case Button4:
