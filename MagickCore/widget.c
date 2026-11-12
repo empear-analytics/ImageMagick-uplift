@@ -8500,7 +8500,11 @@ typedef struct _FontBrowserWidgets
     *back_info,
     *reset_info,
     *action_info,
-    *cancel_info;
+    *cancel_info,
+    *slider_info;
+
+  int
+    *fonts;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -8661,6 +8665,39 @@ static void ToggleFontBrowserButtons(const FontBrowserContext *context,
     }
 }
 
+static void MoveFontBrowserButtons(const FontBrowserContext *context,
+  XEvent event,const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  int
+    *const fonts = widgets->fonts;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
+  if ((*slider_info).active)
+    {
+      /*
+        Move slider matte.
+      */
+      (*slider_info)=TrackFontBrowserSlider((*slider_info),event,(*fonts));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((*state) & InactiveWidgetState)
+    return;
+  ToggleFontBrowserButtons(context,event,widgets);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8738,7 +8775,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
 
   const FontBrowserWidgets
     font_widgets = { &reply_info, &state, &back_info,
-      &reset_info, &action_info, &cancel_info };
+      &reset_info, &action_info, &cancel_info, &slider_info, &fonts };
 
   FontBrowserContext
     font_context;
@@ -9486,22 +9523,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
       }
       case MotionNotify:
       {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (slider_info.active)
-          {
-            /*
-              Move slider matte.
-            */
-            slider_info=TrackFontBrowserSlider(slider_info,event,fonts);
-            state|=RedrawListState;
-            break;
-          }
-        if (state & InactiveWidgetState)
-          break;
-        ToggleFontBrowserButtons(&font_context,event,&font_widgets);
+        MoveFontBrowserButtons(&font_context,event,&font_widgets);
         break;
       }
       case SelectionClear:
