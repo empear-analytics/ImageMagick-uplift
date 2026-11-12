@@ -7772,6 +7772,65 @@ above 5.76. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-1
 
 ---
 
+## Recipe LF - Name a Loop's Skip Tests
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function whose
+loop opens with a run of `if (<test>) continue;` statements, each a test of values that
+are already fixed when the loop body starts, as `policy.c`'s `IsRightsAuthorizedByName`
+does with `if (policy->domain != domain) continue;` and `if ((name != NULL) &&
+(LocaleCompare(name,policy->name) != 0)) continue;`.
+
+**Not covered by:** Recipe P, which names one expression and keeps the `if`; Recipe G,
+which turns a nested `if` into an early exit; Recipe PC, which moves a parallel loop's
+head; Recipe OC, which moves a block ending the iteration through out-parameters. None
+moves a run of skip tests as one predicate.
+
+**How:**
+
+1. Take the first statements of the loop body (after its declarations) that are
+   `if (<test>) continue;`, one or more, each a single `if` with no `else` and no block
+   that does anything but `continue;`. The tests read variables and call functions with
+   no side effect (`LocaleCompare`, member access); none writes anything, as checked by
+   reading.
+2. Write a `static MagickBooleanType Is<Name>(<inputs>)` above the caller, with the
+   variables the tests read as parameters (at most four, `const` where the original is),
+   whose body is `if (<test>) return(MagickFalse);` for each test, in order, then
+   `return(MagickTrue);`. Each test's text is copied character for character.
+3. The tests in the loop become `if (Is<Name>(<inputs>) == MagickFalse) continue;`.
+4. The tests that followed the run stay where they were.
+
+**Before:**
+
+```c
+    if (policy->domain != domain)
+      continue;
+    if ((name != (char *) NULL) && (LocaleCompare(name,policy->name) != 0))
+      continue;
+```
+
+**After:**
+
+```c
+    if (IsPolicyForName(policy,domain,name) == MagickFalse)
+      continue;
+```
+
+**Careful:**
+
+- The tests run in the same order and stop at the first that holds, as the `continue`s
+  did, so a later test that dereferences a pointer an earlier one checked is as safe as
+  before.
+- The helper's tests are the original's; a pointer parameter keeps the type the caller
+  has.
+
+**Evidence level:** oracle, for the function the step changes (`casemap.py` first).
+
+**Provenance:** 2026-11-12, from `policy.c`'s `IsRightsAuthorizedByName` (campaign B,
+M120), 5.88 to 5.93. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -8078,3 +8137,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | SF | Flatten a first-letter `switch` over `LocaleCompare` groups into an `if`/`else if` chain; evidence oracle | `policy.c`'s `SetPolicyInfoAttribute` (cc 20 to 7, 5.02 to 5.29); the same shape stands in seven other files | mandate (2026-10-24) |
 | 2026-11-12 | NEW | RC | Extract a switch group that returns `R` or breaks to a constant `return(F);` into a function ending in `return(F);`; evidence oracle | `policy.c`'s `SetMagickSecurityPolicyValue` (three domain groups; 5.29 to 5.45); SR and Z refuse a `return` in the group, E step 7 takes the tail only | mandate (2026-10-24) |
 | 2026-11-12 | NEW | QS | Replace the quote-state and bracket-depth loop that skips a DOCTYPE by `SkipQuotedText` and `SkipDoctypeElement`; evidence oracle | `policy.c`'s `LoadPolicyCache` (5.45 to 5.76); E with EJ leaves a cc 12 helper the gate refuses | mandate (2026-10-24) |
+| 2026-11-12 | NEW | LF | Move a loop's leading run of `if (<test>) continue;` into one `Is<Name>` predicate; evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (5.88 to 5.93); P names one expression and keeps its `if` | mandate (2026-10-24) |
