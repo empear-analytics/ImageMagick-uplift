@@ -6958,6 +6958,9 @@ typedef struct _DrawPointerTargets
 
   size_t
     *state;
+
+  XEvent
+    *event;
 } DrawPointerTargets;
 
 static void XDrawButtonPress(const DrawEditContext *context,
@@ -6985,6 +6988,64 @@ static void XDrawButtonPress(const DrawEditContext *context,
   (*x)=event.xbutton.x;
   (*y)=event.xbutton.y;
   (*state)|=ExitState;
+}
+
+static void XDrawKeyPress(const DrawEditContext *context,
+  const DrawPointerTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  XEvent
+    *const event = targets->event;
+
+  KeySym
+    key_symbol;
+
+  char
+    command[MagickPathExtent];
+
+  if ((*event).xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Rotation",ImageDrawHelp);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
 }
 
 static MagickBooleanType XDrawEditImage(Display *display,
@@ -7079,7 +7140,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
     draw_context;
 
   const DrawPointerTargets
-    pointer_targets = { &x, &y, &state };
+    pointer_targets = { &x, &y, &state, &event };
 
   const DrawStyleTargets
     style_targets = { &draw_info, &pen_id, &line_width, &stipple, &x, &y };
@@ -7232,41 +7293,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
           break;
         case KeyPress:
         {
-          KeySym
-            key_symbol;
-
-          if (event.xkey.window != windows->image.id)
-            break;
-          /*
-            Respond to a user key press.
-          */
-          (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-            sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-          switch ((int) key_symbol)
-          {
-            case XK_Escape:
-            case XK_F20:
-            {
-              /*
-                Prematurely exit.
-              */
-              state|=EscapeState;
-              state|=ExitState;
-              break;
-            }
-            case XK_F1:
-            case XK_Help:
-            {
-              XTextViewHelp(display,resource_info,windows,MagickFalse,
-                "Help Viewer - Image Rotation",ImageDrawHelp);
-              break;
-            }
-            default:
-            {
-              (void) XBell(display,0);
-              break;
-            }
-          }
+          XDrawKeyPress(&draw_context,&pointer_targets);
           break;
         }
         case MotionNotify:
