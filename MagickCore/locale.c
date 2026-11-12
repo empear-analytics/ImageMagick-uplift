@@ -1430,12 +1430,9 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
           if (*token != '=')
             continue;
           (void) GetNextToken(q,&q,extent,token);
-          if (LocaleCompare(keyword,"locale") == 0)
-            {
-              if (LocaleCompare(locale,token) != 0)
-                break;
-              continue;
-            }
+          if ((LocaleCompare(keyword,"locale") == 0) &&
+              (LocaleCompare(locale,token) != 0))
+            break;
           if (LocaleCompare(keyword,"file") != 0)
             continue;
           if (depth >= MagickMaxRecursionDepth)
