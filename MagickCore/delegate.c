@@ -2540,10 +2540,12 @@ typedef struct _DelegateInclude
     *filename;
 
   char
+    *keyword,
     *token;
 
   size_t
-    depth;
+    depth,
+    extent;
 } DelegateInclude;
 
 static void LoadDelegateInclude(const DelegateInclude *include,
@@ -2712,6 +2714,17 @@ static MagickBooleanType IsIncludeFileAttribute(const char **q,
   return(LocaleCompare(keyword,"file") == 0 ? MagickTrue : MagickFalse);
 }
 
+static void LoadDelegateIncludeElement(const DelegateInclude *include,
+  const char **q,MagickStatusType *status)
+{
+  while (IsIncludeElementOpen(include->token,*q) != MagickFalse)
+  {
+    if (IsIncludeFileAttribute(q,include->extent,include->keyword,
+        include->token) != MagickFalse)
+      LoadDelegateInclude(include,status);
+  }
+}
+
 static DelegateInfo *AcquireDelegateInfo(const char *filename)
 {
   DelegateInfo
@@ -2792,14 +2805,11 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
         /*
           Include element.
         */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          const DelegateInclude
-            include = { cache, exception, filename, token, depth };
+        const DelegateInclude
+          include = { cache, exception, filename, keyword, token, depth,
+            extent };
 
-          if (IsIncludeFileAttribute(&q,extent,keyword,token) != MagickFalse)
-            LoadDelegateInclude(&include,&status);
-        }
+        LoadDelegateIncludeElement(&include,&q,&status);
         continue;
       }
     if (LocaleCompare(keyword,"<delegate") == 0)
