@@ -2694,9 +2694,11 @@ MagickPrivate MagickBooleanType AccelerateGrayscaleImage(Image* image,
   if (image->number_channels < 3)
     return(MagickFalse);
 
-  if ((GetPixelRedTraits(image) == UndefinedPixelTrait) ||
-      (GetPixelGreenTraits(image) == UndefinedPixelTrait) ||
-      (GetPixelBlueTraits(image) == UndefinedPixelTrait))
+  if (GetPixelRedTraits(image) == UndefinedPixelTrait)
+    return(MagickFalse);
+  if (GetPixelGreenTraits(image) == UndefinedPixelTrait)
+    return(MagickFalse);
+  if (GetPixelBlueTraits(image) == UndefinedPixelTrait)
     return(MagickFalse);
 
   clEnv=getOpenCLEnvironment(exception);
