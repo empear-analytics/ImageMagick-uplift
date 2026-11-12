@@ -827,6 +827,19 @@ static void SyncReadImageMetadata(ImageInfo *read_info,Image *next,
     (void) ParseAbsoluteGeometry("0x0+0+0",&next->page);
 }
 
+static Image *SelectImageScenes(Image *image,const char *scenes,
+  ExceptionInfo *exception)
+{
+  Image
+    *clones;
+
+  clones=CloneImages(image,scenes,exception);
+  image=DestroyImageList(image);
+  if (clones != (Image *) NULL)
+    image=GetFirstImageInList(clones);
+  return(image);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -1018,13 +1031,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   if ((IsSceneGeometry(read_info->scenes,MagickFalse) != MagickFalse) &&
       (GetImageListLength(image) != 1))
     {
-      Image
-        *clones;
-
-      clones=CloneImages(image,read_info->scenes,exception);
-      image=DestroyImageList(image);
-      if (clones != (Image *) NULL)
-        image=GetFirstImageInList(clones);
+      image=SelectImageScenes(image,read_info->scenes,exception);
       if (image == (Image *) NULL)
         {
           read_info=DestroyImageInfo(read_info);
