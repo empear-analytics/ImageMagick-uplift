@@ -419,6 +419,17 @@ static inline MagickBooleanType IsExecutableToken(const char *token)
   return(MagickFalse);
 }
 
+static void DestroyDelegateArguments(char **arguments,
+  const int number_arguments)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_arguments; i++)
+    arguments[i]=DestroyString(arguments[i]);
+  (void) RelinquishMagickMemory(arguments);
+}
+
 static MagickBooleanType AuthorizeDelegateArguments(char **arguments,
   const int number_arguments,ExceptionInfo *exception)
 {
@@ -439,15 +450,10 @@ static MagickBooleanType AuthorizeDelegateArguments(char **arguments,
       continue;
     if (IsRightsAuthorized(domain,rights,arguments[i]) == MagickFalse)
       {
-        ssize_t
-          j;
-
         errno=EPERM;
         (void) ThrowMagickException(exception,GetMagickModule(),PolicyError,
           "NotAuthorized","`%s'",arguments[i]);
-        for (j=0; j < (ssize_t) number_arguments; j++)
-          arguments[j]=DestroyString(arguments[j]);
-        arguments=(char **) RelinquishMagickMemory(arguments);
+        DestroyDelegateArguments(arguments,number_arguments);
         return(MagickFalse);
       }
   }
@@ -466,18 +472,13 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
     number_arguments,
     status;
 
-  ssize_t
-    i;
-
   status=(-1);
   arguments=StringToArgv(command,&number_arguments);
   if (arguments == (char **) NULL)
     return(status);
   if (*arguments[1] == '\0')
     {
-      for (i=0; i < (ssize_t) number_arguments; i++)
-        arguments[i]=DestroyString(arguments[i]);
-      arguments=(char **) RelinquishMagickMemory(arguments);
+      DestroyDelegateArguments(arguments,number_arguments);
       return(-1);
     }
   if (AuthorizeDelegateArguments(arguments,number_arguments,exception) ==
@@ -602,9 +603,7 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
           "FailedToExecuteCommand","`%s' (%d)",sanitize_command,status);
     }
   sanitize_command=DestroyString(sanitize_command);
-  for (i=0; i < (ssize_t) number_arguments; i++)
-    arguments[i]=DestroyString(arguments[i]);
-  arguments=(char **) RelinquishMagickMemory(arguments);
+  DestroyDelegateArguments(arguments,number_arguments);
   return(status);
 }
 
