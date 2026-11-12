@@ -1293,6 +1293,23 @@ static const char *ReadMessageText(const char *q,char *message)
   return(q);
 }
 
+static void AppendSubpathElement(const char *keyword,char *token,char *tag)
+{
+  if (*(keyword+1) == '?')
+    return;
+  if (*(keyword+1) == '/')
+    {
+      ChopLocaleComponents(tag,1);
+      if (*tag != '\0')
+        (void) ConcatenateMagickString(tag,"/",MagickLocaleExtent);
+      return;
+    }
+  token[strlen(token)-1]='\0';
+  (void) CopyMagickString(token,token+1,MagickLocaleExtent);
+  (void) ConcatenateMagickString(tag,token,MagickLocaleExtent);
+  (void) ConcatenateMagickString(tag,"/",MagickLocaleExtent);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1467,19 +1484,7 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         /*
           Subpath element.
         */
-        if (*(keyword+1) == '?')
-          continue;
-        if (*(keyword+1) == '/')
-          {
-            ChopLocaleComponents(tag,1);
-            if (*tag != '\0')
-              (void) ConcatenateMagickString(tag,"/",MagickLocaleExtent);
-            continue;
-          }
-        token[strlen(token)-1]='\0';
-        (void) CopyMagickString(token,token+1,MagickLocaleExtent);
-        (void) ConcatenateMagickString(tag,token,MagickLocaleExtent);
-        (void) ConcatenateMagickString(tag,"/",MagickLocaleExtent);
+        AppendSubpathElement(keyword,token,tag);
         continue;
       }
     (void) GetNextToken(q,(const char **) NULL,extent,token);
