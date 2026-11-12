@@ -2194,6 +2194,23 @@ static void ExecuteDelegateCommand(const DelegateExecution *execution,
     }
 }
 
+static void RelinquishDelegateFiles(const ImageInfo *image_info,
+  const Image *image)
+{
+  if (image_info->temporary != MagickFalse)
+    (void) RelinquishUniqueFileResource(image_info->filename);
+  (void) RelinquishUniqueFileResource(image_info->unique);
+  (void) RelinquishUniqueFileResource(image_info->filename);
+  (void) RelinquishUniqueFileResource(image->filename);
+}
+
+static char **DestroyDelegateCommands(char **commands,ssize_t i)
+{
+  for ( ; commands[i] != (char *) NULL; i++)
+    commands[i]=DestroyString(commands[i]);
+  return((char **) RelinquishMagickMemory(commands));
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
@@ -2323,11 +2340,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
         (void) RelinquishUniqueFileResource(output_filename);
         status=MagickFalse;
       }
-    if (image_info->temporary != MagickFalse)
-      (void) RelinquishUniqueFileResource(image_info->filename);
-    (void) RelinquishUniqueFileResource(image_info->unique);
-    (void) RelinquishUniqueFileResource(image_info->filename);
-    (void) RelinquishUniqueFileResource(image->filename);
+    RelinquishDelegateFiles(image_info,image);
     if (status == MagickFalse)
       {
         (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
@@ -2342,9 +2355,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   /*
     Relinquish resources.
   */
-  for ( ; commands[i] != (char *) NULL; i++)
-    commands[i]=DestroyString(commands[i]);
-  commands=(char **) RelinquishMagickMemory(commands);
+  commands=DestroyDelegateCommands(commands,i);
   if (temporary != MagickFalse)
     (void) RelinquishUniqueFileResource(image->filename);
   return(status);
