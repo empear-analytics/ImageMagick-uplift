@@ -2110,7 +2110,8 @@ typedef struct _ColorBrowserTargets
     ***colorlist;
 
   XWidgetInfo
-    *list_info;
+    *list_info,
+    *expose_info;
 } ColorBrowserTargets;
 
 typedef struct _ColorBrowserContext
@@ -2900,6 +2901,80 @@ static void InitializeColorBrowserReply(const ColorBrowserContext *context,
   (*mode_info).y=(*action_info).y;
 }
 
+static void InitializeColorBrowserScroll(const ColorBrowserContext *context,
+  const ColorBrowserTargets *widgets)
+{
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const grab_info = widgets->grab_info,
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const colors = widgets->colors;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_colors = widgets->visible_colors;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const expose_info = widgets->expose_info;
+
+  int
+    id;
+
+  /*
+    Initialize scroll information.
+  */
+  XGetWidgetInfo((char *) NULL,scroll_info);
+  (*scroll_info).bevel_width--;
+  (*scroll_info).width=height;
+  (*scroll_info).height=(unsigned int) ((*reply_info).y-(*grab_info).y-
+    (QuantumMargin >> 1));
+  (*scroll_info).x=(*reply_info).x+(int) ((*reply_info).width-
+    (*scroll_info).width);
+  (*scroll_info).y=(*grab_info).y-(int) (*reply_info).bevel_width;
+  (*scroll_info).raised=MagickFalse;
+  (*scroll_info).trough=MagickTrue;
+  (*north_info)=(*scroll_info);
+  (*north_info).raised=MagickTrue;
+  (*north_info).width-=((*north_info).bevel_width << 1);
+  (*north_info).height=(*north_info).width-1;
+  (*north_info).x+=(int) (*north_info).bevel_width;
+  (*north_info).y+=(int) (*north_info).bevel_width;
+  (*south_info)=(*north_info);
+  (*south_info).y=(*scroll_info).y+(int) (*scroll_info).height-(int)
+    (*scroll_info).bevel_width-(int) (*south_info).height;
+  id=(*slider_info).id;
+  (*slider_info)=(*north_info);
+  (*slider_info).id=id;
+  (*slider_info).width-=2;
+  (*slider_info).min_y=(*north_info).y+(int) (*north_info).height+(int)
+    (*north_info).bevel_width+(int) (*slider_info).bevel_width+2;
+  (*slider_info).height=(unsigned int) ((int) (*scroll_info).height-
+    (((*slider_info).min_y-(*scroll_info).y+1) << 1)+4);
+  (*visible_colors)=(unsigned int) ((*scroll_info).height*
+    MagickSafeReciprocal((double) height+(height >> 3)));
+  if ((*colors) > (*visible_colors))
+    (*slider_info).height=(unsigned int) (((*visible_colors)*
+      (*slider_info).height)/(*colors));
+  (*slider_info).max_y=(*south_info).y-(int) (*south_info).bevel_width-
+    (int) (*slider_info).bevel_width-2;
+  (*slider_info).x=(*scroll_info).x+(int) (*slider_info).bevel_width+1;
+  (*slider_info).y=(*slider_info).min_y;
+  (*expose_info)=(*scroll_info);
+  (*expose_info).y=(*slider_info).y;
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2977,7 +3052,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     color_widgets = { &reply_info, &state,
       &grab_info, &reset_info, &action_info, &cancel_info, &slider_info,
       &colors, &scroll_info, &visible_colors, &north_info, &delay, &south_info,
-      &mode_info, &colorlist, &list_info };
+      &mode_info, &colorlist, &list_info, &expose_info };
 
   ColorBrowserContext
     color_context;
@@ -3095,51 +3170,9 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   {
     if (state & UpdateConfigurationState)
       {
-        int
-          id;
-
         InitializeColorBrowserButtons(&color_context,&color_widgets);
         InitializeColorBrowserReply(&color_context,&color_widgets);
-        /*
-          Initialize scroll information.
-        */
-        XGetWidgetInfo((char *) NULL,&scroll_info);
-        scroll_info.bevel_width--;
-        scroll_info.width=height;
-        scroll_info.height=(unsigned int) (reply_info.y-grab_info.y-
-          (QuantumMargin >> 1));
-        scroll_info.x=reply_info.x+(int) (reply_info.width-scroll_info.width);
-        scroll_info.y=grab_info.y-(int) reply_info.bevel_width;
-        scroll_info.raised=MagickFalse;
-        scroll_info.trough=MagickTrue;
-        north_info=scroll_info;
-        north_info.raised=MagickTrue;
-        north_info.width-=(north_info.bevel_width << 1);
-        north_info.height=north_info.width-1;
-        north_info.x+=(int) north_info.bevel_width;
-        north_info.y+=(int) north_info.bevel_width;
-        south_info=north_info;
-        south_info.y=scroll_info.y+(int) scroll_info.height-(int)
-          scroll_info.bevel_width-(int) south_info.height;
-        id=slider_info.id;
-        slider_info=north_info;
-        slider_info.id=id;
-        slider_info.width-=2;
-        slider_info.min_y=north_info.y+(int) north_info.height+(int)
-          north_info.bevel_width+(int) slider_info.bevel_width+2;
-        slider_info.height=(unsigned int) ((int) scroll_info.height-
-          ((slider_info.min_y-scroll_info.y+1) << 1)+4);
-        visible_colors=(unsigned int) (scroll_info.height*
-          MagickSafeReciprocal((double) height+(height >> 3)));
-        if (colors > visible_colors)
-          slider_info.height=(unsigned int) ((visible_colors*
-            slider_info.height)/colors);
-        slider_info.max_y=south_info.y-(int) south_info.bevel_width-
-          (int) slider_info.bevel_width-2;
-        slider_info.x=scroll_info.x+(int) slider_info.bevel_width+1;
-        slider_info.y=slider_info.min_y;
-        expose_info=scroll_info;
-        expose_info.y=slider_info.y;
+        InitializeColorBrowserScroll(&color_context,&color_widgets);
         /*
           Initialize list information.
         */
