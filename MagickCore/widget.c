@@ -10308,9 +10308,6 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const FontBrowserRunTargets
     run_targets = { &fonts, &i, &font_info, &fontlist, &listhead, &mask };
 
-  FontBrowserContext
-    font_context;
-
   /*
     Get font list and sort in ascending order.
   */
@@ -10378,19 +10375,15 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     windows->widget.height=windows->widget.min_height;
   XConstrainWindowPosition(display,&windows->widget);
   MapFontBrowserWidget(display,windows,mask);
-  font_context.display=display;
-  font_context.windows=windows;
-  font_context.glob_pattern=glob_pattern;
-  font_context.back_pattern=back_pattern;
-  font_context.reset_pattern=reset_pattern;
-  font_context.primary_selection=primary_selection;
-  font_context.height=height;
-  font_context.action=action;
-  font_context.width=width;
-  font_context.reply=reply;
-  font_context.text=text;
-  if (RunFontBrowser(&font_context,&run_targets) == MagickFalse)
-    return;
+  {
+    const FontBrowserContext
+      font_context = { display, windows,
+        glob_pattern, back_pattern, reset_pattern, primary_selection, height,
+        action, width, reply, text };
+
+    if (RunFontBrowser(&font_context,&run_targets) == MagickFalse)
+      return;
+  }
   WithdrawBrowserWidget(display,windows);
   FreeFontBrowserList(listhead,fontlist);
 }
