@@ -16999,6 +16999,9 @@ typedef struct _DisplayEventContext
 
   DisplayCommand
     *ShortCutsCommands;
+
+  Image
+    **image;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -17426,6 +17429,73 @@ static void XPressImageButton3(const DisplayEventContext *context,
   if (entry >= 0)
     (*nexus)=XMagickCommand(display,resource_info,windows,
       ShortCutsCommands[entry],display_image,exception);
+}
+
+static void XPressImageWindow(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const image = context->image;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  switch ((*event).xbutton.button)
+  {
+    case Button1:
+    {
+      XPressImageButton1(context,targets);
+      break;
+    }
+    case Button2:
+    {
+      /*
+        User pressed the image magnify button.
+      */
+      (void) XMagickCommand(display,resource_info,windows,ZoomCommand,
+        display_image,exception);
+      XMagnifyImage(display,windows,event,exception);
+      break;
+    }
+    case Button3:
+    {
+      XPressImageButton3(context,targets);
+      break;
+    }
+    case Button4:
+    {
+      /*
+        Wheel up.
+      */
+      XTranslateImage(display,windows,*image,XK_Up);
+      break;
+    }
+    case Button5:
+    {
+      /*
+        Wheel down.
+      */
+      XTranslateImage(display,windows,*image,XK_Down);
+      break;
+    }
+    default:
+      break;
+  }
 }
 
 /*
@@ -18582,6 +18652,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.VirtualCommands=VirtualCommands;
   event_context.ShortCutsMenu=ShortCutsMenu;
   event_context.ShortCutsCommands=ShortCutsCommands;
+  event_context.image=image;
   do
   {
     /*
@@ -18689,47 +18760,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xbutton.window == windows->image.id)
           {
-            switch (event.xbutton.button)
-            {
-              case Button1:
-              {
-                XPressImageButton1(&event_context,&event_targets);
-                break;
-              }
-              case Button2:
-              {
-                /*
-                  User pressed the image magnify button.
-                */
-                (void) XMagickCommand(display,resource_info,windows,ZoomCommand,
-                  &display_image,exception);
-                XMagnifyImage(display,windows,&event,exception);
-                break;
-              }
-              case Button3:
-              {
-                XPressImageButton3(&event_context,&event_targets);
-                break;
-              }
-              case Button4:
-              {
-                /*
-                  Wheel up.
-                */
-                XTranslateImage(display,windows,*image,XK_Up);
-                break;
-              }
-              case Button5:
-              {
-                /*
-                  Wheel down.
-                */
-                XTranslateImage(display,windows,*image,XK_Down);
-                break;
-              }
-              default:
-                break;
-            }
+            XPressImageWindow(&event_context,&event_targets);
             break;
           }
         if (event.xbutton.window == windows->magnify.id)
