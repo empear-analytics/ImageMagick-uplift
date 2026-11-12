@@ -760,6 +760,10 @@ MagickExport char **GetTypeList(const char *pattern,size_t *number_fonts,
 */
 
 #if defined(MAGICKCORE_FONTCONFIG_DELEGATE)
+#if !defined(FC_FULLNAME)
+#define FC_FULLNAME "fullname"
+#endif
+
 static inline MagickBooleanType IsNonRegularFontStyle(const FcResult status,
   const FcChar8 *style)
 {
@@ -860,13 +864,36 @@ static void GetFontConfigName(FcPattern *font,const FcChar8 *family,char *name)
     }
 }
 
+static FcFontSet *ListFontConfigFonts(FcConfig *font_config)
+{
+  FcFontSet
+    *font_set;
+
+  FcObjectSet
+    *object_set;
+
+  FcPattern
+    *pattern;
+
+  font_set=(FcFontSet *) NULL;
+  object_set=FcObjectSetBuild(FC_FULLNAME,FC_FAMILY,FC_STYLE,FC_SLANT,
+    FC_WIDTH,FC_WEIGHT,FC_FILE,FC_INDEX,(char *) NULL);
+  if (object_set != (FcObjectSet *) NULL)
+    {
+      pattern=FcPatternCreate();
+      if (pattern != (FcPattern *) NULL)
+        {
+          font_set=FcFontList(font_config,pattern,object_set);
+          FcPatternDestroy(pattern);
+        }
+      FcObjectSetDestroy(object_set);
+    }
+  return(font_set);
+}
+
 MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
   ExceptionInfo *exception)
 {
-#if !defined(FC_FULLNAME)
-#define FC_FULLNAME "fullname"
-#endif
-
   char
     extension[MagickPathExtent],
     name[MagickPathExtent];
@@ -883,12 +910,6 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
 
   FcFontSet
     *font_set;
-
-  FcObjectSet
-    *object_set;
-
-  FcPattern
-    *pattern;
 
   FcResult
     status;
@@ -916,19 +937,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
   if (font_config == (FcConfig *) NULL)
     return(MagickFalse);
   (void) FcConfigSetRescanInterval(font_config,0);
-  font_set=(FcFontSet *) NULL;
-  object_set=FcObjectSetBuild(FC_FULLNAME,FC_FAMILY,FC_STYLE,FC_SLANT,
-    FC_WIDTH,FC_WEIGHT,FC_FILE,FC_INDEX,(char *) NULL);
-  if (object_set != (FcObjectSet *) NULL)
-    {
-      pattern=FcPatternCreate();
-      if (pattern != (FcPattern *) NULL)
-        {
-          font_set=FcFontList(font_config,pattern,object_set);
-          FcPatternDestroy(pattern);
-        }
-      FcObjectSetDestroy(object_set);
-    }
+  font_set=ListFontConfigFonts(font_config);
   if (font_set == (FcFontSet *) NULL)
     {
       FcConfigDestroy(font_config);
