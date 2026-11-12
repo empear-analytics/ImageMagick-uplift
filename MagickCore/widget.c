@@ -10274,6 +10274,53 @@ static MagickBooleanType RunFontBrowser(const FontBrowserContext *context,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireFontList(Display *display,XWindows *windows,
+  char *glob_pattern,const FontBrowserRunTargets *run_targets)
+{
+  int
+    *const fonts = run_targets->fonts,
+    *const i = run_targets->i;
+
+  char
+    ***const fontlist = run_targets->fontlist,
+    ***const listhead = run_targets->listhead;
+
+  (*fontlist)=XListFonts(display,glob_pattern,32767,fonts);
+  if ((*fonts) == 0)
+    {
+      /*
+        Pattern failed, obtain all the fonts.
+      */
+      XNoticeWidget(display,windows,"Unable to obtain fonts names:",
+        glob_pattern);
+      (void) CopyMagickString(glob_pattern,"*",MagickPathExtent);
+      (*fontlist)=XListFonts(display,glob_pattern,32767,fonts);
+      if ((*fontlist) == (char **) NULL)
+        {
+          XNoticeWidget(display,windows,"Unable to obtain fonts names:",
+            glob_pattern);
+          return(MagickFalse);
+        }
+    }
+  /*
+    Sort font list in ascending order.
+  */
+  (*listhead)=(*fontlist);
+  (*fontlist)=(char **) AcquireQuantumMemory((size_t) (*fonts),
+    sizeof(*(*fontlist)));
+  if ((*fontlist) == (char **) NULL)
+    {
+      XNoticeWidget(display,windows,"MemoryAllocationFailed",
+        "UnableToViewFonts");
+      return(MagickFalse);
+    }
+  for ((*i)=0; (*i) < (*fonts); (*i)++)
+    (*fontlist)[(*i)]=(*listhead)[(*i)];
+  qsort((void *) (*fontlist),(size_t) (*fonts),sizeof(*(*fontlist)),
+    FontCompare);
+  return(MagickTrue);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -10321,37 +10368,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   XCheckRefreshWindows(display,windows);
   (void) CopyMagickString(back_pattern,glob_pattern,MagickPathExtent);
   (void) CopyMagickString(reset_pattern,"*",MagickPathExtent);
-  fontlist=XListFonts(display,glob_pattern,32767,&fonts);
-  if (fonts == 0)
-    {
-      /*
-        Pattern failed, obtain all the fonts.
-      */
-      XNoticeWidget(display,windows,"Unable to obtain fonts names:",
-        glob_pattern);
-      (void) CopyMagickString(glob_pattern,"*",MagickPathExtent);
-      fontlist=XListFonts(display,glob_pattern,32767,&fonts);
-      if (fontlist == (char **) NULL)
-        {
-          XNoticeWidget(display,windows,"Unable to obtain fonts names:",
-            glob_pattern);
-          return;
-        }
-    }
-  /*
-    Sort font list in ascending order.
-  */
-  listhead=fontlist;
-  fontlist=(char **) AcquireQuantumMemory((size_t) fonts,sizeof(*fontlist));
-  if (fontlist == (char **) NULL)
-    {
-      XNoticeWidget(display,windows,"MemoryAllocationFailed",
-        "UnableToViewFonts");
-      return;
-    }
-  for (i=0; i < fonts; i++)
-    fontlist[i]=listhead[i];
-  qsort((void *) fontlist,(size_t) fonts,sizeof(*fontlist),FontCompare);
+  if (AcquireFontList(display,windows,glob_pattern,&run_targets) == MagickFalse)
+    return;
   /*
     Determine Font Browser widget attributes.
   */
