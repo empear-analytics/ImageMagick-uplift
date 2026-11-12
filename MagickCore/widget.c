@@ -2111,7 +2111,9 @@ typedef struct _ColorBrowserTargets
 
   XWidgetInfo
     *list_info,
-    *expose_info;
+    *expose_info,
+    *text_info,
+    *selection_info;
 } ColorBrowserTargets;
 
 typedef struct _ColorBrowserContext
@@ -2145,7 +2147,8 @@ typedef struct _ColorBrowserContext
     width;
 
   char
-    *reply;
+    *reply,
+    *text;
 } ColorBrowserContext;
 
 static void ClientColorBrowserMessage(const ColorBrowserContext *context,
@@ -3009,6 +3012,44 @@ static void InitializeColorBrowserList(const ColorBrowserContext *context,
     (*state)|=JumpListState;
 }
 
+static void InitializeColorBrowserText(const ColorBrowserContext *context,
+  const ColorBrowserTargets *widgets)
+{
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  char
+    *const text = context->text;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const list_info = widgets->list_info,
+    *const text_info = widgets->text_info,
+    *const selection_info = widgets->selection_info;
+
+  /*
+    Initialize text information.
+  */
+  *text='\0';
+  XGetWidgetInfo(text,text_info);
+  (*text_info).center=MagickFalse;
+  (*text_info).width=(*reply_info).width;
+  (*text_info).height=height;
+  (*text_info).x=(*list_info).x-(int) (QuantumMargin >> 1);
+  (*text_info).y=QuantumMargin;
+  /*
+    Initialize selection information.
+  */
+  XGetWidgetInfo((char *) NULL,selection_info);
+  (*selection_info).center=MagickFalse;
+  (*selection_info).width=(*list_info).width;
+  (*selection_info).height=(unsigned int) ((9*height) >> 3);
+  (*selection_info).x=(*list_info).x;
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3086,7 +3127,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     color_widgets = { &reply_info, &state,
       &grab_info, &reset_info, &action_info, &cancel_info, &slider_info,
       &colors, &scroll_info, &visible_colors, &north_info, &delay, &south_info,
-      &mode_info, &colorlist, &list_info, &expose_info };
+      &mode_info, &colorlist, &list_info, &expose_info, &text_info,
+      &selection_info };
 
   ColorBrowserContext
     color_context;
@@ -3200,6 +3242,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   color_context.action=action;
   color_context.width=width;
   color_context.reply=reply;
+  color_context.text=text;
   do
   {
     if (state & UpdateConfigurationState)
@@ -3208,24 +3251,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
         InitializeColorBrowserReply(&color_context,&color_widgets);
         InitializeColorBrowserScroll(&color_context,&color_widgets);
         InitializeColorBrowserList(&color_context,&color_widgets);
-        /*
-          Initialize text information.
-        */
-        *text='\0';
-        XGetWidgetInfo(text,&text_info);
-        text_info.center=MagickFalse;
-        text_info.width=reply_info.width;
-        text_info.height=height;
-        text_info.x=list_info.x-(int) (QuantumMargin >> 1);
-        text_info.y=QuantumMargin;
-        /*
-          Initialize selection information.
-        */
-        XGetWidgetInfo((char *) NULL,&selection_info);
-        selection_info.center=MagickFalse;
-        selection_info.width=list_info.width;
-        selection_info.height=(unsigned int) ((9*height) >> 3);
-        selection_info.x=list_info.x;
+        InitializeColorBrowserText(&color_context,&color_widgets);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
     if (state & RedrawWidgetState)
