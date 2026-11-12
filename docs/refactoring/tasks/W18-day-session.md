@@ -391,3 +391,34 @@ needs otool on this machine, so `obj_modulo.sh` with dummy caller and helper nam
   `width=WidgetTextWidth(...title)` is a dead store; Dialog's SelectionRequest case has no `break;` and falls into
   `default:`; Dialog's `windows->widget.height < windows->widget.min_height` can never be true; Command's moved
   ConfigureNotify and Expose cases are unreached by the oracle.
+
+## Lane d, fourth round: segment.c 9.02 -> 9.09 (merged, with 33 new oracle cases); the reach lever ends
+
+2 commits; whole catalogue on the lane tip and the merged tree 15,955 cases (15,922 plus the 33 new), 0 diverged, no load
+timeouts. 1f4a88df6 `oracle:` (tools only): imdriver command `dynthreshold IMAGE CLUSTER SMOOTH` printing the status and the
+returned (red, green, blue), and 33 cases over 11 corpus images (rose, rose_blur, rose_alpha, palette, gray16, bilevel,
+tiny, tall, wide, hdri, cmyk) with three threshold pairs each (ids via `--filter dynthreshold`); before them
+`GetImageDynamicThreshold` and about 15 helpers were unreached (API only). A coverage build shows every line of the function
+and its helpers executed except the allocation-failure exits; each case ran twice on the baseline with identical output.
+6fa5e87b0 Recipe W on `GetImageDynamicThreshold`: the histogram/extrema allocation loop becomes
+`AcquireDynamicHistograms(image,histogram,extrema,exception)`; 9.02 -> 9.09 (the function leaves Bumpy Road with one bump
+left, so no finding; the helper has no finding); verify passed (guard, `--calls`, CI warnings, 33 cases, 0 diverged); only
+the success path is oracle-checked, the allocation-failure exits by reading; **the moved `ThrowMagickException` now names the
+helper in `GetMagickModule()`** (E step 6 effect; the owner question from W14 and W17). The second bump (`head == NULL`)
+was not taken (one bump already clears the finding). Plateau at 9.09: Lines of Code (1,655) and the public 5-argument
+`GetImageDynamicThreshold` and 6-argument `SegmentImage`; `split_source.py` refuses both roots (40 shared statics).
+- **Other candidates checked (no commit).** The stale `casemap.json` keys functions by pre-split file names, so reach was
+  matched by function name and cross-checked with the wide lcov. `GetImageDynamicThreshold` was the only unreached function
+  with a finding in a non-wide file; other zero-reach functions in files below 10 are failure-path `Relinquish*` helpers,
+  progress helpers and public API in plateau files, none carrying a finding. magnify.c 8.84: `Scale3X` and `Xbr2X` are fully
+  covered (reach is not the blocker); the chain needs the two unruled recipes (the `?:` fold, NS accepting a reached function
+  without IDENTICAL), probed at about 9.07 with `Scale3X` still cc 12. montage.c 9.11: the line budget (about one line under
+  1,000), not reach. colorspace-convert.c 9.08: label calls have different signatures, so TB/KT do not apply. morphology.c
+  6.19: `split_source.py` accepts families of 1 to 4 functions in a 180-function file, which would not clear Number of
+  Functions. plasma, composite, compare-similarity: clone cliffs, label-run questions or the FFTW/HDRI region.
+- Possible upstream: when `extrema[i]` allocation fails but `histogram[i]` succeeded (or the reverse),
+  `RelinquishHistogramsBelow(i,...)` frees only indices below `i` and the one that succeeded leaks; the `head == NULL`
+  allocation-failure return leaks the histogram and extrema arrays; `extrema` (short) is allocated with
+  `sizeof(**histogram)`, so it is over-allocated (harmless). Tooling: `verify_wt.sh --function` exits on the stale
+  `casemap.json` (rebuild it once, in the foreground, when no lane is running); the pre-commit hook needs a login shell
+  (`bash -ls`) to find `node`.
