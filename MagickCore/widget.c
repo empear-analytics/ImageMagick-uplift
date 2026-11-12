@@ -4670,6 +4670,50 @@ static void KeyDialogRelease(const DialogContext *context,
     (*state)&=(unsigned int) (~ControlState);
 }
 
+static void MoveDialogButtons(const DialogContext *context,XEvent event,
+  const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const action_info = targets->action_info,
+    *const cancel_info = targets->cancel_info;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
+  if ((*state) & InactiveWidgetState)
+    return;
+  if ((*action_info).raised == MatteIsActive((*action_info),event.xmotion))
+    {
+      /*
+        Action button status changed.
+      */
+      (*action_info).raised=(*action_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if ((*cancel_info).raised == MatteIsActive((*cancel_info),event.xmotion))
+    {
+      /*
+        Cancel button status changed.
+      */
+      (*cancel_info).raised=(*cancel_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -4916,32 +4960,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
       }
       case MotionNotify:
       {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (state & InactiveWidgetState)
-          break;
-        if (action_info.raised == MatteIsActive(action_info,event.xmotion))
-          {
-            /*
-              Action button status changed.
-            */
-            action_info.raised=action_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        if (cancel_info.raised == MatteIsActive(cancel_info,event.xmotion))
-          {
-            /*
-              Cancel button status changed.
-            */
-            cancel_info.raised=cancel_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
+        MoveDialogButtons(&context,event,&targets);
         break;
       }
       case SelectionClear:
