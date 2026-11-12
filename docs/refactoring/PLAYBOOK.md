@@ -7887,6 +7887,61 @@ M120): cc 12 to 7, the file 6.02 to 6.21, object file unchanged. Added by Claude
 
 ---
 
+## Recipe DT - Drop a Boolean Ternary After a Logical Expression
+
+**Use when:** CodeScene reports *Complex Method* on a function that ends in, or assigns,
+`(<expr>) ? MagickTrue : MagickFalse` where `<expr>` is a comparison or a chain of
+comparisons joined by `&&` and `||` (the form Recipe P gives its predicates; `policy.c`'s
+`IsPolicyPathSeparator`, `IsNewPolicyPath`, `IsLimitPolicyDomain` and `IsPathAuthorized`).
+Each `?:` counts as a branch.
+
+**Not covered by:** Recipe P, which writes the ternary; Recipe CN, which merges nested
+tests. Neither removes one.
+
+**How:**
+
+1. Find `? MagickTrue : MagickFalse` (or `? MagickFalse : MagickTrue`, with the test's
+   sense kept as written) whose condition is a comparison (`==`, `!=`, `<`, ...), a `!`
+   test, or `&&` / `||` of those, all of which yield `0` or `1` in C.
+2. Delete the ternary and keep the condition: `return(a == b);`, `status = (a != b) &&
+   (c == d);`. A condition that is a bare value (`return(p ? MagickTrue : MagickFalse);`,
+   `x & mask`) is refused: its value is not `0` or `1`.
+3. `MagickFalse` is `0` and `MagickTrue` is `1` (`MagickCore/magick-type.h`); check it
+   once by reading. A `MagickBooleanType` function returning, or a variable of that type
+   assigned, an `int` of `0` or `1` is the same value.
+4. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL`; otherwise revert the
+   step. Run `tools/ci_warnings.sh <file>` and keep the step only if it prints `OK`.
+
+**Before:**
+
+```c
+  return(((policy_info[i]->domain == CachePolicyDomain) ||
+    (policy_info[i]->domain == ResourcePolicyDomain)) ? MagickTrue : MagickFalse);
+```
+
+**After:**
+
+```c
+  return((policy_info[i]->domain == CachePolicyDomain) ||
+    (policy_info[i]->domain == ResourcePolicyDomain));
+```
+
+**Careful:**
+
+- Recipe P's predicates keep the ternary for the sake of the type; where the object file
+  is unchanged and the warnings clean, the form is the same program.
+- A condition whose value can be other than `0` or `1` (a bit test, a pointer) must keep
+  the ternary: step 2.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD` and `tools/ci_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-12, from `policy.c` (campaign B, M120): seven ternaries, the
+file 6.21 to 6.38, object code identical. Added by Claude Code (Claude Sonnet 5.5) under
+the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -8195,3 +8250,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | QS | Replace the quote-state and bracket-depth loop that skips a DOCTYPE by `SkipQuotedText` and `SkipDoctypeElement`; evidence oracle | `policy.c`'s `LoadPolicyCache` (5.45 to 5.76); E with EJ leaves a cc 12 helper the gate refuses | mandate (2026-10-24) |
 | 2026-11-12 | NEW | LF | Move a loop's leading run of `if (<test>) continue;` into one `Is<Name>` predicate; evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (5.88 to 5.93); P names one expression and keeps its `if` | mandate (2026-10-24) |
 | 2026-11-12 | NEW | DL | Drop `case` labels that fall straight into `default:`; proof `obj_identical.sh` | `policy.c`'s `SetMagickSecurityPolicyValue` (five enumerator labels; 6.02 to 6.21, object code identical) | mandate (2026-10-24) |
+| 2026-11-12 | NEW | DT | Drop `? MagickTrue : MagickFalse` after a comparison or a chain of them; proof `obj_identical.sh` and `ci_warnings.sh` | `policy.c` (seven sites in five functions; 6.21 to 6.38, object code identical); P writes the ternary and nothing removes it | mandate (2026-10-24) |
