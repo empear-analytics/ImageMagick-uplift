@@ -1575,6 +1575,17 @@ MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
   return(status);
 }
 
+static MagickSizeType GetPolicyLimit(const char *value)
+{
+  MagickSizeType
+    limit;
+
+  limit=MagickResourceInfinity;
+  if (LocaleCompare("unlimited",value) != 0)
+    limit=StringToMagickSizeType(value,100.0);
+  return(limit);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1641,9 +1652,7 @@ MagickExport MagickBooleanType SetMagickSecurityPolicyValue(
           MagickSizeType
             limit;
 
-          limit=MagickResourceInfinity;
-          if (LocaleCompare("unlimited",value) != 0)
-            limit=StringToMagickSizeType(value,100.0);
+          limit=GetPolicyLimit(value);
           if ((ResourceType) type == TimeResource)
             limit=(MagickSizeType) ParseMagickTimeToLive(value);
           return(SetMagickResourceLimit((ResourceType) type,limit));
@@ -1654,24 +1663,12 @@ MagickExport MagickBooleanType SetMagickSecurityPolicyValue(
     {
       if (LocaleCompare(name,"max-memory-request") == 0)
         {
-          MagickSizeType
-            limit;
-
-          limit=MagickResourceInfinity;
-          if (LocaleCompare("unlimited",value) != 0)
-            limit=StringToMagickSizeType(value,100.0);
-          SetMaxMemoryRequest(limit);
+          SetMaxMemoryRequest(GetPolicyLimit(value));
           return(MagickTrue);
         }
       if (LocaleCompare(name,"max-profile-size") == 0)
         {
-          MagickSizeType
-            limit;
-
-          limit=MagickResourceInfinity;
-          if (LocaleCompare("unlimited",value) != 0)
-            limit=StringToMagickSizeType(value,100.0);
-          SetMaxProfileSize(limit);
+          SetMaxProfileSize(GetPolicyLimit(value));
           return(MagickTrue);
         }
       if (LocaleCompare(name,"memory-map") == 0)
