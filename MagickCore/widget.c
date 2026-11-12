@@ -2072,6 +2072,60 @@ static size_t LeaveWidgetWindow(XWindows *windows,const XEvent event,
   return(state);
 }
 
+typedef struct _ColorBrowserTargets
+{
+  XWidgetInfo
+    *reply_info;
+
+  size_t
+    *state;
+} ColorBrowserTargets;
+
+typedef struct _ColorBrowserContext
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+} ColorBrowserContext;
+
+static void ClientColorBrowserMessage(const ColorBrowserContext *context,
+  const XEvent event,const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  /*
+    If client window delete message, exit.
+  */
+  if (event.xclient.message_type != windows->wm_protocols)
+    return;
+  if (*event.xclient.data.l == (int) windows->wm_take_focus)
+    {
+      (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
+        (Time) event.xclient.data.l[1]);
+      return;
+    }
+  if (*event.xclient.data.l != (int) windows->wm_delete_window)
+    return;
+  if (event.xclient.window == windows->widget.id)
+    {
+      *(*reply_info).text='\0';
+      (*state)|=ExitState;
+      return;
+    }
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2150,6 +2204,12 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
 
   const FontBrowserTargets
     targets = { &reply_info, &state, &selection_info, &list_info };
+
+  const ColorBrowserTargets
+    color_widgets = { &reply_info, &state };
+
+  ColorBrowserContext
+    color_context;
 
   /*
     Get color list and sort in ascending order.
@@ -2249,6 +2309,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   visible_colors=0;
   delay=SuspendTime << 2;
   state=UpdateConfigurationState;
+  color_context.display=display;
+  color_context.windows=windows;
   do
   {
     if (state & UpdateConfigurationState)
@@ -2795,25 +2857,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case ClientMessage:
       {
-        /*
-          If client window delete message, exit.
-        */
-        if (event.xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event.xclient.data.l == (int) windows->wm_take_focus)
-          {
-            (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
-              (Time) event.xclient.data.l[1]);
-            break;
-          }
-        if (*event.xclient.data.l != (int) windows->wm_delete_window)
-          break;
-        if (event.xclient.window == windows->widget.id)
-          {
-            *reply_info.text='\0';
-            state|=ExitState;
-            break;
-          }
+        ClientColorBrowserMessage(&color_context,event,&color_widgets);
         break;
       }
       case ConfigureNotify:
