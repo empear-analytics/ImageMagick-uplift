@@ -10120,6 +10120,27 @@ static void FreeFontBrowserList(char **listhead,char **fontlist)
   fontlist=(char **) RelinquishMagickMemory(fontlist);
 }
 
+static unsigned int GetFontBrowserWidth(XFontStruct *font_info,
+  const char *action)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,(char *) action);
+  if (WidgetTextWidth(font_info,CancelButtonText) > width)
+    width=WidgetTextWidth(font_info,CancelButtonText);
+  if (WidgetTextWidth(font_info,ResetButtonText) > width)
+    width=WidgetTextWidth(font_info,ResetButtonText);
+  if (WidgetTextWidth(font_info,BackButtonText) > width)
+    width=WidgetTextWidth(font_info,BackButtonText);
+  width+=(unsigned int) QuantumMargin;
+  if (WidgetTextWidth(font_info,FontPatternText) > width)
+    width=WidgetTextWidth(font_info,FontPatternText);
+  if (WidgetTextWidth(font_info,FontnameText) > width)
+    width=WidgetTextWidth(font_info,FontnameText);
+  return(width);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -10246,18 +10267,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   for (i=0; i < fonts; i++)
     if (WidgetTextWidth(font_info,fontlist[i]) > text_width)
       text_width=WidgetTextWidth(font_info,fontlist[i]);
-  width=WidgetTextWidth(font_info,(char *) action);
-  if (WidgetTextWidth(font_info,CancelButtonText) > width)
-    width=WidgetTextWidth(font_info,CancelButtonText);
-  if (WidgetTextWidth(font_info,ResetButtonText) > width)
-    width=WidgetTextWidth(font_info,ResetButtonText);
-  if (WidgetTextWidth(font_info,BackButtonText) > width)
-    width=WidgetTextWidth(font_info,BackButtonText);
-  width+=(unsigned int) QuantumMargin;
-  if (WidgetTextWidth(font_info,FontPatternText) > width)
-    width=WidgetTextWidth(font_info,FontPatternText);
-  if (WidgetTextWidth(font_info,FontnameText) > width)
-    width=WidgetTextWidth(font_info,FontnameText);
+  width=GetFontBrowserWidth(font_info,action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   /*
     Position Font Browser widget.
