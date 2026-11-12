@@ -2773,6 +2773,12 @@ static MagickBooleanType SkipDelegateElement(const char **q,
   return(MagickFalse);
 }
 
+static inline MagickBooleanType IsDelegateEnd(const char *keyword)
+{
+  return(((LocaleCompare(keyword,"/>") == 0) ||
+    (LocaleCompare(keyword,"</policy>") == 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType IsIncludeFileAttribute(const char **q,
   const size_t extent,char *keyword,char *token)
 {
@@ -2878,8 +2884,7 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
       }
     if (delegate_info == (DelegateInfo *) NULL)
       continue;
-    if ((LocaleCompare(keyword,"/>") == 0) ||
-        (LocaleCompare(keyword,"</policy>") == 0))
+    if (IsDelegateEnd(keyword) != MagickFalse)
       {
         status=AppendValueToLinkedList(cache,delegate_info);
         if (status == MagickFalse)
