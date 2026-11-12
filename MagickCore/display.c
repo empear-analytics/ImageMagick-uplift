@@ -2498,6 +2498,84 @@ static MagickBooleanType XAnnotateKeyPress(
   return(MagickTrue);
 }
 
+static MagickBooleanType XPasteSelectionCharacter(
+  const AnnotateTextInput *text_input,const AnnotateTargets *targets,
+  unsigned char *data,const ssize_t i)
+{
+  Display
+    *const display = text_input->display;
+
+  XWindows
+    *const windows = text_input->windows;
+
+  const GC
+    annotate_context = text_input->annotate_context;
+
+  XFontStruct
+    *const font_info = text_input->font_info;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  if ((char) data[i] != '\n')
+    {
+      /*
+        Draw a single character on the Image window.
+      */
+      *(*p)=(char) data[i];
+      (void) XDrawString(display,windows->image.id,annotate_context,
+        (*x),(*y),(*p),1);
+      (*x)+=XTextWidth(font_info,(*p),1);
+      (*p)++;
+      if (((*x)+font_info->max_bounds.width) < (int) windows->image.width)
+        return(MagickTrue);
+    }
+  /*
+    Advance to the next line of text.
+  */
+  *(*p)='\0';
+  (*annotate_info)->width=(unsigned int) XTextWidth(font_info,
+    (*annotate_info)->text,(int) strlen((*annotate_info)->text));
+  if ((*annotate_info)->next != (XAnnotateInfo *) NULL)
+    {
+      /*
+        Line of text already exists.
+      */
+      (*annotate_info)=(*annotate_info)->next;
+      (*x)=(*annotate_info)->x;
+      (*y)=(*annotate_info)->y;
+      (*p)=(*annotate_info)->text;
+      return(MagickTrue);
+    }
+  (*annotate_info)->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
+    sizeof(*(*annotate_info)->next));
+  if ((*annotate_info)->next == (XAnnotateInfo *) NULL)
+    return(MagickFalse);
+  *(*annotate_info)->next=(*(*annotate_info));
+  (*annotate_info)->next->previous=(*annotate_info);
+  (*annotate_info)=(*annotate_info)->next;
+  (*annotate_info)->text=(char *) AcquireQuantumMemory((size_t)
+    (windows->image.width/MagickMax((ssize_t)
+    font_info->min_bounds.width,1)+2L),sizeof(*(*annotate_info)->text));
+  if ((*annotate_info)->text == (char *) NULL)
+    return(MagickFalse);
+  (*annotate_info)->y+=(ssize_t) (*annotate_info)->height;
+  if ((*annotate_info)->y > (int) windows->image.height)
+    (*annotate_info)->y=(int) (*annotate_info)->height;
+  (*annotate_info)->next=(XAnnotateInfo *) NULL;
+  (*x)=(*annotate_info)->x;
+  (*y)=(*annotate_info)->y;
+  (*p)=(*annotate_info)->text;
+  return(MagickTrue);
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -3003,6 +3081,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       }
       case SelectionNotify:
       {
+        AnnotateTextInput
+          text_input;
+
         Atom
           type;
 
@@ -3016,6 +3097,12 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
           after,
           length;
 
+        text_input.display=display;
+        text_input.windows=windows;
+        text_input.annotate_context=annotate_context;
+        text_input.font_info=font_info;
+        text_input.command=command;
+        text_input.state=state;
         /*
           Obtain response from primary selection.
         */
@@ -3031,55 +3118,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         */
         for (i=0; i < (ssize_t) length; i++)
         {
-          if ((char) data[i] != '\n')
-            {
-              /*
-                Draw a single character on the Image window.
-              */
-              *p=(char) data[i];
-              (void) XDrawString(display,windows->image.id,annotate_context,
-                x,y,p,1);
-              x+=XTextWidth(font_info,p,1);
-              p++;
-              if ((x+font_info->max_bounds.width) < (int) windows->image.width)
-                continue;
-            }
-          /*
-            Advance to the next line of text.
-          */
-          *p='\0';
-          annotate_info->width=(unsigned int) XTextWidth(font_info,
-            annotate_info->text,(int) strlen(annotate_info->text));
-          if (annotate_info->next != (XAnnotateInfo *) NULL)
-            {
-              /*
-                Line of text already exists.
-              */
-              annotate_info=annotate_info->next;
-              x=annotate_info->x;
-              y=annotate_info->y;
-              p=annotate_info->text;
-              continue;
-            }
-          annotate_info->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
-            sizeof(*annotate_info->next));
-          if (annotate_info->next == (XAnnotateInfo *) NULL)
+          if (XPasteSelectionCharacter(&text_input,&targets,data,i) ==
+              MagickFalse)
             return(MagickFalse);
-          *annotate_info->next=(*annotate_info);
-          annotate_info->next->previous=annotate_info;
-          annotate_info=annotate_info->next;
-          annotate_info->text=(char *) AcquireQuantumMemory((size_t)
-            (windows->image.width/MagickMax((ssize_t)
-            font_info->min_bounds.width,1)+2L),sizeof(*annotate_info->text));
-          if (annotate_info->text == (char *) NULL)
-            return(MagickFalse);
-          annotate_info->y+=(ssize_t) annotate_info->height;
-          if (annotate_info->y > (int) windows->image.height)
-            annotate_info->y=(int) annotate_info->height;
-          annotate_info->next=(XAnnotateInfo *) NULL;
-          x=annotate_info->x;
-          y=annotate_info->y;
-          p=annotate_info->text;
         }
         (void) XFree((void *) data);
         break;
