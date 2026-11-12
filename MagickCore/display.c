@@ -17593,6 +17593,37 @@ static void XPressPanWindow(const DisplayEventContext *context,XEvent *event)
     }
   }
 }
+
+static void XImageWindowKeyPress(const DisplayEventContext *context,
+  const XEvent event,const KeySym key_symbol,const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const nexus = targets->nexus;
+
+  Image
+    **const display_image = targets->display_image;
+
+  DisplayCommand
+    display_command;
+
+  display_command=XImageWindowCommand(display,resource_info,windows,
+    event.xkey.state,key_symbol,display_image,exception);
+  if (display_command != NullCommand)
+    (*nexus)=XMagickCommand(display,resource_info,windows,
+      display_command,display_image,exception);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -19091,11 +19122,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             key_symbol,command);
         if (event.xkey.window == windows->image.id)
           {
-            display_command=XImageWindowCommand(display,resource_info,windows,
-              event.xkey.state,key_symbol,&display_image,exception);
-            if (display_command != NullCommand)
-              nexus=XMagickCommand(display,resource_info,windows,
-                display_command,&display_image,exception);
+            XImageWindowKeyPress(&event_context,event,key_symbol,
+              &event_targets);
           }
         if (event.xkey.window == windows->magnify.id)
           XMagnifyWindowCommand(display,windows,event.xkey.state,key_symbol,
