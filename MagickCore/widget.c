@@ -2105,6 +2105,9 @@ typedef struct _ColorBrowserTargets
   XWidgetInfo
     *south_info,
     *mode_info;
+
+  char
+    ***colorlist;
 } ColorBrowserTargets;
 
 typedef struct _ColorBrowserContext
@@ -2127,6 +2130,9 @@ typedef struct _ColorBrowserContext
 
   char
     *primary_selection;
+
+  unsigned int
+    height;
 } ColorBrowserContext;
 
 static void ClientColorBrowserMessage(const ColorBrowserContext *context,
@@ -2669,6 +2675,44 @@ static void PressColorBrowserButtons(const ColorBrowserContext *context,
   PressColorBrowserReply(context,event,widgets);
 }
 
+static void SelectColorBrowserEntry(const ColorBrowserContext *context,
+  const XEvent event,const FontBrowserTargets *targets,
+  const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const colors = widgets->colors;
+
+  char
+    ***const colorlist = widgets->colorlist;
+
+  FontBrowserPress
+    press;
+
+  press.display=display;
+  press.windows=windows;
+  press.fontlist=(*colorlist);
+  press.fonts=(*colors);
+  press.height=height;
+  press.event=event;
+  press.slider_info=(*slider_info);
+  SelectFontBrowserEntry(&press,glob_pattern,targets);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2752,7 +2796,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     color_widgets = { &reply_info, &state,
       &grab_info, &reset_info, &action_info, &cancel_info, &slider_info,
       &colors, &scroll_info, &visible_colors, &north_info, &delay, &south_info,
-      &mode_info };
+      &mode_info, &colorlist };
 
   ColorBrowserContext
     color_context;
@@ -2862,6 +2906,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   color_context.exception=exception;
   color_context.font_info=font_info;
   color_context.primary_selection=primary_selection;
+  color_context.height=height;
   do
   {
     if (state & UpdateConfigurationState)
@@ -3234,17 +3279,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
           }
         if (MatteIsActive(list_info,event.xbutton))
           {
-            FontBrowserPress
-              press;
-
-            press.display=display;
-            press.windows=windows;
-            press.fontlist=colorlist;
-            press.fonts=colors;
-            press.height=height;
-            press.event=event;
-            press.slider_info=slider_info;
-            SelectFontBrowserEntry(&press,glob_pattern,&targets);
+            SelectColorBrowserEntry(&color_context,event,&targets,
+              &color_widgets);
             break;
           }
         PressColorBrowserButtons(&color_context,event,&color_widgets);
