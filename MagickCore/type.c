@@ -843,6 +843,33 @@ static inline size_t GetFontConfigWeight(const int weight)
   return(400);
 }
 
+static void GetFontConfigName(FcPattern *font,const FcChar8 *family,char *name)
+{
+  FcChar8
+    *fullname,
+    *style;
+
+  FcResult
+    status;
+
+  (void) CopyMagickString(name,"Unknown",MagickPathExtent);
+  status=FcPatternGetString(font,FC_FULLNAME,0,&fullname);
+  if ((status == FcResultMatch) && (fullname != (FcChar8 *) NULL))
+    (void) CopyMagickString(name,(const char *) fullname,MagickPathExtent);
+  else
+    {
+      if (family != (FcChar8 *) NULL)
+        (void) CopyMagickString(name,(const char *) family,MagickPathExtent);
+      status=FcPatternGetString(font,FC_STYLE,0,&style);
+      if (IsNonRegularFontStyle(status,style) != MagickFalse)
+        {
+          (void) ConcatenateMagickString(name," ",MagickPathExtent);
+          (void) ConcatenateMagickString(name,(const char *) style,
+            MagickPathExtent);
+        }
+    }
+}
+
 MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
   ExceptionInfo *exception)
 {
@@ -859,9 +886,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
 
   FcChar8
     *family,
-    *file,
-    *fullname,
-    *style;
+    *file;
 
   FcConfig
     *font_config;
@@ -937,22 +962,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
     (void) memset(type_info,0,sizeof(*type_info));
     type_info->path=ConstantString("System Fonts");
     type_info->signature=MagickCoreSignature;
-    (void) CopyMagickString(name,"Unknown",MagickPathExtent);
-    status=FcPatternGetString(font_set->fonts[i],FC_FULLNAME,0,&fullname);
-    if ((status == FcResultMatch) && (fullname != (FcChar8 *) NULL))
-      (void) CopyMagickString(name,(const char *) fullname,MagickPathExtent);
-    else
-      {
-        if (family != (FcChar8 *) NULL)
-          (void) CopyMagickString(name,(const char *) family,MagickPathExtent);
-        status=FcPatternGetString(font_set->fonts[i],FC_STYLE,0,&style);
-        if (IsNonRegularFontStyle(status,style) != MagickFalse)
-          {
-            (void) ConcatenateMagickString(name," ",MagickPathExtent);
-            (void) ConcatenateMagickString(name,(const char *) style,
-              MagickPathExtent);
-          }
-      }
+    GetFontConfigName(font_set->fonts[i],family,name);
     type_info->name=ConstantString(name);
     (void) SubstituteString(&type_info->name," ","-");
     type_info->family=ConstantString((const char *) family);
