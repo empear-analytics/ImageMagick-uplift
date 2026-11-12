@@ -769,6 +769,12 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
 %
 */
 
+static inline MagickBooleanType IsFontSeparator(const char *p)
+{
+  return(((*p == ':') || (*p == ';') || (*p == ',')) ? MagickTrue :
+    MagickFalse);
+}
+
 static unsigned int CountFonts(const char *font)
 {
   const char
@@ -779,7 +785,7 @@ static unsigned int CountFonts(const char *font)
 
   fonts=1U;
   for (p=font; *p != '\0'; p++)
-    if ((*p == ':') || (*p == ';') || (*p == ','))
+    if (IsFontSeparator(p) != MagickFalse)
       fonts++;
   return(fonts);
 }
@@ -815,7 +821,7 @@ static char **FontToList(char *font)
   for (i=0; i < (int) fonts; i++)
   {
     for (q=p; *q != '\0'; q++)
-      if ((*q == ':') || (*q == ';') || (*q == ','))
+      if (IsFontSeparator(q) != MagickFalse)
         break;
     fontlist[i]=(char *) AcquireQuantumMemory((size_t) (q-p)+1UL,
       sizeof(*fontlist[i]));
