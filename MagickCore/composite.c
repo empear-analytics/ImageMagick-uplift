@@ -3289,6 +3289,9 @@ typedef struct _CompositeRowInputs
 
   GeometryInfo
     geometry_info;
+
+  MagickBooleanType
+    union_coverage;
 } CompositeRowInputs;
 
 static void SetCompositeCoverageModulus(const CompositeRowInputs *row,
@@ -3406,56 +3409,63 @@ static void SetCompositeCoverageDissolve(const CompositeRowInputs *row,
   }
 }
 
+static const CompositeOperator
+  UnionCoverageOperators[] =
+  {
+    BumpmapCompositeOp,
+    ColorBurnCompositeOp,
+    ColorDodgeCompositeOp,
+    DarkenCompositeOp,
+    DifferenceCompositeOp,
+    DivideCompositeOp,
+    DivideDstCompositeOp,
+    DivideSrcCompositeOp,
+    ExclusionCompositeOp,
+    FreezeCompositeOp,
+    HardLightCompositeOp,
+    HardMixCompositeOp,
+    InterpolateCompositeOp,
+    LightenCompositeOp,
+    LinearBurnCompositeOp,
+    LinearDodgeCompositeOp,
+    LinearLightCompositeOp,
+    MathematicsCompositeOp,
+    MinusDstCompositeOp,
+    MinusSrcCompositeOp,
+    MultiplyCompositeOp,
+    NegateCompositeOp,
+    OverlayCompositeOp,
+    PegtopLightCompositeOp,
+    PinLightCompositeOp,
+    ReflectCompositeOp,
+    ScreenCompositeOp,
+    SoftBurnCompositeOp,
+    SoftDodgeCompositeOp,
+    SoftLightCompositeOp,
+    StampCompositeOp,
+    VividLightCompositeOp
+  };
+
+static MagickBooleanType IsUnionCoverageOperator(const CompositeOperator compose)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators)); i++)
+    if (UnionCoverageOperators[i] == compose)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 static void SetCompositeCoverage(const CompositeRowInputs *row,
   const MagickRealType Sa,const MagickRealType Da,MagickRealType *alpha)
 {
-  const CompositeOperator
-    compose = row->compose;
-
-  switch (compose)
-  {
-    case BumpmapCompositeOp:
-    case ColorBurnCompositeOp:
-    case ColorDodgeCompositeOp:
-    case DarkenCompositeOp:
-    case DifferenceCompositeOp:
-    case DivideCompositeOp:
-    case DivideDstCompositeOp:
-    case DivideSrcCompositeOp:
-    case ExclusionCompositeOp:
-    case FreezeCompositeOp:
-    case HardLightCompositeOp:
-    case HardMixCompositeOp:
-    case InterpolateCompositeOp:
-    case LightenCompositeOp:
-    case LinearBurnCompositeOp:
-    case LinearDodgeCompositeOp:
-    case LinearLightCompositeOp:
-    case MathematicsCompositeOp:
-    case MinusDstCompositeOp:
-    case MinusSrcCompositeOp:
-    case MultiplyCompositeOp:
-    case NegateCompositeOp:
-    case OverlayCompositeOp:
-    case PegtopLightCompositeOp:
-    case PinLightCompositeOp:
-    case ReflectCompositeOp:
-    case ScreenCompositeOp:
-    case SoftBurnCompositeOp:
-    case SoftDodgeCompositeOp:
-    case SoftLightCompositeOp:
-    case StampCompositeOp:
-    case VividLightCompositeOp:
+  if (row->union_coverage != MagickFalse)
     {
       (*alpha)=RoundToUnity(Sa+Da-Sa*Da);
-      break;
+      return;
     }
-    default:
-    {
-      SetCompositeCoverageDissolve(row,Sa,Da,alpha);
-      break;
-    }
-  }
+  SetCompositeCoverageDissolve(row,Sa,Da,alpha);
 }
 
 typedef struct _CompositePixelInputs
@@ -5316,6 +5326,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     row.image=image;
     row.source_image=source_image;
     row.compose=compose;
+    row.union_coverage=IsUnionCoverageOperator(compose);
     row.clip_to_self=clip_to_self;
     row.x_offset=x_offset;
     row.y_offset=y_offset;
