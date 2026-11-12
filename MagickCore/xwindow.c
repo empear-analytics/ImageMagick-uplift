@@ -4469,6 +4469,32 @@ typedef struct _ColormapInfo
     *next;
 } ColormapInfo;
 
+static MagickBooleanType IsWindowImported(const WindowInfo *window_info,
+  const int id)
+{
+  int
+    j;
+
+  MagickBooleanType
+    import;
+
+  /*
+    Does target window intersect top level window?
+  */
+  import=IntersectsTopLevelWindow(window_info,id);
+  /*
+    Is target window contained by another window with the same colormap?
+  */
+  for (j=0; j < id; j++)
+    if ((window_info[id].visual == window_info[j].visual) &&
+        (window_info[id].colormap == window_info[j].colormap))
+      {
+        if (IsInsideWindowBounds(window_info,id,j) != MagickFalse)
+          import=MagickFalse;
+      }
+  return(import);
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4642,9 +4668,6 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
       MagickBooleanType
         import;
 
-      int
-        j;
-
       unsigned int
         number_colors;
 
@@ -4663,17 +4686,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
         /*
           Does target window intersect top level window?
         */
-        import=IntersectsTopLevelWindow(window_info,id);
-        /*
-          Is target window contained by another window with the same colormap?
-        */
-        for (j=0; j < id; j++)
-          if ((window_info[id].visual == window_info[j].visual) &&
-              (window_info[id].colormap == window_info[j].colormap))
-            {
-              if (IsInsideWindowBounds(window_info,id,j) != MagickFalse)
-                import=MagickFalse;
-            }
+        import=IsWindowImported(window_info,id);
         if (import == MagickFalse)
           continue;
         /*
