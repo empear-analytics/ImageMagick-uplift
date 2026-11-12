@@ -8526,6 +8526,9 @@ typedef struct _FontBrowserWidgets
 
   XFontStruct
     **font_info;
+
+  char
+    ***fontlist;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -8541,6 +8544,9 @@ typedef struct _FontBrowserContext
     *back_pattern,
     *reset_pattern,
     *primary_selection;
+
+  unsigned int
+    height;
 } FontBrowserContext;
 
 static void ClientFontBrowserMessage(const FontBrowserContext *context,
@@ -9029,6 +9035,44 @@ static void PressFontBrowserButtons(const FontBrowserContext *context,
   PressFontBrowserReply(context,event,widgets);
 }
 
+static void ChooseFontBrowserEntry(const FontBrowserContext *context,
+  const XEvent event,const FontBrowserTargets *targets,
+  const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  int
+    *const fonts = widgets->fonts;
+
+  char
+    ***const fontlist = widgets->fontlist;
+
+  FontBrowserPress
+    press;
+
+  press.display=display;
+  press.windows=windows;
+  press.fontlist=(*fontlist);
+  press.fonts=(*fonts);
+  press.height=height;
+  press.event=event;
+  press.slider_info=(*slider_info);
+  SelectFontBrowserEntry(&press,glob_pattern,targets);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9108,7 +9152,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     font_widgets = { &reply_info, &state, &back_info,
       &reset_info, &action_info, &cancel_info, &slider_info, &fonts,
       &scroll_info, &visible_fonts, &north_info, &delay, &south_info, &i,
-      &font_info };
+      &font_info, &fontlist };
 
   FontBrowserContext
     font_context;
@@ -9230,6 +9274,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   font_context.back_pattern=back_pattern;
   font_context.reset_pattern=reset_pattern;
   font_context.primary_selection=primary_selection;
+  font_context.height=height;
   do
   {
     if (state & UpdateConfigurationState)
@@ -9622,17 +9667,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
           }
         if (MatteIsActive(list_info,event.xbutton))
           {
-            FontBrowserPress
-              press;
-
-            press.display=display;
-            press.windows=windows;
-            press.fontlist=fontlist;
-            press.fonts=fonts;
-            press.height=height;
-            press.event=event;
-            press.slider_info=slider_info;
-            SelectFontBrowserEntry(&press,glob_pattern,&targets);
+            ChooseFontBrowserEntry(&font_context,event,&targets,&font_widgets);
             break;
           }
         PressFontBrowserButtons(&font_context,event,&font_widgets);
