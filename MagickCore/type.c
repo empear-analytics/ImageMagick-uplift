@@ -1185,6 +1185,17 @@ static void GetIncludePath(const char *filename,const char *token,
     (void) ConcatenateMagickString(path,token,MagickPathExtent);
 }
 
+static size_t ParseTypeWeight(const char *token)
+{
+  ssize_t
+    weight;
+
+  weight=ParseCommandOption(MagickWeightOptions,MagickFalse,token);
+  if (weight == -1)
+    weight=(ssize_t) StringToUnsignedLong(token);
+  return((size_t) weight);
+}
+
 static TypeInfo *SetTypeInfoAttribute(TypeInfo *type_info,const char *keyword,
   const char *token,const char *filename,const char *font_path)
 {
@@ -1221,15 +1232,7 @@ static TypeInfo *SetTypeInfoAttribute(TypeInfo *type_info,const char *keyword,
     type_info->style=(StyleType) ParseCommandOption(MagickStyleOptions,
       MagickFalse,token);
   else if (LocaleCompare((char *) keyword,"weight") == 0)
-    {
-      ssize_t
-        weight;
-
-      weight=ParseCommandOption(MagickWeightOptions,MagickFalse,token);
-      if (weight == -1)
-        weight=(ssize_t) StringToUnsignedLong(token);
-      type_info->weight=(size_t) weight;
-    }
+    type_info->weight=ParseTypeWeight(token);
   return(type_info);
 }
 
