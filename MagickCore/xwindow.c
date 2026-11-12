@@ -674,6 +674,18 @@ static void XRotateAnnotateOrigin(const Image *annotate_image,
   }
 }
 
+static MagickBooleanType XAcquireAnnotateImage(
+  const XAnnotateInfo *annotate_info,Image **annotate_image,
+  ExceptionInfo *exception)
+{
+  (*annotate_image)=AcquireImage((ImageInfo *) NULL,exception);
+  if ((*annotate_image) == (Image *) NULL)
+    return(MagickFalse);
+  (*annotate_image)->columns=annotate_info->width;
+  (*annotate_image)->rows=annotate_info->height;
+  return(MagickTrue);
+}
+
 MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
   ExceptionInfo *exception)
@@ -757,11 +769,9 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   /*
     Initialize annotated image.
   */
-  annotate_image=AcquireImage((ImageInfo *) NULL,exception);
-  if (annotate_image == (Image *) NULL)
+  if (XAcquireAnnotateImage(annotate_info,&annotate_image,exception) ==
+      MagickFalse)
     return(MagickFalse);
-  annotate_image->columns=annotate_info->width;
-  annotate_image->rows=annotate_info->height;
   /*
     Transfer annotated X image to image.
   */
