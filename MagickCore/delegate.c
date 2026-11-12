@@ -2194,6 +2194,19 @@ static void ExecuteDelegateCommand(const DelegateExecution *execution,
     }
 }
 
+static MagickBooleanType CopyDelegateOutput(const ImageInfo *image_info,
+  const char *input_filename,const char *output_filename,
+  ExceptionInfo *exception)
+{
+  if ((strcmp(input_filename,output_filename) != 0) &&
+      (CopyDelegateFile(image_info->filename,output_filename,MagickTrue,exception) == MagickFalse))
+    {
+      (void) RelinquishUniqueFileResource(output_filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void RelinquishDelegateFiles(const ImageInfo *image_info,
   const Image *image)
 {
@@ -2334,12 +2347,9 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
     execution.exception=exception;
     ExecuteDelegateCommand(&execution,&status,&command);
     RestoreDelegateInput(image,input_filename,exception,&status);
-    if ((strcmp(input_filename,output_filename) != 0) &&
-        (CopyDelegateFile(image_info->filename,output_filename,MagickTrue,exception) == MagickFalse))
-      {
-        (void) RelinquishUniqueFileResource(output_filename);
-        status=MagickFalse;
-      }
+    if (CopyDelegateOutput(image_info,input_filename,output_filename,
+        exception) == MagickFalse)
+      status=MagickFalse;
     RelinquishDelegateFiles(image_info,image);
     if (status == MagickFalse)
       {
