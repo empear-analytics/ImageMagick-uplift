@@ -3881,6 +3881,27 @@ static void WithdrawBrowserWidget(Display *display,XWindows *windows)
   XCheckRefreshWindows(display,windows);
 }
 
+static unsigned int GetColorBrowserWidth(XFontStruct *font_info,
+  const char *action)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,(char *) action);
+  if (WidgetTextWidth(font_info,CancelButtonText) > width)
+    width=WidgetTextWidth(font_info,CancelButtonText);
+  if (WidgetTextWidth(font_info,ResetButtonText) > width)
+    width=WidgetTextWidth(font_info,ResetButtonText);
+  if (WidgetTextWidth(font_info,GrabButtonText) > width)
+    width=WidgetTextWidth(font_info,GrabButtonText);
+  width+=(unsigned int) QuantumMargin;
+  if (WidgetTextWidth(font_info,ColorPatternText) > width)
+    width=WidgetTextWidth(font_info,ColorPatternText);
+  if (WidgetTextWidth(font_info,ColornameText) > width)
+    width=WidgetTextWidth(font_info,ColornameText);
+  return(width);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3945,18 +3966,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   */
   font_info=windows->widget.font_info;
   text_width=WidestColorBrowserName(font_info,colorlist,colors);
-  width=WidgetTextWidth(font_info,(char *) action);
-  if (WidgetTextWidth(font_info,CancelButtonText) > width)
-    width=WidgetTextWidth(font_info,CancelButtonText);
-  if (WidgetTextWidth(font_info,ResetButtonText) > width)
-    width=WidgetTextWidth(font_info,ResetButtonText);
-  if (WidgetTextWidth(font_info,GrabButtonText) > width)
-    width=WidgetTextWidth(font_info,GrabButtonText);
-  width+=(unsigned int) QuantumMargin;
-  if (WidgetTextWidth(font_info,ColorPatternText) > width)
-    width=WidgetTextWidth(font_info,ColorPatternText);
-  if (WidgetTextWidth(font_info,ColornameText) > width)
-    width=WidgetTextWidth(font_info,ColornameText);
+  width=GetColorBrowserWidth(font_info,action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   {
     const ColorBrowserLayout
