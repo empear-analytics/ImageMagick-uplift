@@ -3778,37 +3778,15 @@ static unsigned int WidestColorBrowserName(XFontStruct *font_info,
   return(text_width);
 }
 
-MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
-  const char *action,char *reply)
+static void RunColorBrowser(const ColorBrowserContext *context,
+  char ***colorlist,size_t *colors,MagickStatusType *mask)
 {
-  char
-    **colorlist,
-    primary_selection[MagickPathExtent],
-    reset_pattern[MagickPathExtent],
-    text[MagickPathExtent];
-
-  ExceptionInfo
-    *exception;
-
-  static char
-    glob_pattern[MagickPathExtent] = "*";
-
-  static MagickStatusType
-    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
-
   unsigned int
-    height,
-    text_width,
-    visible_colors,
-    width;
+    visible_colors;
 
   size_t
-    colors,
     delay,
     state;
-
-  XFontStruct
-    *font_info;
 
   XWidgetInfo
     action_info,
@@ -3832,9 +3810,53 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const ColorBrowserTargets
     color_widgets = { &reply_info, &state,
       &grab_info, &reset_info, &action_info, &cancel_info, &slider_info,
-      &colors, &scroll_info, &visible_colors, &north_info, &delay, &south_info,
-      &mode_info, &colorlist, &list_info, &expose_info, &text_info,
-      &selection_info, &mask };
+      colors, &scroll_info, &visible_colors, &north_info, &delay, &south_info,
+      &mode_info, colorlist, &list_info, &expose_info, &text_info,
+      &selection_info, mask };
+
+  /*
+    Respond to X events.
+  */
+  XGetWidgetInfo((char *) NULL,&mode_info);
+  XGetWidgetInfo((char *) NULL,&slider_info);
+  XGetWidgetInfo((char *) NULL,&north_info);
+  XGetWidgetInfo((char *) NULL,&south_info);
+  XGetWidgetInfo((char *) NULL,&expose_info);
+  XGetWidgetInfo((char *) NULL,&selection_info);
+  visible_colors=0;
+  delay=SuspendTime << 2;
+  state=UpdateConfigurationState;
+  RespondToColorBrowserEvents(context,&targets,&color_widgets);
+}
+
+MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
+  const char *action,char *reply)
+{
+  char
+    **colorlist,
+    primary_selection[MagickPathExtent],
+    reset_pattern[MagickPathExtent],
+    text[MagickPathExtent];
+
+  ExceptionInfo
+    *exception;
+
+  static char
+    glob_pattern[MagickPathExtent] = "*";
+
+  static MagickStatusType
+    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
+
+  unsigned int
+    height,
+    text_width,
+    width;
+
+  size_t
+    colors;
+
+  XFontStruct
+    *font_info;
 
   ColorBrowserContext
     color_context;
@@ -3906,18 +3928,6 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     Map Color Browser widget.
   */
   MapColorBrowserWidget(display,windows,mask);
-  /*
-    Respond to X events.
-  */
-  XGetWidgetInfo((char *) NULL,&mode_info);
-  XGetWidgetInfo((char *) NULL,&slider_info);
-  XGetWidgetInfo((char *) NULL,&north_info);
-  XGetWidgetInfo((char *) NULL,&south_info);
-  XGetWidgetInfo((char *) NULL,&expose_info);
-  XGetWidgetInfo((char *) NULL,&selection_info);
-  visible_colors=0;
-  delay=SuspendTime << 2;
-  state=UpdateConfigurationState;
   color_context.display=display;
   color_context.windows=windows;
   color_context.glob_pattern=glob_pattern;
@@ -3930,7 +3940,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   color_context.width=width;
   color_context.reply=reply;
   color_context.text=text;
-  RespondToColorBrowserEvents(&color_context,&targets,&color_widgets);
+  RunColorBrowser(&color_context,&colorlist,&colors,&mask);
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
   XCheckRefreshWindows(display,windows);
