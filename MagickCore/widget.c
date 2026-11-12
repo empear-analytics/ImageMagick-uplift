@@ -3899,13 +3899,13 @@ static void MoveConfirmButtons(Display *display,XWindows *windows,XEvent event,
   MoveConfirmYes(display,windows,event,targets);
 }
 
-MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
-  const char *reason,const char *description)
-{
 #define CancelButtonText  "Cancel"
 #define DismissButtonText  "Dismiss"
 #define YesButtonText  "Yes"
 
+MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
+  const char *reason,const char *description)
+{
   int
     confirm,
     x,
