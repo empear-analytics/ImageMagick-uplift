@@ -1310,6 +1310,28 @@ static void AppendSubpathElement(const char *keyword,char *token,char *tag)
   (void) ConcatenateMagickString(tag,"/",MagickLocaleExtent);
 }
 
+static const char *ReadMessageName(const char *q,const size_t extent,
+  char *token,char *tag)
+{
+  char
+    keyword[MagickLocaleExtent];
+
+  while ((*token != '>') && (*q != '\0'))
+  {
+    (void) CopyMagickString(keyword,token,MagickLocaleExtent);
+    (void) GetNextToken(q,&q,extent,token);
+    if (*token != '=')
+      continue;
+    (void) GetNextToken(q,&q,extent,token);
+    if (LocaleCompare(keyword,"name") == 0)
+      {
+        (void) ConcatenateMagickString(tag,token,MagickLocaleExtent);
+        (void) ConcatenateMagickString(tag,"/",MagickLocaleExtent);
+      }
+  }
+  return(q);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1443,19 +1465,7 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         /*
           Message element.
         */
-        while ((*token != '>') && (*q != '\0'))
-        {
-          (void) CopyMagickString(keyword,token,MagickLocaleExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
-            continue;
-          (void) GetNextToken(q,&q,extent,token);
-          if (LocaleCompare(keyword,"name") == 0)
-            {
-              (void) ConcatenateMagickString(tag,token,MagickLocaleExtent);
-              (void) ConcatenateMagickString(tag,"/",MagickLocaleExtent);
-            }
-        }
+        q=ReadMessageName(q,extent,token,tag);
         q=ReadMessageText(q,message);
         locale_info=(LocaleInfo *) AcquireCriticalMemory(sizeof(*locale_info));
         (void) memset(locale_info,0,sizeof(*locale_info));
