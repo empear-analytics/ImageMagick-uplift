@@ -5222,6 +5222,22 @@ static void XInitializeWindowOnce(Display *display,
   window->segment_info=(void *) NULL;
 }
 
+static void XResetWindowInfo(Display *display,XWindowInfo *window)
+{
+  if (window->cursor != (Cursor) NULL)
+    (void) XFreeCursor(display,window->cursor);
+  if (window->busy_cursor != (Cursor) NULL)
+    (void) XFreeCursor(display,window->busy_cursor);
+  if (window->highlight_stipple != (Pixmap) NULL)
+    (void) XFreePixmap(display,window->highlight_stipple);
+  if (window->shadow_stipple != (Pixmap) NULL)
+    (void) XFreePixmap(display,window->shadow_stipple);
+  if (window->name == (char *) NULL)
+    window->name=AcquireString("");
+  if (window->icon_name == (char *) NULL)
+    window->icon_name=AcquireString("");
+}
+
 MagickPrivate void XGetWindowInfo(Display *display,XVisualInfo *visual_info,
   XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
   XResourceInfo *resource_info,XWindowInfo *window)
@@ -5238,20 +5254,7 @@ MagickPrivate void XGetWindowInfo(Display *display,XVisualInfo *visual_info,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   if (window->id != (Window) NULL)
-    {
-      if (window->cursor != (Cursor) NULL)
-        (void) XFreeCursor(display,window->cursor);
-      if (window->busy_cursor != (Cursor) NULL)
-        (void) XFreeCursor(display,window->busy_cursor);
-      if (window->highlight_stipple != (Pixmap) NULL)
-        (void) XFreePixmap(display,window->highlight_stipple);
-      if (window->shadow_stipple != (Pixmap) NULL)
-        (void) XFreePixmap(display,window->shadow_stipple);
-      if (window->name == (char *) NULL)
-        window->name=AcquireString("");
-      if (window->icon_name == (char *) NULL)
-        window->icon_name=AcquireString("");
-    }
+    XResetWindowInfo(display,window);
   else
     {
       /*
