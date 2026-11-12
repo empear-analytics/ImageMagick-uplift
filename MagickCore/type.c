@@ -843,6 +843,15 @@ static inline size_t GetFontConfigWeight(const int weight)
   return(400);
 }
 
+static inline StyleType GetFontConfigStyle(const int slant)
+{
+  if (slant == FC_SLANT_OBLIQUE)
+    return(ObliqueStyle);
+  if (slant == FC_SLANT_ITALIC)
+    return(ItalicStyle);
+  return(NormalStyle);
+}
+
 static void GetFontConfigName(FcPattern *font,const FcChar8 *family,char *name)
 {
   FcChar8
@@ -970,11 +979,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
     if (status == FcResultMatch)
       type_info->face=(size_t) index;
     status=FcPatternGetInteger(font_set->fonts[i],FC_SLANT,0,&slant);
-    type_info->style=NormalStyle;
-    if (slant == FC_SLANT_ITALIC)
-      type_info->style=ItalicStyle;
-    if (slant == FC_SLANT_OBLIQUE)
-      type_info->style=ObliqueStyle;
+    type_info->style=GetFontConfigStyle(slant);
     status=FcPatternGetInteger(font_set->fonts[i],FC_WIDTH,0,&width);
     type_info->stretch=GetFontConfigStretch(width);
     status=FcPatternGetInteger(font_set->fonts[i],FC_WEIGHT,0,&weight);
