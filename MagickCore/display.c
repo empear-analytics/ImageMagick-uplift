@@ -17020,6 +17020,9 @@ typedef struct _DisplayEventContext
 
   DisplayCommand
     **Commands;
+
+  XFontStruct
+    *font_info;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -17773,6 +17776,75 @@ static time_t XGetUpdateTime(XResourceInfo *resource_info,Image *display_image)
         update_time=attributes.st_mtime;
     }
   return(update_time);
+}
+
+static void XNameImageWindow(const DisplayEventContext *context,
+  Image *display_image)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  size_t
+    *const state = context->state;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,resource_info,
+    &windows->image);
+  windows->image.shape=MagickTrue;  /* non-rectangular shape hint */
+  if (resource_info->use_shared_memory == MagickFalse)
+    windows->image.shared_memory=MagickFalse;
+  if ((resource_info->title != (char *) NULL) && !(*state & MontageImageState))
+    {
+      char
+        *title;
+
+      title=InterpretImageProperties(resource_info->image_info,display_image,
+        resource_info->title,exception);
+      (void) CloneString(&windows->image.name,title);
+      (void) CloneString(&windows->image.icon_name,title);
+      title=DestroyString(title);
+    }
+  else
+    {
+      char
+        filename[MagickPathExtent],
+        window_name[MagickPathExtent];
+
+      /*
+        Window name is the base of the filename.
+      */
+      GetPathComponent(display_image->magick_filename,TailPath,filename);
+      if (display_image->scene == 0)
+        (void) FormatLocaleString(window_name,MagickPathExtent,"%s: %s",
+          MagickPackageName,filename);
+      else
+        (void) FormatLocaleString(window_name,MagickPathExtent,
+          "%s: %s[scene: %.17g frames: %.17g]",MagickPackageName,filename,
+          (double) display_image->scene,(double) GetImageListLength(
+          display_image));
+      (void) CloneString(&windows->image.name,window_name);
+      (void) CloneString(&windows->image.icon_name,filename);
+    }
 }
 
 /*
@@ -18545,6 +18617,30 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   class_hints=windows->class_hints;
   manager_hints=windows->manager_hints;
   root_window=XRootWindow(display,visual_info->screen);
+  event_context.display=display;
+  event_context.resource_info=resource_info;
+  event_context.windows=windows;
+  event_context.exception=exception;
+  event_context.pixel=pixel;
+  event_context.map_info=map_info;
+  event_context.magick_windows=magick_windows;
+  event_context.number_windows=number_windows;
+  event_context.state=state;
+  event_context.root_window=root_window;
+  event_context.CommandMenu=CommandMenu;
+  event_context.command=command;
+  event_context.visual_info=visual_info;
+  event_context.VirtualMenu=VirtualMenu;
+  event_context.VirtualCommands=VirtualCommands;
+  event_context.ShortCutsMenu=ShortCutsMenu;
+  event_context.ShortCutsCommands=ShortCutsCommands;
+  event_context.image=image;
+  event_context.icon_visual=icon_visual;
+  event_context.icon_map=icon_map;
+  event_context.icon_pixel=icon_pixel;
+  event_context.Menus=Menus;
+  event_context.Commands=Commands;
+  event_context.font_info=font_info;
   nexus=NewImageList();
   XLogDisplayImage(resource_info,display_image);
   XMakeStandardColormap(display,visual_info,resource_info,display_image,
@@ -18635,43 +18731,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Initialize Image window.
   */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,resource_info,
-    &windows->image);
-  windows->image.shape=MagickTrue;  /* non-rectangular shape hint */
-  if (resource_info->use_shared_memory == MagickFalse)
-    windows->image.shared_memory=MagickFalse;
-  if ((resource_info->title != (char *) NULL) && !(*state & MontageImageState))
-    {
-      char
-        *title;
-
-      title=InterpretImageProperties(resource_info->image_info,display_image,
-        resource_info->title,exception);
-      (void) CloneString(&windows->image.name,title);
-      (void) CloneString(&windows->image.icon_name,title);
-      title=DestroyString(title);
-    }
-  else
-    {
-      char
-        filename[MagickPathExtent],
-        window_name[MagickPathExtent];
-
-      /*
-        Window name is the base of the filename.
-      */
-      GetPathComponent(display_image->magick_filename,TailPath,filename);
-      if (display_image->scene == 0)
-        (void) FormatLocaleString(window_name,MagickPathExtent,"%s: %s",
-          MagickPackageName,filename);
-      else
-        (void) FormatLocaleString(window_name,MagickPathExtent,
-          "%s: %s[scene: %.17g frames: %.17g]",MagickPackageName,filename,
-          (double) display_image->scene,(double) GetImageListLength(
-          display_image));
-      (void) CloneString(&windows->image.name,window_name);
-      (void) CloneString(&windows->image.icon_name,filename);
-    }
+  XNameImageWindow(&event_context,display_image);
   if (resource_info->immutable)
     windows->image.immutable=MagickTrue;
   windows->image.use_pixmap=resource_info->use_pixmap;
@@ -19010,31 +19070,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   *state&=(unsigned int) (~FormerImageState);
   *state&=(unsigned int) (~MontageImageState);
   *state&=(unsigned int) (~NextImageState);
-  event_context.display=display;
-  event_context.resource_info=resource_info;
-  event_context.windows=windows;
-  event_context.exception=exception;
-  event_context.pixel=pixel;
-  event_context.map_info=map_info;
-  event_context.magick_windows=magick_windows;
-  event_context.number_windows=number_windows;
   event_context.context_mask=context_mask;
-  event_context.state=state;
-  event_context.root_window=root_window;
-  event_context.CommandMenu=CommandMenu;
-  event_context.command=command;
-  event_context.visual_info=visual_info;
-  event_context.VirtualMenu=VirtualMenu;
-  event_context.VirtualCommands=VirtualCommands;
-  event_context.ShortCutsMenu=ShortCutsMenu;
-  event_context.ShortCutsCommands=ShortCutsCommands;
-  event_context.image=image;
   event_context.update_time=update_time;
-  event_context.icon_visual=icon_visual;
-  event_context.icon_map=icon_map;
-  event_context.icon_pixel=icon_pixel;
-  event_context.Menus=Menus;
-  event_context.Commands=Commands;
   do
   {
     /*
