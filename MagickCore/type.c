@@ -787,6 +787,62 @@ static inline MagickBooleanType IsNonRegularFontStyle(const FcResult status,
     MagickFalse);
 }
 
+static inline StretchType GetFontConfigWideStretch(const int width)
+{
+  if (width >= FC_WIDTH_ULTRAEXPANDED)
+    return(UltraExpandedStretch);
+  if (width >= FC_WIDTH_EXTRAEXPANDED)
+    return(ExtraExpandedStretch);
+  if (width >= FC_WIDTH_EXPANDED)
+    return(ExpandedStretch);
+  if (width >= FC_WIDTH_SEMIEXPANDED)
+    return(SemiExpandedStretch);
+  return(NormalStretch);
+}
+
+static inline StretchType GetFontConfigStretch(const int width)
+{
+  if (width >= FC_WIDTH_NORMAL)
+    return(GetFontConfigWideStretch(width));
+  if (width >= FC_WIDTH_SEMICONDENSED)
+    return(SemiCondensedStretch);
+  if (width >= FC_WIDTH_CONDENSED)
+    return(CondensedStretch);
+  if (width >= FC_WIDTH_EXTRACONDENSED)
+    return(ExtraCondensedStretch);
+  if (width >= FC_WIDTH_ULTRACONDENSED)
+    return(UltraCondensedStretch);
+  return(NormalStretch);
+}
+
+static inline size_t GetFontConfigHeavyWeight(const int weight)
+{
+  if (weight >= FC_WEIGHT_BLACK)
+    return(900);
+  if (weight >= FC_WEIGHT_EXTRABOLD)
+    return(800);
+  if (weight >= FC_WEIGHT_BOLD)
+    return(700);
+  if (weight >= FC_WEIGHT_DEMIBOLD)
+    return(600);
+  if (weight >= FC_WEIGHT_MEDIUM)
+    return(500);
+  return(400);
+}
+
+static inline size_t GetFontConfigWeight(const int weight)
+{
+  if (weight >= FC_WEIGHT_NORMAL)
+    return(GetFontConfigHeavyWeight(weight));
+  if (weight >= FC_WEIGHT_LIGHT)
+    return(300);
+  if (weight >= FC_WEIGHT_EXTRALIGHT)
+    return(200);
+  if (weight >= FC_WEIGHT_THIN)
+    return(100);
+  return(400);
+}
+
 MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
   ExceptionInfo *exception)
 {
@@ -910,45 +966,9 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
     if (slant == FC_SLANT_OBLIQUE)
       type_info->style=ObliqueStyle;
     status=FcPatternGetInteger(font_set->fonts[i],FC_WIDTH,0,&width);
-    type_info->stretch=NormalStretch;
-    if (width >= FC_WIDTH_ULTRACONDENSED)
-      type_info->stretch=UltraCondensedStretch;
-    if (width >= FC_WIDTH_EXTRACONDENSED)
-      type_info->stretch=ExtraCondensedStretch;
-    if (width >= FC_WIDTH_CONDENSED)
-      type_info->stretch=CondensedStretch;
-    if (width >= FC_WIDTH_SEMICONDENSED)
-      type_info->stretch=SemiCondensedStretch;
-    if (width >= FC_WIDTH_NORMAL)
-      type_info->stretch=NormalStretch;
-    if (width >= FC_WIDTH_SEMIEXPANDED)
-      type_info->stretch=SemiExpandedStretch;
-    if (width >= FC_WIDTH_EXPANDED)
-      type_info->stretch=ExpandedStretch;
-    if (width >= FC_WIDTH_EXTRAEXPANDED)
-      type_info->stretch=ExtraExpandedStretch;
-    if (width >= FC_WIDTH_ULTRAEXPANDED)
-      type_info->stretch=UltraExpandedStretch;
-    type_info->weight=400;
+    type_info->stretch=GetFontConfigStretch(width);
     status=FcPatternGetInteger(font_set->fonts[i],FC_WEIGHT,0,&weight);
-    if (weight >= FC_WEIGHT_THIN)
-      type_info->weight=100;
-    if (weight >= FC_WEIGHT_EXTRALIGHT)
-      type_info->weight=200;
-    if (weight >= FC_WEIGHT_LIGHT)
-      type_info->weight=300;
-    if (weight >= FC_WEIGHT_NORMAL)
-      type_info->weight=400;
-    if (weight >= FC_WEIGHT_MEDIUM)
-      type_info->weight=500;
-    if (weight >= FC_WEIGHT_DEMIBOLD)
-      type_info->weight=600;
-    if (weight >= FC_WEIGHT_BOLD)
-      type_info->weight=700;
-    if (weight >= FC_WEIGHT_EXTRABOLD)
-      type_info->weight=800;
-    if (weight >= FC_WEIGHT_BLACK)
-      type_info->weight=900;
+    type_info->weight=GetFontConfigWeight(weight);
     type_info->glyphs=ConstantString((const char *) file);
     (void) AddValueToSplayTree(type_cache,type_info->name,type_info);
   }
