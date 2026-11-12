@@ -3712,29 +3712,13 @@ static void GetResourceDisplayOptions(XrmDatabase database,
   resource_info->display_warnings=IsStringTrue(resource_value);
 }
 
-MagickExport void XGetResourceInfo(const ImageInfo *image_info,
-  XrmDatabase database,const char *client_name,XResourceInfo *resource_info)
+static void GetResourceLayoutInfo(XrmDatabase database,
+  const char *client_name,XResourceInfo *resource_info)
 {
   char
     *directory,
     *resource_value;
 
-  /*
-    Initialize resource info fields.
-  */
-  assert(resource_info != (XResourceInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  (void) memset(resource_info,0,sizeof(*resource_info));
-  resource_info->resource_database=database;
-  resource_info->image_info=(ImageInfo *) image_info;
-  (void) SetImageInfoProgressMonitor(resource_info->image_info,
-    XMagickProgressMonitor,(void *) NULL);
-  resource_info->quantize_info=CloneQuantizeInfo((QuantizeInfo *) NULL);
-  resource_info->close_server=MagickTrue;
-  resource_info->client_name=AcquireString(client_name);
-  GetResourceDisplayOptions(database,client_name,resource_info);
-  GetResourceFontNames(database,client_name,resource_info);
   resource_info->foreground_color=XGetResourceInstance(database,client_name,
     "foreground",ForegroundColor);
   resource_value=XGetResourceClass(database,client_name,"gammaCorrect",
@@ -3766,6 +3750,31 @@ MagickExport void XGetResourceInfo(const ImageInfo *image_info,
     "mattecolor",(char *) NULL);
   resource_info->name=ConstantString(XGetResourceClass(database,client_name,
     "name",(char *) NULL));
+}
+
+MagickExport void XGetResourceInfo(const ImageInfo *image_info,
+  XrmDatabase database,const char *client_name,XResourceInfo *resource_info)
+{
+  char
+    *resource_value;
+
+  /*
+    Initialize resource info fields.
+  */
+  assert(resource_info != (XResourceInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  (void) memset(resource_info,0,sizeof(*resource_info));
+  resource_info->resource_database=database;
+  resource_info->image_info=(ImageInfo *) image_info;
+  (void) SetImageInfoProgressMonitor(resource_info->image_info,
+    XMagickProgressMonitor,(void *) NULL);
+  resource_info->quantize_info=CloneQuantizeInfo((QuantizeInfo *) NULL);
+  resource_info->close_server=MagickTrue;
+  resource_info->client_name=AcquireString(client_name);
+  GetResourceDisplayOptions(database,client_name,resource_info);
+  GetResourceFontNames(database,client_name,resource_info);
+  GetResourceLayoutInfo(database,client_name,resource_info);
   GetResourcePenColors(database,client_name,resource_info);
   resource_value=XGetResourceClass(database,client_name,"pause",(char *) "0");
   resource_info->pause=(unsigned int) StringToUnsignedLong(resource_value);
