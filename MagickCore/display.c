@@ -2625,6 +2625,22 @@ static MagickBooleanType XPasteSelectionText(
   return(MagickTrue);
 }
 
+static void XSetBoxPixelIndex(XWindows *windows,const unsigned int box_id)
+{
+  ssize_t
+    i;
+
+  windows->pixel_info->box_color=windows->pixel_info->pen_colors[box_id];
+  if (windows->pixel_info->colors != 0)
+    for (i=0; i < (ssize_t) windows->pixel_info->colors; i++)
+      if (windows->pixel_info->pixels[i] ==
+          windows->pixel_info->pen_colors[box_id].pixel)
+        {
+          windows->pixel_info->box_index=(unsigned short) i;
+          break;
+        }
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -3179,15 +3195,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     /*
       Determine pixel index for box and pen color.
     */
-    windows->pixel_info->box_color=windows->pixel_info->pen_colors[box_id];
-    if (windows->pixel_info->colors != 0)
-      for (i=0; i < (ssize_t) windows->pixel_info->colors; i++)
-        if (windows->pixel_info->pixels[i] ==
-            windows->pixel_info->pen_colors[box_id].pixel)
-          {
-            windows->pixel_info->box_index=(unsigned short) i;
-            break;
-          }
+    XSetBoxPixelIndex(windows,box_id);
     windows->pixel_info->pen_color=windows->pixel_info->pen_colors[pen_id];
     if (windows->pixel_info->colors != 0)
       for (i=0; i < (ssize_t) windows->pixel_info->colors; i++)
