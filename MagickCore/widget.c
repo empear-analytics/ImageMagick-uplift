@@ -3524,6 +3524,40 @@ static void HandleCommandEvent(const CommandWidgetEvent *tile,int *id,
 #define tile_width 112
 #define tile_height 70
 
+static void RedrawCommandButtons(Display *display,XWindows *windows,
+  const unsigned int number_selections)
+{
+  int
+    i;
+
+  Pixmap
+    tile_pixmap;
+
+  /*
+    Draw command buttons.
+  */
+  tile_pixmap=XCreatePixmapFromBitmapData(display,windows->command.id,
+    (char *) tile_bits,tile_width,tile_height,1L,0L,1);
+  if (tile_pixmap != (Pixmap) NULL)
+    {
+      (void) XCopyPlane(display,tile_pixmap,windows->command.id,
+        windows->command.annotate_context,0,0,tile_width,tile_height,
+        (int) ((windows->command.width-tile_width) >> 1),10,1L);
+      (void) XFreePixmap(display,tile_pixmap);
+    }
+  for (i=0; i < (int) number_selections; i++)
+  {
+    XDrawBeveledButton(display,&windows->command,&selection_info[i]);
+    if (i >= (int) windows->command.data)
+      continue;
+    toggle_info.raised=MagickFalse;
+    toggle_info.y=selection_info[i].y+(int) (selection_info[i].height >> 1)-
+      (int) (toggle_info.height >> 1);
+    XDrawTriangleEast(display,&windows->command,&toggle_info);
+  }
+  XHighlightWidget(display,&windows->command,BorderOffset,BorderOffset);
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -3664,34 +3698,7 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
         (void) XClearWindow(display,windows->command.id);
     }
   if (state & RedrawWidgetState)
-    {
-      Pixmap
-        tile_pixmap;
-
-      /*
-        Draw command buttons.
-      */
-      tile_pixmap=XCreatePixmapFromBitmapData(display,windows->command.id,
-        (char *) tile_bits,tile_width,tile_height,1L,0L,1);
-      if (tile_pixmap != (Pixmap) NULL)
-        {
-          (void) XCopyPlane(display,tile_pixmap,windows->command.id,
-            windows->command.annotate_context,0,0,tile_width,tile_height,
-            (int) ((windows->command.width-tile_width) >> 1),10,1L);
-          (void) XFreePixmap(display,tile_pixmap);
-        }
-      for (i=0; i < (int) number_selections; i++)
-      {
-        XDrawBeveledButton(display,&windows->command,&selection_info[i]);
-        if (i >= (int) windows->command.data)
-          continue;
-        toggle_info.raised=MagickFalse;
-        toggle_info.y=selection_info[i].y+(int) (selection_info[i].height >> 1)-
-          (int) (toggle_info.height >> 1);
-        XDrawTriangleEast(display,&windows->command,&toggle_info);
-      }
-      XHighlightWidget(display,&windows->command,BorderOffset,BorderOffset);
-    }
+    RedrawCommandButtons(display,windows,number_selections);
   return(id);
 }
 
