@@ -614,3 +614,55 @@ score; the Widest message credits the bumps-to-none step; an unsubstantiated cov
   a masking helper in a scratch script rewrote a name inside a string, caught by the guard before any commit. Possible
   upstream: File's SelectionRequest has no `break;` and falls into `default:`; File's `directory=getcwd(...); (void)
   directory;` is a dead store; Font's RedrawAction still frees `font_info` and never restores it.
+
+## Lane b, fifth round: display.c stays at 2.68; the batch closes
+
+No chain probed with real helpers on scratch copies of `display.c` (measured with `tools/ch.py`) raised the score, so nothing
+was committed and no playbook commit was written. **Hoist:** all 28 `XDisplayImage` menu and command tables moved to file
+scope (renamed with a `Display` prefix: the plain names clash with locals in `XROIImage`, `XDrawEditImage` and the helpers):
+alone flat at 2.68; `XDisplayImage` goes from 1,336 to 995 lines. **Helpers:** 24 finding-free helpers on top of the hoist
+(five window creators, seven event cases with four tail helpers, three setup blocks, three tail blocks, magnify, the image
+window): `XDisplayImage` 1,336 -> 400 lines, cc 167 -> 68, bumps 9 -> 6, score 2.68; stubbing the rest of its setup and loop
+gave 282 lines, cc 38 and no bumps, still 2.68. **Why nothing rises:** (1) the earlier 2.74 ceiling came from deleting code,
+not moving it (deleting about 1,300 lines of healthy functions elsewhere in `display.c` also gives 2.74; 928, 1,061 and
+1,190 deleted lines stay flat); (2) a file-wide added-line cliff: about 100 added code lines cost -0.06 (86 flat, 109 gives
+2.62; file-scope declarations count too: 800 added lines also give 2.62); (3) the hoist's 340 moved lines earn no credit and
+make no room for helper overhead (the 22-helper version with full binders added 468 lines and scored 2.62; writing members
+used at most twice as `context->member`, a recipe N step 4 form, got back to 2.68 with 341 added lines); (4) the earlier -0.07
+attributions to the 70-line `XInitializeMagnifyWindow` and a near-twin cliff were most likely this line cliff (five window
+helpers together measured 2.68 with no twin penalty); (5) leaving every category needs `XDisplayImage` under 70 lines and cc
+under 9, about 15 more helpers than the file's line budget allows. The only way to buy headroom, hoisting other functions'
+local tables (`XROIImage`, `XDrawEditImage`), was not taken: it would read as moving code out of CodeScene's view and nothing
+shows the chain would then raise. **Draft recipe, not committed:** "Hoist Function-Local Constant Tables" (a Recipe F
+amendment or a code such as FA, not checked with `recipecodes.sh`): a `const char *const name[]` (or pointer array of such)
+in a function's opening run with an initialiser of string literals, `(char *) NULL`, enum constants and earlier hoisted
+tables, every use an element read, an argument to a pointer-to-`const` parameter or a whole-array assignment to a pointer
+member (no `&name`, comparison, write or `sizeof`), made `static`, dedented, renamed with a prefix and placed above the
+function's banner; behaviour: the object becomes one program-lifetime object rather than one per call, and its address no
+longer dangles after return, which could matter only for address comparisons or pointers kept after return, both excluded by
+the use rule; check: a source script modulo the renames plus the oracle. Scratch tools: `~/sp_w18b` (`dx.py`..`dx5.py`,
+`stubs.py`, `ff.py`, `addlines.py`, `healthy_stub.py`, `codelines.py`).
+
+## Closing the W18 batch (2026-11-12)
+
+All four lanes are idle: nothing legal remains that raises a file, and the levers left wait on the owner's questions. Gate on
+the merged tip: 15,955 cases, 0 diverged; `tools/ci_linux_warnings.sh --campaign-a` OK on 84 files in six configurations
+(including the new gcc-x and clang-x trees that compile the X11 and OpenCL code). Sweep of the merged tip (cs-mcp 1.5.16):
+campaign A 84 files, mean **8.80 -> 8.86**, files at 10.0 **35 -> 36** (channel.c); the lowest files are `xwindow.c` 2.47,
+`display.c` 2.68, `compare-similarity.c` 2.97 (the relabelled half of compare.c), `widget.c` 3.15, `accelerate.c` 3.19,
+`composite.c` 3.69, `animate.c` 4.40, `fx.c` 4.61, `opencl.c` 5.80, `morphology.c` 6.19. Local branches kept for the owner:
+`w18-ft-twin-fold` (Recipe FT, twin fold, in `~/im-w14a`) and `w18c-file-wip` (17 flat File-browser commits, in `~/im-w14c`).
+The lane d read-only survey (`docs/refactoring/tasks/W18-survey.md`) classifies every finding in the 48 files below 10.0.
+
+**Open for the owner (new this batch, on top of W17's):** (1) Recipe FT, folding an identical twin function away (widget.c
+111 -> 110 functions, +0.07; and the File and List browsers are blocked by twin-helper clones until it or a clone-neutral
+boundary rule exists); the new recipe HT merges duplicated exit tests (quantize.c); (2) magnify.c's `?:` fold recipe and NS
+step 5 accepting a reached function without IDENTICAL object code (about 9.07); (3) the code clash: lane b's recipe
+named FT (replace a fall-through into a call) differs from the held twin-fold FT, which needs another code if approved;
+(4) throws moved into helpers now name the helper in `GetMagickModule()` (segment.c, accelerate.c, opencl.c, xwindow.c,
+animate.c, display.c): reached cases pass, the owner question from W14; (5) the recipe text added this batch (HT, SG, CR,
+LC, FT fall-through, PL integer form, RV (d)(e), E step 4, I/CT/OC/N/D/MA/SR amendments) awaits confirmation with W17's;
+(6) the survey's biggest ceilings: attribute-depth `#if !HDRI` edits (8.16 -> 10.0 each), fourier `#if` pairs (7.59 -> 9.38),
+`#if M` (layer 8.25 -> 9.38, resample 8.53 -> 9.68), the OpenMP shared table (feature-texture 7.63 -> 9.38), fx `ExecuteRPN`
+(4.61 -> 8.28), paint-floodfill Recipe H (8.35 -> 9.09). Tooling: `casemap.json` is stale after the 55 new oracle cases (use
+`--filter`; rebuild once in the foreground when no lane runs).
