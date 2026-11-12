@@ -2164,6 +2164,11 @@ typedef struct _DelegateExecution
 
   ExceptionInfo
     *exception;
+
+  const char
+    *input_filename,
+    *output_filename,
+    *text;
 } DelegateExecution;
 
 static void ExecuteDelegateCommand(const DelegateExecution *execution,
@@ -2217,6 +2222,44 @@ static void RelinquishDelegateFiles(const ImageInfo *image_info,
   (void) RelinquishUniqueFileResource(image->filename);
 }
 
+static MagickBooleanType RunDelegateStep(const DelegateExecution *execution,
+  MagickBooleanType *status)
+{
+  ImageInfo
+    *const image_info = execution->image_info;
+
+  Image
+    *const image = execution->image;
+
+  ExceptionInfo
+    *const exception = execution->exception;
+
+  char
+    *command;
+
+  (void) AcquireUniqueSymbolicLink(execution->output_filename,
+    image_info->filename);
+  if (AcquireUniqueFilename(image_info->unique) == MagickFalse)
+    {
+      ThrowFileException(exception,FileOpenError,
+        "UnableToCreateTemporaryFile",image_info->unique);
+      return(MagickFalse);
+    }
+  if (LinkDelegateInput(image,execution->input_filename,exception,status) ==
+      MagickFalse)
+    return(MagickFalse);
+  *status=MagickTrue;
+  command=InterpretDelegateProperties(image_info,image,execution->text,
+    exception);
+  ExecuteDelegateCommand(execution,status,&command);
+  RestoreDelegateInput(image,execution->input_filename,exception,status);
+  if (CopyDelegateOutput(image_info,execution->input_filename,
+      execution->output_filename,exception) == MagickFalse)
+    *status=MagickFalse;
+  RelinquishDelegateFiles(image_info,image);
+  return(MagickTrue);
+}
+
 static char **DestroyDelegateCommands(char **commands,ssize_t i)
 {
   for ( ; commands[i] != (char *) NULL; i++)
@@ -2228,7 +2271,6 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
   char
-    *command,
     **commands,
     input_filename[MagickPathExtent],
     output_filename[MagickPathExtent];
@@ -2319,38 +2361,18 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
         decode ? decode : encode);
       return(MagickFalse);
     }
-  command=(char *) NULL;
   status=MagickTrue;
   (void) CopyMagickString(output_filename,image_info->filename,
     MagickPathExtent);
   (void) CopyMagickString(input_filename,image->filename,MagickPathExtent);
   for (i=0; commands[i] != (char *) NULL; i++)
   {
-    DelegateExecution
-      execution;
+    const DelegateExecution
+      execution = { delegate_info, image_info, image, exception,
+        input_filename, output_filename, commands[i] };
 
-    (void) AcquireUniqueSymbolicLink(output_filename,image_info->filename);
-    if (AcquireUniqueFilename(image_info->unique) == MagickFalse)
-      {
-        ThrowFileException(exception,FileOpenError,
-          "UnableToCreateTemporaryFile",image_info->unique);
-        break;
-      }
-    if (LinkDelegateInput(image,input_filename,exception,&status) ==
-        MagickFalse)
+    if (RunDelegateStep(&execution,&status) == MagickFalse)
       break;
-    status=MagickTrue;
-    command=InterpretDelegateProperties(image_info,image,commands[i],exception);
-    execution.delegate_info=delegate_info;
-    execution.image_info=image_info;
-    execution.image=image;
-    execution.exception=exception;
-    ExecuteDelegateCommand(&execution,&status,&command);
-    RestoreDelegateInput(image,input_filename,exception,&status);
-    if (CopyDelegateOutput(image_info,input_filename,output_filename,
-        exception) == MagickFalse)
-      status=MagickFalse;
-    RelinquishDelegateFiles(image_info,image);
     if (status == MagickFalse)
       {
         (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
