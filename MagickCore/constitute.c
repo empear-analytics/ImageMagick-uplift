@@ -487,6 +487,23 @@ static void SyncDisposeFromConstituteInfo(Image *next,
     next->dispose=(DisposeType) option_type;
 }
 
+static Image *ResizeToExtractRegion(const ImageInfo *read_info,Image *next,
+  RectangleInfo *geometry,ExceptionInfo *exception)
+{
+  Image
+    *resize_image;
+
+  (void) ParseRegionGeometry(next,read_info->extract,geometry,exception);
+  if ((geometry->width != 0) && (geometry->height != 0))
+    {
+      resize_image=ResizeImage(next,geometry->width,geometry->height,
+        next->filter,exception);
+      if (resize_image != (Image *) NULL)
+        ReplaceImageInList(&next,resize_image);
+    }
+  return(next);
+}
+
 static Image *ApplyExtractGeometry(const ImageInfo *read_info,Image *next,
   ExceptionInfo *exception)
 {
@@ -509,17 +526,7 @@ static Image *ApplyExtractGeometry(const ImageInfo *read_info,Image *next,
         }
       else
         if (((flags & WidthValue) != 0) || ((flags & HeightValue) != 0))
-          {
-            flags=ParseRegionGeometry(next,read_info->extract,&geometry,
-              exception);
-            if ((geometry.width != 0) && (geometry.height != 0))
-              {
-                Image *resize_image = ResizeImage(next,geometry.width,
-                  geometry.height,next->filter,exception);
-                if (resize_image != (Image *) NULL)
-                  ReplaceImageInList(&next,resize_image);
-              }
-          }
+          next=ResizeToExtractRegion(read_info,next,&geometry,exception);
     }
   return(next);
 }
