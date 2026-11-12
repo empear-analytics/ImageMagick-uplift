@@ -1100,86 +1100,44 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
       continue;
     (void) GetNextToken(q,&q,extent,token);
     (void) GetNextToken(q,&q,extent,token);
-    switch (*keyword)
-    {
-      case 'E':
-      case 'e':
+    if (LocaleCompare((char *) keyword,"events") == 0)
+      log_info->event_mask=(LogEventType) (log_info->event_mask |
+        ParseCommandOption(MagickLogEventOptions,MagickTrue,token));
+    else if (LocaleCompare((char *) keyword,"filename") == 0)
       {
-        if (LocaleCompare((char *) keyword,"events") == 0)
-          {
-            log_info->event_mask=(LogEventType) (log_info->event_mask |
-              ParseCommandOption(MagickLogEventOptions,MagickTrue,token));
-            break;
-          }
-        break;
+        if (log_info->filename != (char *) NULL)
+          log_info->filename=(char *)
+            RelinquishMagickMemory(log_info->filename);
+        log_info->filename=ConstantString(token);
       }
-      case 'F':
-      case 'f':
+    else if (LocaleCompare((char *) keyword,"format") == 0)
       {
-        if (LocaleCompare((char *) keyword,"filename") == 0)
-          {
-            if (log_info->filename != (char *) NULL)
-              log_info->filename=(char *)
-                RelinquishMagickMemory(log_info->filename);
-            log_info->filename=ConstantString(token);
-            break;
-          }
-        if (LocaleCompare((char *) keyword,"format") == 0)
-          {
-            if (log_info->format != (char *) NULL)
-              log_info->format=(char *)
-                RelinquishMagickMemory(log_info->format);
-            log_info->format=ConstantString(token);
-            break;
-          }
-        break;
+        if (log_info->format != (char *) NULL)
+          log_info->format=(char *)
+            RelinquishMagickMemory(log_info->format);
+        log_info->format=ConstantString(token);
       }
-      case 'G':
-      case 'g':
+    else if (LocaleCompare((char *) keyword,"generations") == 0)
       {
-        if (LocaleCompare((char *) keyword,"generations") == 0)
-          {
-            if (LocaleCompare(token,"unlimited") == 0)
-              {
-                log_info->generations=(~0UL);
-                break;
-              }
-            log_info->generations=StringToUnsignedLong(token);
-            break;
-          }
-        break;
+        if (LocaleCompare(token,"unlimited") == 0)
+          log_info->generations=(~0UL);
+        else
+          log_info->generations=StringToUnsignedLong(token);
       }
-      case 'L':
-      case 'l':
+    else if (LocaleCompare((char *) keyword,"limit") == 0)
       {
-        if (LocaleCompare((char *) keyword,"limit") == 0)
+        if (LocaleCompare(token,"unlimited") == 0)
+          log_info->limit=(~0UL);
+        else
           {
-            if (LocaleCompare(token,"unlimited") == 0)
-              {
-                log_info->limit=(~0UL);
-                break;
-              }
             log_info->limit=StringToMagickSizeType(token,100.0);
             if (log_info->limit < 1024)
               log_info->limit=1024*1024*StringToUnsignedLong(token);
-            break;
           }
-        break;
       }
-      case 'O':
-      case 'o':
-      {
-        if (LocaleCompare((char *) keyword,"output") == 0)
-          {
-            log_info->handler_mask=(LogHandlerType)
-              (log_info->handler_mask | ParseLogHandlers(token));
-            break;
-          }
-        break;
-      }
-      default:
-        break;
-    }
+    else if (LocaleCompare((char *) keyword,"output") == 0)
+      log_info->handler_mask=(LogHandlerType)
+        (log_info->handler_mask | ParseLogHandlers(token));
   }
   token=DestroyString(token);
   if (cache == (LinkedListInfo *) NULL)
