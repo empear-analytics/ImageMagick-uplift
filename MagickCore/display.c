@@ -17780,6 +17780,30 @@ static void XUpdateImageTimer(const DisplayEventContext *context,
     }
 }
 
+static MagickBooleanType XCheckImageTimer(const DisplayEventContext *context,
+  Image *display_image,Image **nexus,time_t *timer)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  if ((display_image->delay != 0) || (resource_info->update != 0))
+    {
+      XUpdateImageTimer(context,display_image,nexus,timer);
+      if (XEventsQueued(display,QueuedAfterFlush) == 0)
+        {
+          /*
+            Do not block if delay > 0.
+          */
+          XDelay(display,SuspendTime << 2);
+          return(MagickTrue);
+        }
+    }
+  return(MagickFalse);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -18818,18 +18842,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       Handle a window event.
     */
     if (windows->image.mapped != MagickFalse)
-      if ((display_image->delay != 0) || (resource_info->update != 0))
-        {
-          XUpdateImageTimer(&event_context,display_image,&nexus,&timer);
-          if (XEventsQueued(display,QueuedAfterFlush) == 0)
-            {
-              /*
-                Do not block if delay > 0.
-              */
-              XDelay(display,SuspendTime << 2);
-              continue;
-            }
-        }
+      if (XCheckImageTimer(&event_context,display_image,&nexus,&timer) !=
+          MagickFalse)
+        continue;
     timestamp=GetMagickTime();
     (void) XNextEvent(display,&event);
     if ((windows->image.stasis == MagickFalse) ||
