@@ -1375,6 +1375,28 @@ static MagickBooleanType HandleStructuralElement(const char *keyword,char *tag)
   return(MagickTrue);
 }
 
+static MagickBooleanType NextIncludeFile(const char **q,const size_t extent,
+  char *token,const char *locale)
+{
+  char
+    keyword[MagickLocaleExtent];
+
+  while (IsIncludeElementOpen(token,*q) != MagickFalse)
+  {
+    (void) CopyMagickString(keyword,token,MagickLocaleExtent);
+    (void) GetNextToken(*q,q,extent,token);
+    if (*token != '=')
+      continue;
+    (void) GetNextToken(*q,q,extent,token);
+    if ((LocaleCompare(keyword,"locale") == 0) &&
+        (LocaleCompare(locale,token) != 0))
+      break;
+    if (LocaleCompare(keyword,"file") == 0)
+      return(MagickTrue);
+  }
+  return(MagickFalse);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1453,18 +1475,8 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         /*
           Include element.
         */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
+        while (NextIncludeFile(&q,extent,token,locale) != MagickFalse)
         {
-          (void) CopyMagickString(keyword,token,MagickLocaleExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
-            continue;
-          (void) GetNextToken(q,&q,extent,token);
-          if ((LocaleCompare(keyword,"locale") == 0) &&
-              (LocaleCompare(locale,token) != 0))
-            break;
-          if (LocaleCompare(keyword,"file") != 0)
-            continue;
           if (depth >= MagickMaxRecursionDepth)
             (void) ThrowMagickException(exception,GetMagickModule(),
               ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
