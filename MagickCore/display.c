@@ -17497,6 +17497,59 @@ static void XPressImageWindow(const DisplayEventContext *context,
       break;
   }
 }
+
+static void XPressMagnifyWindow(const DisplayEventContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    *const command = context->command;
+
+  const char
+    *const MagnifyMenu[] =
+    {
+      "2",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "3",
+      (char *) NULL,
+    };
+
+  int
+    factor;
+
+  static KeySym
+    MagnifyCommands[] =
+    {
+      XK_2,
+      XK_4,
+      XK_5,
+      XK_6,
+      XK_7,
+      XK_8,
+      XK_9,
+      XK_3
+    };
+
+  /*
+    Select a magnify factor from the pop-up menu.
+  */
+  factor=XMenuWidget(display,windows,"Magnify",MagnifyMenu,command);
+  if (factor >= 0)
+    XMagnifyWindowCommand(display,windows,0,MagnifyCommands[factor],
+      exception);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18765,43 +18818,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xbutton.window == windows->magnify.id)
           {
-            const char
-              *const MagnifyMenu[] =
-              {
-                "2",
-                "4",
-                "5",
-                "6",
-                "7",
-                "8",
-                "9",
-                "3",
-                (char *) NULL,
-              };
-
-            int
-              factor;
-
-            static KeySym
-              MagnifyCommands[] =
-              {
-                XK_2,
-                XK_4,
-                XK_5,
-                XK_6,
-                XK_7,
-                XK_8,
-                XK_9,
-                XK_3
-              };
-
-            /*
-              Select a magnify factor from the pop-up menu.
-            */
-            factor=XMenuWidget(display,windows,"Magnify",MagnifyMenu,command);
-            if (factor >= 0)
-              XMagnifyWindowCommand(display,windows,0,MagnifyCommands[factor],
-                exception);
+            XPressMagnifyWindow(&event_context);
             break;
           }
         if (event.xbutton.window == windows->pan.id)
