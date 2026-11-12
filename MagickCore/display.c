@@ -6578,6 +6578,119 @@ static inline MagickBooleanType IsElementComplete(const ElementType element,
     MagickFalse);
 }
 
+typedef struct _DrawEditContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *DrawMenu;
+
+  char
+    *command;
+} DrawEditContext;
+
+typedef struct _DrawStyleTargets
+{
+  XDrawInfo
+    *draw_info;
+
+  unsigned int
+    *pen_id;
+} DrawStyleTargets;
+
+static void XSelectDrawColor(const DrawEditContext *context,const int id,
+  const DrawStyleTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const DrawMenu = context->DrawMenu;
+
+  char
+    *const command = context->command;
+
+  XDrawInfo
+    *const draw_info = targets->draw_info;
+
+  unsigned int
+    *const pen_id = targets->pen_id;
+
+  const char
+    *ColorMenu[MaxNumberPens+1];
+
+  int
+    pen_number;
+
+  MagickBooleanType
+    transparent;
+
+  XColor
+    color;
+
+  int
+    i;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="transparent";
+  ColorMenu[MaxNumberPens-1]="Browser...";
+  ColorMenu[MaxNumberPens]=(char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,DrawMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  transparent=pen_number == (MaxNumberPens-2) ? MagickTrue :
+    MagickFalse;
+  if (transparent != MagickFalse)
+    {
+      (*draw_info).stencil=TransparentStencil;
+      return;
+    }
+  if (pen_number == (MaxNumberPens-1))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set pen color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],&color);
+  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
+    (unsigned int) MaxColors,&color);
+  windows->pixel_info->pen_colors[pen_number]=color;
+  (*pen_id)=(unsigned int) pen_number;
+  (*draw_info).stencil=OpaqueStencil;
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -6667,6 +6780,12 @@ static MagickBooleanType XDrawEditImage(Display *display,
   XSegment
     line_info;
 
+  DrawEditContext
+    draw_context;
+
+  const DrawStyleTargets
+    style_targets = { &draw_info, &pen_id };
+
   /*
     Allocate polygon info.
   */
@@ -6695,6 +6814,11 @@ static MagickBooleanType XDrawEditImage(Display *display,
   draw_info.stencil=OpaqueStencil;
   status=MagickTrue;
   cursor=XCreateFontCursor(display,XC_tcross);
+  draw_context.display=display;
+  draw_context.resource_info=resource_info;
+  draw_context.windows=windows;
+  draw_context.DrawMenu=DrawMenu;
+  draw_context.command=command;
   for ( ; ; )
   {
     XQueryPosition(display,windows->image.id,&x,&y);
@@ -6754,63 +6878,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
             }
             case DrawColorCommand:
             {
-              const char
-                *ColorMenu[MaxNumberPens+1];
-
-              int
-                pen_number;
-
-              MagickBooleanType
-                transparent;
-
-              XColor
-                color;
-
-              /*
-                Initialize menu selections.
-              */
-              for (i=0; i < (int) (MaxNumberPens-2); i++)
-                ColorMenu[i]=resource_info->pen_colors[i];
-              ColorMenu[MaxNumberPens-2]="transparent";
-              ColorMenu[MaxNumberPens-1]="Browser...";
-              ColorMenu[MaxNumberPens]=(char *) NULL;
-              /*
-                Select a pen color from the pop-up menu.
-              */
-              pen_number=XMenuWidget(display,windows,DrawMenu[id],
-                (const char **) ColorMenu,command);
-              if (pen_number < 0)
-                break;
-              transparent=pen_number == (MaxNumberPens-2) ? MagickTrue :
-                MagickFalse;
-              if (transparent != MagickFalse)
-                {
-                  draw_info.stencil=TransparentStencil;
-                  break;
-                }
-              if (pen_number == (MaxNumberPens-1))
-                {
-                  static char
-                    color_name[MagickPathExtent] = "gray";
-
-                  /*
-                    Select a pen color from a dialog.
-                  */
-                  resource_info->pen_colors[pen_number]=color_name;
-                  XColorBrowserWidget(display,windows,"Select",color_name);
-                  if (*color_name == '\0')
-                    break;
-                }
-              /*
-                Set pen color.
-              */
-              (void) XParseColor(display,windows->map_info->colormap,
-                resource_info->pen_colors[pen_number],&color);
-              XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-                (unsigned int) MaxColors,&color);
-              windows->pixel_info->pen_colors[pen_number]=color;
-              pen_id=(unsigned int) pen_number;
-              draw_info.stencil=OpaqueStencil;
+              XSelectDrawColor(&draw_context,id,&style_targets);
               break;
             }
             case DrawStippleCommand:
