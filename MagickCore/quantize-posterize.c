@@ -588,6 +588,7 @@ static MagickOffsetType PosterizeColormap(Image *image,const size_t levels,
   MagickOffsetType
     progress;
 
+  (void) status;
   if (image->storage_class == PseudoClass)
     {
       ssize_t

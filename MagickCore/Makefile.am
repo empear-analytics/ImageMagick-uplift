@@ -88,6 +88,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/attribute-hull.c \
   MagickCore/attribute-bounds.c \
   MagickCore/attribute-depth.c \
+  MagickCore/attribute-depth-measure.c \
   MagickCore/attribute.h \
   MagickCore/blob.c \
   MagickCore/blob.h \
@@ -115,11 +116,13 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colormap.h \
   MagickCore/colormap-private.h \
   MagickCore/colorspace.c \
+  MagickCore/colorspace-transform.c \
   MagickCore/colorspace-convert.c \
   MagickCore/colorspace-generic-rgb.c \
   MagickCore/colorspace.h \
   MagickCore/colorspace-private.h \
   MagickCore/compare.c \
+  MagickCore/compare-similarity.c \
   MagickCore/compare.h \
   MagickCore/compare-private.h \
   MagickCore/composite.c \
@@ -154,8 +157,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/draw.h \
   MagickCore/draw-private.h \
   MagickCore/effect.c \
+  MagickCore/effect-filter.c \
   MagickCore/effect-preview.c \
   MagickCore/effect-blur.c \
+  MagickCore/effect-blur-adaptive.c \
   MagickCore/effect.h \
   MagickCore/enhance.c \
   MagickCore/enhance-clahe.c \
@@ -169,6 +174,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/feature-texture.c \
   MagickCore/feature.h \
   MagickCore/fourier.c \
+  MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
   MagickCore/fx.c \
   MagickCore/fx.h \
@@ -192,6 +198,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/image-view.c \
   MagickCore/image-view.h \
   MagickCore/layer.c \
+  MagickCore/layer-composite.c \
   MagickCore/layer-merge.c \
   MagickCore/layer.h \
   MagickCore/linked-list.c \
@@ -278,6 +285,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/resample.h \
   MagickCore/resample-private.h \
   MagickCore/resize.c \
+  MagickCore/resize-rescale.c \
   MagickCore/resize-sample.c \
   MagickCore/resize-scale.c \
   MagickCore/resize-image.c \
@@ -331,6 +339,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/token.h \
   MagickCore/token-private.h \
   MagickCore/transform.c \
+  MagickCore/transform-region.c \
   MagickCore/transform-tiles.c \
   MagickCore/transform.h \
   MagickCore/threshold.c \
@@ -346,11 +355,13 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/version.h \
   MagickCore/version-private.h \
   MagickCore/visual-effects.c \
+  MagickCore/visual-effects-pixel.c \
   MagickCore/visual-effects-wavelet.c \
   MagickCore/visual-effects-plasma.c \
   MagickCore/visual-effects-stegano.c \
   MagickCore/visual-effects.h \
   MagickCore/vision.c \
+  MagickCore/vision-components.c \
   MagickCore/vision.h \
   MagickCore/widget.c \
   MagickCore/widget.h \

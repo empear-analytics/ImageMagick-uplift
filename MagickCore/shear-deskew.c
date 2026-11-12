@@ -573,7 +573,7 @@ static void ReadRadonRow(MagickBooleanType *status,
 }
 
 static void ScanRadonRowReversed(MagickBooleanType *status,
-  const RadonRowSource *source,const unsigned short *bits)
+  const RadonRowSource *source,unsigned short *bits)
 {
   if ((*status) == MagickFalse)
     return;

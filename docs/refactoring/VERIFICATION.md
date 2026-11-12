@@ -17,7 +17,7 @@ evidence*) and [`../../AGENTS.md`](../../AGENTS.md) since step 1.
 | Build | Where | Configuration | Job | Differential oracle |
 | --- | --- | --- | --- | --- |
 | **Oracle build** | WSL | `tools/oracle/build.sh base / cand / cov / mull`: static, no OpenMP, `--without-x`, OpenCL off | behaviour proof and mutation testing | **yes**: 9,745 cases, `selfcheck --repeat 4` reports 0 nondeterministic |
-| **Wide build** | WSL, `build-oracle/wide` | the same, plus `--with-x --enable-opencl --enable-deprecated` | compile check for the X11 and OpenCL files | yes, since 2026-10-05, as `WIDE=1` (`base-wide`, `cov-wide`): X11 cases under Xvfb, OpenCL under pocl (`MUTATION.md`, *W01*) |
+| **Wide build** | WSL, `build-oracle/wide` | the same, plus `--with-x --enable-opencl --enable-deprecated` | compile check for the X11 and OpenCL files | yes, since 2026-10-05, as `WIDE=1` (`base-wide`, `cov-wide`): X11 cases under Xvfb, OpenCL under pocl (`MUTATION.md`, *W01*); base against candidate trustworthy since 2026-11-10 (14,145 cases, 0 diverged between two builds of one commit; `ORACLE.md`, *The wide build*) |
 | **Windows build** | Windows, MSYS2 UCRT64, a clone with LF line endings | `--disable-shared --disable-openmp --without-modules`, no delegate libraries | compile check for the Windows-only files and branches | later: once `oracle.py` runs on Windows (step 4) |
 
 One full oracle today, possibly two later, and one build that only compiles. The GitHub
@@ -46,6 +46,38 @@ reach almost all the rest:
 The Windows build also compiles the `MAGICKCORE_WINDOWS_SUPPORT` branches of the portable
 files (`utility.c`, `blob.c`, `resource.c`, ...) and the Windows-only coders `emf.c`,
 `clipboard.c` and `screenshot.c`.
+
+### ImageMagick's own CI: `ci_warnings.sh` and `ci_linux_warnings.sh`
+
+The oracle builds use neither `-Werror` nor the CI's warning flags, so a step can pass the
+oracle and still break `main.yml`. Two scripts check a changed file against the CI before
+it is committed:
+
+| Script | Stands for | Build it reads | Flags |
+| --- | --- | --- | --- |
+| `tools/ci_warnings.sh` | the *Build MacOS arm64* job | the oracle's `build-oracle/cand` (HDRI) | the job's, above all `-Wdeclaration-after-statement`, plus `-Wconditional-uninitialized` for MSVC's C4701 |
+| `tools/ci_linux_warnings.sh` | the *Build Linux* gcc and clang jobs, and the Windows jobs' MSVC errors | six trees of its own, `build-oracle/ci-{gcc,clang}-{min,dlg,x}`, configured on first use as the jobs configure (`--with-quantum-depth=16 --enable-hdri=no`, `-O0`); `min` without delegate libraries (the CI container), `dlg` with the installed ones and FFTW (what Windows compiles); `min` and `dlg` are `--without-x`; `x` has X11, OpenCL and FFTW and reports only pointer-type, qualifier, int/pointer and implicit-declaration diagnostics (the code the others compile out) | the jobs' `-Wall -Wextra` (`-Werror` left out so every diagnostic shows), plus `-Wshadow` and the discarded-qualifier warning for MSVC's C4456/C4457/C4459 and C2440/C2664, and a scan for C4065 (a `switch` with a `default:` and no `case`) |
+
+On Linux `ci_warnings.sh` runs `ci_linux_warnings.sh` on the same files, so the AGENTS.md
+loop and the lanes' `verify_wt.sh` get both (`CI_LINUX=0` skips the second).
+`ci_linux_warnings.sh --campaign-a` checks every campaign A file (about 50 s warm).
+
+Why the second script (W16, 2026-11-10): from #86 the `Main` workflow failed on main. The
+Linux jobs stopped at `blob.c` (campaign B; reproduced by the `min` trees, which compile
+its no-zlib branch), and the Windows jobs reported nine diagnostics in campaign A files,
+each from a refactor commit: a `const` member or parameter between two helpers
+(`effect-blur.c`, `shear-deskew.c`), a parameter kept only for a pragma's `shared(status)`
+(`colorspace.c`, `quantize-posterize.c`), a body-local hiding an outer one (`fourier.c`;
+two in `composite.c` and one in `shear.c`, gone by then), and two default-only switches
+left by Recipe SD (`compare.c`). Behind `blob.c` the Linux jobs would also have stopped on
+helpers taking `Quantum **` or `MagickRealType **` for a caller's `magick_restrict` pointer
+(`colorspace.c`, `quantize.c`, `effect-blur.c`), which gcc and clang reject by default. All
+were repaired by `fix(...)` commits with identical object files.
+
+What neither script sees: MSVC's C4702 (unreachable code), the Windows-only `#if`
+branches (the Windows build above), and differences between the CI's compilers (gcc 11
+and clang 14 on Ubuntu 22.04) and WSL's (gcc 13, clang 18). The CI is the final word;
+these scripts catch what they can before a push.
 
 ---
 
@@ -167,3 +199,4 @@ The share of each group over all 441 functions is not measured yet (step 2).
 | 7 | X11 at runtime: under Xvfb, see which paths of `display.c`, `animate.c` and `xwindow.c` non-interactive commands reach (`import -window root`, ...) | open |
 | 8 | Rerun the capped survivors of `colorspace.c` and `morphology.c` uncapped, classify them, and put both files through the gate | `colorspace.c` done: 82% overall, 5 functions ready, the two big ones careful (see `MUTATION.md`, *Linux*); `morphology.c` done: 70% overall. After 109 cases for the gaps: `colorspace.c` 88%, `morphology.c` 77% (`MUTATION.md`) |
 | 9 | A sampled mutation sweep over all compiled MagickCore files on Linux, for the trend figure | done: 4,506 mutants; after rerunning the 190 capped survivors uncapped (175 killed), 73.8% killed, 92.3% on executed lines, gate 89.7%, strict 75.6% (`MUTATION.md`, *Linux sweep*) |
+| 10 | Make the wide oracle's base-against-candidate comparison trustworthy, so the six X11 and OpenCL files can be oracle-verified (W08: 153 cases diverged between two wide builds of one commit) | done (2026-11-10): the baseline cache key lacked a case's `env` and `x11` (129 cases) and the wide build trees were not normalised (24); twelve `xevents` cases that differ under load are listed in `cases.LOAD_SENSITIVE` and settled by a rerun alone (`ORACLE.md`, *The wide build*). Reach, from `casemap-wide.json` (current for this catalogue): display.c 28 of 34 functions, xwindow.c 59/71, widget.c 29/31, animate.c 4/6, accelerate.c 37/42, opencl.c 62/72. Verify a step with `WIDE=1` on the build, `ci_warnings.sh` and `oracle.py run --function` |

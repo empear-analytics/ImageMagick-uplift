@@ -1149,6 +1149,124 @@ static double GetResidualDistance(const ResidualPixels *residual,
   return(distance);
 }
 
+typedef struct _ChannelResidualInputs
+{
+  const Image
+    *alpha_image,
+    *beta_image;
+
+  const Quantum
+    *p,
+    *q;
+
+  double
+    Da,
+    Sa;
+} ChannelResidualInputs;
+
+static void AddChannelResiduals(const ChannelResidualInputs *inputs,
+  double *channel_residual)
+{
+  const Image
+    *const alpha_image = inputs->alpha_image,
+    *const beta_image = inputs->beta_image;
+
+  const Quantum
+    *magick_restrict p = inputs->p,
+    *magick_restrict q = inputs->q;
+
+  const double
+    Da = inputs->Da,
+    Sa = inputs->Sa;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(alpha_image); i++)
+  {
+    double
+      distance;
+
+    ResidualPixels
+      residual;
+
+    PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
+    PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
+    PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
+    if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
+      continue;
+    residual.beta_image=beta_image;
+    residual.p=p;
+    residual.q=q;
+    residual.Da=Da;
+    residual.Sa=Sa;
+    distance=GetResidualDistance(&residual,channel,i);
+    (*channel_residual)+=distance*distance;
+  }
+}
+
+typedef struct _RMSEResidualRow
+{
+  const Image
+    *alpha_image,
+    *beta_image;
+
+  const Quantum
+    *p,
+    *q;
+
+  size_t
+    columns;
+} RMSEResidualRow;
+
+static void AddRMSERowResidual(const RMSEResidualRow *row,double *area,
+  double *channel_residual)
+{
+  const Image
+    *const alpha_image = row->alpha_image,
+    *const beta_image = row->beta_image;
+
+  const Quantum
+    *magick_restrict p = row->p,
+    *magick_restrict q = row->q;
+
+  const size_t
+    columns = row->columns;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) columns; x++)
+  {
+    ChannelResidualInputs
+      inputs;
+
+    double
+      Da,
+      Sa;
+
+    if ((GetPixelReadMask(alpha_image,p) <= (QuantumRange/2)) ||
+        (GetPixelReadMask(beta_image,q) <= (QuantumRange/2)))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(alpha_image);
+        q+=(ptrdiff_t) GetPixelChannels(beta_image);
+        continue;
+      }
+    Sa=QuantumScale*(double) GetPixelAlpha(alpha_image,p);
+    Da=QuantumScale*(double) GetPixelAlpha(beta_image,q);
+    inputs.alpha_image=alpha_image;
+    inputs.beta_image=beta_image;
+    inputs.p=p;
+    inputs.q=q;
+    inputs.Da=Da;
+    inputs.Sa=Sa;
+    AddChannelResiduals(&inputs,channel_residual);
+    (*area)++;
+    p+=(ptrdiff_t) GetPixelChannels(alpha_image);
+    q+=(ptrdiff_t) GetPixelChannels(beta_image);
+  }
+}
+
 static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
   const Image *beta_image,double *residual,ExceptionInfo *exception)
 {
@@ -1183,8 +1301,8 @@ static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
       *magick_restrict p,
       *magick_restrict q;
 
-    ssize_t
-      x;
+    RMSEResidualRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -1196,49 +1314,12 @@ static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
         continue;
       }
     channel_residual=0.0;
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      double
-        Da,
-        Sa;
-
-      ssize_t
-        i;
-
-      if ((GetPixelReadMask(alpha_image,p) <= (QuantumRange/2)) ||
-          (GetPixelReadMask(beta_image,q) <= (QuantumRange/2)))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(alpha_image);
-          q+=(ptrdiff_t) GetPixelChannels(beta_image);
-          continue;
-        }
-      Sa=QuantumScale*(double) GetPixelAlpha(alpha_image,p);
-      Da=QuantumScale*(double) GetPixelAlpha(beta_image,q);
-      for (i=0; i < (ssize_t) GetPixelChannels(alpha_image); i++)
-      {
-        double
-          distance;
-
-        ResidualPixels
-          residual;
-
-        PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
-        PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
-        PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
-          continue;
-        residual.beta_image=beta_image;
-        residual.p=p;
-        residual.q=q;
-        residual.Da=Da;
-        residual.Sa=Sa;
-        distance=GetResidualDistance(&residual,channel,i);
-        channel_residual+=distance*distance;
-      }
-      area++;
-      p+=(ptrdiff_t) GetPixelChannels(alpha_image);
-      q+=(ptrdiff_t) GetPixelChannels(beta_image);
-    }
+    row.alpha_image=alpha_image;
+    row.beta_image=beta_image;
+    row.p=p;
+    row.q=q;
+    row.columns=columns;
+    AddRMSERowResidual(&row,&area,&channel_residual);
   }
   beta_view=DestroyCacheView(beta_view);
   alpha_view=DestroyCacheView(alpha_view);
@@ -1619,6 +1700,107 @@ static MagickBooleanType FetchOverSourceRow(const OverSourceRow *source,
   return(MagickTrue);
 }
 
+static MagickBooleanType GetCompositeClamp(const Image *image)
+{
+  const char
+    *value;
+
+  MagickBooleanType
+    clamp;
+
+  clamp=MagickTrue;
+  value=GetImageArtifact(image,"compose:clamp");
+  if (value != (const char *) NULL)
+    clamp=IsStringTrue(value);
+  return(clamp);
+}
+
+typedef struct _OverRowHead
+{
+  OverSourceRow
+    source;
+
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    clamp;
+} OverRowHead;
+
+static MagickBooleanType CompositeOverRowHead(const OverRowHead *head,
+  MagickBooleanType *status)
+{
+  const OverSourceRow
+    source = head->source;
+
+  Image
+    *const image = head->image;
+
+  CacheView
+    *const image_view = head->image_view;
+
+  const MagickBooleanType
+    clamp = head->clamp;
+
+  const Image
+    *const source_image = source.source_image;
+
+  const MagickBooleanType
+    clip_to_self = source.clip_to_self;
+
+  const ssize_t
+    x_offset = source.x_offset,
+    y_offset = source.y_offset,
+    y = source.y;
+
+  ExceptionInfo
+    *const exception = source.exception;
+
+  const Quantum
+    *pixels;
+
+  PixelInfo
+    canvas_pixel,
+    source_pixel;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  OverRowInputs
+    row;
+
+  if (SkipOverRow(&source,status) == MagickFalse)
+    return(MagickFalse);
+  if (FetchOverSourceRow(&source,&pixels,&p,status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  GetPixelInfo(image,&canvas_pixel);
+  GetPixelInfo(source_image,&source_pixel);
+  row.image=image;
+  row.source_image=source_image;
+  row.pixels=pixels;
+  row.clip_to_self=clip_to_self;
+  row.x_offset=x_offset;
+  row.y_offset=y_offset;
+  row.y=y;
+  row.clamp=clamp;
+  row.exception=exception;
+  CompositeOverRow(&row,p,q);
+  SyncCompositeRow(image_view,exception,status);
+  return(MagickTrue);
+}
+
 static MagickBooleanType CompositeOverImage(Image *image,
   const Image *source_image,const CompositePlacement *placement,
   ExceptionInfo *exception)
@@ -1636,9 +1818,6 @@ static MagickBooleanType CompositeOverImage(Image *image,
     *image_view,
     *source_view;
 
-  const char
-    *value;
-
   MagickBooleanType
     clamp,
     status;
@@ -1654,10 +1833,7 @@ static MagickBooleanType CompositeOverImage(Image *image,
   */
   status=MagickTrue;
   progress=0;
-  clamp=MagickTrue;
-  value=GetImageArtifact(image,"compose:clamp");
-  if (value != (const char *) NULL)
-    clamp=IsStringTrue(value);
+  clamp=GetCompositeClamp(image);
   status=MagickTrue;
   progress=0;
   source_view=AcquireVirtualCacheView(source_image,exception);
@@ -1668,49 +1844,15 @@ static MagickBooleanType CompositeOverImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *pixels;
-
-    PixelInfo
-      canvas_pixel,
-      source_pixel;
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    OverRowInputs
-      row;
-
     const OverSourceRow
       source = { source_view, source_image, clip_to_self, x_offset, y_offset,
         y, exception };
 
-    if (SkipOverRow(&source,&status) == MagickFalse)
+    const OverRowHead
+      head = { source, image, image_view, clamp };
+
+    if (CompositeOverRowHead(&head,&status) == MagickFalse)
       continue;
-    if (FetchOverSourceRow(&source,&pixels,&p,&status) == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    GetPixelInfo(image,&canvas_pixel);
-    GetPixelInfo(source_image,&source_pixel);
-    row.image=image;
-    row.source_image=source_image;
-    row.pixels=pixels;
-    row.clip_to_self=clip_to_self;
-    row.x_offset=x_offset;
-    row.y_offset=y_offset;
-    row.y=y;
-    row.clamp=clamp;
-    row.exception=exception;
-    CompositeOverRow(&row,p,q);
-    SyncCompositeRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2001,27 +2143,101 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
   return(status);
 }
 
-static inline void SetVirtualCompositeChannels(const Image *image,
-  const Image *source_image,const CompositeOperator compose,
-  const Quantum *source,const MagickRealType canvas_dissolve,
-  const MagickBooleanType clamp,Quantum *magick_restrict q)
+typedef struct _VirtualCompositeInputs
+{
+  const Image
+    *image,
+    *source_image;
+
+  CompositeOperator
+    compose;
+
+  MagickRealType
+    canvas_dissolve;
+
+  MagickBooleanType
+    clamp;
+} VirtualCompositeInputs;
+
+static void SetVirtualDissolvePixel(const VirtualCompositeInputs *composite,
+  const PixelChannel channel,const Quantum *source,MagickRealType *pixel)
+{
+  switch (composite->compose)
+  {
+    case BlendCompositeOp:
+    case DissolveCompositeOp:
+    {
+      if (channel == AlphaPixelChannel)
+        (*pixel)=composite->canvas_dissolve*(double) GetPixelAlpha(
+          composite->source_image,source);
+      else
+        (*pixel)=(MagickRealType) source[channel];
+      break;
+    }
+    default:
+    {
+      (*pixel)=(MagickRealType) source[channel];
+      break;
+    }
+  }
+}
+
+static void SetVirtualSourcePixel(const VirtualCompositeInputs *composite,
+  const PixelChannel channel,const Quantum *source,MagickRealType *pixel)
+{
+  switch (composite->compose)
+  {
+    case ClearCompositeOp:
+    case CopyCompositeOp:
+    case ReplaceCompositeOp:
+    {
+      if (channel == AlphaPixelChannel)
+        (*pixel)=(MagickRealType) TransparentAlpha;
+      else
+        (*pixel)=0.0;
+      break;
+    }
+    default:
+    {
+      SetVirtualDissolvePixel(composite,channel,source,&(*pixel));
+      break;
+    }
+  }
+}
+
+static MagickRealType GetVirtualCanvasPixel(const PixelChannel channel,
+  const Quantum *magick_restrict q,const ssize_t i)
+{
+  MagickRealType
+    pixel;
+
+  if (channel == AlphaPixelChannel)
+    pixel=(MagickRealType) TransparentAlpha;
+  else
+    pixel=(MagickRealType) q[i];
+  return(pixel);
+}
+
+static inline void SetVirtualCompositeChannels(
+  const VirtualCompositeInputs *composite,const Quantum *source,
+  Quantum *magick_restrict q)
 {
   ssize_t
     i;
 
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  for (i=0; i < (ssize_t) GetPixelChannels(composite->image); i++)
   {
     MagickRealType
       pixel = 0.0;
 
-    PixelChannel channel = GetPixelChannelChannel(image,i);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    PixelTrait source_traits = GetPixelChannelTraits(source_image,
+    PixelChannel channel = GetPixelChannelChannel(composite->image,i);
+    PixelTrait traits = GetPixelChannelTraits(composite->image,channel);
+    PixelTrait source_traits = GetPixelChannelTraits(composite->source_image,
       channel);
     if ((traits == UndefinedPixelTrait) ||
         (source_traits == UndefinedPixelTrait))
       continue;
-    switch (compose)
+    switch (composite->compose)
     {
       case AlphaCompositeOp:
       case ChangeMaskCompositeOp:
@@ -2033,39 +2249,16 @@ static inline void SetVirtualCompositeChannels(const Image *image,
       case SrcInCompositeOp:
       case SrcOutCompositeOp:
       {
-        if (channel == AlphaPixelChannel)
-          pixel=(MagickRealType) TransparentAlpha;
-        else
-          pixel=(MagickRealType) q[i];
-        break;
-      }
-      case ClearCompositeOp:
-      case CopyCompositeOp:
-      case ReplaceCompositeOp:
-      {
-        if (channel == AlphaPixelChannel)
-          pixel=(MagickRealType) TransparentAlpha;
-        else
-          pixel=0.0;
-        break;
-      }
-      case BlendCompositeOp:
-      case DissolveCompositeOp:
-      {
-        if (channel == AlphaPixelChannel)
-          pixel=canvas_dissolve*(double) GetPixelAlpha(source_image,
-            source);
-        else
-          pixel=(MagickRealType) source[channel];
+        pixel=GetVirtualCanvasPixel(channel,q,i);
         break;
       }
       default:
       {
-        pixel=(MagickRealType) source[channel];
+        SetVirtualSourcePixel(composite,channel,source,&pixel);
         break;
       }
     }
-    q[i]=clamp != MagickFalse ? ClampPixel(pixel) :
+    q[i]=composite->clamp != MagickFalse ? ClampPixel(pixel) :
       ClampToQuantum(pixel);
   }
 }
@@ -4526,6 +4719,9 @@ static void CompositeImageRow(const CompositeRowInputs *row,
   const MagickBooleanType
     clamp = row->clamp;
 
+  const VirtualCompositeInputs
+    virtual_inputs = { image, source_image, compose, canvas_dissolve, clamp };
+
   PixelInfo
     canvas_pixel,
     source_pixel;
@@ -4560,8 +4756,7 @@ static void CompositeImageRow(const CompositeRowInputs *row,
         (void) GetOneVirtualPixel(source_image,
           CastDoubleToSsizeT((double) x-x_offset),
           CastDoubleToSsizeT((double) y-y_offset),source,exception);
-        SetVirtualCompositeChannels(image,source_image,compose,source,
-          canvas_dissolve,clamp,q);
+        SetVirtualCompositeChannels(&virtual_inputs,source,q);
         q+=(ptrdiff_t) GetPixelChannels(image);
         continue;
       }
@@ -5359,15 +5554,12 @@ static void CopyTextureRow(Image *image,Image *texture_image,
   }
 }
 
-MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
+static MagickBooleanType CopyTextureImage(Image *image,Image *texture_image,
   ExceptionInfo *exception)
 {
   CacheView
     *image_view,
     *texture_view;
-
-  Image
-    *texture_image;
 
   MagickBooleanType
     status;
@@ -5375,23 +5567,6 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ssize_t
     y;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  if (texture == (const Image *) NULL)
-    return(MagickFalse);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    return(MagickFalse);
-  texture_image=CloneImage(texture,0,0,MagickTrue,exception);
-  if (texture_image == (const Image *) NULL)
-    return(MagickFalse);
-  (void) TransformImageColorspace(texture_image,image->colorspace,exception);
-  (void) SetImageVirtualPixelMethod(texture_image,TileVirtualPixelMethod,
-    exception);
-  status=MagickTrue;
-  if (IsTextureComposited(image,texture_image) != MagickFalse)
-    return(TileTextureImage(image,texture_image,status,exception));
   /*
     Tile texture onto the image background (optimized).
   */
@@ -5430,4 +5605,33 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   image_view=DestroyCacheView(image_view);
   texture_image=DestroyImage(texture_image);
   return(status);
+}
+
+MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
+  ExceptionInfo *exception)
+{
+  Image
+    *texture_image;
+
+  MagickBooleanType
+    status;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  if (texture == (const Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  texture_image=CloneImage(texture,0,0,MagickTrue,exception);
+  if (texture_image == (const Image *) NULL)
+    return(MagickFalse);
+  (void) TransformImageColorspace(texture_image,image->colorspace,exception);
+  (void) SetImageVirtualPixelMethod(texture_image,TileVirtualPixelMethod,
+    exception);
+  status=MagickTrue;
+  if (IsTextureComposited(image,texture_image) != MagickFalse)
+    return(TileTextureImage(image,texture_image,status,exception));
+  return(CopyTextureImage(image,texture_image,exception));
 }

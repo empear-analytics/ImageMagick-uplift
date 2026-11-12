@@ -107,6 +107,22 @@ static const ResizeWeightingFunctionType supportedResizeWeighting[] =
 /*
   Helper functions.
 */
+static MagickBooleanType IsUnsupportedColorspace(const Image *image)
+{
+  return((image->colorspace != RGBColorspace &&
+      image->colorspace != sRGBColorspace &&
+      image->colorspace != LinearGRAYColorspace &&
+      image->colorspace != GRAYColorspace) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType HasImageMaskChannel(const Image *image)
+{
+  return((((image->channels & ReadMaskChannel) != 0) ||
+      ((image->channels & WriteMaskChannel) != 0) ||
+      ((image->channels & CompositeMaskChannel) != 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType checkAccelerateCondition(const Image* image)
 {
   /* only direct class images are supported */
@@ -114,10 +130,7 @@ static MagickBooleanType checkAccelerateCondition(const Image* image)
     return(MagickFalse);
 
   /* check if the image's colorspace is supported */
-  if (image->colorspace != RGBColorspace &&
-      image->colorspace != sRGBColorspace &&
-      image->colorspace != LinearGRAYColorspace &&
-      image->colorspace != GRAYColorspace)
+  if (IsUnsupportedColorspace(image) != MagickFalse)
     return(MagickFalse);
 
   /* check if the virtual pixel method is compatible with the OpenCL implementation */
@@ -126,9 +139,7 @@ static MagickBooleanType checkAccelerateCondition(const Image* image)
     return(MagickFalse);
 
   /* check if the image has mask */
-  if (((image->channels & ReadMaskChannel) != 0) ||
-      ((image->channels & WriteMaskChannel) != 0) ||
-      ((image->channels & CompositeMaskChannel) != 0))
+  if (HasImageMaskChannel(image) != MagickFalse)
     return(MagickFalse);
 
   if (image->number_channels > 4)
@@ -169,6 +180,15 @@ static MagickBooleanType checkAccelerateCondition(const Image* image)
   return(MagickTrue);
 }
 
+static MagickBooleanType HasUndefinedRGBATraits(const Image *image)
+{
+  return(((GetPixelRedTraits(image) == UndefinedPixelTrait) ||
+      (GetPixelGreenTraits(image) == UndefinedPixelTrait) ||
+      (GetPixelBlueTraits(image) == UndefinedPixelTrait) ||
+      (GetPixelAlphaTraits(image) == UndefinedPixelTrait)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType checkAccelerateConditionRGBA(const Image* image)
 {
   if (checkAccelerateCondition(image) == MagickFalse)
@@ -178,32 +198,37 @@ static MagickBooleanType checkAccelerateConditionRGBA(const Image* image)
   if (image->number_channels != 4)
     return(MagickFalse);
 
-  if ((GetPixelRedTraits(image) == UndefinedPixelTrait) ||
-      (GetPixelGreenTraits(image) == UndefinedPixelTrait) ||
-      (GetPixelBlueTraits(image) == UndefinedPixelTrait) ||
-      (GetPixelAlphaTraits(image) == UndefinedPixelTrait))
+  if (HasUndefinedRGBATraits(image) != MagickFalse)
     return(MagickFalse);
 
   return(MagickTrue);
+}
+
+static MagickBooleanType IsLumaIntensityMethod(
+  const PixelIntensityMethod method)
+{
+  return(((method == Rec601LumaPixelIntensityMethod) ||
+    (method == Rec709LumaPixelIntensityMethod)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType IsLuminanceIntensityMethod(
+  const PixelIntensityMethod method)
+{
+  return(((method == Rec601LuminancePixelIntensityMethod) ||
+    (method == Rec709LuminancePixelIntensityMethod)) ? MagickTrue : MagickFalse);
 }
 
 static MagickBooleanType checkPixelIntensity(const Image *image,
   const PixelIntensityMethod method)
 {
   /* EncodePixelGamma and DecodePixelGamma are not supported */
-  if ((method == Rec601LumaPixelIntensityMethod) ||
-      (method == Rec709LumaPixelIntensityMethod))
-    {
-      if (image->colorspace == RGBColorspace)
-        return(MagickFalse);
-    }
+  if ((IsLumaIntensityMethod(method) != MagickFalse) &&
+      (image->colorspace == RGBColorspace))
+    return(MagickFalse);
 
-  if ((method == Rec601LuminancePixelIntensityMethod) ||
-      (method == Rec709LuminancePixelIntensityMethod))
-    {
-      if (image->colorspace == sRGBColorspace)
-        return(MagickFalse);
-    }
+  if ((IsLuminanceIntensityMethod(method) != MagickFalse) &&
+      (image->colorspace == sRGBColorspace))
+    return(MagickFalse);
 
   return(MagickTrue);
 }
@@ -236,15 +261,20 @@ static MagickCLEnv getOpenCLEnvironment(ExceptionInfo* exception)
   return(clEnv);
 }
 
+static MagickBooleanType IsRGBAChannelMask(const Image *image)
+{
+  return((((image->channel_mask & RedChannel) != 0) &&
+      ((image->channel_mask & GreenChannel) != 0) &&
+      ((image->channel_mask & BlueChannel) != 0) &&
+      ((image->channel_mask & AlphaChannel) != 0)) ? MagickTrue : MagickFalse);
+}
+
 static Image *cloneImage(const Image* image,ExceptionInfo *exception)
 {
   Image
     *clone;
 
-  if (((image->channel_mask & RedChannel) != 0) &&
-      ((image->channel_mask & GreenChannel) != 0) &&
-      ((image->channel_mask & BlueChannel) != 0) &&
-      ((image->channel_mask & AlphaChannel) != 0))
+  if (IsRGBAChannelMask(image) != MagickFalse)
     clone=CloneImage(image,0,0,MagickTrue,exception);
   else
     {
@@ -409,6 +439,18 @@ cleanup:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+static void ReleaseOpenCLBuffer(cl_mem buffer)
+{
+  if (buffer != (cl_mem) NULL)
+    ReleaseOpenCLMemObject(buffer);
+}
+
+static void ReleaseKernel(cl_kernel kernel)
+{
+  if (kernel != (cl_kernel) NULL)
+    ReleaseOpenCLKernel(kernel);
+}
+
 static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
   const double radius,const double sigma,ExceptionInfo *exception)
 {
@@ -569,16 +611,14 @@ static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
 
 cleanup:
 
-  if (imageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageBuffer);
+  ReleaseOpenCLBuffer(imageBuffer);
   if (filteredImageBuffer != (cl_mem) NULL)
     ReleaseOpenCLMemObject(filteredImageBuffer);
   if (tempImageBuffer != (cl_mem) NULL)
     ReleaseOpenCLMemObject(tempImageBuffer);
   if (imageKernelBuffer != (cl_mem) NULL)
     ReleaseOpenCLMemObject(imageKernelBuffer);
-  if (blurRowKernel != (cl_kernel) NULL)
-    ReleaseOpenCLKernel(blurRowKernel);
+  ReleaseKernel(blurRowKernel);
   if (blurColumnKernel != (cl_kernel) NULL)
     ReleaseOpenCLKernel(blurColumnKernel);
   if (queue != (cl_command_queue) NULL)
@@ -756,6 +796,117 @@ MagickPrivate MagickBooleanType AccelerateContrastImage(Image *image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+static MagickBooleanType IsStretchDirectClass(const Image *image)
+{
+  return((((image->channel_mask & AlphaChannel) != 0) || (((image->channel_mask & IndexChannel) != 0) &&
+      (image->colorspace == CMYKColorspace))) ? MagickTrue : MagickFalse);
+}
+
+static cl_mem_flags GetInputBufferFlags(const void *inputPixels)
+{
+  cl_mem_flags
+    mem_flags;
+
+  if (ALIGNED(inputPixels,CLPixelPacket))
+  {
+    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
+  }
+  else
+  {
+    mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
+  }
+  return(mem_flags);
+}
+
+static cl_uint FindStretchBlackBin(const cl_uint4 *histogram,
+  const double black_point)
+{
+  cl_uint
+    i;
+
+  double
+    intensity;
+
+  intensity=0.0;
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    intensity+=histogram[i].s[2];
+    if (intensity > black_point)
+      break;
+  }
+  return(i);
+}
+
+static cl_uint FindStretchWhiteBin(const Image *image,
+  const cl_uint4 *histogram,const double white_point)
+{
+  cl_uint
+    i;
+
+  double
+    intensity;
+
+  intensity=0.0;
+  for (i=(ssize_t) MaxMap; i != 0; i--)
+  {
+    intensity+=histogram[i].s[2];
+    if (intensity > ((double) image->columns*image->rows-white_point))
+      break;
+  }
+  return(i);
+}
+
+static MagickBooleanType StretchesRedChannel(const Image *image,
+  const cl_float4 black,const cl_float4 white)
+{
+  return((((image->channel_mask & RedChannel) != 0) &&
+    (black.x != white.x)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType StretchesGreenChannel(const Image *image,
+  const cl_float4 black,const cl_float4 white)
+{
+  return((((image->channel_mask & GreenChannel) != 0) &&
+    (black.y != white.y)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType StretchesBlueChannel(const Image *image,
+  const cl_float4 black,const cl_float4 white)
+{
+  return((((image->channel_mask & BlueChannel) != 0) &&
+    (black.z != white.z)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType StretchesAlphaChannel(const Image *image,
+  const cl_float4 black,const cl_float4 white)
+{
+  return((((image->channel_mask & AlphaChannel) != 0) &&
+    (black.w != white.w)) ? MagickTrue : MagickFalse);
+}
+
+static void StretchColormap(Image *image,PixelPacket *stretch_map,
+  const cl_float4 black,const cl_float4 white)
+{
+  cl_uint
+    i;
+
+  for (i=0; i < (cl_uint) image->colors; i++)
+  {
+    if (StretchesRedChannel(image,black,white) != MagickFalse)
+      image->colormap[i].red=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
+    if (StretchesGreenChannel(image,black,white) != MagickFalse)
+      image->colormap[i].green=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
+    if (StretchesBlueChannel(image,black,white) != MagickFalse)
+      image->colormap[i].blue=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
+    if (StretchesAlphaChannel(image,black,white) != MagickFalse)
+      image->colormap[i].alpha=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
+  }
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const double black_point,const double white_point,
   ExceptionInfo *exception)
@@ -793,9 +944,6 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
 
   cl_uint4
     *histogram;
-
-  double
-    intensity;
 
   cl_float4
     black,
@@ -882,14 +1030,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   /* If the host pointer is aligned to the size of CLPixelPacket,
      then use the host buffer directly from the GPU; otherwise,
      create a buffer on the GPU and copy the data over */
-  if (ALIGNED(inputPixels,CLPixelPacket))
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
-  }
+  mem_flags=GetInputBufferFlags(inputPixels);
   /* create a CL buffer from image pixel buffer */
   length = image->columns * image->rows;
   imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
@@ -944,13 +1085,11 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
 
   /* unmap, don't block gpu to use this buffer again.  */
   if (ALIGNED(histogram,cl_uint4))
-  {
     clStatus = clEnv->library->clEnqueueUnmapMemObject(queue, histogramBuffer, histogram, 0, NULL, NULL);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
-      goto cleanup;
-    }
+  if ((ALIGNED(histogram,cl_uint4)) && (clStatus != CL_SUCCESS))
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
+    goto cleanup;
   }
 
   /* recreate input buffer later, in case image updated */
@@ -967,84 +1106,36 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   white.x=MaxRange(QuantumRange);
   if ((image->channel_mask & RedChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.x=(cl_float) i;
-    intensity=0.0;
-    for (i=(ssize_t) MaxMap; i != 0; i--)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    i=FindStretchWhiteBin(image,histogram,white_point);
     white.x=(cl_float) i;
   }
   black.y=0.0;
   white.y=MaxRange(QuantumRange);
   if ((image->channel_mask & GreenChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.y=(cl_float) i;
-    intensity=0.0;
-    for (i=(ssize_t) MaxMap; i != 0; i--)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    i=FindStretchWhiteBin(image,histogram,white_point);
     white.y=(cl_float) i;
   }
   black.z=0.0;
   white.z=MaxRange(QuantumRange);
   if ((image->channel_mask & BlueChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.z=(cl_float) i;
-    intensity=0.0;
-    for (i=(ssize_t) MaxMap; i != 0; i--)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    i=FindStretchWhiteBin(image,histogram,white_point);
     white.z=(cl_float) i;
   }
   black.w=0.0;
   white.w=MaxRange(QuantumRange);
   if ((image->channel_mask & AlphaChannel) != 0)
   {
-    intensity=0.0;
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > black_point)
-        break;
-    }
+    i=FindStretchBlackBin(histogram,black_point);
     black.w=(cl_float) i;
-    intensity=0.0;
-    for (i=(ssize_t) MaxMap; i != 0; i--)
-    {
-      intensity+=histogram[i].s[2];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    i=FindStretchWhiteBin(image,histogram,white_point);
     white.w=(cl_float) i;
   }
 
@@ -1061,94 +1152,67 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   (void) memset(stretch_map,0,(MaxMap+1)*sizeof(*stretch_map));
   for (i=0; i <= (ssize_t) MaxMap; i++)
   {
-    if ((image->channel_mask & RedChannel) != 0)
-    {
-      if (i < (cl_uint) black.x)
-        stretch_map[i].red=0;
+    if (((image->channel_mask & RedChannel) != 0) &&
+        (i < (cl_uint) black.x))
+      stretch_map[i].red=0;
+    else
+      if (((image->channel_mask & RedChannel) != 0) &&
+          (i > (cl_uint) white.x))
+        stretch_map[i].red=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.x)
-          stretch_map[i].red=(unsigned int) QuantumRange;
-        else
-          if (black.x != white.x)
-            stretch_map[i].red=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.x)/(white.x-black.x)));
-    }
-    if ((image->channel_mask & GreenChannel) != 0)
-    {
-      if (i < (cl_uint) black.y)
-        stretch_map[i].green=0;
+        if (((image->channel_mask & RedChannel) != 0) &&
+            (black.x != white.x))
+          stretch_map[i].red=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.x)/(white.x-black.x)));
+    if (((image->channel_mask & GreenChannel) != 0) &&
+        (i < (cl_uint) black.y))
+      stretch_map[i].green=0;
+    else
+      if (((image->channel_mask & GreenChannel) != 0) &&
+          (i > (cl_uint) white.y))
+        stretch_map[i].green=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.y)
-          stretch_map[i].green=(unsigned int) QuantumRange;
-        else
-          if (black.y != white.y)
-            stretch_map[i].green=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.y)/(white.y-black.y)));
-    }
-    if ((image->channel_mask & BlueChannel) != 0)
-    {
-      if (i < (cl_uint) black.z)
-        stretch_map[i].blue=0;
+        if (((image->channel_mask & GreenChannel) != 0) &&
+            (black.y != white.y))
+          stretch_map[i].green=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.y)/(white.y-black.y)));
+    if (((image->channel_mask & BlueChannel) != 0) &&
+        (i < (cl_uint) black.z))
+      stretch_map[i].blue=0;
+    else
+      if (((image->channel_mask & BlueChannel) != 0) &&
+          (i > (cl_uint) white.z))
+        stretch_map[i].blue=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.z)
-          stretch_map[i].blue=(unsigned int) QuantumRange;
-        else
-          if (black.z != white.z)
-            stretch_map[i].blue=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.z)/(white.z-black.z)));
-    }
-    if ((image->channel_mask & AlphaChannel) != 0)
-    {
-      if (i < (cl_uint) black.w)
-        stretch_map[i].alpha=0;
+        if (((image->channel_mask & BlueChannel) != 0) &&
+            (black.z != white.z))
+          stretch_map[i].blue=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.z)/(white.z-black.z)));
+    if (((image->channel_mask & AlphaChannel) != 0) &&
+        (i < (cl_uint) black.w))
+      stretch_map[i].alpha=0;
+    else
+      if (((image->channel_mask & AlphaChannel) != 0) &&
+          (i > (cl_uint) white.w))
+        stretch_map[i].alpha=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.w)
-          stretch_map[i].alpha=(unsigned int) QuantumRange;
-        else
-          if (black.w != white.w)
-            stretch_map[i].alpha=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.w)/(white.w-black.w)));
-    }
+        if (((image->channel_mask & AlphaChannel) != 0) &&
+            (black.w != white.w))
+          stretch_map[i].alpha=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.w)/(white.w-black.w)));
   }
 
   /*
     Stretch the image.
   */
-  if (((image->channel_mask & AlphaChannel) != 0) || (((image->channel_mask & IndexChannel) != 0) &&
-      (image->colorspace == CMYKColorspace)))
+  if (IsStretchDirectClass(image) != MagickFalse)
     image->storage_class=DirectClass;
   if (image->storage_class == PseudoClass)
   {
     /*
        Stretch colormap.
        */
-    for (i=0; i < (cl_uint) image->colors; i++)
-    {
-      if ((image->channel_mask & RedChannel) != 0)
-      {
-        if (black.x != white.x)
-          image->colormap[i].red=stretch_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
-      }
-      if ((image->channel_mask & GreenChannel) != 0)
-      {
-        if (black.y != white.y)
-          image->colormap[i].green=stretch_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
-      }
-      if ((image->channel_mask & BlueChannel) != 0)
-      {
-        if (black.z != white.z)
-          image->colormap[i].blue=stretch_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
-      }
-      if ((image->channel_mask & AlphaChannel) != 0)
-      {
-        if (black.w != white.w)
-          image->colormap[i].alpha=stretch_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
-      }
-    }
+    StretchColormap(image,stretch_map,black,white);
   }
 
   /*
@@ -1323,6 +1387,66 @@ MagickPrivate MagickBooleanType AccelerateContrastStretchImage(
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _TempBufferInfo
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+} TempBufferInfo;
+
+static MagickBooleanType CreateTempImageBuffers(const TempBufferInfo *info,
+  cl_mem *tempImageBuffer,ExceptionInfo *exception)
+{
+  const MagickCLDevice
+    device = info->device;
+
+  const MagickCLEnv
+    clEnv = info->clEnv;
+
+  const cl_mem_flags
+    mem_flags = info->mem_flags;
+
+  const size_t
+    length = info->length;
+
+  cl_int
+    clStatus;
+
+  int
+    k;
+
+  for (k = 0; k < 2; k++)
+  {
+    tempImageBuffer[k] = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), NULL, &clStatus);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
+static void ReleaseTempImageBuffers(MagickCLEnv clEnv,cl_mem *tempImageBuffer)
+{
+  int
+    k;
+
+  for (k = 0; k < 2; k++)
+  {
+    if (tempImageBuffer[k]!=NULL)
+      clEnv->library->clReleaseMemObject(tempImageBuffer[k]);
+  }
+}
+
 static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   ExceptionInfo*exception)
 {
@@ -1431,14 +1555,12 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
 
   mem_flags = CL_MEM_READ_WRITE;
   length = image->columns * image->rows;
-  for (k = 0; k < 2; k++)
   {
-    tempImageBuffer[k] = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), NULL, &clStatus);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    const TempBufferInfo
+      info = { clEnv, device, mem_flags, length };
+
+    if (CreateTempImageBuffers(&info,tempImageBuffer,exception) == MagickFalse)
       goto cleanup;
-    }
   }
 
   filteredImage = CloneImage(image,0,0,MagickTrue,exception);
@@ -1674,11 +1796,7 @@ cleanup:
     ReleaseOpenCLDevice(device);
   if (imageBuffer!=NULL)
     clEnv->library->clReleaseMemObject(imageBuffer);
-  for (k = 0; k < 2; k++)
-  {
-    if (tempImageBuffer[k]!=NULL)
-      clEnv->library->clReleaseMemObject(tempImageBuffer[k]);
-  }
+  ReleaseTempImageBuffers(clEnv,tempImageBuffer);
   if (filteredImageBuffer!=NULL)
     clEnv->library->clReleaseMemObject(filteredImageBuffer);
   if (hullPass1!=NULL)
@@ -1726,6 +1844,196 @@ MagickPrivate Image *AccelerateDespeckleImage(const Image* image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _HistogramBufferInfo
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    histogramBuffer;
+
+  cl_uint4
+    *histogram;
+} HistogramBufferInfo;
+
+static MagickBooleanType ReadHistogramBuffer(const HistogramBufferInfo *info,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = info->clEnv;
+
+  const MagickCLDevice
+    device = info->device;
+
+  const cl_command_queue
+    queue = info->queue;
+
+  const cl_mem
+    histogramBuffer = info->histogramBuffer;
+
+  cl_uint4
+    *const histogram = info->histogram;
+
+  cl_int
+    clStatus;
+
+  size_t
+    length;
+
+  /* read from the kernel output */
+  if (ALIGNED(histogram,cl_uint4))
+  {
+    length = (MaxMap+1);
+    clEnv->library->clEnqueueMapBuffer(queue, histogramBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(cl_uint4), 0, NULL, NULL, &clStatus);
+  }
+  else
+  {
+    length = (MaxMap+1);
+    clStatus = clEnv->library->clEnqueueReadBuffer(queue, histogramBuffer, CL_TRUE, 0, length * sizeof(cl_uint4), histogram, 0, NULL, NULL);
+  }
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    return(MagickFalse);
+  }
+
+  /* unmap, don't block gpu to use this buffer again.  */
+  if (ALIGNED(histogram,cl_uint4))
+  {
+    clStatus = clEnv->library->clEnqueueUnmapMemObject(queue, histogramBuffer, histogram, 0, NULL, NULL);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
+typedef struct _EqualizeLevels
+{
+  cl_float4
+    white,
+    black;
+} EqualizeLevels;
+
+static void EqualizeColormapSync(Image *image,PixelPacket *equalize_map,
+  const cl_uint i,const EqualizeLevels *levels)
+{
+  const cl_float4
+    white = levels->white,
+    black = levels->black;
+
+  if (white.x != black.x)
+  {
+    image->colormap[i].red=equalize_map[
+      ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
+    image->colormap[i].green=equalize_map[
+      ScaleQuantumToMap((const Quantum) image->colormap[i].green)].red;
+    image->colormap[i].blue=equalize_map[
+      ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].red;
+    image->colormap[i].alpha=equalize_map[
+      ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].red;
+  }
+}
+
+static void IntegrateEqualizeHistogram(const Image *image,
+  const cl_uint4 *histogram,cl_float4 *map)
+{
+  cl_float4
+    intensity;
+
+  cl_uint
+    i;
+
+  (void) memset(&intensity,0,sizeof(intensity));
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    if ((image->channel_mask & SyncChannels) != 0)
+    {
+      intensity.x+=histogram[i].s[2];
+      map[i]=intensity;
+      continue;
+    }
+    if ((image->channel_mask & RedChannel) != 0)
+      intensity.x+=histogram[i].s[2];
+    if ((image->channel_mask & GreenChannel) != 0)
+      intensity.y+=histogram[i].s[1];
+    if ((image->channel_mask & BlueChannel) != 0)
+      intensity.z+=histogram[i].s[0];
+    if ((image->channel_mask & AlphaChannel) != 0)
+      intensity.w+=histogram[i].s[3];
+    map[i]=intensity;
+  }
+}
+
+static MagickBooleanType EqualizesRedChannel(const Image *image,
+  const cl_float4 white,const cl_float4 black)
+{
+  return((((image->channel_mask & RedChannel) != 0) &&
+    (white.x != black.x)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType EqualizesGreenChannel(const Image *image,
+  const cl_float4 white,const cl_float4 black)
+{
+  return((((image->channel_mask & GreenChannel) != 0) &&
+    (white.y != black.y)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType EqualizesBlueChannel(const Image *image,
+  const cl_float4 white,const cl_float4 black)
+{
+  return((((image->channel_mask & BlueChannel) != 0) &&
+    (white.z != black.z)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType EqualizesAlphaChannel(const Image *image,
+  const cl_float4 white,const cl_float4 black)
+{
+  return((((image->channel_mask & AlphaChannel) != 0) &&
+    (white.w != black.w)) ? MagickTrue : MagickFalse);
+}
+
+static void EqualizeColormap(Image *image,PixelPacket *equalize_map,
+  const cl_float4 white,const cl_float4 black)
+{
+  cl_uint
+    i;
+
+  for (i=0; i < (cl_uint) image->colors; i++)
+  {
+    if ((image->channel_mask & SyncChannels) != 0)
+    {
+      EqualizeLevels
+        levels;
+
+      levels.white=white;
+      levels.black=black;
+      EqualizeColormapSync(image,equalize_map,i,&levels);
+      continue;
+    }
+    if (EqualizesRedChannel(image,white,black) != MagickFalse)
+      image->colormap[i].red=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
+    if (EqualizesGreenChannel(image,white,black) != MagickFalse)
+      image->colormap[i].green=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
+    if (EqualizesBlueChannel(image,white,black) != MagickFalse)
+      image->colormap[i].blue=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
+    if (EqualizesAlphaChannel(image,white,black) != MagickFalse)
+      image->colormap[i].alpha=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
+  }
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -1765,8 +2073,10 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   cl_float4
     white,
     black,
-    intensity,
     *map;
+
+  HistogramBufferInfo
+    histogram_info;
 
   MagickBooleanType
     outputReady,
@@ -1838,14 +2148,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   /* If the host pointer is aligned to the size of CLPixelPacket,
      then use the host buffer directly from the GPU; otherwise,
      create a buffer on the GPU and copy the data over */
-  if (ALIGNED(inputPixels,CLPixelPacket))
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
-  }
+  mem_flags=GetInputBufferFlags(inputPixels);
   /* create a CL buffer from image pixel buffer */
   length = image->columns * image->rows;
   imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
@@ -1881,33 +2184,13 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   if (status == MagickFalse)
     goto cleanup;
 
-  /* read from the kernel output */
-  if (ALIGNED(histogram,cl_uint4))
-  {
-    length = (MaxMap+1);
-    clEnv->library->clEnqueueMapBuffer(queue, histogramBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(cl_uint4), 0, NULL, NULL, &clStatus);
-  }
-  else
-  {
-    length = (MaxMap+1);
-    clStatus = clEnv->library->clEnqueueReadBuffer(queue, histogramBuffer, CL_TRUE, 0, length * sizeof(cl_uint4), histogram, 0, NULL, NULL);
-  }
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+  histogram_info.clEnv=clEnv;
+  histogram_info.device=device;
+  histogram_info.queue=queue;
+  histogram_info.histogramBuffer=histogramBuffer;
+  histogram_info.histogram=histogram;
+  if (ReadHistogramBuffer(&histogram_info,exception) == MagickFalse)
     goto cleanup;
-  }
-
-  /* unmap, don't block gpu to use this buffer again.  */
-  if (ALIGNED(histogram,cl_uint4))
-  {
-    clStatus = clEnv->library->clEnqueueUnmapMemObject(queue, histogramBuffer, histogram, 0, NULL, NULL);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
-      goto cleanup;
-    }
-  }
 
   /* recreate input buffer later, in case image updated */
 #ifdef RECREATEBUFFER
@@ -1927,25 +2210,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   /*
     Integrate the histogram to get the equalization map.
   */
-  (void) memset(&intensity,0,sizeof(intensity));
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    if ((image->channel_mask & SyncChannels) != 0)
-    {
-      intensity.x+=histogram[i].s[2];
-      map[i]=intensity;
-      continue;
-    }
-    if ((image->channel_mask & RedChannel) != 0)
-      intensity.x+=histogram[i].s[2];
-    if ((image->channel_mask & GreenChannel) != 0)
-      intensity.y+=histogram[i].s[1];
-    if ((image->channel_mask & BlueChannel) != 0)
-      intensity.z+=histogram[i].s[0];
-    if ((image->channel_mask & AlphaChannel) != 0)
-      intensity.w+=histogram[i].s[3];
-    map[i]=intensity;
-  }
+  IntegrateEqualizeHistogram(image,histogram,map);
   black=map[0];
   white=map[(int) MaxMap];
   (void) memset(equalize_map,0,(MaxMap+1)*sizeof(*equalize_map));
@@ -1958,16 +2223,16 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
           (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
       continue;
     }
-    if (((image->channel_mask & RedChannel) != 0) && (white.x != black.x))
+    if (EqualizesRedChannel(image,white,black) != MagickFalse)
       equalize_map[i].red=(unsigned int) ScaleMapToQuantum(
         (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
-    if (((image->channel_mask & GreenChannel) != 0) && (white.y != black.y))
+    if (EqualizesGreenChannel(image,white,black) != MagickFalse)
       equalize_map[i].green=(unsigned int) ScaleMapToQuantum(
         (MagickRealType) ((MaxMap*(map[i].y-black.y))/(white.y-black.y)));
-    if (((image->channel_mask & BlueChannel) != 0) && (white.z != black.z))
+    if (EqualizesBlueChannel(image,white,black) != MagickFalse)
       equalize_map[i].blue=(unsigned int) ScaleMapToQuantum(
         (MagickRealType) ((MaxMap*(map[i].z-black.z))/(white.z-black.z)));
-    if (((image->channel_mask & AlphaChannel) != 0) && (white.w != black.w))
+    if (EqualizesAlphaChannel(image,white,black) != MagickFalse)
       equalize_map[i].alpha=(unsigned int) ScaleMapToQuantum(
         (MagickRealType) ((MaxMap*(map[i].w-black.w))/(white.w-black.w)));
   }
@@ -1977,36 +2242,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     /*
        Equalize colormap.
        */
-    for (i=0; i < (cl_uint) image->colors; i++)
-    {
-      if ((image->channel_mask & SyncChannels) != 0)
-      {
-        if (white.x != black.x)
-        {
-          image->colormap[i].red=equalize_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
-          image->colormap[i].green=equalize_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].green)].red;
-          image->colormap[i].blue=equalize_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].red;
-          image->colormap[i].alpha=equalize_map[
-            ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].red;
-        }
-        continue;
-      }
-      if (((image->channel_mask & RedChannel) != 0) && (white.x != black.x))
-        image->colormap[i].red=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
-      if (((image->channel_mask & GreenChannel) != 0) && (white.y != black.y))
-        image->colormap[i].green=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
-      if (((image->channel_mask & BlueChannel) != 0) && (white.z != black.z))
-        image->colormap[i].blue=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
-      if (((image->channel_mask & AlphaChannel) != 0) && (white.w != black.w))
-        image->colormap[i].alpha=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
-    }
+    EqualizeColormap(image,equalize_map,white,black);
   }
 
   /*
@@ -2337,6 +2573,19 @@ MagickPrivate MagickBooleanType AccelerateFunctionImage(Image *image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+static void ReleaseGrayscaleResources(cl_mem imageBuffer,
+  cl_kernel grayscaleKernel,cl_command_queue queue,MagickCLDevice device)
+{
+  if (imageBuffer != (cl_mem) NULL)
+    ReleaseOpenCLMemObject(imageBuffer);
+  if (grayscaleKernel != (cl_kernel) NULL)
+    ReleaseOpenCLKernel(grayscaleKernel);
+  if (queue != (cl_command_queue) NULL)
+    ReleaseOpenCLCommandQueue(device,queue);
+  if (device != (MagickCLDevice) NULL)
+    ReleaseOpenCLDevice(device);
+}
+
 static MagickBooleanType ComputeGrayscaleImage(Image *image,MagickCLEnv clEnv,
   const PixelIntensityMethod method,ExceptionInfo *exception)
 {
@@ -2419,14 +2668,7 @@ static MagickBooleanType ComputeGrayscaleImage(Image *image,MagickCLEnv clEnv,
 
 cleanup:
 
-  if (imageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageBuffer);
-  if (grayscaleKernel != (cl_kernel) NULL)
-    ReleaseOpenCLKernel(grayscaleKernel);
-  if (queue != (cl_command_queue) NULL)
-    ReleaseOpenCLCommandQueue(device,queue);
-  if (device != (MagickCLDevice) NULL)
-    ReleaseOpenCLDevice(device);
+  ReleaseGrayscaleResources(imageBuffer,grayscaleKernel,queue,device);
 
   return(outputReady);
 }
@@ -2452,9 +2694,11 @@ MagickPrivate MagickBooleanType AccelerateGrayscaleImage(Image* image,
   if (image->number_channels < 3)
     return(MagickFalse);
 
-  if ((GetPixelRedTraits(image) == UndefinedPixelTrait) ||
-      (GetPixelGreenTraits(image) == UndefinedPixelTrait) ||
-      (GetPixelBlueTraits(image) == UndefinedPixelTrait))
+  if (GetPixelRedTraits(image) == UndefinedPixelTrait)
+    return(MagickFalse);
+  if (GetPixelGreenTraits(image) == UndefinedPixelTrait)
+    return(MagickFalse);
+  if (GetPixelBlueTraits(image) == UndefinedPixelTrait)
     return(MagickFalse);
 
   clEnv=getOpenCLEnvironment(exception);
@@ -2476,6 +2720,79 @@ MagickPrivate MagickBooleanType AccelerateGrayscaleImage(Image* image,
 %                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
+
+typedef struct _LocalContrastLaunchInfo
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_kernel
+    blurRowKernel;
+
+  const Image
+    *image;
+
+  unsigned int
+    passes;
+} LocalContrastLaunchInfo;
+
+static MagickBooleanType LaunchLocalContrastBlurRow(
+  const LocalContrastLaunchInfo *info,ExceptionInfo *exception)
+{
+  const Image
+    *const image = info->image;
+
+  const MagickCLDevice
+    device = info->device;
+
+  const MagickCLEnv
+    clEnv = info->clEnv;
+
+  const cl_command_queue
+    queue = info->queue;
+
+  const cl_kernel
+    blurRowKernel = info->blurRowKernel;
+
+  const unsigned int
+    passes = info->passes;
+
+  cl_event
+    event;
+
+  cl_int
+    clStatus;
+
+  int x;
+  for (x = 0; x < (int) passes; ++x) {
+    size_t gsize[2];
+    size_t wsize[2];
+    size_t goffset[2];
+
+    gsize[0] = 256;
+    gsize[1] = (image->rows + passes - 1) / passes;
+    wsize[0] = 256;
+    wsize[1] = 1;
+    goffset[0] = 0;
+    goffset[1] = x * gsize[1];
+
+    clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, blurRowKernel, 2, goffset, gsize, wsize, 0, NULL, &event);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+      return(MagickFalse);
+    }
+    clEnv->library->clFlush(queue);
+    RecordProfileData(device,blurRowKernel,event);
+  }
+  return(MagickTrue);
+}
 
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
@@ -2678,28 +2995,11 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
 
     /* launch the kernel */
     {
-      int x;
-      for (x = 0; x < (int) passes; ++x) {
-        size_t gsize[2];
-        size_t wsize[2];
-        size_t goffset[2];
+      const LocalContrastLaunchInfo
+        info = { clEnv, device, queue, blurRowKernel, image, passes };
 
-        gsize[0] = 256;
-        gsize[1] = (image->rows + passes - 1) / passes;
-        wsize[0] = 256;
-        wsize[1] = 1;
-        goffset[0] = 0;
-        goffset[1] = x * gsize[1];
-
-        clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, blurRowKernel, 2, goffset, gsize, wsize, 0, NULL, &event);
-        if (clStatus != CL_SUCCESS)
-        {
-          (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-          goto cleanup;
-        }
-        clEnv->library->clFlush(queue);
-        RecordProfileData(device,blurRowKernel,event);
-      }
+      if (LaunchLocalContrastBlurRow(&info,exception) == MagickFalse)
+        goto cleanup;
     }
 
     {
@@ -2788,13 +3088,10 @@ cleanup:
     ReleaseOpenCLCommandQueue(device, queue);
   if (device != NULL)
     ReleaseOpenCLDevice(device);
-  if (outputReady == MagickFalse)
+  if ((outputReady == MagickFalse) && (filteredImage != NULL))
   {
-    if (filteredImage != NULL)
-    {
-      DestroyImage(filteredImage);
-      filteredImage = NULL;
-    }
+    DestroyImage(filteredImage);
+    filteredImage = NULL;
   }
 
   return(filteredImage);
@@ -3624,6 +3921,99 @@ cleanup:
   return(outputReady);
 }
 
+typedef struct _ResizeVerticalArgs
+{
+  const ResizeFilter
+    *resizeFilter;
+
+  cl_kernel
+    verticalKernel;
+
+  cl_mem
+    imageBuffer;
+
+  cl_uint
+    number_channels,
+    columns,
+    rows;
+
+  cl_mem
+    resizedImageBuffer;
+
+  cl_uint
+    resizedColumns,
+    resizedRows;
+
+  float
+    yFactor;
+
+  int
+    resizeFilterType,
+    resizeWindowType;
+
+  cl_mem
+    resizeFilterCubicCoefficients;
+
+  size_t
+    imageCacheLocalMemorySize;
+
+  int
+    numCachedPixels;
+
+  unsigned int
+    pixelPerWorkgroup,
+    chunkSize;
+
+  size_t
+    pixelAccumulatorLocalMemorySize,
+    weightAccumulatorLocalMemorySize,
+    gammaAccumulatorLocalMemorySize;
+} ResizeVerticalArgs;
+
+static cl_int SetResizeVerticalFilterArgs(const ResizeVerticalArgs *args)
+{
+  cl_int
+    status;
+
+  float
+    resizeFilterScale,
+    resizeFilterSupport,
+    resizeFilterWindowSupport,
+    resizeFilterBlur;
+
+  size_t
+    i;
+
+  resizeFilterScale=(float) GetResizeFilterScale(args->resizeFilter);
+  resizeFilterSupport=(float) GetResizeFilterSupport(args->resizeFilter);
+  resizeFilterBlur=(float) GetResizeFilterBlur(args->resizeFilter);
+  resizeFilterWindowSupport=(float) GetResizeFilterWindowSupport(args->resizeFilter);
+  i=0;
+  status =SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_mem),(void*)&args->imageBuffer);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_uint),(void*)&args->number_channels);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_uint),(void*)&args->columns);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_uint),(void*)&args->rows);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_mem),(void*)&args->resizedImageBuffer);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_uint),(void*)&args->resizedColumns);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_uint),(void*)&args->resizedRows);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(float),(void*)&args->yFactor);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(int),(void*)&args->resizeFilterType);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(int),(void*)&args->resizeWindowType);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(cl_mem),(void*)&args->resizeFilterCubicCoefficients);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(float),(void*)&resizeFilterScale);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(float),(void*)&resizeFilterSupport);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(float),(void*)&resizeFilterWindowSupport);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(float),(void*)&resizeFilterBlur);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,args->imageCacheLocalMemorySize, NULL);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(int), &args->numCachedPixels);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(unsigned int), &args->pixelPerWorkgroup);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,sizeof(unsigned int), &args->chunkSize);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,args->pixelAccumulatorLocalMemorySize, NULL);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,args->weightAccumulatorLocalMemorySize, NULL);
+  status|=SetOpenCLKernelArg(args->verticalKernel,i++,args->gammaAccumulatorLocalMemorySize, NULL);
+  return(status);
+}
+
 static MagickBooleanType resizeVerticalFilter(MagickCLDevice device,
   cl_command_queue queue,const Image *image,Image * filteredImage,
   cl_mem imageBuffer,cl_uint number_channels,cl_uint columns,cl_uint rows,
@@ -3641,10 +4031,6 @@ static MagickBooleanType resizeVerticalFilter(MagickCLDevice device,
     workgroupSize = 256;
 
   float
-    resizeFilterScale,
-    resizeFilterSupport,
-    resizeFilterWindowSupport,
-    resizeFilterBlur,
     scale,
     support;
 
@@ -3656,10 +4042,12 @@ static MagickBooleanType resizeVerticalFilter(MagickCLDevice device,
   MagickBooleanType
     outputReady;
 
+  ResizeVerticalArgs
+    args;
+
   size_t
     gammaAccumulatorLocalMemorySize,
     gsize[2],
-    i,
     imageCacheLocalMemorySize,
     pixelAccumulatorLocalMemorySize,
     lsize[2],
@@ -3750,34 +4138,27 @@ RestoreMSCWarning
     goto cleanup;
   }
 
-  resizeFilterScale=(float) GetResizeFilterScale(resizeFilter);
-  resizeFilterSupport=(float) GetResizeFilterSupport(resizeFilter);
-  resizeFilterBlur=(float) GetResizeFilterBlur(resizeFilter);
-  resizeFilterWindowSupport=(float) GetResizeFilterWindowSupport(resizeFilter);
-
-  i=0;
-  status =SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_mem),(void*)&imageBuffer);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_uint),(void*)&number_channels);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_uint),(void*)&columns);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_uint),(void*)&rows);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_mem),(void*)&resizedImageBuffer);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_uint),(void*)&resizedColumns);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_uint),(void*)&resizedRows);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(float),(void*)&yFactor);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(int),(void*)&resizeFilterType);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(int),(void*)&resizeWindowType);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(cl_mem),(void*)&resizeFilterCubicCoefficients);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(float),(void*)&resizeFilterScale);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(float),(void*)&resizeFilterSupport);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(float),(void*)&resizeFilterWindowSupport);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(float),(void*)&resizeFilterBlur);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,imageCacheLocalMemorySize, NULL);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(int), &numCachedPixels);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(unsigned int), &pixelPerWorkgroup);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,sizeof(unsigned int), &chunkSize);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,pixelAccumulatorLocalMemorySize, NULL);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,weightAccumulatorLocalMemorySize, NULL);
-  status|=SetOpenCLKernelArg(verticalKernel,i++,gammaAccumulatorLocalMemorySize, NULL);
+  args.resizeFilter=resizeFilter;
+  args.verticalKernel=verticalKernel;
+  args.imageBuffer=imageBuffer;
+  args.number_channels=number_channels;
+  args.columns=columns;
+  args.rows=rows;
+  args.resizedImageBuffer=resizedImageBuffer;
+  args.resizedColumns=resizedColumns;
+  args.resizedRows=resizedRows;
+  args.yFactor=yFactor;
+  args.resizeFilterType=resizeFilterType;
+  args.resizeWindowType=resizeWindowType;
+  args.resizeFilterCubicCoefficients=resizeFilterCubicCoefficients;
+  args.imageCacheLocalMemorySize=imageCacheLocalMemorySize;
+  args.numCachedPixels=numCachedPixels;
+  args.pixelPerWorkgroup=pixelPerWorkgroup;
+  args.chunkSize=chunkSize;
+  args.pixelAccumulatorLocalMemorySize=pixelAccumulatorLocalMemorySize;
+  args.weightAccumulatorLocalMemorySize=weightAccumulatorLocalMemorySize;
+  args.gammaAccumulatorLocalMemorySize=gammaAccumulatorLocalMemorySize;
+  status=SetResizeVerticalFilterArgs(&args);
 
   if (status != CL_SUCCESS)
   {
@@ -3800,6 +4181,121 @@ cleanup:
     ReleaseOpenCLKernel(verticalKernel);
 
   return(outputReady);
+}
+
+typedef struct _ResizeArmInfo
+{
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  const Image
+    *image;
+
+  Image
+    *filteredImage;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer,
+    cubicCoefficientsBuffer;
+
+  cl_uint
+    number_channels;
+
+  size_t
+    resizedColumns,
+    resizedRows;
+
+  const ResizeFilter
+    *resizeFilter;
+
+  float
+    xFactor,
+    yFactor;
+} ResizeArmInfo;
+
+typedef struct _ResizeArmTargets
+{
+  cl_mem
+    *tempImageBuffer;
+
+  MagickBooleanType
+    *outputReady;
+} ResizeArmTargets;
+
+static MagickBooleanType ResizeHorizontalThenVertical(
+  const ResizeArmInfo *info,ExceptionInfo *exception,
+  const ResizeArmTargets *targets)
+{
+  const Image
+    *const image = info->image;
+
+  const MagickCLDevice
+    device = info->device;
+
+  const cl_command_queue
+    queue = info->queue;
+
+  Image
+    *const filteredImage = info->filteredImage;
+
+  const cl_mem
+    cubicCoefficientsBuffer = info->cubicCoefficientsBuffer,
+    filteredImageBuffer = info->filteredImageBuffer,
+    imageBuffer = info->imageBuffer;
+
+  const cl_uint
+    number_channels = info->number_channels;
+
+  const size_t
+    resizedColumns = info->resizedColumns,
+    resizedRows = info->resizedRows;
+
+  const ResizeFilter
+    *const resizeFilter = info->resizeFilter;
+
+  const float
+    xFactor = info->xFactor,
+    yFactor = info->yFactor;
+
+  cl_mem
+    *const tempImageBuffer = targets->tempImageBuffer;
+
+  MagickBooleanType
+    *const outputReady = targets->outputReady;
+
+  size_t
+    length;
+
+  length=resizedColumns*image->rows*number_channels;
+  *tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
+    sizeof(CLQuantum),(void *) NULL);
+  if (*tempImageBuffer == (cl_mem) NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
+    return(MagickFalse);
+  }
+
+  *outputReady=resizeHorizontalFilter(device,queue,image,filteredImage,
+    imageBuffer,number_channels,(cl_uint) image->columns,
+    (cl_uint) image->rows,*tempImageBuffer,(cl_uint) resizedColumns,
+    (cl_uint) image->rows,resizeFilter,cubicCoefficientsBuffer,xFactor,
+    exception);
+  if (*outputReady == MagickFalse)
+    return(MagickFalse);
+
+  *outputReady=resizeVerticalFilter(device,queue,image,filteredImage,
+    *tempImageBuffer,number_channels,(cl_uint) resizedColumns,
+    (cl_uint) image->rows,filteredImageBuffer,(cl_uint) resizedColumns,
+    (cl_uint) resizedRows,resizeFilter,cubicCoefficientsBuffer,yFactor,
+    exception);
+  if (*outputReady == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
 }
 
 static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
@@ -3834,6 +4330,12 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
 
   Image
     *filteredImage;
+
+  ResizeArmInfo
+    info;
+
+  ResizeArmTargets
+    targets;
 
   size_t
     i,
@@ -3883,31 +4385,21 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   yFactor=(float) resizedRows/(float) image->rows;
   if (xFactor > yFactor)
   {
-    length=resizedColumns*image->rows*number_channels;
-    tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
-      sizeof(CLQuantum),(void *) NULL);
-    if (tempImageBuffer == (cl_mem) NULL)
-    {
-      (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-        ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
-      goto cleanup;
-    }
-
-    outputReady=resizeHorizontalFilter(device,queue,image,filteredImage,
-      imageBuffer,number_channels,(cl_uint) image->columns,
-      (cl_uint) image->rows,tempImageBuffer,(cl_uint) resizedColumns,
-      (cl_uint) image->rows,resizeFilter,cubicCoefficientsBuffer,xFactor,
-      exception);
-    if (outputReady == MagickFalse)
-      goto cleanup;
-
-    outputReady=resizeVerticalFilter(device,queue,image,filteredImage,
-      tempImageBuffer,number_channels,(cl_uint) resizedColumns,
-      (cl_uint) image->rows,filteredImageBuffer,(cl_uint) resizedColumns,
-      (cl_uint) resizedRows,resizeFilter,cubicCoefficientsBuffer,yFactor,
-      exception);
-    if (outputReady == MagickFalse)
-      goto cleanup;
+    info.device=device;
+    info.queue=queue;
+    info.image=image;
+    info.filteredImage=filteredImage;
+    info.imageBuffer=imageBuffer;
+    info.filteredImageBuffer=filteredImageBuffer;
+    info.cubicCoefficientsBuffer=cubicCoefficientsBuffer;
+    info.number_channels=number_channels;
+    info.resizedColumns=resizedColumns;
+    info.resizedRows=resizedRows;
+    info.resizeFilter=resizeFilter;
+    info.xFactor=xFactor;
+    info.yFactor=yFactor;
+    targets.tempImageBuffer=(&tempImageBuffer);
+    targets.outputReady=(&outputReady);
   }
   else
   {
@@ -3937,6 +4429,9 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
     if (outputReady == MagickFalse)
       goto cleanup;
   }
+  if ((xFactor > yFactor) &&
+      (ResizeHorizontalThenVertical(&info,exception,&targets) == MagickFalse))
+    goto cleanup;
 
 cleanup:
 

@@ -77,6 +77,10 @@ Never, in any commit:
   a delegate library that is not installed). Nothing can check it.
   The one exception (owner, 2026-11-01): a branch no configuration compiles, `#if 0`, may
   move verbatim with the code that holds it (the playbook's *Preprocessor branches*).
+  A second (owner, 2026-11-11): a Recipe S split may move a function whole, with an
+  `#if defined(...)`/`#if !defined(...)` branch inside it, verbatim, when a build that
+  compiles the branch shows the moved functions' instructions unchanged
+  (`tools/split_branch_check.py` prints `IDENTICAL-MODULO-LAYOUT`).
 - Modify a `static const` data table.
 - Fix a bug you noticed. Report it.
 
@@ -98,7 +102,12 @@ python3 tools/oracle/casemap.py <Function>     # which cases execute it
   with `refactor_guard.py --calls` reporting `OK`, and every argument of every call you
   add checked against its parameter by reading; and Recipe D's *Unreached functions*
   form, whose proof is `tools/obj_identical.sh` printing `IDENTICAL` for the whole
-  object file (owner, 2026-10-30).
+  object file (owner, 2026-10-30), or `tools/reuse_check.py` with
+  `tools/obj_modulo.sh` (owner, 2026-11-10); and Recipes B and N with the playbook's
+  *Unreached functions: B and N* checks (`tools/struct_fill_check.py`,
+  `tools/obj_modulo.sh`; owner, 2026-11-10); and Recipe I with its
+  *Unreached functions: Recipe I* checks (`tools/targets_fill_check.py`,
+  `tools/obj_modulo.sh`; owner, 2026-11-10).
 
 The rules are in the playbook, *Two levels of evidence*; the reasoning and the measured
 results are in [`docs/refactoring/VERIFICATION.md`](docs/refactoring/VERIFICATION.md).

@@ -5581,6 +5581,34 @@ GAP_XEVENTS_CASES += [
     ("xevents display chop, vertical", _xev_menu_pick("Transform", "Chop", _XEV_TRANSFORM) +
      " use:1 drag:30,5,30,40 grab:out.ppm key:q", ["display", img("rose")]),
 ]
+# Cases whose result depends on the machine's load, by label, with the reason (2026-11-10). Each
+# presses inside the top left 70x26 where crop, cut, copy and chop map display's Info window (the
+# pointer position) and withdraw it as the pointer moves (display.c XCropImage, XChopImage).
+# display tracks that window as mapped only once it has handled its own MapNotify, so whether the
+# press reaches the image or Info depends on how the client and Xvfb were scheduled: a failing
+# crop's grab shows Info still up ("+10+10") over the uncropped image, and display, still waiting
+# for a press, never quits (exit 124). One at a time they agree in every run; with 24 busy loops
+# beside 16 jobs, 10 or 11 of them differed in 4 runs, and 2 in one ordinary wide run. A round
+# trip before each idle look in xevents did not change that. oracle.py reruns a listed case alone,
+# baseline and candidate, when it diverges, and reports it apart (settle_load_sensitive);
+# selfcheck lists them apart. Moving the presses below y=30, as for draw mode, would remove the
+# cause but make new cases (new ids, a new wide case map): left to the owner.
+_INFO_PRESS = ("a press inside display's Info window area (70x26, top left): whether it reaches the "
+               "image depends on when display handles its own MapNotify for Info, i.e. on scheduling")
+LOAD_SENSITIVE = {label: _INFO_PRESS for label in (
+    "xevents display crop by drag",
+    "xevents display crop by drag, corner moved",
+    "xevents display cut by drag",  # the same press; not yet seen to differ
+    "xevents display crop, corner moved left and up",
+    "xevents display crop, Home, Page Down, Page Up",
+    "xevents display crop, bottom right corner dragged",
+    "xevents display crop, top left corner dragged",
+    "xevents display copy and paste",
+    "xevents display paste, operator Atop",
+    "xevents display paste, operator Clear",
+    "xevents display chop, horizontal",
+    "xevents display chop, vertical",
+)}
 # The magnifier (plus): a q or Escape sent to the magnify window itself (use:2) closes it, which a
 # q to the image window did not; the grab, with no use before it, is the magnify window. Moved
 # with the arrow keys, its factor set with a digit (xwindow.c XMakeMagnifyImage, display.c's
@@ -6962,6 +6990,30 @@ def _windrv_cases():
         for degrees in ("17", "45", "-33", "95", "180", "212.5", "310", "-100"):
             yield _windrv("shearrotate %s %s" % (name, degrees),
                           ("shearrotate", img(name), degrees, "out.miff"), ["out.miff"])
+    # compare.c: IsImagesEqual, which only the API reaches: equal images, a difference in the
+    # first pixels, a difference only in the alpha channel (seen or masked out by a channel
+    # mask, so that channels without an update trait are skipped), images of different size
+    # and of different channel counts
+    for first, second, channels in (
+            ("rose", "rose", None), ("rose", "rose_blur", None), ("rose", "rose_alpha", None),
+            ("rose_alpha", "rose", None), ("rose", "rose_alpha", "RGB"), ("rose_alpha", "rose", "RGB"),
+            ("rose_alpha", "rose_alpha", "Alpha"), ("rose", "rose_alpha", "Alpha"),
+            ("rose", "rose_blur", "Blue"), ("rose", "hdri", None), ("hdri", "rose", "Green"),
+            ("gray16", "rose", None), ("rose", "gray16", None), ("cmyk", "rose", None),
+            ("rose", "tall", None), ("tall", "rose", None), ("tall", "tall", None),
+            ("rose", "wide", None), ("wide", "rose", None), ("tiny", "rose", None), ("tiny", "tiny", None),
+            ("wide", "wide", "Red")):
+        yield _windrv("imagesequal %s %s %s" % (first, second, channels or "all"),
+                      tuple(["imagesequal", img(first), img(second)] + ([channels] if channels else [])))
+    # segment.c: GetImageDynamicThreshold, which only the API reaches: images with several
+    # histogram peaks (rose, its blur, with alpha, a palette image), flat or two-valued ones
+    # (a 1x1 image, a gradient, a bilevel image), thin images, floating-point and CMYK pixels,
+    # each with a few cluster and smoothing thresholds
+    for name in ("rose", "rose_blur", "rose_alpha", "palette", "gray16", "bilevel", "tiny",
+                 "tall", "wide", "hdri", "cmyk"):
+        for cluster, smooth in (("0", "0"), ("5", "2"), ("10", "3")):
+            yield _windrv("dynthreshold %s %s %s" % (name, cluster, smooth),
+                          ("dynthreshold", img(name), cluster, smooth))
     # timer.c: -bench (AcquireTimerInfo) and -duration (ContinueTimer) in magick-cli.c; the
     # oracle masks the report's timings (owner's decision, 2026-10-04). A duration far longer
     # than the run keeps every iteration, so the output is the same each time.

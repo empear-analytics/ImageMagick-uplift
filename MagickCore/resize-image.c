@@ -155,6 +155,21 @@ typedef struct _HorizontalFilterPass
     *magick_restrict progress;
 } HorizontalFilterPass;
 
+typedef struct _VerticalFilterPass
+{
+  const ResizeFilter
+    *magick_restrict resize_filter;
+
+  double
+    y_factor;
+
+  MagickSizeType
+    span;
+
+  MagickOffsetType
+    *magick_restrict progress;
+} VerticalFilterPass;
+
 static void RelinquishContributionRows(ContributionInfo **contribution)
 {
   ssize_t
@@ -235,79 +250,150 @@ static inline MagickBooleanType IsResizeChannelUndefined(
     (resize_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
-static void FilterHorizontalPixel(const Image *image,
-  const Image *resize_image,const ContributionInfo *contribution,
-  const ssize_t n,const ssize_t start,const ssize_t stop,const double bisect,
-  const ssize_t y,const Quantum *p,Quantum *q)
+typedef enum
 {
+  HorizontalResizePixel,
+  VerticalResizePixel
+} ResizePixelSide;
+
+typedef struct _ResizePixelFilter
+{
+  ResizePixelSide
+    side;
+
+  const Image
+    *image,
+    *resize_image;
+
+  const ContributionInfo
+    *contribution;
+
+  ssize_t
+    n,
+    start,
+    stop;
+
+  double
+    bisect;
+
+  ssize_t
+    position;
+} ResizePixelFilter;
+
+static inline ssize_t GetResizePixelOffset(const ResizePixelFilter *filter,
+  const ssize_t j)
+{
+  const ResizePixelSide
+    side = filter->side;
+
+  const Image
+    *const image = filter->image;
+
+  const ContributionInfo
+    *const contribution = filter->contribution;
+
+  const ssize_t
+    n = filter->n,
+    position = filter->position;
+
+  return((side == HorizontalResizePixel) ?
+    position*(contribution[n-1].pixel-contribution[0].pixel+1)+
+    (contribution[j].pixel-contribution[0].pixel) :
+    (ssize_t) ((contribution[j].pixel-contribution[0].pixel)*
+    (ssize_t) image->columns+position));
+}
+
+static magick_attribute((__always_inline__)) inline void FilterResizeChannel(
+  const ResizePixelFilter *filter,const ssize_t i,const Quantum *p,
+  Quantum *q)
+{
+  const Image
+    *const image = filter->image,
+    *const resize_image = filter->resize_image;
+
+  const ContributionInfo
+    *const contribution = filter->contribution;
+
+  const ssize_t
+    n = filter->n,
+    start = filter->start,
+    stop = filter->stop;
+
+  const double
+    bisect = filter->bisect;
+
+  double
+    alpha,
+    gamma,
+    pixel;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    resize_traits,
+    traits;
+
+  ssize_t
+    j,
+    k;
+
+  channel=GetPixelChannelChannel(image,i);
+  traits=GetPixelChannelTraits(image,channel);
+  resize_traits=GetPixelChannelTraits(resize_image,channel);
+  if (IsResizeChannelUndefined(traits,resize_traits) != MagickFalse)
+    return;
+  if (IsResizeChannelCopied(resize_image,resize_traits,q) != MagickFalse)
+    {
+      j=(ssize_t) (MagickMin(MagickMax(bisect,(double) start),(double)
+        stop-1.0)+0.5);
+      k=GetResizePixelOffset(filter,j-start);
+      SetPixelChannel(resize_image,channel,
+        p[k*(ssize_t) GetPixelChannels(image)+i],q);
+      return;
+    }
+  pixel=0.0;
+  if ((resize_traits & BlendPixelTrait) == 0)
+    {
+      /*
+        No alpha blending.
+      */
+      for (j=0; j < n; j++)
+      {
+        k=GetResizePixelOffset(filter,j);
+        alpha=contribution[j].weight;
+        pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
+      }
+      SetPixelChannel(resize_image,channel,ClampToQuantum(pixel),q);
+      return;
+    }
+  /*
+    Alpha blending.
+  */
+  gamma=0.0;
+  for (j=0; j < n; j++)
+  {
+    k=GetResizePixelOffset(filter,j);
+    alpha=contribution[j].weight*QuantumScale*
+      (double) GetPixelAlpha(image,p+k*(ssize_t) GetPixelChannels(image));
+    pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
+    gamma+=alpha;
+  }
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(resize_image,channel,ClampToQuantum(gamma*pixel),q);
+}
+
+static magick_attribute((__always_inline__)) inline void FilterResizePixel(
+  const ResizePixelFilter *filter,const Quantum *p,Quantum *q)
+{
+  const Image
+    *const image = filter->image;
+
   ssize_t
     i;
 
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    double
-      alpha,
-      gamma,
-      pixel;
-
-    PixelChannel
-      channel;
-
-    PixelTrait
-      resize_traits,
-      traits;
-
-    ssize_t
-      j,
-      k;
-
-    channel=GetPixelChannelChannel(image,i);
-    traits=GetPixelChannelTraits(image,channel);
-    resize_traits=GetPixelChannelTraits(resize_image,channel);
-    if (IsResizeChannelUndefined(traits,resize_traits) != MagickFalse)
-      continue;
-    if (IsResizeChannelCopied(resize_image,resize_traits,q) != MagickFalse)
-      {
-        j=(ssize_t) (MagickMin(MagickMax(bisect,(double) start),(double)
-          stop-1.0)+0.5);
-        k=y*(contribution[n-1].pixel-contribution[0].pixel+1)+
-          (contribution[j-start].pixel-contribution[0].pixel);
-        SetPixelChannel(resize_image,channel,
-          p[k*(ssize_t) GetPixelChannels(image)+i],q);
-        continue;
-      }
-    pixel=0.0;
-    if ((resize_traits & BlendPixelTrait) == 0)
-      {
-        /*
-          No alpha blending.
-        */
-        for (j=0; j < n; j++)
-        {
-          k=y*(contribution[n-1].pixel-contribution[0].pixel+1)+
-            (contribution[j].pixel-contribution[0].pixel);
-          alpha=contribution[j].weight;
-          pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
-        }
-        SetPixelChannel(resize_image,channel,ClampToQuantum(pixel),q);
-        continue;
-      }
-    /*
-      Alpha blending.
-    */
-    gamma=0.0;
-    for (j=0; j < n; j++)
-    {
-      k=y*(contribution[n-1].pixel-contribution[0].pixel+1)+
-        (contribution[j].pixel-contribution[0].pixel);
-      alpha=contribution[j].weight*QuantumScale*
-        (double) GetPixelAlpha(image,p+k*(ssize_t) GetPixelChannels(image));
-      pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
-      gamma+=alpha;
-    }
-    gamma=MagickSafeReciprocal(gamma);
-    SetPixelChannel(resize_image,channel,ClampToQuantum(gamma*pixel),q);
-  }
+    FilterResizeChannel(filter,i,p,q);
 }
 
 static MagickBooleanType AcquireFilterContributions(const Image *image,
@@ -461,8 +547,11 @@ static MagickBooleanType FilterHorizontalColumn(
     }
   for (y=0; y < (ssize_t) column->resize_image->rows; y++)
   {
-    FilterHorizontalPixel(column->image,column->resize_image,contribution,n,
-      start,stop,bisect,y,p,q);
+    const ResizePixelFilter
+      filter = { HorizontalResizePixel,column->image,column->resize_image,
+        contribution,n,start,stop,bisect,y };
+
+    FilterResizePixel(&filter,p,q);
     q+=(ptrdiff_t) GetPixelChannels(column->resize_image);
   }
   if (SyncCacheViewAuthenticPixels(column->resize_view,column->exception) ==
@@ -557,78 +646,6 @@ static MagickBooleanType HorizontalFilter(const HorizontalFilterPass *pass,
   return(DestroyFilterResources(image_view,resize_view,contributions,status));
 }
 
-static void FilterVerticalPixel(const Image *image,
-  const Image *resize_image,const ContributionInfo *contribution,
-  const ssize_t n,const ssize_t start,const ssize_t stop,const double bisect,
-  const ssize_t x,const Quantum *p,Quantum *q)
-{
-  ssize_t
-    i;
-
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    double
-      alpha,
-      gamma,
-      pixel;
-
-    PixelChannel
-      channel;
-
-    PixelTrait
-      resize_traits,
-      traits;
-
-    ssize_t
-      j,
-      k;
-
-    channel=GetPixelChannelChannel(image,i);
-    traits=GetPixelChannelTraits(image,channel);
-    resize_traits=GetPixelChannelTraits(resize_image,channel);
-    if (IsResizeChannelUndefined(traits,resize_traits) != MagickFalse)
-      continue;
-    if (IsResizeChannelCopied(resize_image,resize_traits,q) != MagickFalse)
-      {
-        j=(ssize_t) (MagickMin(MagickMax(bisect,(double) start),(double)
-          stop-1.0)+0.5);
-        k=(ssize_t) ((contribution[j-start].pixel-contribution[0].pixel)*
-          (ssize_t) image->columns+x);
-        SetPixelChannel(resize_image,channel,p[k*(ssize_t)
-          GetPixelChannels(image)+i],q);
-        continue;
-      }
-    pixel=0.0;
-    if ((resize_traits & BlendPixelTrait) == 0)
-      {
-        /*
-          No alpha blending.
-        */
-        for (j=0; j < n; j++)
-        {
-          k=(ssize_t) ((contribution[j].pixel-contribution[0].pixel)*
-            (ssize_t) image->columns+x);
-          alpha=contribution[j].weight;
-          pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
-        }
-        SetPixelChannel(resize_image,channel,ClampToQuantum(pixel),q);
-        continue;
-      }
-    gamma=0.0;
-    for (j=0; j < n; j++)
-    {
-      k=(ssize_t) ((contribution[j].pixel-contribution[0].pixel)*
-        (ssize_t) image->columns+x);
-      alpha=contribution[j].weight*QuantumScale*(double)
-       GetPixelAlpha(image,p+k*(ssize_t) GetPixelChannels(image));
-      pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
-      gamma+=alpha;
-    }
-    gamma=MagickSafeReciprocal(gamma);
-    SetPixelChannel(resize_image,channel,ClampToQuantum(gamma*pixel),q);
-  }
-}
-
 static void SyncResizeView(CacheView *resize_view,ExceptionInfo *exception,
   MagickBooleanType *status)
 {
@@ -636,11 +653,168 @@ static void SyncResizeView(CacheView *resize_view,ExceptionInfo *exception,
     (*status)=MagickFalse;
 }
 
-static MagickBooleanType VerticalFilter(
-  const ResizeFilter *magick_restrict resize_filter,
+typedef struct _VerticalFilterRow
+{
+  const ResizeFilter
+    *resize_filter;
+
+  const Image
+    *image;
+
+  Image
+    *resize_image;
+
+  CacheView
+    *image_view,
+    *resize_view;
+
+  ContributionInfo
+    **contributions;
+
+  double
+    y_factor,
+    scale,
+    support;
+
+  ExceptionInfo
+    *exception;
+} VerticalFilterRow;
+
+static MagickBooleanType FilterVerticalRow(const VerticalFilterRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const image = row->image;
+
+  Image
+    *const resize_image = row->resize_image;
+
+  const double
+    support = row->support;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  const int
+    id = GetOpenMPThreadId();
+
+  const Quantum
+    *magick_restrict p;
+
+  ContributionInfo
+    *magick_restrict contribution;
+
+  double
+    bisect,
+    density;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    n,
+    start,
+    stop,
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  bisect=(double) (y+0.5)/row->y_factor+MagickEpsilon;
+  start=(ssize_t) MagickMax(bisect-support+0.5,0.0);
+  stop=(ssize_t) MagickMin(bisect+support+0.5,(double) image->rows);
+  density=0.0;
+  contribution=row->contributions[id];
+  for (n=0; n < (stop-start); n++)
+  {
+    contribution[n].pixel=start+n;
+    contribution[n].weight=GetResizeFilterWeight(row->resize_filter,row->scale*
+      ((double) (start+n)-bisect+0.5));
+    density+=contribution[n].weight;
+  }
+  if (n == 0)
+    return(MagickFalse);
+  NormalizeContributionDensity(contribution,n,density);
+  p=GetCacheViewVirtualPixels(row->image_view,0,contribution[0].pixel,
+    image->columns,(size_t) (contribution[n-1].pixel-contribution[0].pixel+1),
+    exception);
+  q=QueueCacheViewAuthenticPixels(row->resize_view,0,y,resize_image->columns,1,
+    exception);
+  if (IsFilterRowMissing(p,q) != MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) resize_image->columns; x++)
+  {
+    const ResizePixelFilter
+      filter = { VerticalResizePixel,image,resize_image,contribution,n,start,
+        stop,bisect,x };
+
+    FilterResizePixel(&filter,p,q);
+    q+=(ptrdiff_t) GetPixelChannels(resize_image);
+  }
+  SyncResizeView(row->resize_view,exception,status);
+  return(MagickTrue);
+}
+
+static MagickBooleanType FilterVerticalRows(const VerticalFilterRow *filter,
+  const MagickSizeType span,MagickOffsetType *magick_restrict progress,
+  MagickBooleanType status)
+{
+  const ResizeFilter
+    *const resize_filter = filter->resize_filter;
+
+  const Image
+    *const image = filter->image;
+
+  Image
+    *const resize_image = filter->resize_image;
+
+  CacheView
+    *const image_view = filter->image_view,
+    *const resize_view = filter->resize_view;
+
+  ContributionInfo
+    **const contributions = filter->contributions;
+
+  const double
+    y_factor = filter->y_factor,
+    scale = filter->scale,
+    support = filter->support;
+
+  ExceptionInfo
+    *const exception = filter->exception;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(image,resize_image,resize_image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) resize_image->rows; y++)
+  {
+    const VerticalFilterRow
+      row = { resize_filter, image, resize_image, image_view, resize_view,
+        contributions, y_factor, scale, support, exception };
+
+    if (FilterVerticalRow(&row,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        (*progress)++;
+        SetResizeProgress(image,*progress,span,&status);
+      }
+  }
+  return(status);
+}
+
+static MagickBooleanType VerticalFilter(const VerticalFilterPass *pass,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
-  const double y_factor,const MagickSizeType span,
-  MagickOffsetType *magick_restrict progress,ExceptionInfo *exception)
+  ExceptionInfo *exception)
 {
   CacheView
     *image_view,
@@ -656,14 +830,14 @@ static MagickBooleanType VerticalFilter(
   MagickBooleanType
     status;
 
-  ssize_t
-    y;
+  VerticalFilterRow
+    filter;
 
   /*
     Apply filter to resize vertically from image to resize image.
   */
-  scale=MagickMax(1.0/y_factor+MagickEpsilon,1.0);
-  support=scale*GetResizeFilterSupport(resize_filter);
+  scale=MagickMax(1.0/pass->y_factor+MagickEpsilon,1.0);
+  support=scale*GetResizeFilterSupport(pass->resize_filter);
   if (SetFilterStorageClass(image,resize_image,support,exception) == MagickFalse)
     return(MagickFalse);
   ClampFilterSupport(&support,&scale);
@@ -674,77 +848,17 @@ static MagickBooleanType VerticalFilter(
   scale=MagickSafeReciprocal(scale);
   image_view=AcquireVirtualCacheView(image,exception);
   resize_view=AcquireAuthenticCacheView(resize_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(image,resize_image,resize_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) resize_image->rows; y++)
-  {
-    const int
-      id = GetOpenMPThreadId();
-
-    const Quantum
-      *magick_restrict p;
-
-    ContributionInfo
-      *magick_restrict contribution;
-
-    double
-      bisect,
-      density;
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      n,
-      start,
-      stop,
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    bisect=(double) (y+0.5)/y_factor+MagickEpsilon;
-    start=(ssize_t) MagickMax(bisect-support+0.5,0.0);
-    stop=(ssize_t) MagickMin(bisect+support+0.5,(double) image->rows);
-    density=0.0;
-    contribution=contributions[id];
-    for (n=0; n < (stop-start); n++)
-    {
-      contribution[n].pixel=start+n;
-      contribution[n].weight=GetResizeFilterWeight(resize_filter,scale*
-        ((double) (start+n)-bisect+0.5));
-      density+=contribution[n].weight;
-    }
-    if (n == 0)
-      continue;
-    NormalizeContributionDensity(contribution,n,density);
-    p=GetCacheViewVirtualPixels(image_view,0,contribution[0].pixel,
-      image->columns,(size_t) (contribution[n-1].pixel-contribution[0].pixel+1),
-      exception);
-    q=QueueCacheViewAuthenticPixels(resize_view,0,y,resize_image->columns,1,
-      exception);
-    if (IsFilterRowMissing(p,q) != MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) resize_image->columns; x++)
-    {
-      FilterVerticalPixel(image,resize_image,contribution,n,start,stop,bisect,
-        x,p,q);
-      q+=(ptrdiff_t) GetPixelChannels(resize_image);
-    }
-    SyncResizeView(resize_view,exception,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        (*progress)++;
-        SetResizeProgress(image,*progress,span,&status);
-      }
-  }
+  filter.resize_filter=pass->resize_filter;
+  filter.image=image;
+  filter.resize_image=resize_image;
+  filter.image_view=image_view;
+  filter.resize_view=resize_view;
+  filter.contributions=contributions;
+  filter.y_factor=pass->y_factor;
+  filter.scale=scale;
+  filter.support=support;
+  filter.exception=exception;
+  status=FilterVerticalRows(&filter,pass->span,pass->progress,status);
   return(DestroyFilterResources(image_view,resize_view,contributions,status));
 }
 
@@ -873,6 +987,9 @@ static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
   HorizontalFilterPass
     horizontal;
 
+  VerticalFilterPass
+    vertical;
+
   filter_image=CloneFilterImage(pass,exception);
   if (filter_image == (Image *) NULL)
     return(MagickFalse);
@@ -888,14 +1005,21 @@ static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
       horizontal.span=span;
       horizontal.progress=(&offset);
       *status=HorizontalFilter(&horizontal,image,filter_image,exception);
-      *status&=(MagickStatusType) VerticalFilter(resize_filter,filter_image,
-        resize_image,y_factor,span,&offset,exception);
+      vertical.resize_filter=resize_filter;
+      vertical.y_factor=y_factor;
+      vertical.span=span;
+      vertical.progress=(&offset);
+      *status&=(MagickStatusType) VerticalFilter(&vertical,filter_image,
+        resize_image,exception);
     }
   else
     {
       span=(MagickSizeType) (filter_image->rows+columns);
-      *status=VerticalFilter(resize_filter,image,filter_image,y_factor,span,
-        &offset,exception);
+      vertical.resize_filter=resize_filter;
+      vertical.y_factor=y_factor;
+      vertical.span=span;
+      vertical.progress=(&offset);
+      *status=VerticalFilter(&vertical,image,filter_image,exception);
       horizontal.resize_filter=resize_filter;
       horizontal.x_factor=x_factor;
       horizontal.span=span;
@@ -916,6 +1040,31 @@ static inline MagickBooleanType IsResizeSizeZero(const size_t columns,
   return(((columns == 0) || (rows == 0)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType TryApplyResizeFilterPass(const ResizeFilterPass *pass,
+  Image *resize_image,ExceptionInfo *exception,Image **result)
+{
+  ResizeFilter
+    *resize_filter = pass->resize_filter;
+
+  MagickStatusType
+    status;
+
+  if (ApplyResizeFilterPass(pass,&status,resize_image,exception) == MagickFalse)
+    {
+      resize_filter=DestroyResizeFilter(resize_filter);
+      (*result)=DestroyImage(resize_image);
+      return(MagickTrue);
+    }
+  resize_filter=DestroyResizeFilter(resize_filter);
+  if (status == MagickFalse)
+    {
+      resize_image=DestroyImage(resize_image);
+      (*result)=(Image *) NULL;
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   const size_t rows,const FilterType filter,ExceptionInfo *exception)
 {
@@ -929,8 +1078,8 @@ MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   Image
     *resize_image;
 
-  MagickStatusType
-    status;
+  Image
+    *returned;
 
   ResizeFilter
     *resize_filter;
@@ -979,17 +1128,9 @@ MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   pass.rows=rows;
   pass.x_factor=x_factor;
   pass.y_factor=y_factor;
-  if (ApplyResizeFilterPass(&pass,&status,resize_image,exception) == MagickFalse)
-    {
-      resize_filter=DestroyResizeFilter(resize_filter);
-      return(DestroyImage(resize_image));
-    }
-  resize_filter=DestroyResizeFilter(resize_filter);
-  if (status == MagickFalse)
-    {
-      resize_image=DestroyImage(resize_image);
-      return((Image *) NULL);
-    }
+  if (TryApplyResizeFilterPass(&pass,resize_image,exception,&returned) !=
+      MagickFalse)
+    return(returned);
   resize_image->type=image->type;
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 record_resize_transform:

@@ -662,7 +662,7 @@ typedef struct _QuantizeRowInfo
 } QuantizeRowInfo;
 
 static MagickBooleanType FetchQuantizeRow(const QuantizeRowInfo *row,
-  const ssize_t y,Quantum **q,MagickBooleanType *status)
+  const ssize_t y,Quantum *magick_restrict *q,MagickBooleanType *status)
 {
   if ((*status) == MagickFalse)
     return(MagickFalse);
@@ -2335,6 +2335,104 @@ static void RiemersmaVerticalUnitCurve(const RiemersmaCurve *curve,
   }
 }
 
+typedef struct _RiemersmaMoves
+{
+  unsigned int
+    first,
+    second,
+    third;
+} RiemersmaMoves;
+
+static MagickBooleanType RiemersmaUnitCurve(const RiemersmaCurve *curve,
+  const RiemersmaMoves *moves,ExceptionInfo *exception)
+{
+  const unsigned int
+    first = moves->first,
+    second = moves->second,
+    third = moves->third;
+
+  MagickBooleanType
+    status;
+
+  status=RiemersmaDither(curve,first,exception);
+  if (status != MagickFalse)
+    status=RiemersmaDither(curve,second,exception);
+  if (status != MagickFalse)
+    status=RiemersmaDither(curve,third,exception);
+  return(status);
+}
+
+typedef struct _RiemersmaTurns
+{
+  unsigned int
+    enter,
+    step,
+    along,
+    leave;
+} RiemersmaTurns;
+
+static MagickBooleanType
+  Riemersma(const RiemersmaCurve *,const size_t,const unsigned int,
+    ExceptionInfo *);
+
+static MagickBooleanType RiemersmaSubCurves(const RiemersmaCurve *curve,
+  const size_t level,const RiemersmaTurns *turns,ExceptionInfo *exception)
+{
+  const unsigned int
+    enter = turns->enter,
+    step = turns->step,
+    along = turns->along,
+    leave = turns->leave;
+
+  MagickBooleanType
+    status;
+
+  status=Riemersma(curve,level-1,enter,exception);
+  if (status != MagickFalse)
+    status=RiemersmaDither(curve,step,exception);
+  if (status != MagickFalse)
+    status=Riemersma(curve,level-1,along,exception);
+  if (status != MagickFalse)
+    status=RiemersmaDither(curve,leave,exception);
+  if (status != MagickFalse)
+    status=Riemersma(curve,level-1,along,exception);
+  if (status != MagickFalse)
+    status=RiemersmaDither(curve,along,exception);
+  if (status != MagickFalse)
+    status=Riemersma(curve,level-1,leave,exception);
+  return(status);
+}
+
+static void RiemersmaUnitCurves(const RiemersmaCurve *curve,
+  const unsigned int direction,MagickBooleanType *status,
+  ExceptionInfo *exception)
+{
+  switch (direction)
+  {
+    case WestGravity:
+    {
+      const RiemersmaMoves
+        moves = { EastGravity,SouthGravity,WestGravity };
+
+      *status=RiemersmaUnitCurve(curve,&moves,exception);
+      break;
+    }
+    case EastGravity:
+    {
+      const RiemersmaMoves
+        moves = { WestGravity,NorthGravity,EastGravity };
+
+      *status=RiemersmaUnitCurve(curve,&moves,exception);
+      break;
+    }
+    default:
+    {
+      RiemersmaVerticalUnitCurve(curve,direction,status,exception);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType Riemersma(const RiemersmaCurve *curve,
   const size_t level,const unsigned int direction,ExceptionInfo *exception)
 {
@@ -2343,101 +2441,40 @@ static MagickBooleanType Riemersma(const RiemersmaCurve *curve,
 
   status=MagickTrue;
   if (level == 1)
-    switch (direction)
-    {
-      case WestGravity:
-      {
-        status=RiemersmaDither(curve,EastGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,WestGravity,exception);
-        break;
-      }
-      case EastGravity:
-      {
-        status=RiemersmaDither(curve,WestGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,EastGravity,exception);
-        break;
-      }
-      default:
-      {
-        RiemersmaVerticalUnitCurve(curve,direction,&status,exception);
-        break;
-      }
-    }
+    RiemersmaUnitCurves(curve,direction,&status,exception);
   else
     switch (direction)
     {
       case WestGravity:
       {
-        status=Riemersma(curve,level-1,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,EastGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,WestGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,WestGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,WestGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,SouthGravity,exception);
+        const RiemersmaTurns
+          turns = { NorthGravity,EastGravity,WestGravity,SouthGravity };
+
+        status=RiemersmaSubCurves(curve,level,&turns,exception);
         break;
       }
       case EastGravity:
       {
-        status=Riemersma(curve,level-1,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,WestGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,EastGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,EastGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,EastGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,NorthGravity,exception);
+        const RiemersmaTurns
+          turns = { SouthGravity,WestGravity,EastGravity,NorthGravity };
+
+        status=RiemersmaSubCurves(curve,level,&turns,exception);
         break;
       }
       case NorthGravity:
       {
-        status=Riemersma(curve,level-1,WestGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,EastGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,EastGravity,exception);
+        const RiemersmaTurns
+          turns = { WestGravity,SouthGravity,NorthGravity,EastGravity };
+
+        status=RiemersmaSubCurves(curve,level,&turns,exception);
         break;
       }
       case SouthGravity:
       {
-        status=Riemersma(curve,level-1,EastGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,WestGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=Riemersma(curve,level-1,WestGravity,exception);
+        const RiemersmaTurns
+          turns = { EastGravity,NorthGravity,SouthGravity,WestGravity };
+
+        status=RiemersmaSubCurves(curve,level,&turns,exception);
         break;
       }
       default:
@@ -3301,6 +3338,19 @@ static MagickBooleanType RefineKmeansClusters(const KmeansRefinement *refine,
   return(status);
 }
 
+static MagickBooleanType SeedKmeansFromColorList(Image *image,
+  const char *colors,const size_t number_colors,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=AcquireImageColormap(image,number_colors,exception);
+  if (status == MagickFalse)
+    return(status);
+  SeedKmeansFromColors(image,colors,exception);
+  return(status);
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -3337,24 +3387,17 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
     return(MagickFalse);
   colors=GetImageArtifact(image,"kmeans:seed-colors");
   if (colors == (const char *) NULL)
-    {
-      /*
-        Seed clusters from color quantization.
-      */
-      status=SeedKmeansFromQuantization(image,number_colors,exception);
-      if (status == MagickFalse)
-        return(status);
-    }
+    /*
+      Seed clusters from color quantization.
+    */
+    status=SeedKmeansFromQuantization(image,number_colors,exception);
   else
-    {
-      /*
-        Seed clusters from color list (e.g. red;green;blue).
-      */
-      status=AcquireImageColormap(image,number_colors,exception);
-      if (status == MagickFalse)
-        return(status);
-      SeedKmeansFromColors(image,colors,exception);
-    }
+    /*
+      Seed clusters from color list (e.g. red;green;blue).
+    */
+    status=SeedKmeansFromColorList(image,colors,number_colors,exception);
+  if (status == MagickFalse)
+    return(status);
   /*
     Iterative refinement.
   */
