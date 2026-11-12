@@ -4611,6 +4611,99 @@ static void XGetMaskShift(const unsigned long visual_mask,size_t *mask,
   }
 }
 
+typedef struct _WindowImageSource
+{
+  Image
+    *composite_image;
+
+  CacheView
+    *composite_view;
+
+  ExceptionInfo
+    *exception;
+
+  XImage
+    *ximage;
+
+  XColor
+    *colors;
+
+  unsigned int
+    number_colors;
+
+  WindowInfo
+    *window_info;
+
+  int
+    id;
+} WindowImageSource;
+
+static void XImportDirectClass(const WindowImageSource *source)
+{
+  Image
+    *const composite_image = source->composite_image;
+
+  CacheView
+    *const composite_view = source->composite_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  XImage
+    *const ximage = source->ximage;
+
+  XColor
+    *const colors = source->colors;
+
+  const unsigned int
+    number_colors = source->number_colors;
+
+  WindowInfo
+    *const window_info = source->window_info;
+
+  const int
+    id = source->id;
+
+  size_t
+    blue_mask,
+    blue_shift,
+    green_mask,
+    green_shift,
+    red_mask,
+    red_shift;
+
+  XDirectRowSource
+    direct_source;
+
+  /*
+    Determine shift and mask for red, green, and blue.
+  */
+  XGetMaskShift(window_info[id].visual->red_mask,&red_mask,&red_shift);
+  XGetMaskShift(window_info[id].visual->green_mask,&green_mask,
+    &green_shift);
+  XGetMaskShift(window_info[id].visual->blue_mask,&blue_mask,
+    &blue_shift);
+  /*
+    Convert X image to DirectClass packets.
+  */
+  direct_source.composite_image=composite_image;
+  direct_source.composite_view=composite_view;
+  direct_source.exception=exception;
+  direct_source.ximage=ximage;
+  direct_source.colors=colors;
+  direct_source.blue_mask=blue_mask;
+  direct_source.blue_shift=blue_shift;
+  direct_source.green_mask=green_mask;
+  direct_source.green_shift=green_shift;
+  direct_source.red_mask=red_mask;
+  direct_source.red_shift=red_shift;
+  if ((number_colors != 0) &&
+      (window_info[id].visual->klass == DirectColor))
+    XImportDirectColorRows(&direct_source);
+  else
+    XImportTrueColorRows(&direct_source);
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4852,44 +4945,11 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
           case DirectClass:
           default:
           {
-            size_t
-              blue_mask,
-              blue_shift,
-              green_mask,
-              green_shift,
-              red_mask,
-              red_shift;
+            const WindowImageSource
+              source = { composite_image, composite_view, exception, ximage,
+                colors, number_colors, window_info, id };
 
-            XDirectRowSource
-              direct_source;
-
-            /*
-              Determine shift and mask for red, green, and blue.
-            */
-            XGetMaskShift(window_info[id].visual->red_mask,&red_mask,&red_shift);
-            XGetMaskShift(window_info[id].visual->green_mask,&green_mask,
-              &green_shift);
-            XGetMaskShift(window_info[id].visual->blue_mask,&blue_mask,
-              &blue_shift);
-            /*
-              Convert X image to DirectClass packets.
-            */
-            direct_source.composite_image=composite_image;
-            direct_source.composite_view=composite_view;
-            direct_source.exception=exception;
-            direct_source.ximage=ximage;
-            direct_source.colors=colors;
-            direct_source.blue_mask=blue_mask;
-            direct_source.blue_shift=blue_shift;
-            direct_source.green_mask=green_mask;
-            direct_source.green_shift=green_shift;
-            direct_source.red_mask=red_mask;
-            direct_source.red_shift=red_shift;
-            if ((number_colors != 0) &&
-                (window_info[id].visual->klass == DirectColor))
-              XImportDirectColorRows(&direct_source);
-            else
-              XImportTrueColorRows(&direct_source);
+            XImportDirectClass(&source);
             break;
           }
           case PseudoClass:
