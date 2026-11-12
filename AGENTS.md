@@ -81,6 +81,18 @@ Never, in any commit:
   `#if defined(...)`/`#if !defined(...)` branch inside it, verbatim, when a build that
   compiles the branch shows the moved functions' instructions unchanged
   (`tools/split_branch_check.py` prints `IDENTICAL-MODULO-LAYOUT`).
+  Rulings of 2026-11-12 (owner, "all of these are ok", answering a list of seven questions):
+  a build configured with a feature absent (for example `ac_cv_func_atanh=no`, the
+  `ci-gcc-noatanh` configuration) counts as an available build for that check; Recipe S
+  splits that relabel most of a file are allowed; Recipe FT (fold an identical twin
+  function into its twin) is allowed; the `#if`/OpenMP sites the lanes had listed as owner
+  questions (attribute-depth, fourier, layer, resample, feature-texture, `ExecuteRPN`,
+  `AcquireKernelBuiltIn`, `paint-floodfill`'s Recipe H, the `?:` fold in magnify) may be
+  taken one at a time, each with the sharpest check the situation allows - for an OpenMP
+  region, the playbook's rule about which variables a block may write, read by hand and
+  quoted in the commit, plus the cases that reach it run with `OMP_NUM_THREADS=1` and
+  `=4` and compared; an NS step may accept a reached function whose object code differs;
+  an error call moved into a helper may name the helper in `GetMagickModule()`.
 - Modify a `static const` data table.
 - Fix a bug you noticed. Report it.
 
