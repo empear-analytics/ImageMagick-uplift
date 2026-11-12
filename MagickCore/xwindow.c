@@ -8781,6 +8781,50 @@ static void MagnifyBitPlanesLSB(const MagnifyBitPlanes *planes,
   }
 }
 
+static void MagnifyBitPlanesMSB(const MagnifyBitPlanes *planes,
+  unsigned char *byte,unsigned char *q_bit,unsigned char **q)
+{
+  XImage
+    *const ximage = planes->ximage;
+
+  const unsigned char
+    background = planes->background,
+    foreground = planes->foreground,
+    p_bit = planes->p_bit;
+
+  const unsigned int
+    magnify = planes->magnify;
+
+  unsigned char
+    *const p = planes->p;
+
+  unsigned int
+    l,
+    plane;
+
+  for (l=0; l < magnify; l++)
+  {
+    /*
+      Propagate each bit plane.
+    */
+    for (plane=0; (int) plane < ximage->bits_per_pixel; plane++)
+    {
+      (*byte)<<=1;
+      if (*p & (0x80 >> (p_bit+plane)))
+        (*byte)|=foreground;
+      else
+        (*byte)|=background;
+      (*q_bit)++;
+      if ((*q_bit) == 8)
+        {
+          *(*q)++=(*byte);
+          (*q_bit)=0;
+          (*byte)=0;
+        }
+    }
+  }
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -8816,7 +8860,6 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
     height,
     j,
     k,
-    l,
     magnify,
     scanline_pad,
     width;
@@ -8905,9 +8948,6 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
         foreground,
         p_bit,
         q_bit;
-
-      unsigned int
-        plane;
 
       XPixelInfo
         *pixel_info;
@@ -9008,26 +9048,12 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
                 /*
                   Propagate pixel magnify columns.
                 */
-                for (l=0; l < magnify; l++)
                 {
-                  /*
-                    Propagate each bit plane.
-                  */
-                  for (plane=0; (int) plane < ximage->bits_per_pixel; plane++)
-                  {
-                    byte<<=1;
-                    if (*p & (0x80 >> (p_bit+plane)))
-                      byte|=foreground;
-                    else
-                      byte|=background;
-                    q_bit++;
-                    if (q_bit == 8)
-                      {
-                        *q++=byte;
-                        q_bit=0;
-                        byte=0;
-                      }
-                  }
+                  const MagnifyBitPlanes
+                    planes = { magnify, ximage, p, p_bit, background,
+                      foreground };
+
+                  MagnifyBitPlanesMSB(&planes,&byte,&q_bit,&q);
                 }
                 p_bit+=ximage->bits_per_pixel;
                 if (p_bit == 8)
