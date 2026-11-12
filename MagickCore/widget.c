@@ -2142,6 +2142,9 @@ typedef struct _ColorBrowserContext
 
   unsigned int
     width;
+
+  char
+    *reply;
 } ColorBrowserContext;
 
 static void ClientColorBrowserMessage(const ColorBrowserContext *context,
@@ -2852,6 +2855,51 @@ static void InitializeColorBrowserButtons(const ColorBrowserContext *context,
   (*reset_info).y=(*grab_info).y+(int) (*grab_info).height+QuantumMargin;
 }
 
+static void InitializeColorBrowserReply(const ColorBrowserContext *context,
+  const ColorBrowserTargets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height,
+    width = context->width;
+
+  char
+    *const reply = context->reply;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const action_info = widgets->action_info,
+    *const mode_info = widgets->mode_info;
+
+  /*
+    Initialize reply information.
+  */
+  XGetWidgetInfo(reply,reply_info);
+  (*reply_info).raised=MagickFalse;
+  (*reply_info).bevel_width--;
+  (*reply_info).width=windows->widget.width-width-(unsigned int)
+    ((6*QuantumMargin) >> 1);
+  (*reply_info).height=height << 1;
+  (*reply_info).x=(int) width+(QuantumMargin << 1);
+  (*reply_info).y=(*action_info).y-(int) (*reply_info).height-QuantumMargin;
+  /*
+    Initialize mode information.
+  */
+  XGetWidgetInfo((char *) NULL,mode_info);
+  (*mode_info).active=MagickTrue;
+  (*mode_info).bevel_width=0;
+  (*mode_info).width=(unsigned int) ((*action_info).x-
+    (int) (QuantumMargin << 1));
+  (*mode_info).height=(*action_info).height;
+  (*mode_info).x=QuantumMargin;
+  (*mode_info).y=(*action_info).y;
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3042,6 +3090,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   color_context.height=height;
   color_context.action=action;
   color_context.width=width;
+  color_context.reply=reply;
   do
   {
     if (state & UpdateConfigurationState)
@@ -3050,27 +3099,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
           id;
 
         InitializeColorBrowserButtons(&color_context,&color_widgets);
-        /*
-          Initialize reply information.
-        */
-        XGetWidgetInfo(reply,&reply_info);
-        reply_info.raised=MagickFalse;
-        reply_info.bevel_width--;
-        reply_info.width=windows->widget.width-width-(unsigned int)
-          ((6*QuantumMargin) >> 1);
-        reply_info.height=height << 1;
-        reply_info.x=(int) width+(QuantumMargin << 1);
-        reply_info.y=action_info.y-(int) reply_info.height-QuantumMargin;
-        /*
-          Initialize mode information.
-        */
-        XGetWidgetInfo((char *) NULL,&mode_info);
-        mode_info.active=MagickTrue;
-        mode_info.bevel_width=0;
-        mode_info.width=(unsigned int) (action_info.x-(int) (QuantumMargin << 1));
-        mode_info.height=action_info.height;
-        mode_info.x=QuantumMargin;
-        mode_info.y=action_info.y;
+        InitializeColorBrowserReply(&color_context,&color_widgets);
         /*
           Initialize scroll information.
         */
