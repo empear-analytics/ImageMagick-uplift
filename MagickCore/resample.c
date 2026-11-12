@@ -778,6 +778,115 @@ static MagickBooleanType TryResampleShortcut(const ResampleLimitPoint *area,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _ResampleRowInputs
+{
+  ResampleFilter
+    *resample_filter;
+
+  PixelInfo
+    *pixel;
+
+  double
+    DDQ;
+
+  ssize_t
+    uw;
+} ResampleRowInputs;
+
+typedef struct _ResampleRowTargets
+{
+  double
+    *divisor_m,
+    *divisor_c;
+
+  ssize_t
+    *hit;
+
+  const Quantum
+    **pixels;
+
+  double
+    *Q,
+    *DQ;
+} ResampleRowTargets;
+
+static void ScanResampleRow(const ResampleRowInputs *row,
+  const ResampleRowTargets *targets)
+{
+  const double
+    DDQ = row->DDQ;
+
+  PixelInfo
+    *const pixel = row->pixel;
+
+  ResampleFilter
+    *const resample_filter = row->resample_filter;
+
+  const ssize_t
+    uw = row->uw;
+
+  double
+    *const DQ = targets->DQ,
+    *const Q = targets->Q,
+    *const divisor_c = targets->divisor_c,
+    *const divisor_m = targets->divisor_m;
+
+  const Quantum
+    **const pixels = targets->pixels;
+
+  ssize_t
+    *const hit = targets->hit;
+
+  double
+    weight;
+
+  ssize_t
+    u;
+
+  for( u=0; u<uw; u++ ) {
+    ResamplePixelSource
+      source;
+
+    weight = 0.0;
+#if FILTER_LUT
+    /* Note that the ellipse has been pre-scaled so F = WLUT_WIDTH */
+    if (((int) (*Q) >= 0) && ((int) (*Q) < WLUT_WIDTH)) {
+      weight = resample_filter->filter_lut[(int) (*Q)];
+#else
+    /* Note that the ellipse has been pre-scaled so F = support^2 */
+    if ((Q >= 0.0) && (Q < resample_filter->F)) {
+      weight = GetResizeFilterWeight(resample_filter->filter_def,
+           sqrt(Q));    /* a SquareRoot!  Arrggghhhhh... */
+#endif
+
+      source.resample_filter=resample_filter;
+      source.pixels=(*pixels);
+      source.pixel=pixel;
+      AccumulateResampledPixel(&source,divisor_m,&weight,divisor_c);
+
+      (*hit)++;
+#if DEBUG_HIT_MISS
+      /* mark the pixel according to hit/miss of the ellipse */
+      (void) FormatLocaleFile(stderr, "set arrow from %lf,%lf to %lf,%lf nohead ls 3\n",
+                   (long)uu-.1,(double)v-.1,(long)uu+.1,(long)v+.1);
+      (void) FormatLocaleFile(stderr, "set arrow from %lf,%lf to %lf,%lf nohead ls 3\n",
+                   (long)uu+.1,(double)v-.1,(long)uu-.1,(long)v+.1);
+    } else {
+      (void) FormatLocaleFile(stderr, "set arrow from %lf,%lf to %lf,%lf nohead ls 1\n",
+                   (long)uu-.1,(double)v-.1,(long)uu+.1,(long)v+.1);
+      (void) FormatLocaleFile(stderr, "set arrow from %lf,%lf to %lf,%lf nohead ls 1\n",
+                   (long)uu+.1,(double)v-.1,(long)uu-.1,(long)v+.1);
+    }
+    uu++;
+#else
+    }
+#endif
+    (*pixels)+=(ptrdiff_t) GetPixelChannels(resample_filter->image);
+    (*Q) += (*DQ);
+    (*DQ) += DDQ;
+  }
+}
+
 MagickExport MagickBooleanType ResamplePixelColor(
   ResampleFilter *resample_filter,const double u0,const double v0,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -793,7 +902,6 @@ MagickExport MagickBooleanType ResamplePixelColor(
   double u1;
   double U,V,Q,DQ,DDQ;
   double divisor_c,divisor_m;
-  double weight;
   const Quantum *pixels;
   assert(resample_filter != (ResampleFilter *) NULL);
   assert(resample_filter->signature == MagickCoreSignature);
@@ -881,47 +989,14 @@ MagickExport MagickBooleanType ResamplePixelColor(
       return(MagickFalse);
 
     /* count up the weighted pixel colors */
-    for( u=0; u<uw; u++ ) {
-      ResamplePixelSource
-        source;
+    {
+      const ResampleRowInputs
+        row = { resample_filter, pixel, DDQ, uw };
 
-      weight = 0.0;
-#if FILTER_LUT
-      /* Note that the ellipse has been pre-scaled so F = WLUT_WIDTH */
-      if (((int) Q >= 0) && ((int) Q < WLUT_WIDTH)) {
-        weight = resample_filter->filter_lut[(int) Q];
-#else
-      /* Note that the ellipse has been pre-scaled so F = support^2 */
-      if ((Q >= 0.0) && (Q < resample_filter->F)) {
-        weight = GetResizeFilterWeight(resample_filter->filter_def,
-             sqrt(Q));    /* a SquareRoot!  Arrggghhhhh... */
-#endif
+      const ResampleRowTargets
+        targets = { &divisor_m, &divisor_c, &hit, &pixels, &Q, &DQ };
 
-        source.resample_filter=resample_filter;
-        source.pixels=pixels;
-        source.pixel=pixel;
-        AccumulateResampledPixel(&source,&divisor_m,&weight,&divisor_c);
-
-        hit++;
-#if DEBUG_HIT_MISS
-        /* mark the pixel according to hit/miss of the ellipse */
-        (void) FormatLocaleFile(stderr, "set arrow from %lf,%lf to %lf,%lf nohead ls 3\n",
-                     (long)uu-.1,(double)v-.1,(long)uu+.1,(long)v+.1);
-        (void) FormatLocaleFile(stderr, "set arrow from %lf,%lf to %lf,%lf nohead ls 3\n",
-                     (long)uu+.1,(double)v-.1,(long)uu-.1,(long)v+.1);
-      } else {
-        (void) FormatLocaleFile(stderr, "set arrow from %lf,%lf to %lf,%lf nohead ls 1\n",
-                     (long)uu-.1,(double)v-.1,(long)uu+.1,(long)v+.1);
-        (void) FormatLocaleFile(stderr, "set arrow from %lf,%lf to %lf,%lf nohead ls 1\n",
-                     (long)uu+.1,(double)v-.1,(long)uu-.1,(long)v+.1);
-      }
-      uu++;
-#else
-      }
-#endif
-      pixels+=(ptrdiff_t) GetPixelChannels(resample_filter->image);
-      Q += DQ;
-      DQ += DDQ;
+      ScanResampleRow(&row,&targets);
     }
   }
 #if DEBUG_ELLIPSE
