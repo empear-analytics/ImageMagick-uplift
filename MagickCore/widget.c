@@ -3903,12 +3903,6 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   XFontStruct
     *font_info;
 
-  ColorBrowserContext
-    color_context;
-
-  ColorBrowserLayout
-    color_layout;
-
   /*
     Get color list and sort in ascending order.
   */
@@ -3957,29 +3951,25 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   if (WidgetTextWidth(font_info,ColornameText) > width)
     width=WidgetTextWidth(font_info,ColornameText);
   height=(unsigned int) (font_info->ascent+font_info->descent);
-  color_layout.display=display;
-  color_layout.font_info=font_info;
-  color_layout.width=width;
-  color_layout.height=height;
-  color_layout.text_width=text_width;
-  PositionColorBrowserWidget(windows,&color_layout);
+  {
+    const ColorBrowserLayout
+      color_layout = { display, font_info, width,
+        height, text_width };
+
+    PositionColorBrowserWidget(windows,&color_layout);
+  }
   /*
     Map Color Browser widget.
   */
   MapColorBrowserWidget(display,windows,mask);
-  color_context.display=display;
-  color_context.windows=windows;
-  color_context.glob_pattern=glob_pattern;
-  color_context.reset_pattern=reset_pattern;
-  color_context.exception=exception;
-  color_context.font_info=font_info;
-  color_context.primary_selection=primary_selection;
-  color_context.height=height;
-  color_context.action=action;
-  color_context.width=width;
-  color_context.reply=reply;
-  color_context.text=text;
-  RunColorBrowser(&color_context,&colorlist,&colors,&mask);
+  {
+    const ColorBrowserContext
+      color_context = { display, windows,
+        glob_pattern, reset_pattern, exception, font_info, primary_selection,
+        height, action, width, reply, text };
+
+    RunColorBrowser(&color_context,&colorlist,&colors,&mask);
+  }
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
   XCheckRefreshWindows(display,windows);
