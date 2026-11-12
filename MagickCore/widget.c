@@ -3409,6 +3409,58 @@ static size_t ExposeCommandWindow(XWindows *windows,XEvent *event,
   return(state);
 }
 
+static void HandleCommandWindowEvent(const CommandWidgetEvent *tile,int *id,
+  size_t *state)
+{
+  Display
+    *const display = tile->display;
+
+  XWindows
+    *const windows = tile->windows;
+
+  XEvent
+    *const event = tile->event;
+
+  const unsigned int
+    number_selections = tile->number_selections;
+
+  switch (event->type)
+  {
+    case Expose:
+    {
+      (*state)=ExposeCommandWindow(windows,event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      CommandWidgetEvent
+        motion;
+
+      /*
+        Return the ID of the highlighted menu entry.
+      */
+      motion.display=display;
+      motion.windows=windows;
+      motion.event=event;
+      motion.number_selections=number_selections;
+      (*id)=FollowCommandMotion(&motion,(*id));
+      break;
+    }
+    case MapNotify:
+    {
+      windows->command.mapped=MagickTrue;
+      break;
+    }
+    case UnmapNotify:
+    {
+      windows->command.mapped=MagickFalse;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -3433,6 +3485,9 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
 
   XFontStruct
     *font_info;
+
+  CommandWidgetEvent
+    tile;
 
   assert(display != (Display *) NULL);
   assert(windows != (XWindows *) NULL);
@@ -3513,6 +3568,10 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   /*
     Wait for next event.
   */
+  tile.display=display;
+  tile.windows=windows;
+  tile.event=event;
+  tile.number_selections=number_selections;
   if (event != (XEvent *) NULL)
     switch (event->type)
     {
@@ -3550,38 +3609,11 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
         state=ConfigureCommandWindow(windows,event,state);
         break;
       }
-      case Expose:
-      {
-        state=ExposeCommandWindow(windows,event,state);
-        break;
-      }
-      case MotionNotify:
-      {
-        CommandWidgetEvent
-          motion;
-
-        /*
-          Return the ID of the highlighted menu entry.
-        */
-        motion.display=display;
-        motion.windows=windows;
-        motion.event=event;
-        motion.number_selections=number_selections;
-        id=FollowCommandMotion(&motion,id);
-        break;
-      }
-      case MapNotify:
-      {
-        windows->command.mapped=MagickTrue;
-        break;
-      }
-      case UnmapNotify:
-      {
-        windows->command.mapped=MagickFalse;
-        break;
-      }
       default:
+      {
+        HandleCommandWindowEvent(&tile,&id,&state);
         break;
+      }
     }
   if (state & UpdateConfigurationState)
     {
