@@ -3374,6 +3374,30 @@ static void ClientCommandMessage(Display *display,XWindows *windows,
     windows->command.screen);
 }
 
+static size_t ConfigureCommandWindow(XWindows *windows,XEvent *event,
+  size_t state)
+{
+  /*
+    Update widget configuration.
+  */
+  if (event->xconfigure.window != windows->command.id)
+    return(state);
+  if (event->xconfigure.send_event != 0)
+    {
+      windows->command.x=event->xconfigure.x;
+      windows->command.y=event->xconfigure.y;
+    }
+  if ((event->xconfigure.width == (int) windows->command.width) &&
+      (event->xconfigure.height == (int) windows->command.height))
+    return(state);
+  windows->command.width=(unsigned int)
+    MagickMax(event->xconfigure.width,(int) windows->command.min_width);
+  windows->command.height=(unsigned int)
+    MagickMax(event->xconfigure.height,(int) windows->command.min_height);
+  state|=UpdateConfigurationState;
+  return(state);
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -3512,24 +3536,7 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
       }
       case ConfigureNotify:
       {
-        /*
-          Update widget configuration.
-        */
-        if (event->xconfigure.window != windows->command.id)
-          break;
-        if (event->xconfigure.send_event != 0)
-          {
-            windows->command.x=event->xconfigure.x;
-            windows->command.y=event->xconfigure.y;
-          }
-        if ((event->xconfigure.width == (int) windows->command.width) &&
-            (event->xconfigure.height == (int) windows->command.height))
-          break;
-        windows->command.width=(unsigned int)
-          MagickMax(event->xconfigure.width,(int) windows->command.min_width);
-        windows->command.height=(unsigned int)
-          MagickMax(event->xconfigure.height,(int) windows->command.min_height);
-        state|=UpdateConfigurationState;
+        state=ConfigureCommandWindow(windows,event,state);
         break;
       }
       case Expose:
