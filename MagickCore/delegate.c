@@ -2626,6 +2626,31 @@ static void SetDelegateInfoAttribute(DelegateInfo *delegate_info,
     SetDelegateThreadSupport(delegate_info,token);
 }
 
+static MagickBooleanType IsIncludeFileAttribute(const char **q,
+  const size_t extent,char *keyword,char *token)
+{
+  (void) CopyMagickString(keyword,token,MagickPathExtent);
+  (void) GetNextToken(*q,q,extent,token);
+  if (*token != '=')
+    return(MagickFalse);
+  (void) GetNextToken(*q,q,extent,token);
+  return(LocaleCompare(keyword,"file") == 0 ? MagickTrue : MagickFalse);
+}
+
+static DelegateInfo *AcquireDelegateInfo(const char *filename)
+{
+  DelegateInfo
+    *delegate_info;
+
+  delegate_info=(DelegateInfo *) AcquireCriticalMemory(
+    sizeof(*delegate_info));
+  (void) memset(delegate_info,0,sizeof(*delegate_info));
+  delegate_info->path=ConstantString(filename);
+  delegate_info->thread_support=MagickTrue;
+  delegate_info->signature=MagickCoreSignature;
+  return(delegate_info);
+}
+
 static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2694,23 +2719,11 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
         */
         while (IsIncludeElementOpen(token,q) != MagickFalse)
         {
-          (void) CopyMagickString(keyword,token,MagickPathExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
-            continue;
-          (void) GetNextToken(q,&q,extent,token);
-          if (LocaleCompare(keyword,"file") == 0)
-            {
-              DelegateInclude
-                include;
+          const DelegateInclude
+            include = { cache, exception, filename, token, depth };
 
-              include.cache=cache;
-              include.exception=exception;
-              include.filename=filename;
-              include.token=token;
-              include.depth=depth;
-              LoadDelegateInclude(&include,&status);
-            }
+          if (IsIncludeFileAttribute(&q,extent,keyword,token) != MagickFalse)
+            LoadDelegateInclude(&include,&status);
         }
         continue;
       }
@@ -2719,12 +2732,7 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
         /*
           Delegate element.
         */
-        delegate_info=(DelegateInfo *) AcquireCriticalMemory(
-          sizeof(*delegate_info));
-        (void) memset(delegate_info,0,sizeof(*delegate_info));
-        delegate_info->path=ConstantString(filename);
-        delegate_info->thread_support=MagickTrue;
-        delegate_info->signature=MagickCoreSignature;
+        delegate_info=AcquireDelegateInfo(filename);
         continue;
       }
     if (delegate_info == (DelegateInfo *) NULL)
