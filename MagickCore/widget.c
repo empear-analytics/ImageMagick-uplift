@@ -3360,6 +3360,20 @@ static const unsigned char
     0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
   };
 
+static void ClientCommandMessage(Display *display,XWindows *windows,
+  XEvent *event)
+{
+  /*
+    If client window delete message, withdraw command widget.
+  */
+  if (event->xclient.message_type != windows->wm_protocols)
+    return;
+  if (*event->xclient.data.l != (int) windows->wm_delete_window)
+    return;
+  (void) XWithdrawWindow(display,windows->command.id,
+    windows->command.screen);
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -3493,15 +3507,7 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
       }
       case ClientMessage:
       {
-        /*
-          If client window delete message, withdraw command widget.
-        */
-        if (event->xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event->xclient.data.l != (int) windows->wm_delete_window)
-          break;
-        (void) XWithdrawWindow(display,windows->command.id,
-          windows->command.screen);
+        ClientCommandMessage(display,windows,event);
         break;
       }
       case ConfigureNotify:
