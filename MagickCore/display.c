@@ -15664,6 +15664,21 @@ static void XScreenKeyPress(Display *display,XWindows *windows,XEvent *event,
     exception);
 }
 
+static void XScreenMap(Display *display,XWindows *windows,XEvent *event)
+{
+  if (event->xmap.window == windows->magnify.id)
+    {
+      windows->magnify.mapped=MagickTrue;
+      (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+      return;
+    }
+  if (event->xmap.window == windows->info.id)
+    {
+      windows->info.mapped=MagickTrue;
+      return;
+    }
+}
+
 static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
@@ -15704,17 +15719,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
     }
     case MapNotify:
     {
-      if (event->xmap.window == windows->magnify.id)
-        {
-          windows->magnify.mapped=MagickTrue;
-          (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-          break;
-        }
-      if (event->xmap.window == windows->info.id)
-        {
-          windows->info.mapped=MagickTrue;
-          break;
-        }
+      XScreenMap(display,windows,event);
       break;
     }
     case MotionNotify:
