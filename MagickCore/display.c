@@ -7452,6 +7452,23 @@ static void XPreviewEllipse(const DrawEditContext *context,
         windows->info.screen);
 }
 
+static void XPreviewRectangleErase(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const RectangleInfo
+    rectangle_info = preview->rectangle_info;
+
+  if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
+    XHighlightRectangle(display,windows->image.id,
+      windows->image.highlight_context,&rectangle_info);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7805,9 +7822,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         case RectangleElement:
         case FillRectangleElement:
         {
-          if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
-            XHighlightRectangle(display,windows->image.id,
-              windows->image.highlight_context,&rectangle_info);
+          XPreviewRectangleErase(&draw_context,&preview_input);
           break;
         }
         case CircleElement:
