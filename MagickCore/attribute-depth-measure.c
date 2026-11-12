@@ -309,8 +309,16 @@ typedef struct _DepthMapScan
   const Image
     *image;
 
+  CacheView
+    *image_view;
+
   size_t
-    *depth_map,
+    *depth_map;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
     *current_depth;
 } DepthMapScan;
 
@@ -368,6 +376,33 @@ static size_t *AcquireDepthMap(void)
     depth_map[i]=depth;
   }
   return(depth_map);
+}
+
+static void RaiseMappedRowDepth(MagickBooleanType *status,
+  const DepthMapScan *scan,const ssize_t y)
+{
+  const int
+    id = GetOpenMPThreadId();
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(scan->image_view,0,y,scan->image->columns,1,
+    scan->exception);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) scan->image->columns; x++)
+  {
+    RaiseMappedPixelDepth(scan,p,id);
+    p+=(ptrdiff_t) GetPixelChannels(scan->image);
+  }
+  if (scan->current_depth[id] == MAGICKCORE_QUANTUM_DEPTH)
+    (*status)=MagickFalse;
 }
 #endif
 
@@ -428,33 +463,10 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        const int
-          id = GetOpenMPThreadId();
+        const DepthMapScan
+          scan = { image, image_view, depth_map, exception, current_depth };
 
-        const Quantum
-          *magick_restrict p;
-
-        DepthMapScan
-          scan;
-
-        ssize_t
-          x;
-
-        if (status == MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-        if (p == (const Quantum *) NULL)
-          continue;
-        scan.image=image;
-        scan.depth_map=depth_map;
-        scan.current_depth=current_depth;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          RaiseMappedPixelDepth(&scan,p,id);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (current_depth[id] == MAGICKCORE_QUANTUM_DEPTH)
-          status=MagickFalse;
+        RaiseMappedRowDepth(&status,&scan,y);
       }
       image_view=DestroyCacheView(image_view);
       depth=current_depth[0];
