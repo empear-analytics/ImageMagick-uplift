@@ -5704,6 +5704,41 @@ static inline MagickBooleanType IsWindowsInfoMissing(const XWindows *windows)
     MagickFalse);
 }
 
+static void LogXWindowProtocols(Display *display,const XWindows *windows)
+{
+  if ((GetLogEventMask() & X11Event) != 0)
+    {
+      (void) XSynchronize(display,MagickTrue);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"Version: %s",
+        GetMagickVersion((size_t *) NULL));
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"Protocols:");
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "  Window Manager: 0x%lx",windows->wm_protocols);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "    delete window: 0x%lx",windows->wm_delete_window);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"    take focus: 0x%lx",
+        windows->wm_take_focus);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"  ImageMagick: 0x%lx",
+        windows->im_protocols);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "    remote command: 0x%lx",windows->im_remote_command);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "    update widget: 0x%lx",windows->im_update_widget);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "    update colormap: 0x%lx",windows->im_update_colormap);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "    former image: 0x%lx",windows->im_former_image);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"    next image: 0x%lx",
+        windows->im_next_image);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "    retain colors: 0x%lx",windows->im_retain_colors);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"    exit: 0x%lx",
+        windows->im_exit);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"  Drag and Drop: 0x%lx",
+        windows->dnd_protocols);
+    }
+}
+
 MagickPrivate XWindows *XInitializeWindows(Display *display,
   XResourceInfo *resource_info)
 {
@@ -5759,37 +5794,7 @@ MagickPrivate XWindows *XInitializeWindows(Display *display,
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   (void) XSynchronize(display,MagickFalse);
 #endif
-  if ((GetLogEventMask() & X11Event) != 0)
-    {
-      (void) XSynchronize(display,MagickTrue);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"Version: %s",
-        GetMagickVersion((size_t *) NULL));
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"Protocols:");
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "  Window Manager: 0x%lx",windows->wm_protocols);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "    delete window: 0x%lx",windows->wm_delete_window);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"    take focus: 0x%lx",
-        windows->wm_take_focus);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  ImageMagick: 0x%lx",
-        windows->im_protocols);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "    remote command: 0x%lx",windows->im_remote_command);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "    update widget: 0x%lx",windows->im_update_widget);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "    update colormap: 0x%lx",windows->im_update_colormap);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "    former image: 0x%lx",windows->im_former_image);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"    next image: 0x%lx",
-        windows->im_next_image);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "    retain colors: 0x%lx",windows->im_retain_colors);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"    exit: 0x%lx",
-        windows->im_exit);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  Drag and Drop: 0x%lx",
-        windows->dnd_protocols);
-    }
+  LogXWindowProtocols(display,windows);
   /*
     Allocate standard colormap.
   */
