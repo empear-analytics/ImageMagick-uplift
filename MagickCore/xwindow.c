@@ -1102,20 +1102,49 @@ MagickPrivate void XBestIconSize(Display *display,XWindowInfo *window,
 %    o color: Specifies the desired RGB value to find in the colors array.
 %
 */
+static int XClosestColor(const XColor *colors,const unsigned int number_colors,
+  XColor *color)
+{
+  double
+    distance,
+    min_distance;
+
+  int
+    i,
+    j;
+
+  PixelInfo
+    pixel;
+
+  min_distance=3.0*((double) QuantumRange+1.0)*((double)
+    QuantumRange+1.0);
+  j=0;
+  for (i=0; i < (int) number_colors; i++)
+  {
+    pixel.red=colors[i].red-(double) color->red;
+    distance=pixel.red*pixel.red;
+    if (distance > min_distance)
+      continue;
+    pixel.green=colors[i].green-(double) color->green;
+    distance+=pixel.green*pixel.green;
+    if (distance > min_distance)
+      continue;
+    pixel.blue=colors[i].blue-(double) color->blue;
+    distance+=pixel.blue*pixel.blue;
+    if (distance > min_distance)
+      continue;
+    min_distance=distance;
+    color->pixel=colors[i].pixel;
+    j=i;
+  }
+  return(j);
+}
+
 MagickPrivate void XBestPixel(Display *display,const Colormap colormap,
   XColor *colors,unsigned int number_colors,XColor *color)
 {
   MagickBooleanType
     query_server;
-
-  PixelInfo
-    pixel;
-
-  double
-    min_distance;
-
-  double
-    distance;
 
   int
     i,
@@ -1153,27 +1182,7 @@ MagickPrivate void XBestPixel(Display *display,const Colormap colormap,
         number_colors=256;
       (void) XQueryColors(display,colormap,colors,(int) number_colors);
     }
-  min_distance=3.0*((double) QuantumRange+1.0)*((double)
-    QuantumRange+1.0);
-  j=0;
-  for (i=0; i < (int) number_colors; i++)
-  {
-    pixel.red=colors[i].red-(double) color->red;
-    distance=pixel.red*pixel.red;
-    if (distance > min_distance)
-      continue;
-    pixel.green=colors[i].green-(double) color->green;
-    distance+=pixel.green*pixel.green;
-    if (distance > min_distance)
-      continue;
-    pixel.blue=colors[i].blue-(double) color->blue;
-    distance+=pixel.blue*pixel.blue;
-    if (distance > min_distance)
-      continue;
-    min_distance=distance;
-    color->pixel=colors[i].pixel;
-    j=i;
-  }
+  j=XClosestColor(colors,number_colors,color);
   (void) XAllocColor(display,colormap,&colors[j]);
   if (query_server != MagickFalse)
     colors=(XColor *) RelinquishMagickMemory(colors);
