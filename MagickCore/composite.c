@@ -100,6 +100,20 @@ typedef struct _BlendMagnitudePair
     *beta_image;
 } BlendMagnitudePair;
 
+typedef struct _BlendRequest
+{
+  ssize_t
+    x_offset,
+    y_offset;
+
+  double
+    iterations,
+    residual_threshold;
+
+  size_t
+    tick;
+} BlendRequest;
+
 typedef struct _CompositePlacement
 {
   MagickBooleanType
@@ -1876,8 +1890,7 @@ static void ReportBlendResidual(const MagickBooleanType verbose,
 }
 
 static MagickBooleanType SaliencyBlendImage(Image *image,
-  const Image *source_image,const ssize_t x_offset,const ssize_t y_offset,
-  const double iterations,const double residual_threshold,const size_t tick,
+  const Image *source_image,const BlendRequest *request,
   ExceptionInfo *exception)
 {
   Image
@@ -1897,14 +1910,14 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
     crop_info = {
       source_image->columns,
       source_image->rows,
-      x_offset,
-      y_offset
+      request->x_offset,
+      request->y_offset
     };
 
   ssize_t
     i;
 
-  const CompositePlacement placement = { MagickTrue, x_offset, y_offset };
+  const CompositePlacement placement = { MagickTrue, request->x_offset, request->y_offset };
 
   /*
     Saliency blend composite operator.
@@ -1955,7 +1968,7 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
   verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
   if (verbose != MagickFalse)
     (void) FormatLocaleFile(stderr,"saliency blending:\n");
-  for (i=0; i < (ssize_t) iterations; i++)
+  for (i=0; i < (ssize_t) request->iterations; i++)
   {
     double
       residual = 1.0;
@@ -1983,9 +1996,9 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
     status=BlendRMSEResidual(relax_image,residual_image,&residual,exception);
     if (status == MagickFalse)
       break;
-    if ((verbose != MagickFalse) && ((i % MagickMax(tick,1)) == 0))
+    if ((verbose != MagickFalse) && ((i % MagickMax(request->tick,1)) == 0))
       (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double) residual);
-    if (residual < residual_threshold)
+    if (residual < request->residual_threshold)
       {
         ReportBlendResidual(verbose,i,residual);
         break;
@@ -5381,12 +5394,19 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         residual_threshold = 0.0002,
         iterations = 400.0;
 
+      BlendRequest
+        request;
+
       size_t
         tick = 100;
 
       GetBlendIterations(image,&iterations,&residual_threshold,&tick);
-      status=SaliencyBlendImage(image,composite,x_offset,y_offset,iterations,
-        residual_threshold,tick,exception);
+      request.x_offset=x_offset;
+      request.y_offset=y_offset;
+      request.iterations=iterations;
+      request.residual_threshold=residual_threshold;
+      request.tick=tick;
+      status=SaliencyBlendImage(image,composite,&request,exception);
       source_image=DestroyImage(source_image);
       return(status);
     }
