@@ -904,11 +904,32 @@ static FcFontSet *ListFontConfigFonts(FcConfig *font_config)
   return(font_set);
 }
 
+static MagickBooleanType GetFontConfigFile(FcPattern *font,FcChar8 **family,
+  FcChar8 **file)
+{
+  char
+    extension[MagickPathExtent];
+
+  FcResult
+    status;
+
+  status=FcPatternGetString(font,FC_FAMILY,0,family);
+  if (status != FcResultMatch)
+    return(MagickFalse);
+  status=FcPatternGetString(font,FC_FILE,0,file);
+  if (status != FcResultMatch)
+    return(MagickFalse);
+  *extension='\0';
+  GetPathComponent((const char *) *file,ExtensionPath,extension);
+  if ((*extension != '\0') && (LocaleCompare(extension,"gz") == 0))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
   ExceptionInfo *exception)
 {
   char
-    extension[MagickPathExtent],
     name[MagickPathExtent];
 
   FcBool
@@ -958,15 +979,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
     }
   for (i=0; i < (ssize_t) font_set->nfont; i++)
   {
-    status=FcPatternGetString(font_set->fonts[i],FC_FAMILY,0,&family);
-    if (status != FcResultMatch)
-      continue;
-    status=FcPatternGetString(font_set->fonts[i],FC_FILE,0,&file);
-    if (status != FcResultMatch)
-      continue;
-    *extension='\0';
-    GetPathComponent((const char *) file,ExtensionPath,extension);
-    if ((*extension != '\0') && (LocaleCompare(extension,"gz") == 0))
+    if (GetFontConfigFile(font_set->fonts[i],&family,&file) == MagickFalse)
       continue;
     type_info=(TypeInfo *) AcquireMagickMemory(sizeof(*type_info));
     if (type_info == (TypeInfo *) NULL)
