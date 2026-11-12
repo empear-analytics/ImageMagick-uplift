@@ -44,3 +44,24 @@ helpers (the `GetMagickModule()` question), `XAnimateBackgroundImage` and `XAnim
 `GetOpenCLPlatformString` and `GetOpenCLDeviceString` are the last twin pair (function pointers). Tooling: backgrounded `wsl`
 jobs freeze (the clock stops): run the oracle in the foreground; with `WIDE=1` the `casemap.json` does not match the wide
 catalogue (`--function` fails): run the whole wide catalogue; `verify_wt.sh` prints VERIFY FAILED for wide files.
+
+## Complex Conditional scan (no commit) and closing
+
+Lane c (wide files) and lane b (narrow files) listed the review categories of all 84 campaign A files (`tools/ch.py --review`,
+cross-checked against `docs/refactoring/tasks/W18-survey.md` and its 596-row table): the only *Complex Conditional* findings
+were `AccelerateGrayscaleImage`, `IsSameOpenCLDevice` and `IsBenchmarkedOpenCLDevice`, which lane a's Recipes GC and GD
+already removed. Recipes GC and GD have no further targets in campaign A (a new one could only appear as a side effect of
+another recipe). Nothing was committed by lanes b, c or d in this batch.
+
+Closing sweep of the tip (cs-mcp 1.5.16): campaign A 84 files, mean **8.86 -> 8.88**, files at 10.0 unchanged at 36. The
+lowest files: `xwindow.c` 2.47, `display.c` 2.68, `compare-similarity.c` 2.97, `widget.c` 3.15, `accelerate.c` 3.27,
+`composite.c` 3.69, `animate.c` 4.40, `fx.c` 4.61, `morphology.c` 6.19, `opencl.c` 7.36 (up from 5.80). Gate on the merged
+tip: 15,955 cases, 0 diverged; `ci_linux_warnings.sh --campaign-a` OK on 84 files in six configurations.
+
+**Where the campaign stands:** every remaining finding in the 48 files below 10.0 is one of: a public signature, a file-level
+count (lines, functions), code inside an `#if defined` branch, an owner question (listed in the W17 and W18 reports and the
+PR descriptions), or a cliff (Code Duplication threshold, added lines, Large Method at 70 lines) that a helper-only chain
+cannot cross. Mining for every recipe shape added on W17 to W19 found no further legal raise. The routes that remain are the
+owner's: the twin-fold recipe (widget.c, and the File and List browsers), the magnify `?:` fold, the `#if` and OpenMP
+questions, the wrapper preamble, and the one new idea of this batch, a Recipe S split of montage.c to free its 1,000-line
+budget for `MontageImageList`.
