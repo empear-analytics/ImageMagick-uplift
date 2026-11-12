@@ -17154,13 +17154,13 @@ static Image *XReloadModifiedImage(XResourceInfo *resource_info,
   return(nexus);
 }
 
-MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
-  char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
-{
 #define MagnifySize  256  /* must be a power of 2 */
 #define MagickMenus  10
 #define MagickTitle  "Commands"
 
+MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
+  char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
+{
   const char
     *const CommandMenu[] =
     {
