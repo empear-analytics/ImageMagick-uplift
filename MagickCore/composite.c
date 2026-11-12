@@ -3537,6 +3537,62 @@ static MagickBooleanType IsSourceAlphaOperator(const CompositeOperator compose)
   return(MagickFalse);
 }
 
+static void CompositeAlphaMultiplyRun(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,MagickRealType *pixel)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickBooleanType
+    compose_sync = row->compose_sync;
+
+  const MagickRealType
+    alpha = authentic->alpha,
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  switch (compose)
+  {
+    case MultiplyCompositeOp:
+    {
+      MultiplyAlphaInputs
+        multiply;
+
+      multiply.compose_sync=compose_sync;
+      multiply.alpha=alpha;
+      multiply.Sa=Sa;
+      multiply.Da=Da;
+      (*pixel)=GetMultiplyAlpha(&multiply,(*pixel));
+      break;
+    }
+    case NegateCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*((1.0-Sa-Da));
+      break;
+    }
+    case ReflectCompositeOp:
+    {
+      (*pixel)=GetReflectAlpha(Sa,Da);
+      break;
+    }
+    case StampCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*(Sa+Da*Da-1.0);
+      break;
+    }
+    case StereoCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*(Sa+Da)/2;
+      break;
+    }
+    default:
+    {
+      (*pixel)=(double) QuantumRange*alpha;
+      break;
+    }
+  }
+}
+
 static void CompositeAlphaChannel(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,Quantum *magick_restrict q,
   MagickRealType *pixel)
@@ -3555,7 +3611,6 @@ static void CompositeAlphaChannel(const CompositeRowInputs *row,
     *const p = authentic->p;
 
   const MagickRealType
-    alpha = authentic->alpha,
     Da = authentic->Da,
     Di = authentic->Di,
     Sa = authentic->Sa,
@@ -3659,41 +3714,9 @@ static void CompositeAlphaChannel(const CompositeRowInputs *row,
       (*pixel)=(double) QuantumRange*Da;
       break;
     }
-    case MultiplyCompositeOp:
-    {
-      MultiplyAlphaInputs
-        multiply;
-
-      multiply.compose_sync=compose_sync;
-      multiply.alpha=alpha;
-      multiply.Sa=Sa;
-      multiply.Da=Da;
-      (*pixel)=GetMultiplyAlpha(&multiply,(*pixel));
-      break;
-    }
-    case NegateCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*((1.0-Sa-Da));
-      break;
-    }
-    case ReflectCompositeOp:
-    {
-      (*pixel)=GetReflectAlpha(Sa,Da);
-      break;
-    }
-    case StampCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*(Sa+Da*Da-1.0);
-      break;
-    }
-    case StereoCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*(Sa+Da)/2;
-      break;
-    }
     default:
     {
-      (*pixel)=(double) QuantumRange*alpha;
+      CompositeAlphaMultiplyRun(row,authentic,pixel);
       break;
     }
   }
