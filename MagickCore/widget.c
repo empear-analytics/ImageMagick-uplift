@@ -4465,6 +4465,12 @@ typedef struct _DialogContext
 
   MagickBooleanType
     raised;
+
+  char
+    *reply;
+
+  unsigned int
+    width;
 } DialogContext;
 
 static void PressDialogButton(const DialogContext *context,
@@ -4837,6 +4843,67 @@ static void InitializeDialogOptions(const DialogContext *context,
   (*text_info).center=MagickFalse;
 }
 
+static void UpdateDialogLayout(const DialogContext *context,
+  const DialogTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const char
+    *const action = context->action;
+
+  char
+    *const reply = context->reply;
+
+  const unsigned int
+    width = context->width,
+    height = context->height;
+
+  XWidgetInfo
+    *const action_info = targets->action_info,
+    *const cancel_info = targets->cancel_info,
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      /*
+        Initialize button information.
+      */
+      XGetWidgetInfo(CancelButtonText,cancel_info);
+      (*cancel_info).width=width;
+      (*cancel_info).height=(unsigned int) ((3*height) >> 1);
+      (*cancel_info).x=(int) windows->widget.width-(int) (*cancel_info).width-
+        ((3*QuantumMargin) >> 1);
+      (*cancel_info).y=(int) windows->widget.height-(int) (*cancel_info).height-
+        ((3*QuantumMargin) >> 1);
+      XGetWidgetInfo(action,action_info);
+      (*action_info).width=width;
+      (*action_info).height=(unsigned int) ((3*height) >> 1);
+      (*action_info).x=(*cancel_info).x-((int) (*cancel_info).width+QuantumMargin+
+        (int) ((*action_info).bevel_width << 1));
+      (*action_info).y=(*cancel_info).y;
+      /*
+        Initialize reply information.
+      */
+      XGetWidgetInfo(reply,reply_info);
+      (*reply_info).raised=MagickFalse;
+      (*reply_info).bevel_width--;
+      (*reply_info).width=(unsigned int) ((int) windows->widget.width-
+        (3*QuantumMargin));
+      (*reply_info).height=height << 1;
+      (*reply_info).x=(3*QuantumMargin) >> 1;
+      (*reply_info).y=(*action_info).y-(int) (*reply_info).height-QuantumMargin;
+      InitializeDialogOptions(context,targets);
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -4956,40 +5023,11 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   context.query=query;
   context.height=height;
   context.raised=raised;
+  context.reply=reply;
+  context.width=width;
   do
   {
-    if (state & UpdateConfigurationState)
-      {
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(CancelButtonText,&cancel_info);
-        cancel_info.width=width;
-        cancel_info.height=(unsigned int) ((3*height) >> 1);
-        cancel_info.x=(int) windows->widget.width-(int) cancel_info.width-
-          ((3*QuantumMargin) >> 1);
-        cancel_info.y=(int) windows->widget.height-(int) cancel_info.height-
-          ((3*QuantumMargin) >> 1);
-        XGetWidgetInfo(action,&action_info);
-        action_info.width=width;
-        action_info.height=(unsigned int) ((3*height) >> 1);
-        action_info.x=cancel_info.x-((int) cancel_info.width+QuantumMargin+
-          (int) (action_info.bevel_width << 1));
-        action_info.y=cancel_info.y;
-        /*
-          Initialize reply information.
-        */
-        XGetWidgetInfo(reply,&reply_info);
-        reply_info.raised=MagickFalse;
-        reply_info.bevel_width--;
-        reply_info.width=(unsigned int) ((int) windows->widget.width-
-          (3*QuantumMargin));
-        reply_info.height=height << 1;
-        reply_info.x=(3*QuantumMargin) >> 1;
-        reply_info.y=action_info.y-(int) reply_info.height-QuantumMargin;
-        InitializeDialogOptions(&context,&targets);
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
+    UpdateDialogLayout(&context,&targets);
     if (state & RedrawWidgetState)
       {
         /*
