@@ -12367,6 +12367,27 @@ static MagickBooleanType XSelectOpenFile(Display *display,XWindows *windows,
     }
   return(MagickTrue);
 }
+
+static MagickBooleanType XGrabDelay(Display *display,XWindows *windows,
+  const ImageInfo *image_info)
+{
+  if (LocaleCompare(image_info->magick,"X") == 0)
+    {
+      char
+        seconds[MagickPathExtent];
+
+      /*
+        User may want to delay the X server screen grab.
+      */
+      (void) CopyMagickString(seconds,"0",MagickPathExtent);
+      (void) XDialogWidget(display,windows,"Grab","Enter any delay in seconds:",
+        seconds);
+      if (*seconds == '\0')
+        return(MagickFalse);
+      XDelay(display,(size_t) (1000*StringToLong(seconds)));
+    }
+  return(MagickTrue);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12430,21 +12451,8 @@ static Image *XOpenImage(Display *display,XResourceInfo *resource_info,
   (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
   exception=AcquireExceptionInfo();
   (void) SetImageInfo(image_info,0,exception);
-  if (LocaleCompare(image_info->magick,"X") == 0)
-    {
-      char
-        seconds[MagickPathExtent];
-
-      /*
-        User may want to delay the X server screen grab.
-      */
-      (void) CopyMagickString(seconds,"0",MagickPathExtent);
-      (void) XDialogWidget(display,windows,"Grab","Enter any delay in seconds:",
-        seconds);
-      if (*seconds == '\0')
-        return((Image *) NULL);
-      XDelay(display,(size_t) (1000*StringToLong(seconds)));
-    }
+  if (XGrabDelay(display,windows,image_info) == MagickFalse)
+    return((Image *) NULL);
   magick_info=GetMagickInfo(image_info->magick,exception);
   if ((magick_info != (const MagickInfo *) NULL) &&
       GetMagickRawSupport(magick_info) == MagickTrue)
