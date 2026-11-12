@@ -3656,14 +3656,72 @@ static void ReconfigureCommandWindow(Display *display,XWindows *windows)
     }
 }
 
+typedef struct _CommandSizing
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *selections;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    height;
+} CommandSizing;
+
+static unsigned int SizeCommandWindow(const CommandSizing *sizing)
+{
+  Display
+    *const display = sizing->display;
+
+  XWindows
+    *const windows = sizing->windows;
+
+  const char
+    *const *const selections = sizing->selections;
+
+  XFontStruct
+    *const font_info = sizing->font_info;
+
+  const unsigned int
+    height = sizing->height;
+
+  int
+    i;
+
+  unsigned int
+    number_selections,
+    width;
+
+  windows->command.width=0;
+  for (i=0; selections[i] != (char *) NULL; i++)
+  {
+    width=WidgetTextWidth(font_info,(char *) selections[i]);
+    if (width > windows->command.width)
+      windows->command.width=width;
+  }
+  number_selections=(unsigned int) i;
+  windows->command.width+=(unsigned int) (3*QuantumMargin+10);
+  if ((int) windows->command.width < (tile_width+QuantumMargin+10))
+    windows->command.width=(unsigned  int) (tile_width+QuantumMargin+10);
+  windows->command.height=(unsigned  int) (number_selections*
+    (((3*height) >> 1)+10)+tile_height+20);
+  windows->command.min_width=windows->command.width;
+  windows->command.min_height=windows->command.height;
+  XConstrainWindowPosition(display,&windows->command);
+  return(number_selections);
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
   int
     id;
-
-  int
-    i;
 
   static unsigned int
     number_selections;
@@ -3690,29 +3748,19 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   state=DefaultState;
   if (event == (XEvent *) NULL)
     {
-      unsigned int
-        width;
+      CommandSizing
+        sizing;
 
       /*
         Determine command window attributes.
       */
       assert(selections != (const char **) NULL);
-      windows->command.width=0;
-      for (i=0; selections[i] != (char *) NULL; i++)
-      {
-        width=WidgetTextWidth(font_info,(char *) selections[i]);
-        if (width > windows->command.width)
-          windows->command.width=width;
-      }
-      number_selections=(unsigned int) i;
-      windows->command.width+=(unsigned int) (3*QuantumMargin+10);
-      if ((int) windows->command.width < (tile_width+QuantumMargin+10))
-        windows->command.width=(unsigned  int) (tile_width+QuantumMargin+10);
-      windows->command.height=(unsigned  int) (number_selections*
-        (((3*height) >> 1)+10)+tile_height+20);
-      windows->command.min_width=windows->command.width;
-      windows->command.min_height=windows->command.height;
-      XConstrainWindowPosition(display,&windows->command);
+      sizing.display=display;
+      sizing.windows=windows;
+      sizing.selections=selections;
+      sizing.font_info=font_info;
+      sizing.height=height;
+      number_selections=SizeCommandWindow(&sizing);
       ReconfigureCommandWindow(display,windows);
       /*
         Allocate selection info memory.
