@@ -17002,6 +17002,9 @@ typedef struct _DisplayEventContext
 
   Image
     **image;
+
+  time_t
+    update_time;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -17713,6 +17716,48 @@ static void XHandleProtocolMessage(const DisplayEventContext *context,
       *state|=ExitState;
       return;
     }
+}
+
+static void XReloadModifiedDisplay(const DisplayEventContext *context,
+  Image *display_image,Image **nexus,time_t *timer)
+{
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  size_t
+    *const state = context->state;
+
+  const time_t
+    update_time = context->update_time;
+
+  MagickBooleanType
+    status;
+
+  struct stat
+    attributes;
+
+  size_t
+    delay;
+
+  /*
+    Determine if image file was modified.
+  */
+  status=GetPathAttributes(display_image->filename,&attributes);
+  if ((status != MagickFalse) &&
+      (update_time != attributes.st_mtime))
+    {
+      /*
+        Redisplay image.
+      */
+      (*nexus)=XReloadModifiedImage(resource_info,display_image,
+        state,exception);
+    }
+  delay=display_image->delay/(size_t) MagickMax(
+    display_image->ticks_per_second,1L);
+  (*timer)=GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1;
 }
 
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
@@ -18746,6 +18791,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.ShortCutsMenu=ShortCutsMenu;
   event_context.ShortCutsCommands=ShortCutsCommands;
   event_context.image=image;
+  event_context.update_time=update_time;
   do
   {
     /*
@@ -18760,25 +18806,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
                 *state|=NextImageState | ExitState;
               else
                 {
-                  MagickBooleanType
-                    status;
-
-                  /*
-                    Determine if image file was modified.
-                  */
-                  status=GetPathAttributes(display_image->filename,&attributes);
-                  if ((status != MagickFalse) &&
-                      (update_time != attributes.st_mtime))
-                    {
-                      /*
-                        Redisplay image.
-                      */
-                      nexus=XReloadModifiedImage(resource_info,display_image,
-                        state,exception);
-                    }
-                  delay=display_image->delay/(size_t) MagickMax(
-                    display_image->ticks_per_second,1L);
-                  timer=GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1;
+                  XReloadModifiedDisplay(&event_context,display_image,&nexus,
+                    &timer);
                 }
             }
           if (XEventsQueued(display,QueuedAfterFlush) == 0)
