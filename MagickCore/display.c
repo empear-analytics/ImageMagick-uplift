@@ -15583,6 +15583,45 @@ static void XScreenClientMessage(Display *display,XWindows *windows,
     }
 }
 
+static void XScreenConfigure(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  if (event->xconfigure.window == windows->magnify.id)
+    {
+      unsigned int
+        magnify;
+
+      /*
+        Magnify window has a new configuration.
+      */
+      windows->magnify.width=(unsigned int) event->xconfigure.width;
+      windows->magnify.height=(unsigned int) event->xconfigure.height;
+      if (windows->magnify.mapped == MagickFalse)
+        return;
+      magnify=1;
+      while ((int) magnify <= event->xconfigure.width)
+        magnify<<=1;
+      while ((int) magnify <= event->xconfigure.height)
+        magnify<<=1;
+      magnify>>=1;
+      if (((int) magnify != event->xconfigure.width) ||
+          ((int) magnify != event->xconfigure.height))
+        {
+          XWindowChanges
+            window_changes;
+
+          window_changes.width=(int) magnify;
+          window_changes.height=(int) magnify;
+          (void) XReconfigureWMWindow(display,windows->magnify.id,
+            windows->magnify.screen,(unsigned int) (CWWidth | CWHeight),
+            &window_changes);
+          return;
+        }
+      XMakeMagnifyImage(display,windows,exception);
+      return;
+    }
+}
+
 static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
@@ -15608,40 +15647,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
     }
     case ConfigureNotify:
     {
-      if (event->xconfigure.window == windows->magnify.id)
-        {
-          unsigned int
-            magnify;
-
-          /*
-            Magnify window has a new configuration.
-          */
-          windows->magnify.width=(unsigned int) event->xconfigure.width;
-          windows->magnify.height=(unsigned int) event->xconfigure.height;
-          if (windows->magnify.mapped == MagickFalse)
-            break;
-          magnify=1;
-          while ((int) magnify <= event->xconfigure.width)
-            magnify<<=1;
-          while ((int) magnify <= event->xconfigure.height)
-            magnify<<=1;
-          magnify>>=1;
-          if (((int) magnify != event->xconfigure.width) ||
-              ((int) magnify != event->xconfigure.height))
-            {
-              XWindowChanges
-                window_changes;
-
-              window_changes.width=(int) magnify;
-              window_changes.height=(int) magnify;
-              (void) XReconfigureWMWindow(display,windows->magnify.id,
-                windows->magnify.screen,(unsigned int) (CWWidth | CWHeight),
-                &window_changes);
-              break;
-            }
-          XMakeMagnifyImage(display,windows,exception);
-          break;
-        }
+      XScreenConfigure(display,windows,event,exception);
       break;
     }
     case Expose:
