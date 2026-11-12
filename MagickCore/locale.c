@@ -1038,6 +1038,16 @@ MagickExport double InterpretLocaleValue(const char *magick_restrict string,
   return(value);
 }
 
+static void PrintLocaleHeader(FILE *file,const char *path)
+{
+  if (path != (char *) NULL)
+    (void) FormatLocaleFile(file,"\nPath: %s\n\n",path);
+  (void) FormatLocaleFile(file,"Tag/Message\n");
+  (void) FormatLocaleFile(file,
+    "-------------------------------------------------"
+    "------------------------------\n");
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1091,12 +1101,7 @@ MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
     if ((path == (const char *) NULL) ||
         (LocaleCompare(path,locale_info[i]->path) != 0))
       {
-        if (locale_info[i]->path != (char *) NULL)
-          (void) FormatLocaleFile(file,"\nPath: %s\n\n",locale_info[i]->path);
-        (void) FormatLocaleFile(file,"Tag/Message\n");
-        (void) FormatLocaleFile(file,
-          "-------------------------------------------------"
-          "------------------------------\n");
+        PrintLocaleHeader(file,locale_info[i]->path);
       }
     path=locale_info[i]->path;
     (void) FormatLocaleFile(file,"%s\n",locale_info[i]->tag);
