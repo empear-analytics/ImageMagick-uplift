@@ -12512,6 +12512,35 @@ static Cursor XSelectPanCursor(Display *display,XWindows *windows)
         cursor=XCreateFontCursor(display,XC_arrow);
   return(cursor);
 }
+
+static void XClampPanOffset(XWindows *windows,RectangleInfo *pan_info,
+  const double x_factor,const double y_factor)
+{
+  if ((*pan_info).x < (ssize_t) ((*pan_info).width/2))
+    (*pan_info).x=0;
+  else
+    (*pan_info).x=(ssize_t) (x_factor*((*pan_info).x-((int)
+      (*pan_info).width/2)));
+  if ((*pan_info).x < 0)
+    (*pan_info).x=0;
+  else
+    if ((int) ((*pan_info).x+windows->image.width) >
+        windows->image.ximage->width)
+      (*pan_info).x=(ssize_t) (windows->image.ximage->width-(int)
+        windows->image.width);
+  if ((*pan_info).y < (ssize_t) ((*pan_info).height/2))
+    (*pan_info).y=0;
+  else
+    (*pan_info).y=(ssize_t) (y_factor*((*pan_info).y-((int)
+      (*pan_info).height/2)));
+  if ((*pan_info).y < 0)
+    (*pan_info).y=0;
+  else
+    if ((int) ((*pan_info).y+windows->image.height) >
+        windows->image.ximage->height)
+      (*pan_info).y=(ssize_t) (windows->image.ximage->height-(int)
+        windows->image.height);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12618,27 +12647,7 @@ static void XPanImage(Display *display,XWindows *windows,XEvent *event,
         /*
           Check boundary conditions.
         */
-        if (pan_info.x < (ssize_t) (pan_info.width/2))
-          pan_info.x=0;
-        else
-          pan_info.x=(ssize_t) (x_factor*(pan_info.x-((int) pan_info.width/2)));
-        if (pan_info.x < 0)
-          pan_info.x=0;
-        else
-          if ((int) (pan_info.x+windows->image.width) >
-              windows->image.ximage->width)
-            pan_info.x=(ssize_t) (windows->image.ximage->width-(int) windows->image.width);
-        if (pan_info.y < (ssize_t) (pan_info.height/2))
-          pan_info.y=0;
-        else
-          pan_info.y=(ssize_t) (y_factor*(pan_info.y-((int) pan_info.height/2)));
-        if (pan_info.y < 0)
-          pan_info.y=0;
-        else
-          if ((int) (pan_info.y+windows->image.height) >
-              windows->image.ximage->height)
-            pan_info.y=(ssize_t) (windows->image.ximage->height-(int)
-              windows->image.height);
+        XClampPanOffset(windows,&pan_info,x_factor,y_factor);
         if ((windows->image.x != (int) pan_info.x) ||
             (windows->image.y != (int) pan_info.y))
           {
