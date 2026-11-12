@@ -535,6 +535,52 @@ static Quantum *AcquireDepthMap(const QuantumAny range)
       range);
   return(depth_map);
 }
+
+typedef struct _DepthMapRows
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  Quantum
+    *depth_map;
+
+  ExceptionInfo
+    *exception;
+} DepthMapRows;
+
+static void MapImageRowToDepth(MagickBooleanType *status,
+  const DepthMapRows *rows,const ssize_t y)
+{
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(rows->image_view,0,y,rows->image->columns,1,
+    rows->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) rows->image->columns; x++)
+  {
+    MapPixelToDepth(rows->image,rows->depth_map,q);
+    q+=(ptrdiff_t) GetPixelChannels(rows->image);
+  }
+  if (SyncCacheViewAuthenticPixels(rows->image_view,rows->exception) ==
+      MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+}
 #endif
 
 MagickExport MagickBooleanType SetImageDepth(Image *image,
@@ -602,31 +648,10 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        ssize_t
-          x;
+        const DepthMapRows
+          rows = { image, image_view, depth_map, exception };
 
-        Quantum
-          *magick_restrict q;
-
-        if (status == MagickFalse)
-          continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          MapPixelToDepth(image,depth_map,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-          {
-            status=MagickFalse;
-            continue;
-          }
+        MapImageRowToDepth(&status,&rows,y);
       }
       image_view=DestroyCacheView(image_view);
       depth_map=(Quantum *) RelinquishMagickMemory(depth_map);
