@@ -65,3 +65,56 @@ cannot cross. Mining for every recipe shape added on W17 to W19 found no further
 owner's: the twin-fold recipe (widget.c, and the File and List browsers), the magnify `?:` fold, the `#if` and OpenMP
 questions, the wrapper preamble, and the one new idea of this batch, a Recipe S split of montage.c to free its 1,000-line
 budget for `MontageImageList`.
+
+## Afternoon: montage.c 9.11 -> 9.12 (merged); the split re-scan; one split held
+
+**Lane d, montage.c.** `split_source.py` dry-run on every function as a root: every static, including the families around
+`PlaceMontageTile`, `WrapMontageRow`, `CopyMontageTiles`, `AdvanceMontagePage` and the tile placement statics, is refused for
+shared statics (a non-public family cannot move because `MontageImageList`, which stays, calls it); `MontageImageList` with all
+its statics is refused at the `extern "C" {` block around `SceneCompare`; `MontageImages` alone is accepted (14 lines, the new
+file scores 10.0, guards unchanged, 29 and 49 oracle cases pass) but frees only 12 lines: the file's real margin is 15 lines
+under 1,000 (padded probe 1,007 at 22 added lines), so the split gives about 27 lines of room, which only a whole-loop helper
+(9.27 on a scratch copy) would use, and that cannot be formulated legally (three exits, two of them `ThrowImageException`,
+one silent `return NULL`); the full Large Method fix (164 -> 70 lines) needs one or two structs of 20 or more members. The
+split was not committed. Merged: 3d369e2a6 E `LogMontageImages` (the trace-event block; cc 10 -> 9, 164 -> 163 lines, flat,
+first step of the plan; the trace event under `-debug` now names the helper as the function) and ebdea5c25 E
+`DestroyMontageTexture` (cc 9 -> 8, leaves Complex Method, 163 -> 162 lines): **9.11 -> 9.12**. Whole catalogue 15,955 cases,
+0 diverged. Plateau 9.12: Large Method at 162 lines; the remaining blocks need large struct fills or more than four parameters.
+
+**Lane a, Recipe S re-scan.** For 26 files with Lines of Code or Number of Functions findings (plus xwindow, resample, magnify,
+plasma, floodfill, compare, colorspace-convert, attribute-depth*) the current tool was run on every public root and on every
+union of closed root sets (roots linked by shared statics); accepted unions were scored on both files. **One legal split
+rises: effect-blur.c 9.09 -> 10.00** (commit 6817fef41 on `campaign/W19-a`; HELD, see below). Refused (one closed set or
+shared statics): compare-similarity, composite, fx, feature, segment, enhance-tone, effect-filter, statistic,
+transform-region, vision-components, feature-texture, fourier, distort, magnify, plasma, floodfill, accelerate (14 roots),
+animate (2), widget (13; `DestroyXWidget` refused on type `XWidgetInfo`), display (`XDisplayImage` = 197 functions), quantize,
+layer (7 roots plus `RemoveZeroDelayLayers`). Accepted but not raising the kept file: enhance, threshold (even with
+`--copy-macro ThresholdsFilename`), layer, accelerate, animate, morphology (63 unions, Number of Functions stays 161+): flat;
+visual-effects-pixel (only moves that leave the kept file a stub rise; the new file 8.54, below the original: unnatural
+boundary); colorspace-transform (rises only by moving the namesake `TransformImageColorspace` family out: unnatural
+boundary). **Accepted by the tool but the output is invalid:** opencl, xwindow, display, animate: the wide files sit inside
+an `#if` X11 or OpenCL block (with a stub `#else` for some) and the new file opens that `#if` without closing it, or carries
+none ("unterminated conditional" for opencl; undeclared X types for display and animate). xwindow: 63 accepted splits, all
+rule-OK; the kept file rises only 2.47 -> 2.49 to 2.55; new files score 5.0 to 9.5 because finding-bearing functions leave (the
+one-function-per-file lever, e.g. `DestroyXResources` alone 8.15); a natural candidate is `XBestVisualInfo`,
+`XDisplayImageInfo`, `XInitializeWindows` (kept 2.53, new 7.28); it needs a tool extension to wrap the new file in the `#if`
+and close it: an owner question. enhance.c: the four-root family (Contrast, Enhance, Modulate, Sigmoidal) plus WhiteBalance
+would put enhance.c at 10.0 (kept under about 500 lines, new about 9.68); two blockers: function-pointer typedefs between
+functions (a six-line patch to the tool, tested on a scratch copy and not committed) and the multi-definition `#if/#else`
+macros of Sigmoidal and ScaledSigmoidal.
+
+**The effect-blur.c split (6817fef41), held on branch `w19-effect-blur-split` (in `~/im-w14a`) for the owner:** moves 9 publics
+(AdaptiveBlur, AdaptiveSharpen, BilateralBlur, Convolve, Emboss, MotionBlur, RotationalBlur, SelectiveBlur, Sharpen), 69
+statics and typedefs (78 functions, 4,235 lines) to a new `effect-blur-adaptive.c` (9.09, the original's score); the kept
+file holds `BlurImage` and `GaussianBlurImage` with one static (236 lines) and scores 10.00. Only a union works: single roots are
+refused (shared `SetBlurProgress`, `ReleaseFailedImage`, `MagickSigma`), and `ConvolveImage` must move with the others
+because Emboss and Sharpen call it. Checks: guard `--combined` 309 literals and 617 call sites unchanged; `ci_warnings` and
+`ci_linux_warnings` clean; `nm` shows no linkage change; oracle on all 11 functions, 0 diverged; whole catalogue 15,955
+cases, 0 diverged; the CodeScene gate passed. `split_branch_check.py` prints IDENTICAL-MODULO-LAYOUT in ci-gcc-min, ci-gcc-dlg
+and ci-gcc-x; for `cand` and `cand-wide` (the builds that compile the OpenCL branches) it prints DIFFERENT because clang emitted
+`ConvolveImage` ahead of `BilateralBlurImage` in the original object; a per-function comparison by name (lane a's copy of the
+tool's routines) is identical at -O2 (10 functions) and -O0 (90 functions): the tool should compare by name. **Held because**
+(1) it moves 9 of 11 public functions to a file that keeps the original's score while the kept file becomes a near-stub (the
+open owner question on splits that relabel most of a file), and (2) the 2026-11-11 ruling's check does not pass as written in
+the two builds that compile the OpenCL branches. If the owner allows relabelling splits and a by-name comparison in
+`split_branch_check.py`, it merges as is.
