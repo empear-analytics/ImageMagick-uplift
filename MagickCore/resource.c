@@ -608,21 +608,7 @@ MagickExport MagickSizeType GetMagickResource(const ResourceType type)
     resource;
 
   resource=0;
-  switch (type)
-  {
-    case DiskResource:
-    case FileResource:
-    case MapResource:
-    case MemoryResource:
-    case TimeResource:
-    {
-      if (resource_semaphore[type] == (SemaphoreInfo *) NULL)
-        ActivateSemaphoreInfo(&resource_semaphore[type]);
-      LockSemaphoreInfo(resource_semaphore[type]);
-      break;
-    }
-    default: ;
-  }
+  LockResourceSemaphore(type);
   switch (type)
   {
     case AreaResource:
@@ -683,19 +669,7 @@ MagickExport MagickSizeType GetMagickResource(const ResourceType type)
     default:
       break;
   }
-  switch (type)
-  {
-    case DiskResource:
-    case FileResource:
-    case MapResource:
-    case MemoryResource:
-    case TimeResource:
-    {
-      UnlockSemaphoreInfo(resource_semaphore[type]);
-      break;
-    }
-    default: ;
-  }
+  UnlockResourceSemaphore(type);
   return(resource);
 }
 
