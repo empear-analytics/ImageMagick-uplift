@@ -6970,6 +6970,9 @@ typedef struct _DrawPointerTargets
 
   XEvent
     *event;
+
+  ElementType
+    *element;
 } DrawPointerTargets;
 
 static void XDrawButtonPress(const DrawEditContext *context,
@@ -7551,6 +7554,85 @@ static void XDrawCommandAction(const DrawEditContext *context,const int id,
   }
 }
 
+static void XDrawCommand(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawStyleTargets *style_targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const DrawMenu = context->DrawMenu;
+
+  XEvent
+    *const event = pointer_targets->event;
+
+  ElementType
+    *const element = pointer_targets->element;
+
+  int
+    id;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(display,windows,DrawMenu,event);
+  if (id < 0)
+    return;
+  switch (context->DrawCommands[id])
+  {
+    case DrawElementCommand:
+    {
+      const char
+        *const Elements[] =
+        {
+          "point",
+          "line",
+          "rectangle",
+          "fill rectangle",
+          "circle",
+          "fill circle",
+          "ellipse",
+          "fill ellipse",
+          "polygon",
+          "fill polygon",
+          (char *) NULL,
+        };
+
+      /*
+        Select a command from the pop-up menu.
+      */
+      (*element)=(ElementType) (XMenuWidget(display,windows,
+        DrawMenu[id],Elements,context->command)+1);
+      break;
+    }
+    case DrawColorCommand:
+    {
+      XSelectDrawColor(context,id,style_targets);
+      break;
+    }
+    case DrawStippleCommand:
+    {
+      XSelectDrawStipple(context,id,style_targets);
+      break;
+    }
+    case DrawWidthCommand:
+    {
+      XSelectDrawWidth(context,id,style_targets);
+      break;
+    }
+    default:
+    {
+      XDrawCommandAction(context,id,pointer_targets);
+      break;
+    }
+  }
+  (void) XCheckDefineCursor(display,windows->image.id,context->cursor);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7598,7 +7680,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
     cursor;
 
   int
-    id,
     number_coordinates,
     x,
     y;
@@ -7650,7 +7731,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
     shape_input;
 
   const DrawPointerTargets
-    pointer_targets = { &x, &y, &state, &event };
+    pointer_targets = { &x, &y, &state, &event, &element };
 
   const DrawStyleTargets
     style_targets = { &draw_info, &pen_id, &line_width, &stipple, &x, &y };
@@ -7717,61 +7798,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
       XScreenEvent(display,windows,&event,exception);
       if (event.xany.window == windows->command.id)
         {
-          /*
-            Select a command from the Command widget.
-          */
-          id=XCommandWidget(display,windows,DrawMenu,&event);
-          if (id < 0)
-            continue;
-          switch (DrawCommands[id])
-          {
-            case DrawElementCommand:
-            {
-              const char
-                *const Elements[] =
-                {
-                  "point",
-                  "line",
-                  "rectangle",
-                  "fill rectangle",
-                  "circle",
-                  "fill circle",
-                  "ellipse",
-                  "fill ellipse",
-                  "polygon",
-                  "fill polygon",
-                  (char *) NULL,
-                };
-
-              /*
-                Select a command from the pop-up menu.
-              */
-              element=(ElementType) (XMenuWidget(display,windows,
-                DrawMenu[id],Elements,command)+1);
-              break;
-            }
-            case DrawColorCommand:
-            {
-              XSelectDrawColor(&draw_context,id,&style_targets);
-              break;
-            }
-            case DrawStippleCommand:
-            {
-              XSelectDrawStipple(&draw_context,id,&style_targets);
-              break;
-            }
-            case DrawWidthCommand:
-            {
-              XSelectDrawWidth(&draw_context,id,&style_targets);
-              break;
-            }
-            default:
-            {
-              XDrawCommandAction(&draw_context,id,&pointer_targets);
-              break;
-            }
-          }
-          (void) XCheckDefineCursor(display,windows->image.id,cursor);
+          XDrawCommand(&draw_context,&pointer_targets,&style_targets);
           continue;
         }
       switch (event.type)
