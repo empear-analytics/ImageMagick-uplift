@@ -6948,6 +6948,45 @@ static void XSelectDrawStipple(const DrawEditContext *context,const int id,
   XReadStippleFile(context,targets);
 }
 
+typedef struct _DrawPointerTargets
+{
+  int
+    *x;
+
+  int
+    *y;
+
+  size_t
+    *state;
+} DrawPointerTargets;
+
+static void XDrawButtonPress(const DrawEditContext *context,
+  const XEvent event,const DrawPointerTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  int
+    *const x = targets->x;
+
+  int
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  if (event.xbutton.button != Button1)
+    return;
+  if (event.xbutton.window != windows->image.id)
+    return;
+  /*
+    exit loop.
+  */
+  (*x)=event.xbutton.x;
+  (*y)=event.xbutton.y;
+  (*state)|=ExitState;
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7038,6 +7077,9 @@ static MagickBooleanType XDrawEditImage(Display *display,
 
   DrawEditContext
     draw_context;
+
+  const DrawPointerTargets
+    pointer_targets = { &x, &y, &state };
 
   const DrawStyleTargets
     style_targets = { &draw_info, &pen_id, &line_width, &stipple, &x, &y };
@@ -7181,16 +7223,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
       {
         case ButtonPress:
         {
-          if (event.xbutton.button != Button1)
-            break;
-          if (event.xbutton.window != windows->image.id)
-            break;
-          /*
-            exit loop.
-          */
-          x=event.xbutton.x;
-          y=event.xbutton.y;
-          state|=ExitState;
+          XDrawButtonPress(&draw_context,event,&pointer_targets);
           break;
         }
         case ButtonRelease:
