@@ -13745,6 +13745,109 @@ row pair and Recipe E step 7 on the two tails, a probe measured 8.50, 8.50, 8.72
 
 ---
 
+## Recipe RH - Hoist a Label Run into a Row Flag
+
+**Use when:** CodeScene reports *Complex Method* on a function that runs once per pixel and whose
+complexity is a `switch` on a member of a struct that its caller fills once per row, with one or two
+groups of many labels (a run of eight or more) among the other groups, and the run's group ends
+in `break;` where nothing follows the `switch` (`composite.c`'s `SetCompositeCoverage`, a run of
+thirty-two `compose` labels, and `CompositeAlphaChannel`, runs of eleven and seven). A label-run
+predicate that keeps the `switch` is a *Complex Method* of its own (Recipe LP, flat), and Recipe
+TB's table scan, written where the `switch` stood, runs on every pixel: measured on `composite.c`
+at +46 to +91 instructions per pixel (+4% to +9% of a 400x400 composite).
+
+**Not covered by:** Recipe LP, which leaves the label test in a function that runs on the pixel
+path; Recipe TB, whose step 2 refuses a function called per pixel; Recipes SD, SR and SW, which
+split a run of groups and give the run's body to each copy; Recipe NS, which names one `?:`.
+
+**How:**
+
+1. The selector is `row->compose`, a member of a `const` struct that the function reads through a
+   `const S *row`; `S` is declared once in the file and is filled by plain member assignments (`row.compose=compose;`) at
+   exactly one place, inside the loop body that calls the function (check by `grep` that nothing
+   else fills or writes `compose` of an `S`). The function is `static void`, outside every OpenMP
+   region of its own, and the `switch` is its last statement.
+2. The group `G` is `case L1: ... case Ln:` with body `B` whose last statement is `break;` and
+   which holds no other `break`, no `continue`, `goto` or `case` label and no `#` line (a braced
+   block is kept whole); `G`'s labels are not among the labels of any other group of the `switch`.
+3. Write, directly above the first function that needs it, a `static const` array of the selector's enumeration type
+   named for what the labels have in common, holding `L1 ... Ln` in the `switch`'s order, then
+   `static MagickBooleanType Is<Name>(const <Enum> compose)` whose body is `size_t i;` and
+   `for (i=0; i < (sizeof(T)/sizeof(*T)); i++) if (T[i] == compose) return(MagickTrue);
+   return(MagickFalse);` (Recipe TB's membership form).
+4. Add `MagickBooleanType <name>;` to `S` (a declaration of its own after the last member) and, in
+   the one place that fills `S`, `row.<name>=Is<Name>(compose);` directly after `row.compose=compose;`, with
+   `compose` the value that statement assigned.
+5. Replace `G` and its `case` labels by an `if (row-><name> != MagickFalse)` block ahead of the
+   `switch`, holding `B` without its closing `break;` and ending in `return;`; the `switch` keeps its
+   other groups and its `default:`. When `G` and `default:` are the `switch`'s only groups, the
+   `switch` goes: `if (row-><name> != MagickFalse)` runs `B` and returns, then comes the body of
+   `default:` without its `break;`.
+6. Check by script that the table holds exactly `G`'s labels, each once, in the `switch`'s order, that no
+   other statement of the file changed, and that the new function is reached from the one place that fills `S`.
+7. `refactor_guard.py` `WARN` listing only the `0` of the loop's `i=0` as added; `--calls` `+2` for the predicate and
+   `+1` for the filling call, nothing else; time the step as Recipe CF step 7 says (callgrind
+   instruction counts over operators from and outside the run): the lookup now runs once per row.
+
+**Before:**
+
+```c
+  switch (compose)
+  {
+    case DarkenCompositeOp:
+    ...
+    case VividLightCompositeOp:
+    {
+      (*alpha)=RoundToUnity(Sa+Da-Sa*Da);
+      break;
+    }
+    default:
+    {
+      SetCompositeCoverageDissolve(row,Sa,Da,alpha);
+      break;
+    }
+  }
+```
+
+**After:**
+
+```c
+  if (row->union_coverage != MagickFalse)
+    {
+      (*alpha)=RoundToUnity(Sa+Da-Sa*Da);
+      return;
+    }
+  SetCompositeCoverageDissolve(row,Sa,Da,alpha);
+```
+
+with `UnionCoverageOperators[]`, `IsUnionCoverageOperator(compose)`, the member `union_coverage` and
+`row.union_coverage=IsUnionCoverageOperator(compose);` in the row loop.
+
+**Careful:**
+
+- Why the behaviour is the same. `compose` is assigned once when `S` is filled and no code writes it
+  afterwards (step 1), so the flag computed from it at that point holds for every later call
+  through the same `S`. The predicate is true exactly when `compose` equals one of the table's
+  labels (step 6), which are the labels of `G`, so `B` runs on the inputs on which the `switch`
+  chose `G`; the remaining groups are disjoint from `G` (step 2), so testing `G` first selects the
+  same group as the `switch` did, and the function ends where the `switch` ended (step 1), so
+  `return;` ends it as its closing `break;` did.
+- The fill is a store of a `MagickBooleanType` into a member of a struct declared in the loop body, executed once per
+  row where the other members are; no shared variable is read or written, so the OpenMP argument of the
+  other recipes that fill that struct holds.
+- Cost: one table scan per row replaces one `switch` per pixel; every pixel now tests one member.
+
+**Evidence level:** oracle (the cases that reach the function), steps 6 and 7 by script, the
+timing quoted in the commit.
+
+**Provenance:** 2026-11-12, from `composite.c`'s `SetCompositeCoverage` and `CompositeAlphaChannel` (campaign A, W19
+lane c): the file's stub ceiling with both clean, the pixel path's last Complex Methods but one, was
+3.69 to 3.84 in a hybrid probe with the five other statics emptied; Recipe TB on the same runs measured +9% on the
+atop and src operators, Recipe LP kept the finding (flat). Added by Claude Code
+(Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -14792,3 +14895,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
 | 2026-11-13 | NEW | ME | Merge Mirrored Twins That Leave Through a Constant Return: copies of one block that leave the function through `return(c);` (Recipe Y steps 1 and 2; `c` may differ between copies), in two mirrored sides (Recipe MT step 1's alignment) whose copies differ in one member-access value, become one `static inline MagickBooleanType` function taking the input struct, a constant selector, the value and the written variable by pointer; each copy becomes `if (Helper(...) == MagickFalse) return(c);` with its own constant. *Careful* gives the argument (the conditional evaluates only the copy's run, in its order; the constants stay in the callers) | `visual-effects-plasma.c`'s `PlasmaImageProxy` (campaign A, W21 round four, lane d): four edge-pixel blocks (left/right along a column, bottom/top along a row) that Recipes MT, Y, SV and W refuse; helpers per side cloned (8.15), precomputed coordinates moved `errno`-writing casts; a probe of the chain this recipe opens: 8.50 to 9.09 | mandate (2026-10-24) |
+| 2026-11-12 | NEW | RH | Hoist a Label Run into a Row Flag: a run of eight or more `case` labels of `row->compose` in a `static void` per-pixel function becomes a `static const` table and a membership predicate (Recipe TB's loop), evaluated once per row where the row struct is filled into a new `MagickBooleanType` member, and the group becomes `if (row->flag != MagickFalse) { B return; }` ahead of the `switch`. *Careful* gives the argument (`compose` is not written after the fill, labels disjoint, the function ends where the `switch` ended) | `composite.c`'s `SetCompositeCoverage` (32 labels) and `CompositeAlphaChannel` (11 and 7) (campaign A, W19 lane c): Recipe TB's loop on the pixel path measured +46 to +91 instructions per pixel (+4% to +9%), Recipe LP keeps the finding; with the flag, +0.5% to +1.5% of a 400x400 composite, no new finding; a hybrid probe with the other five Complex Methods of the pixel path emptied: 3.69 to 3.83 | owner |
