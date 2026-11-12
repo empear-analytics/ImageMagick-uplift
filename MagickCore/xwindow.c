@@ -4181,6 +4181,16 @@ static inline MagickBooleanType IsInsideWindowBounds(
     MagickFalse);
 }
 
+static inline MagickBooleanType IntersectsTopLevelWindow(
+  const WindowInfo *window_info,const int id)
+{
+  return(((window_info[id].bounds.x2 >= window_info[0].bounds.x1) &&
+     (window_info[id].bounds.x1 <= window_info[0].bounds.x2) &&
+     (window_info[id].bounds.y2 >= window_info[0].bounds.y1) &&
+     (window_info[id].bounds.y1 <= window_info[0].bounds.y2)) ?
+    MagickTrue : MagickFalse);
+}
+
 static void XInitializeDirectColors(const WindowInfo *window_info,
   const int id,const unsigned int number_colors,XColor *colors)
 {
@@ -4653,11 +4663,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
         /*
           Does target window intersect top level window?
         */
-        import=((window_info[id].bounds.x2 >= window_info[0].bounds.x1) &&
-           (window_info[id].bounds.x1 <= window_info[0].bounds.x2) &&
-           (window_info[id].bounds.y2 >= window_info[0].bounds.y1) &&
-           (window_info[id].bounds.y1 <= window_info[0].bounds.y2)) ?
-          MagickTrue : MagickFalse;
+        import=IntersectsTopLevelWindow(window_info,id);
         /*
           Is target window contained by another window with the same colormap?
         */
