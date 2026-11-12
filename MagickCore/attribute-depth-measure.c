@@ -447,7 +447,6 @@ static size_t GetMappedImageDepth(const DepthMapImage *map_image)
     depth;
 
   ssize_t
-    i,
     y;
 
   /*
@@ -466,10 +465,7 @@ static size_t GetMappedImageDepth(const DepthMapImage *map_image)
     RaiseMappedRowDepth(&status,&scan,y);
   }
   image_view=DestroyCacheView(image_view);
-  depth=current_depth[0];
-  for (i=1; i < (ssize_t) number_threads; i++)
-    if (depth < current_depth[i])
-      depth=current_depth[i];
+  depth=GetMaximumDepth(current_depth,number_threads);
   depth_map=(size_t *) RelinquishMagickMemory(depth_map);
   current_depth=(size_t *) RelinquishMagickMemory(current_depth);
   return(depth);
