@@ -8536,6 +8536,9 @@ typedef struct _FontBrowserWidgets
     *expose_info,
     *text_info,
     *selection_info;
+
+  char
+    ***listhead;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -9704,6 +9707,50 @@ static void RedrawFontBrowserAction(const FontBrowserContext *context,
     }
 }
 
+static MagickBooleanType ReloadFontList(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern,
+    *const back_pattern = context->back_pattern,
+    *const reply = context->reply;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  int
+    *const fonts = widgets->fonts;
+
+  char
+    ***const fontlist = widgets->fontlist,
+    ***const listhead = widgets->listhead;
+
+  const FontBrowserUpdateTargets
+    update_targets = { action_info, fontlist, fonts };
+
+  FontBrowserUpdate
+    update;
+
+  /*
+    Update font list.
+  */
+  update.display=display;
+  update.windows=windows;
+  update.reply=reply;
+  update.glob_pattern=glob_pattern;
+  update.back_pattern=back_pattern;
+  update.listhead=(*listhead);
+  if (UpdateFontBrowserList(&update,&update_targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9776,7 +9823,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
       &reset_info, &action_info, &cancel_info, &slider_info, &fonts,
       &scroll_info, &visible_fonts, &north_info, &delay, &south_info, &i,
       &font_info, &fontlist, &list_info, &mode_info, &expose_info, &text_info,
-      &selection_info };
+      &selection_info, &listhead };
 
   FontBrowserContext
     font_context;
@@ -9909,22 +9956,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     RedrawFontBrowserWidget(&font_context,&font_widgets);
     if (state & UpdateListState)
       {
-        const FontBrowserUpdateTargets
-          update_targets = { &action_info, &fontlist, &fonts };
-
-        FontBrowserUpdate
-          update;
-
-        /*
-          Update font list.
-        */
-        update.display=display;
-        update.windows=windows;
-        update.reply=reply;
-        update.glob_pattern=glob_pattern;
-        update.back_pattern=back_pattern;
-        update.listhead=listhead;
-        if (UpdateFontBrowserList(&update,&update_targets) == MagickFalse)
+        if (ReloadFontList(&font_context,&font_widgets) == MagickFalse)
           break;
         /*
           Sort font list in ascending order.
