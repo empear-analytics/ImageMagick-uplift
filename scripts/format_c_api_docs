@@ -55,6 +55,7 @@ if ( ! GetOptions(
 	 'effect-filter.c',
 	 'effect-preview.c',
 	 'effect-blur.c',
+	 'effect-blur-adaptive.c',
 	 'enhance.c',
 	 'enhance-clahe.c',
 	 'enhance-tone.c',

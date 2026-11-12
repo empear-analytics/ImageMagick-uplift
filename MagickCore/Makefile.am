@@ -160,6 +160,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/effect-filter.c \
   MagickCore/effect-preview.c \
   MagickCore/effect-blur.c \
+  MagickCore/effect-blur-adaptive.c \
   MagickCore/effect.h \
   MagickCore/enhance.c \
   MagickCore/enhance-clahe.c \
