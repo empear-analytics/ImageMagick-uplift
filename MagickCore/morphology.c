@@ -414,6 +414,34 @@ static KernelInfo *FinishKernelArray(KernelInfo *kernel,
   return(kernel);
 }
 
+static MagickBooleanType IsKernelArrayComplete(KernelInfo *kernel,
+  const char *p,const ssize_t i)
+{
+  char
+    token[MagickPathExtent];
+
+  /* sanity check -- no more values in kernel definition */
+  (void) GetNextToken(p,&p,MagickPathExtent,token);
+  if (IsKernelArrayTokenLeft(token) != MagickFalse)
+    return(MagickFalse);
+
+#if 0
+  /* this was the old method of handling a incomplete kernel */
+  if ( i < (ssize_t) (kernel->width*kernel->height) ) {
+    Minimize(kernel->minimum, kernel->values[i]);
+    Maximize(kernel->maximum, kernel->values[i]);
+    for ( ; i < (ssize_t) (kernel->width*kernel->height); i++)
+      kernel->values[i]=0.0;
+  }
+#else
+  /* Number of values for kernel was not enough - Report Error */
+  if ( i < (ssize_t) (kernel->width*kernel->height) )
+    return(MagickFalse);
+#endif
+
+  return(MagickTrue);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -477,24 +505,8 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
     SetKernelArrayValue(kernel,i,token,nan);
   }
 
-  /* sanity check -- no more values in kernel definition */
-  (void) GetNextToken(p,&p,MagickPathExtent,token);
-  if (IsKernelArrayTokenLeft(token) != MagickFalse)
+  if (IsKernelArrayComplete(kernel,p,i) == MagickFalse)
     return(DestroyKernelInfo(kernel));
-
-#if 0
-  /* this was the old method of handling a incomplete kernel */
-  if ( i < (ssize_t) (kernel->width*kernel->height) ) {
-    Minimize(kernel->minimum, kernel->values[i]);
-    Maximize(kernel->maximum, kernel->values[i]);
-    for ( ; i < (ssize_t) (kernel->width*kernel->height); i++)
-      kernel->values[i]=0.0;
-  }
-#else
-  /* Number of values for kernel was not enough - Report Error */
-  if ( i < (ssize_t) (kernel->width*kernel->height) )
-    return(DestroyKernelInfo(kernel));
-#endif
 
   return(FinishKernelArray(kernel,flags));
 }
