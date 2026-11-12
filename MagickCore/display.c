@@ -17550,6 +17550,46 @@ static void XPressMagnifyWindow(const DisplayEventContext *context)
     XMagnifyWindowCommand(display,windows,0,MagnifyCommands[factor],
       exception);
 }
+
+static void XPressPanWindow(const DisplayEventContext *context,XEvent *event)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const image = context->image;
+
+  switch ((*event).xbutton.button)
+  {
+    case Button4:
+    {
+      /*
+        Wheel up.
+      */
+      XTranslateImage(display,windows,*image,XK_Up);
+      break;
+    }
+    case Button5:
+    {
+      /*
+        Wheel down.
+      */
+      XTranslateImage(display,windows,*image,XK_Down);
+      break;
+    }
+    default:
+    {
+      XPanImage(display,windows,event,exception);
+      break;
+    }
+  }
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18823,30 +18863,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xbutton.window == windows->pan.id)
           {
-            switch (event.xbutton.button)
-            {
-              case Button4:
-              {
-                /*
-                  Wheel up.
-                */
-                XTranslateImage(display,windows,*image,XK_Up);
-                break;
-              }
-              case Button5:
-              {
-                /*
-                  Wheel down.
-                */
-                XTranslateImage(display,windows,*image,XK_Down);
-                break;
-              }
-              default:
-              {
-                XPanImage(display,windows,&event,exception);
-                break;
-              }
-            }
+            XPressPanWindow(&event_context,&event);
             break;
           }
         delay=display_image->delay/(size_t)
