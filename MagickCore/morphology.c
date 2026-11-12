@@ -1492,12 +1492,60 @@ static KernelInfo *AcquireFreiChenEdgeBasisKernel(KernelInfo *kernel,
   return(RotateFreiChenKernel(kernel,args));
 }
 
+typedef struct _FreiChenScaledKernel
+{
+  int
+    key;
+
+  const char
+    *definition;
+
+  double
+    scale;
+} FreiChenScaledKernel;
+
+static const FreiChenScaledKernel
+  FreiChenScaledKernels[] =
+  {
+    { 15, "3: 0,-1,0  1,0,1  0,-1,0", 1.0/2.0 },
+    { 16, "3: 1,0,-1  0,0,0  -1,0,1", 1.0/2.0 },
+    { 17, "3: 1,-2,1  -2,4,-2  -1,-2,1", 1.0/6.0 },
+    { 18, "3: -2,1,-2  1,4,1  -2,1,-2", 1.0/6.0 },
+    { 19, "3: 1,1,1  1,1,1  1,1,1", 1.0/3.0 }
+  };
+
+static const FreiChenScaledKernel *FindFreiChenScaledKernel(const int key)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(FreiChenScaledKernels)/
+       sizeof(*FreiChenScaledKernels)); i++)
+    if (FreiChenScaledKernels[i].key == key)
+      return(FreiChenScaledKernels+i);
+  return((const FreiChenScaledKernel *) NULL);
+}
+
 static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
-  switch ( (int) args->rho ) {
+  const FreiChenScaledKernel
+    *scaled;
+
+  const int
+    key = (int) args->rho;
+
+  switch ( key ) {
     default:
-      return(AcquireFreiChenEdgeBasisKernel(kernel,type,args,exception));
+      scaled=FindFreiChenScaledKernel(key);
+      if (scaled == (const FreiChenScaledKernel *) NULL)
+        return(AcquireFreiChenEdgeBasisKernel(kernel,type,args,exception));
+      kernel=ParseKernelArray(scaled->definition);
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, scaled->scale, NoValue);
+      break;
     case 13:
       kernel=ParseKernelArray("3: 2,-1,0  -1,0,1  0,1,-2");
       if (kernel == (KernelInfo *) NULL)
@@ -1517,41 +1565,6 @@ static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
       kernel->values[6] = +(MagickRealType) MagickSQ2;
       CalcKernelMetaData(kernel);
       ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-      break;
-    case 15:
-      kernel=ParseKernelArray("3: 0,-1,0  1,0,1  0,-1,0");
-      if (kernel == (KernelInfo *) NULL)
-        return(kernel);
-      kernel->type = type;
-      ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
-      break;
-    case 16:
-      kernel=ParseKernelArray("3: 1,0,-1  0,0,0  -1,0,1");
-      if (kernel == (KernelInfo *) NULL)
-        return(kernel);
-      kernel->type = type;
-      ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
-      break;
-    case 17:
-      kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  -1,-2,1");
-      if (kernel == (KernelInfo *) NULL)
-        return(kernel);
-      kernel->type = type;
-      ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
-      break;
-    case 18:
-      kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
-      if (kernel == (KernelInfo *) NULL)
-        return(kernel);
-      kernel->type = type;
-      ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
-      break;
-    case 19:
-      kernel=ParseKernelArray("3: 1,1,1  1,1,1  1,1,1");
-      if (kernel == (KernelInfo *) NULL)
-        return(kernel);
-      kernel->type = type;
-      ScaleKernelInfo(kernel, 1.0/3.0, NoValue);
       break;
   }
   return(RotateFreiChenKernel(kernel,args));
