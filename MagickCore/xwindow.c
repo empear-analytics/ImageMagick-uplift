@@ -6981,6 +6981,62 @@ static void XPackContinuousMultiByteLSB(const XImageRowSource *source,
   }
 }
 
+typedef struct _XBitmapPacking
+{
+  Image
+    *canvas;
+
+  unsigned short
+    polarity;
+
+  unsigned char
+    background,
+    foreground;
+} XBitmapPacking;
+
+static unsigned char *XPackBitmapRowLSB(const XBitmapPacking *bitmap,
+  const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = bitmap->canvas;
+
+  const unsigned short
+    polarity = bitmap->polarity;
+
+  const unsigned char
+    background = bitmap->background,
+    foreground = bitmap->foreground;
+
+  int
+    x;
+
+  unsigned char
+    bit,
+    byte;
+
+  bit=0;
+  byte=0;
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    byte>>=1;
+    if (GetPixelIndex(canvas,p) == (Quantum) polarity)
+      byte|=foreground;
+    else
+      byte|=background;
+    bit++;
+    if (bit == 8)
+      {
+        *q++=byte;
+        bit=0;
+        byte=0;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  if (bit != 0)
+    *q=byte >> (8-bit);
+  return(q);
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7088,6 +7144,9 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
         background,
         foreground;
 
+      XBitmapPacking
+        bitmap;
+
       /*
         Convert canvas to big-endian bitmap.
       */
@@ -7102,32 +7161,17 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
       if (canvas->colors == 2)
         polarity=GetPixelInfoIntensity(image,&canvas->colormap[0]) <
           GetPixelInfoIntensity(image,&canvas->colormap[1]);
+      bitmap.canvas=canvas;
+      bitmap.polarity=polarity;
+      bitmap.background=background;
+      bitmap.foreground=foreground;
       for (y=0; y < (int) canvas->rows; y++)
       {
         p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
           exception);
         if (p == (const Quantum *) NULL)
           break;
-        bit=0;
-        byte=0;
-        for (x=0; x < (int) canvas->columns; x++)
-        {
-          byte>>=1;
-          if (GetPixelIndex(canvas,p) == (Quantum) polarity)
-            byte|=foreground;
-          else
-            byte|=background;
-          bit++;
-          if (bit == 8)
-            {
-              *q++=byte;
-              bit=0;
-              byte=0;
-            }
-          p+=(ptrdiff_t) GetPixelChannels(canvas);
-        }
-        if (bit != 0)
-          *q=byte >> (8-bit);
+        q=XPackBitmapRowLSB(&bitmap,p,q);
         q+=(ptrdiff_t) scanline_pad;
       }
     }
