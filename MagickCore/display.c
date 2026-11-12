@@ -18412,60 +18412,60 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
                 /*
                   Position the transient windows relative of the Image window.
                 */
-                if (windows->command.geometry == (char *) NULL)
-                  if (windows->command.mapped == MagickFalse)
-                    {
-                      windows->command.x=event.xconfigure.x-(int)
-                        windows->command.width-25;
-                      windows->command.y=event.xconfigure.y;
-                      XConstrainWindowPosition(display,&windows->command);
-                      window_changes.x=windows->command.x;
-                      window_changes.y=windows->command.y;
-                      (void) XReconfigureWMWindow(display,windows->command.id,
-                        windows->command.screen,(unsigned int) (CWX | CWY),
-                        &window_changes);
-                    }
-                if (windows->widget.geometry == (char *) NULL)
-                  if (windows->widget.mapped == MagickFalse)
-                    {
-                      windows->widget.x=event.xconfigure.x+
-                        event.xconfigure.width/10;
-                      windows->widget.y=event.xconfigure.y+
-                        event.xconfigure.height/10;
-                      XConstrainWindowPosition(display,&windows->widget);
-                      window_changes.x=windows->widget.x;
-                      window_changes.y=windows->widget.y;
-                      (void) XReconfigureWMWindow(display,windows->widget.id,
-                        windows->widget.screen,(unsigned int) (CWX | CWY),
-                        &window_changes);
-                    }
-                if (windows->magnify.geometry == (char *) NULL)
-                  if (windows->magnify.mapped == MagickFalse)
-                    {
-                      windows->magnify.x=event.xconfigure.x+
-                        event.xconfigure.width+25;
-                      windows->magnify.y=event.xconfigure.y;
-                      XConstrainWindowPosition(display,&windows->magnify);
-                      window_changes.x=windows->magnify.x;
-                      window_changes.y=windows->magnify.y;
-                      (void) XReconfigureWMWindow(display,windows->magnify.id,
-                        windows->magnify.screen,(unsigned int) (CWX | CWY),
-                        &window_changes);
-                    }
-                if (windows->pan.geometry == (char *) NULL)
-                  if (windows->pan.mapped == MagickFalse)
-                    {
-                      windows->pan.x=event.xconfigure.x+(int)
-                        event.xconfigure.width+25;
-                      windows->pan.y=event.xconfigure.y+(int)
-                        windows->magnify.height+50;
-                      XConstrainWindowPosition(display,&windows->pan);
-                      window_changes.x=windows->pan.x;
-                      window_changes.y=windows->pan.y;
-                      (void) XReconfigureWMWindow(display,windows->pan.id,
-                        windows->pan.screen,(unsigned int) (CWX | CWY),
-                        &window_changes);
-                    }
+                if ((windows->command.geometry == (char *) NULL) &&
+                    (windows->command.mapped == MagickFalse))
+                  {
+                    windows->command.x=event.xconfigure.x-(int)
+                      windows->command.width-25;
+                    windows->command.y=event.xconfigure.y;
+                    XConstrainWindowPosition(display,&windows->command);
+                    window_changes.x=windows->command.x;
+                    window_changes.y=windows->command.y;
+                    (void) XReconfigureWMWindow(display,windows->command.id,
+                      windows->command.screen,(unsigned int) (CWX | CWY),
+                      &window_changes);
+                  }
+                if ((windows->widget.geometry == (char *) NULL) &&
+                    (windows->widget.mapped == MagickFalse))
+                  {
+                    windows->widget.x=event.xconfigure.x+
+                      event.xconfigure.width/10;
+                    windows->widget.y=event.xconfigure.y+
+                      event.xconfigure.height/10;
+                    XConstrainWindowPosition(display,&windows->widget);
+                    window_changes.x=windows->widget.x;
+                    window_changes.y=windows->widget.y;
+                    (void) XReconfigureWMWindow(display,windows->widget.id,
+                      windows->widget.screen,(unsigned int) (CWX | CWY),
+                      &window_changes);
+                  }
+                if ((windows->magnify.geometry == (char *) NULL) &&
+                    (windows->magnify.mapped == MagickFalse))
+                  {
+                    windows->magnify.x=event.xconfigure.x+
+                      event.xconfigure.width+25;
+                    windows->magnify.y=event.xconfigure.y;
+                    XConstrainWindowPosition(display,&windows->magnify);
+                    window_changes.x=windows->magnify.x;
+                    window_changes.y=windows->magnify.y;
+                    (void) XReconfigureWMWindow(display,windows->magnify.id,
+                      windows->magnify.screen,(unsigned int) (CWX | CWY),
+                      &window_changes);
+                  }
+                if ((windows->pan.geometry == (char *) NULL) &&
+                    (windows->pan.mapped == MagickFalse))
+                  {
+                    windows->pan.x=event.xconfigure.x+(int)
+                      event.xconfigure.width+25;
+                    windows->pan.y=event.xconfigure.y+(int)
+                      windows->magnify.height+50;
+                    XConstrainWindowPosition(display,&windows->pan);
+                    window_changes.x=windows->pan.x;
+                    window_changes.y=windows->pan.y;
+                    (void) XReconfigureWMWindow(display,windows->pan.id,
+                      windows->pan.screen,(unsigned int) (CWX | CWY),
+                      &window_changes);
+                  }
               }
             if ((event.xconfigure.width == (int) windows->image.width) &&
                 (event.xconfigure.height == (int) windows->image.height))
@@ -18589,9 +18589,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
         /*
           Selectively install colormap.
         */
-        if (map_info->colormap != XDefaultColormap(display,visual_info->screen))
-          if (event.xcrossing.mode != NotifyUngrab)
-            XInstallColormap(display,map_info->colormap);
+        if ((map_info->colormap != XDefaultColormap(display,visual_info->screen)) &&
+            (event.xcrossing.mode != NotifyUngrab))
+          XInstallColormap(display,map_info->colormap);
         break;
       }
       case Expose:
@@ -18691,9 +18691,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
         /*
           Selectively uninstall colormap.
         */
-        if (map_info->colormap != XDefaultColormap(display,visual_info->screen))
-          if (event.xcrossing.mode != NotifyUngrab)
-            XUninstallColormap(display,map_info->colormap);
+        if ((map_info->colormap != XDefaultColormap(display,visual_info->screen)) &&
+            (event.xcrossing.mode != NotifyUngrab))
+          XUninstallColormap(display,map_info->colormap);
         break;
       }
       case MapNotify:
@@ -18712,11 +18712,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           {
             if (windows->backdrop.id != (Window) NULL)
               (void) XInstallColormap(display,map_info->colormap);
-            if (LocaleCompare(display_image->magick,"LOGO") == 0)
-              {
-                if (LocaleCompare(display_image->filename,"LOGO") == 0)
-                  nexus=XOpenImage(display,resource_info,windows,MagickFalse);
-              }
+            if ((LocaleCompare(display_image->magick,"LOGO") == 0) &&
+                (LocaleCompare(display_image->filename,"LOGO") == 0))
+              nexus=XOpenImage(display,resource_info,windows,MagickFalse);
             if (((int) windows->image.width < windows->image.ximage->width) ||
                 ((int) windows->image.height < windows->image.ximage->height))
               (void) XMapRaised(display,windows->pan.id);
@@ -18957,18 +18955,17 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     }
   if (windows->pan.mapped != MagickFalse)
     (void) XWithdrawWindow(display,windows->pan.id,windows->pan.screen);
-  if (resource_info->backdrop == MagickFalse)
-    if (windows->backdrop.mapped)
-      {
-        (void) XWithdrawWindow(display,windows->backdrop.id,
-          windows->backdrop.screen);
-        (void) XDestroyWindow(display,windows->backdrop.id);
-        windows->backdrop.id=(Window) NULL;
-        (void) XWithdrawWindow(display,windows->image.id,
-          windows->image.screen);
-        (void) XDestroyWindow(display,windows->image.id);
-        windows->image.id=(Window) NULL;
-      }
+  if ((resource_info->backdrop == MagickFalse) && (windows->backdrop.mapped))
+    {
+      (void) XWithdrawWindow(display,windows->backdrop.id,
+        windows->backdrop.screen);
+      (void) XDestroyWindow(display,windows->backdrop.id);
+      windows->backdrop.id=(Window) NULL;
+      (void) XWithdrawWindow(display,windows->image.id,
+        windows->image.screen);
+      (void) XDestroyWindow(display,windows->image.id);
+      windows->image.id=(Window) NULL;
+    }
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   if (((*state & FormerImageState) != 0) || ((*state & NextImageState) != 0))
