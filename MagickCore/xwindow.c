@@ -2121,6 +2121,14 @@ static void XWriteUndoInfo(FILE *file,const XResourceInfo *resource_info,
     resource_info->undo_cache);
 }
 
+static void XWriteGammaInfo(FILE *file,const XResourceInfo *resource_info)
+{
+  if (resource_info->gamma_correct != MagickFalse)
+    if (resource_info->display_gamma != (char *) NULL)
+      (void) FormatLocaleFile(file,"Display\n  gamma: %s\n\n",
+        resource_info->display_gamma);
+}
+
 MagickPrivate void XDisplayImageInfo(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,Image *undo_image,
   Image *image,ExceptionInfo *exception)
@@ -2157,10 +2165,7 @@ MagickPrivate void XDisplayImageInfo(Display *display,
       XNoticeWidget(display,windows,"Unable to display image info",filename);
       return;
     }
-  if (resource_info->gamma_correct != MagickFalse)
-    if (resource_info->display_gamma != (char *) NULL)
-      (void) FormatLocaleFile(file,"Display\n  gamma: %s\n\n",
-        resource_info->display_gamma);
+  XWriteGammaInfo(file,resource_info);
   /*
     Write info about the X image to a file.
   */
