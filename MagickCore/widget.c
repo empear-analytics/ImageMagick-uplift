@@ -2136,6 +2136,12 @@ typedef struct _ColorBrowserContext
 
   unsigned int
     height;
+
+  const char
+    *action;
+
+  unsigned int
+    width;
 } ColorBrowserContext;
 
 static void ClientColorBrowserMessage(const ColorBrowserContext *context,
@@ -2794,6 +2800,58 @@ static void PressColorBrowserScroll(const ColorBrowserContext *context,
 #define GrabButtonText  "Grab"
 #define ResetButtonText  "Reset"
 
+static void InitializeColorBrowserButtons(const ColorBrowserContext *context,
+  const ColorBrowserTargets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  const char
+    *const action = context->action;
+
+  const unsigned int
+    width = context->width;
+
+  XWidgetInfo
+    *const grab_info = widgets->grab_info,
+    *const reset_info = widgets->reset_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  /*
+    Initialize button information.
+  */
+  XGetWidgetInfo(CancelButtonText,cancel_info);
+  (*cancel_info).width=width;
+  (*cancel_info).height=(unsigned int) ((3*height) >> 1);
+  (*cancel_info).x=(int) windows->widget.width-(int) (*cancel_info).width-
+    QuantumMargin-2;
+  (*cancel_info).y=(int) windows->widget.height-(int) (*cancel_info).height-
+    QuantumMargin;
+  XGetWidgetInfo(action,action_info);
+  (*action_info).width=width;
+  (*action_info).height=(unsigned int) ((3*height) >> 1);
+  (*action_info).x=(int) windows->widget.width-(int) (*action_info).width-
+    (int) (*cancel_info).width-2*QuantumMargin-2;
+  (*action_info).y=(*cancel_info).y;
+  XGetWidgetInfo(GrabButtonText,grab_info);
+  (*grab_info).width=width;
+  (*grab_info).height=(unsigned int) ((3*height) >> 1);
+  (*grab_info).x=QuantumMargin;
+  (*grab_info).y=((5*QuantumMargin) >> 1)+(int) height;
+  XGetWidgetInfo(ResetButtonText,reset_info);
+  (*reset_info).width=width;
+  (*reset_info).height=(unsigned int) ((3*height) >> 1);
+  (*reset_info).x=QuantumMargin;
+  (*reset_info).y=(*grab_info).y+(int) (*grab_info).height+QuantumMargin;
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2982,6 +3040,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   color_context.font_info=font_info;
   color_context.primary_selection=primary_selection;
   color_context.height=height;
+  color_context.action=action;
+  color_context.width=width;
   do
   {
     if (state & UpdateConfigurationState)
@@ -2989,32 +3049,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
         int
           id;
 
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(CancelButtonText,&cancel_info);
-        cancel_info.width=width;
-        cancel_info.height=(unsigned int) ((3*height) >> 1);
-        cancel_info.x=(int) windows->widget.width-(int) cancel_info.width-
-          QuantumMargin-2;
-        cancel_info.y=(int) windows->widget.height-(int) cancel_info.height-
-          QuantumMargin;
-        XGetWidgetInfo(action,&action_info);
-        action_info.width=width;
-        action_info.height=(unsigned int) ((3*height) >> 1);
-        action_info.x=(int) windows->widget.width-(int) action_info.width-
-          (int) cancel_info.width-2*QuantumMargin-2;
-        action_info.y=cancel_info.y;
-        XGetWidgetInfo(GrabButtonText,&grab_info);
-        grab_info.width=width;
-        grab_info.height=(unsigned int) ((3*height) >> 1);
-        grab_info.x=QuantumMargin;
-        grab_info.y=((5*QuantumMargin) >> 1)+(int) height;
-        XGetWidgetInfo(ResetButtonText,&reset_info);
-        reset_info.width=width;
-        reset_info.height=(unsigned int) ((3*height) >> 1);
-        reset_info.x=QuantumMargin;
-        reset_info.y=grab_info.y+(int) grab_info.height+QuantumMargin;
+        InitializeColorBrowserButtons(&color_context,&color_widgets);
         /*
           Initialize reply information.
         */
