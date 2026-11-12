@@ -581,6 +581,75 @@ static void MapImageRowToDepth(MagickBooleanType *status,
       return;
     }
 }
+
+typedef struct _DepthMapImage
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  size_t
+    depth;
+
+  QuantumAny
+    range;
+
+  ExceptionInfo
+    *exception;
+
+  MagickBooleanType
+    status;
+} DepthMapImage;
+
+static MagickBooleanType SetImageDepthWithMap(const DepthMapImage *map_image)
+{
+  CacheView
+    *image_view = map_image->image_view;
+
+  const QuantumAny
+    range = map_image->range;
+
+  const size_t
+    depth = map_image->depth;
+
+  ExceptionInfo
+    *const exception = map_image->exception;
+
+  Image
+    *const image = map_image->image;
+
+  MagickBooleanType
+    status = map_image->status;
+
+  Quantum
+    *depth_map;
+
+  ssize_t
+    y;
+
+  /*
+    Scale pixels to desired (optimized with depth map).
+  */
+  depth_map=AcquireDepthMap(range);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const DepthMapRows
+      rows = { image, image_view, depth_map, exception };
+
+    MapImageRowToDepth(&status,&rows,y);
+  }
+  image_view=DestroyCacheView(image_view);
+  depth_map=(Quantum *) RelinquishMagickMemory(depth_map);
+  if (status != MagickFalse)
+    image->depth=depth;
+  return(status);
+}
 #endif
 
 MagickExport MagickBooleanType SetImageDepth(Image *image,
@@ -635,29 +704,16 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
   if ((1UL*QuantumRange) <= MaxMap)
   RestoreMSCWarning
     {
-      Quantum
-        *depth_map;
+      DepthMapImage
+        map_image;
 
-      /*
-        Scale pixels to desired (optimized with depth map).
-      */
-      depth_map=AcquireDepthMap(range);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const DepthMapRows
-          rows = { image, image_view, depth_map, exception };
-
-        MapImageRowToDepth(&status,&rows,y);
-      }
-      image_view=DestroyCacheView(image_view);
-      depth_map=(Quantum *) RelinquishMagickMemory(depth_map);
-      if (status != MagickFalse)
-        image->depth=depth;
-      return(status);
+      map_image.image=image;
+      map_image.image_view=image_view;
+      map_image.depth=depth;
+      map_image.range=range;
+      map_image.exception=exception;
+      map_image.status=status;
+      return(SetImageDepthWithMap(&map_image));
     }
 #endif
   /*
