@@ -9653,6 +9653,57 @@ static void RedrawFontBrowserList(const FontBrowserContext *context,
     }
 }
 
+static void RedrawFontBrowserAction(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XFontStruct
+    **const font_info = widgets->font_info;
+
+  XWidgetInfo
+    *const mode_info = widgets->mode_info;
+
+  if ((*state) & RedrawActionState)
+    {
+      XFontStruct
+        *save_info;
+
+      /*
+        Display the selected font in a drawing area.
+      */
+      save_info=windows->widget.font_info;
+      (*font_info)=XLoadQueryFont(display,(*reply_info).text);
+      if ((*font_info) != (XFontStruct *) NULL)
+        {
+          windows->widget.font_info=(*font_info);
+          (void) XSetFont(display,windows->widget.widget_context,
+            (*font_info)->fid);
+        }
+      XDrawBeveledButton(display,&windows->widget,mode_info);
+      windows->widget.font_info=save_info;
+      if ((*font_info) != (XFontStruct *) NULL)
+        {
+          (void) XSetFont(display,windows->widget.widget_context,
+            windows->widget.font_info->fid);
+          (void) XFreeFont(display,(*font_info));
+        }
+      XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+      XDrawMatteText(display,&windows->widget,reply_info);
+      (*state)&=(unsigned int) (~RedrawActionState);
+    }
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9920,34 +9971,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
       }
     JumpFontBrowserList(&font_context,&font_widgets);
     RedrawFontBrowserList(&font_context,&font_widgets);
-    if (state & RedrawActionState)
-      {
-        XFontStruct
-          *save_info;
-
-        /*
-          Display the selected font in a drawing area.
-        */
-        save_info=windows->widget.font_info;
-        font_info=XLoadQueryFont(display,reply_info.text);
-        if (font_info != (XFontStruct *) NULL)
-          {
-            windows->widget.font_info=font_info;
-            (void) XSetFont(display,windows->widget.widget_context,
-              font_info->fid);
-          }
-        XDrawBeveledButton(display,&windows->widget,&mode_info);
-        windows->widget.font_info=save_info;
-        if (font_info != (XFontStruct *) NULL)
-          {
-            (void) XSetFont(display,windows->widget.widget_context,
-              windows->widget.font_info->fid);
-            (void) XFreeFont(display,font_info);
-          }
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        state&=(unsigned int) (~RedrawActionState);
-      }
+    RedrawFontBrowserAction(&font_context,&font_widgets);
     /*
       Wait for next event.
     */
