@@ -11133,6 +11133,20 @@ static void XUpdateMagnifyInfo(Display *display,XWindows *windows,const int x,
       XInfoWidget(display,windows,text);
     }
 }
+
+static void XClampMagnifyPosition(XWindows *windows,int *x,int *y)
+{
+  if ((*x) < 0)
+    (*x)=0;
+  else
+    if ((*x) >= (int) windows->image.width)
+      (*x)=(int) windows->image.width-1;
+  if ((*y) < 0)
+    (*y)=0;
+  else
+   if ((*y) >= (int) windows->image.height)
+     (*y)=(int) windows->image.height-1;
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -11223,16 +11237,7 @@ static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
     /*
       Check boundary conditions.
     */
-    if (x < 0)
-      x=0;
-    else
-      if (x >= (int) windows->image.width)
-        x=(int) windows->image.width-1;
-    if (y < 0)
-      y=0;
-    else
-     if (y >= (int) windows->image.height)
-       y=(int) windows->image.height-1;
+    XClampMagnifyPosition(windows,&x,&y);
   } while ((state & ExitState) == 0);
   /*
     Display magnified image.
