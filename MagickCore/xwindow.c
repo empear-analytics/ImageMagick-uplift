@@ -3089,6 +3089,19 @@ MagickPrivate void XGetAnnotateInfo(XAnnotateInfo *annotate_info)
 %    o map_info: Specifies a pointer to a X11 XStandardColormap structure.
 %
 */
+static void XGetMaskMultiplier(const unsigned long visual_mask,
+  unsigned long *max,unsigned long *mult)
+{
+  (*max)=visual_mask;
+  (*mult)=(size_t) ((*max) != 0 ? 1 : 0);
+  if ((*max) != 0)
+    while (((*max) & 0x01) == 0)
+    {
+      (*max)>>=1;
+      (*mult)<<=1;
+    }
+}
+
 MagickPrivate void XGetMapInfo(const XVisualInfo *visual_info,
   const Colormap colormap,XStandardColormap *map_info)
 {
@@ -3100,30 +3113,12 @@ MagickPrivate void XGetMapInfo(const XVisualInfo *visual_info,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   map_info->colormap=colormap;
-  map_info->red_max=visual_info->red_mask;
-  map_info->red_mult=(size_t) (map_info->red_max != 0 ? 1 : 0);
-  if (map_info->red_max != 0)
-    while ((map_info->red_max & 0x01) == 0)
-    {
-      map_info->red_max>>=1;
-      map_info->red_mult<<=1;
-    }
-  map_info->green_max=visual_info->green_mask;
-  map_info->green_mult=(size_t) (map_info->green_max != 0 ? 1 : 0);
-  if (map_info->green_max != 0)
-    while ((map_info->green_max & 0x01) == 0)
-    {
-      map_info->green_max>>=1;
-      map_info->green_mult<<=1;
-    }
-  map_info->blue_max=visual_info->blue_mask;
-  map_info->blue_mult=(size_t) (map_info->blue_max != 0 ? 1 : 0);
-  if (map_info->blue_max != 0)
-    while ((map_info->blue_max & 0x01) == 0)
-    {
-      map_info->blue_max>>=1;
-      map_info->blue_mult<<=1;
-    }
+  XGetMaskMultiplier(visual_info->red_mask,&map_info->red_max,
+    &map_info->red_mult);
+  XGetMaskMultiplier(visual_info->green_mask,&map_info->green_max,
+    &map_info->green_mult);
+  XGetMaskMultiplier(visual_info->blue_mask,&map_info->blue_max,
+    &map_info->blue_mult);
   map_info->base_pixel=0;
 }
 
