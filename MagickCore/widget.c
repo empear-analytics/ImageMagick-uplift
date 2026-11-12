@@ -4434,6 +4434,9 @@ typedef struct _DialogTargets
 
   size_t
     *state;
+
+  XWidgetInfo
+    *text_info;
 } DialogTargets;
 
 typedef struct _DialogContext
@@ -4452,6 +4455,16 @@ typedef struct _DialogContext
 
   char
     *primary_selection;
+
+  const char
+    *action,
+    *query;
+
+  unsigned int
+    height;
+
+  MagickBooleanType
+    raised;
 } DialogContext;
 
 static void PressDialogButton(const DialogContext *context,
@@ -4770,6 +4783,60 @@ static void SelectDialogReply(const DialogContext *context,
   (void) XFree((void *) data);
 }
 
+static void InitializeDialogOptions(const DialogContext *context,
+  const DialogTargets *targets)
+{
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const char
+    *const action = context->action,
+    *const query = context->query;
+
+  const unsigned int
+    height = context->height;
+
+  const MagickBooleanType
+    raised = context->raised;
+
+  XWidgetInfo
+    *const special_info = targets->special_info,
+    *const action_info = targets->action_info,
+    *const reply_info = targets->reply_info,
+    *const text_info = targets->text_info;
+
+  /*
+    Initialize option information.
+  */
+  XGetWidgetInfo("Dither",special_info);
+  (*special_info).raised=raised;
+  (*special_info).bevel_width--;
+  (*special_info).width=(unsigned int) QuantumMargin >> 1;
+  (*special_info).height=(unsigned int) QuantumMargin >> 1;
+  (*special_info).x=(*reply_info).x;
+  (*special_info).y=(*action_info).y+(int) (*action_info).height-(int)
+    (*special_info).height;
+  if (LocaleCompare(action,"Background") == 0)
+    (*special_info).text=(char *) "Backdrop";
+  if (LocaleCompare(action,"New") == 0)
+    (*special_info).text=(char *) "Gradation";
+  if (LocaleCompare(action,"Resize") == 0)
+    (*special_info).text=(char *) "Constrain ratio";
+  if (LocaleCompare(action,"Save") == 0)
+    (*special_info).text=(char *) "Non-progressive";
+  if (LocaleCompare(action,"Shade") == 0)
+    (*special_info).text=(char *) "Color shading";
+  /*
+    Initialize text information.
+  */
+  XGetWidgetInfo(query,text_info);
+  (*text_info).width=(*reply_info).width;
+  (*text_info).height=height;
+  (*text_info).x=(*reply_info).x-(int) (QuantumMargin >> 1);
+  (*text_info).y=QuantumMargin;
+  (*text_info).center=MagickFalse;
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -4811,7 +4878,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
 
   const DialogTargets
     targets = { &special_info, &action_info, &cancel_info, &reply_info,
-      &state };
+      &state, &text_info };
 
   DialogContext
     context;
@@ -4885,6 +4952,10 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   context.font_info=font_info;
   context.anomaly=anomaly;
   context.primary_selection=primary_selection;
+  context.action=action;
+  context.query=query;
+  context.height=height;
+  context.raised=raised;
   do
   {
     if (state & UpdateConfigurationState)
@@ -4916,36 +4987,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
         reply_info.height=height << 1;
         reply_info.x=(3*QuantumMargin) >> 1;
         reply_info.y=action_info.y-(int) reply_info.height-QuantumMargin;
-        /*
-          Initialize option information.
-        */
-        XGetWidgetInfo("Dither",&special_info);
-        special_info.raised=raised;
-        special_info.bevel_width--;
-        special_info.width=(unsigned int) QuantumMargin >> 1;
-        special_info.height=(unsigned int) QuantumMargin >> 1;
-        special_info.x=reply_info.x;
-        special_info.y=action_info.y+(int) action_info.height-(int)
-          special_info.height;
-        if (LocaleCompare(action,"Background") == 0)
-          special_info.text=(char *) "Backdrop";
-        if (LocaleCompare(action,"New") == 0)
-          special_info.text=(char *) "Gradation";
-        if (LocaleCompare(action,"Resize") == 0)
-          special_info.text=(char *) "Constrain ratio";
-        if (LocaleCompare(action,"Save") == 0)
-          special_info.text=(char *) "Non-progressive";
-        if (LocaleCompare(action,"Shade") == 0)
-          special_info.text=(char *) "Color shading";
-        /*
-          Initialize text information.
-        */
-        XGetWidgetInfo(query,&text_info);
-        text_info.width=reply_info.width;
-        text_info.height=height;
-        text_info.x=reply_info.x-(int) (QuantumMargin >> 1);
-        text_info.y=QuantumMargin;
-        text_info.center=MagickFalse;
+        InitializeDialogOptions(&context,&targets);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
     if (state & RedrawWidgetState)
