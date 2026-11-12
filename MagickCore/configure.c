@@ -1039,6 +1039,25 @@ static void SetConfigureAttribute(ConfigureInfo *configure_info,
     configure_info->value=ConstantString(token);
 }
 
+static MagickBooleanType NextIncludeFile(const char **q,const size_t extent,
+  char *token)
+{
+  char
+    keyword[MagickPathExtent];
+
+  while (IsIncludeElementOpen(token,*q) != MagickFalse)
+  {
+    (void) CopyMagickString(keyword,token,MagickPathExtent);
+    (void) GetNextToken(*q,q,extent,token);
+    if (*token != '=')
+      continue;
+    (void) GetNextToken(*q,q,extent,token);
+    if (LocaleCompare(keyword,"file") == 0)
+      return(MagickTrue);
+  }
+  return(MagickFalse);
+}
+
 static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1103,23 +1122,13 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
         /*
           Include element.
         */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          (void) CopyMagickString(keyword,token,MagickPathExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
-            continue;
-          (void) GetNextToken(q,&q,extent,token);
-          if (LocaleCompare(keyword,"file") == 0)
-            {
-              if (depth >= MagickMaxRecursionDepth)
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-              else
-                status&=(MagickStatusType) LoadConfigureInclude(target,
-                  filename,token,depth);
-            }
-        }
+        while (NextIncludeFile(&q,extent,token) != MagickFalse)
+          if (depth >= MagickMaxRecursionDepth)
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+          else
+            status&=(MagickStatusType) LoadConfigureInclude(target,filename,
+              token,depth);
         continue;
       }
     if (LocaleCompare(keyword,"<configure") == 0)
