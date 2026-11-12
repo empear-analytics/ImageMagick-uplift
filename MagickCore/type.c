@@ -1172,121 +1172,48 @@ static void GetIncludePath(const char *filename,const char *token,
 static TypeInfo *SetTypeInfoAttribute(TypeInfo *type_info,const char *keyword,
   const char *token,const char *filename,const char *font_path)
 {
-  switch (*keyword)
-  {
-    case 'E':
-    case 'e':
+  if (LocaleCompare((char *) keyword,"encoding") == 0)
+    type_info->encoding=ConstantString(token);
+  else if (LocaleCompare((char *) keyword,"face") == 0)
+    type_info->face=StringToUnsignedLong(token);
+  else if (LocaleCompare((char *) keyword,"family") == 0)
+    type_info->family=ConstantString(token);
+  else if (LocaleCompare((char *) keyword,"format") == 0)
+    type_info->format=ConstantString(token);
+  else if (LocaleCompare((char *) keyword,"foundry") == 0)
+    type_info->foundry=ConstantString(token);
+  else if (LocaleCompare((char *) keyword,"fullname") == 0)
+    type_info->description=ConstantString(token);
+  else if (LocaleCompare((char *) keyword,"glyphs") == 0)
     {
-      if (LocaleCompare((char *) keyword,"encoding") == 0)
-        {
-          type_info->encoding=ConstantString(token);
-          break;
-        }
-      break;
+      if (SetTypeNodePath(filename,font_path,token,&type_info->glyphs) == MagickFalse)
+        type_info=(TypeInfo *) DestroyTypeNode(type_info);
     }
-    case 'F':
-    case 'f':
+  else if (LocaleCompare((char *) keyword,"metrics") == 0)
     {
-      if (LocaleCompare((char *) keyword,"face") == 0)
-        {
-          type_info->face=StringToUnsignedLong(token);
-          break;
-        }
-      if (LocaleCompare((char *) keyword,"family") == 0)
-        {
-          type_info->family=ConstantString(token);
-          break;
-        }
-      if (LocaleCompare((char *) keyword,"format") == 0)
-        {
-          type_info->format=ConstantString(token);
-          break;
-        }
-      if (LocaleCompare((char *) keyword,"foundry") == 0)
-        {
-          type_info->foundry=ConstantString(token);
-          break;
-        }
-      if (LocaleCompare((char *) keyword,"fullname") == 0)
-        {
-          type_info->description=ConstantString(token);
-          break;
-        }
-      break;
+      if (SetTypeNodePath(filename,font_path,token,&type_info->metrics) == MagickFalse)
+        type_info=(TypeInfo *) DestroyTypeNode(type_info);
     }
-    case 'G':
-    case 'g':
+  else if (LocaleCompare((char *) keyword,"name") == 0)
+    type_info->name=ConstantString(token);
+  else if (LocaleCompare((char *) keyword,"stealth") == 0)
+    type_info->stealth=IsStringTrue(token);
+  else if (LocaleCompare((char *) keyword,"stretch") == 0)
+    type_info->stretch=(StretchType) ParseCommandOption(
+      MagickStretchOptions,MagickFalse,token);
+  else if (LocaleCompare((char *) keyword,"style") == 0)
+    type_info->style=(StyleType) ParseCommandOption(MagickStyleOptions,
+      MagickFalse,token);
+  else if (LocaleCompare((char *) keyword,"weight") == 0)
     {
-      if (LocaleCompare((char *) keyword,"glyphs") == 0)
-        {
-          if (SetTypeNodePath(filename,font_path,token,&type_info->glyphs) == MagickFalse)
-            type_info=(TypeInfo *) DestroyTypeNode(type_info);
-          break;
-        }
-      break;
-    }
-    case 'M':
-    case 'm':
-    {
-      if (LocaleCompare((char *) keyword,"metrics") == 0)
-        {
-          if (SetTypeNodePath(filename,font_path,token,&type_info->metrics) == MagickFalse)
-            type_info=(TypeInfo *) DestroyTypeNode(type_info);
-          break;
-        }
-      break;
-    }
-    case 'N':
-    case 'n':
-    {
-      if (LocaleCompare((char *) keyword,"name") == 0)
-        {
-          type_info->name=ConstantString(token);
-          break;
-        }
-      break;
-    }
-    case 'S':
-    case 's':
-    {
-      if (LocaleCompare((char *) keyword,"stealth") == 0)
-        {
-          type_info->stealth=IsStringTrue(token);
-          break;
-        }
-      if (LocaleCompare((char *) keyword,"stretch") == 0)
-        {
-          type_info->stretch=(StretchType) ParseCommandOption(
-            MagickStretchOptions,MagickFalse,token);
-          break;
-        }
-      if (LocaleCompare((char *) keyword,"style") == 0)
-        {
-          type_info->style=(StyleType) ParseCommandOption(MagickStyleOptions,
-            MagickFalse,token);
-          break;
-        }
-      break;
-    }
-    case 'W':
-    case 'w':
-    {
-      if (LocaleCompare((char *) keyword,"weight") == 0)
-        {
-          ssize_t
-            weight;
+      ssize_t
+        weight;
 
-          weight=ParseCommandOption(MagickWeightOptions,MagickFalse,token);
-          if (weight == -1)
-            weight=(ssize_t) StringToUnsignedLong(token);
-          type_info->weight=(size_t) weight;
-          break;
-        }
-      break;
+      weight=ParseCommandOption(MagickWeightOptions,MagickFalse,token);
+      if (weight == -1)
+        weight=(ssize_t) StringToUnsignedLong(token);
+      type_info->weight=(size_t) weight;
     }
-    default:
-      break;
-  }
   return(type_info);
 }
 
