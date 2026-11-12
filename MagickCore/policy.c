@@ -1171,73 +1171,20 @@ static void GetIncludePath(const char *filename,const char *token,
 static void SetPolicyInfoAttribute(PolicyInfo *policy_info,const char *keyword,
   const char *token)
 {
-  switch (*keyword)
-  {
-    case 'D':
-    case 'd':
-    {
-      if (LocaleCompare((char *) keyword,"domain") == 0)
-        {
-          policy_info->domain=(PolicyDomain) ParseCommandOption(
-            MagickPolicyDomainOptions,MagickTrue,token);
-          break;
-        }
-      break;
-    }
-    case 'N':
-    case 'n':
-    {
-      if (LocaleCompare((char *) keyword,"name") == 0)
-        {
-          policy_info->name=AcquirePolicyString(token,1);
-          break;
-        }
-      break;
-    }
-    case 'P':
-    case 'p':
-    {
-      if (LocaleCompare((char *) keyword,"pattern") == 0)
-        {
-          policy_info->pattern=AcquirePolicyString(token,1);
-          break;
-        }
-      break;
-    }
-    case 'R':
-    case 'r':
-    {
-      if (LocaleCompare((char *) keyword,"rights") == 0)
-        {
-          policy_info->rights=(PolicyRights) ParseCommandOption(
-            MagickPolicyRightsOptions,MagickTrue,token);
-          break;
-        }
-      break;
-    }
-    case 'S':
-    case 's':
-    {
-      if (LocaleCompare((char *) keyword,"stealth") == 0)
-        {
-          policy_info->stealth=IsStringTrue(token);
-          break;
-        }
-      break;
-    }
-    case 'V':
-    case 'v':
-    {
-      if (LocaleCompare((char *) keyword,"value") == 0)
-        {
-          policy_info->value=AcquirePolicyString(token,1);
-          break;
-        }
-      break;
-    }
-    default:
-      break;
-  }
+  if (LocaleCompare((char *) keyword,"domain") == 0)
+    policy_info->domain=(PolicyDomain) ParseCommandOption(
+      MagickPolicyDomainOptions,MagickTrue,token);
+  else if (LocaleCompare((char *) keyword,"name") == 0)
+    policy_info->name=AcquirePolicyString(token,1);
+  else if (LocaleCompare((char *) keyword,"pattern") == 0)
+    policy_info->pattern=AcquirePolicyString(token,1);
+  else if (LocaleCompare((char *) keyword,"rights") == 0)
+    policy_info->rights=(PolicyRights) ParseCommandOption(
+      MagickPolicyRightsOptions,MagickTrue,token);
+  else if (LocaleCompare((char *) keyword,"stealth") == 0)
+    policy_info->stealth=IsStringTrue(token);
+  else if (LocaleCompare((char *) keyword,"value") == 0)
+    policy_info->value=AcquirePolicyString(token,1);
 }
 
 static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
