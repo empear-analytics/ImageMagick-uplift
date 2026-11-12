@@ -1028,6 +1028,17 @@ static const char *SkipCommentElement(const char *q,const size_t extent,
   return(q);
 }
 
+static void SetConfigureAttribute(ConfigureInfo *configure_info,
+  const char *keyword,const char *token)
+{
+  if (LocaleCompare(keyword,"name") == 0)
+    configure_info->name=ConstantString(token);
+  else if (LocaleCompare(keyword,"stealth") == 0)
+    configure_info->stealth=IsStringTrue(token);
+  else if (LocaleCompare(keyword,"value") == 0)
+    configure_info->value=ConstantString(token);
+}
+
 static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1145,41 +1156,7 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
       continue;
     (void) GetNextToken(q,&q,extent,token);
     (void) GetNextToken(q,&q,extent,token);
-    switch (*keyword)
-    {
-      case 'N':
-      case 'n':
-      {
-        if (LocaleCompare((char *) keyword,"name") == 0)
-          {
-            configure_info->name=ConstantString(token);
-            break;
-          }
-        break;
-      }
-      case 'S':
-      case 's':
-      {
-        if (LocaleCompare((char *) keyword,"stealth") == 0)
-          {
-            configure_info->stealth=IsStringTrue(token);
-            break;
-          }
-        break;
-      }
-      case 'V':
-      case 'v':
-      {
-        if (LocaleCompare((char *) keyword,"value") == 0)
-          {
-            configure_info->value=ConstantString(token);
-            break;
-          }
-        break;
-      }
-      default:
-        break;
-    }
+    SetConfigureAttribute(configure_info,keyword,token);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);
