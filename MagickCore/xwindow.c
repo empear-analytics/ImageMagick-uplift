@@ -11616,6 +11616,23 @@ MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
 %    o filename: the name of the image filename to display.
 %
 */
+static Window XRemoteWindowByName(Display *display,const Window root_window,
+  const char *window,Window remote_window)
+{
+  if (window != (char *) NULL)
+    {
+      /*
+        Search window hierarchy and identify any clients by name or ID.
+      */
+      if (isdigit((int) ((unsigned char) *window)) != 0)
+        remote_window=XWindowByID(display,root_window,(Window)
+          strtol((char *) window,(char **) NULL,0));
+      if (remote_window == (Window) NULL)
+        remote_window=XWindowByName(display,root_window,window);
+    }
+  return(remote_window);
+}
+
 MagickExport MagickBooleanType XRemoteCommand(Display *display,
   const char *window,const char *filename)
 {
@@ -11639,17 +11656,7 @@ MagickExport MagickBooleanType XRemoteCommand(Display *display,
   remote_atom=XInternAtom(display,"IM_PROTOCOLS",MagickFalse);
   remote_window=(Window) NULL;
   root_window=XRootWindow(display,XDefaultScreen(display));
-  if (window != (char *) NULL)
-    {
-      /*
-        Search window hierarchy and identify any clients by name or ID.
-      */
-      if (isdigit((int) ((unsigned char) *window)) != 0)
-        remote_window=XWindowByID(display,root_window,(Window)
-          strtol((char *) window,(char **) NULL,0));
-      if (remote_window == (Window) NULL)
-        remote_window=XWindowByName(display,root_window,window);
-    }
+  remote_window=XRemoteWindowByName(display,root_window,window,remote_window);
   if (remote_window == (Window) NULL)
     remote_window=XWindowByProperty(display,root_window,remote_atom);
   if (remote_window == (Window) NULL)
