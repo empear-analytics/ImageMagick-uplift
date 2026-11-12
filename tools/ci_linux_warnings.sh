@@ -12,16 +12,32 @@
 # delegate libraries. tools/ci_warnings.sh checks the macOS job's flags against
 # the oracle's HDRI build; neither sees what these jobs see.
 #
-# Four configurations, each configured once under build-oracle/ci-<cc>-<conf>:
-#   gcc and clang  x  min (no delegates, no X: the CI container) and
+# Six configurations, each configured once under build-oracle/ci-<cc>-<conf>:
+#   gcc and clang  x  min (no delegates, no X: the CI container),
 #                     dlg (the installed delegates and FFTW, as the Windows jobs
-#                     compile fourier.c and compare.c's FFT code; no X)
+#                     compile fourier.c and compare.c's FFT code; no X) and
+#                     x (X11, OpenCL and FFTW; see below)
 # with main.yml's CFLAGS, -Werror left out so a file's diagnostics show at once,
 # and these added for MSVC (C4456/C4457/C4459 hides a declaration; C2440/C2664
-# const to non-const pointer):
-#   gcc    -Wshadow -Wdiscarded-qualifiers
-#   clang  -Wshadow -Wincompatible-pointer-types-discards-qualifiers
-# plus a scan for MSVC's C4065 (a switch with a default but no case label),
+# const to non-const pointer or pointer-to-pointer, an `&` that makes `T **`
+# where `T *` is wanted):
+#   gcc    -Wshadow -Wincompatible-pointer-types -Wdiscarded-qualifiers
+#   clang  -Wshadow -Wincompatible-pointer-types
+#          -Wincompatible-pointer-types-discards-qualifiers
+# (-Wincompatible-pointer-types is on by default in both; naming it keeps it on
+# should a flag set ever add -Wno-... or move to gcc 14, where it is an error.)
+#
+# The x configurations (2026-11-12): xwindow.c, display.c, animate.c, widget.c,
+# accelerate.c, opencl.c and the OpenCL branches of other files are compiled out
+# of the other four, so a `const Quantum **` passed for a `const Quantum *` in
+# xwindow.c (XTransferAnnotatePixels attempt, W18 lane a) was never diagnosed by
+# any flag: the oracle's wide build caught it. The flags above catch it once the
+# code is compiled, and only the x configurations compile it. Those trees have
+# hundreds of upstream -Wshadow/-Wunused-parameter diagnostics CI would not see
+# either, so only the type-error classes are reported from them (see the filter
+# below). Needs the X11 and OpenCL development headers (libx11-dev, opencl-headers).
+#
+# Also a scan for MSVC's C4065 (a switch with a default but no case label),
 # which no gcc or clang warning reports. What the four found in campaign A on
 # 2026-11-10 (VERIFICATION.md, *CI warnings*): helpers taking `Quantum **` for a
 # caller's `Quantum *magick_restrict q`, `const` dropped between helpers, a
@@ -71,6 +87,7 @@ MIN_FLAGS=(--without-x --without-bzlib --without-djvu --without-dmr --without-fo
   --without-pango --without-png --without-raqm --without-raw --without-tiff --without-webp
   --without-xml --without-zip --without-zlib --without-zstd)
 DLG_FLAGS=(--without-x --with-fftw)
+X_FLAGS=(--with-x --enable-opencl --with-fftw)
 
 ci_cflags() {
   case $1 in
@@ -80,8 +97,8 @@ ci_cflags() {
 }
 extra_flags() {
   case $1 in
-    gcc) echo "-Wshadow -Wdiscarded-qualifiers" ;;
-    clang) echo "-Wshadow -Wincompatible-pointer-types-discards-qualifiers" ;;
+    gcc) echo "-Wshadow -Wincompatible-pointer-types -Wdiscarded-qualifiers" ;;
+    clang) echo "-Wshadow -Wincompatible-pointer-types -Wincompatible-pointer-types-discards-qualifiers" ;;
   esac
 }
 
@@ -93,13 +110,14 @@ configure_tree() {  # <cc> <conf>
   mkdir -p "$b"
   local extra=("${MIN_FLAGS[@]}")
   [ "$conf" = dlg ] && extra=("${DLG_FLAGS[@]}")
+  [ "$conf" = x ] && extra=("${X_FLAGS[@]}")
   (cd "$b" && CC=$cc CXX=$cxx CFLAGS="$flags" CXXFLAGS="$flags" \
      "$ROOT/configure" --with-quantum-depth=16 --enable-hdri=no --without-perl \
      --prefix=/usr "${extra[@]}" > configure.log 2>&1) \
     || { echo "configure failed, see $b/configure.log" >&2; return 1; }
 }
 
-CONFS="gcc-min clang-min gcc-dlg clang-dlg"
+CONFS="gcc-min clang-min gcc-dlg clang-dlg gcc-x clang-x"
 for c in $CONFS; do configure_tree "${c%-*}" "${c#*-}" & done
 wait
 for c in $CONFS; do
@@ -134,6 +152,13 @@ raw=$(cat "$TMP"/* 2>/dev/null)
 # clang 18 reports __func__ and __PRETTY_FUNCTION__ (const char[N]) passed to a
 # const char * parameter as discarding qualifiers, in every file; gcc and MSVC do not.
 raw=$(printf '%s\n' "$raw" | grep -v "passing 'const char\[[0-9]*\]' to parameter of type 'char \*'")
+
+# The x configurations exist for the code the others compile out. CI never
+# compiles it, and it has hundreds of upstream -Wshadow, -Wunused-parameter and
+# -Wsign-compare diagnostics, so from the x configurations only the type errors
+# MSVC would stop on are kept: a pointer-type mismatch, a dropped qualifier, an
+# implicit declaration, an int/pointer conversion.
+raw=$(printf '%s\n' "$raw" | awk -F'\t' '$2 !~ /-x$/ || $1 ~ /error:|\[-W(incompatible-pointer-types[a-z-]*|discarded-qualifiers|int-conversion|implicit-function-declaration)\]/')
 
 # Only diagnostics in the files asked about (not in the headers they include).
 pat=$(printf '%s\n' "${FILES[@]}" | sed "s#^$ROOT/##; s/\./\\\\./g; s/^/^/; s/\$/:/" | paste -sd'|')
