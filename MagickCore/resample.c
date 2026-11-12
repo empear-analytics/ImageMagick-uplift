@@ -887,6 +887,109 @@ static void ScanResampleRow(const ResampleRowInputs *row,
   }
 }
 
+typedef struct _ResampleAreaScan
+{
+  ResampleFilter
+    *resample_filter;
+
+  PixelInfo
+    *pixel;
+
+  double
+    u0,
+    v0,
+    u1;
+
+  ssize_t
+    v1,
+    v2,
+    uw;
+} ResampleAreaScan;
+
+typedef struct _ResampleAreaSums
+{
+  double
+    *divisor_m,
+    *divisor_c;
+
+  ssize_t
+    *hit;
+} ResampleAreaSums;
+
+static MagickBooleanType ScanResampleArea(const ResampleAreaScan *scan,
+  const ResampleAreaSums *sums)
+{
+  PixelInfo
+    *const pixel = scan->pixel;
+
+  ResampleFilter
+    *const resample_filter = scan->resample_filter;
+
+  const double
+    u0 = scan->u0,
+    v0 = scan->v0;
+
+  const ssize_t
+    uw = scan->uw,
+    v1 = scan->v1,
+    v2 = scan->v2;
+
+  double
+    *const divisor_c = sums->divisor_c,
+    *const divisor_m = sums->divisor_m,
+    DDQ,
+    DQ,
+    Q,
+    U,
+    u1 = scan->u1,
+    V;
+
+  const Quantum
+    *pixels;
+
+  ssize_t
+    *const hit = sums->hit,
+    u,
+    v;
+
+  DDQ = 2*resample_filter->A;
+  for( v=v1; v<=v2;  v++ ) {
+#if DEBUG_HIT_MISS
+    long uu = ceil(u1);   /* actual pixel location (for debug only) */
+    (void) FormatLocaleFile(stderr, "# scan line from pixel %ld, %ld\n", (long)uu, (long)v);
+#endif
+    u = (ssize_t)ceil(u1);        /* first pixel in scanline */
+    u1 += resample_filter->slope; /* start of next scan line */
+
+
+    /* location of this first pixel, relative to u0,v0 */
+    U = (double)u-u0;
+    V = (double)v-v0;
+
+    /* Q = ellipse quotient ( if Q<F then pixel is inside ellipse) */
+    Q = (resample_filter->A*U + resample_filter->B*V)*U + resample_filter->C*V*V;
+    DQ = resample_filter->A*(2.0*U+1) + resample_filter->B*V;
+
+    /* get the scanline of pixels for this v */
+    pixels=GetCacheViewVirtualPixels(resample_filter->view,u,v,(size_t) uw,
+      1,resample_filter->exception);
+    if (pixels == (const Quantum *) NULL)
+      return(MagickFalse);
+
+    /* count up the weighted pixel colors */
+    {
+      const ResampleRowInputs
+        row = { resample_filter, pixel, DDQ, uw };
+
+      const ResampleRowTargets
+        targets = { divisor_m, divisor_c, hit, &pixels, &Q, &DQ };
+
+      ScanResampleRow(&row,&targets);
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ResamplePixelColor(
   ResampleFilter *resample_filter,const double u0,const double v0,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -898,11 +1001,9 @@ MagickExport MagickBooleanType ResamplePixelColor(
   ResampleLimitPoint
     area;
 
-  ssize_t u,v, v1, v2, uw, hit;
+  ssize_t v1, v2, uw, hit;
   double u1;
-  double U,V,Q,DQ,DDQ;
   double divisor_c,divisor_m;
-  const Quantum *pixels;
   assert(resample_filter != (ResampleFilter *) NULL);
   assert(resample_filter->signature == MagickCoreSignature);
 
@@ -964,40 +1065,15 @@ MagickExport MagickBooleanType ResamplePixelColor(
     Do weighted resampling of all pixels,  within the scaled ellipse,
     bound by a Parallelogram fitted to the ellipse.
   */
-  DDQ = 2*resample_filter->A;
-  for( v=v1; v<=v2;  v++ ) {
-#if DEBUG_HIT_MISS
-    long uu = ceil(u1);   /* actual pixel location (for debug only) */
-    (void) FormatLocaleFile(stderr, "# scan line from pixel %ld, %ld\n", (long)uu, (long)v);
-#endif
-    u = (ssize_t)ceil(u1);        /* first pixel in scanline */
-    u1 += resample_filter->slope; /* start of next scan line */
+  {
+    const ResampleAreaScan
+      scan = { resample_filter, pixel, u0, v0, u1, v1, v2, uw };
 
+    const ResampleAreaSums
+      sums = { &divisor_m, &divisor_c, &hit };
 
-    /* location of this first pixel, relative to u0,v0 */
-    U = (double)u-u0;
-    V = (double)v-v0;
-
-    /* Q = ellipse quotient ( if Q<F then pixel is inside ellipse) */
-    Q = (resample_filter->A*U + resample_filter->B*V)*U + resample_filter->C*V*V;
-    DQ = resample_filter->A*(2.0*U+1) + resample_filter->B*V;
-
-    /* get the scanline of pixels for this v */
-    pixels=GetCacheViewVirtualPixels(resample_filter->view,u,v,(size_t) uw,
-      1,resample_filter->exception);
-    if (pixels == (const Quantum *) NULL)
+    if (ScanResampleArea(&scan,&sums) == MagickFalse)
       return(MagickFalse);
-
-    /* count up the weighted pixel colors */
-    {
-      const ResampleRowInputs
-        row = { resample_filter, pixel, DDQ, uw };
-
-      const ResampleRowTargets
-        targets = { &divisor_m, &divisor_c, &hit, &pixels, &Q, &DQ };
-
-      ScanResampleRow(&row,&targets);
-    }
   }
 #if DEBUG_ELLIPSE
   (void) FormatLocaleFile(stderr, "Hit=%ld;  Total=%ld;\n", (long)hit, (long)uw*(v2-v1) );
