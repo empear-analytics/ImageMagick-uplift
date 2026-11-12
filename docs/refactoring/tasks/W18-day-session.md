@@ -509,3 +509,46 @@ compilers; the header comment and `docs/refactoring/VERIFICATION.md` line 59 are
 by gcc-x and clang-x; `--campaign-a` passes on all 84 files in all six configurations (the first run builds the two new
 trees, about a minute); KNOWN is unchanged. The oracle gate therefore now includes the X and OpenCL files' pointer
 conversions in its CI check. Merged tree: 15,955 cases, 0 diverged.
+
+## Lane c, fourth round: widget.c 3.04 -> 3.08 (wide build, merged; the Font chain is mid-plan)
+
+66 commits on 51e74cccb (61 refactor on `widget.c`: 39 on `XColorBrowserWidget`, 22 on `XFontBrowserWidget`; 2 playbook; 3
+tools); whole wide catalogue 14,167 cases, 0 diverged. Every refactor commit passed `verify_wt` (oracle on the function,
+guard, calls, CI warnings) and obj_modulo (IDENTICAL or MODULO-IDENTICAL); each message lists its own measured cc, LoC and
+bumps. The local `casemap.py` staleness bypass was reverted, not committed.
+- **XColorBrowserWidget is finished (no finding left except its signature-level ones).** CT case tails (ClientMessage
+  51fc2fce2, SelectionNotify, Motion x2, KeyPress, ButtonRelease x2, ButtonPress x4: list entry 6af83f84b, whole case
+  2b08269c1); E KeyRelease value form f884403f7; H macros 39ede1b53; O step 7 (the Update layout in five runs plus the
+  whole `if` f26e6cb25, and the Redraw, Jump, RedrawList, RedrawAction and UpdateList blocks); LB `ReloadColorList`
+  b16147711; LC `WaitColorEvent` 4a19a4fa9 (**3.04 -> 3.06**, bumps 5 -> 4); SD x2 and N on the switch dc6435d88, N on the
+  loop 906314c2f; E three clean-up helpers, then `WidestColorBrowserName` f8ed2c21c (**3.06 -> 3.08**, leaves Bumpy Road);
+  O `RunColorBrowser` f92423d14 (about 35 lines out, cc stays 11); N `PositionColorBrowserWidget`, FB, E
+  `WithdrawBrowserWidget`; E `GetColorBrowserWidth` 14b6e820f drops Complex Method and Large Method together (score stays
+  3.08).
+- **XFontBrowserWidget is MID-PLAN (flat steps, 22 commits; the plan's raising step is not yet done):** cc 104 -> 49, LoC
+  792 -> 365, bumps 9 -> 6: all cases (CT, plus D reuse of `ReleaseWidgetKey`), H, the Update runs, the Redraw, Jump and
+  RedrawList blocks (638148f5e, the last commit). Still to do: RedrawAction, UpdateList, Wait, SD x2, the switch and the
+  loop, then the clean-up and set-up (UpdateList holds a `break` and a `return`, so the loop N needs a Recipe W-style helper
+  returning `MagickBooleanType`; RedrawAction assigns the caller's `font_info`, so it needs the pointer form). File and List
+  browsers: not started. The score moves only when all four browsers are clear (stub ceiling 3.66). Stopped at the commit
+  target, not at a plateau.
+- **Ordering lesson (measured):** taking Color out of Complex Method while it was still Large dipped 3.08 -> 2.93; steps
+  that cut lines while cc stayed at 9 (FB, then `WithdrawBrowserWidget`) came first and the last step crossed both thresholds
+  together. A Large Method needs LoC <= 69 (70 is flagged). Probe: 24 extra copies of three Dialog helpers produced no Code
+  Duplication finding.
+- **Recipe text (CT amendments, Decided by `owner`, 2026-11-10 OK; 0ccecfe88, 2df73482f):** step 3: six members stay the
+  limit, except for a struct that serves every block of one event loop (the cases of its `switch` and its `if (state &
+  ...)` blocks), which may hold one member per local of the loop's state; each block still writes two to six, each helper
+  binds only the members it names (a member it only reads included) and uses `(*v)`; step 4: a `const` targets struct of
+  another helper that the block passes on as `&t` goes as one more parameter `const T *t`, after the input struct and before
+  this recipe's targets struct, each `&t` written `t`; step 5: a member the helper only reads, whose variable another block
+  of the loop writes, and whose uses include a macro that names the variable (`QuantumMargin` names `font_info`), is bound
+  `T *const v = *targets->v;`. Stretch to check: `text[]` and `reset_pattern` go in the context as `char *` although
+  `XGetWidgetInfo` stores the address (same address). Tools: 17ed00058, 8a01372fc, 14558e37f (`case_tail_check.py` now reads
+  an extended initialiser, a passed-on struct, re-wrapped lines and the live binding).
+- **Message slip:** the Font commit that moves `PressFontBrowserReply` (45b4cfc08) does not mention the live `font_info`
+  binding (the playbook text came after the first attempt) and carries a stray "no finding on XNone".
+- Possible upstream: `XFontBrowserWidget`'s RedrawAction block does `font_info=XLoadQueryFont(...)`, calls `XFreeFont` and
+  never restores the variable, so later blocks (`QuantumMargin`, `FindFontBrowserCursor`) use a freed or NULL font (kept as
+  is); Color's and Font's SelectionRequest cases have no `break;` and fall into `default:`; Color's ButtonRelease ends
+  `if (MatteIsActive(reply_info,...) == MagickFalse) break; break;`.
