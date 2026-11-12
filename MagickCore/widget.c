@@ -9147,15 +9147,15 @@ static void PressFontBrowserScroll(const FontBrowserContext *context,
   PressFontBrowserButtons(context,event,widgets);
 }
 
-MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
-  const char *action,char *reply)
-{
 #define BackButtonText  "Back"
 #define CancelButtonText  "Cancel"
 #define FontnameText  "Name:"
 #define FontPatternText  "Pattern:"
 #define ResetButtonText  "Reset"
 
+MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
+  const char *action,char *reply)
+{
   char
     back_pattern[MagickPathExtent],
     **fontlist,
