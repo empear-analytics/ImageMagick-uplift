@@ -704,15 +704,9 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
   if ((1UL*QuantumRange) <= MaxMap)
   RestoreMSCWarning
     {
-      DepthMapImage
-        map_image;
+      const DepthMapImage
+        map_image = { image, image_view, depth, range, exception, status };
 
-      map_image.image=image;
-      map_image.image_view=image_view;
-      map_image.depth=depth;
-      map_image.range=range;
-      map_image.exception=exception;
-      map_image.status=status;
       return(SetImageDepthWithMap(&map_image));
     }
 #endif
