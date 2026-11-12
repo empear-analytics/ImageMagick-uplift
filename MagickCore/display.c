@@ -17023,6 +17023,18 @@ typedef struct _DisplayEventContext
 
   XFontStruct
     *font_info;
+
+  char
+    **argv;
+
+  int
+    argc;
+
+  XClassHint
+    *class_hints;
+
+  XWMHints
+    *manager_hints;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -17846,6 +17858,93 @@ static void XNameImageWindow(const DisplayEventContext *context,
       (void) CloneString(&windows->image.icon_name,filename);
     }
 }
+
+static void XInitializeBackdropWindow(const DisplayEventContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  const Window
+    root_window = context->root_window;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  char
+    **const argv = context->argv;
+
+  const int
+    argc = context->argc;
+
+  XClassHint
+    *const class_hints = context->class_hints;
+
+  XWMHints
+    *const manager_hints = context->manager_hints;
+
+  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
+    resource_info,&windows->backdrop);
+  if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
+    {
+      /*
+        Initialize backdrop window.
+      */
+      windows->backdrop.x=0;
+      windows->backdrop.y=0;
+      (void) CloneString(&windows->backdrop.name,"Backdrop");
+      windows->backdrop.flags=(size_t) (USSize | USPosition);
+      windows->backdrop.width=(unsigned int)
+        XDisplayWidth(display,visual_info->screen);
+      windows->backdrop.height=(unsigned int)
+        XDisplayHeight(display,visual_info->screen);
+      windows->backdrop.border_width=0;
+      windows->backdrop.immutable=MagickTrue;
+      windows->backdrop.attributes.do_not_propagate_mask=ButtonPressMask |
+        ButtonReleaseMask;
+      windows->backdrop.attributes.event_mask=ButtonPressMask | KeyPressMask |
+        StructureNotifyMask;
+      manager_hints->flags=IconWindowHint | InputHint | StateHint;
+      manager_hints->icon_window=windows->icon.id;
+      manager_hints->input=MagickTrue;
+      manager_hints->initial_state=resource_info->iconic ? IconicState :
+        NormalState;
+      XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+        &windows->backdrop);
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),
+          "Window id: 0x%lx (backdrop)",windows->backdrop.id);
+      (void) XMapWindow(display,windows->backdrop.id);
+      (void) XClearWindow(display,windows->backdrop.id);
+      if (windows->image.id != (Window) NULL)
+        {
+          (void) XDestroyWindow(display,windows->image.id);
+          windows->image.id=(Window) NULL;
+        }
+      /*
+        Position image in the center the backdrop.
+      */
+      windows->image.flags|=USPosition;
+      windows->image.x=(XDisplayWidth(display,visual_info->screen)/2)-
+        ((int) windows->image.width/2);
+      windows->image.y=(XDisplayHeight(display,visual_info->screen)/2)-
+        ((int) windows->image.height/2);
+    }
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18641,6 +18740,10 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.Menus=Menus;
   event_context.Commands=Commands;
   event_context.font_info=font_info;
+  event_context.argv=argv;
+  event_context.argc=argc;
+  event_context.class_hints=class_hints;
+  event_context.manager_hints=manager_hints;
   nexus=NewImageList();
   XLogDisplayImage(resource_info,display_image);
   XMakeStandardColormap(display,visual_info,resource_info,display_image,
@@ -18751,53 +18854,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
     KeyReleaseMask | LeaveWindowMask | OwnerGrabButtonMask |
     PropertyChangeMask | StructureNotifyMask | SubstructureNotifyMask;
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->backdrop);
-  if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
-    {
-      /*
-        Initialize backdrop window.
-      */
-      windows->backdrop.x=0;
-      windows->backdrop.y=0;
-      (void) CloneString(&windows->backdrop.name,"Backdrop");
-      windows->backdrop.flags=(size_t) (USSize | USPosition);
-      windows->backdrop.width=(unsigned int)
-        XDisplayWidth(display,visual_info->screen);
-      windows->backdrop.height=(unsigned int)
-        XDisplayHeight(display,visual_info->screen);
-      windows->backdrop.border_width=0;
-      windows->backdrop.immutable=MagickTrue;
-      windows->backdrop.attributes.do_not_propagate_mask=ButtonPressMask |
-        ButtonReleaseMask;
-      windows->backdrop.attributes.event_mask=ButtonPressMask | KeyPressMask |
-        StructureNotifyMask;
-      manager_hints->flags=IconWindowHint | InputHint | StateHint;
-      manager_hints->icon_window=windows->icon.id;
-      manager_hints->input=MagickTrue;
-      manager_hints->initial_state=resource_info->iconic ? IconicState :
-        NormalState;
-      XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-        &windows->backdrop);
-      if (resource_info->debug != MagickFalse)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),
-          "Window id: 0x%lx (backdrop)",windows->backdrop.id);
-      (void) XMapWindow(display,windows->backdrop.id);
-      (void) XClearWindow(display,windows->backdrop.id);
-      if (windows->image.id != (Window) NULL)
-        {
-          (void) XDestroyWindow(display,windows->image.id);
-          windows->image.id=(Window) NULL;
-        }
-      /*
-        Position image in the center the backdrop.
-      */
-      windows->image.flags|=USPosition;
-      windows->image.x=(XDisplayWidth(display,visual_info->screen)/2)-
-        ((int) windows->image.width/2);
-      windows->image.y=(XDisplayHeight(display,visual_info->screen)/2)-
-        ((int) windows->image.height/2);
-    }
+  XInitializeBackdropWindow(&event_context);
   manager_hints->flags=IconWindowHint | InputHint | StateHint;
   manager_hints->icon_window=windows->icon.id;
   manager_hints->input=MagickTrue;
