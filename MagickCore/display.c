@@ -12541,6 +12541,32 @@ static void XClampPanOffset(XWindows *windows,RectangleInfo *pan_info,
       (*pan_info).y=(ssize_t) (windows->image.ximage->height-(int)
         windows->image.height);
 }
+
+static void XDisplayPanOffset(Display *display,XWindows *windows,
+  const RectangleInfo pan_info)
+{
+  char
+    text[MagickPathExtent];
+
+  if ((windows->image.x != (int) pan_info.x) ||
+      (windows->image.y != (int) pan_info.y))
+    {
+      /*
+        Display image pan offset.
+      */
+      windows->image.x=(int) pan_info.x;
+      windows->image.y=(int) pan_info.y;
+      (void) FormatLocaleString(text,MagickPathExtent," %ux%u%+d%+d ",
+        windows->image.width,windows->image.height,windows->image.x,
+        windows->image.y);
+      XInfoWidget(display,windows,text);
+      /*
+        Refresh Image window.
+      */
+      XDrawPanRectangle(display,windows);
+      XRefreshWindow(display,&windows->image,(XEvent *) NULL);
+    }
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12576,9 +12602,6 @@ static void XClampPanOffset(XWindows *windows,RectangleInfo *pan_info,
 static void XPanImage(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
-  char
-    text[MagickPathExtent];
-
   Cursor
     cursor;
 
@@ -12648,24 +12671,7 @@ static void XPanImage(Display *display,XWindows *windows,XEvent *event,
           Check boundary conditions.
         */
         XClampPanOffset(windows,&pan_info,x_factor,y_factor);
-        if ((windows->image.x != (int) pan_info.x) ||
-            (windows->image.y != (int) pan_info.y))
-          {
-            /*
-              Display image pan offset.
-            */
-            windows->image.x=(int) pan_info.x;
-            windows->image.y=(int) pan_info.y;
-            (void) FormatLocaleString(text,MagickPathExtent," %ux%u%+d%+d ",
-              windows->image.width,windows->image.height,windows->image.x,
-              windows->image.y);
-            XInfoWidget(display,windows,text);
-            /*
-              Refresh Image window.
-            */
-            XDrawPanRectangle(display,windows);
-            XRefreshWindow(display,&windows->image,(XEvent *) NULL);
-          }
+        XDisplayPanOffset(display,windows,pan_info);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
     /*
