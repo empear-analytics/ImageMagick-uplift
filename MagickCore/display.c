@@ -15644,6 +15644,26 @@ static void XScreenExpose(Display *display,XWindows *windows,XEvent *event,
     }
 }
 
+static void XScreenKeyPress(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  if (event->xkey.window != windows->magnify.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &event->xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  XMagnifyWindowCommand(display,windows,event->xkey.state,key_symbol,
+    exception);
+}
+
 static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
@@ -15679,21 +15699,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
     }
     case KeyPress:
     {
-      char
-        command[MagickPathExtent];
-
-      KeySym
-        key_symbol;
-
-      if (event->xkey.window != windows->magnify.id)
-        break;
-      /*
-        Respond to a user key press.
-      */
-      (void) XLookupString((XKeyEvent *) &event->xkey,command,(int)
-        sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-      XMagnifyWindowCommand(display,windows,event->xkey.state,key_symbol,
-        exception);
+      XScreenKeyPress(display,windows,event,exception);
       break;
     }
     case MapNotify:
