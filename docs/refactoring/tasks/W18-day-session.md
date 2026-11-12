@@ -262,3 +262,38 @@ set. Possible upstream: XMenuWidget `width=WidgetTextWidth(...title)` is a dead 
 gaps: `case_tail_check.py` fails on an extended targets initialiser and on `&targets` becoming `targets`. Message slips
 (amended): the Notice Move commit now says `dismiss_info` is the only written variable; the TextView reuse commit first
 carried the Preferences message after a race with a background run.
+
+## Lane a, fourth round: xwindow.c 1.99 -> 2.27 (wide build, merged); composite, feature-texture, layer no commit
+
+21 commits; whole catalogue wide 14,145 and narrow 15,900 cases, 0 diverged. Each step ran `verify_wt`, guard, `--calls`,
+`ci_linux_warnings` and obj_modulo (every step MODULO-IDENTICAL or IDENTICAL, 66 other functions compared); verify prints
+VERIFY FAILED only from the two old `ci_warnings` diagnostics.
+- **XMakeImageLSBFirst** (514 cases): 5cd4c069e N+E7 bitmap row helper, baf8a126c N y-loop helper (flat), 528e1ed44 O
+  matte row (`x` and `q` out-parameters) 2.03 (leaves Deep Nesting). **XMakeImageMSBFirst** (no case): fcccf9a64 N (flat);
+  801344a36 E step 4 (amended) matte row 2.06 (leaves Deep Nesting; a first O version was reset: O is not open to unreached
+  functions). **XDitherImage** (no case): 1940bd2c8, bd55c2844, 647d2f6df N red, green and blue entry helpers sharing one
+  struct, 2.10 (leaves Deep Nesting; the red and green helpers are twins and are not flagged as duplicates).
+  **XMakeMagnifyImage** (13 cases): 89b8b9fb3 E, 2201eff1a, f50782fbb, 9adb49685 N (8-bit and multi-byte cases, flat);
+  cfc9c0720, 83afa1be4 Z (MSB, 2.18); 13a7b9b8c, 797e307af N (MSB, 2.23); 75383d3d5, 8b0b32d47 N (bitmap row loops,
+  flat); cfc0daabe SG shape (b) on both `if (XYBitmap) {S; if (Swap)}` blocks 2.27 (leaves Deep Nesting; depth 8 -> 3,
+  cc 72 -> 47, 366 -> 288 lines). The W17 note that only Q fits was wrong: the four case loops are N, E and Z, since `y` and
+  `q` are dead after them. 71f3616ee tools (`struct_fill_check.py` reads `(*name)[N]` members); f7e16c4d8 playbook.
+- **Recipe text (Decided by `owner`, 2026-11-10 OK): Recipe E step 4 amendment.** A variable the block writes before it
+  reads on every path, that nothing after the block reads, and whose only use left in the caller would be a store before the
+  block that nothing else reads (a column counter `x` set by `x=0;` above a loop the block's own `for` restarts), so that
+  declaring it in the new function would leave that store set but never used (`-Wunused-but-set-variable`, an error in the
+  CI jobs; no recipe deletes the store), passes as a pointer `T *v` on Recipe O step 2's last paragraph's terms.
+- Plateau xwindow.c 2.27: XMakeImage (Brain Method, shared-memory `#if` blocks plus three other depth-4 sites; emptied
+  2.57, without the shm blocks 2.35), XBestVisualInfo and DestroyXResources (`#if` blocks); XGetWindowImage (+0.05 if
+  emptied: two different exits, the switch's `while` loops keep depth 4); SG found no usable shape (9 of 33 candidate spreads
+  rescored, all flat or worse).
+- **composite.c 3.69:** the bumps in `CompositeImage` are the Intensity loop (a clone of `CompositeCopyImage`: owner
+  question), the Displace loop and the main loop (progress-tail pragma blocks); the score stays flat until all go, and the
+  function emptied scores 3.71; no SG, UX or LC shape found. **feature-texture.c 7.63:** the two bumps are the parallel
+  grays column loop (the owner's per-iteration-slot question; removing it scores 7.75) and the tail loops need `shared(status)`
+  used in a helper. **layer.c 8.25:** the first validation loop's `ThrowImageException` calls differ in tag (V, I, RV refuse),
+  the frame loop's else block carries `#if DEBUG_OPT_FRAME`, SG-style rewrites of the `x < 0` nest left the bump count at 3.
+- Possible upstream: `XGetWindowImage`'s second exit (`AcquireMagickMemory(p)` failure) leaks `colors` and `ximage`, unlike
+  the first exit; the dead `x=0;` stores in `XMakeImageLSBFirst`/`MSBFirst` remain (now kept alive by passing `&x`).
+  Tool notes: `refactor_guard --calls` prints a stray `+2 short` for a member declared `const short (*v)[16]` (still
+  PASS); cs-mcp rates all three bump-removing steps flat when a helper still has two or more bumps.
