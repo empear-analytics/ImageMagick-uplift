@@ -460,6 +460,52 @@ static MagickBooleanType AuthorizeDelegateArguments(char **arguments,
   return(MagickTrue);
 }
 
+#if defined(MAGICKCORE_POSIX_SUPPORT) && defined(MAGICKCORE_HAVE_EXECVP)
+static int RunDelegateProgram(char **arguments,const char *sanitize_command)
+{
+  int
+    status = (-1);
+
+  pid_t
+    child_pid;
+
+  /*
+    Call application directly rather than from a shell.
+  */
+  child_pid=(pid_t) fork();
+  if (child_pid == (pid_t) -1)
+    status=system(sanitize_command);
+  else
+    if (child_pid == 0)
+      {
+        status=execvp(arguments[1],arguments+1);
+        _exit(1);
+      }
+    else
+      {
+        int
+          child_status;
+
+        pid_t
+          pid;
+
+        child_status=0;
+        pid=(pid_t) waitpid(child_pid,&child_status,0);
+        if (pid == -1)
+          status=(-1);
+        else
+          {
+            if (WIFEXITED(child_status) != 0)
+              status=WEXITSTATUS(child_status);
+            else
+              if (WIFSIGNALED(child_status))
+                status=(-1);
+          }
+      }
+  return(status);
+}
+#endif
+
 MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   const MagickBooleanType verbose,const char *command,char *message,
   ExceptionInfo *exception)
@@ -525,44 +571,7 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
           (strpbrk(sanitize_command,"&;<>|") != (char *) NULL))
         status=system(sanitize_command);
       else
-        {
-          pid_t
-            child_pid;
-
-          /*
-            Call application directly rather than from a shell.
-          */
-          child_pid=(pid_t) fork();
-          if (child_pid == (pid_t) -1)
-            status=system(sanitize_command);
-          else
-            if (child_pid == 0)
-              {
-                status=execvp(arguments[1],arguments+1);
-                _exit(1);
-              }
-            else
-              {
-                int
-                  child_status;
-
-                pid_t
-                  pid;
-
-                child_status=0;
-                pid=(pid_t) waitpid(child_pid,&child_status,0);
-                if (pid == -1)
-                  status=(-1);
-                else
-                  {
-                    if (WIFEXITED(child_status) != 0)
-                      status=WEXITSTATUS(child_status);
-                    else
-                      if (WIFSIGNALED(child_status))
-                        status=(-1);
-                  }
-              }
-        }
+        status=RunDelegateProgram(arguments,sanitize_command);
 #endif
     }
 #elif defined(MAGICKCORE_WINDOWS_SUPPORT)
