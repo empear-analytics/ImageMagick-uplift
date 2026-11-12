@@ -404,6 +404,76 @@ static void RaiseMappedRowDepth(MagickBooleanType *status,
   if (scan->current_depth[id] == MAGICKCORE_QUANTUM_DEPTH)
     (*status)=MagickFalse;
 }
+
+typedef struct _DepthMapImage
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    *current_depth,
+    number_threads;
+
+  MagickBooleanType
+    status;
+} DepthMapImage;
+
+static size_t GetMappedImageDepth(const DepthMapImage *map_image)
+{
+  CacheView
+    *image_view = map_image->image_view;
+
+  const Image
+    *const image = map_image->image;
+
+  ExceptionInfo
+    *const exception = map_image->exception;
+
+  MagickBooleanType
+    status = map_image->status;
+
+  const size_t
+    number_threads = map_image->number_threads;
+
+  size_t
+    *current_depth = map_image->current_depth,
+    *depth_map,
+    depth;
+
+  ssize_t
+    i,
+    y;
+
+  /*
+    Scale pixels to desired (optimized with depth map).
+  */
+  depth_map=AcquireDepthMap();
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const DepthMapScan
+      scan = { image, image_view, depth_map, exception, current_depth };
+
+    RaiseMappedRowDepth(&status,&scan,y);
+  }
+  image_view=DestroyCacheView(image_view);
+  depth=current_depth[0];
+  for (i=1; i < (ssize_t) number_threads; i++)
+    if (depth < current_depth[i])
+      depth=current_depth[i];
+  depth_map=(size_t *) RelinquishMagickMemory(depth_map);
+  current_depth=(size_t *) RelinquishMagickMemory(current_depth);
+  return(depth);
+}
 #endif
 
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
@@ -450,32 +520,16 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
   if ((1UL*QuantumRange) <= MaxMap)
   RestoreMSCWarning
     {
-      size_t
-        *depth_map;
+      DepthMapImage
+        map_image;
 
-      /*
-        Scale pixels to desired (optimized with depth map).
-      */
-      depth_map=AcquireDepthMap();
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,1)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const DepthMapScan
-          scan = { image, image_view, depth_map, exception, current_depth };
-
-        RaiseMappedRowDepth(&status,&scan,y);
-      }
-      image_view=DestroyCacheView(image_view);
-      depth=current_depth[0];
-      for (i=1; i < (ssize_t) number_threads; i++)
-        if (depth < current_depth[i])
-          depth=current_depth[i];
-      depth_map=(size_t *) RelinquishMagickMemory(depth_map);
-      current_depth=(size_t *) RelinquishMagickMemory(current_depth);
-      return(depth);
+      map_image.image=image;
+      map_image.image_view=image_view;
+      map_image.exception=exception;
+      map_image.current_depth=current_depth;
+      map_image.number_threads=number_threads;
+      map_image.status=status;
+      return(GetMappedImageDepth(&map_image));
     }
 #endif
   /*
