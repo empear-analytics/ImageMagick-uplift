@@ -973,12 +973,33 @@ static unsigned int XIconHeight(const XIconSize *icon_size,
   return(icon_height);
 }
 
+static XIconSize *XPreferredIconSize(Display *display,
+  const XWindowInfo *window)
+{
+  int
+    number_sizes;
+
+  Window
+    root_window;
+
+  XIconSize
+    *icon_size,
+    *size_list;
+
+  icon_size=(XIconSize *) NULL;
+  number_sizes=0;
+  root_window=XRootWindow(display,window->screen);
+  if (XGetIconSizes(display,root_window,&size_list,&number_sizes) != 0)
+    if ((number_sizes > 0) && (size_list != (XIconSize *) NULL))
+      icon_size=size_list;
+  return(icon_size);
+}
+
 MagickPrivate void XBestIconSize(Display *display,XWindowInfo *window,
   Image *image)
 {
   int
-    i,
-    number_sizes;
+    i;
 
   double
     scale_factor;
@@ -989,12 +1010,8 @@ MagickPrivate void XBestIconSize(Display *display,XWindowInfo *window,
     icon_width,
     width;
 
-  Window
-    root_window;
-
   XIconSize
-    *icon_size,
-    *size_list;
+    *icon_size;
 
   /*
     Determine if the window manager has specified preferred icon sizes.
@@ -1006,12 +1023,7 @@ MagickPrivate void XBestIconSize(Display *display,XWindowInfo *window,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   window->width=MaxIconSize;
   window->height=MaxIconSize;
-  icon_size=(XIconSize *) NULL;
-  number_sizes=0;
-  root_window=XRootWindow(display,window->screen);
-  if (XGetIconSizes(display,root_window,&size_list,&number_sizes) != 0)
-    if ((number_sizes > 0) && (size_list != (XIconSize *) NULL))
-      icon_size=size_list;
+  icon_size=XPreferredIconSize(display,window);
   if (icon_size == (XIconSize *) NULL)
     {
       /*
