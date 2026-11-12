@@ -7471,6 +7471,73 @@ by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe NG - Drop a NULL Guard Before a NULL-Safe Release
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Lines of Code in a
+Single File*, and the function holds `if (x != NULL) x=Release(x);` where `Release` is a
+MagickCore routine that returns at once when handed `NULL`: `DestroyString`,
+`RelinquishMagickMemory`, `DestroyExceptionInfo`, `DestroyImage`, `DestroyImageInfo`, and
+the other `Destroy*` and `Relinquish*` routines whose first statement tests for `NULL`
+(`policy.c`'s `IsRightsAuthorizedByName` and `DestroyPolicyElement`). Each guard is a
+branch and a line; a file at the 1,000-line limit has no room for the helpers an
+extraction adds.
+
+**Not covered by:** Recipe G, which inverts a condition into an early exit and keeps the
+test; Recipe CN, which merges nested `if`s and keeps every test; Recipe E, which moves a
+block. Nothing else removes a test.
+
+**How:**
+
+1. Find a statement `if (x != (T *) NULL)` (or `if (x)`) with one controlled statement,
+   `x=Release(x);` or `Release(x);`, for the same `x`, no `else` and no braces.
+2. Read `Release` in this repository and confirm that its body, or the body of the one
+   function it returns the value of, begins `if (x == NULL) return(NULL);` or the
+   equivalent (`DestroyString` returns `RelinquishMagickMemory`, which does). A callee
+   that does not, or one reached through a function pointer, refuses the step.
+3. Delete the `if` line, keeping the statement as it was; its indentation moves one step
+   less. A run of such guards in one function may go in one commit.
+4. Refuse a guard whose `x` is a macro argument, a side-effecting expression (`*p++`), or
+   a pointer the controlled statement is the only reader of after a test that has other
+   effects.
+
+**Before:**
+
+```c
+  if (canonical_candidate != (char *) NULL)
+    canonical_candidate=DestroyString(canonical_candidate);
+  if (canonical_path != (char *) NULL)
+    canonical_path=DestroyString(canonical_path);
+```
+
+**After:**
+
+```c
+  canonical_candidate=DestroyString(canonical_candidate);
+  canonical_path=DestroyString(canonical_path);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The callee does nothing for `NULL` and returns `NULL`,
+  so the assignment stores `NULL` back into a variable that held `NULL`; with a non-NULL
+  `x` the guarded call ran before too. The object code differs (one test fewer), so
+  `obj_identical.sh` does not apply; step 2's reading is the proof.
+- A routine that logs, counts or asserts on `NULL` (`DestroyImage` asserts its argument
+  in debug builds) is refused by step 2, which asks for the first statement to be the
+  `NULL` return.
+- Memory: nothing is freed that was not, and nothing is freed twice.
+
+**Evidence level:** oracle, for the functions the step changes (`casemap.py` first), and
+the reading of step 2 stated in the commit message.
+
+**Provenance:** 2026-11-12, from `policy.c`'s `IsRightsAuthorizedByName` (three guards
+before `DestroyString`) and `DestroyPolicyElement` (four), campaign B, M120: the file
+sat at the 1,000-line limit and every extraction (include handler of `LoadPolicyCache`,
+4.83 to 4.58) crossed it; seven guards removed gave 4.88 and `IsRightsAuthorizedByName`
+cc 27 to 24. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -7773,3 +7840,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-07 | AMEND | PS | Step 6: the helper may read the input struct as `name->member` at every use (Recipe N step 4's member form, as Q step 4 allows), the text then changing by that prefix too; a member a function-like macro names keeps its `const` local. When every member's value is a plain identifier that nothing in the loop body writes, the struct may be declared `const` with the values as its initialiser among the loop body's declarations (PC step 4's form). Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): its column loop body, fourteen inputs, as a step 7 nested-loop helper with `const` locals would be a *Large Method* (about 87 lines by count); in the member form 60 lines, no finding, 6.30 to 6.51 | mandate (2026-10-24) |
 | 2026-11-07 | AMEND | N | Step 8: the sibling and later-block forms also join a PS step 7 nested-loop helper and the parallel body's head moved by PC: the head takes the PS struct (declared `const` with its initialiser among the body's declarations, which stays), the typedef and initialiser gain the members the head reads, the head binds them as `const` locals (PC keeps its text), and the inner call passes `name`. Still eight steps | `distort.c`'s `DistortImage` (campaign A, W15 lane b): PC before the column body moves gives a *Complex* and *Large* helper (6.30 to 6.21); after it, with its own struct, about 80 lines; sharing the PS struct, 52 lines and no finding, 6.51 to 6.62 | mandate (2026-10-24) |
 | 2026-11-09 | NEW | EJ | Join an Else and its Sole If: `else` and the `if` on the next line become `else if` on one line, whitespace only; proof `obj_identical.sh` | `color.c`'s DOCTYPE skipper (extraction verbatim 4.24 to 4.09; with the chain joined 4.42) and the hex-digit loops of `QueryColorCompliance`; unbraced `else`/`if` nesting counts as a level for CodeScene | mandate (2026-10-24) |
+| 2026-11-12 | NEW | NG | Drop the `NULL` guard before a release routine that returns at once on `NULL` (`x=DestroyString(x)`); proof by reading the callee, evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (3 guards) and `DestroyPolicyElement` (4): a file at the 1,000-line limit loses 0.25 to *Lines of Code in a Single File* when an extraction adds lines; 4.58 to 4.88 with the guards gone | mandate (2026-10-24) |
