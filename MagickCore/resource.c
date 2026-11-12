@@ -227,6 +227,19 @@ static void UnlockResourceSemaphore(const ResourceType type)
 %    o size: the number of bytes needed from for this resource.
 %
 */
+static MagickBooleanType AcquireResourceCounter(MagickOffsetType *counter,
+  const MagickOffsetType request,const MagickSizeType limit)
+{
+  if (*counter > (MagickOffsetMax-request))
+    return(MagickFalse);
+  *counter+=request;
+  if ((limit == MagickResourceInfinity) ||
+      (*counter < (MagickOffsetType) limit))
+    return(MagickTrue);
+  *counter-=request;
+  return(MagickFalse);
+}
+
 MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
   const MagickSizeType size)
 {
@@ -264,15 +277,7 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
     {
       bi=MagickTrue;
       limit=resource_info.disk_limit;
-      if (resource_info.disk <= (MagickOffsetMax-request))
-        {
-          resource_info.disk+=request;
-          if ((limit == MagickResourceInfinity) ||
-              (resource_info.disk < (MagickOffsetType) limit))
-            status=MagickTrue;
-          else
-            resource_info.disk-=request;
-        }
+      status=AcquireResourceCounter(&resource_info.disk,request,limit);
       current=resource_info.disk;
       break;
     }
@@ -310,15 +315,7 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
     {
       bi=MagickTrue;
       limit=resource_info.map_limit;
-      if (resource_info.map <= (MagickOffsetMax-request))
-        {
-          resource_info.map+=request;
-          if ((limit == MagickResourceInfinity) ||
-              (resource_info.map < (MagickOffsetType) limit))
-            status=MagickTrue;
-          else
-            resource_info.map-=request;
-        }
+      status=AcquireResourceCounter(&resource_info.map,request,limit);
       current=resource_info.map;
       break;
     }
@@ -326,15 +323,7 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
     {
       bi=MagickTrue;
       limit=resource_info.memory_limit;
-      if (resource_info.memory <= (MagickOffsetMax-request))
-        {
-          resource_info.memory+=request;
-          if ((limit == MagickResourceInfinity) ||
-              (resource_info.memory < (MagickOffsetType) limit))
-            status=MagickTrue;
-          else
-            resource_info.memory-=request;
-        }
+      status=AcquireResourceCounter(&resource_info.memory,request,limit);
       current=resource_info.memory;
       break;
     }
@@ -357,15 +346,7 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
     case TimeResource:
     {
       limit=resource_info.time_limit;
-      if (resource_info.time <= (MagickOffsetMax-request))
-        {
-          resource_info.time+=request;
-          if ((limit == MagickResourceInfinity) ||
-              (resource_info.time < (MagickOffsetType) limit))
-            status=MagickTrue;
-          else
-            resource_info.time-=request;
-        }
+      status=AcquireResourceCounter(&resource_info.time,request,limit);
       current=resource_info.time;
       break;
     }
