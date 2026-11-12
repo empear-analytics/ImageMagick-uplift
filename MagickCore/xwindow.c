@@ -8178,6 +8178,34 @@ static unsigned char *XPackBitmapRowMSB(const XBitmapPacking *bitmap,
   return(q);
 }
 
+static unsigned char *XPackMatteRowMSB(const Image *canvas,const Quantum *p,
+  unsigned char *q,int *x)
+{
+  unsigned char
+    bit,
+    byte;
+
+  bit=0;
+  byte=0;
+  for ((*x)=(int) canvas->columns-1; (*x) >= 0; (*x)--)
+  {
+    byte<<=1;
+    if (GetPixelAlpha(canvas,p) > (QuantumRange/2))
+      byte|=0x01;
+    bit++;
+    if (bit == 8)
+      {
+        *q++=byte;
+        bit=0;
+        byte=0;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  if (bit != 0)
+    *q=byte << (8-bit);
+  return(q);
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -8207,10 +8235,6 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
 
   unsigned char
     *q;
-
-  unsigned char
-    bit,
-    byte;
 
   unsigned int
     scanline_pad;
@@ -8390,24 +8414,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
           exception);
         if (p == (const Quantum *) NULL)
           break;
-        bit=0;
-        byte=0;
-        for (x=(int) canvas->columns-1; x >= 0; x--)
-        {
-          byte<<=1;
-          if (GetPixelAlpha(canvas,p) > (QuantumRange/2))
-            byte|=0x01;
-          bit++;
-          if (bit == 8)
-            {
-              *q++=byte;
-              bit=0;
-              byte=0;
-            }
-          p+=(ptrdiff_t) GetPixelChannels(canvas);
-        }
-        if (bit != 0)
-          *q=byte << (8-bit);
+        q=XPackMatteRowMSB(canvas,p,q,&x);
         q+=(ptrdiff_t) scanline_pad;
       }
     }
