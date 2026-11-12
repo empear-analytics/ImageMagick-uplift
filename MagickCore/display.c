@@ -16143,6 +16143,21 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XSetCursorState(display,windows,MagickFalse);
   return(tile_image);
 }
+
+static void XClampImageOffset(XWindows *windows)
+{
+  if (windows->image.x < 0)
+    windows->image.x=0;
+  else
+    if ((windows->image.x+(int) windows->image.width) > windows->image.ximage->width)
+      windows->image.x=windows->image.ximage->width-(int) windows->image.width;
+  if (windows->image.y < 0)
+    windows->image.y=0;
+  else
+    if ((windows->image.y+(int) windows->image.height) > windows->image.ximage->height)
+      windows->image.y=windows->image.ximage->height-(int)
+        windows->image.height;
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -16239,17 +16254,7 @@ static void XTranslateImage(Display *display,XWindows *windows,
   /*
     Check boundary conditions.
   */
-  if (windows->image.x < 0)
-    windows->image.x=0;
-  else
-    if ((windows->image.x+(int) windows->image.width) > windows->image.ximage->width)
-      windows->image.x=windows->image.ximage->width-(int) windows->image.width;
-  if (windows->image.y < 0)
-    windows->image.y=0;
-  else
-    if ((windows->image.y+(int) windows->image.height) > windows->image.ximage->height)
-      windows->image.y=windows->image.ximage->height-(int)
-        windows->image.height;
+  XClampImageOffset(windows);
   /*
     Refresh Image window.
   */
