@@ -3624,6 +3624,38 @@ static void InitializeCommandButtons(const CommandLayout *layout)
     (void) XClearWindow(display,windows->command.id);
 }
 
+static void ReconfigureCommandWindow(Display *display,XWindows *windows)
+{
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  if (windows->command.id != (Window) NULL)
+    {
+      Status
+        status;
+
+      /*
+        Reconfigure command window.
+      */
+      status=XStringListToTextProperty(&windows->command.name,1,
+        &window_name);
+      if (status != False)
+        {
+          XSetWMName(display,windows->command.id,&window_name);
+          XSetWMIconName(display,windows->command.id,&window_name);
+          (void) XFree((void *) window_name.value);
+        }
+      window_changes.width=(int) windows->command.width;
+      window_changes.height=(int) windows->command.height;
+      (void) XReconfigureWMWindow(display,windows->command.id,
+        windows->command.screen,(unsigned int) (CWWidth | CWHeight),
+        &window_changes);
+    }
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -3661,12 +3693,6 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
       unsigned int
         width;
 
-      XTextProperty
-        window_name;
-
-      XWindowChanges
-        window_changes;
-
       /*
         Determine command window attributes.
       */
@@ -3687,28 +3713,7 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
       windows->command.min_width=windows->command.width;
       windows->command.min_height=windows->command.height;
       XConstrainWindowPosition(display,&windows->command);
-      if (windows->command.id != (Window) NULL)
-        {
-          Status
-            status;
-
-          /*
-            Reconfigure command window.
-          */
-          status=XStringListToTextProperty(&windows->command.name,1,
-            &window_name);
-          if (status != False)
-            {
-              XSetWMName(display,windows->command.id,&window_name);
-              XSetWMIconName(display,windows->command.id,&window_name);
-              (void) XFree((void *) window_name.value);
-            }
-          window_changes.width=(int) windows->command.width;
-          window_changes.height=(int) windows->command.height;
-          (void) XReconfigureWMWindow(display,windows->command.id,
-            windows->command.screen,(unsigned int) (CWWidth | CWHeight),
-            &window_changes);
-        }
+      ReconfigureCommandWindow(display,windows);
       /*
         Allocate selection info memory.
       */
