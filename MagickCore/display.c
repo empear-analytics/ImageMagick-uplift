@@ -1588,6 +1588,13 @@ static void
   XSetCropGeometry(Display *,XWindows *,RectangleInfo *,Image *),
   XScreenEvent(Display *,XWindows *,XEvent *,ExceptionInfo *),
   XTranslateImage(Display *,XWindows *,Image *,const KeySym);
+
+static void XSetPageGeometry(const ImageInfo *image_info,
+  XResourceInfo *resource_info)
+{
+  if (image_info->page != (char *) NULL)
+    (*resource_info).image_geometry=AcquireString(image_info->page);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1661,8 +1668,7 @@ MagickExport MagickBooleanType DisplayImages(const ImageInfo *image_info,
   resource_database=XGetResourceDatabase(display,GetClientName());
   (void) memset(&resource_info,0,sizeof(resource_info));
   XGetResourceInfo(image_info,resource_database,GetClientName(),&resource_info);
-  if (image_info->page != (char *) NULL)
-    resource_info.image_geometry=AcquireString(image_info->page);
+  XSetPageGeometry(image_info,&resource_info);
   resource_info.immutable=MagickTrue;
   argv[0]=AcquireString(GetClientName());
   state=DefaultState;
