@@ -601,6 +601,26 @@ static int XTransferAnnotatePixels(const AnnotatePixels *annotate_pixels)
   return(y);
 }
 
+static Image *XScaleAnnotateImage(Image *annotate_image,
+  const unsigned int width,const unsigned int height,ExceptionInfo *exception)
+{
+  if ((width != (unsigned int) annotate_image->columns) ||
+      (height != (unsigned int) annotate_image->rows))
+    {
+      char
+        image_geometry[MagickPathExtent];
+
+      /*
+        Scale image.
+      */
+      (void) FormatLocaleString(image_geometry,MagickPathExtent,"%ux%u",
+        width,height);
+      (void) TransformImage(&annotate_image,(char *) NULL,image_geometry,
+        exception);
+    }
+  return(annotate_image);
+}
+
 MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
   ExceptionInfo *exception)
@@ -711,20 +731,7 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
     Determine annotate geometry.
   */
   (void) XParseGeometry(annotate_info->geometry,&x,&y,&width,&height);
-  if ((width != (unsigned int) annotate_image->columns) ||
-      (height != (unsigned int) annotate_image->rows))
-    {
-      char
-        image_geometry[MagickPathExtent];
-
-      /*
-        Scale image.
-      */
-      (void) FormatLocaleString(image_geometry,MagickPathExtent,"%ux%u",
-        width,height);
-      (void) TransformImage(&annotate_image,(char *) NULL,image_geometry,
-        exception);
-    }
+  annotate_image=XScaleAnnotateImage(annotate_image,width,height,exception);
   if (annotate_info->degrees != 0.0)
     {
       Image
