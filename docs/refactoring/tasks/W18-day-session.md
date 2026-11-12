@@ -494,3 +494,18 @@ form (checked by reading, said in each message).
   `ResizeQuantumMemory` in ButtonRelease/MotionNotify, throws and the next event writes through the NULL `coordinate_info`;
   the stipple file branch passes `&x,&y` to `XReadBitmapFile`, which overwrites the pointer position with the bitmap hot
   spot; `degrees=0.0` is a dead store; `XDisplayImage`'s Magnify configure branch's `status=XMakeImage(...)` is never read.
+
+## Lane a, seventh round: the CI warning check now compiles the X11 and OpenCL code (merged)
+
+f05038024 `tools/ci_linux_warnings.sh`: the gap lane a found in the xwindow.c round (a `&cp` of type `const T **` passed for
+`const T *`, the MSVC C2664 class) was the configuration, not a missing flag: gcc 13 and clang 18 both report it by default
+as `-Wincompatible-pointer-types`, but all four CI trees are built `--without-x` and without OpenCL, so the X block of
+xwindow.c (and display, animate, widget, accelerate, opencl and the OpenCL branches of other files) is compiled out. A
+planted error inside the X block of a scratch copy of xwindow.c printed OK with the old script. Two new trees,
+`build-oracle/ci-{gcc,clang}-x` (`--with-x --enable-opencl --with-fftw`); from them only pointer-type, discarded-qualifier,
+int-conversion, implicit-declaration and error lines are kept (the X and OpenCL code has hundreds of upstream `-Wshadow`,
+`-Wunused-parameter` and `-Wsign-compare` diagnostics that CI never sees); `-Wincompatible-pointer-types` is named for both
+compilers; the header comment and `docs/refactoring/VERIFICATION.md` line 59 are updated. The planted error is now reported
+by gcc-x and clang-x; `--campaign-a` passes on all 84 files in all six configurations (the first run builds the two new
+trees, about a minute); KNOWN is unchanged. The oracle gate therefore now includes the X and OpenCL files' pointer
+conversions in its CI check. Merged tree: 15,955 cases, 0 diverged.
