@@ -1071,6 +1071,17 @@ static MagickBooleanType SkipMarkupElement(const char *keyword,const char **q,
   return(MagickTrue);
 }
 
+static MagickBooleanType ReadAttributeValue(const char **q,const size_t extent,
+  char *token)
+{
+  (void) GetNextToken(*q,(const char **) NULL,extent,token);
+  if (*token != '=')
+    return(MagickFalse);
+  (void) GetNextToken(*q,q,extent,token);
+  (void) GetNextToken(*q,q,extent,token);
+  return(MagickTrue);
+}
+
 static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1159,12 +1170,8 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
     /*
       Parse configure element.
     */
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    SetConfigureAttribute(configure_info,keyword,token);
+    if (ReadAttributeValue(&q,extent,token) != MagickFalse)
+      SetConfigureAttribute(configure_info,keyword,token);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);
