@@ -3371,6 +3371,76 @@ static MagickBooleanType ReloadColorList(const ColorBrowserContext *context,
   return(MagickTrue);
 }
 
+static void UpdateColorBrowserSlider(const ColorBrowserContext *context,
+  const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const colors = widgets->colors;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_colors = widgets->visible_colors;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info,
+    *const expose_info = widgets->expose_info,
+    *const text_info = widgets->text_info,
+    *const selection_info = widgets->selection_info;
+
+  /*
+    Sort color list in ascending order.
+  */
+  (*slider_info).height=(unsigned int) ((int) (*scroll_info).height-
+    (((*slider_info).min_y-(*scroll_info).y+1) << 1)+1);
+  if ((*colors) > (*visible_colors))
+    (*slider_info).height=(unsigned int) (((*visible_colors)*
+      (*slider_info).height)/(*colors));
+  (*slider_info).max_y=(*south_info).y-(int) (*south_info).bevel_width-
+    (int) (*slider_info).bevel_width-2;
+  (*slider_info).id=0;
+  (*slider_info).y=(*slider_info).min_y;
+  (*expose_info).y=(*slider_info).y;
+  (*selection_info).id=(~0);
+  (*list_info).id=(~0);
+  (*state)|=RedrawListState;
+  /*
+    Redraw color name & reply.
+  */
+  *(*reply_info).text='\0';
+  (*reply_info).cursor=(*reply_info).text;
+  (void) CopyMagickString((*text_info).text,glob_pattern,MagickPathExtent);
+  XDrawWidgetText(display,&windows->widget,text_info);
+  XDrawMatteText(display,&windows->widget,reply_info);
+  XDrawBeveledMatte(display,&windows->widget,scroll_info);
+  XDrawTriangleNorth(display,&windows->widget,north_info);
+  XDrawBeveledButton(display,&windows->widget,slider_info);
+  XDrawTriangleSouth(display,&windows->widget,south_info);
+  XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+  (*state)&=(unsigned int) (~UpdateListState);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3568,36 +3638,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       {
         if (ReloadColorList(&color_context,&color_widgets) == MagickFalse)
           break;
-        /*
-          Sort color list in ascending order.
-        */
-        slider_info.height=(unsigned int) ((int) scroll_info.height-
-          ((slider_info.min_y-scroll_info.y+1) << 1)+1);
-        if (colors > visible_colors)
-          slider_info.height=(unsigned int) ((visible_colors*
-            slider_info.height)/colors);
-        slider_info.max_y=south_info.y-(int) south_info.bevel_width-
-          (int) slider_info.bevel_width-2;
-        slider_info.id=0;
-        slider_info.y=slider_info.min_y;
-        expose_info.y=slider_info.y;
-        selection_info.id=(~0);
-        list_info.id=(~0);
-        state|=RedrawListState;
-        /*
-          Redraw color name & reply.
-        */
-        *reply_info.text='\0';
-        reply_info.cursor=reply_info.text;
-        (void) CopyMagickString(text_info.text,glob_pattern,MagickPathExtent);
-        XDrawWidgetText(display,&windows->widget,&text_info);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        XDrawBeveledMatte(display,&windows->widget,&scroll_info);
-        XDrawTriangleNorth(display,&windows->widget,&north_info);
-        XDrawBeveledButton(display,&windows->widget,&slider_info);
-        XDrawTriangleSouth(display,&windows->widget,&south_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        state&=(unsigned int) (~UpdateListState);
+        UpdateColorBrowserSlider(&color_context,&color_widgets);
       }
     JumpColorBrowserList(&color_context,&color_widgets);
     RedrawColorBrowserList(&color_context,&color_widgets);
