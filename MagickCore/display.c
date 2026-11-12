@@ -17760,6 +17760,26 @@ static void XReloadModifiedDisplay(const DisplayEventContext *context,
   (*timer)=GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1;
 }
 
+static void XUpdateImageTimer(const DisplayEventContext *context,
+  Image *display_image,Image **nexus,time_t *timer)
+{
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  size_t
+    *const state = context->state;
+
+  if ((*timer) < GetMagickTime())
+    {
+      if (resource_info->update == MagickFalse)
+        *state|=NextImageState | ExitState;
+      else
+        {
+          XReloadModifiedDisplay(context,display_image,nexus,timer);
+        }
+    }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -18800,16 +18820,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     if (windows->image.mapped != MagickFalse)
       if ((display_image->delay != 0) || (resource_info->update != 0))
         {
-          if (timer < GetMagickTime())
-            {
-              if (resource_info->update == MagickFalse)
-                *state|=NextImageState | ExitState;
-              else
-                {
-                  XReloadModifiedDisplay(&event_context,display_image,&nexus,
-                    &timer);
-                }
-            }
+          XUpdateImageTimer(&event_context,display_image,&nexus,&timer);
           if (XEventsQueued(display,QueuedAfterFlush) == 0)
             {
               /*
