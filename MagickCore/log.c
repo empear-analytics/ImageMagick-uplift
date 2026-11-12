@@ -1302,6 +1302,34 @@ MagickPrivate void LogComponentTerminus(void)
 %
 */
 
+static ptrdiff_t FormatLogSpecifier(char *q,const size_t extent,
+  const char specifier)
+{
+  switch (specifier)
+  {
+    case 'c':
+      return((ptrdiff_t) CopyMagickString(q,GetClientName(),extent));
+    case 'n':
+      return((ptrdiff_t) CopyMagickString(q,GetLogName(),extent));
+    case 'p':
+      return((ptrdiff_t) FormatLocaleString(q,extent,"%.17g",(double)
+        getpid()));
+    case 'v':
+      return((ptrdiff_t) CopyMagickString(q,MagickLibVersionText,extent));
+    case '%':
+    {
+      *q=specifier;
+      return(1);
+    }
+    default:
+    {
+      q[0]='%';
+      q[1]=specifier;
+      return(2);
+    }
+  }
+}
+
 static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
   char *filename)
 {
@@ -1343,11 +1371,6 @@ static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
         p--;
         break;
       }
-      case 'c':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,GetClientName(),MagickPathExtent);
-        break;
-      }
       case 'g':
       {
         if (log_info->generations == 0)
@@ -1360,32 +1383,9 @@ static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
           (generation % log_info->generations));
         break;
       }
-      case 'n':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,GetLogName(),MagickPathExtent);
-        break;
-      }
-      case 'p':
-      {
-        q+=(ptrdiff_t) FormatLocaleString(q,MagickPathExtent,"%.17g",(double)
-          getpid());
-        break;
-      }
-      case 'v':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,MagickLibVersionText,
-          MagickPathExtent);
-        break;
-      }
-      case '%':
-      {
-        *q++=(*p);
-        break;
-      }
       default:
       {
-        *q++='%';
-        *q++=(*p);
+        q+=FormatLogSpecifier(q,MagickPathExtent,*p);
         break;
       }
     }
@@ -1405,37 +1405,6 @@ static const char *GetModuleBasename(const char *module)
         break;
       }
   return(r);
-}
-
-static ptrdiff_t FormatLogSpecifier(char *q,const size_t extent,
-  const char specifier)
-{
-  switch (specifier)
-  {
-    case 'c':
-      return((ptrdiff_t) CopyMagickString(q,GetClientName(),extent));
-    case 'i':
-      return((ptrdiff_t) FormatLocaleString(q,extent,"%.17g",(double)
-        GetMagickThreadSignature()));
-    case 'n':
-      return((ptrdiff_t) CopyMagickString(q,GetLogName(),extent));
-    case 'p':
-      return((ptrdiff_t) FormatLocaleString(q,extent,"%.17g",(double)
-        getpid()));
-    case 'v':
-      return((ptrdiff_t) CopyMagickString(q,MagickLibVersionText,extent));
-    case '%':
-    {
-      *q=specifier;
-      return(1);
-    }
-    default:
-    {
-      q[0]='%';
-      q[1]=specifier;
-      return(2);
-    }
-  }
 }
 
 static char *TranslateEvent(const LogEventLocation *location,
@@ -1583,6 +1552,12 @@ static char *TranslateEvent(const LogEventLocation *location,
       case 'f':
       {
         q+=(ptrdiff_t) CopyMagickString(q,function,extent-(q-text));
+        break;
+      }
+      case 'i':
+      {
+        q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%.17g",(double)
+          GetMagickThreadSignature());
         break;
       }
       case 'l':
