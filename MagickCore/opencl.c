@@ -2279,13 +2279,20 @@ MagickExport const char *GetOpenCLDeviceVersion(const MagickCLDevice device)
 %
 */
 
+static MagickBooleanType HasCurrentOpenCLEnv(MagickCLEnv *clEnv)
+{
+  *clEnv=GetCurrentOpenCLEnv();
+  if (*clEnv == (MagickCLEnv) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType GetOpenCLEnabled(void)
 {
   MagickCLEnv
     clEnv;
 
-  clEnv=GetCurrentOpenCLEnv();
-  if (clEnv == (MagickCLEnv) NULL)
+  if (HasCurrentOpenCLEnv(&clEnv) == MagickFalse)
     return(MagickFalse);
   return(clEnv->enabled);
 }
