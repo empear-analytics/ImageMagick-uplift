@@ -14,18 +14,34 @@ NEW's name (letters taken from the other MagickCore headers) and TITLE, and
 FILE's include block. Register NEW with tools/register_source.py.
 
 Also moved: a forward declaration of a moved static, and a typedef struct elsewhere
-in FILE that only the family uses. --copy-macro NAME (repeatable) defines a one-line
+in FILE that only the family uses. A function-pointer typedef (`typedef T` / `  (*Name)(...);`)
+between or directly above the moved functions moves with them when the kept part names none
+of its names (it refuses the split when the kept part does). A function that names a macro
+calls what the macro's definitions name, in every branch and through further macros
+(`#define ScaledSig(x) ... ScaledSigmoidal(...)`), so a static reached only through a macro
+moves with its callers, and one the kept part also calls is shared. --copy-macro NAME (repeatable) defines a one-line
 `#define NAME "literal"` of the kept part again in NEW (Recipe S step 2). A file-scope
 `static const` table between the moved functions moves with them, and a one-line
 `#define` of the original that only the family uses moves to NEW (step 2 as amended
 2026-11-11), each refused when the kept part names it; a two-line forward declaration
 of a moved static at the top of FILE moves to NEW. A trailing run of conditional lines
 in FILE's include block that holds every macro the block defines (a delegate's headers)
-is left out of NEW's copy when the family names none of those macros. A file-level
+is left out of NEW's copy when the family names none of those macros. A quoted `#include` of a header of the same directory that defines objects (a file-scope initialised
+variable, as accelerate-kernels-private.h's `accelerateKernels`) is left out of NEW's copy of the include
+block, since both files would define the variable, when no line of the family names a variable or macro
+that header defines; the split is refused when one does. A file-level
 `#if defined(...)` ... `#else` ... `#endif` block that holds whole functions of the family
 (a delegate's code and its stub of the same public function) moves whole, its directives
 included, when its `#endif` follows the family's last function; a function defined in both
 branches calls what either definition calls (owner, 2026-11-11).
+
+When the family stands inside a file-level conditional that the rest of FILE keeps (a delegate's
+`#if defined(MAGICKCORE_X11_DELEGATE)` that wraps the whole file), NEW carries that conditional too:
+its `#if` line, if the copied include block does not hold it, the family, and its `#endif`, every
+directive verbatim. Family functions standing in the `#else` branch of that conditional (the stub of a
+moved public function) are carried under a copy of the `#else` line. A family that stands in an `#elif`
+branch, in different conditionals, or in the `#else` branch of an outer conditional is refused, and so
+is a NEW whose directives do not balance.
 """
 import collections, glob, os, re, sys
 
@@ -63,6 +79,40 @@ def conditional_start(L, end):
         if depth == 0: return u
     return None
 
+def conditional_records(L):
+    """Every #if ... #endif of L as {"if": line, "else": [lines of its #else/#elif], "end": line}, by #if line."""
+    recs = []; stack = []
+    for n, line in enumerate(L):
+        w = line.strip()
+        if re.match(r"#\s*(if|ifdef|ifndef)\b", w): recs.append({"if": n, "else": [], "end": None}); stack.append(recs[-1])
+        elif re.match(r"#\s*(else|elif)\b", w) and stack: stack[-1]["else"].append(n)
+        elif re.match(r"#\s*endif\b", w) and stack: stack.pop()["end"] = n
+    return recs
+
+def enclosing_conditionals(recs, a):
+    """The conditionals of RECS that are open at line A, outermost first, with the branch (0 for #if) A stands in."""
+    return [(r, sum(1 for e in r["else"] if e < a)) for r in recs if r["if"] < a and (r["end"] is None or r["end"] > a)]
+
+def open_directives(lines):
+    """The #if lines still open at the end of LINES, outermost first; None when an #endif or #else has no #if."""
+    stack = []
+    for line in lines:
+        w = line.strip()
+        if re.match(r"#\s*(if|ifdef|ifndef)\b", w): stack.append(w)
+        elif re.match(r"#\s*(else|elif)\b", w) and not stack: return None
+        elif re.match(r"#\s*endif\b", w):
+            if not stack: return None
+            stack.pop()
+    return stack
+
+def object_header_names(path):
+    """The names a header at PATH defines that make it unfit for two files: each file-scope initialised object
+    (`const char *name =` in column 0) and each #define; empty when PATH has no such object definition."""
+    if not os.path.exists(path): return set()
+    text = re.sub(r"/\*.*?\*/", "", open(path, errors="replace").read(), flags=re.S)
+    objects = set(re.findall(r"(?m)^(?!typedef|static|extern|return|#)(?:const\s+)?\w[\w \t\*]*?[ \t\*](\w+)\s*(?:\[[^\]]*\])?\s*=(?!=)", text))
+    return objects | set(re.findall(r"(?m)^\s*#\s*define\s+(\w+)", text)) if objects else set()
+
 def macro_block_start(L, c):
     """First line of the #define, or the #if ... #endif holding one, that ends at L[c - 1]."""
     if L[c - 1].strip().startswith("#endif"):
@@ -80,6 +130,22 @@ def typedef_names(L, starts):
         while not re.match(r"^} \w+;$", L[n]): n += 1
         names.append(L[n][2:-1])
     return names
+
+def continues_above(L, s):
+    """True when the statement that L[s] belongs to goes on above it: L[s] is no `typedef` line, and the line above is
+    neither blank nor the end of a statement, a block or a comment."""
+    if L[s].startswith("typedef"): return False
+    above = L[s - 1].rstrip()
+    return bool(above) and not above.endswith((";", "{", "}", "*/"))
+
+def function_pointer_typedef(L, e):
+    """(first line, names) of a `typedef T` / `  (*Name)(...);` function-pointer typedef (one or more declarators)
+    that ends at L[e], else None."""
+    s = e
+    while s > 0 and continues_above(L, s): s -= 1
+    text = " ".join(x.strip() for x in L[s:e + 1])
+    if not re.fullmatch(r"typedef[^;{}]*\(\*\w+\)\([^;{}]*\);", text): return None
+    return s, re.findall(r"\(\*(\w+)\)", text)
 
 def static_table(L, n):
     """(last line, name) of a file-scope `static const` table declared from L[n], else None."""
@@ -100,9 +166,9 @@ def drop_empty_banner(lines, banner):
     lines[:] = text.split("\n")
 
 def take_forward_declarations(lines, statics):
-    """Remove from LINES the two-line forward declarations `static T` / `  Name(...);` of STATICS; return them."""
+    """Remove from LINES the two-line forward declarations `static T` / `  Name(...);` (or `  *Name(...);`) of STATICS; return them."""
     text = "\n".join(lines)
-    found = re.findall(r"(?m)^(static [\w \*]+\n  (\w+)\(.*\);)\n", text)
+    found = re.findall(r"(?m)^(static [\w \*]+\n  \*?(\w+)\(.*\);)\n", text)
     taken = [decl for decl, name in found if name in statics]
     for decl in taken: text = text.replace(decl + "\n", "", 1)
     lines[:] = text.split("\n")
@@ -160,7 +226,25 @@ names = {d[0] for d in defs}
 # a function defined once in each branch of an #if/#else (a delegate's code and its stub) calls what either one calls
 body = collections.defaultdict(str)
 for d in defs: body[d[0]] += re.sub(r"/\*.*?\*/", "", "\n".join(L[d[1]:d[2] + 1]), flags=re.S) + "\n"
-calls = {n: {x for x in names if x != n and re.search(r"\b%s\b" % re.escape(x), body[n])} for n in names}
+# a macro's body names functions too (`#define ScaledSig(x) ... ScaledSigmoidal(...)`): a function that names a macro
+# calls what the macro's definitions name, in every branch of a conditional, through further macros
+macro_text = collections.defaultdict(str)
+for k, line in enumerate(L):
+    dm = re.match(r"^#\s*define\s+(\w+)", line)
+    if not dm: continue
+    e = k
+    while L[e].rstrip().endswith("\\") and e + 1 < len(L): e += 1
+    macro_text[dm.group(1)] += re.sub(r"/\*.*?\*/", "", "\n".join(L[k:e + 1]), flags=re.S) + "\n"
+def macro_expansion(text):
+    """TEXT and the text of every macro definition it names, through further macros."""
+    seen = set(); out = [text]; todo = [text]
+    while todo:
+        t = todo.pop()
+        for mname in macro_text:
+            if mname not in seen and re.search(r"\b%s\b" % re.escape(mname), t):
+                seen.add(mname); out.append(macro_text[mname]); todo.append(macro_text[mname])
+    return "\n".join(out)
+calls = {n: {x for x in names if x != n and re.search(r"\b%s\b" % re.escape(x), macro_expansion(body[n]))} for n in names}
 static = {d[0] for d in defs if d[3]}
 reach = set(roots); st = list(roots)
 while st:
@@ -183,6 +267,7 @@ for k in idx:
     else: runs.append([k])
 spans = [(d[1], d[2]) for d in order if d[0] in moved]
 cuts = []; typedefs = []; tables = []
+recs = conditional_records(L)
 for run in runs:
     first, last = order[run[0]], order[run[-1]]
     # start: the comment directly above the first function
@@ -202,11 +287,14 @@ for run in runs:
             outside = "\n".join(L[:t] + L[last[2] + 1:])
             if not re.search(r"\b%s\b" % m.group(1), outside):
                 a = t; typedefs.append(m.group(1)); continue
+        fp = function_pointer_typedef(L, c - 1)
+        if fp and not any(re.search(r"\b%s\b" % n, "\n".join(L[:fp[0]] + L[last[2] + 1:])) for n in fp[1]):
+            a = fp[0]; continue
         u = macro_block_start(L, c)
         if u is None: break
         a = u
     b = last[2] + 1
-    incomment = False; intype = False; bad = []; depth = 0; inner = []; inproto = False; table_end = -1
+    incomment = False; intype = False; bad = []; depth = 0; inner = []; inproto = False; table_end = -1; fp_end = -1
     for n in range(a, b):
         if any(s <= n <= e for s, e in spans): continue
         t = L[n].strip()
@@ -217,6 +305,12 @@ for run in runs:
             inproto = not t.endswith(";"); continue
         if intype:
             intype = not re.match(r"^} \w+;$", L[n]); continue
+        if n <= fp_end: continue
+        if L[n].startswith("typedef"):
+            e = next(k for k in range(n, len(L)) if L[k].rstrip().endswith(";"))
+            fp = function_pointer_typedef(L, e)
+            if fp and fp[0] == n:
+                fp_end = e; typedefs.extend(fp[1]); continue
         if n <= table_end: continue
         table = static_table(L, n)
         if table:
@@ -232,6 +326,8 @@ for run in runs:
             incomment = "*/" not in t[2:]; continue
         if re.match(r"#\s*(if|ifdef|ifndef)\b", t): depth += 1; continue
         if re.match(r"#\s*(else|elif)\b", t) and depth > 0: continue
+        # the #else of the conditional the whole run stands in (a moved function and its stub, side by side)
+        if re.match(r"#\s*else\b", t) and any(r["if"] < a and n in r["else"] and r["end"] >= b for r in recs): continue
         if re.match(r"#\s*endif\b", t) and depth > 0: depth -= 1; continue
         if t: bad.append((n + 1, t))
     # a file-level #if opened in the region whose #endif follows its last function moves whole, #endif included
@@ -243,7 +339,16 @@ for run in runs:
 first = order[idx[0]]
 region = "\n\n".join("\n".join(L[a:b]) for a, b in cuts)
 rest_lines = list(L)
-for a, b in reversed(cuts):
+# the #else of the conditional that a whole run stands in (a moved function and its stub, side by side) stays in FILE:
+# the run is cut in two around it, and NEW takes the whole run, #else included
+stays = {n for a, b in cuts for r in recs if r["if"] < a and r["end"] >= b for n in r["else"] if a <= n < b}
+deletions = []
+for a, b in cuts:
+    start = a
+    for n in sorted(x for x in stays if a <= x < b):
+        deletions.append((start, n)); start = n + 1
+    deletions.append((start, b))
+for a, b in reversed(deletions):
     del rest_lines[a:b]
     # drop one of the two blank lines left at the seam
     while 1 < a < len(rest_lines) and rest_lines[a - 1] == "" and rest_lines[a] == "" and rest_lines[a - 2] == "":
@@ -287,6 +392,11 @@ for tname in sorted(set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M))):
 types = set(re.findall(r"^typedef\s+(?:struct|enum|union)\s+(\w+)", rest, re.M)) | \
     set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M)) | \
     {t.lstrip("_") for t in re.findall(r"^struct\s+(\w+)\s*$", rest, re.M)}
+for k, line in enumerate(rest_lines):
+    if line.startswith("typedef") and "(*" in line + " ".join(rest_lines[k + 1:k + 2]):
+        e = next(x for x in range(k, len(rest_lines)) if rest_lines[x].rstrip().endswith(";"))
+        fp = function_pointer_typedef(rest_lines, e)
+        if fp and fp[0] == k: types.update(fp[1])
 for tname in sorted(types):
     if re.search(r"\b%s\b" % tname, region): sys.exit("refused: type %s defined outside the region and used in it" % tname)
 # a file-scope variable the original keeps must not be used by the region
@@ -355,10 +465,52 @@ if defined("\n".join(L[inc_a:inc_b + 1])):
     print("include block: the conditional lines %d-%d (macros %s) stay in the original only" %
         (last + 2, inc_b + 1, sorted(tail_macros)))
     inc_b = last
+include_lines = L[inc_a:inc_b + 1]
+region_code = re.sub(r'"(?:\\.|[^"\\])*"', '""', re.sub(r"/\*.*?\*/", "", region, flags=re.S))
+for k, line in enumerate(list(include_lines)):
+    mi = re.match(r'^#include "(?:[\w.-]+/)*([\w.-]+\.h)"\s*$', line)
+    names_in = object_header_names(os.path.join(os.path.dirname(path), mi.group(1))) if mi else set()
+    if not names_in: continue
+    named = sorted(n for n in names_in if re.search(r"\b%s\b" % n, region_code))
+    if named: sys.exit("refused: the family names %s, defined by %s, which defines objects and cannot be included by both files" % (named, mi.group(1)))
+    include_lines[k] = None
+    print("include block: %s defines objects and stays in the original only" % mi.group(1))
+include_lines = [l for l in include_lines if l is not None]
 extra = declaration_block("Typedef declarations.", moved_types, "\n\n") + \
     declaration_block("Define declarations.", moved_macros + macro_lines) + \
     declaration_block("Forward declarations.", forward)
-text = "\n".join(hdr) + "\n\n" + "\n".join(L[inc_a:inc_b + 1]) + "\n\n" + extra + region + "\n"
+# the file-level conditionals the family stands in (a delegate's #if around the whole file) go to NEW as well
+runs_in = [enclosing_conditionals(recs, a) for a, b in cuts]
+if any([r["if"] for r, _ in e] != [r["if"] for r, _ in runs_in[0]] for e in runs_in):
+    sys.exit("refused: the moved runs stand in different conditionals")
+enc = [r for r, _ in runs_in[0]]
+branch = [[k for _, k in e] for e in runs_in]
+for lvl, r in enumerate(enc):
+    inner = lvl == len(enc) - 1
+    ks = {b[lvl] for b in branch}
+    if not inner and ks != {0}:
+        sys.exit("refused: the family stands in the #else or #elif branch of the outer conditional at line %d" % (r["if"] + 1))
+    if r["end"] is None: sys.exit("refused: the conditional at line %d has no #endif" % (r["if"] + 1))
+    if ks - {0} and (ks - {0, 1} or not re.match(r"#\s*else\b", L[r["else"][0]].strip())):
+        sys.exit("refused: the family stands in an #elif branch of the conditional at line %d" % (r["if"] + 1))
+pre = [L[r["if"]] for r in enc if r["if"] < inc_a]
+post = [L[r["if"]] for r in enc if r["if"] > inc_b]
+closers = [L[r["end"]] for r in reversed(enc)]
+pieces = []; cur = 0
+for (a, b), br in zip(cuts, branch):
+    k = br[-1] if br else 0
+    if k != cur: pieces.append(L[enc[-1]["else"][0]]); cur = k
+    pieces.append("\n".join(L[a:b]))
+region_out = "\n\n".join(pieces)
+text = "\n".join(hdr) + "\n\n" + "".join(l + "\n" for l in pre) + "\n".join(include_lines) + "\n" + \
+    "".join(l + "\n" for l in post) + "\n" + extra + region_out + "\n" + "".join(l + "\n" for l in closers)
+if enc:
+    head = text[:text.index(region_out)].split("\n")
+    if open_directives(head) != [L[r["if"]].strip() for r in enc]:
+        sys.exit("refused: the new file's include block does not open the conditionals the family stands in")
+    print("conditionals carried: %s" % [(r["if"] + 1, r["end"] + 1) for r in enc])
+if open_directives(text.split("\n")) != []:
+    sys.exit("refused: the new file's #if, #else and #endif lines do not balance")
 dst_new = os.path.join(out, os.path.basename(new)) if out else new
 dst_old = os.path.join(out, os.path.basename(path)) if out else path
 open(dst_new, "w").write(text)
