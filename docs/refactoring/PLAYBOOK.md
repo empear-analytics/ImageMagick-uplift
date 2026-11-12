@@ -10929,7 +10929,12 @@ whole groups and keeps their nesting in the new function.
    gains the member after the last, the initialiser the address `&v` after the last,
    in the commit of that helper; the helpers made earlier bind only the members they
    write, so their text does not change, and the entries before the new one keep their
-   positions. Six members stay the limit.
+   positions. Six members stay the limit, except for a struct that serves every block of one event
+   loop (the cases of its `switch` and its `if (state & ...)` blocks, as `XColorBrowserWidget`'s do): it
+   may hold one member per local of the loop's state (2026-11-12, later). Each block still writes two
+   to six of them (step 2), each helper binds only the members it names, a member it only reads
+   included, and reads or writes it as `(*v)` (the same address), and the members are the addresses of
+   distinct locals.
 4. Cut the block into a new `static void` function directly above the caller. It takes
    the variables the block only reads by value, or in one `const` input struct filled
    as Recipe Y steps 3 to 5 say (Recipe N step 2's conditions for struct values and its
@@ -10944,6 +10949,10 @@ whole groups and keeps their nesting in the new function.
    `AnimateEventContext`, shared by the helpers of the event switch's cases). The
    argument is N step 8's for the reads and this recipe's for the writes, which do not
    meet: a written variable goes by the targets struct, never by the input struct.
+   A `const` targets struct of another helper that the block passes on as `&t` (`XColorBrowserWidget`'s
+   list press hands `&targets` to `SelectFontBrowserEntry`) goes as one more parameter `const T *t`,
+   after the input struct and before this recipe's targets struct, and each `&t` of the block is
+   written `t`, as Recipe SR step 3 passes a targets struct on (2026-11-12, later).
 5. At the top of its body bind, per member the block writes and in member order,
    `V *const v = targets->v;` (and the input struct's members as Recipe N step 4 does).
    Write each written variable `v` as `(*v)` at every use, reads included, `&v` as `v`;
@@ -10957,6 +10966,11 @@ whole groups and keeps their nesting in the new function.
    targets only the members its own text writes: a member that only the inner call
    writes is not bound (the inner helper writes it through the same address), and a
    member only the inner call reads from the input struct is not bound either.
+   A member that the helper only reads, whose variable another block of the loop writes, and
+   whose uses include a macro that names the variable (`QuantumMargin` names `font_info`, which
+   `XFontBrowserWidget`'s action-redraw block replaces with the font it loads), is bound
+   `T *const v = *targets->v;` instead, its uses stay as written, and a member whose variable
+   the helper itself writes is written `(*v)` as above (2026-11-12, later).
 6. Where the block stood write the input struct's fill, if any, then the call
    `Helper(...,&targets);`, directly before the case's closing `break;`, which stays.
    Declare the input local at the top of the block that holds the call.
@@ -11089,7 +11103,17 @@ static void SelectListBrowserEntry(const ListBrowserPress *press,
   address `&v` gave the callee; no member is copied, so none is read that the block
   did not read, and a callee that fills the whole structure through the pointer
   (`XParseColor`) fills the static itself, as before.
+- A targets struct of more than six members (step 3) gives no member a second name and no helper a
+  write it did not make: every member is the address of its own local, fixed at the declaration; a
+  helper binds the members its block names and no other, so a member it does not name is not touched.
+  The count of members is the count of locals the loop's blocks share between them, which the blocks
+  already named one by one; each block still writes at most six, so the argument of Recipe I's
+  *Careful* is applied per block as before.
+- A pass-through `const` targets struct (step 4) is the same object the caller declared, read by the
+  callee through the pointer the block passed (`&t`); the parameter holds that address, so `t` in the
+  helper is the value `&t` had, and the call the block made receives it unchanged.
 
+- A member bound by `T *const v = *targets->v;` (step 5, 2026-11-12, later) reads the caller's variable once, when the helper starts: the helper writes nothing that changes it, and nothing it calls writes it (checked by reading the callees), so each read sees the value the block saw. Such a variable cannot go in the shared input struct (N step 8: that struct is filled once, before a loop whose blocks must not write a member's variable), which is why it goes by the targets.
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved) and steps 1, 2, 4 and 7 checked by reading; or, when no case reaches
 some of the moved lines, guard: the same, plus step 8's `OK` and `tools/obj_modulo.sh`
@@ -12403,3 +12427,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | AMEND | MA | Step 2: role (b) may be the right operand of the block's first statement (a read the block does not write); role (c) may name two lvalues `e.m1` and `e.m2` of one base, each with its own pointer parameter (step 3 lists `T1 *value1,T2 *value2`); *Careful* gives the argument (two different members never alias) | `xwindow.c`'s `XGetMapInfo` (campaign A, W18 lane a, wide build): its red, green and blue blocks each assign `map_info->X_max` from `visual_info->X_mask`, set `map_info->X_mult` and loop shifting both; one lvalue per copy refused them, so the three loops stayed (Bumpy Road Ahead, 3 bumps, and Complex Method, cc 11) | owner |
 | 2026-11-12 | AMEND | CT | Step 5: a call in the block of a helper this recipe made earlier for the same caller, `Inner(&name,...,&targets);`, is written `Inner(name,...,targets);` in the helper (the two `const` pointers passed on, as SR step 3 passes a `targets` on); the helper binds only the members its own text writes. *Careful* gives the argument | `display.c`'s `XDrawEditImage` (campaign A, W18 lane b, wide build): the stipple case as one helper is a Large Method (86 lines); its file-reading tail and its menu head are two helpers of this recipe, the head calling the tail, and the command-widget block (a later recipe's step) calls all the case helpers with the same two structs | owner |
 | 2026-11-12 | AMEND | OC | Step 7: the block may hold calls of helpers that Recipe CT, SD or Z made earlier for the same caller (`Inner(&name,...,&targets);`), written `Inner(name,...,targets);` in the new helper; the helper takes the shared input struct and up to two targets structs (those it binds from or passes on), at most four parameters, and binds only the members its own text writes. *Careful* (step 7) gives the argument | `display.c`'s `XDrawEditImage` (campaign A, W18 lane b, wide build): the command-widget block of the first event loop (`if (id < 0) continue;` and a `switch` of seven labels, whose colour, stipple, width and Undo/Help/Dismiss groups are helpers of CT and SD taking two structs) holds the function's last depth-4 sites and writes `element` and the event itself; step 7 allowed two to four written variables in one struct, and the groups' writes number eight in two structs. A probe of the block as one helper: the function leaves Deep, Nested Complexity and Brain Method | owner |
+| 2026-11-12 | AMEND | CT | Step 3: a targets struct that serves every block of one event loop (the cases of its `switch` and its `if (state & ...)` blocks) may hold more than six members, one per local of the loop's state; each block still writes two to six of them, each helper binds only the members it names (reads included, as `(*v)`). Step 4: a `const` targets struct of another helper that the block passes on as `&t` goes as one more parameter `const T *t`, each `&t` written `t` (Recipe SR step 3's form). *Careful* gives both arguments | `widget.c`'s `XColorBrowserWidget`, `XFileBrowserWidget`, `XFontBrowserWidget` and `XListBrowserWidget` (campaign A, W18 lane c, wide build): each event loop shares fourteen widgets, its state word, delay and list counters between about twenty blocks (cases and state blocks), each of which writes two to six of them; a struct capped at six members needs three or four types per browser and a helper of five parameters, and the list press hands the browser's earlier `targets` to `SelectFontBrowserEntry` | owner |
+| 2026-11-12 | AMEND | CT | Step 5: a member the helper only reads, whose variable another block of the loop writes and whose uses include a macro that names the variable, is bound `T *const v = *targets->v;` with its uses unchanged; the helper that writes it uses `(*v)`. *Careful* gives the argument | `widget.c`'s `XFontBrowserWidget` (campaign A, W18 lane c, wide build): the action-redraw block assigns the caller's `font_info` (`font_info=XLoadQueryFont(...)`, never restored), and `QuantumMargin`, used by almost every other block, expands to `font_info->max_bounds.width`; an input-struct copy would change what those blocks read after the redraw, a pointer-to-pointer member written `(*font_info)` would not compile inside the macro | owner |
