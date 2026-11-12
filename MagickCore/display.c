@@ -7686,23 +7686,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
             (void) XDrawLines(display,windows->image.id,
               windows->image.highlight_context,coordinate_info,
               number_coordinates,CoordModeOrigin);
-          if (distance > 9)
-            {
-              /*
-                Display angle of the line.
-              */
-              degrees=RadiansToDegrees(-atan2((double) (line_info.y2-
-                line_info.y1),(double) (line_info.x2-line_info.x1)));
-              (void) FormatLocaleString(text,MagickPathExtent," %g",
-                (double) degrees);
-              XInfoWidget(display,windows,text);
-              XHighlightLine(display,windows->image.id,
-                windows->image.highlight_context,&line_info);
-            }
-          else
-            if (windows->info.mapped != MagickFalse)
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
+          XPreviewLine(&draw_context,&preview_input,&degrees);
           break;
         }
       }
