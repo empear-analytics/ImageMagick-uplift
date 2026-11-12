@@ -3916,6 +3916,12 @@ typedef struct _ConfirmContext
 
   const char
     *description;
+
+  Display
+    *display;
+
+  const char
+    *reason;
 } ConfirmContext;
 
 static void UpdateConfirmButtons(const ConfirmContext *context,
@@ -3975,13 +3981,78 @@ static void UpdateConfirmButtons(const ConfirmContext *context,
     }
 }
 
+static void RedrawConfirmWidget(const ConfirmContext *context,
+  const ConfirmTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  const char
+    *const description = context->description;
+
+  Display
+    *const display = context->display;
+
+  const char
+    *const reason = context->reason;
+
+  XWidgetInfo
+    *const cancel_info = targets->cancel_info,
+    *const dismiss_info = targets->dismiss_info,
+    *const yes_info = targets->yes_info;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    width;
+
+  if ((*state) & RedrawWidgetState)
+    {
+      /*
+        Redraw Confirm widget.
+      */
+      width=WidgetTextWidth(font_info,(char *) reason);
+      x=(int) ((windows->widget.width >> 1)-(width >> 1));
+      y=(int) ((windows->widget.height >> 1)-(height << 1));
+      (void) XDrawString(display,windows->widget.id,
+        windows->widget.annotate_context,x,y,(char *) reason,Extent(reason));
+      if (description != (char *) NULL)
+        {
+          char
+            question[MagickPathExtent];
+
+          (void) CopyMagickString(question,description,MagickPathExtent);
+          (void) ConcatenateMagickString(question,"?",MagickPathExtent);
+          width=WidgetTextWidth(font_info,question);
+          x=((int) (windows->widget.width >> 1)-(int) (width >> 1));
+          y+=(int) height;
+          (void) XDrawString(display,windows->widget.id,
+            windows->widget.annotate_context,x,y,question,Extent(question));
+        }
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      XDrawBeveledButton(display,&windows->widget,yes_info);
+      XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+      (*state)&=(unsigned int) (~RedrawWidgetState);
+    }
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
   int
-    confirm,
-    x,
-    y;
+    confirm;
 
   Status
     status;
@@ -4080,38 +4151,12 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   context.font_info=font_info;
   context.height=height;
   context.description=description;
+  context.display=display;
+  context.reason=reason;
   do
   {
     UpdateConfirmButtons(&context,&targets);
-    if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw Confirm widget.
-        */
-        width=WidgetTextWidth(font_info,(char *) reason);
-        x=(int) ((windows->widget.width >> 1)-(width >> 1));
-        y=(int) ((windows->widget.height >> 1)-(height << 1));
-        (void) XDrawString(display,windows->widget.id,
-          windows->widget.annotate_context,x,y,(char *) reason,Extent(reason));
-        if (description != (char *) NULL)
-          {
-            char
-              question[MagickPathExtent];
-
-            (void) CopyMagickString(question,description,MagickPathExtent);
-            (void) ConcatenateMagickString(question,"?",MagickPathExtent);
-            width=WidgetTextWidth(font_info,question);
-            x=((int) (windows->widget.width >> 1)-(int) (width >> 1));
-            y+=(int) height;
-            (void) XDrawString(display,windows->widget.id,
-              windows->widget.annotate_context,x,y,question,Extent(question));
-          }
-        XDrawBeveledButton(display,&windows->widget,&cancel_info);
-        XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-        XDrawBeveledButton(display,&windows->widget,&yes_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
+    RedrawConfirmWidget(&context,&targets);
     /*
       Wait for next event.
     */
