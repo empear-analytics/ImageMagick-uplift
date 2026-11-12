@@ -1970,6 +1970,13 @@ static void WaitForDelegateInput(const Image *image)
     (void) MagickDelay(100);  /* sleep 0.1 seconds */
 }
 
+static void RelinquishTemporaryInput(const Image *image,
+  const MagickBooleanType temporary)
+{
+  if (temporary != MagickFalse)
+    (void) RelinquishUniqueFileResource(image->filename);
+}
+
 typedef struct _DelegateInvocation
 {
   ImageInfo
@@ -2086,8 +2093,7 @@ static MagickBooleanType ConvertDelegateInput(
   if (magick == (char *) NULL)
     {
       (void) RelinquishUniqueFileResource(image_info->unique);
-      if (temporary != MagickFalse)
-        (void) RelinquishUniqueFileResource(image->filename);
+      RelinquishTemporaryInput(image,temporary);
       (void) ThrowMagickException(exception,GetMagickModule(),
         DelegateError,"DelegateFailed","`%s'",decode ? decode : encode);
       return(MagickFalse);
@@ -2269,8 +2275,7 @@ static MagickBooleanType AcquireDelegateOutputFilename(ImageInfo *image_info,
     return(MagickTrue);
   if (AcquireUniqueFilename(image_info->filename) == MagickFalse)
     {
-      if (temporary != MagickFalse)
-        (void) RelinquishUniqueFileResource(image->filename);
+      RelinquishTemporaryInput(image,temporary);
       ThrowFileException(exception,FileOpenError,
         "UnableToCreateTemporaryFile",image_info->filename);
       return(MagickFalse);
@@ -2343,8 +2348,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   delegate_info=GetDelegateInfo(decode,encode,exception);
   if (delegate_info == (DelegateInfo *) NULL)
     {
-      if (temporary != MagickFalse)
-        (void) RelinquishUniqueFileResource(image->filename);
+      RelinquishTemporaryInput(image,temporary);
       (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
         "NoTagFound","`%s'",decode ? decode : encode);
       return(MagickFalse);
@@ -2373,8 +2377,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   commands=StringToList(delegate_info->commands);
   if (commands == (char **) NULL)
     {
-      if (temporary != MagickFalse)
-        (void) RelinquishUniqueFileResource(image->filename);
+      RelinquishTemporaryInput(image,temporary);
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",
         decode ? decode : encode);
@@ -2407,8 +2410,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
     Relinquish resources.
   */
   commands=DestroyDelegateCommands(commands,i);
-  if (temporary != MagickFalse)
-    (void) RelinquishUniqueFileResource(image->filename);
+  RelinquishTemporaryInput(image,temporary);
   return(status);
 }
 
