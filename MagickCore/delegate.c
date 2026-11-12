@@ -2512,6 +2512,49 @@ static void LoadDelegateInclude(const DelegateInclude *include,
     }
 }
 
+static const char *SkipQuotedText(const char *q)
+{
+  const char
+    quote = (*q),
+    *p = q+1;
+
+  /*
+    Return the last character of the quoted text: the closing quote, or the
+    last character of the string if the quote is not closed.
+  */
+  while ((*p != '\0') && (*p != quote))
+    p++;
+  return(*p == '\0' ? p-1 : p);
+}
+
+static const char *SkipDoctypeElement(const char *q)
+{
+  int
+    bracket_depth = 0;
+
+  while (*q != '\0')
+  {
+    if (strchr("\"'",*q) != (char *) NULL)
+      q=SkipQuotedText(q);
+    else if (*q == '[')
+      bracket_depth++;
+    else if ((*q == ']') && (bracket_depth > 0))
+      bracket_depth--;
+    else if ((*q == '>') && (bracket_depth == 0))
+      return(q+1);   /* consume final '>' */
+    q++;
+  }
+  return(q);
+}
+
+static const char *SkipCommentElement(const char *q,const size_t extent,
+  char *token)
+{
+  while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
+    (void) GetNextToken(q,&q,extent,token);
+  return(q);
+}
+
 static void SetDelegateCommands(DelegateInfo *delegate_info,
   const char *token)
 {
@@ -2630,41 +2673,10 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
     (void) CopyMagickString(keyword,token,MagickPathExtent);
     if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
       {
-        int
-          bracket_depth = 0,
-          quote = 0;
-
         /*
           DOCTYPE element.
         */
-        for ( ; *q != '\0'; q++)
-        {
-          if (quote != 0)
-            {
-              if (*q == quote)
-                quote=0;
-            }
-          else
-            {
-              if ((*q == '"') || (*q == '\''))
-                quote=(*q);
-              else
-                if (*q == '[')
-                  bracket_depth++;
-                else
-                  if (*q == ']')
-                    {
-                      if (bracket_depth > 0)
-                        bracket_depth--;
-                    }
-                  else
-                    if ((*q == '>') && (bracket_depth == 0))
-                      {
-                        q++;   /* consume final '>' */
-                        break;
-                      }
-            }
-        }
+        q=SkipDoctypeElement(q);
         continue;
       }
     if (LocaleNCompare(keyword,"<!--",4) == 0)
@@ -2672,8 +2684,7 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
         /*
           Comment element.
         */
-        while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
-          (void) GetNextToken(q,&q,extent,token);
+        q=SkipCommentElement(q,extent,token);
         continue;
       }
     if (LocaleCompare(keyword,"<include") == 0)
