@@ -4909,16 +4909,14 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
       status=XQueryTree(display,window,&root_window,&window_info[id].parent,
         &children,&number_children);
       for (i=0; i < id; i++)
-        if (IsSameVisualParent(window_info,id,i) != MagickFalse)
+        if ((IsSameVisualParent(window_info,id,i) != MagickFalse) &&
+            (IsOutsideParentBounds(window_info,id,i) != MagickFalse))
           {
-            if (IsOutsideParentBounds(window_info,id,i) != MagickFalse)
-              {
-                /*
-                  Eliminate windows not circumscribed by their parent.
-                */
-                number_windows--;
-                break;
-              }
+            /*
+              Eliminate windows not circumscribed by their parent.
+            */
+            number_windows--;
+            break;
           }
       if ((status == True) && (number_children != 0))
         {
