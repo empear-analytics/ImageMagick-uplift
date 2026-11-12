@@ -268,6 +268,42 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
   return(cache);
 }
 
+static void StripPolicyWhitespace(char *policyname)
+{
+  char
+    *q;
+
+  for (q=policyname; *q != '\0'; q++)
+  {
+    if (isspace((int) ((unsigned char) *q)) == 0)
+      continue;
+    (void) CopyMagickString(q,q+1,MagickPathExtent);
+    q--;
+  }
+}
+
+static PolicyDomain StripPolicyDomain(char *policyname)
+{
+  char
+    *q;
+
+  PolicyDomain
+    domain;
+
+  domain=UndefinedPolicyDomain;
+  for (q=policyname; *q != '\0'; q++)
+  {
+    if (*q != ':')
+      continue;
+    *q='\0';
+    domain=(PolicyDomain) ParseCommandOption(MagickPolicyDomainOptions,
+      MagickTrue,policyname);
+    (void) CopyMagickString(policyname,q+1,MagickPathExtent);
+    break;
+  }
+  return(domain);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -296,8 +332,7 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
 static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
 {
   char
-    policyname[MagickPathExtent],
-    *q;
+    policyname[MagickPathExtent];
 
   ElementInfo
     *p;
@@ -317,27 +352,11 @@ static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
   *policyname='\0';
   if (name != (const char *) NULL)
     (void) CopyMagickString(policyname,name,MagickPathExtent);
-  for (q=policyname; *q != '\0'; q++)
-  {
-    if (isspace((int) ((unsigned char) *q)) == 0)
-      continue;
-    (void) CopyMagickString(q,q+1,MagickPathExtent);
-    q--;
-  }
+  StripPolicyWhitespace(policyname);
   /*
     Strip domain from policy name (e.g. resource:map).
   */
-  domain=UndefinedPolicyDomain;
-  for (q=policyname; *q != '\0'; q++)
-  {
-    if (*q != ':')
-      continue;
-    *q='\0';
-    domain=(PolicyDomain) ParseCommandOption(MagickPolicyDomainOptions,
-      MagickTrue,policyname);
-    (void) CopyMagickString(policyname,q+1,MagickPathExtent);
-    break;
-  }
+  domain=StripPolicyDomain(policyname);
   /*
     Search for policy tag.
   */
