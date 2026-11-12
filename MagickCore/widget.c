@@ -4714,6 +4714,62 @@ static void MoveDialogButtons(const DialogContext *context,XEvent event,
     }
 }
 
+static void SelectDialogReply(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
+
+  Status
+    status;
+
+  Atom
+    type;
+
+  int
+    format;
+
+  unsigned char
+    *data;
+
+  unsigned long
+    after,
+    length;
+
+  /*
+    Obtain response from primary selection.
+  */
+  if (event.xselection.property == (Atom) None)
+    return;
+  status=XGetWindowProperty(display,event.xselection.requestor,
+    event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
+    &format,&length,&after,&data);
+  if (IsUnusableSelection(status,type,format,length) != MagickFalse)
+    return;
+  if ((Extent((*reply_info).text)+(int) length) >= (MagickPathExtent-1))
+    (void) XBell(display,0);
+  else
+    {
+      /*
+        Insert primary selection in reply text.
+      */
+      *(data+length)='\0';
+      XEditText(display,reply_info,(KeySym) XK_Insert,(char *) data,
+        (*state));
+      XDrawMatteText(display,&windows->widget,reply_info);
+    }
+  (void) XFree((void *) data);
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -4971,42 +5027,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
       }
       case SelectionNotify:
       {
-        Atom
-          type;
-
-        int
-          format;
-
-        unsigned char
-          *data;
-
-        unsigned long
-          after,
-          length;
-
-        /*
-          Obtain response from primary selection.
-        */
-        if (event.xselection.property == (Atom) None)
-          break;
-        status=XGetWindowProperty(display,event.xselection.requestor,
-          event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
-          &format,&length,&after,&data);
-        if (IsUnusableSelection(status,type,format,length) != MagickFalse)
-          break;
-        if ((Extent(reply_info.text)+(int) length) >= (MagickPathExtent-1))
-          (void) XBell(display,0);
-        else
-          {
-            /*
-              Insert primary selection in reply text.
-            */
-            *(data+length)='\0';
-            XEditText(display,&reply_info,(KeySym) XK_Insert,(char *) data,
-              state);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-          }
-        (void) XFree((void *) data);
+        SelectDialogReply(&context,event,&targets);
         break;
       }
       case SelectionRequest:
