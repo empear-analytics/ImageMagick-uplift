@@ -810,18 +810,17 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
 static unsigned char GetMimeEscape(const char c)
 {
-  switch (c)
-  {
-    case 'b': return('\b');
-    case 'f': return('\f');
-    case 'n': return('\n');
-    case 'r': return('\r');
-    case 't': return('\t');
-    case 'v': return('\v');
-    case 'a': return('a');
-    case '?': return('\?');
-    default: return((unsigned char) c);
-  }
+  static const char
+    escapes[] = "\b\f\n\r\t\va\?",
+    letters[] = "bfnrtva?";
+
+  const char
+    *p;
+
+  p=(c != '\0') ? strchr(letters,c) : (const char *) NULL;
+  if (p != (const char *) NULL)
+    return((unsigned char) escapes[p-letters]);
+  return((unsigned char) c);
 }
 
 static void ParseMimeMagic(MimeInfo *mime_info,const char *attribute)
