@@ -153,6 +153,20 @@ static MagickBooleanType
   LoadPolicyCache(const PolicyLoadTarget *,const char *,const char *,
     const size_t);
 
+static void SetBuiltInPolicyInfo(PolicyInfo *policy_info,
+  const PolicyMapInfo *p)
+{
+  (void) memset(policy_info,0,sizeof(*policy_info));
+  policy_info->path=(char *) "[built-in]";
+  policy_info->domain=p->domain;
+  policy_info->rights=p->rights;
+  policy_info->name=(char *) p->name;
+  policy_info->pattern=(char *) p->pattern;
+  policy_info->value=(char *) p->value;
+  policy_info->exempt=MagickTrue;
+  policy_info->signature=MagickCoreSignature;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -247,15 +261,7 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
         CatchException(exception);
         continue;
       }
-    (void) memset(policy_info,0,sizeof(*policy_info));
-    policy_info->path=(char *) "[built-in]";
-    policy_info->domain=p->domain;
-    policy_info->rights=p->rights;
-    policy_info->name=(char *) p->name;
-    policy_info->pattern=(char *) p->pattern;
-    policy_info->value=(char *) p->value;
-    policy_info->exempt=MagickTrue;
-    policy_info->signature=MagickCoreSignature;
+    SetBuiltInPolicyInfo(policy_info,p);
     status=AppendValueToLinkedList(cache,policy_info);
     if (status == MagickFalse)
       {
