@@ -16972,6 +16972,12 @@ typedef struct _DisplayEventContext
 
   MagickStatusType
     context_mask;
+
+  size_t
+    *state;
+
+  Window
+    root_window;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -17164,6 +17170,79 @@ static void XUpdateWindowColormaps(const DisplayEventContext *context,
     }
   if (windows->backdrop.id != (Window) NULL)
     (void) XInstallColormap(display,map_info->colormap);
+}
+
+static Image *XDropImage(const DisplayEventContext *context,const XEvent event,
+  Image *nexus)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  size_t
+    *const state = context->state;
+
+  const Window
+    root_window = context->root_window;
+
+  Atom
+    selection,
+    type;
+
+  int
+    format,
+    status;
+
+  unsigned char
+    *data;
+
+  unsigned long
+    after,
+    length;
+
+  /*
+    Display image named by the Drag-and-Drop selection.
+  */
+  if ((*event.xclient.data.l != 2) && (*event.xclient.data.l != 128))
+    return(nexus);
+  selection=XInternAtom(display,"DndSelection",MagickFalse);
+  status=XGetWindowProperty(display,root_window,selection,0L,(long)
+    MagickPathExtent,MagickFalse,(Atom) AnyPropertyType,&type,&format,
+    &length,&after,&data);
+  if ((status != Success) || (length == 0))
+    return(nexus);
+  if (*event.xclient.data.l == 2)
+    {
+      /*
+        Offix DND.
+      */
+      (void) CopyMagickString(resource_info->image_info->filename,
+        (char *) data,MagickPathExtent);
+    }
+  else
+    {
+      /*
+        XDND.
+      */
+      if (strncmp((char *) data, "file:", 5) != 0)
+        {
+          (void) XFree((void *) data);
+          return(nexus);
+        }
+      (void) CopyMagickString(resource_info->image_info->filename,
+        ((char *) data)+5,MagickPathExtent);
+    }
+  nexus=ReadImage(resource_info->image_info,exception);
+  CatchException(exception);
+  if (nexus != (Image *) NULL)
+    *state|=NextImageState | ExitState;
+  (void) XFree((void *) data);
+  return(nexus);
 }
 
 /*
@@ -18258,6 +18337,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.magick_windows=magick_windows;
   event_context.number_windows=number_windows;
   event_context.context_mask=context_mask;
+  event_context.state=state;
+  event_context.root_window=root_window;
   do
   {
     /*
@@ -18591,58 +18672,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xclient.message_type == windows->dnd_protocols)
           {
-            Atom
-              selection,
-              type;
-
-            int
-              format,
-              status;
-
-            unsigned char
-              *data;
-
-            unsigned long
-              after,
-              length;
-
-            /*
-              Display image named by the Drag-and-Drop selection.
-            */
-            if ((*event.xclient.data.l != 2) && (*event.xclient.data.l != 128))
-              break;
-            selection=XInternAtom(display,"DndSelection",MagickFalse);
-            status=XGetWindowProperty(display,root_window,selection,0L,(long)
-              MagickPathExtent,MagickFalse,(Atom) AnyPropertyType,&type,&format,
-              &length,&after,&data);
-            if ((status != Success) || (length == 0))
-              break;
-            if (*event.xclient.data.l == 2)
-              {
-                /*
-                  Offix DND.
-                */
-                (void) CopyMagickString(resource_info->image_info->filename,
-                  (char *) data,MagickPathExtent);
-              }
-            else
-              {
-                /*
-                  XDND.
-                */
-                if (strncmp((char *) data, "file:", 5) != 0)
-                  {
-                    (void) XFree((void *) data);
-                    break;
-                  }
-                (void) CopyMagickString(resource_info->image_info->filename,
-                  ((char *) data)+5,MagickPathExtent);
-              }
-            nexus=ReadImage(resource_info->image_info,exception);
-            CatchException(exception);
-            if (nexus != (Image *) NULL)
-              *state|=NextImageState | ExitState;
-            (void) XFree((void *) data);
+            nexus=XDropImage(&event_context,event,nexus);
             break;
           }
         /*
