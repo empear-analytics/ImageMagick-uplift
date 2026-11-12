@@ -621,6 +621,22 @@ static Image *XScaleAnnotateImage(Image *annotate_image,
   return(annotate_image);
 }
 
+static int XQuarterTurns(const double degrees)
+{
+  double
+    normalized_degrees;
+
+  int
+    rotations;
+
+  normalized_degrees=degrees;
+  while (normalized_degrees < -45.0)
+    normalized_degrees+=360.0;
+  for (rotations=0; normalized_degrees > 45.0; rotations++)
+    normalized_degrees-=90.0;
+  return(rotations);
+}
+
 MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
   ExceptionInfo *exception)
@@ -740,9 +756,6 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
       int
         rotations;
 
-      double
-        normalized_degrees;
-
       /*
         Rotate image.
       */
@@ -754,11 +767,7 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
       /*
         Annotation is relative to the degree of rotation.
       */
-      normalized_degrees=annotate_info->degrees;
-      while (normalized_degrees < -45.0)
-        normalized_degrees+=360.0;
-      for (rotations=0; normalized_degrees > 45.0; rotations++)
-        normalized_degrees-=90.0;
+      rotations=XQuarterTurns(annotate_info->degrees);
       switch (rotations % 4)
       {
         default:
