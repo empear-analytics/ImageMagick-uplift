@@ -2576,6 +2576,55 @@ static MagickBooleanType XPasteSelectionCharacter(
   return(MagickTrue);
 }
 
+static MagickBooleanType XPasteSelectionText(
+  const AnnotateTextInput *text_input,const XEvent *event,
+  const AnnotateTargets *targets)
+{
+  Display
+    *const display = text_input->display;
+
+  Atom
+    type;
+
+  int
+    format;
+
+  unsigned char
+    *data;
+
+  unsigned long
+    after,
+    length;
+
+  int
+    status;
+
+  ssize_t
+    i;
+
+  /*
+    Obtain response from primary selection.
+  */
+  if ((*event).xselection.property == (Atom) None)
+    return(MagickTrue);
+  status=XGetWindowProperty(display,(*event).xselection.requestor,
+    (*event).xselection.property,0L,(long) MagickPathExtent,True,XA_STRING,
+    &type,&format,&length,&after,&data);
+  if (IsSelectionUnusable(status,type,format,length) != MagickFalse)
+    return(MagickTrue);
+  /*
+    Annotate Image window with primary selection.
+  */
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    if (XPasteSelectionCharacter(text_input,targets,data,i) ==
+        MagickFalse)
+      return(MagickFalse);
+  }
+  (void) XFree((void *) data);
+  return(MagickTrue);
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -3084,45 +3133,14 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         AnnotateTextInput
           text_input;
 
-        Atom
-          type;
-
-        int
-          format;
-
-        unsigned char
-          *data;
-
-        unsigned long
-          after,
-          length;
-
         text_input.display=display;
         text_input.windows=windows;
         text_input.annotate_context=annotate_context;
         text_input.font_info=font_info;
         text_input.command=command;
         text_input.state=state;
-        /*
-          Obtain response from primary selection.
-        */
-        if (event.xselection.property == (Atom) None)
-          break;
-        status=XGetWindowProperty(display,event.xselection.requestor,
-          event.xselection.property,0L,(long) MagickPathExtent,True,XA_STRING,
-          &type,&format,&length,&after,&data);
-        if (IsSelectionUnusable(status,type,format,length) != MagickFalse)
-          break;
-        /*
-          Annotate Image window with primary selection.
-        */
-        for (i=0; i < (ssize_t) length; i++)
-        {
-          if (XPasteSelectionCharacter(&text_input,&targets,data,i) ==
-              MagickFalse)
-            return(MagickFalse);
-        }
-        (void) XFree((void *) data);
+        if (XPasteSelectionText(&text_input,&event,&targets) == MagickFalse)
+          return(MagickFalse);
         break;
       }
       default:
