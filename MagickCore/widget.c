@@ -10141,6 +10141,22 @@ static unsigned int GetFontBrowserWidth(XFontStruct *font_info,
   return(width);
 }
 
+static unsigned int WidestFontBrowserName(XFontStruct *font_info,
+  char **fontlist,int fonts)
+{
+  int
+    i;
+
+  unsigned int
+    text_width;
+
+  text_width=0;
+  for (i=0; i < fonts; i++)
+    if (WidgetTextWidth(font_info,fontlist[i]) > text_width)
+      text_width=WidgetTextWidth(font_info,fontlist[i]);
+  return(text_width);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -10263,10 +10279,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     Determine Font Browser widget attributes.
   */
   font_info=windows->widget.font_info;
-  text_width=0;
-  for (i=0; i < fonts; i++)
-    if (WidgetTextWidth(font_info,fontlist[i]) > text_width)
-      text_width=WidgetTextWidth(font_info,fontlist[i]);
+  text_width=WidestFontBrowserName(font_info,fontlist,fonts);
   width=GetFontBrowserWidth(font_info,action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   /*
