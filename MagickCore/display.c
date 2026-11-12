@@ -16981,6 +16981,18 @@ typedef struct _DisplayEventContext
 
   const char
     *const *CommandMenu;
+
+  char
+    *command;
+
+  XVisualInfo
+    *visual_info;
+
+  const char
+    *const *VirtualMenu;
+
+  DisplayCommand
+    *VirtualCommands;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -17246,6 +17258,77 @@ static Image *XDropImage(const DisplayEventContext *context,const XEvent event,
     *state|=NextImageState | ExitState;
   (void) XFree((void *) data);
   return(nexus);
+}
+
+typedef struct _DisplayEventTargets
+{
+  Image
+    **nexus;
+
+  Image
+    **display_image;
+} DisplayEventTargets;
+
+static void XPressImageButton1(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const char
+    *const *const CommandMenu = context->CommandMenu;
+
+  char
+    *const command = context->command;
+
+  const char
+    *const *const VirtualMenu = context->VirtualMenu;
+
+  DisplayCommand
+    *const VirtualCommands = context->VirtualCommands;
+
+  Image
+    **const nexus = targets->nexus;
+
+  Image
+    **const display_image = targets->display_image;
+
+  int
+    entry;
+
+  if (resource_info->immutable)
+    {
+      /*
+        Select a command from the Virtual menu.
+      */
+      entry=XMenuWidget(display,windows,"Commands",VirtualMenu,
+        command);
+      if (entry >= 0)
+        (*nexus)=XMagickCommand(display,resource_info,windows,
+          VirtualCommands[entry],display_image,exception);
+      return;
+    }
+  /*
+    Map/unmap Command widget.
+  */
+  if (windows->command.mapped != MagickFalse)
+    (void) XWithdrawWindow(display,windows->command.id,
+      windows->command.screen);
+  else
+    {
+      (void) XCommandWidget(display,windows,CommandMenu,
+        (XEvent *) NULL);
+      (void) XMapRaised(display,windows->command.id);
+    }
 }
 
 /*
@@ -17818,6 +17901,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
 
   DisplayEventContext
     event_context;
+
+  const DisplayEventTargets
+    event_targets = { &nexus, &display_image };
 
   assert(image != (Image **) NULL);
   assert((*image)->signature == MagickCoreSignature);
@@ -18393,6 +18479,10 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.state=state;
   event_context.root_window=root_window;
   event_context.CommandMenu=CommandMenu;
+  event_context.command=command;
+  event_context.visual_info=visual_info;
+  event_context.VirtualMenu=VirtualMenu;
+  event_context.VirtualCommands=VirtualCommands;
   do
   {
     /*
@@ -18504,30 +18594,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             {
               case Button1:
               {
-                if (resource_info->immutable)
-                  {
-                    /*
-                      Select a command from the Virtual menu.
-                    */
-                    entry=XMenuWidget(display,windows,"Commands",VirtualMenu,
-                      command);
-                    if (entry >= 0)
-                      nexus=XMagickCommand(display,resource_info,windows,
-                        VirtualCommands[entry],&display_image,exception);
-                    break;
-                  }
-                /*
-                  Map/unmap Command widget.
-                */
-                if (windows->command.mapped != MagickFalse)
-                  (void) XWithdrawWindow(display,windows->command.id,
-                    windows->command.screen);
-                else
-                  {
-                    (void) XCommandWidget(display,windows,CommandMenu,
-                      (XEvent *) NULL);
-                    (void) XMapRaised(display,windows->command.id);
-                  }
+                XPressImageButton1(&event_context,&event_targets);
                 break;
               }
               case Button2:
