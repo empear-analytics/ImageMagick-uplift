@@ -7705,6 +7705,73 @@ file 5.29 to 5.45. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
 
 ---
 
+## Recipe QS - Skip Quoted Text and Brackets in Helpers
+
+**Use when:** CodeScene reports *Deep, Nested Complexity* or *Bumpy Road Ahead* on a
+configuration loader that skips its `<!DOCTYPE ...>` element with a loop over the
+characters holding a `quote` state and a `bracket_depth` counter (`policy.c`'s
+`LoadPolicyCache`; the same loop stands in the other `Load*Cache` functions). Moved whole
+into a helper (Recipe E, with EJ) the loop is itself cc 12 and fails the gate for new
+code.
+
+**Not covered by:** Recipe E, which moves the loop unchanged and so keeps its cc; Recipe
+EJ, which joins `else` and `if` and leaves the quote state; Recipe SF, which flattens a
+`switch`.
+
+**How:**
+
+1. The loop is `for ( ; *q != '\0'; q++)` over `bracket_depth` and `quote`: while
+   `quote` is set it clears it at the next equal character and does nothing else;
+   otherwise a `"` or `'` sets it, `[` adds one to `bracket_depth`, `]` subtracts one when
+   it is above 0, and `>` at depth 0 ends the loop after `q++`. Nothing else is read or
+   written.
+2. Write `SkipQuotedText(const char *q)`, called with `q` at the opening quote: it
+   returns the last character of the quoted text, the closing quote or, with none, the
+   last character before the terminating `'\0'`. Write `SkipDoctypeElement(const char
+   *q)` as `while (*q != '\0')` testing, in an `if`/`else if` chain, a quote (`q=
+   SkipQuotedText(q);`), `[`, `]` with depth above 0, and `>` at depth 0
+   (`return(q+1);`), then `q++;`, and `return(q);` after the loop. Avoid `continue`: it
+   raises the function's cc.
+3. The loader's block becomes `q=SkipDoctypeElement(q);` then its `continue;`, the
+   comment kept.
+4. Check by reading that both functions, called on a string with no closing quote, no
+   `>`, or a `>` inside quotes or brackets, leave `q` where the loop did (at the
+   terminating `'\0'`, or after the `>` at depth 0).
+
+**Before:**
+
+```c
+        for ( ; *q != '\0'; q++)
+        {
+          if (quote != 0)
+            { if (*q == quote) quote=0; }
+          else
+            { if ((*q == '"') || (*q == '\'')) quote=(*q); /* [ ] > chain */ }
+        }
+```
+
+**After:**
+
+```c
+        q=SkipDoctypeElement(q);
+```
+
+**Careful:**
+
+- The quote state is replaced by a skip, so an unclosed quote ends the scan at the string
+  end exactly as before; step 4 is the argument, the oracle's DOCTYPE cases (quoted
+  `]>`, nested brackets) the check.
+- Both functions have no side effect and read only `q`.
+
+**Evidence level:** oracle, for the loader (`casemap.py` first), and the reading of step 4
+in the commit message.
+
+**Provenance:** 2026-11-12, from `policy.c`'s `LoadPolicyCache` (campaign B, M120): the
+loop as one helper scored 5.62 (`SkipDoctypeElement` cc 9 with a `continue`), the form
+above 5.76. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -8010,3 +8077,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | NG | Drop the `NULL` guard before a release routine that returns at once on `NULL` (`x=DestroyString(x)`); proof by reading the callee, evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (3 guards) and `DestroyPolicyElement` (4): a file at the 1,000-line limit loses 0.25 to *Lines of Code in a Single File* when an extraction adds lines; 4.58 to 4.88 with the guards gone | mandate (2026-10-24) |
 | 2026-11-12 | NEW | SF | Flatten a first-letter `switch` over `LocaleCompare` groups into an `if`/`else if` chain; evidence oracle | `policy.c`'s `SetPolicyInfoAttribute` (cc 20 to 7, 5.02 to 5.29); the same shape stands in seven other files | mandate (2026-10-24) |
 | 2026-11-12 | NEW | RC | Extract a switch group that returns `R` or breaks to a constant `return(F);` into a function ending in `return(F);`; evidence oracle | `policy.c`'s `SetMagickSecurityPolicyValue` (three domain groups; 5.29 to 5.45); SR and Z refuse a `return` in the group, E step 7 takes the tail only | mandate (2026-10-24) |
+| 2026-11-12 | NEW | QS | Replace the quote-state and bracket-depth loop that skips a DOCTYPE by `SkipQuotedText` and `SkipDoctypeElement`; evidence oracle | `policy.c`'s `LoadPolicyCache` (5.45 to 5.76); E with EJ leaves a cc 12 helper the gate refuses | mandate (2026-10-24) |
