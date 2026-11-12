@@ -319,6 +319,28 @@ static MagickBooleanType MatchMimeElement(const MimeInfo *q,
   return(MatchMimeData(q,magic,length));
 }
 
+static ElementInfo *FindMimeElement(ElementInfo *p,const char *filename,
+  const unsigned char *magic,const size_t length)
+{
+  ElementInfo
+    *element_info;
+
+  element_info=(ElementInfo *) NULL;
+  while (p != (ElementInfo *) NULL)
+  {
+    const MimeInfo
+      *q;
+
+    q=(const MimeInfo *) p->value;
+    assert(q->offset >= 0);
+    if ((IsMimeOutranked(q,element_info) == MagickFalse) &&
+        (MatchMimeElement(q,filename,magic,length) != MagickFalse))
+      element_info=p;
+    p=p->next;
+  }
+  return(element_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -374,19 +396,7 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
         return((const MimeInfo *) p->value);
       return((const MimeInfo *) NULL);
     }
-  element_info=(ElementInfo *) NULL;
-  while (p != (ElementInfo *) NULL)
-  {
-    const MimeInfo
-      *q;
-
-    q=(const MimeInfo *) p->value;
-    assert(q->offset >= 0);
-    if ((IsMimeOutranked(q,element_info) == MagickFalse) &&
-        (MatchMimeElement(q,filename,magic,length) != MagickFalse))
-      element_info=p;
-    p=p->next;
-  }
+  element_info=FindMimeElement(p,filename,magic,length);
   if (element_info != (ElementInfo *) NULL)
     SetHeadElementInLinkedList(mime_cache,element_info);
   UnlockSemaphoreInfo(mime_semaphore);
