@@ -687,14 +687,11 @@ static inline MagickBooleanType IsPathContainsSymlink(const char *path)
     (void) memcpy(partial+offset,component,i);
     offset+=i;
     partial[offset]='\0';
-    if (*p != '\0')
-      {
-        /*
-          Check whether this prefix is a symlink.
-        */
-        if (is_symlink_utf8(partial) != MagickFalse)
-          return(MagickTrue);
-      }
+    /*
+      Check whether this prefix is a symlink.
+    */
+    if ((*p != '\0') && (is_symlink_utf8(partial) != MagickFalse))
+      return(MagickTrue);
     /*
       Skip separator.
     */
@@ -714,11 +711,9 @@ MagickExport MagickBooleanType IsPathAuthorized(const PolicyRights rights,
     ((symlink_follow_allowed != MagickFalse) ||
      (is_symlink_utf8(path) == MagickFalse))) ? MagickTrue : MagickFalse;
   if ((status != MagickFalse) && (symlink_follow_allowed == MagickFalse))
-    {
-      if ((is_symlink_utf8(path) != MagickFalse) ||
-          (IsPathContainsSymlink(path) != MagickFalse))
-        status=MagickFalse;
-    }
+    if ((is_symlink_utf8(path) != MagickFalse) ||
+        (IsPathContainsSymlink(path) != MagickFalse))
+      status=MagickFalse;
   if (status != MagickFalse)
     status=IsFileResourceIdentityValid(path);
   return(status);
@@ -840,6 +835,23 @@ static char *AcquireCanonicalCandidate(const char *canonical_directory,
   return(canonical_candidate);
 }
 
+static MagickBooleanType IsGlobMatch(const char *path,const char *pattern)
+{
+  return(path != (const char *) NULL ? GlobExpression(path,pattern,
+    MagickFalse) : MagickFalse);
+}
+
+static MagickBooleanType IsCanonicalMatch(const char *canonical_path,
+  const char *canonical_candidate,const char *canonical_directory,
+  const char *pattern)
+{
+  if (IsGlobMatch(canonical_path,pattern) != MagickFalse)
+    return(MagickTrue);
+  if (IsGlobMatch(canonical_candidate,pattern) != MagickFalse)
+    return(MagickTrue);
+  return(IsGlobMatch(canonical_directory,pattern));
+}
+
 MagickExport MagickBooleanType IsRightsAuthorizedByName(
   const PolicyDomain domain,const char *name,const PolicyRights rights,
   const char *pattern)
@@ -927,21 +939,10 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
         /*
           Match against directory, basename, and canonical path.
         */
-        if ((canonical_directory != (char *) NULL) && (match == MagickFalse))
-          match=GlobExpression(canonical_directory,policy->pattern,MagickFalse);
-        if ((canonical_candidate != (char *) NULL) && (match == MagickFalse))
-          match=GlobExpression(canonical_candidate,policy->pattern,MagickFalse);
-        if ((canonical_path != (char *) NULL) && (match == MagickFalse))
-          match=GlobExpression(canonical_path,policy->pattern,MagickFalse);
-        if ((canonical_path != (char *) NULL) &&
-            (GlobExpression(canonical_path,policy->pattern,MagickFalse) != MagickFalse))
-          matched_canonical=MagickTrue;
-        else if ((canonical_candidate != (char *) NULL) &&
-                 (GlobExpression(canonical_candidate,policy->pattern,MagickFalse) != MagickFalse))
-          matched_canonical=MagickTrue;
-        else if ((canonical_directory != (char *) NULL) &&
-                 (GlobExpression(canonical_directory,policy->pattern,MagickFalse) != MagickFalse))
-          matched_canonical=MagickTrue;
+        matched_canonical=IsCanonicalMatch(canonical_path,canonical_candidate,
+          canonical_directory,policy->pattern);
+        if (match == MagickFalse)
+          match=matched_canonical;
       }
     if (match == MagickFalse)
       continue;
