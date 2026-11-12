@@ -4333,6 +4333,49 @@ static void MapConfirmWidget(Display *display,XWindows *windows)
   windows->widget.mapped=MagickFalse;
 }
 
+typedef struct _ConfirmLayout
+{
+  Display
+    *display;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    width,
+    height;
+} ConfirmLayout;
+
+static void PositionConfirmWidget(XWindows *windows,
+  const ConfirmLayout *layout)
+{
+  Display
+    *const display = layout->display;
+
+  XFontStruct
+    *const font_info = layout->font_info;
+
+  const unsigned int
+    width = layout->width,
+    height = layout->height;
+
+  /*
+    Position Confirm widget.
+  */
+  windows->widget.width=(unsigned int) ((int) width+9*QuantumMargin);
+  windows->widget.min_width=9*(unsigned int) QuantumMargin+
+    WidgetTextWidth(font_info,CancelButtonText)+
+    WidgetTextWidth(font_info,DismissButtonText)+
+    WidgetTextWidth(font_info,YesButtonText);
+  if (windows->widget.width < windows->widget.min_width)
+    windows->widget.width=windows->widget.min_width;
+  windows->widget.height=(unsigned int) (12*height);
+  windows->widget.min_height=(unsigned int) (7*height);
+  if (windows->widget.height < windows->widget.min_height)
+    windows->widget.height=windows->widget.min_height;
+  XConstrainWindowPosition(display,&windows->widget);
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -4362,6 +4405,9 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
 
   ConfirmContext
     context;
+
+  ConfirmLayout
+    layout;
   /*
     Determine Confirm widget attributes.
   */
@@ -4383,21 +4429,11 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
     if (WidgetTextWidth(font_info,(char *) description) > width)
       width=WidgetTextWidth(font_info,(char *) description);
   height=(unsigned int) (font_info->ascent+font_info->descent);
-  /*
-    Position Confirm widget.
-  */
-  windows->widget.width=(unsigned int) ((int) width+9*QuantumMargin);
-  windows->widget.min_width=9*(unsigned int) QuantumMargin+
-    WidgetTextWidth(font_info,CancelButtonText)+
-    WidgetTextWidth(font_info,DismissButtonText)+
-    WidgetTextWidth(font_info,YesButtonText);
-  if (windows->widget.width < windows->widget.min_width)
-    windows->widget.width=windows->widget.min_width;
-  windows->widget.height=(unsigned int) (12*height);
-  windows->widget.min_height=(unsigned int) (7*height);
-  if (windows->widget.height < windows->widget.min_height)
-    windows->widget.height=windows->widget.min_height;
-  XConstrainWindowPosition(display,&windows->widget);
+  layout.display=display;
+  layout.font_info=font_info;
+  layout.width=width;
+  layout.height=height;
+  PositionConfirmWidget(windows,&layout);
   /*
     Map Confirm widget.
   */
