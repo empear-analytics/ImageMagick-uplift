@@ -637,6 +637,43 @@ static int XQuarterTurns(const double degrees)
   return(rotations);
 }
 
+static void XRotateAnnotateOrigin(const Image *annotate_image,
+  const int rotations,int *x,int *y)
+{
+  switch (rotations % 4)
+  {
+    default:
+    case 0:
+      break;
+    case 1:
+    {
+      /*
+        Rotate 90 degrees.
+      */
+      (*x)-=(int) annotate_image->columns/2;
+      (*y)+=(int) annotate_image->columns/2;
+      break;
+    }
+    case 2:
+    {
+      /*
+        Rotate 180 degrees.
+      */
+      (*x)=(*x)-(int) annotate_image->columns;
+      break;
+    }
+    case 3:
+    {
+      /*
+        Rotate 270 degrees.
+      */
+      (*x)=(*x)-(int) annotate_image->columns/2;
+      (*y)=(*y)-(int) (annotate_image->rows-(annotate_image->columns/2));
+      break;
+    }
+  }
+}
+
 MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
   ExceptionInfo *exception)
@@ -768,38 +805,7 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
         Annotation is relative to the degree of rotation.
       */
       rotations=XQuarterTurns(annotate_info->degrees);
-      switch (rotations % 4)
-      {
-        default:
-        case 0:
-          break;
-        case 1:
-        {
-          /*
-            Rotate 90 degrees.
-          */
-          x-=(int) annotate_image->columns/2;
-          y+=(int) annotate_image->columns/2;
-          break;
-        }
-        case 2:
-        {
-          /*
-            Rotate 180 degrees.
-          */
-          x=x-(int) annotate_image->columns;
-          break;
-        }
-        case 3:
-        {
-          /*
-            Rotate 270 degrees.
-          */
-          x=x-(int) annotate_image->columns/2;
-          y=y-(int) (annotate_image->rows-(annotate_image->columns/2));
-          break;
-        }
-      }
+      XRotateAnnotateOrigin(annotate_image,rotations,&x,&y);
     }
   /*
     Composite text onto the image.
