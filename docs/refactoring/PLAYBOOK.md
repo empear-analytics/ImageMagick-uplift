@@ -986,6 +986,12 @@ is worth it.
    block (a delegate's headers and the macros it supplies, as `fourier.c`'s FFTW and
    `complex.h` block) is left out of the copy when no line of the family, comments and
    strings aside, names one of those macros. The original keeps the run unchanged.
+   A second exception (2026-11-12): a quoted `#include` of a header of the same directory
+   that *defines objects* (a file-scope initialised variable in column 0, as
+   `accelerate-kernels-private.h`'s `const char *accelerateKernels =`) is left out of the
+   copy as well, when no line of the family, comments and strings aside, names an object
+   or a macro that header defines. Both files including it would define the object twice
+   (a link error); the split is refused when the family names one.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -1003,6 +1009,11 @@ is worth it.
   expands to the same tokens in the one file that uses it, and the kept file used none.
   `refactor_guard.py --combined` therefore counts every literal once, as before; say in
   the message which tables and macros moved.
+- An include left out under step 2's second exception is neither moved nor edited either:
+  the original keeps the line, and the header's objects stay defined once, in the original's
+  object. The family names none of them (the tool checks, with the header's macros), so every
+  token of the moved text means what it meant, and the object code of every moved function
+  is compared unchanged (`tools/split_branch_check.py`, as for the run below).
 - An include run left out under step 2 is neither moved nor edited: the original keeps
   it, uncompiled branches included, as it stood. The family compiles without it, so it
   needs nothing the run declares: a call of a function only a dropped header declares
@@ -12584,3 +12595,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | AMEND | CT | Step 5: a member the helper only reads, whose variable another block of the loop writes and whose uses include a macro that names the variable, is bound `T *const v = *targets->v;` with its uses unchanged; the helper that writes it uses `(*v)`. *Careful* gives the argument | `widget.c`'s `XFontBrowserWidget` (campaign A, W18 lane c, wide build): the action-redraw block assigns the caller's `font_info` (`font_info=XLoadQueryFont(...)`, never restored), and `QuantumMargin`, used by almost every other block, expands to `font_info->max_bounds.width`; an input-struct copy would change what those blocks read after the redraw, a pointer-to-pointer member written `(*font_info)` would not compile inside the macro | owner |
 | 2026-11-12 | NEW | GC | Guard Returns from a Conjunction: `if (A1 && ... && An) return(T); return(F);` (`T`, `F` constants, `n` at least three, no logical-or operator) becomes one `if (Ai') return(F);` per operand in order and `return(T);`, `Ai'` the inverse as Recipe G says (`!(Ai)` for floating-point operands, calls and bare values). *Careful* gives the argument (left-to-right short circuit, each operand evaluated at most once, same order) | `opencl.c`'s `IsSameOpenCLDevice` and `IsBenchmarkedOpenCLDevice` (campaign A, W19 lane a, wide build): the file's two *Complex Conditional* functions, twins on two struct types that no predicate or merge reaches (six operands, eight parameters); one as guards 6.33 to 6.83, both 7.36 | owner |
 | 2026-11-12 | NEW | GD | Guard Returns from a Disjunction: `if (A1 or A2 or ... or An) return(F);` (`F` a constant or a bare `return;`, `n` at least three, no `&&`) becomes one `if (Ai) return(F);` per operand in order. *Careful* gives the argument (left-to-right short circuit, each operand evaluated at most once, same order) | `accelerate.c`'s `AccelerateGrayscaleImage` (campaign A, W19 lane a, wide build): its three-trait failure test is the file's only *Complex Conditional*; Recipe P's predicate 3.19 to 3.19 (a new clone function), three guards 3.19 to 3.27 | owner |
+| 2026-11-12 | AMEND | S | Step 2: a quoted `#include` of a header that defines objects (a file-scope initialised variable in column 0) is left out of the new file's include block, when no line of the family names an object or macro of that header; the split is refused when one does. *Careful* gives the argument | `opencl.c`'s device-property family (campaign A, W19 lane a, wide build): the copied include block included `accelerate-kernels-private.h`, which defines `accelerateKernels` and `accelerateKernels2`, and the pair failed to link (multiple definition); the family names neither, and the moved functions' object code compares unchanged | owner |
