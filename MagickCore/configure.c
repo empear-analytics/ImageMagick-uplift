@@ -948,6 +948,43 @@ static inline MagickBooleanType IsIncludeElementOpen(const char *token,
     MagickTrue : MagickFalse);
 }
 
+static void GetIncludePath(const char *filename,const char *token,
+  char *path)
+{
+  GetPathComponent(filename,HeadPath,path);
+  if (*path != '\0')
+    (void) ConcatenateMagickString(path,DirectorySeparator,
+      MagickPathExtent);
+  if (*token == *DirectorySeparator)
+    (void) CopyMagickString(path,token,MagickPathExtent);
+  else
+    (void) ConcatenateMagickString(path,token,MagickPathExtent);
+}
+
+static MagickBooleanType LoadConfigureInclude(const ConfigureLoadTarget *target,
+  const char *filename,const char *token,const size_t depth)
+{
+  const ConfigureLoadTarget include_target = { target->cache,
+    target->exception };
+
+  char
+    path[MagickPathExtent],
+    *file_xml;
+
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  GetIncludePath(filename,token,path);
+  file_xml=FileToXML(path,~0UL);
+  if (file_xml != (char *) NULL)
+    {
+      status=LoadConfigureCache(&include_target,file_xml,path,depth+1);
+      file_xml=DestroyString(file_xml);
+    }
+  return(status);
+}
+
 static const char *SkipQuotedText(const char *q)
 {
   const char
@@ -1068,30 +1105,8 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
                 (void) ThrowMagickException(exception,GetMagickModule(),
                   ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
               else
-                {
-                  const ConfigureLoadTarget include_target = { cache,
-                    exception };
-
-                  char
-                    path[MagickPathExtent],
-                    *file_xml;
-
-                  GetPathComponent(filename,HeadPath,path);
-                  if (*path != '\0')
-                    (void) ConcatenateMagickString(path,DirectorySeparator,
-                      MagickPathExtent);
-                  if (*token == *DirectorySeparator)
-                    (void) CopyMagickString(path,token,MagickPathExtent);
-                  else
-                    (void) ConcatenateMagickString(path,token,MagickPathExtent);
-                  file_xml=FileToXML(path,~0UL);
-                  if (file_xml != (char *) NULL)
-                    {
-                      status&=(MagickStatusType) LoadConfigureCache(
-                        &include_target,file_xml,path,depth+1);
-                      file_xml=DestroyString(file_xml);
-                    }
-                }
+                status&=(MagickStatusType) LoadConfigureInclude(target,
+                  filename,token,depth);
             }
         }
         continue;
