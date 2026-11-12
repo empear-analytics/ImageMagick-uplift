@@ -2934,6 +2934,31 @@ MagickExport int XError(Display *display,XErrorEvent *error)
 %    o window_info: Specifies a pointer to a X11 XWindowInfo structure.
 %
 */
+static void XFreeWindowContexts(Display *display,const XVisualInfo *visual_info,
+  XWindowInfo *window_info)
+{
+  if (window_info->id != (Window) NULL)
+    {
+      /*
+        Free destroy window and free cursors.
+      */
+      if (window_info->id != XRootWindow(display,visual_info->screen))
+        (void) XDestroyWindow(display,window_info->id);
+      if (window_info->annotate_context != (GC) NULL)
+        (void) XFreeGC(display,window_info->annotate_context);
+      if (window_info->highlight_context != (GC) NULL)
+        (void) XFreeGC(display,window_info->highlight_context);
+      if (window_info->widget_context != (GC) NULL)
+        (void) XFreeGC(display,window_info->widget_context);
+      if (window_info->cursor != (Cursor) NULL)
+        (void) XFreeCursor(display,window_info->cursor);
+      window_info->cursor=(Cursor) NULL;
+      if (window_info->busy_cursor != (Cursor) NULL)
+        (void) XFreeCursor(display,window_info->busy_cursor);
+      window_info->busy_cursor=(Cursor) NULL;
+    }
+}
+
 MagickPrivate void XFreeResources(Display *display,XVisualInfo *visual_info,
   XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
   XResourceInfo *resource_info,XWindowInfo *window_info)
@@ -2949,26 +2974,7 @@ MagickPrivate void XFreeResources(Display *display,XVisualInfo *visual_info,
       */
       if (window_info->ximage != (XImage *) NULL)
         XDestroyImage(window_info->ximage);
-      if (window_info->id != (Window) NULL)
-        {
-          /*
-            Free destroy window and free cursors.
-          */
-          if (window_info->id != XRootWindow(display,visual_info->screen))
-            (void) XDestroyWindow(display,window_info->id);
-          if (window_info->annotate_context != (GC) NULL)
-            (void) XFreeGC(display,window_info->annotate_context);
-          if (window_info->highlight_context != (GC) NULL)
-            (void) XFreeGC(display,window_info->highlight_context);
-          if (window_info->widget_context != (GC) NULL)
-            (void) XFreeGC(display,window_info->widget_context);
-          if (window_info->cursor != (Cursor) NULL)
-            (void) XFreeCursor(display,window_info->cursor);
-          window_info->cursor=(Cursor) NULL;
-          if (window_info->busy_cursor != (Cursor) NULL)
-            (void) XFreeCursor(display,window_info->busy_cursor);
-          window_info->busy_cursor=(Cursor) NULL;
-        }
+      XFreeWindowContexts(display,visual_info,window_info);
     }
   /*
     Free font.
