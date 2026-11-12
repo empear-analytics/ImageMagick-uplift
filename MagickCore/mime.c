@@ -319,6 +319,23 @@ static MagickBooleanType MatchMimeData(const MimeInfo *q,
   return(MagickFalse);
 }
 
+static MagickBooleanType IsMimeOutranked(const MimeInfo *q,
+  const ElementInfo *element_info)
+{
+  if (element_info == (const ElementInfo *) NULL)
+    return(MagickFalse);
+  return(q->priority > ((const MimeInfo *) element_info->value)->priority ?
+    MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType MatchMimeElement(const MimeInfo *q,
+  const char *filename,const unsigned char *magic,const size_t length)
+{
+  if ((q->pattern != (char *) NULL) && (filename != (char *) NULL))
+    return(GlobExpression(filename,q->pattern,MagickFalse));
+  return(MatchMimeData(q,magic,length));
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -382,20 +399,8 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
 
     q=(const MimeInfo *) p->value;
     assert(q->offset >= 0);
-    if (element_info != (const ElementInfo *) NULL)
-      if (q->priority > ((const MimeInfo *) element_info->value)->priority)
-        {
-          p=p->next;
-          continue;
-        }
-    if ((q->pattern != (char *) NULL) && (filename != (char *) NULL))
-      {
-        if (GlobExpression(filename,q->pattern,MagickFalse) != MagickFalse)
-          element_info=p;
-        p=p->next;
-        continue;
-      }
-    if (MatchMimeData(q,magic,length) != MagickFalse)
+    if ((IsMimeOutranked(q,element_info) == MagickFalse) &&
+        (MatchMimeElement(q,filename,magic,length) != MagickFalse))
       element_info=p;
     p=p->next;
   }
