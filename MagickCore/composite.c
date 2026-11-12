@@ -3665,6 +3665,44 @@ static void CompositeAlphaDarkenRun(const CompositeRowInputs *row,
   }
 }
 
+static void CompositeAlphaColorizeRun(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,MagickRealType *pixel)
+{
+  Image
+    *const source_image = row->source_image;
+
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa,
+    Si = authentic->Si;
+
+  switch (compose)
+  {
+    case ColorizeCompositeOp:
+    case HueCompositeOp:
+    case LuminizeCompositeOp:
+    case RMSECompositeOp:
+    case SaturateCompositeOp:
+    {
+      (*pixel)=GetHueAlpha(Sa,Da,(*pixel));
+      break;
+    }
+    case CopyAlphaCompositeOp:
+    {
+      (*pixel)=GetCopyAlpha(source_image,Si,Sa);
+      break;
+    }
+    default:
+    {
+      CompositeAlphaDarkenRun(row,authentic,pixel);
+      break;
+    }
+  }
+}
+
 static void CompositeAlphaChannel(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,Quantum *magick_restrict q,
   MagickRealType *pixel)
@@ -3721,23 +3759,9 @@ static void CompositeAlphaChannel(const CompositeRowInputs *row,
       (*pixel)=(MagickRealType) TransparentAlpha;
       break;
     }
-    case ColorizeCompositeOp:
-    case HueCompositeOp:
-    case LuminizeCompositeOp:
-    case RMSECompositeOp:
-    case SaturateCompositeOp:
-    {
-      (*pixel)=GetHueAlpha(Sa,Da,(*pixel));
-      break;
-    }
-    case CopyAlphaCompositeOp:
-    {
-      (*pixel)=GetCopyAlpha(source_image,Si,Sa);
-      break;
-    }
     default:
     {
-      CompositeAlphaDarkenRun(row,authentic,pixel);
+      CompositeAlphaColorizeRun(row,authentic,pixel);
       break;
     }
   }
