@@ -16943,6 +16943,76 @@ static void XUpdatePanWindow(Display *display,XWindows *windows,
       (void) XWithdrawWindow(display,windows->pan.id,
         windows->pan.screen);
 }
+
+typedef struct _DisplayEventContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  ExceptionInfo
+    *exception;
+} DisplayEventContext;
+
+static void XConfigureImageWindow(const DisplayEventContext *context,
+  const XEvent event,Image *display_image,const XPoint vid_info)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  /*
+    Image window has a new configuration.
+  */
+  if (event.xconfigure.send_event != 0)
+    {
+      /*
+        Position the transient windows relative of the Image window.
+      */
+      XPositionCommandAndWidget(display,windows,event);
+      XPositionMagnifyAndPan(display,windows,event);
+    }
+  if ((event.xconfigure.width == (int) windows->image.width) &&
+      (event.xconfigure.height == (int) windows->image.height))
+    return;
+  windows->image.width=(unsigned int) event.xconfigure.width;
+  windows->image.height=(unsigned int) event.xconfigure.height;
+  windows->image.x=0;
+  windows->image.y=0;
+  if (display_image->montage != (char *) NULL)
+    {
+      windows->image.x=vid_info.x;
+      windows->image.y=vid_info.y;
+    }
+  if (windows->image.mapped != MagickFalse &&
+      windows->image.stasis != MagickFalse)
+    {
+      /*
+        Update image window configuration.
+      */
+      windows->image.window_changes.width=event.xconfigure.width;
+      windows->image.window_changes.height=event.xconfigure.height;
+      (void) XConfigureImage(display,resource_info,windows,
+        display_image,exception);
+    }
+  /*
+    Update pan window configuration.
+  */
+  XUpdatePanWindow(display,windows,event);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -17464,6 +17534,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
 
   XWMHints
     *manager_hints;
+
+  DisplayEventContext
+    event_context;
 
   assert(image != (Image **) NULL);
   assert((*image)->signature == MagickCoreSignature);
@@ -18027,6 +18100,10 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   *state&=(unsigned int) (~FormerImageState);
   *state&=(unsigned int) (~MontageImageState);
   *state&=(unsigned int) (~NextImageState);
+  event_context.display=display;
+  event_context.resource_info=resource_info;
+  event_context.windows=windows;
+  event_context.exception=exception;
   do
   {
     /*
@@ -18486,44 +18563,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             event.xconfigure.y,event.xconfigure.send_event);
         if (event.xconfigure.window == windows->image.id)
           {
-            /*
-              Image window has a new configuration.
-            */
-            if (event.xconfigure.send_event != 0)
-              {
-                /*
-                  Position the transient windows relative of the Image window.
-                */
-                XPositionCommandAndWidget(display,windows,event);
-                XPositionMagnifyAndPan(display,windows,event);
-              }
-            if ((event.xconfigure.width == (int) windows->image.width) &&
-                (event.xconfigure.height == (int) windows->image.height))
-              break;
-            windows->image.width=(unsigned int) event.xconfigure.width;
-            windows->image.height=(unsigned int) event.xconfigure.height;
-            windows->image.x=0;
-            windows->image.y=0;
-            if (display_image->montage != (char *) NULL)
-              {
-                windows->image.x=vid_info.x;
-                windows->image.y=vid_info.y;
-              }
-            if (windows->image.mapped != MagickFalse &&
-                windows->image.stasis != MagickFalse)
-              {
-                /*
-                  Update image window configuration.
-                */
-                windows->image.window_changes.width=event.xconfigure.width;
-                windows->image.window_changes.height=event.xconfigure.height;
-                (void) XConfigureImage(display,resource_info,windows,
-                  display_image,exception);
-              }
-            /*
-              Update pan window configuration.
-            */
-            XUpdatePanWindow(display,windows,event);
+            XConfigureImageWindow(&event_context,event,display_image,vid_info);
             break;
           }
         if (event.xconfigure.window == windows->magnify.id)
