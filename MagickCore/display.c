@@ -6594,6 +6594,12 @@ typedef struct _DrawEditContext
 
   char
     *command;
+
+  Window
+    root_window;
+
+  ExceptionInfo
+    *exception;
 } DrawEditContext;
 
 typedef struct _DrawStyleTargets
@@ -6606,6 +6612,15 @@ typedef struct _DrawStyleTargets
 
   unsigned int
     *line_width;
+
+  Pixmap
+    *stipple;
+
+  int
+    *x;
+
+  int
+    *y;
 } DrawStyleTargets;
 
 static void XSelectDrawColor(const DrawEditContext *context,const int id,
@@ -6806,6 +6821,76 @@ static Pixmap XCreateStippleBitmap(Display *display,const Window root_window,
   return(stipple);
 }
 
+static void XReadStippleFile(const DrawEditContext *context,
+  const DrawStyleTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const Window
+    root_window = context->root_window;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Pixmap
+    *const stipple = targets->stipple;
+
+  int
+    *const x = targets->x;
+
+  int
+    *const y = targets->y;
+
+  Image
+    *stipple_image;
+
+  ImageInfo
+    *image_info;
+
+  int
+    status;
+
+  static char
+    filename[MagickPathExtent] = "\0";
+
+  unsigned int
+    height,
+    width;
+
+  XFileBrowserWidget(display,windows,"Stipple",filename);
+  if (*filename == '\0')
+    return;
+  /*
+    Read image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  image_info=AcquireImageInfo();
+  (void) CopyMagickString(image_info->filename,filename,
+    MagickPathExtent);
+  stipple_image=ReadImage(image_info,exception);
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (stipple_image == (Image *) NULL)
+    return;
+  (void) AcquireUniqueFileResource(filename);
+  (void) FormatLocaleString(stipple_image->filename,
+    MagickPathExtent,"xbm:%s",filename);
+  (void) WriteImage(image_info,stipple_image,exception);
+  stipple_image=DestroyImage(stipple_image);
+  image_info=DestroyImageInfo(image_info);
+  status=XReadBitmapFile(display,root_window,filename,&width,
+    &height,stipple,x,y);
+  (void) RelinquishUniqueFileResource(filename);
+  if ((status != BitmapSuccess) != 0)
+    XNoticeWidget(display,windows,"Unable to read X bitmap image:",
+      filename);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -6899,7 +6984,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
     draw_context;
 
   const DrawStyleTargets
-    style_targets = { &draw_info, &pen_id, &line_width };
+    style_targets = { &draw_info, &pen_id, &line_width, &stipple, &x, &y };
 
   /*
     Allocate polygon info.
@@ -6934,6 +7019,8 @@ static MagickBooleanType XDrawEditImage(Display *display,
   draw_context.windows=windows;
   draw_context.DrawMenu=DrawMenu;
   draw_context.command=command;
+  draw_context.root_window=root_window;
+  draw_context.exception=exception;
   for ( ; ; )
   {
     XQueryPosition(display,windows->image.id,&x,&y);
@@ -7012,18 +7099,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
                   (char *) NULL,
                 };
 
-              Image
-                *stipple_image;
-
-              ImageInfo
-                *image_info;
-
-              int
-                status;
-
-              static char
-                filename[MagickPathExtent] = "\0";
-
               /*
                 Select a command from the pop-up menu.
               */
@@ -7040,34 +7115,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
                   stipple=XCreateStippleBitmap(display,root_window,entry);
                   break;
                 }
-              XFileBrowserWidget(display,windows,"Stipple",filename);
-              if (*filename == '\0')
-                break;
-              /*
-                Read image.
-              */
-              XSetCursorState(display,windows,MagickTrue);
-              XCheckRefreshWindows(display,windows);
-              image_info=AcquireImageInfo();
-              (void) CopyMagickString(image_info->filename,filename,
-                MagickPathExtent);
-              stipple_image=ReadImage(image_info,exception);
-              CatchException(exception);
-              XSetCursorState(display,windows,MagickFalse);
-              if (stipple_image == (Image *) NULL)
-                break;
-              (void) AcquireUniqueFileResource(filename);
-              (void) FormatLocaleString(stipple_image->filename,
-                MagickPathExtent,"xbm:%s",filename);
-              (void) WriteImage(image_info,stipple_image,exception);
-              stipple_image=DestroyImage(stipple_image);
-              image_info=DestroyImageInfo(image_info);
-              status=XReadBitmapFile(display,root_window,filename,&width,
-                &height,&stipple,&x,&y);
-              (void) RelinquishUniqueFileResource(filename);
-              if ((status != BitmapSuccess) != 0)
-                XNoticeWidget(display,windows,"Unable to read X bitmap image:",
-                  filename);
+              XReadStippleFile(&draw_context,&style_targets);
               break;
             }
             case DrawWidthCommand:
