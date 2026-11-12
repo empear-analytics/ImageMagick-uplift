@@ -4447,6 +4447,18 @@ static void XImportTrueColorRows(const XDirectRowSource *source)
   }
 }
 
+typedef struct _ColormapInfo
+{
+  Colormap
+    colormap;
+
+  XColor
+    *colors;
+
+  struct _ColormapInfo
+    *next;
+} ColormapInfo;
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4455,18 +4467,6 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
 
   ExceptionInfo
     *const exception = window_context->exception;
-
-  typedef struct _ColormapInfo
-  {
-    Colormap
-      colormap;
-
-    XColor
-      *colors;
-
-    struct _ColormapInfo
-      *next;
-  } ColormapInfo;
 
   int
     display_height,
