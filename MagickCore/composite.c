@@ -3293,7 +3293,9 @@ typedef struct _CompositeRowInputs
   MagickBooleanType
     union_coverage,
     canvas_alpha,
-    source_alpha;
+    source_alpha,
+    pixel_info_inputs,
+    intensity_inputs;
 } CompositeRowInputs;
 
 static void SetCompositeCoverageModulus(const CompositeRowInputs *row,
@@ -4734,15 +4736,54 @@ static void CompositeImageChannels(const CompositeRowInputs *row,
   }
 }
 
+static const CompositeOperator
+  PixelInfoInputOperators[] =
+  {
+    ColorizeCompositeOp,
+    HueCompositeOp,
+    LuminizeCompositeOp,
+    ModulateCompositeOp,
+    RMSECompositeOp,
+    SaturateCompositeOp
+  };
+
+static MagickBooleanType IsPixelInfoInputOperator(const CompositeOperator compose)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators)); i++)
+    if (PixelInfoInputOperators[i] == compose)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
+static const CompositeOperator
+  IntensityInputOperators[] =
+  {
+    BumpmapCompositeOp,
+    CopyAlphaCompositeOp,
+    DarkenIntensityCompositeOp,
+    LightenIntensityCompositeOp
+  };
+
+static MagickBooleanType IsIntensityInputOperator(const CompositeOperator compose)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators)); i++)
+    if (IntensityInputOperators[i] == compose)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 static void CompositeImagePixel(const CompositeRowInputs *row,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
   Image
     *const image = row->image,
     *const source_image = row->source_image;
-
-  const CompositeOperator
-    compose = row->compose;
 
   CompositePixelInputs
     authentic;
@@ -4766,32 +4807,17 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
   Sa=QuantumScale*(double) GetPixelAlpha(source_image,p);
   Da=QuantumScale*(double) GetPixelAlpha(image,q);
   SetCompositeCoverage(row,Sa,Da,&alpha);
-  switch (compose)
-  {
-    case ColorizeCompositeOp:
-    case HueCompositeOp:
-    case LuminizeCompositeOp:
-    case ModulateCompositeOp:
-    case RMSECompositeOp:
-    case SaturateCompositeOp:
+  if (row->pixel_info_inputs != MagickFalse)
     {
-      Si=GetPixelIntensity(source_image,p);
-      GetPixelInfoPixel(source_image,p,&source_pixel);
-      GetPixelInfoPixel(image,q,&canvas_pixel);
-      break;
+        Si=GetPixelIntensity(source_image,p);
+        GetPixelInfoPixel(source_image,p,&source_pixel);
+        GetPixelInfoPixel(image,q,&canvas_pixel);
     }
-    case BumpmapCompositeOp:
-    case CopyAlphaCompositeOp:
-    case DarkenIntensityCompositeOp:
-    case LightenIntensityCompositeOp:
+  else if (row->intensity_inputs != MagickFalse)
     {
-      Si=GetPixelIntensity(source_image,p);
-      Di=GetPixelIntensity(image,q);
-      break;
+        Si=GetPixelIntensity(source_image,p);
+        Di=GetPixelIntensity(image,q);
     }
-    default:
-      break;
-  }
   authentic.p=p;
   authentic.alpha=alpha;
   authentic.Da=Da;
@@ -5433,6 +5459,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     row.union_coverage=IsUnionCoverageOperator(compose);
     row.canvas_alpha=IsCanvasAlphaOperator(compose);
     row.source_alpha=IsSourceAlphaOperator(compose);
+    row.pixel_info_inputs=IsPixelInfoInputOperator(compose);
+    row.intensity_inputs=IsIntensityInputOperator(compose);
     row.clip_to_self=clip_to_self;
     row.x_offset=x_offset;
     row.y_offset=y_offset;
