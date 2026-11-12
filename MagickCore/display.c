@@ -17069,6 +17069,20 @@ static MagickStatusType XConfigureMagnifyWindow(
     }
   return(status);
 }
+
+static void XConfigurePanWindow(XWindows *windows,const XEvent event)
+{
+  /*
+    Pan icon window has a new configuration.
+  */
+  if (event.xconfigure.send_event != 0)
+    {
+      windows->pan.x=event.xconfigure.x;
+      windows->pan.y=event.xconfigure.y;
+    }
+  windows->pan.width=(unsigned int) event.xconfigure.width;
+  windows->pan.height=(unsigned int) event.xconfigure.height;
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18628,16 +18642,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
         if (windows->magnify.mapped != MagickFalse &&
             (event.xconfigure.window == windows->pan.id))
           {
-            /*
-              Pan icon window has a new configuration.
-            */
-            if (event.xconfigure.send_event != 0)
-              {
-                windows->pan.x=event.xconfigure.x;
-                windows->pan.y=event.xconfigure.y;
-              }
-            windows->pan.width=(unsigned int) event.xconfigure.width;
-            windows->pan.height=(unsigned int) event.xconfigure.height;
+            XConfigurePanWindow(windows,event);
             break;
           }
         if (event.xconfigure.window == windows->icon.id)
