@@ -5405,6 +5405,33 @@ static void MapDialogWidget(Display *display,XWindows *windows)
   windows->widget.mapped=MagickFalse;
 }
 
+static void RespondToDialogEvents(const DialogContext *context,
+  const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  XEvent
+    event;
+
+  do
+  {
+    UpdateDialogLayout(context,targets);
+    RedrawDialogWidget(context,targets);
+    /*
+      Wait for next event.
+    */
+    (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
+    HandleDialogEvent(context,event,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -5421,9 +5448,6 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
 
   size_t
     state;
-
-  XEvent
-    event;
 
   XFontStruct
     *font_info;
@@ -5495,16 +5519,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   context.raised=raised;
   context.reply=reply;
   context.width=width;
-  do
-  {
-    UpdateDialogLayout(&context,&targets);
-    RedrawDialogWidget(&context,&targets);
-    /*
-      Wait for next event.
-    */
-    (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    HandleDialogEvent(&context,event,&targets);
-  } while ((state & ExitState) == 0);
+  RespondToDialogEvents(&context,&targets);
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
   XCheckRefreshWindows(display,windows);
