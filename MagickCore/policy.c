@@ -638,6 +638,12 @@ static inline MagickBooleanType IsPolicyPathSeparator(const char c)
   return(c == *DirectorySeparator ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsPolicyPathComponentCharacter(const char c)
+{
+  return(((c != '\0') && (IsPolicyPathSeparator(c) == MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsPathContainsSymlink(const char *path)
 {
   char
@@ -675,7 +681,7 @@ static inline MagickBooleanType IsPathContainsSymlink(const char *path)
     /*
       Copy next component into a temporary buffer.
     */
-    while ((*p != '\0') && (IsPolicyPathSeparator(*p) == MagickFalse) &&
+    while ((IsPolicyPathComponentCharacter(*p) != MagickFalse) &&
            ((i+1) < (ssize_t) sizeof(component)))
       component[i++]=(*p++);
     component[i]='\0';
