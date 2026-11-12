@@ -7313,6 +7313,27 @@ static void XPreviewLine(const DrawEditContext *context,
         windows->info.screen);
 }
 
+static void XPreviewPolyline(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const int
+    number_coordinates = preview->number_coordinates;
+
+  XPoint
+    *const coordinate_info = preview->coordinate_info;
+
+  if (number_coordinates > 1)
+    (void) XDrawLines(display,windows->image.id,
+      windows->image.highlight_context,coordinate_info,
+      number_coordinates,CoordModeOrigin);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7682,10 +7703,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         case PolygonElement:
         case FillPolygonElement:
         {
-          if (number_coordinates > 1)
-            (void) XDrawLines(display,windows->image.id,
-              windows->image.highlight_context,coordinate_info,
-              number_coordinates,CoordModeOrigin);
+          XPreviewPolyline(&draw_context,&preview_input);
           XPreviewLine(&draw_context,&preview_input,&degrees);
           break;
         }
@@ -7699,10 +7717,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         case PointElement:
         default:
         {
-          if (number_coordinates > 1)
-            (void) XDrawLines(display,windows->image.id,
-              windows->image.highlight_context,coordinate_info,
-              number_coordinates,CoordModeOrigin);
+          XPreviewPolyline(&draw_context,&preview_input);
           break;
         }
         case LineElement:
@@ -7733,10 +7748,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         case PolygonElement:
         case FillPolygonElement:
         {
-          if (number_coordinates > 1)
-            (void) XDrawLines(display,windows->image.id,
-              windows->image.highlight_context,coordinate_info,
-              number_coordinates,CoordModeOrigin);
+          XPreviewPolyline(&draw_context,&preview_input);
           if (distance > 9)
             XHighlightLine(display,windows->image.id,
               windows->image.highlight_context,&line_info);
