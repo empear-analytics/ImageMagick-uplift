@@ -6,7 +6,8 @@ verbatim with the function that holds it when a build that compiles that branch 
 instructions unchanged. This compiles the original file as it stood at OLDREV and the new file as it is in
 the working tree, both with the flags of build-oracle/BUILD (cand-wide for X11/OpenCL, ci-gcc-min or
 ci-gcc-dlg for the non-HDRI branches), at -g0, disassembles every function the new file defines in both
-objects, and compares them line by line. Allowed differences, each counted in the output:
+objects, and compares them function by function, matched by name (so the order the compiler laid the
+functions out in does not matter), line by line. Allowed differences, each counted in the output:
   - a `__LINE__` immediate (`mov $N,%ecx` / `%edx`) shifted by a constant per function,
   - a .rodata reference (resolved to the 16 bytes it points at; `__FILE__` strings differ),
   - a compiler constant-pool label number (.LCPI<n>_<m>), a rip-relative offset,
@@ -38,19 +39,20 @@ def string_labels(obj, src):
 def disasm(obj, names, src):
     ro = sh("objcopy", "-O", "binary", "--only-section=.rodata", obj, "/dev/stdout").stdout
     strs = string_labels(obj, src)
-    out, keep = [], False
+    out, keep, cur = {}, False, None
     for line in sh("objdump", "-d", "--no-show-raw-insn", "-r", obj, text=True).stdout.splitlines():
         m = re.match(r"^[0-9a-f]+ <(.*)>:$", line)
         if m:
             keep = m.group(1) in names
-            if keep: out.append("<%s>" % m.group(1))
+            cur = m.group(1)
+            if keep: out[cur] = ["<%s>" % cur]
             continue
         if not keep or not line.strip(): continue
         line = re.sub(r"^\s*[0-9a-f]+:\s*", "", line)
         line = re.sub(r"\b[0-9a-f]+ <([A-Za-z_0-9.]+)(\+0x[0-9a-f]+)?>", r"<\1>", line)
         line = re.sub(r"\.rodata\+0x([0-9a-f]+)", lambda mm: ".rodata[%s]" % ro[int(mm.group(1), 16):int(mm.group(1), 16) + 16].hex(), line)
         line = re.sub(r"(\.L\.str(?:\.\d+)?)(?=[-+\s]|$)", lambda mm: "%s[%s]" % (mm.group(1), strs.get(mm.group(1), "?")), line)
-        out.append(line)
+        out[cur].append(line)
     return out
 
 def label_kind(x, y):
@@ -78,6 +80,20 @@ def compare(a, b):
         k = classify(x, y)
         if k is None: bad.append((x, y))
         else: kinds[k] = kinds.get(k, 0) + 1
+    return kinds, bad
+
+def compare_by_name(a, b):
+    """Compare the functions of A and B (name -> lines) one by name, so a different function order in the two
+    objects (a compiler's choice) is not a difference. A name in one only, or a different length, is one."""
+    kinds, bad = {}, []
+    for name in sorted(set(a) | set(b)):
+        if name not in a or name not in b or len(a[name]) != len(b[name]):
+            bad.append(("<%s> %s" % (name, "missing in old" if name not in a else "%d lines" % len(a[name])),
+                        "<%s> %s" % (name, "missing in new" if name not in b else "%d lines" % len(b[name]))))
+            continue
+        k, d = compare(a[name], b[name])
+        for key, n in k.items(): kinds[key] = kinds.get(key, 0) + n
+        bad += d
     return kinds, bad
 
 def compile_both(bdir, old, new, tmp):
@@ -113,9 +129,9 @@ def main():
     names = {l.split()[2] for l in nm if len(l.split()) == 3 and l.split()[1] in "tT"}
     a = disasm(os.path.join(tmp, "old.o"), names, oldsrc)
     b = disasm(os.path.join(tmp, "new.o"), names, os.path.join(root, new))
-    print("%s: %d functions, %d vs %d lines" % (build, len(names), len(a), len(b)))
-    if len(a) != len(b): print("DIFFERENT (length)"); sys.exit(1)
-    kinds, bad = compare(a, b)
+    la, lb = sum(map(len, a.values())), sum(map(len, b.values()))
+    print("%s: %d functions, %d vs %d lines" % (build, len(names), la, lb))
+    kinds, bad = compare_by_name(a, b)
     report(kinds, bad)
 
 main()

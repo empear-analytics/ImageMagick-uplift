@@ -163,29 +163,37 @@ SemaphoreInfo
 static inline MagickBooleanType IsSameOpenCLDevice(MagickCLDevice a,
   MagickCLDevice b)
 {
-  if ((LocaleCompare(a->platform_name,b->platform_name) == 0) &&
-      (LocaleCompare(a->vendor_name,b->vendor_name) == 0) &&
-      (LocaleCompare(a->name,b->name) == 0) &&
-      (LocaleCompare(a->version,b->version) == 0) &&
-      (a->max_clock_frequency == b->max_clock_frequency) &&
-      (a->max_compute_units == b->max_compute_units))
-    return(MagickTrue);
-
-  return(MagickFalse);
+  if (LocaleCompare(a->platform_name,b->platform_name) != 0)
+    return(MagickFalse);
+  if (LocaleCompare(a->vendor_name,b->vendor_name) != 0)
+    return(MagickFalse);
+  if (LocaleCompare(a->name,b->name) != 0)
+    return(MagickFalse);
+  if (LocaleCompare(a->version,b->version) != 0)
+    return(MagickFalse);
+  if (a->max_clock_frequency != b->max_clock_frequency)
+    return(MagickFalse);
+  if (a->max_compute_units != b->max_compute_units)
+    return(MagickFalse);
+  return(MagickTrue);
 }
 
 static inline MagickBooleanType IsBenchmarkedOpenCLDevice(MagickCLDevice a,
   MagickCLDeviceBenchmark *b)
 {
-  if ((LocaleCompare(a->platform_name,b->platform_name) == 0) &&
-      (LocaleCompare(a->vendor_name,b->vendor_name) == 0) &&
-      (LocaleCompare(a->name,b->name) == 0) &&
-      (LocaleCompare(a->version,b->version) == 0) &&
-      (a->max_clock_frequency == b->max_clock_frequency) &&
-      (a->max_compute_units == b->max_compute_units))
-    return(MagickTrue);
-
-  return(MagickFalse);
+  if (LocaleCompare(a->platform_name,b->platform_name) != 0)
+    return(MagickFalse);
+  if (LocaleCompare(a->vendor_name,b->vendor_name) != 0)
+    return(MagickFalse);
+  if (LocaleCompare(a->name,b->name) != 0)
+    return(MagickFalse);
+  if (LocaleCompare(a->version,b->version) != 0)
+    return(MagickFalse);
+  if (a->max_clock_frequency != b->max_clock_frequency)
+    return(MagickFalse);
+  if (a->max_compute_units != b->max_compute_units)
+    return(MagickFalse);
+  return(MagickTrue);
 }
 
 static inline void RelinquishMagickCLDevices(MagickCLEnv clEnv)
@@ -2279,13 +2287,20 @@ MagickExport const char *GetOpenCLDeviceVersion(const MagickCLDevice device)
 %
 */
 
+static MagickBooleanType HasCurrentOpenCLEnv(MagickCLEnv *clEnv)
+{
+  *clEnv=GetCurrentOpenCLEnv();
+  if (*clEnv == (MagickCLEnv) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType GetOpenCLEnabled(void)
 {
   MagickCLEnv
     clEnv;
 
-  clEnv=GetCurrentOpenCLEnv();
-  if (clEnv == (MagickCLEnv) NULL)
+  if (HasCurrentOpenCLEnv(&clEnv) == MagickFalse)
     return(MagickFalse);
   return(clEnv->enabled);
 }

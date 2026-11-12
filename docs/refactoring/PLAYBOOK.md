@@ -12021,6 +12021,159 @@ Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the
 
 ---
 
+## Recipe GC - Guard Returns from a Conjunction
+
+**Use when:** CodeScene reports *Complex Conditional* (and often *Code Duplication* between twin
+predicates) on a function that ends in `if (A1 && A2 && ... && An) return(T); return(F);` with `T`
+and `F` constants, as `opencl.c`'s `IsSameOpenCLDevice` and `IsBenchmarkedOpenCLDevice` do: six
+operands, four of them `LocaleCompare(...) == 0`, on two struct types, so that neither a shared
+predicate (eight parameters) nor a merge of the twins is open.
+
+**Not covered by:** Recipe P, which moves the expression (or its leading operands) into a
+predicate and leaves the chain whole in it, or takes the five or more parameters that
+*Excess Number of Function Arguments* refuses; Recipe G, whose guards invert an outermost
+`if` around a body; Recipe EI, which chains exiting `if` statements of an `else`; Recipe SG,
+which spreads a guard over tests inside it; Recipe CN, which combines two nested tests into one
+(the opposite direction); Recipe D and Recipe TI, which merge copies or twins.
+
+**How:**
+
+1. Find `if (A1 && A2 && ... && An) return(T);` outside every OpenMP region, with `n` three or
+   more, no `#` line in it. The controlling expression is a chain of `&&` only, each operand in its
+   own parentheses, with no `||`, no `?:` and no assignment or increment. The `if` has no `else`,
+   its body is the one statement `return(T);` (braces or none), and the next statement is the
+   function's last, `return(F);`, `T` and `F` constants (an enumeration constant or a literal;
+   `return T;` written alike). Nothing else stands between them but comments and blank lines.
+2. Write the inverse `Ai'` of each operand as Recipe G's *Careful* says: `==` becomes `!=`, `!=`
+   becomes `==`, `<` becomes `>=` (and so on) for integer, pointer and enumeration operands; an
+   operand that compares a `double`, `float` or `MagickRealType` is written `!(Ai)` (a NaN makes
+   both `a < b` and `a >= b` false); an operand that is a call or a bare value is written
+   `!(Ai)`.
+3. Replace the two statements by `if (A1') return(F);` `if (A2') return(F);` ... `if (An')
+   return(F);` and `return(T);`, one guard per operand in the operands' order, the operands'
+   own text inside, each on its own lines.
+4. Every such pair of statements of one function, and the same step on a twin function that
+   meets step 1, may go in one commit (one recipe; say which functions).
+5. Check by `tools/refactor_guard.py <file>` and `--calls` (nothing changes: every call stays
+   one call), then `WIDE=1 sh tools/obj_modulo.sh <file> <Function> <Function>` for a
+   wide-build file (or `tools/obj_identical.sh <file>` for a narrow one): `IDENTICAL` or
+   `MODULO-IDENTICAL`; anything else reverts the step.
+
+**Before:**
+
+```c
+  if ((LocaleCompare(a->platform_name,b->platform_name) == 0) &&
+      (LocaleCompare(a->vendor_name,b->vendor_name) == 0) &&
+      (a->max_clock_frequency == b->max_clock_frequency))
+    return(MagickTrue);
+
+  return(MagickFalse);
+```
+
+**After:**
+
+```c
+  if (LocaleCompare(a->platform_name,b->platform_name) != 0)
+    return(MagickFalse);
+  if (LocaleCompare(a->vendor_name,b->vendor_name) != 0)
+    return(MagickFalse);
+  if (a->max_clock_frequency != b->max_clock_frequency)
+    return(MagickFalse);
+  return(MagickTrue);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `A1 && A2 && ... && An` evaluates left to right and stops at
+  the first false operand; the guards evaluate `A1'`, `A2'`, ... in the same order, return `F` at
+  the first operand that is false (its inverse holds) and reach `return(T);` exactly when every
+  operand held. Each operand is evaluated once, at most, as before, so a call in one runs under
+  the same condition and the same number of times.
+- The inverse is exact only under step 2's forms: write `!(Ai)` whenever an operand is not
+  a plain comparison of integers, pointers or enumeration values.
+- A category the step leaves intact is *Code Duplication*, when it came from two functions
+  that stay twins (the guards of both read alike); a probe measures it.
+
+**Evidence level:** oracle, with `refactor_guard.py` (and `--calls`) clean and the object code
+`IDENTICAL` or `MODULO-IDENTICAL` as step 5 says.
+
+**Provenance:** 2026-11-12, from `opencl.c`'s `IsSameOpenCLDevice` and
+`IsBenchmarkedOpenCLDevice` (campaign A, W19 lane a, wide build): the two twins (the second
+takes a `MagickCLDeviceBenchmark`, a struct of another type) are the file's only *Complex
+Conditional* functions; one of them as guards: 6.33 to 6.83, both: 7.36 (the category leaves;
+the twins read alike and stay no clone finding). Added by Claude Code (Claude Sonnet 5.5)
+under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe GD - Guard Returns from a Disjunction
+
+**Use when:** CodeScene reports *Complex Conditional* on an `if (A1 || A2 || ... || An) return(F);`
+(or `return;`) with three or more operands, an early exit that tests several failure conditions at
+once, as `accelerate.c`'s `AccelerateGrayscaleImage` does for the three colour traits of its image.
+
+**Not covered by:** Recipe P, which moves the expression into a predicate (a new function, and a
+clone of a neighbour such as `HasUndefinedRGBATraits`: flat in a probe); Recipe GC, whose
+conjunction returns `T` or `F` at its end; Recipe G, which inverts an outermost `if` around a
+body; Recipe EI, which chains the exiting `if` statements of an `else`; Recipe SG, which spreads a
+guard over tests inside it.
+
+**How:**
+
+1. Find `if (A1 || A2 || ... || An) X` outside every OpenMP region, `n` three or more, with no `#`
+   line in it, no `&&`, `?:`, assignment or increment in the controlling expression, each operand in
+   its own parentheses (a single comparison or a call), and no `else`. `X` is the one statement
+   `return(F);` or `return;`, with `F` a constant (an enumeration constant or a literal), braces or
+   none.
+2. Write one guard per operand, in the operands' order, each with the operand's text (the
+   outer parentheses of the operand go) and `X` unchanged: `if (A1) X` `if (A2) X` ... `if (An) X`.
+3. Every such `if` of one function may go in one commit (one recipe, one function).
+4. Check by `tools/refactor_guard.py <file>` (a WARN whose counts only rose, every value present,
+   names the literals written once more for each guard) and `--calls` (nothing changes: each
+   operand's call stays one call), then, for a function whose lines no case reaches, `WIDE=1
+   NOINLINE=<Function> sh tools/obj_modulo.sh <file> <Function> <Function>` (without `WIDE=1` for
+   a narrow-build file): `IDENTICAL` or `MODULO-IDENTICAL`; anything else reverts the step.
+
+**Before:**
+
+```c
+  if ((GetPixelRedTraits(image) == UndefinedPixelTrait) ||
+      (GetPixelGreenTraits(image) == UndefinedPixelTrait) ||
+      (GetPixelBlueTraits(image) == UndefinedPixelTrait))
+    return(MagickFalse);
+```
+
+**After:**
+
+```c
+  if (GetPixelRedTraits(image) == UndefinedPixelTrait)
+    return(MagickFalse);
+  if (GetPixelGreenTraits(image) == UndefinedPixelTrait)
+    return(MagickFalse);
+  if (GetPixelBlueTraits(image) == UndefinedPixelTrait)
+    return(MagickFalse);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `A1 || A2 || ... || An` evaluates left to right and stops at the
+  first true operand; the guards test `A1`, `A2`, ... in the same order, and the first that holds
+  runs `X` and leaves, so no later operand is evaluated, exactly as the short circuit. When none
+  holds, nothing runs and control reaches the next statement. Each operand is evaluated at most
+  once, as before.
+- `X` is a bare `return`: a guard that ran any statement before it would not be this recipe.
+
+**Evidence level:** oracle, with `refactor_guard.py` (and `--calls`) clean; for lines no case
+reaches, the object code `IDENTICAL` or `MODULO-IDENTICAL` as step 4 says.
+
+**Provenance:** 2026-11-12, from `accelerate.c`'s `AccelerateGrayscaleImage` (campaign A, W19 lane
+a, wide build): the three-trait failure test is the file's only *Complex Conditional*; Recipe P's
+predicate is flat (3.19 to 3.19, with a new *Code Duplication* function), three guards: 3.19 to
+3.27, the category leaves. Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -12429,3 +12582,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | AMEND | OC | Step 7: the block may hold calls of helpers that Recipe CT, SD or Z made earlier for the same caller (`Inner(&name,...,&targets);`), written `Inner(name,...,targets);` in the new helper; the helper takes the shared input struct and up to two targets structs (those it binds from or passes on), at most four parameters, and binds only the members its own text writes. *Careful* (step 7) gives the argument | `display.c`'s `XDrawEditImage` (campaign A, W18 lane b, wide build): the command-widget block of the first event loop (`if (id < 0) continue;` and a `switch` of seven labels, whose colour, stipple, width and Undo/Help/Dismiss groups are helpers of CT and SD taking two structs) holds the function's last depth-4 sites and writes `element` and the event itself; step 7 allowed two to four written variables in one struct, and the groups' writes number eight in two structs. A probe of the block as one helper: the function leaves Deep, Nested Complexity and Brain Method | owner |
 | 2026-11-12 | AMEND | CT | Step 3: a targets struct that serves every block of one event loop (the cases of its `switch` and its `if (state & ...)` blocks) may hold more than six members, one per local of the loop's state; each block still writes two to six of them, each helper binds only the members it names (reads included, as `(*v)`). Step 4: a `const` targets struct of another helper that the block passes on as `&t` goes as one more parameter `const T *t`, each `&t` written `t` (Recipe SR step 3's form). *Careful* gives both arguments | `widget.c`'s `XColorBrowserWidget`, `XFileBrowserWidget`, `XFontBrowserWidget` and `XListBrowserWidget` (campaign A, W18 lane c, wide build): each event loop shares fourteen widgets, its state word, delay and list counters between about twenty blocks (cases and state blocks), each of which writes two to six of them; a struct capped at six members needs three or four types per browser and a helper of five parameters, and the list press hands the browser's earlier `targets` to `SelectFontBrowserEntry` | owner |
 | 2026-11-12 | AMEND | CT | Step 5: a member the helper only reads, whose variable another block of the loop writes and whose uses include a macro that names the variable, is bound `T *const v = *targets->v;` with its uses unchanged; the helper that writes it uses `(*v)`. *Careful* gives the argument | `widget.c`'s `XFontBrowserWidget` (campaign A, W18 lane c, wide build): the action-redraw block assigns the caller's `font_info` (`font_info=XLoadQueryFont(...)`, never restored), and `QuantumMargin`, used by almost every other block, expands to `font_info->max_bounds.width`; an input-struct copy would change what those blocks read after the redraw, a pointer-to-pointer member written `(*font_info)` would not compile inside the macro | owner |
+| 2026-11-12 | NEW | GC | Guard Returns from a Conjunction: `if (A1 && ... && An) return(T); return(F);` (`T`, `F` constants, `n` at least three, no logical-or operator) becomes one `if (Ai') return(F);` per operand in order and `return(T);`, `Ai'` the inverse as Recipe G says (`!(Ai)` for floating-point operands, calls and bare values). *Careful* gives the argument (left-to-right short circuit, each operand evaluated at most once, same order) | `opencl.c`'s `IsSameOpenCLDevice` and `IsBenchmarkedOpenCLDevice` (campaign A, W19 lane a, wide build): the file's two *Complex Conditional* functions, twins on two struct types that no predicate or merge reaches (six operands, eight parameters); one as guards 6.33 to 6.83, both 7.36 | owner |
+| 2026-11-12 | NEW | GD | Guard Returns from a Disjunction: `if (A1 or A2 or ... or An) return(F);` (`F` a constant or a bare `return;`, `n` at least three, no `&&`) becomes one `if (Ai) return(F);` per operand in order. *Careful* gives the argument (left-to-right short circuit, each operand evaluated at most once, same order) | `accelerate.c`'s `AccelerateGrayscaleImage` (campaign A, W19 lane a, wide build): its three-trait failure test is the file's only *Complex Conditional*; Recipe P's predicate 3.19 to 3.19 (a new clone function), three guards 3.19 to 3.27 | owner |

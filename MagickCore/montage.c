@@ -1428,6 +1428,19 @@ static MagickBooleanType AdvanceMontagePage(const MontageNextPage *next,
   return(MagickTrue);
 }
 
+static Image *DestroyMontageTexture(Image *texture)
+{
+  if (texture != (Image *) NULL)
+    texture=DestroyImage(texture);
+  return(texture);
+}
+
+static void LogMontageImages(const Image *images)
+{
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1511,8 +1524,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   assert(montage_info->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
   assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
+  LogMontageImages(images);
   number_images=GetImageListLength(images);
   primary_list=ImageListToArray(images,exception);
   if (primary_list == (Image **) NULL)
@@ -1636,8 +1648,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     }
   }
   tile_image=DestroyImage(tile_image);
-  if (texture != (Image *) NULL)
-    texture=DestroyImage(texture);
+  texture=DestroyMontageTexture(texture);
   title=DestroyString(title);
   primary_list=(Image **) RelinquishMagickMemory(primary_list);
   draw_info=DestroyDrawInfo(draw_info);
