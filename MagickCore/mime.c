@@ -254,25 +254,15 @@ static ssize_t ReadMimeLongValue(const MimeInfo *q,const unsigned char *r)
   return(value);
 }
 
-static ElementInfo *MatchMimeValue(const MimeInfo *q,const ssize_t value,
-  ElementInfo *p,ElementInfo *element_info)
+static MagickBooleanType MatchMimeValue(const MimeInfo *q,const ssize_t value)
 {
   if (q->mask == 0)
-    {
-      if (q->value == value)
-        element_info=p;
-    }
-  else
-    {
-      if ((q->value & q->mask) == value)
-        element_info=p;
-    }
-  return(element_info);
+    return(q->value == value ? MagickTrue : MagickFalse);
+  return((q->value & q->mask) == value ? MagickTrue : MagickFalse);
 }
 
-static ElementInfo *MatchMimeString(const MimeInfo *q,
-  const unsigned char *magic,const size_t length,ElementInfo *p,
-  ElementInfo *element_info)
+static MagickBooleanType MatchMimeString(const MimeInfo *q,
+  const unsigned char *magic,const size_t length)
 {
   ssize_t
     i;
@@ -282,16 +272,13 @@ static ElementInfo *MatchMimeString(const MimeInfo *q,
     if ((size_t) (q->offset+i+(ssize_t) q->length) > length)
       break;
     if (memcmp(magic+q->offset+i,q->magic,q->length) == 0)
-      {
-        element_info=p;
-        break;
-      }
+      return(MagickTrue);
   }
-  return(element_info);
+  return(MagickFalse);
 }
 
-static ElementInfo *MatchMimeData(const MimeInfo *q,const unsigned char *magic,
-  const size_t length,ElementInfo *p,ElementInfo *element_info)
+static MagickBooleanType MatchMimeData(const MimeInfo *q,
+  const unsigned char *magic,const size_t length)
 {
   const unsigned char
     *r;
@@ -307,8 +294,7 @@ static ElementInfo *MatchMimeData(const MimeInfo *q,const unsigned char *magic,
         break;
       r=magic+q->offset;
       value=(ssize_t) (*r++);
-      element_info=MatchMimeValue(q,value,p,element_info);
-      break;
+      return(MatchMimeValue(q,value));
     }
     case ShortData:
     {
@@ -316,8 +302,7 @@ static ElementInfo *MatchMimeData(const MimeInfo *q,const unsigned char *magic,
         break;
       r=magic+q->offset;
       value=ReadMimeShortValue(q,r);
-      element_info=MatchMimeValue(q,value,p,element_info);
-      break;
+      return(MatchMimeValue(q,value));
     }
     case LongData:
     {
@@ -325,17 +310,13 @@ static ElementInfo *MatchMimeData(const MimeInfo *q,const unsigned char *magic,
         break;
       r=magic+q->offset;
       value=ReadMimeLongValue(q,r);
-      element_info=MatchMimeValue(q,value,p,element_info);
-      break;
+      return(MatchMimeValue(q,value));
     }
     case StringData:
     default:
-    {
-      element_info=MatchMimeString(q,magic,length,p,element_info);
-      break;
-    }
+      return(MatchMimeString(q,magic,length));
   }
-  return(element_info);
+  return(MagickFalse);
 }
 
 /*
@@ -414,7 +395,8 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
         p=p->next;
         continue;
       }
-    element_info=MatchMimeData(q,magic,length,p,element_info);
+    if (MatchMimeData(q,magic,length) != MagickFalse)
+      element_info=p;
     p=p->next;
   }
   if (element_info != (ElementInfo *) NULL)
