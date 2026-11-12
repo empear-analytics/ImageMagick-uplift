@@ -17005,6 +17005,15 @@ typedef struct _DisplayEventContext
 
   time_t
     update_time;
+
+  XVisualInfo
+    *icon_visual;
+
+  XStandardColormap
+    *icon_map;
+
+  XPixelInfo
+    *icon_pixel;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -17683,6 +17692,41 @@ static void XFocusImageWindow(Display *display,XWindows *windows)
   if (windows->backdrop.id != (Window) NULL)
     (void) XSetInputFocus(display,windows->image.id,RevertToParent,
       CurrentTime);
+}
+
+static void XUnmapIconWindow(const DisplayEventContext *context,
+  Image *display_image)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  XVisualInfo
+    *const icon_visual = context->icon_visual;
+
+  XStandardColormap
+    *const icon_map = context->icon_map;
+
+  XPixelInfo
+    *const icon_pixel = context->icon_pixel;
+
+  if (map_info->colormap == icon_map->colormap)
+    XConfigureImageColormap(display,resource_info,windows,
+      display_image,exception);
+  (void) XFreeStandardColormap(display,icon_visual,icon_map,
+    icon_pixel);
+  windows->icon.mapped=MagickFalse;
 }
 
 /*
@@ -18927,6 +18971,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.ShortCutsCommands=ShortCutsCommands;
   event_context.image=image;
   event_context.update_time=update_time;
+  event_context.icon_visual=icon_visual;
+  event_context.icon_map=icon_map;
+  event_context.icon_pixel=icon_pixel;
   do
   {
     /*
@@ -19389,12 +19436,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xunmap.window == windows->icon.id)
           {
-            if (map_info->colormap == icon_map->colormap)
-              XConfigureImageColormap(display,resource_info,windows,
-                display_image,exception);
-            (void) XFreeStandardColormap(display,icon_visual,icon_map,
-              icon_pixel);
-            windows->icon.mapped=MagickFalse;
+            XUnmapIconWindow(&event_context,display_image);
             break;
           }
         if (event.xunmap.window == windows->command.id)
