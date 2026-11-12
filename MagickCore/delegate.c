@@ -2512,117 +2512,75 @@ static void LoadDelegateInclude(const DelegateInclude *include,
     }
 }
 
+static void SetDelegateCommands(DelegateInfo *delegate_info,
+  const char *token)
+{
+  char
+    *commands;
+
+  commands=AcquireString(token);
+#if defined(MAGICKCORE_WINDOWS_SUPPORT)
+  if (strchr(commands,'@') != (char *) NULL)
+    {
+      char
+        path[MagickPathExtent];
+
+      NTGhostscriptEXE(path,MagickPathExtent);
+      (void) SubstituteString((char **) &commands,"@PSDelegate@",path);
+      (void) SubstituteString((char **) &commands,"\\","/");
+    }
+#endif
+  (void) SubstituteString((char **) &commands,"&quot;","\"");
+  (void) SubstituteString((char **) &commands,"&apos;","'");
+  (void) SubstituteString((char **) &commands,"&amp;","&");
+  (void) SubstituteString((char **) &commands,"&gt;",">");
+  (void) SubstituteString((char **) &commands,"&lt;","<");
+  if (delegate_info->commands != (char *) NULL)
+    delegate_info->commands=DestroyString(delegate_info->commands);
+  delegate_info->commands=commands;
+}
+
 static void SetDelegateThreadSupport(DelegateInfo *delegate_info,
-  const char *keyword,const char *token)
+  const char *token)
 {
-  switch (*keyword)
-  {
-    case 'T':
-    case 't':
-    {
-      if (LocaleCompare((char *) keyword,"thread-support") == 0)
-        {
-          delegate_info->thread_support=IsStringTrue(token);
-          if (delegate_info->thread_support == MagickFalse)
-            delegate_info->semaphore=AcquireSemaphoreInfo();
-          break;
-        }
-      break;
-    }
-    default:
-      break;
-  }
+  delegate_info->thread_support=IsStringTrue(token);
+  if (delegate_info->thread_support == MagickFalse)
+    delegate_info->semaphore=AcquireSemaphoreInfo();
 }
 
-static void SetDelegateFormatAttribute(DelegateInfo *delegate_info,
-  const char *keyword,const char *token)
+static void SetDelegateMode(DelegateInfo *delegate_info,const char *token)
 {
-  switch (*keyword)
-  {
-    case 'D':
-    case 'd':
-    {
-      if (LocaleCompare((char *) keyword,"decode") == 0)
-        {
-          delegate_info->decode=ConstantString(token);
-          delegate_info->mode=1;
-          break;
-        }
-      break;
-    }
-    case 'E':
-    case 'e':
-    {
-      if (LocaleCompare((char *) keyword,"encode") == 0)
-        {
-          delegate_info->encode=ConstantString(token);
-          delegate_info->mode=(-1);
-          break;
-        }
-      break;
-    }
-    default:
-    {
-      SetDelegateThreadSupport(delegate_info,keyword,token);
-      break;
-    }
-  }
+  delegate_info->mode=1;
+  if (LocaleCompare(token,"bi") == 0)
+    delegate_info->mode=0;
+  else
+    if (LocaleCompare(token,"encode") == 0)
+      delegate_info->mode=(-1);
 }
 
-static void SetDelegateModeAttribute(DelegateInfo *delegate_info,
+static void SetDelegateInfoAttribute(DelegateInfo *delegate_info,
   const char *keyword,const char *token)
 {
-  switch (*keyword)
-  {
-    case 'M':
-    case 'm':
+  if (LocaleCompare((char *) keyword,"command") == 0)
+    SetDelegateCommands(delegate_info,token);
+  else if (LocaleCompare((char *) keyword,"decode") == 0)
     {
-      if (LocaleCompare((char *) keyword,"mode") == 0)
-        {
-          delegate_info->mode=1;
-          if (LocaleCompare(token,"bi") == 0)
-            delegate_info->mode=0;
-          else
-            if (LocaleCompare(token,"encode") == 0)
-              delegate_info->mode=(-1);
-          break;
-        }
-      break;
+      delegate_info->decode=ConstantString(token);
+      delegate_info->mode=1;
     }
-    default:
+  else if (LocaleCompare((char *) keyword,"encode") == 0)
     {
-      SetDelegateFormatAttribute(delegate_info,keyword,token);
-      break;
+      delegate_info->encode=ConstantString(token);
+      delegate_info->mode=(-1);
     }
-  }
-}
-
-static void SetDelegateSpawnAttribute(DelegateInfo *delegate_info,
-  const char *keyword,const char *token)
-{
-  switch (*keyword)
-  {
-    case 'S':
-    case 's':
-    {
-      if (LocaleCompare((char *) keyword,"spawn") == 0)
-        {
-          delegate_info->spawn=IsStringTrue(token);
-          break;
-        }
-      if (LocaleCompare((char *) keyword,"stealth") == 0)
-        {
-          delegate_info->stealth=IsStringTrue(token);
-          break;
-        }
-      break;
-    }
-    default:
-    {
-      SetDelegateModeAttribute(delegate_info,keyword,token);
-      break;
-    }
-  }
+  else if (LocaleCompare((char *) keyword,"mode") == 0)
+    SetDelegateMode(delegate_info,token);
+  else if (LocaleCompare((char *) keyword,"spawn") == 0)
+    delegate_info->spawn=IsStringTrue(token);
+  else if (LocaleCompare((char *) keyword,"stealth") == 0)
+    delegate_info->stealth=IsStringTrue(token);
+  else if (LocaleCompare((char *) keyword,"thread-support") == 0)
+    SetDelegateThreadSupport(delegate_info,token);
 }
 
 static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
@@ -2776,47 +2734,7 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
       continue;
     (void) GetNextToken(q,&q,extent,token);
     (void) GetNextToken(q,&q,extent,token);
-    switch (*keyword)
-    {
-      case 'C':
-      case 'c':
-      {
-        if (LocaleCompare((char *) keyword,"command") == 0)
-          {
-            char
-              *commands;
-
-            commands=AcquireString(token);
-#if defined(MAGICKCORE_WINDOWS_SUPPORT)
-            if (strchr(commands,'@') != (char *) NULL)
-              {
-                char
-                  path[MagickPathExtent];
-
-                NTGhostscriptEXE(path,MagickPathExtent);
-                (void) SubstituteString((char **) &commands,"@PSDelegate@",
-                  path);
-                (void) SubstituteString((char **) &commands,"\\","/");
-              }
-#endif
-            (void) SubstituteString((char **) &commands,"&quot;","\"");
-            (void) SubstituteString((char **) &commands,"&apos;","'");
-            (void) SubstituteString((char **) &commands,"&amp;","&");
-            (void) SubstituteString((char **) &commands,"&gt;",">");
-            (void) SubstituteString((char **) &commands,"&lt;","<");
-            if (delegate_info->commands != (char *) NULL)
-              delegate_info->commands=DestroyString(delegate_info->commands);
-            delegate_info->commands=commands;
-            break;
-          }
-        break;
-      }
-      default:
-      {
-        SetDelegateSpawnAttribute(delegate_info,keyword,token);
-        break;
-      }
-    }
+    SetDelegateInfoAttribute(delegate_info,keyword,token);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);
