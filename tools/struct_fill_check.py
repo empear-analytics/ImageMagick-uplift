@@ -37,6 +37,11 @@ def members(text, type_name):
     names = []
     for decl in m.group(1).split(";"):
         for part in decl.split(","):
+            # a pointer to an array, `(*name)[N]`, names the member inside the parentheses
+            ptr_to_array = re.search(r"\(\s*\*\s*(\w+)\s*\)", part)
+            if ptr_to_array:
+                names.append(ptr_to_array.group(1))
+                continue
             words = re.findall(r"\w+", part)
             if words:
                 names.append(words[-1])
@@ -76,7 +81,9 @@ def check_bindings(params, body, type_name, names):
         return [f"no const {type_name} * parameter"]
     ptr = p.group(1)
     bad = []
-    for m in re.finditer(r"\**\s*(\w+)\s*=\s*" + re.escape(ptr) + r"->(\w+)", body):
+    # the bound local may be a pointer to an array, `(*v)[N] = p->v`
+    for m in re.finditer(r"\**\s*(\w+)\s*\)?(?:\[\w*\])*\s*=\s*" + re.escape(ptr) + r"->(\w+)",
+                         body):
         if m.group(1) != m.group(2) or m.group(2) not in names:
             bad.append(m.group(0))
     return bad
