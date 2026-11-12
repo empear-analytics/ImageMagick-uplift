@@ -1710,6 +1710,30 @@ static void AcquireFeatureBuffers(const unsigned int number_grays,
     sizeof(*(*sum)));
 }
 
+static void RecordFeatureGrays(const Image *image,const Quantum *p,
+  PixelPacket *grays)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    grays[ScaleQuantumToMap(GetPixelRed(image,p))].red=
+      ScaleQuantumToMap(GetPixelRed(image,p));
+    grays[ScaleQuantumToMap(GetPixelGreen(image,p))].green=
+      ScaleQuantumToMap(GetPixelGreen(image,p));
+    grays[ScaleQuantumToMap(GetPixelBlue(image,p))].blue=
+      ScaleQuantumToMap(GetPixelBlue(image,p));
+    if (image->colorspace == CMYKColorspace)
+      grays[ScaleQuantumToMap(GetPixelBlack(image,p))].black=
+        ScaleQuantumToMap(GetPixelBlack(image,p));
+    if (image->alpha_trait != UndefinedPixelTrait)
+      grays[ScaleQuantumToMap(GetPixelAlpha(image,p))].alpha=
+        ScaleQuantumToMap(GetPixelAlpha(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1803,30 +1827,12 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     const FeatureGrayRow
       row = { image, image_view, exception };
 
     if (FetchFeatureGrayRow(&row,r,&p,&status) == MagickFalse)
       continue;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      grays[ScaleQuantumToMap(GetPixelRed(image,p))].red=
-        ScaleQuantumToMap(GetPixelRed(image,p));
-      grays[ScaleQuantumToMap(GetPixelGreen(image,p))].green=
-        ScaleQuantumToMap(GetPixelGreen(image,p));
-      grays[ScaleQuantumToMap(GetPixelBlue(image,p))].blue=
-        ScaleQuantumToMap(GetPixelBlue(image,p));
-      if (image->colorspace == CMYKColorspace)
-        grays[ScaleQuantumToMap(GetPixelBlack(image,p))].black=
-          ScaleQuantumToMap(GetPixelBlack(image,p));
-      if (image->alpha_trait != UndefinedPixelTrait)
-        grays[ScaleQuantumToMap(GetPixelAlpha(image,p))].alpha=
-          ScaleQuantumToMap(GetPixelAlpha(image,p));
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    RecordFeatureGrays(image,p,grays);
   }
   image_view=DestroyCacheView(image_view);
   if (status == MagickFalse)
