@@ -5008,6 +5008,45 @@ static void HandleDialogSelectionEvent(const DialogContext *context,
   }
 }
 
+static void HandleDialogKeyEvent(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      KeyDialogPress(context,event,targets);
+      break;
+    }
+    case KeyRelease:
+    {
+      KeyDialogRelease(context,event,targets);
+      break;
+    }
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      MoveDialogButtons(context,event,targets);
+      break;
+    }
+    default:
+    {
+      HandleDialogSelectionEvent(context,event,targets);
+      break;
+    }
+  }
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -5169,29 +5208,9 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
         state=ExposeWidgetWindow(windows,event,state);
         break;
       }
-      case KeyPress:
-      {
-        KeyDialogPress(&context,event,&targets);
-        break;
-      }
-      case KeyRelease:
-      {
-        KeyDialogRelease(&context,event,&targets);
-        break;
-      }
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MotionNotify:
-      {
-        MoveDialogButtons(&context,event,&targets);
-        break;
-      }
       default:
       {
-        HandleDialogSelectionEvent(&context,event,&targets);
+        HandleDialogKeyEvent(&context,event,&targets);
         break;
       }
     }
