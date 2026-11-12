@@ -9420,6 +9420,23 @@ static void InitializeFontBrowserText(const FontBrowserContext *context,
   (*selection_info).x=(*list_info).x;
 }
 
+static void UpdateFontBrowserLayout(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      InitializeFontBrowserButtons(context,widgets);
+      InitializeFontBrowserReply(context,widgets);
+      InitializeFontBrowserScroll(context,widgets);
+      InitializeFontBrowserList(context,widgets);
+      InitializeFontBrowserText(context,widgets);
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9623,15 +9640,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   font_context.text=text;
   do
   {
-    if (state & UpdateConfigurationState)
-      {
-        InitializeFontBrowserButtons(&font_context,&font_widgets);
-        InitializeFontBrowserReply(&font_context,&font_widgets);
-        InitializeFontBrowserScroll(&font_context,&font_widgets);
-        InitializeFontBrowserList(&font_context,&font_widgets);
-        InitializeFontBrowserText(&font_context,&font_widgets);
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
+    UpdateFontBrowserLayout(&font_context,&font_widgets);
     if (state & RedrawWidgetState)
       {
         /*
