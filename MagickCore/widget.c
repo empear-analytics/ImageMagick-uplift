@@ -2120,6 +2120,12 @@ typedef struct _ColorBrowserContext
 
   ExceptionInfo
     *exception;
+
+  XFontStruct
+    *font_info;
+
+  char
+    *primary_selection;
 } ColorBrowserContext;
 
 static void ClientColorBrowserMessage(const ColorBrowserContext *context,
@@ -2529,6 +2535,83 @@ static void ReleaseColorBrowserScroll(const ColorBrowserContext *context,
   ReleaseColorBrowserButtons(context,event,widgets);
 }
 
+static void PressColorBrowserReply(const ColorBrowserContext *context,
+  const XEvent event,const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  int
+    x;
+
+  int
+    i;
+
+  if (MatteIsActive((*action_info),event.xbutton))
+    {
+      /*
+        User pressed action button.
+      */
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if (MatteIsActive((*cancel_info),event.xbutton))
+    {
+      /*
+        User pressed Cancel button.
+      */
+      (*cancel_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+  if (MatteIsActive((*reply_info),event.xbutton) == MagickFalse)
+    return;
+  if (event.xbutton.button != Button2)
+    {
+      static Time
+        click_time;
+
+      ListBrowserClick
+        click;
+
+      /*
+        Move text cursor to position of button press.
+      */
+      x=event.xbutton.x-(*reply_info).x-(int) (QuantumMargin >> 2);
+      i=FindListBrowserCursor(font_info,(*reply_info),x);
+      (*reply_info).cursor=(*reply_info).marker+i-1;
+      click.display=display;
+      click.window_info=(&windows->widget);
+      click.event=event;
+      click.click_time=click_time;
+      (*reply_info)=HighlightListBrowserReply(&click,primary_selection,
+        (*reply_info));
+      XDrawMatteText(display,&windows->widget,reply_info);
+      click_time=event.xbutton.time;
+      return;
+    }
+  /*
+    Request primary selection.
+  */
+  (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
+    windows->widget.id,event.xbutton.time);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2720,6 +2803,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   color_context.glob_pattern=glob_pattern;
   color_context.reset_pattern=reset_pattern;
   color_context.exception=exception;
+  color_context.font_info=font_info;
+  color_context.primary_selection=primary_selection;
   do
   {
     if (state & UpdateConfigurationState)
@@ -3140,55 +3225,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             XDrawMatteText(display,&windows->widget,&reply_info);
             break;
           }
-        if (MatteIsActive(action_info,event.xbutton))
-          {
-            /*
-              User pressed action button.
-            */
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        if (MatteIsActive(cancel_info,event.xbutton))
-          {
-            /*
-              User pressed Cancel button.
-            */
-            cancel_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
-          break;
-        if (event.xbutton.button != Button2)
-          {
-            static Time
-              click_time;
-
-            ListBrowserClick
-              click;
-
-            /*
-              Move text cursor to position of button press.
-            */
-            x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            i=FindListBrowserCursor(font_info,reply_info,x);
-            reply_info.cursor=reply_info.marker+i-1;
-            click.display=display;
-            click.window_info=(&windows->widget);
-            click.event=event;
-            click.click_time=click_time;
-            reply_info=HighlightListBrowserReply(&click,primary_selection,
-              reply_info);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-            click_time=event.xbutton.time;
-            break;
-          }
-        /*
-          Request primary selection.
-        */
-        (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
-          windows->widget.id,event.xbutton.time);
+        PressColorBrowserReply(&color_context,event,&color_widgets);
         break;
       }
       case ButtonRelease:
