@@ -297,3 +297,33 @@ VERIFY FAILED only from the two old `ci_warnings` diagnostics.
   the first exit; the dead `x=0;` stores in `XMakeImageLSBFirst`/`MSBFirst` remain (now kept alive by passing `&x`).
   Tool notes: `refactor_guard --calls` prints a stray `+2 short` for a member declared `const short (*v)[16]` (still
   PASS); cs-mcp rates all three bump-removing steps flat when a helper still has two or more bumps.
+
+## Lane a, fifth round: xwindow.c 2.27 -> 2.42 (wide build, merged); opencl.c no commit
+
+16 commits; whole wide catalogue 14,145 cases, 0 diverged; obj_modulo MODULO-IDENTICAL or IDENTICAL on every step; no helper
+has a finding. `verify_wt` prints VERIFY FAILED only from the two old `ci_warnings` diagnostics.
+- **XGetWindowImage** (173 cases each): 7aec2b313 L (hoist `ColormapInfo`, IDENTICAL), 37b4c8dcd P
+  `IntersectsTopLevelWindow`, bc5609bf7 E `IsWindowImported`, 5e1fd3b04 E `FindWindowColormap`, 95dd02cc6 I
+  `XGetWindowColormap` (writes `number_colors`, `colors` and the block-static `colormap_info`; two exits), 1b6506206 D
+  `XGetMaskShift` x3, 2e9cc9237 N `XImportDirectClass`, 4ee5c0070 Y `XImportWindowImage`, 3ec02e105 CN 2.32 (leaves Deep
+  Nesting, the whole +0.05 emptying it was worth). All steps before CN were flat.
+- **XGetResourceInfo** (539 cases): 74892e1c0 E `GetResourceDisplayOptions` 2.35; 51b81273a E `GetResourceLayoutInfo` 2.42
+  (leaves Large Method). **XInitializeWindows** (347 cases), four flat E steps leaving it with no findings: f0c6edcc6
+  `LogXWindowProtocols`, c25726d2a `LogXWindowVisual`, 05e15a3c8 `GetXWindowGroupLeader`, 4ffeabeef
+  `InitializeXWindowColormaps`; the moved `LogMagickEvent` and `ThrowXWindowFatalException` calls now name the helper in
+  `GetMagickModule()` (run only under `-debug X11` or on a fatal error).
+- **Recipe text (Decided by `owner`, 2026-11-10 OK):** edc9084c7 Recipe I step 2 amended: a block-scope `static` of
+  arithmetic, enumeration or pointer type (not an array), whose address the caller takes nowhere but in the targets
+  initialiser, may be a written variable, on Recipe CT step 2's and O step 2's terms (its member is a pointer to its type,
+  each use is `*v`, the call passes the same address). It copies the CT and O amendments, which already admit block-scope
+  statics.
+- **Plateau xwindow.c 2.42:** `XMakeImage` (stubbing every non-`#if` block still 2.32: Brain Method, depth 4 and 206 lines
+  stay in the shared-memory `#if` code), `DestroyXResources` and `XBestVisualInfo` (`#if`-pinned); `XGetMapInfo`'s three
+  mask blocks differ in two members each, so MA does not fit; `XBestIconSize` keeps two bumps; any other single function
+  stubbed scores 2.32, only a group lifts it (`XMakeStandardColormap`, `XDrawImage`, `XMakeWindow` together with the other
+  groups: 3.40). **opencl.c 5.80:** held items stay held; E on `BenchmarkOpenCLDevices`' inner loop
+  (`SetScoreOnSameOpenCLDevices`, unreached) scored 5.67 (the helper gets a Code Duplication finding), reverted.
+- Tool gaps: `targets_fill_check.py` and `struct_fill_check.py` each read one struct, so they FAIL a step using both an input
+  struct and a targets struct (95dd02cc6: fills and bindings checked by reading); `struct_fill_check` FAILs a pass-through
+  `&source` -> `source` (4ee5c0070). Possible upstream: `XGetWindowImage`'s second colormap exit (`AcquireMagickMemory(p)`
+  fails) leaks `colors` and `ximage`; its `AcquireImageColormap` failure path leaks `composite_view`.
