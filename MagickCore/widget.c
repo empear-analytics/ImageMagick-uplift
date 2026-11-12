@@ -3273,105 +3273,455 @@ static int FollowCommandMotion(const CommandWidgetEvent *motion,int id)
   return(id);
 }
 
-MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
-  const char *const *selections,XEvent *event)
+static const unsigned char
+  tile_bits[]=
+  {
+    0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x1e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x1e, 0x38, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x1e, 0xbc, 0x9f, 0x03, 0x00, 0x3e, 0x00, 0xc0,
+    0x1f, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x1e, 0xfc, 0xff, 0x0f, 0x80, 0x3f,
+    0x00, 0xf0, 0x1f, 0xc0, 0x0f, 0x00, 0x00, 0x00, 0x1e, 0xfc, 0xff, 0x1f,
+    0xe0, 0x3f, 0x00, 0xfc, 0x1f, 0xf0, 0x0f, 0x00, 0x00, 0x00, 0x1e, 0xfc,
+    0xff, 0x1f, 0xf0, 0x3f, 0x00, 0xfe, 0x1f, 0xf8, 0x0f, 0x00, 0x00, 0x00,
+    0x1e, 0xfc, 0xfc, 0x3f, 0xf8, 0x3f, 0x00, 0xff, 0x1e, 0xfc, 0x0f, 0x00,
+    0x00, 0x00, 0x1e, 0x7c, 0xfc, 0x3e, 0xf8, 0x3c, 0x80, 0x1f, 0x1e, 0x7c,
+    0x0f, 0x00, 0x00, 0x00, 0x1e, 0x78, 0x78, 0x3c, 0x7c, 0x3c, 0xc0, 0x0f,
+    0x1e, 0x3e, 0x0f, 0x00, 0x00, 0x00, 0x1e, 0x78, 0x78, 0x3c, 0x7c, 0x3c,
+    0xc0, 0x07, 0x1e, 0x3e, 0x0f, 0x00, 0x00, 0x00, 0x1e, 0x78, 0x78, 0x3c,
+    0x7c, 0x7c, 0xc0, 0x0f, 0x1e, 0x3e, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x78,
+    0x78, 0x3c, 0xfc, 0x7c, 0x80, 0x7f, 0x1e, 0x7c, 0x00, 0x00, 0x00, 0x00,
+    0x1e, 0xf8, 0x78, 0x7c, 0xf8, 0xff, 0x00, 0xff, 0x1f, 0xf8, 0xff, 0x00,
+    0x00, 0x00, 0x1e, 0xf8, 0x78, 0x7c, 0xf0, 0xff, 0x07, 0xfe, 0x1f, 0xf8,
+    0xff, 0x00, 0x00, 0x00, 0x1e, 0xf8, 0x78, 0x7c, 0xf0, 0xff, 0x07, 0xf8,
+    0x1f, 0xf0, 0xff, 0x01, 0x00, 0x00, 0x1e, 0xf8, 0x78, 0x7c, 0xc0, 0xef,
+    0x07, 0xe0, 0x1f, 0xc0, 0xff, 0x01, 0x00, 0x00, 0x1e, 0x70, 0x40, 0x78,
+    0x00, 0xc7, 0x07, 0x00, 0x1e, 0x00, 0x1f, 0x00, 0x00, 0x00, 0x1e, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x1e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
+    0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0xc0, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0xe0, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x01, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfc, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x01, 0x02, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x07,
+    0x1e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0xc0, 0x0f, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x60, 0x00, 0xc0, 0x0f, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x78, 0x00, 0xc0, 0x8f, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x78, 0x00, 0xc0, 0x8f, 0x3f, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78, 0x00, 0xe0, 0x9f, 0x7f, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78, 0x00, 0xe0, 0xdf,
+    0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x00, 0x00, 0x78, 0x00,
+    0xe0, 0xdf, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x00, 0x0c,
+    0x78, 0x30, 0xf0, 0xff, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e,
+    0x00, 0x0f, 0xf8, 0x70, 0xf0, 0xff, 0x7b, 0x00, 0x00, 0x1f, 0x00, 0xe0,
+    0x0f, 0x1e, 0x80, 0x0f, 0xf8, 0x78, 0xf0, 0xfd, 0xf9, 0x00, 0xc0, 0x1f,
+    0x00, 0xf8, 0x0f, 0x00, 0xe0, 0x1f, 0xf8, 0x7c, 0xf0, 0xfc, 0xf9, 0x00,
+    0xf0, 0x1f, 0x00, 0xfe, 0x0f, 0x00, 0xf0, 0x07, 0xf8, 0x3e, 0xf8, 0xfc,
+    0xf0, 0x01, 0xf8, 0x1f, 0x00, 0xff, 0x0f, 0x1e, 0xf0, 0x03, 0xf8, 0x3f,
+    0xf8, 0xf8, 0xf0, 0x01, 0xfc, 0x1f, 0x80, 0x7f, 0x0f, 0x1e, 0xf8, 0x00,
+    0xf8, 0x1f, 0x78, 0x18, 0xf0, 0x01, 0x7c, 0x1e, 0xc0, 0x0f, 0x0f, 0x1e,
+    0x7c, 0x00, 0xf0, 0x0f, 0x78, 0x00, 0xf0, 0x01, 0x3e, 0x1e, 0xe0, 0x07,
+    0x0f, 0x1e, 0x7c, 0x00, 0xf0, 0x07, 0x7c, 0x00, 0xe0, 0x01, 0x3e, 0x1e,
+    0xe0, 0x03, 0x0f, 0x1e, 0x3e, 0x00, 0xf0, 0x0f, 0x7c, 0x00, 0xe0, 0x03,
+    0x3e, 0x3e, 0xe0, 0x07, 0x0f, 0x1e, 0x1e, 0x00, 0xf0, 0x1f, 0x3c, 0x00,
+    0xe0, 0x03, 0x7e, 0x3e, 0xc0, 0x3f, 0x0f, 0x1e, 0x3e, 0x00, 0xf0, 0x1f,
+    0x3e, 0x00, 0xe0, 0x03, 0xfc, 0x7f, 0x80, 0xff, 0x0f, 0x1e, 0xfc, 0x00,
+    0xf0, 0x3e, 0x3e, 0x00, 0xc0, 0x03, 0xf8, 0xff, 0x03, 0xff, 0x0f, 0x1e,
+    0xfc, 0x07, 0xf0, 0x7c, 0x1e, 0x00, 0xc0, 0x03, 0xf8, 0xff, 0x03, 0xfc,
+    0x0f, 0x1e, 0xf8, 0x1f, 0xf0, 0xf8, 0x1e, 0x00, 0xc0, 0x03, 0xe0, 0xf7,
+    0x03, 0xf0, 0x0f, 0x1e, 0xe0, 0x3f, 0xf0, 0x78, 0x1c, 0x00, 0x80, 0x03,
+    0x80, 0xe3, 0x03, 0x00, 0x0f, 0x1e, 0xc0, 0x3f, 0xf0, 0x30, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x0e, 0x00, 0x3e, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x0f, 0x00, 0x00, 0x10,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x0f, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0,
+    0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0xe0, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0xf0, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfc, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3c,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  };
+
+static void ClientCommandMessage(Display *display,XWindows *windows,
+  XEvent *event)
 {
+  /*
+    If client window delete message, withdraw command widget.
+  */
+  if (event->xclient.message_type != windows->wm_protocols)
+    return;
+  if (*event->xclient.data.l != (int) windows->wm_delete_window)
+    return;
+  (void) XWithdrawWindow(display,windows->command.id,
+    windows->command.screen);
+}
+
+static size_t ConfigureCommandWindow(XWindows *windows,XEvent *event,
+  size_t state)
+{
+  /*
+    Update widget configuration.
+  */
+  if (event->xconfigure.window != windows->command.id)
+    return(state);
+  if (event->xconfigure.send_event != 0)
+    {
+      windows->command.x=event->xconfigure.x;
+      windows->command.y=event->xconfigure.y;
+    }
+  if ((event->xconfigure.width == (int) windows->command.width) &&
+      (event->xconfigure.height == (int) windows->command.height))
+    return(state);
+  windows->command.width=(unsigned int)
+    MagickMax(event->xconfigure.width,(int) windows->command.min_width);
+  windows->command.height=(unsigned int)
+    MagickMax(event->xconfigure.height,(int) windows->command.min_height);
+  state|=UpdateConfigurationState;
+  return(state);
+}
+
+static size_t ExposeCommandWindow(XWindows *windows,XEvent *event,
+  size_t state)
+{
+  if (event->xexpose.window != windows->command.id)
+    return(state);
+  if (event->xexpose.count != 0)
+    return(state);
+  state|=RedrawWidgetState;
+  return(state);
+}
+
+static void HandleCommandWindowEvent(const CommandWidgetEvent *tile,int *id,
+  size_t *state)
+{
+  Display
+    *const display = tile->display;
+
+  XWindows
+    *const windows = tile->windows;
+
+  XEvent
+    *const event = tile->event;
+
+  const unsigned int
+    number_selections = tile->number_selections;
+
+  switch (event->type)
+  {
+    case Expose:
+    {
+      (*state)=ExposeCommandWindow(windows,event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      CommandWidgetEvent
+        motion;
+
+      /*
+        Return the ID of the highlighted menu entry.
+      */
+      motion.display=display;
+      motion.windows=windows;
+      motion.event=event;
+      motion.number_selections=number_selections;
+      (*id)=FollowCommandMotion(&motion,(*id));
+      break;
+    }
+    case MapNotify:
+    {
+      windows->command.mapped=MagickTrue;
+      break;
+    }
+    case UnmapNotify:
+    {
+      windows->command.mapped=MagickFalse;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void HandleCommandEvent(const CommandWidgetEvent *tile,int *id,
+  size_t *state)
+{
+  Display
+    *const display = tile->display;
+
+  XWindows
+    *const windows = tile->windows;
+
+  XEvent
+    *const event = tile->event;
+
+  const unsigned int
+    number_selections = tile->number_selections;
+
+  if (event != (XEvent *) NULL)
+    switch (event->type)
+    {
+      case ButtonPress:
+      {
+        CommandWidgetEvent
+          command_event;
+
+        command_event.display=display;
+        command_event.windows=windows;
+        command_event.event=event;
+        command_event.number_selections=number_selections;
+        (*id)=PressCommandSelection(&command_event,(*id));
+        break;
+      }
+      case ButtonRelease:
+      {
+        CommandWidgetEvent
+          command_event;
+
+        command_event.display=display;
+        command_event.windows=windows;
+        command_event.event=event;
+        command_event.number_selections=number_selections;
+        (*id)=ReleaseCommandSelection(&command_event,(*id));
+        break;
+      }
+      case ClientMessage:
+      {
+        ClientCommandMessage(display,windows,event);
+        break;
+      }
+      case ConfigureNotify:
+      {
+        (*state)=ConfigureCommandWindow(windows,event,(*state));
+        break;
+      }
+      default:
+      {
+        HandleCommandWindowEvent(tile,id,state);
+        break;
+      }
+    }
+}
+
 #define tile_width 112
 #define tile_height 70
 
-  static const unsigned char
-    tile_bits[]=
+static void RedrawCommandButtons(Display *display,XWindows *windows,
+  const unsigned int number_selections)
+{
+  int
+    i;
+
+  Pixmap
+    tile_pixmap;
+
+  /*
+    Draw command buttons.
+  */
+  tile_pixmap=XCreatePixmapFromBitmapData(display,windows->command.id,
+    (char *) tile_bits,tile_width,tile_height,1L,0L,1);
+  if (tile_pixmap != (Pixmap) NULL)
     {
-      0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x1e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x1e, 0x38, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x1e, 0xbc, 0x9f, 0x03, 0x00, 0x3e, 0x00, 0xc0,
-      0x1f, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x1e, 0xfc, 0xff, 0x0f, 0x80, 0x3f,
-      0x00, 0xf0, 0x1f, 0xc0, 0x0f, 0x00, 0x00, 0x00, 0x1e, 0xfc, 0xff, 0x1f,
-      0xe0, 0x3f, 0x00, 0xfc, 0x1f, 0xf0, 0x0f, 0x00, 0x00, 0x00, 0x1e, 0xfc,
-      0xff, 0x1f, 0xf0, 0x3f, 0x00, 0xfe, 0x1f, 0xf8, 0x0f, 0x00, 0x00, 0x00,
-      0x1e, 0xfc, 0xfc, 0x3f, 0xf8, 0x3f, 0x00, 0xff, 0x1e, 0xfc, 0x0f, 0x00,
-      0x00, 0x00, 0x1e, 0x7c, 0xfc, 0x3e, 0xf8, 0x3c, 0x80, 0x1f, 0x1e, 0x7c,
-      0x0f, 0x00, 0x00, 0x00, 0x1e, 0x78, 0x78, 0x3c, 0x7c, 0x3c, 0xc0, 0x0f,
-      0x1e, 0x3e, 0x0f, 0x00, 0x00, 0x00, 0x1e, 0x78, 0x78, 0x3c, 0x7c, 0x3c,
-      0xc0, 0x07, 0x1e, 0x3e, 0x0f, 0x00, 0x00, 0x00, 0x1e, 0x78, 0x78, 0x3c,
-      0x7c, 0x7c, 0xc0, 0x0f, 0x1e, 0x3e, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x78,
-      0x78, 0x3c, 0xfc, 0x7c, 0x80, 0x7f, 0x1e, 0x7c, 0x00, 0x00, 0x00, 0x00,
-      0x1e, 0xf8, 0x78, 0x7c, 0xf8, 0xff, 0x00, 0xff, 0x1f, 0xf8, 0xff, 0x00,
-      0x00, 0x00, 0x1e, 0xf8, 0x78, 0x7c, 0xf0, 0xff, 0x07, 0xfe, 0x1f, 0xf8,
-      0xff, 0x00, 0x00, 0x00, 0x1e, 0xf8, 0x78, 0x7c, 0xf0, 0xff, 0x07, 0xf8,
-      0x1f, 0xf0, 0xff, 0x01, 0x00, 0x00, 0x1e, 0xf8, 0x78, 0x7c, 0xc0, 0xef,
-      0x07, 0xe0, 0x1f, 0xc0, 0xff, 0x01, 0x00, 0x00, 0x1e, 0x70, 0x40, 0x78,
-      0x00, 0xc7, 0x07, 0x00, 0x1e, 0x00, 0x1f, 0x00, 0x00, 0x00, 0x1e, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x1e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
-      0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0xc0, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0xe0, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x01, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfc, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x01, 0x02, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x07,
-      0x1e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0xc0, 0x0f, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x60, 0x00, 0xc0, 0x0f, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x78, 0x00, 0xc0, 0x8f, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x78, 0x00, 0xc0, 0x8f, 0x3f, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78, 0x00, 0xe0, 0x9f, 0x7f, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78, 0x00, 0xe0, 0xdf,
-      0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x00, 0x00, 0x78, 0x00,
-      0xe0, 0xdf, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x00, 0x0c,
-      0x78, 0x30, 0xf0, 0xff, 0x7b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e,
-      0x00, 0x0f, 0xf8, 0x70, 0xf0, 0xff, 0x7b, 0x00, 0x00, 0x1f, 0x00, 0xe0,
-      0x0f, 0x1e, 0x80, 0x0f, 0xf8, 0x78, 0xf0, 0xfd, 0xf9, 0x00, 0xc0, 0x1f,
-      0x00, 0xf8, 0x0f, 0x00, 0xe0, 0x1f, 0xf8, 0x7c, 0xf0, 0xfc, 0xf9, 0x00,
-      0xf0, 0x1f, 0x00, 0xfe, 0x0f, 0x00, 0xf0, 0x07, 0xf8, 0x3e, 0xf8, 0xfc,
-      0xf0, 0x01, 0xf8, 0x1f, 0x00, 0xff, 0x0f, 0x1e, 0xf0, 0x03, 0xf8, 0x3f,
-      0xf8, 0xf8, 0xf0, 0x01, 0xfc, 0x1f, 0x80, 0x7f, 0x0f, 0x1e, 0xf8, 0x00,
-      0xf8, 0x1f, 0x78, 0x18, 0xf0, 0x01, 0x7c, 0x1e, 0xc0, 0x0f, 0x0f, 0x1e,
-      0x7c, 0x00, 0xf0, 0x0f, 0x78, 0x00, 0xf0, 0x01, 0x3e, 0x1e, 0xe0, 0x07,
-      0x0f, 0x1e, 0x7c, 0x00, 0xf0, 0x07, 0x7c, 0x00, 0xe0, 0x01, 0x3e, 0x1e,
-      0xe0, 0x03, 0x0f, 0x1e, 0x3e, 0x00, 0xf0, 0x0f, 0x7c, 0x00, 0xe0, 0x03,
-      0x3e, 0x3e, 0xe0, 0x07, 0x0f, 0x1e, 0x1e, 0x00, 0xf0, 0x1f, 0x3c, 0x00,
-      0xe0, 0x03, 0x7e, 0x3e, 0xc0, 0x3f, 0x0f, 0x1e, 0x3e, 0x00, 0xf0, 0x1f,
-      0x3e, 0x00, 0xe0, 0x03, 0xfc, 0x7f, 0x80, 0xff, 0x0f, 0x1e, 0xfc, 0x00,
-      0xf0, 0x3e, 0x3e, 0x00, 0xc0, 0x03, 0xf8, 0xff, 0x03, 0xff, 0x0f, 0x1e,
-      0xfc, 0x07, 0xf0, 0x7c, 0x1e, 0x00, 0xc0, 0x03, 0xf8, 0xff, 0x03, 0xfc,
-      0x0f, 0x1e, 0xf8, 0x1f, 0xf0, 0xf8, 0x1e, 0x00, 0xc0, 0x03, 0xe0, 0xf7,
-      0x03, 0xf0, 0x0f, 0x1e, 0xe0, 0x3f, 0xf0, 0x78, 0x1c, 0x00, 0x80, 0x03,
-      0x80, 0xe3, 0x03, 0x00, 0x0f, 0x1e, 0xc0, 0x3f, 0xf0, 0x30, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x0e, 0x00, 0x3e, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x0f, 0x00, 0x00, 0x10,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x0f, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0,
-      0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0xe0, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0xf0, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfc, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3c,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-    };
+      (void) XCopyPlane(display,tile_pixmap,windows->command.id,
+        windows->command.annotate_context,0,0,tile_width,tile_height,
+        (int) ((windows->command.width-tile_width) >> 1),10,1L);
+      (void) XFreePixmap(display,tile_pixmap);
+    }
+  for (i=0; i < (int) number_selections; i++)
+  {
+    XDrawBeveledButton(display,&windows->command,&selection_info[i]);
+    if (i >= (int) windows->command.data)
+      continue;
+    toggle_info.raised=MagickFalse;
+    toggle_info.y=selection_info[i].y+(int) (selection_info[i].height >> 1)-
+      (int) (toggle_info.height >> 1);
+    XDrawTriangleEast(display,&windows->command,&toggle_info);
+  }
+  XHighlightWidget(display,&windows->command,BorderOffset,BorderOffset);
+}
+
+typedef struct _CommandLayout
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *selections;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    height,
+    number_selections;
+} CommandLayout;
+
+static void InitializeCommandButtons(const CommandLayout *layout)
+{
+  Display
+    *const display = layout->display;
+
+  XWindows
+    *const windows = layout->windows;
+
+  const char
+    *const *const selections = layout->selections;
+
+  XFontStruct
+    *const font_info = layout->font_info;
+
+  const unsigned int
+    height = layout->height,
+    number_selections = layout->number_selections;
 
   int
-    id,
+    i,
     y;
+
+  y=tile_height+20;
+  for (i=0; i < (int) number_selections; i++)
+  {
+    XGetWidgetInfo(selections[i],&selection_info[i]);
+    selection_info[i].center=MagickFalse;
+    selection_info[i].bevel_width--;
+    selection_info[i].height=(unsigned int) ((3*height) >> 1);
+    selection_info[i].x=(QuantumMargin >> 1)+4;
+    selection_info[i].width=(unsigned int) ((int) windows->command.width-
+      (selection_info[i].x << 1));
+    selection_info[i].y=y;
+    y+=(int) selection_info[i].height+(int)
+      (selection_info[i].bevel_width << 1)+6;
+  }
+  XGetWidgetInfo((char *) NULL,&toggle_info);
+  toggle_info.bevel_width--;
+  toggle_info.width=(unsigned int) (((5*height) >> 3)-
+    (toggle_info.bevel_width << 1));
+  toggle_info.height=toggle_info.width;
+  toggle_info.x=selection_info[0].x+(int) selection_info[0].width-
+    (int) toggle_info.width-(int) (QuantumMargin >> 1);
+  if (windows->command.mapped)
+    (void) XClearWindow(display,windows->command.id);
+}
+
+static void ReconfigureCommandWindow(Display *display,XWindows *windows)
+{
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  if (windows->command.id != (Window) NULL)
+    {
+      Status
+        status;
+
+      /*
+        Reconfigure command window.
+      */
+      status=XStringListToTextProperty(&windows->command.name,1,
+        &window_name);
+      if (status != False)
+        {
+          XSetWMName(display,windows->command.id,&window_name);
+          XSetWMIconName(display,windows->command.id,&window_name);
+          (void) XFree((void *) window_name.value);
+        }
+      window_changes.width=(int) windows->command.width;
+      window_changes.height=(int) windows->command.height;
+      (void) XReconfigureWMWindow(display,windows->command.id,
+        windows->command.screen,(unsigned int) (CWWidth | CWHeight),
+        &window_changes);
+    }
+}
+
+typedef struct _CommandSizing
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *selections;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    height;
+} CommandSizing;
+
+static unsigned int SizeCommandWindow(const CommandSizing *sizing)
+{
+  Display
+    *const display = sizing->display;
+
+  XWindows
+    *const windows = sizing->windows;
+
+  const char
+    *const *const selections = sizing->selections;
+
+  XFontStruct
+    *const font_info = sizing->font_info;
+
+  const unsigned int
+    height = sizing->height;
 
   int
     i;
+
+  unsigned int
+    number_selections,
+    width;
+
+  windows->command.width=0;
+  for (i=0; selections[i] != (char *) NULL; i++)
+  {
+    width=WidgetTextWidth(font_info,(char *) selections[i]);
+    if (width > windows->command.width)
+      windows->command.width=width;
+  }
+  number_selections=(unsigned int) i;
+  windows->command.width+=(unsigned int) (3*QuantumMargin+10);
+  if ((int) windows->command.width < (tile_width+QuantumMargin+10))
+    windows->command.width=(unsigned  int) (tile_width+QuantumMargin+10);
+  windows->command.height=(unsigned  int) (number_selections*
+    (((3*height) >> 1)+10)+tile_height+20);
+  windows->command.min_width=windows->command.width;
+  windows->command.min_height=windows->command.height;
+  XConstrainWindowPosition(display,&windows->command);
+  return(number_selections);
+}
+
+MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
+  const char *const *selections,XEvent *event)
+{
+  int
+    id;
 
   static unsigned int
     number_selections;
@@ -3385,6 +3735,9 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   XFontStruct
     *font_info;
 
+  CommandWidgetEvent
+    tile;
+
   assert(display != (Display *) NULL);
   assert(windows != (XWindows *) NULL);
   if (IsEventLogging() != MagickFalse)
@@ -3395,57 +3748,20 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   state=DefaultState;
   if (event == (XEvent *) NULL)
     {
-      unsigned int
-        width;
-
-      XTextProperty
-        window_name;
-
-      XWindowChanges
-        window_changes;
+      CommandSizing
+        sizing;
 
       /*
         Determine command window attributes.
       */
       assert(selections != (const char **) NULL);
-      windows->command.width=0;
-      for (i=0; selections[i] != (char *) NULL; i++)
-      {
-        width=WidgetTextWidth(font_info,(char *) selections[i]);
-        if (width > windows->command.width)
-          windows->command.width=width;
-      }
-      number_selections=(unsigned int) i;
-      windows->command.width+=(unsigned int) (3*QuantumMargin+10);
-      if ((int) windows->command.width < (tile_width+QuantumMargin+10))
-        windows->command.width=(unsigned  int) (tile_width+QuantumMargin+10);
-      windows->command.height=(unsigned  int) (number_selections*
-        (((3*height) >> 1)+10)+tile_height+20);
-      windows->command.min_width=windows->command.width;
-      windows->command.min_height=windows->command.height;
-      XConstrainWindowPosition(display,&windows->command);
-      if (windows->command.id != (Window) NULL)
-        {
-          Status
-            status;
-
-          /*
-            Reconfigure command window.
-          */
-          status=XStringListToTextProperty(&windows->command.name,1,
-            &window_name);
-          if (status != False)
-            {
-              XSetWMName(display,windows->command.id,&window_name);
-              XSetWMIconName(display,windows->command.id,&window_name);
-              (void) XFree((void *) window_name.value);
-            }
-          window_changes.width=(int) windows->command.width;
-          window_changes.height=(int) windows->command.height;
-          (void) XReconfigureWMWindow(display,windows->command.id,
-            windows->command.screen,(unsigned int) (CWWidth | CWHeight),
-            &window_changes);
-        }
+      sizing.display=display;
+      sizing.windows=windows;
+      sizing.selections=selections;
+      sizing.font_info=font_info;
+      sizing.height=height;
+      number_selections=SizeCommandWindow(&sizing);
+      ReconfigureCommandWindow(display,windows);
       /*
         Allocate selection info memory.
       */
@@ -3464,164 +3780,30 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   /*
     Wait for next event.
   */
-  if (event != (XEvent *) NULL)
-    switch (event->type)
-    {
-      case ButtonPress:
-      {
-        CommandWidgetEvent
-          command_event;
-
-        command_event.display=display;
-        command_event.windows=windows;
-        command_event.event=event;
-        command_event.number_selections=number_selections;
-        id=PressCommandSelection(&command_event,id);
-        break;
-      }
-      case ButtonRelease:
-      {
-        CommandWidgetEvent
-          command_event;
-
-        command_event.display=display;
-        command_event.windows=windows;
-        command_event.event=event;
-        command_event.number_selections=number_selections;
-        id=ReleaseCommandSelection(&command_event,id);
-        break;
-      }
-      case ClientMessage:
-      {
-        /*
-          If client window delete message, withdraw command widget.
-        */
-        if (event->xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event->xclient.data.l != (int) windows->wm_delete_window)
-          break;
-        (void) XWithdrawWindow(display,windows->command.id,
-          windows->command.screen);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        /*
-          Update widget configuration.
-        */
-        if (event->xconfigure.window != windows->command.id)
-          break;
-        if (event->xconfigure.send_event != 0)
-          {
-            windows->command.x=event->xconfigure.x;
-            windows->command.y=event->xconfigure.y;
-          }
-        if ((event->xconfigure.width == (int) windows->command.width) &&
-            (event->xconfigure.height == (int) windows->command.height))
-          break;
-        windows->command.width=(unsigned int)
-          MagickMax(event->xconfigure.width,(int) windows->command.min_width);
-        windows->command.height=(unsigned int)
-          MagickMax(event->xconfigure.height,(int) windows->command.min_height);
-        state|=UpdateConfigurationState;
-        break;
-      }
-      case Expose:
-      {
-        if (event->xexpose.window != windows->command.id)
-          break;
-        if (event->xexpose.count != 0)
-          break;
-        state|=RedrawWidgetState;
-        break;
-      }
-      case MotionNotify:
-      {
-        CommandWidgetEvent
-          motion;
-
-        /*
-          Return the ID of the highlighted menu entry.
-        */
-        motion.display=display;
-        motion.windows=windows;
-        motion.event=event;
-        motion.number_selections=number_selections;
-        id=FollowCommandMotion(&motion,id);
-        break;
-      }
-      case MapNotify:
-      {
-        windows->command.mapped=MagickTrue;
-        break;
-      }
-      case UnmapNotify:
-      {
-        windows->command.mapped=MagickFalse;
-        break;
-      }
-      default:
-        break;
-    }
+  tile.display=display;
+  tile.windows=windows;
+  tile.event=event;
+  tile.number_selections=number_selections;
+  HandleCommandEvent(&tile,&id,&state);
   if (state & UpdateConfigurationState)
     {
+      CommandLayout
+        layout;
+
       /*
         Initialize button information.
       */
       assert(selections != (const char **) NULL);
-      y=tile_height+20;
-      for (i=0; i < (int) number_selections; i++)
-      {
-        XGetWidgetInfo(selections[i],&selection_info[i]);
-        selection_info[i].center=MagickFalse;
-        selection_info[i].bevel_width--;
-        selection_info[i].height=(unsigned int) ((3*height) >> 1);
-        selection_info[i].x=(QuantumMargin >> 1)+4;
-        selection_info[i].width=(unsigned int) ((int) windows->command.width-
-          (selection_info[i].x << 1));
-        selection_info[i].y=y;
-        y+=(int) selection_info[i].height+(int)
-          (selection_info[i].bevel_width << 1)+6;
-      }
-      XGetWidgetInfo((char *) NULL,&toggle_info);
-      toggle_info.bevel_width--;
-      toggle_info.width=(unsigned int) (((5*height) >> 3)-
-        (toggle_info.bevel_width << 1));
-      toggle_info.height=toggle_info.width;
-      toggle_info.x=selection_info[0].x+(int) selection_info[0].width-
-        (int) toggle_info.width-(int) (QuantumMargin >> 1);
-      if (windows->command.mapped)
-        (void) XClearWindow(display,windows->command.id);
+      layout.display=display;
+      layout.windows=windows;
+      layout.selections=selections;
+      layout.font_info=font_info;
+      layout.height=height;
+      layout.number_selections=number_selections;
+      InitializeCommandButtons(&layout);
     }
   if (state & RedrawWidgetState)
-    {
-      Pixmap
-        tile_pixmap;
-
-      /*
-        Draw command buttons.
-      */
-      tile_pixmap=XCreatePixmapFromBitmapData(display,windows->command.id,
-        (char *) tile_bits,tile_width,tile_height,1L,0L,1);
-      if (tile_pixmap != (Pixmap) NULL)
-        {
-          (void) XCopyPlane(display,tile_pixmap,windows->command.id,
-            windows->command.annotate_context,0,0,tile_width,tile_height,
-            (int) ((windows->command.width-tile_width) >> 1),10,1L);
-          (void) XFreePixmap(display,tile_pixmap);
-        }
-      for (i=0; i < (int) number_selections; i++)
-      {
-        XDrawBeveledButton(display,&windows->command,&selection_info[i]);
-        if (i >= (int) windows->command.data)
-          continue;
-        toggle_info.raised=MagickFalse;
-        toggle_info.y=selection_info[i].y+(int) (selection_info[i].height >> 1)-
-          (int) (toggle_info.height >> 1);
-        XDrawTriangleEast(display,&windows->command,&toggle_info);
-      }
-      XHighlightWidget(display,&windows->command,BorderOffset,BorderOffset);
-    }
+    RedrawCommandButtons(display,windows,number_selections);
   return(id);
 }
 
@@ -4122,14 +4304,83 @@ static void HandleConfirmEvent(Display *display,XWindows *windows,
   }
 }
 
+static void MapConfirmWidget(Display *display,XWindows *windows)
+{
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  (void) CopyMagickString(windows->widget.name,"Confirm",MagickPathExtent);
+  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
+  if (status != False)
+    {
+      XSetWMName(display,windows->widget.id,&window_name);
+      XSetWMIconName(display,windows->widget.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  window_changes.width=(int) windows->widget.width;
+  window_changes.height=(int) windows->widget.height;
+  window_changes.x=windows->widget.x;
+  window_changes.y=windows->widget.y;
+  (void) XReconfigureWMWindow(display,windows->widget.id,windows->widget.screen,
+    (unsigned int) (CWWidth | CWHeight | CWX | CWY),&window_changes);
+  (void) XMapRaised(display,windows->widget.id);
+  windows->widget.mapped=MagickFalse;
+}
+
+typedef struct _ConfirmLayout
+{
+  Display
+    *display;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    width,
+    height;
+} ConfirmLayout;
+
+static void PositionConfirmWidget(XWindows *windows,
+  const ConfirmLayout *layout)
+{
+  Display
+    *const display = layout->display;
+
+  XFontStruct
+    *const font_info = layout->font_info;
+
+  const unsigned int
+    width = layout->width,
+    height = layout->height;
+
+  /*
+    Position Confirm widget.
+  */
+  windows->widget.width=(unsigned int) ((int) width+9*QuantumMargin);
+  windows->widget.min_width=9*(unsigned int) QuantumMargin+
+    WidgetTextWidth(font_info,CancelButtonText)+
+    WidgetTextWidth(font_info,DismissButtonText)+
+    WidgetTextWidth(font_info,YesButtonText);
+  if (windows->widget.width < windows->widget.min_width)
+    windows->widget.width=windows->widget.min_width;
+  windows->widget.height=(unsigned int) (12*height);
+  windows->widget.min_height=(unsigned int) (7*height);
+  if (windows->widget.height < windows->widget.min_height)
+    windows->widget.height=windows->widget.min_height;
+  XConstrainWindowPosition(display,&windows->widget);
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
   int
     confirm;
-
-  Status
-    status;
 
   unsigned int
     height,
@@ -4144,22 +4395,19 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   XFontStruct
     *font_info;
 
-  XTextProperty
-    window_name;
-
   XWidgetInfo
     cancel_info,
     dismiss_info,
     yes_info;
-
-  XWindowChanges
-    window_changes;
 
   const ConfirmTargets
     targets = { &cancel_info, &dismiss_info, &yes_info, &state, &confirm };
 
   ConfirmContext
     context;
+
+  ConfirmLayout
+    layout;
   /*
     Determine Confirm widget attributes.
   */
@@ -4181,40 +4429,15 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
     if (WidgetTextWidth(font_info,(char *) description) > width)
       width=WidgetTextWidth(font_info,(char *) description);
   height=(unsigned int) (font_info->ascent+font_info->descent);
-  /*
-    Position Confirm widget.
-  */
-  windows->widget.width=(unsigned int) ((int) width+9*QuantumMargin);
-  windows->widget.min_width=9*(unsigned int) QuantumMargin+
-    WidgetTextWidth(font_info,CancelButtonText)+
-    WidgetTextWidth(font_info,DismissButtonText)+
-    WidgetTextWidth(font_info,YesButtonText);
-  if (windows->widget.width < windows->widget.min_width)
-    windows->widget.width=windows->widget.min_width;
-  windows->widget.height=(unsigned int) (12*height);
-  windows->widget.min_height=(unsigned int) (7*height);
-  if (windows->widget.height < windows->widget.min_height)
-    windows->widget.height=windows->widget.min_height;
-  XConstrainWindowPosition(display,&windows->widget);
+  layout.display=display;
+  layout.font_info=font_info;
+  layout.width=width;
+  layout.height=height;
+  PositionConfirmWidget(windows,&layout);
   /*
     Map Confirm widget.
   */
-  (void) CopyMagickString(windows->widget.name,"Confirm",MagickPathExtent);
-  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
-  if (status != False)
-    {
-      XSetWMName(display,windows->widget.id,&window_name);
-      XSetWMIconName(display,windows->widget.id,&window_name);
-      (void) XFree((void *) window_name.value);
-    }
-  window_changes.width=(int) windows->widget.width;
-  window_changes.height=(int) windows->widget.height;
-  window_changes.x=windows->widget.x;
-  window_changes.y=windows->widget.y;
-  (void) XReconfigureWMWindow(display,windows->widget.id,windows->widget.screen,
-    (unsigned int) (CWWidth | CWHeight | CWX | CWY),&window_changes);
-  (void) XMapRaised(display,windows->widget.id);
-  windows->widget.mapped=MagickFalse;
+  MapConfirmWidget(display,windows);
   /*
     Respond to X events.
   */
@@ -4422,64 +4645,718 @@ static void ApplyDialogControlKey(const KeySym key_symbol,const size_t state,
     }
 }
 
-MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
-  const char *action,const char *query,char *reply)
-{
 #define CancelButtonText  "Cancel"
 
-  char
-    primary_selection[MagickPathExtent];
-
-  static MagickBooleanType
-    raised = MagickFalse;
-
-  Status
-    status;
-
-  unsigned int
-    anomaly,
-    height,
-    width;
+typedef struct _DialogTargets
+{
+  XWidgetInfo
+    *special_info,
+    *action_info,
+    *cancel_info,
+    *reply_info;
 
   size_t
-    state;
+    *state;
 
-  XEvent
-    event;
+  XWidgetInfo
+    *text_info;
+} DialogTargets;
+
+typedef struct _DialogContext
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
 
   XFontStruct
     *font_info;
 
-  XTextProperty
-    window_name;
+  unsigned int
+    anomaly;
+
+  char
+    *primary_selection;
+
+  const char
+    *action,
+    *query;
+
+  unsigned int
+    height;
+
+  MagickBooleanType
+    raised;
+
+  char
+    *reply;
+
+  unsigned int
+    width;
+} DialogContext;
+
+static void PressDialogButton(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    anomaly = context->anomaly;
+
+  char
+    *const primary_selection = context->primary_selection;
 
   XWidgetInfo
-    action_info,
-    cancel_info,
-    reply_info,
-    special_info,
-    text_info;
+    *const special_info = targets->special_info,
+    *const action_info = targets->action_info,
+    *const cancel_info = targets->cancel_info,
+    *const reply_info = targets->reply_info;
 
-  XWindowChanges
-    window_changes;
+  if ((anomaly) && (MatteIsActive((*special_info),event.xbutton)))
+    {
+      /*
+        Option button status changed.
+      */
+      (*special_info).raised=!(*special_info).raised;
+      XDrawBeveledButton(display,&windows->widget,special_info);
+      return;
+    }
+  if (MatteIsActive((*action_info),event.xbutton))
+    {
+      /*
+        User pressed Action button.
+      */
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if (MatteIsActive((*cancel_info),event.xbutton))
+    {
+      /*
+        User pressed Cancel button.
+      */
+      (*cancel_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+  if (MatteIsActive((*reply_info),event.xbutton) == MagickFalse)
+    return;
+  if (event.xbutton.button != Button2)
+    {
+      DialogPress
+        press;
+
+      press.display=display;
+      press.windows=windows;
+      press.event=event;
+      press.font_info=font_info;
+      PressDialogReply(&press,primary_selection,reply_info);
+      return;
+    }
+  /*
+    Request primary selection.
+  */
+  (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
+    windows->widget.id,event.xbutton.time);
+}
+
+static void ReleaseDialogButtons(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const action_info = targets->action_info,
+    *const cancel_info = targets->cancel_info,
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
+
+  DialogRelease
+    release;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  release.display=display;
+  release.windows=windows;
+  release.event=event;
+  ReleaseDialogAction(&release,action_info,state);
+  release.display=display;
+  release.windows=windows;
+  release.event=event;
+  ReleaseDialogCancel(&release,reply_info,cancel_info,state);
+}
+
+static void ClientDialogMessage(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
 
   /*
-    Determine Dialog widget attributes.
+    If client window delete message, exit.
   */
-  assert(display != (Display *) NULL);
-  assert(windows != (XWindows *) NULL);
-  assert(action != (char *) NULL);
-  assert(query != (char *) NULL);
-  assert(reply != (char *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",action);
-  XCheckRefreshWindows(display,windows);
-  font_info=windows->widget.font_info;
-  width=WidgetTextWidth(font_info,(char *) action);
-  if (WidgetTextWidth(font_info,CancelButtonText) > width)
-    width=WidgetTextWidth(font_info,CancelButtonText);
-  width+=(unsigned int) (3*QuantumMargin) >> 1;
-  height=(unsigned int) (font_info->ascent+font_info->descent);
+  if (event.xclient.message_type != windows->wm_protocols)
+    return;
+  if (*event.xclient.data.l == (int) windows->wm_take_focus)
+    {
+      (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
+        (Time) event.xclient.data.l[1]);
+      return;
+    }
+  if (*event.xclient.data.l != (int) windows->wm_delete_window)
+    return;
+  if (event.xclient.window == windows->widget.id)
+    {
+      *(*reply_info).text='\0';
+      (*state)|=ExitState;
+      return;
+    }
+}
+
+static void KeyDialogPress(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const action_info = targets->action_info,
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
+
+  static char
+    command[MagickPathExtent];
+
+  static int
+    length;
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  length=XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      (*state)|=ExitState;
+      return;
+    }
+  if (key_symbol == XK_Control_L)
+    {
+      (*state)|=ControlState;
+      return;
+    }
+  ApplyDialogControlKey(key_symbol,(*state),reply_info);
+  XEditText(display,reply_info,key_symbol,command,(*state));
+  XDrawMatteText(display,&windows->widget,reply_info);
+}
+
+static void KeyDialogRelease(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  static char
+    command[MagickPathExtent];
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key release.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  if (key_symbol == XK_Control_L)
+    (*state)&=(unsigned int) (~ControlState);
+}
+
+static void MoveDialogButtons(const DialogContext *context,XEvent event,
+  const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const action_info = targets->action_info,
+    *const cancel_info = targets->cancel_info;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
+  if ((*state) & InactiveWidgetState)
+    return;
+  if ((*action_info).raised == MatteIsActive((*action_info),event.xmotion))
+    {
+      /*
+        Action button status changed.
+      */
+      (*action_info).raised=(*action_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if ((*cancel_info).raised == MatteIsActive((*cancel_info),event.xmotion))
+    {
+      /*
+        Cancel button status changed.
+      */
+      (*cancel_info).raised=(*cancel_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+}
+
+static void SelectDialogReply(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
+
+  Status
+    status;
+
+  Atom
+    type;
+
+  int
+    format;
+
+  unsigned char
+    *data;
+
+  unsigned long
+    after,
+    length;
+
+  /*
+    Obtain response from primary selection.
+  */
+  if (event.xselection.property == (Atom) None)
+    return;
+  status=XGetWindowProperty(display,event.xselection.requestor,
+    event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
+    &format,&length,&after,&data);
+  if (IsUnusableSelection(status,type,format,length) != MagickFalse)
+    return;
+  if ((Extent((*reply_info).text)+(int) length) >= (MagickPathExtent-1))
+    (void) XBell(display,0);
+  else
+    {
+      /*
+        Insert primary selection in reply text.
+      */
+      *(data+length)='\0';
+      XEditText(display,reply_info,(KeySym) XK_Insert,(char *) data,
+        (*state));
+      XDrawMatteText(display,&windows->widget,reply_info);
+    }
+  (void) XFree((void *) data);
+}
+
+static void InitializeDialogOptions(const DialogContext *context,
+  const DialogTargets *targets)
+{
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const char
+    *const action = context->action,
+    *const query = context->query;
+
+  const unsigned int
+    height = context->height;
+
+  const MagickBooleanType
+    raised = context->raised;
+
+  XWidgetInfo
+    *const special_info = targets->special_info,
+    *const action_info = targets->action_info,
+    *const reply_info = targets->reply_info,
+    *const text_info = targets->text_info;
+
+  /*
+    Initialize option information.
+  */
+  XGetWidgetInfo("Dither",special_info);
+  (*special_info).raised=raised;
+  (*special_info).bevel_width--;
+  (*special_info).width=(unsigned int) QuantumMargin >> 1;
+  (*special_info).height=(unsigned int) QuantumMargin >> 1;
+  (*special_info).x=(*reply_info).x;
+  (*special_info).y=(*action_info).y+(int) (*action_info).height-(int)
+    (*special_info).height;
+  if (LocaleCompare(action,"Background") == 0)
+    (*special_info).text=(char *) "Backdrop";
+  if (LocaleCompare(action,"New") == 0)
+    (*special_info).text=(char *) "Gradation";
+  if (LocaleCompare(action,"Resize") == 0)
+    (*special_info).text=(char *) "Constrain ratio";
+  if (LocaleCompare(action,"Save") == 0)
+    (*special_info).text=(char *) "Non-progressive";
+  if (LocaleCompare(action,"Shade") == 0)
+    (*special_info).text=(char *) "Color shading";
+  /*
+    Initialize text information.
+  */
+  XGetWidgetInfo(query,text_info);
+  (*text_info).width=(*reply_info).width;
+  (*text_info).height=height;
+  (*text_info).x=(*reply_info).x-(int) (QuantumMargin >> 1);
+  (*text_info).y=QuantumMargin;
+  (*text_info).center=MagickFalse;
+}
+
+static void UpdateDialogLayout(const DialogContext *context,
+  const DialogTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const char
+    *const action = context->action;
+
+  char
+    *const reply = context->reply;
+
+  const unsigned int
+    width = context->width,
+    height = context->height;
+
+  XWidgetInfo
+    *const action_info = targets->action_info,
+    *const cancel_info = targets->cancel_info,
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      /*
+        Initialize button information.
+      */
+      XGetWidgetInfo(CancelButtonText,cancel_info);
+      (*cancel_info).width=width;
+      (*cancel_info).height=(unsigned int) ((3*height) >> 1);
+      (*cancel_info).x=(int) windows->widget.width-(int) (*cancel_info).width-
+        ((3*QuantumMargin) >> 1);
+      (*cancel_info).y=(int) windows->widget.height-(int) (*cancel_info).height-
+        ((3*QuantumMargin) >> 1);
+      XGetWidgetInfo(action,action_info);
+      (*action_info).width=width;
+      (*action_info).height=(unsigned int) ((3*height) >> 1);
+      (*action_info).x=(*cancel_info).x-((int) (*cancel_info).width+QuantumMargin+
+        (int) ((*action_info).bevel_width << 1));
+      (*action_info).y=(*cancel_info).y;
+      /*
+        Initialize reply information.
+      */
+      XGetWidgetInfo(reply,reply_info);
+      (*reply_info).raised=MagickFalse;
+      (*reply_info).bevel_width--;
+      (*reply_info).width=(unsigned int) ((int) windows->widget.width-
+        (3*QuantumMargin));
+      (*reply_info).height=height << 1;
+      (*reply_info).x=(3*QuantumMargin) >> 1;
+      (*reply_info).y=(*action_info).y-(int) (*reply_info).height-QuantumMargin;
+      InitializeDialogOptions(context,targets);
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+}
+
+static void RedrawDialogWidget(const DialogContext *context,
+  const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    anomaly = context->anomaly;
+
+  XWidgetInfo
+    *const special_info = targets->special_info,
+    *const action_info = targets->action_info,
+    *const cancel_info = targets->cancel_info,
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
+
+  XWidgetInfo
+    *const text_info = targets->text_info;
+
+  if ((*state) & RedrawWidgetState)
+    {
+      /*
+        Redraw Dialog widget.
+      */
+      XDrawWidgetText(display,&windows->widget,text_info);
+      XDrawBeveledMatte(display,&windows->widget,reply_info);
+      XDrawMatteText(display,&windows->widget,reply_info);
+      if (anomaly)
+        XDrawBeveledButton(display,&windows->widget,special_info);
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+      (*state)&=(unsigned int) (~RedrawWidgetState);
+    }
+}
+
+static void HandleDialogSelectionEvent(const DialogContext *context,
+  XEvent event,const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const reply_info = targets->reply_info;
+
+  switch (event.type)
+  {
+    case SelectionClear:
+    {
+      (*reply_info).highlight=MagickFalse;
+      XDrawMatteText(display,&windows->widget,reply_info);
+      break;
+    }
+    case SelectionNotify:
+    {
+      SelectDialogReply(context,event,targets);
+      break;
+    }
+    case SelectionRequest:
+    {
+      XSelectionEvent
+        notify;
+
+      XSelectionRequestEvent
+        *request;
+
+      if ((*reply_info).highlight == MagickFalse)
+        break;
+      /*
+        Set primary selection.
+      */
+      request=(&(event.xselectionrequest));
+      (void) XChangeProperty(request->display,request->requestor,
+        request->property,request->target,8,PropModeReplace,
+        (unsigned char *) primary_selection,Extent(primary_selection));
+      notify.type=SelectionNotify;
+      notify.display=request->display;
+      notify.requestor=request->requestor;
+      notify.selection=request->selection;
+      notify.target=request->target;
+      notify.time=request->time;
+      if (request->property == None)
+        notify.property=request->target;
+      else
+        notify.property=request->property;
+      (void) XSendEvent(request->display,request->requestor,False,0,
+        (XEvent *) &notify);
+    }
+    default:
+      break;
+  }
+}
+
+static void HandleDialogKeyEvent(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      KeyDialogPress(context,event,targets);
+      break;
+    }
+    case KeyRelease:
+    {
+      KeyDialogRelease(context,event,targets);
+      break;
+    }
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      MoveDialogButtons(context,event,targets);
+      break;
+    }
+    default:
+    {
+      HandleDialogSelectionEvent(context,event,targets);
+      break;
+    }
+  }
+}
+
+static void HandleDialogEvent(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      PressDialogButton(context,event,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      ReleaseDialogButtons(context,event,targets);
+      break;
+    }
+    case ClientMessage:
+    {
+      ClientDialogMessage(context,event,targets);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleDialogKeyEvent(context,event,targets);
+      break;
+    }
+  }
+}
+
+typedef struct _DialogLayout
+{
+  Display
+    *display;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    width,
+    height;
+
+  const char
+    *query;
+
+  char
+    *reply;
+} DialogLayout;
+
+static void PositionDialogWidget(XWindows *windows,
+  const DialogLayout *layout)
+{
+  Display
+    *const display = layout->display;
+
+  XFontStruct
+    *const font_info = layout->font_info;
+
+  const unsigned int
+    width = layout->width,
+    height = layout->height;
+
+  const char
+    *const query = layout->query;
+
+  char
+    *const reply = layout->reply;
+
   /*
     Position Dialog widget.
   */
@@ -4497,9 +5374,19 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   if (windows->widget.height < windows->widget.min_height)
     windows->widget.height=windows->widget.min_height;
   XConstrainWindowPosition(display,&windows->widget);
-  /*
-    Map Dialog widget.
-  */
+}
+
+static void MapDialogWidget(Display *display,XWindows *windows)
+{
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
   (void) CopyMagickString(windows->widget.name,"Dialog",MagickPathExtent);
   status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
   if (status != False)
@@ -4516,376 +5403,134 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
     (unsigned int) (CWWidth | CWHeight | CWX | CWY),&window_changes);
   (void) XMapRaised(display,windows->widget.id);
   windows->widget.mapped=MagickFalse;
-  /*
-    Respond to X events.
-  */
-  anomaly=(LocaleCompare(action,"Background") == 0) ||
-    (LocaleCompare(action,"New") == 0) ||
-    (LocaleCompare(action,"Quantize") == 0) ||
-    (LocaleCompare(action,"Resize") == 0) ||
-    (LocaleCompare(action,"Save") == 0) ||
-    (LocaleCompare(action,"Shade") == 0);
-  state=UpdateConfigurationState;
-  XSetCursorState(display,windows,MagickTrue);
+}
+
+static void RespondToDialogEvents(const DialogContext *context,
+  const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  XEvent
+    event;
+
   do
   {
-    if (state & UpdateConfigurationState)
-      {
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(CancelButtonText,&cancel_info);
-        cancel_info.width=width;
-        cancel_info.height=(unsigned int) ((3*height) >> 1);
-        cancel_info.x=(int) windows->widget.width-(int) cancel_info.width-
-          ((3*QuantumMargin) >> 1);
-        cancel_info.y=(int) windows->widget.height-(int) cancel_info.height-
-          ((3*QuantumMargin) >> 1);
-        XGetWidgetInfo(action,&action_info);
-        action_info.width=width;
-        action_info.height=(unsigned int) ((3*height) >> 1);
-        action_info.x=cancel_info.x-((int) cancel_info.width+QuantumMargin+
-          (int) (action_info.bevel_width << 1));
-        action_info.y=cancel_info.y;
-        /*
-          Initialize reply information.
-        */
-        XGetWidgetInfo(reply,&reply_info);
-        reply_info.raised=MagickFalse;
-        reply_info.bevel_width--;
-        reply_info.width=(unsigned int) ((int) windows->widget.width-
-          (3*QuantumMargin));
-        reply_info.height=height << 1;
-        reply_info.x=(3*QuantumMargin) >> 1;
-        reply_info.y=action_info.y-(int) reply_info.height-QuantumMargin;
-        /*
-          Initialize option information.
-        */
-        XGetWidgetInfo("Dither",&special_info);
-        special_info.raised=raised;
-        special_info.bevel_width--;
-        special_info.width=(unsigned int) QuantumMargin >> 1;
-        special_info.height=(unsigned int) QuantumMargin >> 1;
-        special_info.x=reply_info.x;
-        special_info.y=action_info.y+(int) action_info.height-(int)
-          special_info.height;
-        if (LocaleCompare(action,"Background") == 0)
-          special_info.text=(char *) "Backdrop";
-        if (LocaleCompare(action,"New") == 0)
-          special_info.text=(char *) "Gradation";
-        if (LocaleCompare(action,"Resize") == 0)
-          special_info.text=(char *) "Constrain ratio";
-        if (LocaleCompare(action,"Save") == 0)
-          special_info.text=(char *) "Non-progressive";
-        if (LocaleCompare(action,"Shade") == 0)
-          special_info.text=(char *) "Color shading";
-        /*
-          Initialize text information.
-        */
-        XGetWidgetInfo(query,&text_info);
-        text_info.width=reply_info.width;
-        text_info.height=height;
-        text_info.x=reply_info.x-(int) (QuantumMargin >> 1);
-        text_info.y=QuantumMargin;
-        text_info.center=MagickFalse;
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
-    if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw Dialog widget.
-        */
-        XDrawWidgetText(display,&windows->widget,&text_info);
-        XDrawBeveledMatte(display,&windows->widget,&reply_info);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        if (anomaly)
-          XDrawBeveledButton(display,&windows->widget,&special_info);
-        XDrawBeveledButton(display,&windows->widget,&action_info);
-        XDrawBeveledButton(display,&windows->widget,&cancel_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
+    UpdateDialogLayout(context,targets);
+    RedrawDialogWidget(context,targets);
     /*
       Wait for next event.
     */
     (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if ((anomaly) && (MatteIsActive(special_info,event.xbutton)))
-          {
-            /*
-              Option button status changed.
-            */
-            special_info.raised=!special_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&special_info);
-            break;
-          }
-        if (MatteIsActive(action_info,event.xbutton))
-          {
-            /*
-              User pressed Action button.
-            */
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        if (MatteIsActive(cancel_info,event.xbutton))
-          {
-            /*
-              User pressed Cancel button.
-            */
-            cancel_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
-          break;
-        if (event.xbutton.button != Button2)
-          {
-            DialogPress
-              press;
+    HandleDialogEvent(context,event,targets);
+  } while (((*state) & ExitState) == 0);
+}
 
-            press.display=display;
-            press.windows=windows;
-            press.event=event;
-            press.font_info=font_info;
-            PressDialogReply(&press,primary_selection,&reply_info);
-            break;
-          }
-        /*
-          Request primary selection.
-        */
-        (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
-          windows->widget.id,event.xbutton.time);
-        break;
-      }
-      case ButtonRelease:
-      {
-        DialogRelease
-          release;
+static unsigned int GetDialogButtonWidth(XFontStruct *font_info,
+  const char *action)
+{
+  unsigned int
+    width;
 
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        release.display=display;
-        release.windows=windows;
-        release.event=event;
-        ReleaseDialogAction(&release,&action_info,&state);
-        release.display=display;
-        release.windows=windows;
-        release.event=event;
-        ReleaseDialogCancel(&release,&reply_info,&cancel_info,&state);
-        break;
-      }
-      case ClientMessage:
-      {
-        /*
-          If client window delete message, exit.
-        */
-        if (event.xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event.xclient.data.l == (int) windows->wm_take_focus)
-          {
-            (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
-              (Time) event.xclient.data.l[1]);
-            break;
-          }
-        if (*event.xclient.data.l != (int) windows->wm_delete_window)
-          break;
-        if (event.xclient.window == windows->widget.id)
-          {
-            *reply_info.text='\0';
-            state|=ExitState;
-            break;
-          }
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
-      case KeyPress:
-      {
-        static char
-          command[MagickPathExtent];
+  width=WidgetTextWidth(font_info,(char *) action);
+  if (WidgetTextWidth(font_info,CancelButtonText) > width)
+    width=WidgetTextWidth(font_info,CancelButtonText);
+  width+=(unsigned int) (3*QuantumMargin) >> 1;
+  return(width);
+}
 
-        static int
-          length;
+static MagickBooleanType IsDialogOptionAction(const char *action)
+{
+  return(((LocaleCompare(action,"Background") == 0) ||
+    (LocaleCompare(action,"New") == 0) ||
+    (LocaleCompare(action,"Quantize") == 0) ||
+    (LocaleCompare(action,"Resize") == 0) ||
+    (LocaleCompare(action,"Save") == 0) ||
+    (LocaleCompare(action,"Shade") == 0)) ? MagickTrue : MagickFalse);
+}
 
-        static KeySym
-          key_symbol;
+MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
+  const char *action,const char *query,char *reply)
+{
+  char
+    primary_selection[MagickPathExtent];
 
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        length=XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            state|=ExitState;
-            break;
-          }
-        if (key_symbol == XK_Control_L)
-          {
-            state|=ControlState;
-            break;
-          }
-        ApplyDialogControlKey(key_symbol,state,&reply_info);
-        XEditText(display,&reply_info,key_symbol,command,state);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        break;
-      }
-      case KeyRelease:
-      {
-        static char
-          command[MagickPathExtent];
+  static MagickBooleanType
+    raised = MagickFalse;
 
-        static KeySym
-          key_symbol;
+  unsigned int
+    anomaly,
+    height,
+    width;
 
-        /*
-          Respond to a user key release.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if (key_symbol == XK_Control_L)
-          state&=(unsigned int) (~ControlState);
-        break;
-      }
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (state & InactiveWidgetState)
-          break;
-        if (action_info.raised == MatteIsActive(action_info,event.xmotion))
-          {
-            /*
-              Action button status changed.
-            */
-            action_info.raised=action_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        if (cancel_info.raised == MatteIsActive(cancel_info,event.xmotion))
-          {
-            /*
-              Cancel button status changed.
-            */
-            cancel_info.raised=cancel_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        break;
-      }
-      case SelectionClear:
-      {
-        reply_info.highlight=MagickFalse;
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        break;
-      }
-      case SelectionNotify:
-      {
-        Atom
-          type;
+  size_t
+    state;
 
-        int
-          format;
+  XFontStruct
+    *font_info;
 
-        unsigned char
-          *data;
+  XWidgetInfo
+    action_info,
+    cancel_info,
+    reply_info,
+    special_info,
+    text_info;
 
-        unsigned long
-          after,
-          length;
+  const DialogTargets
+    targets = { &special_info, &action_info, &cancel_info, &reply_info,
+      &state, &text_info };
 
-        /*
-          Obtain response from primary selection.
-        */
-        if (event.xselection.property == (Atom) None)
-          break;
-        status=XGetWindowProperty(display,event.xselection.requestor,
-          event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
-          &format,&length,&after,&data);
-        if (IsUnusableSelection(status,type,format,length) != MagickFalse)
-          break;
-        if ((Extent(reply_info.text)+(int) length) >= (MagickPathExtent-1))
-          (void) XBell(display,0);
-        else
-          {
-            /*
-              Insert primary selection in reply text.
-            */
-            *(data+length)='\0';
-            XEditText(display,&reply_info,(KeySym) XK_Insert,(char *) data,
-              state);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-          }
-        (void) XFree((void *) data);
-        break;
-      }
-      case SelectionRequest:
-      {
-        XSelectionEvent
-          notify;
+  DialogContext
+    context;
 
-        XSelectionRequestEvent
-          *request;
+  /*
+    Determine Dialog widget attributes.
+  */
+  assert(display != (Display *) NULL);
+  assert(windows != (XWindows *) NULL);
+  assert(action != (char *) NULL);
+  assert(query != (char *) NULL);
+  assert(reply != (char *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",action);
+  XCheckRefreshWindows(display,windows);
+  font_info=windows->widget.font_info;
+  width=GetDialogButtonWidth(font_info,action);
+  height=(unsigned int) (font_info->ascent+font_info->descent);
+  {
+    const DialogLayout
+      layout = { display, font_info, width, height, query, reply };
 
-        if (reply_info.highlight == MagickFalse)
-          break;
-        /*
-          Set primary selection.
-        */
-        request=(&(event.xselectionrequest));
-        (void) XChangeProperty(request->display,request->requestor,
-          request->property,request->target,8,PropModeReplace,
-          (unsigned char *) primary_selection,Extent(primary_selection));
-        notify.type=SelectionNotify;
-        notify.display=request->display;
-        notify.requestor=request->requestor;
-        notify.selection=request->selection;
-        notify.target=request->target;
-        notify.time=request->time;
-        if (request->property == None)
-          notify.property=request->target;
-        else
-          notify.property=request->property;
-        (void) XSendEvent(request->display,request->requestor,False,0,
-          (XEvent *) &notify);
-      }
-      default:
-        break;
-    }
-  } while ((state & ExitState) == 0);
+    PositionDialogWidget(windows,&layout);
+  }
+  /*
+    Map Dialog widget.
+  */
+  MapDialogWidget(display,windows);
+  /*
+    Respond to X events.
+  */
+  anomaly=(IsDialogOptionAction(action) != MagickFalse);
+  state=UpdateConfigurationState;
+  XSetCursorState(display,windows,MagickTrue);
+  context.display=display;
+  context.windows=windows;
+  context.font_info=font_info;
+  context.anomaly=anomaly;
+  context.primary_selection=primary_selection;
+  context.action=action;
+  context.query=query;
+  context.height=height;
+  context.raised=raised;
+  context.reply=reply;
+  context.width=width;
+  RespondToDialogEvents(&context,&targets);
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
   XCheckRefreshWindows(display,windows);
