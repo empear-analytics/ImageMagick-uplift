@@ -6600,6 +6600,15 @@ typedef struct _DrawEditContext
 
   ExceptionInfo
     *exception;
+
+  Image
+    **image;
+
+  Cursor
+    cursor;
+
+  const ModeType
+    *DrawCommands;
 } DrawEditContext;
 
 typedef struct _DrawStyleTargets
@@ -7486,6 +7495,62 @@ static void XPreviewEllipseErase(const DrawEditContext *context,
       windows->image.highlight_context,&rectangle_info);
 }
 
+static void XDrawCommandAction(const DrawEditContext *context,const int id,
+  const DrawPointerTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const image = context->image;
+
+  const Cursor
+    cursor = context->cursor;
+
+  const ModeType
+    *const DrawCommands = context->DrawCommands;
+
+  size_t
+    *const state = targets->state;
+
+  switch (DrawCommands[id])
+  {
+    case DrawUndoCommand:
+    {
+      (void) XMagickCommand(display,resource_info,windows,UndoCommand,
+        image,exception);
+      break;
+    }
+    case DrawHelpCommand:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Rotation",ImageDrawHelp);
+      (void) XCheckDefineCursor(display,windows->image.id,cursor);
+      break;
+    }
+    case DrawDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7625,6 +7690,9 @@ static MagickBooleanType XDrawEditImage(Display *display,
   draw_context.command=command;
   draw_context.root_window=root_window;
   draw_context.exception=exception;
+  draw_context.image=image;
+  draw_context.cursor=cursor;
+  draw_context.DrawCommands=DrawCommands;
   for ( ; ; )
   {
     XQueryPosition(display,windows->image.id,&x,&y);
@@ -7697,30 +7765,11 @@ static MagickBooleanType XDrawEditImage(Display *display,
               XSelectDrawWidth(&draw_context,id,&style_targets);
               break;
             }
-            case DrawUndoCommand:
-            {
-              (void) XMagickCommand(display,resource_info,windows,UndoCommand,
-                image,exception);
-              break;
-            }
-            case DrawHelpCommand:
-            {
-              XTextViewHelp(display,resource_info,windows,MagickFalse,
-                "Help Viewer - Image Rotation",ImageDrawHelp);
-              (void) XCheckDefineCursor(display,windows->image.id,cursor);
-              break;
-            }
-            case DrawDismissCommand:
-            {
-              /*
-                Prematurely exit.
-              */
-              state|=EscapeState;
-              state|=ExitState;
-              break;
-            }
             default:
+            {
+              XDrawCommandAction(&draw_context,id,&pointer_targets);
               break;
+            }
           }
           (void) XCheckDefineCursor(display,windows->image.id,cursor);
           continue;
