@@ -1268,6 +1268,14 @@ static const char *SkipDoctypeElement(const char *q)
   return(q);
 }
 
+static const char *SkipCommentElement(const char *q,const size_t extent,
+  char *token)
+{
+  while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
+    (void) GetNextToken(q,&q,extent,token);
+  return(q);
+}
+
 static MagickBooleanType LoadTypeInclude(const TypeLoadTarget *target,
   const char *filename,const char *token,const size_t depth)
 {
@@ -1363,8 +1371,7 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
         /*
           Comment element.
         */
-        while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
-          (void) GetNextToken(q,&q,extent,token);
+        q=SkipCommentElement(q,extent,token);
         continue;
       }
     if (LocaleCompare(keyword,"<include") == 0)
