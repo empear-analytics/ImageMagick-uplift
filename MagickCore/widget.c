@@ -3860,6 +3860,45 @@ static void MoveConfirmYes(Display *display,XWindows *windows,
     }
 }
 
+static void MoveConfirmButtons(Display *display,XWindows *windows,XEvent event,
+  const ConfirmTargets *targets)
+{
+  XWidgetInfo
+    *const cancel_info = targets->cancel_info,
+    *const dismiss_info = targets->dismiss_info;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
+  if ((*state) & InactiveWidgetState)
+    return;
+  if ((*cancel_info).raised == MatteIsActive((*cancel_info),event.xmotion))
+    {
+      /*
+        Cancel button status changed.
+      */
+      (*cancel_info).raised=(*cancel_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+  if ((*dismiss_info).raised == MatteIsActive((*dismiss_info),event.xmotion))
+    {
+      /*
+        Dismiss button status changed.
+      */
+      (*dismiss_info).raised=(*dismiss_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      return;
+    }
+  MoveConfirmYes(display,windows,event,targets);
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -4072,33 +4111,7 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
       }
       case MotionNotify:
       {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (state & InactiveWidgetState)
-          break;
-        if (cancel_info.raised == MatteIsActive(cancel_info,event.xmotion))
-          {
-            /*
-              Cancel button status changed.
-            */
-            cancel_info.raised=cancel_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        if (dismiss_info.raised == MatteIsActive(dismiss_info,event.xmotion))
-          {
-            /*
-              Dismiss button status changed.
-            */
-            dismiss_info.raised=dismiss_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-            break;
-          }
-        MoveConfirmYes(display,windows,event,&targets);
+        MoveConfirmButtons(display,windows,event,&targets);
         break;
       }
       default:
