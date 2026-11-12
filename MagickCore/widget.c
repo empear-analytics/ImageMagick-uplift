@@ -5335,6 +5335,35 @@ static void PositionDialogWidget(XWindows *windows,
   XConstrainWindowPosition(display,&windows->widget);
 }
 
+static void MapDialogWidget(Display *display,XWindows *windows)
+{
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  (void) CopyMagickString(windows->widget.name,"Dialog",MagickPathExtent);
+  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
+  if (status != False)
+    {
+      XSetWMName(display,windows->widget.id,&window_name);
+      XSetWMIconName(display,windows->widget.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  window_changes.width=(int) windows->widget.width;
+  window_changes.height=(int) windows->widget.height;
+  window_changes.x=windows->widget.x;
+  window_changes.y=windows->widget.y;
+  (void) XReconfigureWMWindow(display,windows->widget.id,windows->widget.screen,
+    (unsigned int) (CWWidth | CWHeight | CWX | CWY),&window_changes);
+  (void) XMapRaised(display,windows->widget.id);
+  windows->widget.mapped=MagickFalse;
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -5343,9 +5372,6 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
 
   static MagickBooleanType
     raised = MagickFalse;
-
-  Status
-    status;
 
   unsigned int
     anomaly,
@@ -5361,18 +5387,12 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   XFontStruct
     *font_info;
 
-  XTextProperty
-    window_name;
-
   XWidgetInfo
     action_info,
     cancel_info,
     reply_info,
     special_info,
     text_info;
-
-  XWindowChanges
-    window_changes;
 
   const DialogTargets
     targets = { &special_info, &action_info, &cancel_info, &reply_info,
@@ -5411,22 +5431,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   /*
     Map Dialog widget.
   */
-  (void) CopyMagickString(windows->widget.name,"Dialog",MagickPathExtent);
-  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
-  if (status != False)
-    {
-      XSetWMName(display,windows->widget.id,&window_name);
-      XSetWMIconName(display,windows->widget.id,&window_name);
-      (void) XFree((void *) window_name.value);
-    }
-  window_changes.width=(int) windows->widget.width;
-  window_changes.height=(int) windows->widget.height;
-  window_changes.x=windows->widget.x;
-  window_changes.y=windows->widget.y;
-  (void) XReconfigureWMWindow(display,windows->widget.id,windows->widget.screen,
-    (unsigned int) (CWWidth | CWHeight | CWX | CWY),&window_changes);
-  (void) XMapRaised(display,windows->widget.id);
-  windows->widget.mapped=MagickFalse;
+  MapDialogWidget(display,windows);
   /*
     Respond to X events.
   */
