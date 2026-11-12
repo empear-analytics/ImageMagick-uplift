@@ -552,3 +552,37 @@ bumps. The local `casemap.py` staleness bypass was reverted, not committed.
   never restores the variable, so later blocks (`QuantumMargin`, `FindFontBrowserCursor`) use a freed or NULL font (kept as
   is); Color's and Font's SelectionRequest cases have no `break;` and fall into `default:`; Color's ButtonRelease ends
   `if (MatteIsActive(reply_info,...) == MagickFalse) break; break;`.
+
+## Lane b, fourth round: display.c 2.58 -> 2.68 (wide build, merged)
+
+29 commits (last 44d6685b6); whole wide catalogue on the lane tip 14,200 cases, 0 diverged (230 s). **Oracle caveat:**
+`casemap.json` was stale after the merged lanes' oracle cases, so each step's cases ran through `--filter` built from the old
+wide map (317 cases for `XDisplayImage`, 237 for `XScreenEvent`, 10 for `XOpenImage`): every step 0 diverged; every step
+also passed obj_modulo or obj_identical (`NOINLINE=` for inlined functions), the guard, `--calls`, `ci_linux_warnings` and
+`ci_warnings`; no helper has a finding, no new Code Duplication. The moved `LogMagickEvent` and `ThrowXWindowException`
+calls now name the helper in `GetMagickModule()`. **The raise (XDisplayImage setup, the only score movement):** 5fbcac2e2 E
+`XLogDisplayImage`, b8480ee86 E `XGetUpdateTime`, 18225a13c N `XNameImageWindow`, 1f31f38af N `XInitializeBackdropWindow`
+(all flat; 18225a13c moved the 23 fill lines of `DisplayEventContext` up to just after `root_window` and added `font_info`,
+1f31f38af added `argv`, `argc`, `class_hints` and `manager_hints`; a script shows nothing writes a member's variable between
+the new fill and the loop), then f38e5c5e0 N `XMakeImageWindow` **2.58 -> 2.68** (bumps 14 -> 9, cc 186 -> 167, Large 1,447
+-> 1,336; a probe showed these five blocks are the minimal set that raises the score). **Functions cleared (flat at 2.68,
+each leaves a category under rule 2):** 3248bfb01 CN `XCropExpose` (leaves Bumpy Road; combining pairs in `XCropImage` and
+`XCropButtonRelease` creates Complex Conditionals, 2.57, not committed); `XMagnifyImage` a26ee930a E, 20fa0f3a2 O;
+fd4b2879c E `XTranslateImage` (leaves Large, cc 15 remains); `XPanImage` 9e8d51c0b, 957397646, e39eb7767 E; `XScreenEvent`
+4371f14fe CN, E per case (46d7e7e88 Button, 1a0df5a79 ClientMessage, a3ebddd6e Configure, 60f4176e1 Expose, a05c26ab8 Key,
+163ce6cba Map, 84f907709 Motion, 5aeb28e5f Unmap), 85a5cdb58 SD; `XOpenImage` c5c027d39, ddacb98f9, ec4ca4cdd W, a6a1eaebf,
+e345a3177 E (most of its lines are unreached: evidence is obj_modulo); 6529df770 SD `XCreateStippleBitmap`; 44d6685b6 E
+`DisplayImages`. Functions in the review: Bumpy 22 -> 19, Complex 28 -> 24, Large 26 -> 21; function count 176 -> 202.
+- **Plateau at 2.68:** stubbing `XDisplayImage`'s setup and loop gave 2.74 on the unchanged file but, with the real setup
+  helpers added, the same stub stayed 2.68 (a real chain adds lines); with the real 12-step setup chain `XDisplayImage` ends at
+  cc 131, bumps 7, 1,114 lines, still 2.68, so it was not committed (no raise probed: rule 2). Near-twin window helpers are a
+  cliff (two or more of the info, command, widget and popup helpers cost -0.06); `XInitializeMagnifyWindow` is exactly 70
+  lines (Large, -0.07). The remaining setup, tables and loop need a hoist of the automatic `const char *const` menu tables (a
+  new recipe on Recipe F) plus about 25 more steps. Rejected (flat or capped at five arguments): `XDrawEditImage` info/clamp
+  helpers (cc 64 -> 59, bumps unchanged), an `XTranslateImage` refresh helper, `XTrimImage` scans (twin clones),
+  `XVisualDirectoryImage` and `XDisplayBackgroundImage` (statics, five or more parameters); `XMagickCommand` (87 cases):
+  stubbing 40 of them gives 2.74, so about 40 helpers plus SD chains would be needed.
+- Possible upstream: `XOpenImage` leaks `image_info` and `exception` on the early `return` after the grab-delay dialog and
+  on `text == NULL` (its early returns also skip the final `DestroyExceptionInfo` and `DestroyImageInfo`); `XDisplayImage`'s
+  setup `status=XMakeImage(...)` for the magnify window is read only by the first ConfigureNotify, so an extracted
+  `XMakeDisplayImages` must keep returning it.
