@@ -7204,6 +7204,57 @@ static void XDrawButtonRelease(const DrawEditContext *context,
       ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
 }
 
+static void XDrawMotion(const DrawEditContext *context,
+  const DrawShapeInput *shape,const XEvent event,
+  const DrawShapeTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const ElementType
+    element = shape->element;
+
+  XSegment
+    *const line_info = targets->line_info;
+
+  RectangleInfo
+    *const rectangle_info = targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = targets->coordinate_info;
+
+  int
+    *const number_coordinates = targets->number_coordinates;
+
+  unsigned int
+    *const max_coordinates = targets->max_coordinates;
+
+  if (event.xmotion.window != windows->image.id)
+    return;
+  if (element != PointElement)
+    {
+      (*line_info).x2=event.xmotion.x;
+      (*line_info).y2=event.xmotion.y;
+      (*rectangle_info).x=(ssize_t) event.xmotion.x;
+      (*rectangle_info).y=(ssize_t) event.xmotion.y;
+      return;
+    }
+  (*coordinate_info)[(*number_coordinates)].x=event.xbutton.x;
+  (*coordinate_info)[(*number_coordinates)].y=event.xbutton.y;
+  (*number_coordinates)++;
+  if ((*number_coordinates) < (int) (*max_coordinates))
+    return;
+  (*max_coordinates)<<=1;
+  (*coordinate_info)=(XPoint *) ResizeQuantumMemory((*coordinate_info),
+    (*max_coordinates),sizeof(*(*coordinate_info)));
+  if ((*coordinate_info) == (XPoint *) NULL)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7672,27 +7723,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
           break;
         case MotionNotify:
         {
-          if (event.xmotion.window != windows->image.id)
-            break;
-          if (element != PointElement)
-            {
-              line_info.x2=event.xmotion.x;
-              line_info.y2=event.xmotion.y;
-              rectangle_info.x=(ssize_t) event.xmotion.x;
-              rectangle_info.y=(ssize_t) event.xmotion.y;
-              break;
-            }
-          coordinate_info[number_coordinates].x=event.xbutton.x;
-          coordinate_info[number_coordinates].y=event.xbutton.y;
-          number_coordinates++;
-          if (number_coordinates < (int) max_coordinates)
-            break;
-          max_coordinates<<=1;
-          coordinate_info=(XPoint *) ResizeQuantumMemory(coordinate_info,
-            max_coordinates,sizeof(*coordinate_info));
-          if (coordinate_info == (XPoint *) NULL)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
+          XDrawMotion(&draw_context,&shape_input,event,&shape_targets);
           break;
         }
         default:
