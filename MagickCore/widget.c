@@ -3720,6 +3720,12 @@ typedef struct _ConfirmTargets
     *cancel_info,
     *dismiss_info,
     *yes_info;
+
+  size_t
+    *state;
+
+  int
+    *confirm;
 } ConfirmTargets;
 
 static void PressConfirmButton(Display *display,XWindows *windows,
@@ -3756,6 +3762,48 @@ static void PressConfirmButton(Display *display,XWindows *windows,
       (*yes_info).raised=MagickFalse;
       XDrawBeveledButton(display,&windows->widget,yes_info);
       return;
+    }
+}
+
+static void ReleaseConfirmButtons(Display *display,XWindows *windows,
+  const XEvent event,const ConfirmTargets *targets)
+{
+  XWidgetInfo
+    *const cancel_info = targets->cancel_info,
+    *const dismiss_info = targets->dismiss_info,
+    *const yes_info = targets->yes_info;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const confirm = targets->confirm;
+
+  ConfirmRelease
+    release;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  release.windows=windows;
+  release.event=event;
+  release.confirm=(confirm);
+  if ((*cancel_info).raised == MagickFalse)
+    {
+      (*state)=ReleaseConfirmChoice(&release,(*cancel_info),0,(*state));
+      (*cancel_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+    }
+  if ((*dismiss_info).raised == MagickFalse)
+    {
+      (*state)=ReleaseConfirmChoice(&release,(*dismiss_info),(-1),(*state));
+      (*dismiss_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+    }
+  if ((*yes_info).raised == MagickFalse)
+    {
+      (*state)=ReleaseConfirmChoice(&release,(*yes_info),1,(*state));
+      (*yes_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,yes_info);
     }
 }
 
@@ -3799,7 +3847,7 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
     window_changes;
 
   const ConfirmTargets
-    targets = { &cancel_info, &dismiss_info, &yes_info };
+    targets = { &cancel_info, &dismiss_info, &yes_info, &state, &confirm };
   /*
     Determine Confirm widget attributes.
   */
@@ -3936,32 +3984,7 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        ConfirmRelease
-          release;
-
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        release.windows=windows;
-        release.event=event;
-        release.confirm=(&confirm);
-        if (cancel_info.raised == MagickFalse)
-          {
-            state=ReleaseConfirmChoice(&release,cancel_info,0,state);
-            cancel_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-          }
-        if (dismiss_info.raised == MagickFalse)
-          {
-            state=ReleaseConfirmChoice(&release,dismiss_info,(-1),state);
-            dismiss_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-          }
-        if (yes_info.raised == MagickFalse)
-          {
-            state=ReleaseConfirmChoice(&release,yes_info,1,state);
-            yes_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&yes_info);
-          }
+        ReleaseConfirmButtons(display,windows,event,&targets);
         break;
       }
       case ClientMessage:
