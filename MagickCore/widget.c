@@ -2095,6 +2095,15 @@ typedef struct _ColorBrowserTargets
 
   unsigned int
     *visible_colors;
+
+  XWidgetInfo
+    *north_info;
+
+  size_t
+    *delay;
+
+  XWidgetInfo
+    *south_info;
 } ColorBrowserTargets;
 
 typedef struct _ColorBrowserContext
@@ -2470,6 +2479,56 @@ static void ReleaseColorBrowserButtons(const ColorBrowserContext *context,
     return;
 }
 
+static void ReleaseColorBrowserScroll(const ColorBrowserContext *context,
+  const XEvent event,const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info,
+    *const north_info = widgets->north_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  if ((*north_info).raised == MagickFalse)
+    {
+      /*
+        User released up button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*north_info).raised=MagickTrue;
+      XDrawTriangleNorth(display,&windows->widget,north_info);
+    }
+  if ((*south_info).raised == MagickFalse)
+    {
+      /*
+        User released down button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*south_info).raised=MagickTrue;
+      XDrawTriangleSouth(display,&windows->widget,south_info);
+    }
+  if ((*slider_info).active)
+    {
+      /*
+        Stop tracking slider.
+      */
+      (*slider_info).active=MagickFalse;
+      return;
+    }
+  ReleaseColorBrowserButtons(context,event,widgets);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2552,7 +2611,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const ColorBrowserTargets
     color_widgets = { &reply_info, &state,
       &grab_info, &reset_info, &action_info, &cancel_info, &slider_info,
-      &colors, &scroll_info, &visible_colors };
+      &colors, &scroll_info, &visible_colors, &north_info, &delay,
+      &south_info };
 
   ColorBrowserContext
     color_context;
@@ -3133,35 +3193,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        if (north_info.raised == MagickFalse)
-          {
-            /*
-              User released up button.
-            */
-            delay=SuspendTime << 2;
-            north_info.raised=MagickTrue;
-            XDrawTriangleNorth(display,&windows->widget,&north_info);
-          }
-        if (south_info.raised == MagickFalse)
-          {
-            /*
-              User released down button.
-            */
-            delay=SuspendTime << 2;
-            south_info.raised=MagickTrue;
-            XDrawTriangleSouth(display,&windows->widget,&south_info);
-          }
-        if (slider_info.active)
-          {
-            /*
-              Stop tracking slider.
-            */
-            slider_info.active=MagickFalse;
-            break;
-          }
-        ReleaseColorBrowserButtons(&color_context,event,&color_widgets);
+        ReleaseColorBrowserScroll(&color_context,event,&color_widgets);
         break;
       }
       case ClientMessage:
