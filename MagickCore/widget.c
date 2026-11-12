@@ -3715,6 +3715,22 @@ static void CheckColorBrowserReply(Display *display,XWindows *windows,
   (void) CopyMagickString(reply,"gray",MagickPathExtent);
 }
 
+static void FreeColorBrowserList(char **colorlist,size_t colors,
+  ExceptionInfo *exception)
+{
+  int
+    i;
+
+  /*
+    Free color list.
+  */
+  for (i=0; i < (int) colors; i++)
+    colorlist[i]=DestroyString(colorlist[i]);
+  if (colorlist != (char **) NULL)
+    colorlist=(char **) RelinquishMagickMemory(colorlist);
+  exception=DestroyExceptionInfo(exception);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3902,14 +3918,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
   XCheckRefreshWindows(display,windows);
-  /*
-    Free color list.
-  */
-  for (i=0; i < (int) colors; i++)
-    colorlist[i]=DestroyString(colorlist[i]);
-  if (colorlist != (char **) NULL)
-    colorlist=(char **) RelinquishMagickMemory(colorlist);
-  exception=DestroyExceptionInfo(exception);
+  FreeColorBrowserList(colorlist,colors,exception);
   CheckColorBrowserReply(display,windows,reply);
 }
 
