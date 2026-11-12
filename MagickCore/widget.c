@@ -4076,6 +4076,52 @@ static void HandleConfirmKeyEvent(Display *display,XWindows *windows,
   }
 }
 
+static void HandleConfirmEvent(Display *display,XWindows *windows,
+  const XEvent event,const ConfirmTargets *targets)
+{
+  size_t
+    *const state = targets->state;
+
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      PressConfirmButton(display,windows,event,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      ReleaseConfirmButtons(display,windows,event,targets);
+      break;
+    }
+    case ClientMessage:
+    {
+      (*state)=ClientWidgetMessage(display,windows,event,(*state));
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleConfirmKeyEvent(display,windows,event,targets);
+      break;
+    }
+  }
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -4189,44 +4235,7 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
       Wait for next event.
     */
     (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        PressConfirmButton(display,windows,event,&targets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        ReleaseConfirmButtons(display,windows,event,&targets);
-        break;
-      }
-      case ClientMessage:
-      {
-        state=ClientWidgetMessage(display,windows,event,state);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
-      default:
-      {
-        HandleConfirmKeyEvent(display,windows,event,&targets);
-        break;
-      }
-    }
+    HandleConfirmEvent(display,windows,event,&targets);
   } while ((state & ExitState) == 0);
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
