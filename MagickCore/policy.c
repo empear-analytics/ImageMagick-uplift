@@ -845,6 +845,8 @@ static char *AcquireCanonicalCandidate(const char *canonical_directory,
   size_t
     length;
 
+  if ((canonical_directory == (const char *) NULL) || (*filename == '\0'))
+    return((char *) NULL);
   length=strlen(canonical_directory)+strlen(filename)+2;
   canonical_candidate=(char *) AcquireCriticalMemory(length*
     sizeof(*canonical_candidate));
@@ -950,9 +952,8 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
             GetPathComponent(pattern,HeadPath,directory);
             GetPathComponent(pattern,TailPath,filename);
             canonical_directory=realpath_utf8(directory);
-            if ((canonical_directory != (char *) NULL) && (*filename != '\0'))
-              canonical_candidate=AcquireCanonicalCandidate(canonical_directory,
-                filename);
+            canonical_candidate=AcquireCanonicalCandidate(canonical_directory,
+              filename);
             canonical_path=realpath_utf8(pattern);
           }
         /*
