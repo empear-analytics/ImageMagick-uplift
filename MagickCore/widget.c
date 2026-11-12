@@ -8995,6 +8995,40 @@ static void PressFontBrowserReply(const FontBrowserContext *context,
     windows->widget.id,event.xbutton.time);
 }
 
+static void PressFontBrowserButtons(const FontBrowserContext *context,
+  const XEvent event,const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const back_info = widgets->back_info,
+    *const reset_info = widgets->reset_info;
+
+  if (MatteIsActive((*back_info),event.xbutton))
+    {
+      /*
+        User pressed Back button.
+      */
+      (*back_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,back_info);
+      return;
+    }
+  if (MatteIsActive((*reset_info),event.xbutton))
+    {
+      /*
+        User pressed Reset button.
+      */
+      (*reset_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,reset_info);
+      return;
+    }
+  PressFontBrowserReply(context,event,widgets);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9601,25 +9635,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
             SelectFontBrowserEntry(&press,glob_pattern,&targets);
             break;
           }
-        if (MatteIsActive(back_info,event.xbutton))
-          {
-            /*
-              User pressed Back button.
-            */
-            back_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&back_info);
-            break;
-          }
-        if (MatteIsActive(reset_info,event.xbutton))
-          {
-            /*
-              User pressed Reset button.
-            */
-            reset_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&reset_info);
-            break;
-          }
-        PressFontBrowserReply(&font_context,event,&font_widgets);
+        PressFontBrowserButtons(&font_context,event,&font_widgets);
         break;
       }
       case ButtonRelease:
