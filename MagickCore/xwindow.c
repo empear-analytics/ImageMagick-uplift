@@ -4599,6 +4599,18 @@ static MagickBooleanType XGetWindowColormap(const WindowColormapInput *input,
   return(MagickTrue);
 }
 
+static void XGetMaskShift(const unsigned long visual_mask,size_t *mask,
+  size_t *shift)
+{
+  (*mask)=visual_mask;
+  (*shift)=0;
+  while (((*mask) != 0) && (((*mask) & 0x01) == 0))
+  {
+    (*mask)>>=1;
+    (*shift)++;
+  }
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4854,27 +4866,11 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
             /*
               Determine shift and mask for red, green, and blue.
             */
-            red_mask=window_info[id].visual->red_mask;
-            red_shift=0;
-            while ((red_mask != 0) && ((red_mask & 0x01) == 0))
-            {
-              red_mask>>=1;
-              red_shift++;
-            }
-            green_mask=window_info[id].visual->green_mask;
-            green_shift=0;
-            while ((green_mask != 0) && ((green_mask & 0x01) == 0))
-            {
-              green_mask>>=1;
-              green_shift++;
-            }
-            blue_mask=window_info[id].visual->blue_mask;
-            blue_shift=0;
-            while ((blue_mask != 0) && ((blue_mask & 0x01) == 0))
-            {
-              blue_mask>>=1;
-              blue_shift++;
-            }
+            XGetMaskShift(window_info[id].visual->red_mask,&red_mask,&red_shift);
+            XGetMaskShift(window_info[id].visual->green_mask,&green_mask,
+              &green_shift);
+            XGetMaskShift(window_info[id].visual->blue_mask,&blue_mask,
+              &blue_shift);
             /*
               Convert X image to DirectClass packets.
             */
