@@ -394,6 +394,14 @@ static size_t GetTypeScore(const TypeInfo *p,const StyleType style,
   return(score);
 }
 
+static MagickBooleanType IsFamilyMismatch(const char *name,const char *family)
+{
+  if (family == (const char *) NULL)
+    return(((LocaleCompare(name,"arial") != 0) &&
+      (LocaleCompare(name,"helvetica") != 0)) ? MagickTrue : MagickFalse);
+  return(LocaleCompare(name,family) != 0 ? MagickTrue : MagickFalse);
+}
+
 static const TypeInfo *GetExactTypeInfo(const char *family,
   const StyleType style,const StretchType stretch,const size_t font_weight)
 {
@@ -412,21 +420,11 @@ static const TypeInfo *GetExactTypeInfo(const char *family,
         p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
         continue;
       }
-    if (family == (const char *) NULL)
+    if (IsFamilyMismatch(p->family,family) != MagickFalse)
       {
-        if ((LocaleCompare(p->family,"arial") != 0) &&
-            (LocaleCompare(p->family,"helvetica") != 0))
-          {
-            p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
-            continue;
-          }
+        p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
+        continue;
       }
-    else
-      if (LocaleCompare(p->family,family) != 0)
-        {
-          p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
-          continue;
-        }
     if (IsStyleMismatch(p,style) != MagickFalse)
       {
         p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
@@ -508,21 +506,11 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
         p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
         continue;
       }
-    if (family == (const char *) NULL)
+    if (IsFamilyMismatch(p->family,family) != MagickFalse)
       {
-        if ((LocaleCompare(p->family,"arial") != 0) &&
-            (LocaleCompare(p->family,"helvetica") != 0))
-          {
-            p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
-            continue;
-          }
+        p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
+        continue;
       }
-    else
-      if (LocaleCompare(p->family,family) != 0)
-        {
-          p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
-          continue;
-        }
     score=GetTypeScore(p,style,stretch,font_weight);
     if (score > max_score)
       {
@@ -539,15 +527,8 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   */
   for (i=0; i < (ssize_t) (sizeof(fontmap)/sizeof(fontmap[0])); i++)
   {
-    if (family == (const char *) NULL)
-      {
-        if ((LocaleCompare(fontmap[i].name,"arial") != 0) &&
-            (LocaleCompare(fontmap[i].name,"helvetica") != 0))
-          continue;
-      }
-    else
-      if (LocaleCompare(fontmap[i].name,family) != 0)
-        continue;
+    if (IsFamilyMismatch(fontmap[i].name,family) != MagickFalse)
+      continue;
     type_info=GetTypeInfoByFamily(fontmap[i].substitute,style,stretch,weight,
       exception);
     break;
