@@ -447,6 +447,46 @@ static const TypeInfo *GetExactTypeInfo(const char *family,
   return(type_info);
 }
 
+static const TypeInfo *GetBestFamilyTypeInfo(const char *family,
+  const StyleType style,const StretchType stretch,const size_t font_weight)
+{
+  const TypeInfo
+    *p,
+    *type_info;
+
+  size_t
+    max_score,
+    score;
+
+  type_info=(const TypeInfo *) NULL;
+  max_score=0;
+  LockSemaphoreInfo(type_semaphore);
+  ResetSplayTreeIterator(type_cache);
+  p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
+  while (p != (const TypeInfo *) NULL)
+  {
+    if (p->family == (char *) NULL)
+      {
+        p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
+        continue;
+      }
+    if (IsFamilyMismatch(p->family,family) != MagickFalse)
+      {
+        p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
+        continue;
+      }
+    score=GetTypeScore(p,style,stretch,font_weight);
+    if (score > max_score)
+      {
+        max_score=score;
+        type_info=p;
+      }
+    p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
+  }
+  UnlockSemaphoreInfo(type_semaphore);
+  return(type_info);
+}
+
 MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   const StyleType style,const StretchType stretch,const size_t weight,
   ExceptionInfo *exception)
@@ -459,13 +499,10 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   } Fontmap;
 
   const TypeInfo
-    *p,
     *type_info;
 
   size_t
-    font_weight,
-    max_score,
-    score;
+    font_weight;
 
   ssize_t
     i;
@@ -495,31 +532,7 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   /*
     Check for types in the same family.
   */
-  max_score=0;
-  LockSemaphoreInfo(type_semaphore);
-  ResetSplayTreeIterator(type_cache);
-  p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
-  while (p != (const TypeInfo *) NULL)
-  {
-    if (p->family == (char *) NULL)
-      {
-        p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
-        continue;
-      }
-    if (IsFamilyMismatch(p->family,family) != MagickFalse)
-      {
-        p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
-        continue;
-      }
-    score=GetTypeScore(p,style,stretch,font_weight);
-    if (score > max_score)
-      {
-        max_score=score;
-        type_info=p;
-      }
-    p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
-  }
-  UnlockSemaphoreInfo(type_semaphore);
+  type_info=GetBestFamilyTypeInfo(family,style,stretch,font_weight);
   if (type_info != (const TypeInfo *) NULL)
     return(type_info);
   /*
