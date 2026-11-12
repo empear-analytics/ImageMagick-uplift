@@ -5096,6 +5096,63 @@ static void HandleDialogEvent(const DialogContext *context,
   }
 }
 
+typedef struct _DialogLayout
+{
+  Display
+    *display;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    width,
+    height;
+
+  const char
+    *query;
+
+  char
+    *reply;
+} DialogLayout;
+
+static void PositionDialogWidget(XWindows *windows,
+  const DialogLayout *layout)
+{
+  Display
+    *const display = layout->display;
+
+  XFontStruct
+    *const font_info = layout->font_info;
+
+  const unsigned int
+    width = layout->width,
+    height = layout->height;
+
+  const char
+    *const query = layout->query;
+
+  char
+    *const reply = layout->reply;
+
+  /*
+    Position Dialog widget.
+  */
+  windows->widget.width=(unsigned int) MagickMax((int) (2*width),(int)
+    WidgetTextWidth(font_info,(char *) query));
+  if (windows->widget.width < WidgetTextWidth(font_info,reply))
+    windows->widget.width=WidgetTextWidth(font_info,reply);
+  windows->widget.width+=(unsigned int) (6*QuantumMargin);
+  windows->widget.min_width=(unsigned int)
+    ((int) width+28*XTextWidth(font_info,"#",1)+4*QuantumMargin);
+  if (windows->widget.width < windows->widget.min_width)
+    windows->widget.width=windows->widget.min_width;
+  windows->widget.height=(unsigned int) (7*(int) height+(QuantumMargin << 1));
+  windows->widget.min_height=windows->widget.height;
+  if (windows->widget.height < windows->widget.min_height)
+    windows->widget.height=windows->widget.min_height;
+  XConstrainWindowPosition(display,&windows->widget);
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -5142,6 +5199,9 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   DialogContext
     context;
 
+  DialogLayout
+    layout;
+
   /*
     Determine Dialog widget attributes.
   */
@@ -5159,23 +5219,13 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
     width=WidgetTextWidth(font_info,CancelButtonText);
   width+=(unsigned int) (3*QuantumMargin) >> 1;
   height=(unsigned int) (font_info->ascent+font_info->descent);
-  /*
-    Position Dialog widget.
-  */
-  windows->widget.width=(unsigned int) MagickMax((int) (2*width),(int)
-    WidgetTextWidth(font_info,(char *) query));
-  if (windows->widget.width < WidgetTextWidth(font_info,reply))
-    windows->widget.width=WidgetTextWidth(font_info,reply);
-  windows->widget.width+=(unsigned int) (6*QuantumMargin);
-  windows->widget.min_width=(unsigned int)
-    ((int) width+28*XTextWidth(font_info,"#",1)+4*QuantumMargin);
-  if (windows->widget.width < windows->widget.min_width)
-    windows->widget.width=windows->widget.min_width;
-  windows->widget.height=(unsigned int) (7*(int) height+(QuantumMargin << 1));
-  windows->widget.min_height=windows->widget.height;
-  if (windows->widget.height < windows->widget.min_height)
-    windows->widget.height=windows->widget.min_height;
-  XConstrainWindowPosition(display,&windows->widget);
+  layout.display=display;
+  layout.font_info=font_info;
+  layout.width=width;
+  layout.height=height;
+  layout.query=query;
+  layout.reply=reply;
+  PositionDialogWidget(windows,&layout);
   /*
     Map Dialog widget.
   */
