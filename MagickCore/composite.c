@@ -4620,11 +4620,50 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
   }
 }
 
-static void CompositeImageChannels(const CompositeRowInputs *row,
-  const CompositePixelInputs *authentic,Quantum *magick_restrict q)
+typedef struct _CompositeChannelTail
 {
+  const CompositeRowInputs
+    *row;
+
+  const CompositePixelInputs
+    *authentic;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    i;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    traits,
+    source_traits;
+} CompositeChannelTail;
+
+static void CompositeSourceChannel(const CompositeChannelTail *tail)
+{
+  const CompositeRowInputs
+    *const row = tail->row;
+
+  const CompositePixelInputs
+    *const authentic = tail->authentic;
+
+  Quantum
+    *magick_restrict q = tail->q;
+
+  const ssize_t
+    i = tail->i;
+
+  const PixelChannel
+    channel = tail->channel;
+
+  const PixelTrait
+    source_traits = tail->source_traits,
+    traits = tail->traits;
+
   Image
-    *const image = row->image,
     *const source_image = row->source_image;
 
   const CompositeOperator
@@ -4650,13 +4689,64 @@ static void CompositeImageChannels(const CompositeRowInputs *row,
     Sc = 0.0,
     Sca = 0.0;
 
+  CompositeChannelInputs
+    tile;
+
+  MagickRealType
+    pixel = 0.0;
+
+  if (source_traits == UndefinedPixelTrait)
+    return;
+  /*
+    Sc: source color.
+    Dc: canvas color.
+  */
+  Sc=(MagickRealType) GetPixelChannel(source_image,channel,p);
+  Dc=(MagickRealType) q[i];
+  if ((traits & CopyPixelTrait) != 0)
+    {
+      /*
+        Copy channel.
+      */
+      q[i]=ClampToQuantum(Dc);
+      return;
+    }
+  /*
+    Porter-Duff compositions:
+      Sca: source normalized color multiplied by alpha.
+      Dca: normalized canvas color multiplied by alpha.
+  */
+  Sca=QuantumScale*Sa*Sc;
+  Dca=QuantumScale*Da*Dc;
+  gamma=GetCompositeGamma(compose,alpha);
+  pixel=Dc;
+  tile.channel=channel;
+  tile.Dc=Dc;
+  tile.Dca=Dca;
+  tile.Sc=Sc;
+  tile.Sca=Sca;
+  tile.gamma=gamma;
+  CompositeChannelColor(row,authentic,&tile,&pixel);
+  q[i]=clamp != MagickFalse ? ClampPixel(pixel) : ClampToQuantum(pixel);
+}
+
+static void CompositeImageChannels(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,Quantum *magick_restrict q)
+{
+  Image
+    *const image = row->image,
+    *const source_image = row->source_image;
+
+  const MagickBooleanType
+    clamp = row->clamp;
+
   ssize_t
     i;
 
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    CompositeChannelInputs
-      tile;
+    CompositeChannelTail
+      tail;
 
     MagickRealType
       pixel = 0.0;
@@ -4677,39 +4767,14 @@ static void CompositeImageChannels(const CompositeRowInputs *row,
           ClampToQuantum(pixel);
         continue;
       }
-    if (source_traits == UndefinedPixelTrait)
-      continue;
-    /*
-      Sc: source color.
-      Dc: canvas color.
-    */
-    Sc=(MagickRealType) GetPixelChannel(source_image,channel,p);
-    Dc=(MagickRealType) q[i];
-    if ((traits & CopyPixelTrait) != 0)
-      {
-        /*
-          Copy channel.
-        */
-        q[i]=ClampToQuantum(Dc);
-        continue;
-      }
-    /*
-      Porter-Duff compositions:
-        Sca: source normalized color multiplied by alpha.
-        Dca: normalized canvas color multiplied by alpha.
-    */
-    Sca=QuantumScale*Sa*Sc;
-    Dca=QuantumScale*Da*Dc;
-    gamma=GetCompositeGamma(compose,alpha);
-    pixel=Dc;
-    tile.channel=channel;
-    tile.Dc=Dc;
-    tile.Dca=Dca;
-    tile.Sc=Sc;
-    tile.Sca=Sca;
-    tile.gamma=gamma;
-    CompositeChannelColor(row,authentic,&tile,&pixel);
-    q[i]=clamp != MagickFalse ? ClampPixel(pixel) : ClampToQuantum(pixel);
+    tail.row=row;
+    tail.authentic=authentic;
+    tail.q=q;
+    tail.i=i;
+    tail.channel=channel;
+    tail.traits=traits;
+    tail.source_traits=source_traits;
+    CompositeSourceChannel(&tail);
   }
 }
 
