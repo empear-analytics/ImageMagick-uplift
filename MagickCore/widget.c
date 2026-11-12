@@ -3326,6 +3326,51 @@ static void RedrawColorBrowserAction(const ColorBrowserContext *context,
     }
 }
 
+static MagickBooleanType ReloadColorList(const ColorBrowserContext *context,
+  const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern,
+    *const reset_pattern = context->reset_pattern;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    *const reply = context->reply;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  size_t
+    *const colors = widgets->colors;
+
+  char
+    ***const colorlist = widgets->colorlist;
+
+  const ColorBrowserUpdateTargets
+    update_targets = { action_info, colorlist, colors };
+
+  ColorBrowserUpdate
+    update;
+
+  update.display=display;
+  update.windows=windows;
+  update.reply=reply;
+  update.glob_pattern=glob_pattern;
+  update.reset_pattern=reset_pattern;
+  update.exception=exception;
+  if (UpdateColorBrowserList(&update,&update_targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3521,19 +3566,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     RedrawColorBrowserWidget(&color_context,&color_widgets);
     if (state & UpdateListState)
       {
-        const ColorBrowserUpdateTargets
-          update_targets = { &action_info, &colorlist, &colors };
-        
-        ColorBrowserUpdate
-          update;
-
-        update.display=display;
-        update.windows=windows;
-        update.reply=reply;
-        update.glob_pattern=glob_pattern;
-        update.reset_pattern=reset_pattern;
-        update.exception=exception;
-        if (UpdateColorBrowserList(&update,&update_targets) == MagickFalse)
+        if (ReloadColorList(&color_context,&color_widgets) == MagickFalse)
           break;
         /*
           Sort color list in ascending order.
