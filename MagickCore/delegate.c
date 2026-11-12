@@ -2278,6 +2278,13 @@ static MagickBooleanType AcquireDelegateOutputFilename(ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsDelegateNameDenied(const char *name)
+{
+  return(((name != (const char *) NULL) &&
+    (IsRightsAuthorized(DelegatePolicyDomain,ExecutePolicyRights,name) ==
+     MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
 static char **DestroyDelegateCommands(char **commands,ssize_t i)
 {
   for ( ; commands[i] != (char *) NULL; i++)
@@ -2300,9 +2307,6 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
     status,
     temporary;
 
-  PolicyRights
-    rights;
-
   ssize_t
     i;
 
@@ -2315,12 +2319,9 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  rights=ExecutePolicyRights;
-  if ((decode != (const char *) NULL) &&
-      (IsRightsAuthorized(DelegatePolicyDomain,rights,decode) == MagickFalse))
+  if (IsDelegateNameDenied(decode) != MagickFalse)
     ThrowPolicyException(decode,MagickFalse);
-  if ((encode != (const char *) NULL) &&
-      (IsRightsAuthorized(DelegatePolicyDomain,rights,encode) == MagickFalse))
+  if (IsDelegateNameDenied(encode) != MagickFalse)
     ThrowPolicyException(encode,MagickFalse);
   temporary=(*image->filename == '\0') ? MagickTrue : MagickFalse;
   if ((temporary != MagickFalse) && (AcquireUniqueFilename(image->filename) ==
