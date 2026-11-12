@@ -461,20 +461,16 @@ static void *DestroyTemporaryResources(void *temporary_resource)
   return((void *) NULL);
 }
 
-MagickExport int AcquireUniqueFileResource(char *path)
+static void FillPathTemplate(char *path,const size_t length)
 {
-  int
-    c,
-    file;
-
   char
     *p;
 
-  MagickBooleanType
-    status;
+  int
+    c;
 
   ssize_t
-    i;
+    j;
 
   static const char
     portable_filename[65] =
@@ -483,11 +479,33 @@ MagickExport int AcquireUniqueFileResource(char *path)
   StringInfo
     *key;
 
-  struct stat
-    *attributes;
-
   unsigned char
     *datum;
+
+  key=GetRandomKey(random_info,length);
+  p=path+strlen(path)-strlen(MagickPathTemplate);
+  datum=GetStringInfoDatum(key);
+  for (j=0; j < (ssize_t) GetStringInfoLength(key); j++)
+  {
+    c=(int) (datum[j] & 0x3f);
+    *p++=portable_filename[c];
+  }
+  key=DestroyStringInfo(key);
+}
+
+MagickExport int AcquireUniqueFileResource(char *path)
+{
+  int
+    file;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    i;
+
+  struct stat
+    *attributes;
 
   assert(path != (char *) NULL);
   if ((GetLogEventMask() & ResourceEvent) != 0)
@@ -504,22 +522,11 @@ MagickExport int AcquireUniqueFileResource(char *path)
   file=(-1);
   for (i=0; i < (ssize_t) TMP_MAX; i++)
   {
-    ssize_t
-      j;
-
     /*
       Get temporary pathname.
     */
     (void) GetPathTemplate(path);
-    key=GetRandomKey(random_info,strlen(MagickPathTemplate)-6);
-    p=path+strlen(path)-strlen(MagickPathTemplate);
-    datum=GetStringInfoDatum(key);
-    for (j=0; j < (ssize_t) GetStringInfoLength(key); j++)
-    {
-      c=(int) (datum[j] & 0x3f);
-      *p++=portable_filename[c];
-    }
-    key=DestroyStringInfo(key);
+    FillPathTemplate(path,strlen(MagickPathTemplate)-6);
 #if defined(MAGICKCORE_HAVE_MKSTEMP)
     file=mkstemp(path);
     if (file != -1)
@@ -533,15 +540,7 @@ MagickExport int AcquireUniqueFileResource(char *path)
         break;
       }
 #endif
-    key=GetRandomKey(random_info,strlen(MagickPathTemplate));
-    p=path+strlen(path)-strlen(MagickPathTemplate);
-    datum=GetStringInfoDatum(key);
-    for (j=0; j < (ssize_t) GetStringInfoLength(key); j++)
-    {
-      c=(int) (datum[j] & 0x3f);
-      *p++=portable_filename[c];
-    }
-    key=DestroyStringInfo(key);
+    FillPathTemplate(path,strlen(MagickPathTemplate));
     file=open_utf8(path,O_RDWR | O_CLOEXEC | O_CREAT | O_EXCL | O_BINARY | O_NOFOLLOW,
       S_MODE);
     if ((file >= 0) || (errno != EEXIST))
