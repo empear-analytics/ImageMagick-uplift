@@ -9734,10 +9734,14 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
 2. Align the copies by script (whitespace ignored; no variable renamed). Where they
    differ, each differing run is one of three roles: (a) a literal or enumeration
    constant, as Recipe SC step 2; (b) the whole controlling expression's operand that the
-   block evaluates first and unconditionally (the `x` of a leading `if ((x & M) != 0)`),
-   a call of a function with no side effect or a read of an object the block does not
-   write; (c) the member designator of one lvalue `e.m`, the same base `e` in every copy,
-   which the block reads or assigns and does not take the address of. The lvalues of the
+   block evaluates first and unconditionally (the `x` of a leading `if ((x & M) != 0)`, or
+   the right operand of the block's first statement, `visual_info->red_mask` of
+   `map_info->red_max=visual_info->red_mask;`, 2026-11-12), a call of a function with no
+   side effect or a read of an object the block does not write; (c) the member designator
+   of one lvalue `e.m`, the same base `e` in every copy, which the block reads or assigns
+   and does not take the address of. A copy may name two such lvalues `e.m1` and `e.m2`
+   of one base `e` (2026-11-12), two different members, each with its own declared type
+   `T1`, `T2` and its own pointer parameter. The lvalues of the
    copies may also differ in a member of the chain before the last, when each is a chain
    of member selections through one pointer variable the copies share (`windows->popup.mapped`,
    `windows->widget.mapped`: `windows->M.mapped`), with no call and no subscript in it
@@ -9746,8 +9750,9 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
 3. Write one `static void` function directly above the caller (or in place of step 1's
    helper): its parameters are the variables a copy reads, or the input struct the
    copies already read, then one parameter per role (a) of the constant's type (Recipe
-   SC step 3), one per role (b) of the expression's type, and `T *value` for role (c),
-   at most four in all (roles (a) beyond that in Recipe SC's `const` struct).
+   SC step 3), one per role (b) of the expression's type, and `T *value` for role (c)
+   (`T1 *value1,T2 *value2` for two lvalues), at most four in all (roles (a) beyond that in
+   Recipe SC's `const` struct).
 4. Its body is one copy's text with each role (a) and (b) run replaced by its
    parameter's name and every `e.m` of role (c) by `(*value)`, nothing else changed;
    bindings of an input struct stay as they were.
@@ -9830,6 +9835,10 @@ static void EqualizeColormapValue(const EqualizeColors *colors,
   a pointer variable already holding a valid object (the copy read `windows->popup.id` to
   reach the block), so computing the address reads nothing the copy did not read and
   `(*value)` reads and writes that object where the copy did.
+- Role (c) with two lvalues (2026-11-12): `&e.m1` and `&e.m2` are the addresses of two
+  different members of one object, so the two pointers never alias; the copy read and
+  wrote each member where `(*value1)` and `(*value2)` now do, in the same order, and its
+  casts and conversions between them stay in the body as written.
 - Role (c): `&e.m` is the address of the member the copy named, so `(*value)` reads and
   writes the very object `e.m` did, in the same order, with the same type `T`. Computing
   the address reads no member; the base `e` (`image->colormap[j]`) must designate an
@@ -9858,7 +9867,10 @@ evolve the recipes. Step 2 (c) amended 2026-11-11 (W18 lane a) from `widget.c`'s
 `XScreenEvent`: its popup block sets `windows->popup.mapped` on MapNotify and UnmapNotify,
 and the existing helper `XScreenTrackWidgetMapping` is the same two tests on
 `windows->widget.mapped`; the helper takes the flag by pointer and serves both (no new
-function), the function leaves *Bumpy Road Ahead* (probe 3.04 to 3.06).
+function), the function leaves *Bumpy Road Ahead* (probe 3.04 to 3.06). Step 2 (b) and (c) amended again 2026-11-12 (W18 lane a) from `xwindow.c`'s
+`XGetMapInfo`: its three mask blocks assign `map_info-><c>_max` from `visual_info-><c>_mask`
+and update `map_info-><c>_mult` beside it, so each copy names two lvalues and reads the
+mask first; one helper serves the three and the function leaves Bumpy Road Ahead and Complex Method.
 
 ---
 
@@ -12342,3 +12354,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | WORDING | CR | Step 4: the targets struct comes after the input struct and before a by-value parameter that the block reads and then writes (`XAnnotateKeyPress`'s `key_symbol`, assigned by its `XK_bracketleft` group), instead of "last" | `display.c`'s `XAnnotateEditImage`: its CR helpers take `(text_input, targets, value)`; the first wording would have put `key_symbol` before `targets` | owner |
 | 2026-11-12 | AMEND | E | Step 4: a temporary the block writes before it reads, that nothing after the block reads, whose only use left in the caller would be a store before the block (so that declaring it in the new function leaves the store set but never used, `-Wunused-but-set-variable`), passes as a pointer `T *v` on Recipe O step 2's last paragraph's terms: every use `(*v)`, `&v` to a callee written `v`, the call passing `&v`, the function still returning its one value | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W18 lane a, wide build), reached by no case, so Recipe O is not available there: its matte row loop writes `q` (returned) and the column counter `x`, whose caller store `x=0;` nothing else reads once the XYBitmap and matte loops have left; taking both loops out of the function ends its Deep, Nested Complexity (probe: 2.03 to 2.06, with the LSB twin 1.99 to 2.03) | owner |
 | 2026-11-12 | AMEND | I | Step 2: a block-scope `static` of the caller (arithmetic, enumeration or pointer type, not an array) whose address the caller takes only in the targets initialiser may be a written variable, on Recipe CT step 2's and Recipe O step 2's terms; *Careful* repeats their argument (one object of static storage duration at one address, nothing copied, same exits) | `xwindow.c`'s `XGetWindowImage` (campaign A, W18 lane a, wide build): its colormap block writes `number_colors`, `colors` and the `static` `colormap_info`, leaves through `return((Image *) NULL);` on two paths, and holds the function at depth 5; I step 2 refused the static (CT and O already admit it) | owner |
+| 2026-11-12 | AMEND | MA | Step 2: role (b) may be the right operand of the block's first statement (a read the block does not write); role (c) may name two lvalues `e.m1` and `e.m2` of one base, each with its own pointer parameter (step 3 lists `T1 *value1,T2 *value2`); *Careful* gives the argument (two different members never alias) | `xwindow.c`'s `XGetMapInfo` (campaign A, W18 lane a, wide build): its red, green and blue blocks each assign `map_info->X_max` from `visual_info->X_mask`, set `map_info->X_mult` and loop shifting both; one lvalue per copy refused them, so the three loops stayed (Bumpy Road Ahead, 3 bumps, and Complex Method, cc 11) | owner |
