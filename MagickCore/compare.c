@@ -288,9 +288,6 @@ MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
       *magick_restrict p,
       *magick_restrict q;
 
-    CompareHighlightRow
-      row;
-
     MagickBooleanType
       sync;
 
@@ -307,14 +304,13 @@ MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
         status=MagickFalse;
         continue;
       }
-    row.image=image;
-    row.reconstruct_image=reconstruct_image;
-    row.highlight_image=highlight_image;
-    row.highlight=highlight;
-    row.lowlight=lowlight;
-    row.masklight=masklight;
-    row.columns=columns;
-    HighlightCompareRow(&row,p,q,r);
+    {
+      const CompareHighlightRow
+        row = { image, reconstruct_image, highlight_image, highlight, lowlight,
+          masklight, columns };
+
+      HighlightCompareRow(&row,p,q,r);
+    }
     sync=SyncCacheViewAuthenticPixels(highlight_view,exception);
     if (sync == MagickFalse)
       status=MagickFalse;
