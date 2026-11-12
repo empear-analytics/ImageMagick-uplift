@@ -69,6 +69,7 @@ $call Make effect.c
 $call Make effect-filter.c
 $call Make effect-preview.c
 $call Make effect-blur.c
+$call Make effect-blur-adaptive.c
 $call Make enhance.c
 $call Make enhance-clahe.c
 $call Make enhance-tone.c
