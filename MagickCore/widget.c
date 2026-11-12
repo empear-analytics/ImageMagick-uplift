@@ -8531,7 +8531,8 @@ typedef struct _FontBrowserWidgets
     ***fontlist;
 
   XWidgetInfo
-    *list_info;
+    *list_info,
+    *mode_info;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -8556,6 +8557,9 @@ typedef struct _FontBrowserContext
 
   unsigned int
     width;
+
+  char
+    *reply;
 } FontBrowserContext;
 
 static void ClientFontBrowserMessage(const FontBrowserContext *context,
@@ -9211,6 +9215,54 @@ static void InitializeFontBrowserButtons(const FontBrowserContext *context,
   (*reset_info).y=(*back_info).y+(int) (*back_info).height+QuantumMargin;
 }
 
+static void InitializeFontBrowserReply(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height,
+    width = context->width;
+
+  char
+    *const reply = context->reply;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const action_info = widgets->action_info;
+
+  XFontStruct
+    *const font_info = *widgets->font_info;
+
+  XWidgetInfo
+    *const mode_info = widgets->mode_info;
+
+  /*
+    Initialize reply information.
+  */
+  XGetWidgetInfo(reply,reply_info);
+  (*reply_info).raised=MagickFalse;
+  (*reply_info).bevel_width--;
+  (*reply_info).width=(unsigned int) ((int) windows->widget.width-(int)
+    width-((6*QuantumMargin) >> 1));
+  (*reply_info).height=height << 1;
+  (*reply_info).x=(int) width+(QuantumMargin << 1);
+  (*reply_info).y=(*action_info).y-(int) ((*action_info).height << 1)-
+    QuantumMargin;
+  /*
+    Initialize mode information.
+  */
+  XGetWidgetInfo(reply,mode_info);
+  (*mode_info).bevel_width=0;
+  (*mode_info).width=(unsigned int)
+    ((*action_info).x-(*reply_info).x-QuantumMargin);
+  (*mode_info).height=(*action_info).height << 1;
+  (*mode_info).x=(*reply_info).x;
+  (*mode_info).y=(*action_info).y-(int) (*action_info).height+(int)
+    (*action_info).bevel_width;
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9284,7 +9336,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     font_widgets = { &reply_info, &state, &back_info,
       &reset_info, &action_info, &cancel_info, &slider_info, &fonts,
       &scroll_info, &visible_fonts, &north_info, &delay, &south_info, &i,
-      &font_info, &fontlist, &list_info };
+      &font_info, &fontlist, &list_info, &mode_info };
 
   FontBrowserContext
     font_context;
@@ -9409,6 +9461,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   font_context.height=height;
   font_context.action=action;
   font_context.width=width;
+  font_context.reply=reply;
   do
   {
     if (state & UpdateConfigurationState)
@@ -9417,29 +9470,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
           id;
 
         InitializeFontBrowserButtons(&font_context,&font_widgets);
-        /*
-          Initialize reply information.
-        */
-        XGetWidgetInfo(reply,&reply_info);
-        reply_info.raised=MagickFalse;
-        reply_info.bevel_width--;
-        reply_info.width=(unsigned int) ((int) windows->widget.width-(int)
-          width-((6*QuantumMargin) >> 1));
-        reply_info.height=height << 1;
-        reply_info.x=(int) width+(QuantumMargin << 1);
-        reply_info.y=action_info.y-(int) (action_info.height << 1)-
-          QuantumMargin;
-        /*
-          Initialize mode information.
-        */
-        XGetWidgetInfo(reply,&mode_info);
-        mode_info.bevel_width=0;
-        mode_info.width=(unsigned int)
-          (action_info.x-reply_info.x-QuantumMargin);
-        mode_info.height=action_info.height << 1;
-        mode_info.x=reply_info.x;
-        mode_info.y=action_info.y-(int) action_info.height+(int)
-          action_info.bevel_width;
+        InitializeFontBrowserReply(&font_context,&font_widgets);
         /*
           Initialize scroll information.
         */
