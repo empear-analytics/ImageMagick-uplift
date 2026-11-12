@@ -7627,6 +7627,84 @@ Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe RC - Extract a Case That Returns
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on
+a function whose `switch` has groups that either `return(R);` or `break;`, with the
+function ending in `return(F);` for one constant `F` after the `switch`
+(`policy.c`'s `SetMagickSecurityPolicyValue`: one group per policy domain, each testing
+a name and returning a status, `break;` for a name it does not know, and
+`return(MagickFalse);` after the `switch`).
+
+**Not covered by:** Recipe SR, which moves the `default` group and its neighbours into a
+function that still holds a `switch`; Recipe Z and Recipe O, which refuse a `return` in
+the block; Recipe E step 7, which moves the tail of a function and returns its value;
+Recipe SD, whose groups do not return.
+
+**How:**
+
+1. The `switch` is the last statement before `return(F);`, `F` a constant expression
+   (`MagickFalse`, `NULL`, `0`) with no side effect. Each group to move has its label
+   (or label pair), one compound block, and ends with `break;` (the group's last line)
+   or `return(R);`. It holds no `continue`, `goto` or `break` of an enclosing loop, no
+   `#pragma`, and no `break;` of the `switch` except that last line or one inside a
+   loop or `switch` of its own.
+2. The group writes no variable of the caller that anything reads after it: on every
+   path it ends in `return` or in the `break;` that reaches `return(F);`, so the caller
+   reads nothing afterwards.
+3. Cut the block, braces dropped and one indent level less, into a new `static` function
+   directly above the caller, of the caller's return type, taking as parameters the
+   variables the block reads (at most four; five or more is Recipe Z's case, not this
+   one). Its body ends with `return(F);` in the place of the `break;`. Every `return(R);`
+   stays. A variable the block alone declared goes with it.
+4. The group's place now holds `return(Helper(<arguments>));` after its label, the
+   arguments the variables the block read. The label stays in the `switch`.
+5. Why the behaviour is the same: where the group returned `R`, the helper returns `R`
+   and the caller returns it; where it broke, the caller would have returned `F` and the
+   helper returns `F`.
+
+**Before:**
+
+```c
+    case CachePolicyDomain:
+    {
+      if (LocaleCompare(name,"memory-map") == 0)
+        {
+          if (LocaleCompare(value,"anonymous") != 0)
+            return(MagickFalse);
+          ResetCacheAnonymousMemory();
+          return(MagickTrue);
+        }
+      break;
+    }
+```
+
+**After:**
+
+```c
+    case CachePolicyDomain:
+      return(SetCachePolicyValue(name,value));
+```
+
+**Careful:**
+
+- A helper that reads a variable the caller wrote inside the `switch` before the group
+  (step 2's complement) refuses the step: the parameters hold the value on entry.
+- Static data the block reads or writes (`policy_cache`) is visible to the helper in the
+  same file; the step does not move code between files.
+- No literal, call or test changes; calls to the helper are new calls, so
+  `refactor_guard.py` counts them as the new function's.
+
+**Evidence level:** oracle, for the function the step changes (`casemap.py` first).
+
+**Provenance:** 2026-11-12, from `policy.c`'s `SetMagickSecurityPolicyValue` (campaign B,
+M120): three domain groups to `SetCachePolicyValue`, `SetResourcePolicyValue` and
+`SetSystemPolicyValue`, the function leaving Large Method and Bumpy Road to 3 bumps, the
+file 5.29 to 5.45. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -7931,3 +8009,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-09 | NEW | EJ | Join an Else and its Sole If: `else` and the `if` on the next line become `else if` on one line, whitespace only; proof `obj_identical.sh` | `color.c`'s DOCTYPE skipper (extraction verbatim 4.24 to 4.09; with the chain joined 4.42) and the hex-digit loops of `QueryColorCompliance`; unbraced `else`/`if` nesting counts as a level for CodeScene | mandate (2026-10-24) |
 | 2026-11-12 | NEW | NG | Drop the `NULL` guard before a release routine that returns at once on `NULL` (`x=DestroyString(x)`); proof by reading the callee, evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (3 guards) and `DestroyPolicyElement` (4): a file at the 1,000-line limit loses 0.25 to *Lines of Code in a Single File* when an extraction adds lines; 4.58 to 4.88 with the guards gone | mandate (2026-10-24) |
 | 2026-11-12 | NEW | SF | Flatten a first-letter `switch` over `LocaleCompare` groups into an `if`/`else if` chain; evidence oracle | `policy.c`'s `SetPolicyInfoAttribute` (cc 20 to 7, 5.02 to 5.29); the same shape stands in seven other files | mandate (2026-10-24) |
+| 2026-11-12 | NEW | RC | Extract a switch group that returns `R` or breaks to a constant `return(F);` into a function ending in `return(F);`; evidence oracle | `policy.c`'s `SetMagickSecurityPolicyValue` (three domain groups; 5.29 to 5.45); SR and Z refuse a `return` in the group, E step 7 takes the tail only | mandate (2026-10-24) |
