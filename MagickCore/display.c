@@ -18626,14 +18626,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
               {
                 if (resource_info->immutable)
                   {
-                    /*
-                      Select a command from the Virtual menu.
-                    */
-                    entry=XMenuWidget(display,windows,"Commands",VirtualMenu,
-                      command);
-                    if (entry >= 0)
-                      nexus=XMagickCommand(display,resource_info,windows,
-                        VirtualCommands[entry],&display_image,exception);
+                    XSelectVirtualCommand(&event_context,&event_targets);
                     break;
                   }
                 if (display_image->montage != (char *) NULL)
