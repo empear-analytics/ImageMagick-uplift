@@ -1241,6 +1241,29 @@ static void SetPolicyInfoAttribute(PolicyInfo *policy_info,const char *keyword,
 }
 
 static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
+  const char *policy,const char *filename,const size_t depth);
+
+static MagickBooleanType LoadPolicyInclude(const PolicyLoadTarget *target,
+  const char *filename,const char *token,const size_t depth)
+{
+  char
+    path[MagickPathExtent],
+    *file_xml;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  GetIncludePath(filename,token,path);
+  file_xml=FileToXML(path,~0UL);
+  if (file_xml != (char *) NULL)
+    {
+      status=LoadPolicyCache(target,file_xml,path,depth+1);
+      file_xml=DestroyString(file_xml);
+    }
+  return(status);
+}
+
+static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
   const char *policy,const char *filename,const size_t depth)
 {
   LinkedListInfo
@@ -1348,22 +1371,8 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
                 (void) ThrowMagickException(exception,GetMagickModule(),
                   ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
               else
-                {
-                  const PolicyLoadTarget include_target = { cache, exception };
-
-                  char
-                    path[MagickPathExtent],
-                    *file_xml;
-
-                  GetIncludePath(filename,token,path);
-                  file_xml=FileToXML(path,~0UL);
-                  if (file_xml != (char *) NULL)
-                    {
-                      status&=(MagickStatusType) LoadPolicyCache(
-                        &include_target,file_xml,path,depth+1);
-                      file_xml=DestroyString(file_xml);
-                    }
-                }
+                status&=(MagickStatusType) LoadPolicyInclude(target,filename,
+                  token,depth);
             }
         }
         continue;
