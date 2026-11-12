@@ -2156,7 +2156,8 @@ typedef struct _VirtualCompositeInputs
     canvas_dissolve;
 
   MagickBooleanType
-    clamp;
+    clamp,
+    canvas_pixel;
 } VirtualCompositeInputs;
 
 static void SetVirtualDissolvePixel(const VirtualCompositeInputs *composite,
@@ -2218,6 +2219,20 @@ static MagickRealType GetVirtualCanvasPixel(const PixelChannel channel,
   return(pixel);
 }
 
+static const CompositeOperator
+  CanvasPixelOperators[] =
+  {
+    AlphaCompositeOp,
+    ChangeMaskCompositeOp,
+    CopyAlphaCompositeOp,
+    DstAtopCompositeOp,
+    DstInCompositeOp,
+    InCompositeOp,
+    OutCompositeOp,
+    SrcInCompositeOp,
+    SrcOutCompositeOp
+  };
+
 static inline void SetVirtualCompositeChannels(
   const VirtualCompositeInputs *composite,const Quantum *source,
   Quantum *magick_restrict q)
@@ -2237,27 +2252,10 @@ static inline void SetVirtualCompositeChannels(
     if ((traits == UndefinedPixelTrait) ||
         (source_traits == UndefinedPixelTrait))
       continue;
-    switch (composite->compose)
-    {
-      case AlphaCompositeOp:
-      case ChangeMaskCompositeOp:
-      case CopyAlphaCompositeOp:
-      case DstAtopCompositeOp:
-      case DstInCompositeOp:
-      case InCompositeOp:
-      case OutCompositeOp:
-      case SrcInCompositeOp:
-      case SrcOutCompositeOp:
-      {
-        pixel=GetVirtualCanvasPixel(channel,q,i);
-        break;
-      }
-      default:
-      {
-        SetVirtualSourcePixel(composite,channel,source,&pixel);
-        break;
-      }
-    }
+    if (composite->canvas_pixel != MagickFalse)
+      pixel=GetVirtualCanvasPixel(channel,q,i);
+    else
+      SetVirtualSourcePixel(composite,channel,source,&pixel);
     q[i]=composite->clamp != MagickFalse ? ClampPixel(pixel) :
       ClampToQuantum(pixel);
   }
@@ -4817,7 +4815,9 @@ static void CompositeImageRow(const CompositeRowInputs *row,
     clamp = row->clamp;
 
   const VirtualCompositeInputs
-    virtual_inputs = { image, source_image, compose, canvas_dissolve, clamp };
+    virtual_inputs = { image, source_image, compose, canvas_dissolve, clamp,
+      IsListedOperator(CanvasPixelOperators,
+        sizeof(CanvasPixelOperators)/sizeof(*CanvasPixelOperators),compose) };
 
   PixelInfo
     canvas_pixel,
