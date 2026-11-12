@@ -7005,6 +7005,15 @@ def _windrv_cases():
             ("wide", "wide", "Red")):
         yield _windrv("imagesequal %s %s %s" % (first, second, channels or "all"),
                       tuple(["imagesequal", img(first), img(second)] + ([channels] if channels else [])))
+    # segment.c: GetImageDynamicThreshold, which only the API reaches: images with several
+    # histogram peaks (rose, its blur, with alpha, a palette image), flat or two-valued ones
+    # (a 1x1 image, a gradient, a bilevel image), thin images, floating-point and CMYK pixels,
+    # each with a few cluster and smoothing thresholds
+    for name in ("rose", "rose_blur", "rose_alpha", "palette", "gray16", "bilevel", "tiny",
+                 "tall", "wide", "hdri", "cmyk"):
+        for cluster, smooth in (("0", "0"), ("5", "2"), ("10", "3")):
+            yield _windrv("dynthreshold %s %s %s" % (name, cluster, smooth),
+                          ("dynthreshold", img(name), cluster, smooth))
     # timer.c: -bench (AcquireTimerInfo) and -duration (ContinueTimer) in magick-cli.c; the
     # oracle masks the report's timings (owner's decision, 2026-10-04). A duration far longer
     # than the run keeps every iteration, so the output is the same each time.
