@@ -8549,6 +8549,25 @@ static inline MagickBooleanType IsMagnifyWithinHalf(const unsigned int magnify,
     (magnify <= (height >> 1)))) ? MagickTrue : MagickFalse);
 }
 
+static unsigned char *MagnifyColumns8Bit(const unsigned int width,
+  const unsigned int magnify,unsigned char *p,unsigned char *q)
+{
+  unsigned int
+    k,
+    l;
+
+  for (k=0; k < width; k+=magnify)
+  {
+    /*
+      Propagate pixel magnify columns.
+    */
+    for (l=0; l < magnify; l++)
+      *q++=(*p);
+    p++;
+  }
+  return(q);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -8846,15 +8865,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
           {
             p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
               ((x*ximage->bits_per_pixel) >> 3);
-            for (k=0; k < width; k+=magnify)
-            {
-              /*
-                Propagate pixel magnify columns.
-              */
-              for (l=0; l < magnify; l++)
-                *q++=(*p);
-              p++;
-            }
+            q=MagnifyColumns8Bit(width,magnify,p,q);
             q+=(ptrdiff_t) scanline_pad;
           }
           y++;
