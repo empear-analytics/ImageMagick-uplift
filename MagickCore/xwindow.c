@@ -5202,6 +5202,26 @@ static void XInitializeWindowGeometry(Display *display,const XPixelInfo *pixel,
   window->data=0;
 }
 
+static void XInitializeWindowOnce(Display *display,
+  const XVisualInfo *visual_info,XWindowInfo *window)
+{
+  window->id=(Window) NULL;
+  if (window->name == (char *) NULL)
+    window->name=AcquireString("");
+  if (window->icon_name == (char *) NULL)
+    window->icon_name=AcquireString("");
+  window->x=XDisplayWidth(display,visual_info->screen) >> 1;
+  window->y=XDisplayWidth(display,visual_info->screen) >> 1;
+  window->ximage=(XImage *) NULL;
+  window->matte_image=(XImage *) NULL;
+  window->pixmap=(Pixmap) NULL;
+  window->matte_pixmap=(Pixmap) NULL;
+  window->mapped=MagickFalse;
+  window->stasis=MagickFalse;
+  window->shared_memory=MagickTrue;
+  window->segment_info=(void *) NULL;
+}
+
 MagickPrivate void XGetWindowInfo(Display *display,XVisualInfo *visual_info,
   XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
   XResourceInfo *resource_info,XWindowInfo *window)
@@ -5237,21 +5257,7 @@ MagickPrivate void XGetWindowInfo(Display *display,XVisualInfo *visual_info,
       /*
         Initialize these attributes just once.
       */
-      window->id=(Window) NULL;
-      if (window->name == (char *) NULL)
-        window->name=AcquireString("");
-      if (window->icon_name == (char *) NULL)
-        window->icon_name=AcquireString("");
-      window->x=XDisplayWidth(display,visual_info->screen) >> 1;
-      window->y=XDisplayWidth(display,visual_info->screen) >> 1;
-      window->ximage=(XImage *) NULL;
-      window->matte_image=(XImage *) NULL;
-      window->pixmap=(Pixmap) NULL;
-      window->matte_pixmap=(Pixmap) NULL;
-      window->mapped=MagickFalse;
-      window->stasis=MagickFalse;
-      window->shared_memory=MagickTrue;
-      window->segment_info=(void *) NULL;
+      XInitializeWindowOnce(display,visual_info,window);
 #if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
       {
         XShmSegmentInfo
