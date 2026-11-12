@@ -957,6 +957,22 @@ static unsigned int XIconWidth(const XIconSize *icon_size,
   return(icon_width);
 }
 
+static unsigned int XIconHeight(const XIconSize *icon_size,
+  const double scale_factor,const unsigned int height)
+{
+  unsigned int
+    icon_height;
+
+  icon_height=(unsigned int) icon_size->min_height;
+  while ((int) icon_height < icon_size->max_height)
+  {
+    if (icon_height >= (unsigned int) (scale_factor*height+0.5))
+      break;
+    icon_height+=(unsigned int) icon_size->height_inc;
+  }
+  return(icon_height);
+}
+
 MagickPrivate void XBestIconSize(Display *display,XWindowInfo *window,
   Image *image)
 {
@@ -1030,13 +1046,7 @@ MagickPrivate void XBestIconSize(Display *display,XWindowInfo *window,
   if (scale_factor > ((double) icon_size->max_height/height))
     scale_factor=(double) icon_size->max_height/height;
   icon_width=XIconWidth(icon_size,scale_factor,width);
-  icon_height=(unsigned int) icon_size->min_height;
-  while ((int) icon_height < icon_size->max_height)
-  {
-    if (icon_height >= (unsigned int) (scale_factor*height+0.5))
-      break;
-    icon_height+=(unsigned int) icon_size->height_inc;
-  }
+  icon_height=XIconHeight(icon_size,scale_factor,height);
   (void) XFree((void *) icon_size);
   window->width=icon_width;
   window->height=icon_height;
