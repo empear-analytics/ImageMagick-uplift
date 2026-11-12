@@ -185,96 +185,158 @@ static void HighlightCompareRow(const CompareHighlightRow *row,
   }
 }
 
-MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
-  const MetricType metric,double *distortion,ExceptionInfo *exception)
+typedef struct _CompareImageTargets
 {
-  CacheView
-    *highlight_view,
-    *image_view,
-    *reconstruct_view;
+  size_t
+    *columns,
+    *rows;
 
+  Image
+    **difference_image,
+    **highlight_image;
+
+  MagickBooleanType
+    *status;
+} CompareImageTargets;
+
+static MagickBooleanType AcquireCompareImages(const Image *image,
+  const Image *reconstruct_image,ExceptionInfo *exception,
+  const CompareImageTargets *targets)
+{
+  Image
+    *clone_image,
+    **const difference_image = targets->difference_image,
+    **const highlight_image = targets->highlight_image;
+
+  MagickBooleanType
+    *const status = targets->status;
+
+  RectangleInfo
+    geometry;
+
+  size_t
+    *const columns = targets->columns,
+    *const rows = targets->rows;
+
+  SetImageCompareBounds(image,reconstruct_image,columns,rows);
+  SetGeometry(image,&geometry);
+  geometry.width=*columns;
+  geometry.height=*rows;
+  clone_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (clone_image == (Image *) NULL)
+    return(MagickFalse);
+  (void) SetImageMask(clone_image,ReadPixelMask,(Image *) NULL,exception);
+  *difference_image=ExtentImage(clone_image,&geometry,exception);
+  clone_image=DestroyImage(clone_image);
+  if (*difference_image == (Image *) NULL)
+    return(MagickFalse);
+  (void) ResetImagePage(*difference_image,"0x0+0+0");
+  (void) SetImageAlphaChannel(*difference_image,OpaqueAlphaChannel,exception);
+  *highlight_image=CloneImage(image,*columns,*rows,MagickTrue,exception);
+  if (*highlight_image == (Image *) NULL)
+    {
+      *difference_image=DestroyImage(*difference_image);
+      return(MagickFalse);
+    }
+  *status=SetImageStorageClass(*highlight_image,DirectClass,exception);
+  if (*status == MagickFalse)
+    {
+      *difference_image=DestroyImage(*difference_image);
+      *highlight_image=DestroyImage(*highlight_image);
+      return(MagickFalse);
+    }
+  (void) SetImageMask(*highlight_image,ReadPixelMask,(Image *) NULL,exception);
+  (void) SetImageAlphaChannel(*highlight_image,OpaqueAlphaChannel,exception);
+  return(MagickTrue);
+}
+
+typedef struct _CompareColorTargets
+{
+  PixelInfo
+    *highlight,
+    *lowlight,
+    *masklight;
+} CompareColorTargets;
+
+static void GetCompareColors(const Image *image,ExceptionInfo *exception,
+  const CompareColorTargets *targets)
+{
   const char
     *artifact;
 
-  Image
-    *clone_image,
-    *difference_image,
-    *highlight_image;
+  PixelInfo
+    *const highlight = targets->highlight,
+    *const lowlight = targets->lowlight,
+    *const masklight = targets->masklight;
 
-  MagickBooleanType
-    status = MagickTrue;
+  (void) QueryColorCompliance("#f1001ecc",AllCompliance,highlight,exception);
+  artifact=GetImageArtifact(image,"compare:highlight-color");
+  if (artifact != (const char *) NULL)
+    (void) QueryColorCompliance(artifact,AllCompliance,highlight,exception);
+  (void) QueryColorCompliance("#ffffffcc",AllCompliance,lowlight,exception);
+  artifact=GetImageArtifact(image,"compare:lowlight-color");
+  if (artifact != (const char *) NULL)
+    (void) QueryColorCompliance(artifact,AllCompliance,lowlight,exception);
+  (void) QueryColorCompliance("#888888cc",AllCompliance,masklight,exception);
+  artifact=GetImageArtifact(image,"compare:masklight-color");
+  if (artifact != (const char *) NULL)
+    (void) QueryColorCompliance(artifact,AllCompliance,masklight,exception);
+}
+
+typedef struct _CompareRowsInfo
+{
+  Image
+    *image;
+
+  const Image
+    *reconstruct_image;
+
+  Image
+    *highlight_image;
 
   PixelInfo
     highlight,
     lowlight,
     masklight;
 
-  RectangleInfo
-    geometry;
-
   size_t
     columns,
     rows;
 
+  ExceptionInfo
+    *exception;
+} CompareRowsInfo;
+
+static MagickBooleanType HighlightCompareRows(const CompareRowsInfo *info,
+  MagickBooleanType status)
+{
+  CacheView
+    *highlight_view,
+    *image_view,
+    *reconstruct_view;
+
+  Image
+    *const image = info->image,
+    *const highlight_image = info->highlight_image;
+
+  const Image
+    *const reconstruct_image = info->reconstruct_image;
+
+  const PixelInfo
+    highlight = info->highlight,
+    lowlight = info->lowlight,
+    masklight = info->masklight;
+
+  const size_t
+    columns = info->columns,
+    rows = info->rows;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
   ssize_t
     y;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(reconstruct_image != (const Image *) NULL);
-  assert(reconstruct_image->signature == MagickCoreSignature);
-  assert(distortion != (double *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  *distortion=0.0;
-  status=GetImageDistortion(image,reconstruct_image,metric,distortion,
-    exception);
-  if (status == MagickFalse)
-    return((Image *) NULL);
-  SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
-  SetGeometry(image,&geometry);
-  geometry.width=columns;
-  geometry.height=rows;
-  clone_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (clone_image == (Image *) NULL)
-    return((Image *) NULL);
-  (void) SetImageMask(clone_image,ReadPixelMask,(Image *) NULL,exception);
-  difference_image=ExtentImage(clone_image,&geometry,exception);
-  clone_image=DestroyImage(clone_image);
-  if (difference_image == (Image *) NULL)
-    return((Image *) NULL);
-  (void) ResetImagePage(difference_image,"0x0+0+0");
-  (void) SetImageAlphaChannel(difference_image,OpaqueAlphaChannel,exception);
-  highlight_image=CloneImage(image,columns,rows,MagickTrue,exception);
-  if (highlight_image == (Image *) NULL)
-    {
-      difference_image=DestroyImage(difference_image);
-      return((Image *) NULL);
-    }
-  status=SetImageStorageClass(highlight_image,DirectClass,exception);
-  if (status == MagickFalse)
-    {
-      difference_image=DestroyImage(difference_image);
-      highlight_image=DestroyImage(highlight_image);
-      return((Image *) NULL);
-    }
-  (void) SetImageMask(highlight_image,ReadPixelMask,(Image *) NULL,exception);
-  (void) SetImageAlphaChannel(highlight_image,OpaqueAlphaChannel,exception);
-  (void) QueryColorCompliance("#f1001ecc",AllCompliance,&highlight,exception);
-  artifact=GetImageArtifact(image,"compare:highlight-color");
-  if (artifact != (const char *) NULL)
-    (void) QueryColorCompliance(artifact,AllCompliance,&highlight,exception);
-  (void) QueryColorCompliance("#ffffffcc",AllCompliance,&lowlight,exception);
-  artifact=GetImageArtifact(image,"compare:lowlight-color");
-  if (artifact != (const char *) NULL)
-    (void) QueryColorCompliance(artifact,AllCompliance,&lowlight,exception);
-  (void) QueryColorCompliance("#888888cc",AllCompliance,&masklight,exception);
-  artifact=GetImageArtifact(image,"compare:masklight-color");
-  if (artifact != (const char *) NULL)
-    (void) QueryColorCompliance(artifact,AllCompliance,&masklight,exception);
-  /*
-    Generate difference image.
-  */
   image_view=AcquireVirtualCacheView(image,exception);
   reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
   highlight_view=AcquireAuthenticCacheView(highlight_image,exception);
@@ -318,6 +380,66 @@ MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
   highlight_view=DestroyCacheView(highlight_view);
   reconstruct_view=DestroyCacheView(reconstruct_view);
   image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
+  const MetricType metric,double *distortion,ExceptionInfo *exception)
+{
+  CompareRowsInfo
+    info;
+
+  Image
+    *difference_image,
+    *highlight_image;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  PixelInfo
+    highlight,
+    lowlight,
+    masklight;
+
+  size_t
+    columns,
+    rows;
+
+  const CompareImageTargets
+    targets = { &columns, &rows, &difference_image, &highlight_image, &status };
+
+  const CompareColorTargets
+    colors = { &highlight, &lowlight, &masklight };
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(reconstruct_image != (const Image *) NULL);
+  assert(reconstruct_image->signature == MagickCoreSignature);
+  assert(distortion != (double *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  *distortion=0.0;
+  status=GetImageDistortion(image,reconstruct_image,metric,distortion,
+    exception);
+  if (status == MagickFalse)
+    return((Image *) NULL);
+  if (AcquireCompareImages(image,reconstruct_image,exception,&targets) ==
+      MagickFalse)
+    return((Image *) NULL);
+  GetCompareColors(image,exception,&colors);
+  /*
+    Generate difference image.
+  */
+  info.image=image;
+  info.reconstruct_image=reconstruct_image;
+  info.highlight_image=highlight_image;
+  info.highlight=highlight;
+  info.lowlight=lowlight;
+  info.masklight=masklight;
+  info.columns=columns;
+  info.rows=rows;
+  info.exception=exception;
+  status=HighlightCompareRows(&info,status);
   if ((status != MagickFalse) && (difference_image != (Image *) NULL))
     status=CompositeImage(difference_image,highlight_image,image->compose,
       MagickTrue,0,0,exception);
