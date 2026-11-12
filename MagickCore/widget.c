@@ -5432,6 +5432,19 @@ static void RespondToDialogEvents(const DialogContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
+static unsigned int GetDialogButtonWidth(XFontStruct *font_info,
+  const char *action)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,(char *) action);
+  if (WidgetTextWidth(font_info,CancelButtonText) > width)
+    width=WidgetTextWidth(font_info,CancelButtonText);
+  width+=(unsigned int) (3*QuantumMargin) >> 1;
+  return(width);
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -5478,10 +5491,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",action);
   XCheckRefreshWindows(display,windows);
   font_info=windows->widget.font_info;
-  width=WidgetTextWidth(font_info,(char *) action);
-  if (WidgetTextWidth(font_info,CancelButtonText) > width)
-    width=WidgetTextWidth(font_info,CancelButtonText);
-  width+=(unsigned int) (3*QuantumMargin) >> 1;
+  width=GetDialogButtonWidth(font_info,action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   {
     const DialogLayout
