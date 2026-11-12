@@ -7384,6 +7384,40 @@ static void XPreviewPoint(const DrawEditContext *context,
     }
 }
 
+static void XPreviewRectangle(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const RectangleInfo
+    rectangle_info = preview->rectangle_info;
+
+  char
+    text[MagickPathExtent];
+
+  if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
+    {
+      /*
+        Display info and draw drawing rectangle.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) rectangle_info.width,
+        (double) rectangle_info.height,(double) rectangle_info.x,
+        (double) rectangle_info.y);
+      XInfoWidget(display,windows,text);
+      XHighlightRectangle(display,windows->image.id,
+        windows->image.highlight_context,&rectangle_info);
+    }
+  else
+    if (windows->info.mapped != MagickFalse)
+      (void) XWithdrawWindow(display,windows->info.id,
+        windows->info.screen);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7698,23 +7732,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         case RectangleElement:
         case FillRectangleElement:
         {
-          if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
-            {
-              /*
-                Display info and draw drawing rectangle.
-              */
-              (void) FormatLocaleString(text,MagickPathExtent,
-                " %.17gx%.17g%+.20g%+.20g",(double) rectangle_info.width,
-                (double) rectangle_info.height,(double) rectangle_info.x,
-                (double) rectangle_info.y);
-              XInfoWidget(display,windows,text);
-              XHighlightRectangle(display,windows->image.id,
-                windows->image.highlight_context,&rectangle_info);
-            }
-          else
-            if (windows->info.mapped != MagickFalse)
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
+          XPreviewRectangle(&draw_context,&preview_input);
           break;
         }
         case CircleElement:
