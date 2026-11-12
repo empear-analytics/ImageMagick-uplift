@@ -461,11 +461,28 @@ static MagickBooleanType AuthorizeDelegateArguments(char **arguments,
 }
 
 #if defined(MAGICKCORE_POSIX_SUPPORT) && defined(MAGICKCORE_HAVE_EXECVP)
-static int RunDelegateProgram(char **arguments,const char *sanitize_command)
+static int WaitForDelegateChild(const pid_t child_pid)
 {
   int
+    child_status = 0,
     status = (-1);
 
+  pid_t
+    pid;
+
+  pid=(pid_t) waitpid(child_pid,&child_status,0);
+  if (pid == -1)
+    return(-1);
+  if (WIFEXITED(child_status) != 0)
+    status=WEXITSTATUS(child_status);
+  else
+    if (WIFSIGNALED(child_status))
+      status=(-1);
+  return(status);
+}
+
+static int RunDelegateProgram(char **arguments,const char *sanitize_command)
+{
   pid_t
     child_pid;
 
@@ -474,35 +491,11 @@ static int RunDelegateProgram(char **arguments,const char *sanitize_command)
   */
   child_pid=(pid_t) fork();
   if (child_pid == (pid_t) -1)
-    status=system(sanitize_command);
-  else
-    if (child_pid == 0)
-      {
-        status=execvp(arguments[1],arguments+1);
-        _exit(1);
-      }
-    else
-      {
-        int
-          child_status;
-
-        pid_t
-          pid;
-
-        child_status=0;
-        pid=(pid_t) waitpid(child_pid,&child_status,0);
-        if (pid == -1)
-          status=(-1);
-        else
-          {
-            if (WIFEXITED(child_status) != 0)
-              status=WEXITSTATUS(child_status);
-            else
-              if (WIFSIGNALED(child_status))
-                status=(-1);
-          }
-      }
-  return(status);
+    return(system(sanitize_command));
+  if (child_pid != 0)
+    return(WaitForDelegateChild(child_pid));
+  (void) execvp(arguments[1],arguments+1);
+  _exit(1);
 }
 #endif
 
