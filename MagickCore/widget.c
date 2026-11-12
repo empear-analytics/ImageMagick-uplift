@@ -3050,6 +3050,23 @@ static void InitializeColorBrowserText(const ColorBrowserContext *context,
   (*selection_info).x=(*list_info).x;
 }
 
+static void UpdateColorBrowserLayout(const ColorBrowserContext *context,
+  const ColorBrowserTargets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      InitializeColorBrowserButtons(context,widgets);
+      InitializeColorBrowserReply(context,widgets);
+      InitializeColorBrowserScroll(context,widgets);
+      InitializeColorBrowserList(context,widgets);
+      InitializeColorBrowserText(context,widgets);
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3245,15 +3262,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   color_context.text=text;
   do
   {
-    if (state & UpdateConfigurationState)
-      {
-        InitializeColorBrowserButtons(&color_context,&color_widgets);
-        InitializeColorBrowserReply(&color_context,&color_widgets);
-        InitializeColorBrowserScroll(&color_context,&color_widgets);
-        InitializeColorBrowserList(&color_context,&color_widgets);
-        InitializeColorBrowserText(&color_context,&color_widgets);
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
+    UpdateColorBrowserLayout(&color_context,&color_widgets);
     if (state & RedrawWidgetState)
       {
         /*
