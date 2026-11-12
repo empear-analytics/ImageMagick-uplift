@@ -2106,7 +2106,11 @@ typedef struct _ColorBrowserContext
     *windows;
 
   char
-    *glob_pattern;
+    *glob_pattern,
+    *reset_pattern;
+
+  ExceptionInfo
+    *exception;
 } ColorBrowserContext;
 
 static void ClientColorBrowserMessage(const ColorBrowserContext *context,
@@ -2395,6 +2399,77 @@ static void PressColorBrowserKey(const ColorBrowserContext *context,
     (*state)|=RedrawActionState;
 }
 
+static void ReleaseColorBrowserButtons(const ColorBrowserContext *context,
+  const XEvent event,const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern,
+    *const reset_pattern = context->reset_pattern;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const grab_info = widgets->grab_info,
+    *const reset_info = widgets->reset_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  ListBrowserRelease
+    release;
+
+  if ((*grab_info).raised == MagickFalse)
+    {
+      ColorBrowserGrab
+        grab;
+
+      grab.display=display;
+      grab.windows=windows;
+      grab.event=event;
+      grab.grab_info=(*grab_info);
+      grab.exception=exception;
+      ReleaseColorBrowserGrab(&grab,reply_info,state);
+      (*grab_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,grab_info);
+    }
+  if ((*reset_info).raised == MagickFalse)
+    {
+      FontBrowserBack
+        back;
+
+      back.windows=windows;
+      back.event=event;
+      back.back_info=(*reset_info);
+      back.glob_pattern=glob_pattern;
+      back.back_pattern=reset_pattern;
+      (*state)=ReleaseFontBrowserBack(&back,(*state));
+      (*reset_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,reset_info);
+    }
+  release.display=display;
+  release.window_info=(&windows->widget);
+  release.event=event;
+  ReleaseListBrowserAction(&release,(*reply_info),action_info,state);
+  release.display=display;
+  release.window_info=(&windows->widget);
+  release.event=event;
+  ReleaseListBrowserCancel(&release,(*reply_info),cancel_info,state);
+  if (MatteIsActive((*reply_info),event.xbutton) == MagickFalse)
+    return;
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2583,6 +2658,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   color_context.display=display;
   color_context.windows=windows;
   color_context.glob_pattern=glob_pattern;
+  color_context.reset_pattern=reset_pattern;
+  color_context.exception=exception;
   do
   {
     if (state & UpdateConfigurationState)
@@ -3056,9 +3133,6 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        ListBrowserRelease
-          release;
-
         if (windows->widget.mapped == MagickFalse)
           break;
         if (north_info.raised == MagickFalse)
@@ -3087,44 +3161,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             slider_info.active=MagickFalse;
             break;
           }
-        if (grab_info.raised == MagickFalse)
-          {
-            ColorBrowserGrab
-              grab;
-
-            grab.display=display;
-            grab.windows=windows;
-            grab.event=event;
-            grab.grab_info=grab_info;
-            grab.exception=exception;
-            ReleaseColorBrowserGrab(&grab,&reply_info,&state);
-            grab_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&grab_info);
-          }
-        if (reset_info.raised == MagickFalse)
-          {
-            FontBrowserBack
-              back;
-
-            back.windows=windows;
-            back.event=event;
-            back.back_info=reset_info;
-            back.glob_pattern=glob_pattern;
-            back.back_pattern=reset_pattern;
-            state=ReleaseFontBrowserBack(&back,state);
-            reset_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&reset_info);
-          }
-        release.display=display;
-        release.window_info=(&windows->widget);
-        release.event=event;
-        ReleaseListBrowserAction(&release,reply_info,&action_info,&state);
-        release.display=display;
-        release.window_info=(&windows->widget);
-        release.event=event;
-        ReleaseListBrowserCancel(&release,reply_info,&cancel_info,&state);
-        if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
-          break;
+        ReleaseColorBrowserButtons(&color_context,event,&color_widgets);
         break;
       }
       case ClientMessage:
