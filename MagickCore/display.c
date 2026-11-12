@@ -12354,6 +12354,19 @@ static MagickBooleanType XSelectCommandLineFile(Display *display,
   (void) XFreeStringList(files);
   return(MagickTrue);
 }
+
+static MagickBooleanType XSelectOpenFile(Display *display,XWindows *windows,
+  const MagickBooleanType command,char *filename)
+{
+  if (command == MagickFalse)
+    XFileBrowserWidget(display,windows,"Open",filename);
+  else
+    {
+      if (XSelectCommandLineFile(display,windows,filename) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12407,13 +12420,8 @@ static Image *XOpenImage(Display *display,XResourceInfo *resource_info,
   /*
     Request file name from user.
   */
-  if (command == MagickFalse)
-    XFileBrowserWidget(display,windows,"Open",filename);
-  else
-    {
-      if (XSelectCommandLineFile(display,windows,filename) == MagickFalse)
-        return((Image *) NULL);
-    }
+  if (XSelectOpenFile(display,windows,command,filename) == MagickFalse)
+    return((Image *) NULL);
   if (*filename == '\0')
     return((Image *) NULL);
   image_info=CloneImageInfo(resource_info->image_info);
