@@ -8529,6 +8529,9 @@ typedef struct _FontBrowserWidgets
 
   char
     ***fontlist;
+
+  XWidgetInfo
+    *list_info;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -9073,6 +9076,77 @@ static void ChooseFontBrowserEntry(const FontBrowserContext *context,
   SelectFontBrowserEntry(&press,glob_pattern,targets);
 }
 
+static void PressFontBrowserScroll(const FontBrowserContext *context,
+  const XEvent event,const FontBrowserTargets *targets,
+  const FontBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  int
+    *const fonts = widgets->fonts;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_fonts = widgets->visible_fonts;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info;
+
+  if (MatteIsActive((*slider_info),event.xbutton))
+    {
+      /*
+        Track slider.
+      */
+      (*slider_info).active=MagickTrue;
+      return;
+    }
+  if ((MatteIsActive((*north_info),event.xbutton)) && ((*slider_info).id > 0))
+    {
+      /*
+        Move slider up.
+      */
+      (*north_info).raised=MagickFalse;
+      (*slider_info).id--;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((MatteIsActive((*south_info),event.xbutton)) &&
+      ((*slider_info).id < (*fonts)))
+    {
+      /*
+        Move slider down.
+      */
+      (*south_info).raised=MagickFalse;
+      (*slider_info).id++;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*scroll_info),event.xbutton))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=PageFontBrowserSlider((*slider_info),event,
+        (*visible_fonts));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*list_info),event.xbutton))
+    {
+      ChooseFontBrowserEntry(context,event,targets,widgets);
+      return;
+    }
+  PressFontBrowserButtons(context,event,widgets);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9152,7 +9226,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     font_widgets = { &reply_info, &state, &back_info,
       &reset_info, &action_info, &cancel_info, &slider_info, &fonts,
       &scroll_info, &visible_fonts, &north_info, &delay, &south_info, &i,
-      &font_info, &fontlist };
+      &font_info, &fontlist, &list_info };
 
   FontBrowserContext
     font_context;
@@ -9627,50 +9701,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     {
       case ButtonPress:
       {
-        if (MatteIsActive(slider_info,event.xbutton))
-          {
-            /*
-              Track slider.
-            */
-            slider_info.active=MagickTrue;
-            break;
-          }
-        if ((MatteIsActive(north_info,event.xbutton)) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            north_info.raised=MagickFalse;
-            slider_info.id--;
-            state|=RedrawListState;
-            break;
-          }
-        if ((MatteIsActive(south_info,event.xbutton)) &&
-            (slider_info.id < fonts))
-          {
-            /*
-              Move slider down.
-            */
-            south_info.raised=MagickFalse;
-            slider_info.id++;
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(scroll_info,event.xbutton))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=PageFontBrowserSlider(slider_info,event,visible_fonts);
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(list_info,event.xbutton))
-          {
-            ChooseFontBrowserEntry(&font_context,event,&targets,&font_widgets);
-            break;
-          }
-        PressFontBrowserButtons(&font_context,event,&font_widgets);
+        PressFontBrowserScroll(&font_context,event,&targets,&font_widgets);
         break;
       }
       case ButtonRelease:
