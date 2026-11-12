@@ -499,6 +499,25 @@ static int RunDelegateProgram(char **arguments,const char *sanitize_command)
 }
 #endif
 
+#if defined(MAGICKCORE_POSIX_SUPPORT) && defined(MAGICKCORE_HAVE_POPEN)
+static int ReadDelegateOutput(const char *sanitize_command,char *message)
+{
+  FILE
+    *file;
+
+  size_t
+    offset = 0;
+
+  file=popen_utf8(sanitize_command,"r");
+  if (file == (FILE *) NULL)
+    return(system(sanitize_command));
+  while ((offset < MagickPathExtent) &&
+         (fgets(message+offset,(int) (MagickPathExtent-offset),file) != NULL))
+    offset+=strlen(message);
+  return(pclose(file));
+}
+#endif
+
 MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   const MagickBooleanType verbose,const char *command,char *message,
   ExceptionInfo *exception)
@@ -536,24 +555,7 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
 #if defined(MAGICKCORE_POSIX_SUPPORT)
 #if defined(MAGICKCORE_HAVE_POPEN)
   if ((asynchronous == MagickFalse) && (message !=  (char *) NULL))
-    {
-      FILE
-        *file;
-
-      file=popen_utf8(sanitize_command,"r");
-      if (file == (FILE *) NULL)
-        status=system(sanitize_command);
-      else
-        {
-          size_t
-            offset = 0;
-
-          while ((offset < MagickPathExtent) &&
-                 (fgets(message+offset,(int) (MagickPathExtent-offset),file) != NULL))
-            offset+=strlen(message);
-          status=pclose(file);
-        }
-    }
+    status=ReadDelegateOutput(sanitize_command,message);
   else
 #endif
     {
