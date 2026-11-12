@@ -2094,6 +2094,24 @@ MagickExport double *StringToArrayOfDoubles(const char *string,ssize_t *count,
 %      NULL.
 %
 */
+static MagickBooleanType IsDelimiter(const int c,const char *delimiters)
+{
+  const char
+    *r;
+
+  int
+    d;
+
+  r=delimiters;
+  do
+  {
+    d=(*r++);
+    if (c == d)
+      return(MagickTrue);
+  } while (d != '\0');
+  return(MagickFalse);
+}
+
 MagickExport char *StringToken(const char *delimiters,char **string)
 {
   char
@@ -2102,12 +2120,8 @@ MagickExport char *StringToken(const char *delimiters,char **string)
   char
     *p;
 
-  const char
-    *r;
-
   int
-    c,
-    d;
+    c;
 
   p=(*string);
   if (p == (char *) NULL)
@@ -2116,20 +2130,15 @@ MagickExport char *StringToken(const char *delimiters,char **string)
   for ( ; ; )
   {
     c=(*p++);
-    r=delimiters;
-    do
-    {
-      d=(*r++);
-      if (c == d)
-        {
-          if (c == '\0')
-            p=(char *) NULL;
-          else
-            p[-1]='\0';
-          *string=p;
-          return(q);
-        }
-    } while (d != '\0');
+    if (IsDelimiter(c,delimiters) != MagickFalse)
+      {
+        if (c == '\0')
+          p=(char *) NULL;
+        else
+          p[-1]='\0';
+        *string=p;
+        return(q);
+      }
   }
 }
 
