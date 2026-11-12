@@ -8539,6 +8539,9 @@ typedef struct _FontBrowserWidgets
 
   char
     ***listhead;
+
+  MagickStatusType
+    *mask;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -9976,6 +9979,54 @@ static void HandleFontSelectionEvent(const FontBrowserContext *context,
   }
 }
 
+static void HandleFontKeyEvent(const FontBrowserContext *context,
+  XEvent event,const FontBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  MagickStatusType
+    *const mask = widgets->mask;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      PressFontBrowserKey(context,event,widgets);
+      break;
+    }
+    case KeyRelease:
+    {
+      (*state)=ReleaseWidgetKey(windows,event,(*state));
+      break;
+    }
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case MapNotify:
+    {
+      (*mask)&=(unsigned int) (~CWX);
+      (*mask)&=(unsigned int) (~CWY);
+      break;
+    }
+    case MotionNotify:
+    {
+      MoveFontBrowserButtons(context,event,widgets);
+      break;
+    }
+    default:
+    {
+      HandleFontSelectionEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -10048,7 +10099,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
       &reset_info, &action_info, &cancel_info, &slider_info, &fonts,
       &scroll_info, &visible_fonts, &north_info, &delay, &south_info, &i,
       &font_info, &fontlist, &list_info, &mode_info, &expose_info, &text_info,
-      &selection_info, &listhead };
+      &selection_info, &listhead, &mask };
 
   FontBrowserContext
     font_context;
@@ -10227,35 +10278,9 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
         state=ExposeWidgetWindow(windows,event,state);
         break;
       }
-      case KeyPress:
-      {
-        PressFontBrowserKey(&font_context,event,&font_widgets);
-        break;
-      }
-      case KeyRelease:
-      {
-        state=ReleaseWidgetKey(windows,event,state);
-        break;
-      }
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MapNotify:
-      {
-        mask&=(unsigned int) (~CWX);
-        mask&=(unsigned int) (~CWY);
-        break;
-      }
-      case MotionNotify:
-      {
-        MoveFontBrowserButtons(&font_context,event,&font_widgets);
-        break;
-      }
       default:
       {
-        HandleFontSelectionEvent(&font_context,event,&font_widgets);
+        HandleFontKeyEvent(&font_context,event,&font_widgets);
         break;
       }
     }
