@@ -327,3 +327,36 @@ has a finding. `verify_wt` prints VERIFY FAILED only from the two old `ci_warnin
   struct and a targets struct (95dd02cc6: fills and bindings checked by reading); `struct_fill_check` FAILs a pass-through
   `&source` -> `source` (4ee5c0070). Possible upstream: `XGetWindowImage`'s second colormap exit (`AcquireMagickMemory(p)`
   fails) leaks `colors` and `ximage`; its `AcquireImageColormap` failure path leaks `composite_view`.
+
+## Lane d, third round: compare.c 8.92 -> 9.68 (merged, with 22 new oracle cases); magnify, animate, accelerate plateau
+
+8 commits; whole catalogue on the lane tip 15,922 cases (15,900 plus the 22 new), 0 diverged; on the merged tree 15,922
+cases, 0 diverged. The only finding left in compare.c is the five arguments of the public `CompareImages`.
+- 6a2b0db91 FB `CompareImages` row fill 8.95 (IDENTICAL; FI step 8(b)'s hoist measured DIFFERENT object code).
+  **8b18f7fef oracle (tools only): `imdriver imagesequal IMAGE RECONSTRUCT [CHANNELS]` and 22 cases** for `IsImagesEqual`,
+  which no case reached (neither the command line nor any library function calls it): equal images, a difference in the
+  first pixels, a difference only in alpha (seen or masked out), images of different size and of different channel counts;
+  they protect the row and column loops that Recipe LT changes. `casemap.json` is stale until rebuilt: run them with
+  `oracle.py run --filter imagesequal`. c5b14026a LT `IsImagesEqual` (`IsCompareRowEqual` plus the `CompareColumnScan`
+  input struct that LT step 5 sends to N) 9.02 (leaves Bumpy Road). 83189e0d0 rule 1 Overall Code Complexity set on
+  `CompareImages`: I step 2 const form with five written variables (`AcquireCompareImages`), O step 7
+  (`GetCompareColors`), N step 1 whole parallel loop (`HighlightCompareRows`): 9.09 (alone I 8.60, O 8.52, N 8.63; pairs
+  8.65, 8.81, 8.68). 14532069f PS `SyncCompareRow`, 192cf14ac PS step 7 (`CompareRow` with a `const CompareRowInput`
+  initialiser), 66b4e570a E step 7 (tail of `AcquireCompareImages`): flat; 580970288 E highlight colour triple
+  (`GetCompareHighlight`) 9.68. The four flat steps are one plan; probes showed Overall Code Complexity (mean cc 4) clears at
+  exactly four more functions, so the file never carries it at the end. Evidence: oracle on the 187 cases that reach
+  `CompareImages` and its helpers (165 from the old map plus the 22 new), 0 diverged at every step; guard, `--calls` and
+  `ci_linux_warnings` pass; failure paths are allocation failures, checked by reading. The per-pixel `HighlightCompareRow`
+  is untouched (the new cost is one call and one struct init per row; a noisy run at load 15 showed no clear difference).
+- Plateaus (no commit): **magnify.c 8.84**: folding the 12 `if (C) CopyPixels(..) else CopyPixels(..)` pairs in `Scale2X` and
+  `Scale3X` into `?:` frees the line budget (flat at 8.84, object code DIFFERENT, no recipe for it); with it NS on `Xbr2X`
+  scores 9.07, but NS step 5 demands IDENTICAL and here `Xbr2X` alone differs (`setbe` -> `setle` on 0/1 values;
+  obj_modulo clean elsewhere); without the fold NS on `Xbr2X` crosses 1,000 lines (8.52); `Scale3X` stays cc 12 (the `?:`
+  sites still count). **Owner call needed:** a fold recipe and accepting NS on a reached function without IDENTICAL.
+  **animate.c `XMagickCommand` 4.40**: the OpenCommand tail is unreached and exits through `return((Image *) NULL)` with a
+  `static char filenames[]` array (V, Y, W not allowed on unreached code; I needs two to four written variables; E step 7
+  and CT refuse `return`). **accelerate.c `AccelerateGrayscaleImage` 3.19**: P twice removes Complex Conditional and
+  Complex Method, but the function joins the wrapper Code Duplication group (10 -> 11 functions), so the score stays flat.
+- Possible upstream: `CompareImages` tests `(difference_image != NULL)` after an earlier return (always true);
+  `IsImagesEqual` has no caller in the tree. Tool note: `verify_wt`'s `--function` run exits on the stale `casemap.json`
+  after the oracle commit (use `--filter`).
