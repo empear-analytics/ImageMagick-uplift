@@ -3829,6 +3829,51 @@ static void RunColorBrowser(const ColorBrowserContext *context,
   RespondToColorBrowserEvents(context,&targets,&color_widgets);
 }
 
+typedef struct _ColorBrowserLayout
+{
+  Display
+    *display;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    width,
+    height,
+    text_width;
+} ColorBrowserLayout;
+
+static void PositionColorBrowserWidget(XWindows *windows,
+  const ColorBrowserLayout *layout)
+{
+  Display
+    *const display = layout->display;
+
+  XFontStruct
+    *const font_info = layout->font_info;
+
+  const unsigned int
+    width = layout->width,
+    height = layout->height,
+    text_width = layout->text_width;
+
+  /*
+    Position Color Browser widget.
+  */
+  windows->widget.width=width+MagickMin(text_width,MaxTextWidth)+
+    6*(unsigned int) QuantumMargin;
+  windows->widget.min_width=width+MinTextWidth+4*(unsigned int) QuantumMargin;
+  if (windows->widget.width < windows->widget.min_width)
+    windows->widget.width=windows->widget.min_width;
+  windows->widget.height=(unsigned int)
+    ((81*height) >> 2)+((13*(unsigned int) QuantumMargin) >> 1)+4;
+  windows->widget.min_height=(unsigned int)
+    (((23*height) >> 1)+((13*(unsigned int) QuantumMargin) >> 1)+4);
+  if (windows->widget.height < windows->widget.min_height)
+    windows->widget.height=windows->widget.min_height;
+  XConstrainWindowPosition(display,&windows->widget);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3860,6 +3905,9 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
 
   ColorBrowserContext
     color_context;
+
+  ColorBrowserLayout
+    color_layout;
 
   /*
     Get color list and sort in ascending order.
@@ -3909,21 +3957,12 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   if (WidgetTextWidth(font_info,ColornameText) > width)
     width=WidgetTextWidth(font_info,ColornameText);
   height=(unsigned int) (font_info->ascent+font_info->descent);
-  /*
-    Position Color Browser widget.
-  */
-  windows->widget.width=width+MagickMin(text_width,MaxTextWidth)+
-    6*(unsigned int) QuantumMargin;
-  windows->widget.min_width=width+MinTextWidth+4*(unsigned int) QuantumMargin;
-  if (windows->widget.width < windows->widget.min_width)
-    windows->widget.width=windows->widget.min_width;
-  windows->widget.height=(unsigned int)
-    ((81*height) >> 2)+((13*(unsigned int) QuantumMargin) >> 1)+4;
-  windows->widget.min_height=(unsigned int)
-    (((23*height) >> 1)+((13*(unsigned int) QuantumMargin) >> 1)+4);
-  if (windows->widget.height < windows->widget.min_height)
-    windows->widget.height=windows->widget.min_height;
-  XConstrainWindowPosition(display,&windows->widget);
+  color_layout.display=display;
+  color_layout.font_info=font_info;
+  color_layout.width=width;
+  color_layout.height=height;
+  color_layout.text_width=text_width;
+  PositionColorBrowserWidget(windows,&color_layout);
   /*
     Map Color Browser widget.
   */
