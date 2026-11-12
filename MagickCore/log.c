@@ -1675,6 +1675,29 @@ static void RotateLogFiles(LogInfo *log_info)
   log_info->file=(FILE *) NULL;
 }
 
+static MagickBooleanType OpenLogFile(LogInfo *log_info)
+{
+  char
+    log_filename[MagickPathExtent];
+
+  FormatLogFilename(log_info,0,log_filename);
+  log_info->append=IsPathAccessible(log_filename);
+  log_info->file=fopen_utf8(log_filename,"ab");
+  if (log_info->file == (FILE *) NULL)
+    {
+      UnlockSemaphoreInfo(log_info->event_semaphore);
+      return(MagickFalse);
+    }
+  if (log_info->append == MagickFalse)
+    {
+      (void) FormatLocaleFile(log_info->file,"<?xml version=\"1.0\" "
+        "encoding=\"UTF-8\" standalone=\"yes\"?>\n");
+      (void) FormatLocaleFile(log_info->file,"<logEntries>\n");
+    }
+  (void) FormatLocaleFile(log_info->file,"<log>\n");
+  return(MagickTrue);
+}
+
 static MagickBooleanType WriteLogFile(LogInfo *log_info,const char *text)
 {
   if ((log_info->handler_mask & FileHandler) != 0)
@@ -1687,27 +1710,9 @@ static MagickBooleanType WriteLogFile(LogInfo *log_info,const char *text)
         (void) fstat(fileno(log_info->file),&file_info);
       if (file_info.st_size > (MagickOffsetType) log_info->limit)
         RotateLogFiles(log_info);
-      if (log_info->file == (FILE *) NULL)
-        {
-          char
-            log_filename[MagickPathExtent];
-
-          FormatLogFilename(log_info,0,log_filename);
-          log_info->append=IsPathAccessible(log_filename);
-          log_info->file=fopen_utf8(log_filename,"ab");
-          if (log_info->file == (FILE *) NULL)
-            {
-              UnlockSemaphoreInfo(log_info->event_semaphore);
-              return(MagickFalse);
-            }
-          if (log_info->append == MagickFalse)
-            {
-              (void) FormatLocaleFile(log_info->file,"<?xml version=\"1.0\" "
-                "encoding=\"UTF-8\" standalone=\"yes\"?>\n");
-              (void) FormatLocaleFile(log_info->file,"<logEntries>\n");
-            }
-          (void) FormatLocaleFile(log_info->file,"<log>\n");
-        }
+      if ((log_info->file == (FILE *) NULL) &&
+          (OpenLogFile(log_info) == MagickFalse))
+        return(MagickFalse);
       (void) FormatLocaleFile(log_info->file,"  <event>%s</event>\n",text);
       (void) fflush(log_info->file);
     }
