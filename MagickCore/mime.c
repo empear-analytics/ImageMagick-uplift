@@ -727,6 +727,16 @@ static void PadMimeType(FILE *file,const MimeInfo **mime_info,
     }
 }
 
+static void PrintMimeEntry(FILE *file,const MimeInfo **mime_info,
+  const ssize_t i)
+{
+  (void) FormatLocaleFile(file,"%s",mime_info[i]->type);
+  PadMimeType(file,mime_info,i);
+  if (mime_info[i]->description != (char *) NULL)
+    (void) FormatLocaleFile(file,"%s",mime_info[i]->description);
+  (void) FormatLocaleFile(file,"\n");
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -779,11 +789,7 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
         (strcasecmp(path,mime_info[i]->path) != 0))
       PrintMimePathHeader(file,mime_info,i);
     path=mime_info[i]->path;
-    (void) FormatLocaleFile(file,"%s",mime_info[i]->type);
-    PadMimeType(file,mime_info,i);
-    if (mime_info[i]->description != (char *) NULL)
-      (void) FormatLocaleFile(file,"%s",mime_info[i]->description);
-    (void) FormatLocaleFile(file,"\n");
+    PrintMimeEntry(file,mime_info,i);
   }
   (void) fflush(file);
   mime_info=(const MimeInfo **) RelinquishMagickMemory((void *) mime_info);
