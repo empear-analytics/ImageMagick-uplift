@@ -3558,12 +3558,77 @@ static void RedrawCommandButtons(Display *display,XWindows *windows,
   XHighlightWidget(display,&windows->command,BorderOffset,BorderOffset);
 }
 
+typedef struct _CommandLayout
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *selections;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    height,
+    number_selections;
+} CommandLayout;
+
+static void InitializeCommandButtons(const CommandLayout *layout)
+{
+  Display
+    *const display = layout->display;
+
+  XWindows
+    *const windows = layout->windows;
+
+  const char
+    *const *const selections = layout->selections;
+
+  XFontStruct
+    *const font_info = layout->font_info;
+
+  const unsigned int
+    height = layout->height,
+    number_selections = layout->number_selections;
+
+  int
+    i,
+    y;
+
+  y=tile_height+20;
+  for (i=0; i < (int) number_selections; i++)
+  {
+    XGetWidgetInfo(selections[i],&selection_info[i]);
+    selection_info[i].center=MagickFalse;
+    selection_info[i].bevel_width--;
+    selection_info[i].height=(unsigned int) ((3*height) >> 1);
+    selection_info[i].x=(QuantumMargin >> 1)+4;
+    selection_info[i].width=(unsigned int) ((int) windows->command.width-
+      (selection_info[i].x << 1));
+    selection_info[i].y=y;
+    y+=(int) selection_info[i].height+(int)
+      (selection_info[i].bevel_width << 1)+6;
+  }
+  XGetWidgetInfo((char *) NULL,&toggle_info);
+  toggle_info.bevel_width--;
+  toggle_info.width=(unsigned int) (((5*height) >> 3)-
+    (toggle_info.bevel_width << 1));
+  toggle_info.height=toggle_info.width;
+  toggle_info.x=selection_info[0].x+(int) selection_info[0].width-
+    (int) toggle_info.width-(int) (QuantumMargin >> 1);
+  if (windows->command.mapped)
+    (void) XClearWindow(display,windows->command.id);
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
   int
-    id,
-    y;
+    id;
 
   int
     i;
@@ -3669,33 +3734,20 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   HandleCommandEvent(&tile,&id,&state);
   if (state & UpdateConfigurationState)
     {
+      CommandLayout
+        layout;
+
       /*
         Initialize button information.
       */
       assert(selections != (const char **) NULL);
-      y=tile_height+20;
-      for (i=0; i < (int) number_selections; i++)
-      {
-        XGetWidgetInfo(selections[i],&selection_info[i]);
-        selection_info[i].center=MagickFalse;
-        selection_info[i].bevel_width--;
-        selection_info[i].height=(unsigned int) ((3*height) >> 1);
-        selection_info[i].x=(QuantumMargin >> 1)+4;
-        selection_info[i].width=(unsigned int) ((int) windows->command.width-
-          (selection_info[i].x << 1));
-        selection_info[i].y=y;
-        y+=(int) selection_info[i].height+(int)
-          (selection_info[i].bevel_width << 1)+6;
-      }
-      XGetWidgetInfo((char *) NULL,&toggle_info);
-      toggle_info.bevel_width--;
-      toggle_info.width=(unsigned int) (((5*height) >> 3)-
-        (toggle_info.bevel_width << 1));
-      toggle_info.height=toggle_info.width;
-      toggle_info.x=selection_info[0].x+(int) selection_info[0].width-
-        (int) toggle_info.width-(int) (QuantumMargin >> 1);
-      if (windows->command.mapped)
-        (void) XClearWindow(display,windows->command.id);
+      layout.display=display;
+      layout.windows=windows;
+      layout.selections=selections;
+      layout.font_info=font_info;
+      layout.height=height;
+      layout.number_selections=number_selections;
+      InitializeCommandButtons(&layout);
     }
   if (state & RedrawWidgetState)
     RedrawCommandButtons(display,windows,number_selections);
