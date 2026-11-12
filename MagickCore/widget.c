@@ -4422,11 +4422,11 @@ static void ApplyDialogControlKey(const KeySym key_symbol,const size_t state,
     }
 }
 
+#define CancelButtonText  "Cancel"
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
-#define CancelButtonText  "Cancel"
-
   char
     primary_selection[MagickPathExtent];
 
