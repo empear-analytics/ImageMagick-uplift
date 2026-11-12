@@ -12174,6 +12174,552 @@ predicate is flat (3.19 to 3.19, with a new *Code Duplication* function), three 
 
 ---
 
+## Recipe EJ - Join an Else and its Sole If
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* or *Deep, Nested Complexity*, and the
+code holds a chain written as `else` on one line and the `if` of the next test on the
+line below, each level indented one step deeper, as `color.c`'s DOCTYPE skipper and its
+hex-digit loops do (`if (c is a digit) ...; else if (c is A-F) ...` written as `else`,
+newline, `if`). CodeScene counts every such `if` as one level deeper; the same chain
+written as `else if` is flat.
+
+**Not covered by:** Recipe EI, whose `else` holds a run of `if` statements that each
+leave the flow (here the `else` holds one `if`, and nothing leaves); Recipe CN, whose
+bump is an `if` holding an `if`, with no `else`; Recipe G, which inverts conditions into
+early exits and changes the text of the tests.
+
+**How:**
+
+1. Find `else` followed by exactly one statement that is an `if` statement (with or
+   without `else` of its own), with no braces around it and no comment between.
+2. Write `else if (...)` on one line, the `if` and everything after it in the text as it
+   was, each line of the joined `if` moved one indent level less (and, with it, the lines
+   of its own `else` chain).
+3. Repeat down the chain; every such chain of one function may go in one commit (one
+   recipe, one function).
+4. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
+   the step.
+
+**Before:**
+
+```c
+          if (*q == '[')
+            bracket_depth++;
+          else
+            if (*q == ']')
+              {
+                if (bracket_depth > 0)
+                  bracket_depth--;
+              }
+            else
+              if ((*q == '>') && (bracket_depth == 0))
+                break;
+```
+
+**After:**
+
+```c
+          if (*q == '[')
+            bracket_depth++;
+          else if (*q == ']')
+            {
+              if (bracket_depth > 0)
+                bracket_depth--;
+            }
+          else if ((*q == '>') && (bracket_depth == 0))
+            break;
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `else` followed by one statement and `else if` are the
+  same tokens; only the line breaks and the indentation change. The compiler sees the
+  same program, which the object file proves.
+- A comment between the `else` and the `if`, or braces around the `if`, are not covered: step 1 refuses them.
+- No test, statement or literal changes; only whitespace and the `else`/`if` line join.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`, and `refactor_guard.py` literal and call counts unchanged.
+
+**Provenance:** 2026-11-09, from `color.c`'s `LoadColorCache` DOCTYPE loop and
+`QueryColorCompliance`'s hex-digit loops (campaign B, M120): extracting the loop
+verbatim into a helper dropped the file 4.24 to 4.09, because the helper is itself
+Deep, Nested; the same chain joined with `else if` gave 4.42 after the extraction. Added
+by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe NG - Drop a NULL Guard Before a NULL-Safe Release
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Lines of Code in a
+Single File*, and the function holds `if (x != NULL) x=Release(x);` where `Release` is a
+MagickCore routine that returns at once when handed `NULL`: `DestroyString`,
+`RelinquishMagickMemory`, `DestroyExceptionInfo`, `DestroyImage`, `DestroyImageInfo`, and
+the other `Destroy*` and `Relinquish*` routines whose first statement tests for `NULL`
+(`policy.c`'s `IsRightsAuthorizedByName` and `DestroyPolicyElement`). Each guard is a
+branch and a line; a file at the 1,000-line limit has no room for the helpers an
+extraction adds.
+
+**Not covered by:** Recipe G, which inverts a condition into an early exit and keeps the
+test; Recipe CN, which merges nested `if`s and keeps every test; Recipe E, which moves a
+block. Nothing else removes a test.
+
+**How:**
+
+1. Find a statement `if (x != (T *) NULL)` (or `if (x)`) with one controlled statement,
+   `x=Release(x);` or `Release(x);`, for the same `x`, no `else` and no braces.
+2. Read `Release` in this repository and confirm that its body, or the body of the one
+   function it returns the value of, begins `if (x == NULL) return(NULL);` or the
+   equivalent (`DestroyString` returns `RelinquishMagickMemory`, which does). A callee
+   that does not, or one reached through a function pointer, refuses the step.
+3. Delete the `if` line, keeping the statement as it was; its indentation moves one step
+   less. A run of such guards in one function may go in one commit.
+4. Refuse a guard whose `x` is a macro argument, a side-effecting expression (`*p++`), or
+   a pointer the controlled statement is the only reader of after a test that has other
+   effects.
+
+**Before:**
+
+```c
+  if (canonical_candidate != (char *) NULL)
+    canonical_candidate=DestroyString(canonical_candidate);
+  if (canonical_path != (char *) NULL)
+    canonical_path=DestroyString(canonical_path);
+```
+
+**After:**
+
+```c
+  canonical_candidate=DestroyString(canonical_candidate);
+  canonical_path=DestroyString(canonical_path);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The callee does nothing for `NULL` and returns `NULL`,
+  so the assignment stores `NULL` back into a variable that held `NULL`; with a non-NULL
+  `x` the guarded call ran before too. The object code differs (one test fewer), so
+  `obj_identical.sh` does not apply; step 2's reading is the proof.
+- A routine that logs, counts or asserts on `NULL` (`DestroyImage` asserts its argument
+  in debug builds) is refused by step 2, which asks for the first statement to be the
+  `NULL` return.
+- Memory: nothing is freed that was not, and nothing is freed twice.
+
+**Evidence level:** oracle, for the functions the step changes (`casemap.py` first), and
+the reading of step 2 stated in the commit message.
+
+**Provenance:** 2026-11-12, from `policy.c`'s `IsRightsAuthorizedByName` (three guards
+before `DestroyString`) and `DestroyPolicyElement` (four), campaign B, M120: the file
+sat at the 1,000-line limit and every extraction (include handler of `LoadPolicyCache`,
+4.83 to 4.58) crossed it; seven guards removed gave 4.88 and `IsRightsAuthorizedByName`
+cc 27 to 24. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe SF - Flatten a First-Letter Switch
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function that
+reads one keyword and dispatches on its first character, as the `Load*Cache` and
+`Set*Attribute` code of the configuration files do (`policy.c`'s `SetPolicyInfoAttribute`:
+`switch (*keyword)` with `case 'D': case 'd':` holding `if (LocaleCompare(keyword,
+"domain") == 0) {...; break;} break;`). Every group costs a label pair, an `if`, a brace
+pair and two `break`s for one comparison.
+
+**Not covered by:** Recipe SD, which splits a `switch` into functions and keeps it; Recipe
+EJ, which joins an `else` and its `if`; Recipe Z, which moves a `case` body. None
+replaces the `switch` by tests.
+
+**How:**
+
+1. The `switch` is on `*keyword` (or the same first-character read of one string), and
+   each group is a label pair (`case 'X':` `case 'x':`) or one label, then braces holding
+   only `if (LocaleCompare(keyword,"<word>") == 0)` followed by one statement and
+   `break;`, and a final `break;`. The `default:` group holds only `break;`.
+2. Check by script that each label pair is the first letter of `<word>` in both cases,
+   and that `LocaleCompare` (`MagickCore/locale.c`) compares through
+   `LocaleToLowercase`, so that equal strings have first characters with the same
+   lowercase, which for an ASCII letter means the two labels. Then a string equal to
+   `<word>` has a first character that selects exactly that group, and the `switch` only
+   skipped comparisons that would have failed. A word whose first letter differs from its label,
+   or two statements, or a group that does more than the comparison, refuses the step.
+3. Replace the `switch` by `if (LocaleCompare(keyword,"<word>") == 0)` followed by the
+   statement, then `else if` for each next group in the order of the source, braces only
+   where a statement already had them. Groups with the same first letter stay in their
+   order.
+4. The `break;` of a group that matched leaves the `switch`, and code after the `switch`
+   runs; the chain gives the same, by falling off its last `else if`. A `switch` followed
+   by code that reads which group ran refuses the step.
+
+**Before:**
+
+```c
+  switch (*keyword)
+  {
+    case 'N':
+    case 'n':
+    {
+      if (LocaleCompare((char *) keyword,"name") == 0)
+        {
+          policy_info->name=AcquirePolicyString(token,1);
+          break;
+        }
+      break;
+    }
+    case 'P':
+    case 'p':
+    {
+      if (LocaleCompare((char *) keyword,"pattern") == 0)
+        {
+          policy_info->pattern=AcquirePolicyString(token,1);
+          break;
+        }
+      break;
+    }
+    default:
+      break;
+  }
+```
+
+**After:**
+
+```c
+  if (LocaleCompare((char *) keyword,"name") == 0)
+    policy_info->name=AcquirePolicyString(token,1);
+  else if (LocaleCompare((char *) keyword,"pattern") == 0)
+    policy_info->pattern=AcquirePolicyString(token,1);
+```
+
+**Careful:**
+
+- Why the behaviour is the same: see step 2. The only difference is that a keyword whose
+  first letter has no group now meets up to six comparisons instead of none; each fails
+  at once, and `LocaleCompare` has no side effects.
+- The object code differs, so `obj_identical.sh` does not apply.
+
+**Evidence level:** oracle, for the functions the step changes (`casemap.py` first).
+
+**Provenance:** 2026-11-12, from `policy.c`'s `SetPolicyInfoAttribute` (campaign B,
+M120): cc 20 to 7 and 71 to 18 lines, the file 5.02 to 5.29. The same shape stands at
+`color.c`, `configure.c`, `delegate.c`, `draw.c`, `log.c`, `opencl.c` and `type.c`.
+Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe RC - Extract a Case That Returns
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on
+a function whose `switch` has groups that either `return(R);` or `break;`, with the
+function ending in `return(F);` for one constant `F` after the `switch`
+(`policy.c`'s `SetMagickSecurityPolicyValue`: one group per policy domain, each testing
+a name and returning a status, `break;` for a name it does not know, and
+`return(MagickFalse);` after the `switch`).
+
+**Not covered by:** Recipe SR, which moves the `default` group and its neighbours into a
+function that still holds a `switch`; Recipe Z and Recipe O, which refuse a `return` in
+the block; Recipe E step 7, which moves the tail of a function and returns its value;
+Recipe SD, whose groups do not return.
+
+**How:**
+
+1. The `switch` is the last statement before `return(F);`, `F` a constant expression
+   (`MagickFalse`, `NULL`, `0`) with no side effect. Each group to move has its label
+   (or label pair), one compound block, and ends with `break;` (the group's last line)
+   or `return(R);`. It holds no `continue`, `goto` or `break` of an enclosing loop, no
+   `#pragma`, and no `break;` of the `switch` except that last line or one inside a
+   loop or `switch` of its own.
+2. The group writes no variable of the caller that anything reads after it: on every
+   path it ends in `return` or in the `break;` that reaches `return(F);`, so the caller
+   reads nothing afterwards.
+3. Cut the block, braces dropped and one indent level less, into a new `static` function
+   directly above the caller, of the caller's return type, taking as parameters the
+   variables the block reads (at most four; five or more is Recipe Z's case, not this
+   one). Its body ends with `return(F);` in the place of the `break;`. Every `return(R);`
+   stays. A variable the block alone declared goes with it.
+4. The group's place now holds `return(Helper(<arguments>));` after its label, the
+   arguments the variables the block read. The label stays in the `switch`.
+5. Why the behaviour is the same: where the group returned `R`, the helper returns `R`
+   and the caller returns it; where it broke, the caller would have returned `F` and the
+   helper returns `F`.
+
+**Before:**
+
+```c
+    case CachePolicyDomain:
+    {
+      if (LocaleCompare(name,"memory-map") == 0)
+        {
+          if (LocaleCompare(value,"anonymous") != 0)
+            return(MagickFalse);
+          ResetCacheAnonymousMemory();
+          return(MagickTrue);
+        }
+      break;
+    }
+```
+
+**After:**
+
+```c
+    case CachePolicyDomain:
+      return(SetCachePolicyValue(name,value));
+```
+
+**Careful:**
+
+- A helper that reads a variable the caller wrote inside the `switch` before the group
+  (step 2's complement) refuses the step: the parameters hold the value on entry.
+- Static data the block reads or writes (`policy_cache`) is visible to the helper in the
+  same file; the step does not move code between files.
+- No literal, call or test changes; calls to the helper are new calls, so
+  `refactor_guard.py` counts them as the new function's.
+
+**Evidence level:** oracle, for the function the step changes (`casemap.py` first).
+
+**Provenance:** 2026-11-12, from `policy.c`'s `SetMagickSecurityPolicyValue` (campaign B,
+M120): three domain groups to `SetCachePolicyValue`, `SetResourcePolicyValue` and
+`SetSystemPolicyValue`, the function leaving Large Method and Bumpy Road to 3 bumps, the
+file 5.29 to 5.45. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
+
+---
+
+## Recipe QS - Skip Quoted Text and Brackets in Helpers
+
+**Use when:** CodeScene reports *Deep, Nested Complexity* or *Bumpy Road Ahead* on a
+configuration loader that skips its `<!DOCTYPE ...>` element with a loop over the
+characters holding a `quote` state and a `bracket_depth` counter (`policy.c`'s
+`LoadPolicyCache`; the same loop stands in the other `Load*Cache` functions). Moved whole
+into a helper (Recipe E, with EJ) the loop is itself cc 12 and fails the gate for new
+code.
+
+**Not covered by:** Recipe E, which moves the loop unchanged and so keeps its cc; Recipe
+EJ, which joins `else` and `if` and leaves the quote state; Recipe SF, which flattens a
+`switch`.
+
+**How:**
+
+1. The loop is `for ( ; *q != '\0'; q++)` over `bracket_depth` and `quote`: while
+   `quote` is set it clears it at the next equal character and does nothing else;
+   otherwise a `"` or `'` sets it, `[` adds one to `bracket_depth`, `]` subtracts one when
+   it is above 0, and `>` at depth 0 ends the loop after `q++`. Nothing else is read or
+   written.
+2. Write `SkipQuotedText(const char *q)`, called with `q` at the opening quote: it
+   returns the last character of the quoted text, the closing quote or, with none, the
+   last character before the terminating `'\0'`. Write `SkipDoctypeElement(const char
+   *q)` as `while (*q != '\0')` testing, in an `if`/`else if` chain, a quote (`q=
+   SkipQuotedText(q);`), `[`, `]` with depth above 0, and `>` at depth 0
+   (`return(q+1);`), then `q++;`, and `return(q);` after the loop. Avoid `continue`: it
+   raises the function's cc.
+3. The loader's block becomes `q=SkipDoctypeElement(q);` then its `continue;`, the
+   comment kept.
+4. Check by reading that both functions, called on a string with no closing quote, no
+   `>`, or a `>` inside quotes or brackets, leave `q` where the loop did (at the
+   terminating `'\0'`, or after the `>` at depth 0).
+
+**Before:**
+
+```c
+        for ( ; *q != '\0'; q++)
+        {
+          if (quote != 0)
+            { if (*q == quote) quote=0; }
+          else
+            { if ((*q == '"') || (*q == '\'')) quote=(*q); /* [ ] > chain */ }
+        }
+```
+
+**After:**
+
+```c
+        q=SkipDoctypeElement(q);
+```
+
+**Careful:**
+
+- The quote state is replaced by a skip, so an unclosed quote ends the scan at the string
+  end exactly as before; step 4 is the argument, the oracle's DOCTYPE cases (quoted
+  `]>`, nested brackets) the check.
+- Both functions have no side effect and read only `q`.
+
+**Evidence level:** oracle, for the loader (`casemap.py` first), and the reading of step 4
+in the commit message.
+
+**Provenance:** 2026-11-12, from `policy.c`'s `LoadPolicyCache` (campaign B, M120): the
+loop as one helper scored 5.62 (`SkipDoctypeElement` cc 9 with a `continue`), the form
+above 5.76. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe LF - Name a Loop's Skip Tests
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function whose
+loop opens with a run of `if (<test>) continue;` statements, each a test of values that
+are already fixed when the loop body starts, as `policy.c`'s `IsRightsAuthorizedByName`
+does with `if (policy->domain != domain) continue;` and `if ((name != NULL) &&
+(LocaleCompare(name,policy->name) != 0)) continue;`.
+
+**Not covered by:** Recipe P, which names one expression and keeps the `if`; Recipe G,
+which turns a nested `if` into an early exit; Recipe PC, which moves a parallel loop's
+head; Recipe OC, which moves a block ending the iteration through out-parameters. None
+moves a run of skip tests as one predicate.
+
+**How:**
+
+1. Take the first statements of the loop body (after its declarations) that are
+   `if (<test>) continue;`, one or more, each a single `if` with no `else` and no block
+   that does anything but `continue;`. The tests read variables and call functions with
+   no side effect (`LocaleCompare`, member access); none writes anything, as checked by
+   reading.
+2. Write a `static MagickBooleanType Is<Name>(<inputs>)` above the caller, with the
+   variables the tests read as parameters (at most four, `const` where the original is),
+   whose body is `if (<test>) return(MagickFalse);` for each test, in order, then
+   `return(MagickTrue);`. Each test's text is copied character for character.
+3. The tests in the loop become `if (Is<Name>(<inputs>) == MagickFalse) continue;`.
+4. The tests that followed the run stay where they were.
+
+**Before:**
+
+```c
+    if (policy->domain != domain)
+      continue;
+    if ((name != (char *) NULL) && (LocaleCompare(name,policy->name) != 0))
+      continue;
+```
+
+**After:**
+
+```c
+    if (IsPolicyForName(policy,domain,name) == MagickFalse)
+      continue;
+```
+
+**Careful:**
+
+- The tests run in the same order and stop at the first that holds, as the `continue`s
+  did, so a later test that dereferences a pointer an earlier one checked is as safe as
+  before.
+- The helper's tests are the original's; a pointer parameter keeps the type the caller
+  has.
+
+**Evidence level:** oracle, for the function the step changes (`casemap.py` first).
+
+**Provenance:** 2026-11-12, from `policy.c`'s `IsRightsAuthorizedByName` (campaign B,
+M120), 5.88 to 5.93. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
+
+---
+
+## Recipe DL - Drop Case Labels That Share the Default
+
+**Use when:** CodeScene reports *Complex Method* on a function whose `switch` lists
+labels that do nothing but fall into `default:`, as `policy.c`'s
+`SetMagickSecurityPolicyValue` lists five `PolicyDomain` values
+(`case CoderPolicyDomain: ... case PathPolicyDomain: default: break;`). Each label counts
+as a branch.
+
+**Not covered by:** Recipe SD and its relatives, which split groups into functions;
+Recipe NS, which names a constant selection; Recipe EI, which chains guards. None removes
+a label.
+
+**How:**
+
+1. In a `switch`, find a run of `case` labels directly followed by `default:` and then
+   the default group's statements, with no statement between the labels. The run is
+   written together with `default:` in one group (all fall into the same statements).
+2. Delete those `case` labels and keep `default:` and its statements unchanged.
+3. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
+   the step. (A build that warns on enumerators missing from a `switch` with a
+   `default:` (`-Wswitch-enum`) is not the oracle build; the step is refused where the
+   project's own flags include it.)
+
+**Before:**
+
+```c
+    case CoderPolicyDomain:
+    case DelegatePolicyDomain:
+    case PathPolicyDomain:
+    default:
+      break;
+```
+
+**After:**
+
+```c
+    default:
+      break;
+```
+
+**Careful:**
+
+- A label with its own statements, or one that falls into a group other than the
+  `default` one, is not covered: step 1 refuses it.
+- The labels documented which enumerators the function means to ignore. A comment on the
+  `default:` may keep that, at no cost to the score.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`.
+
+**Provenance:** 2026-11-12, from `policy.c`'s `SetMagickSecurityPolicyValue` (campaign B,
+M120): cc 12 to 7, the file 6.02 to 6.21, object file unchanged. Added by Claude Code
+(Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe DT - Drop a Boolean Ternary After a Logical Expression
+
+**Use when:** CodeScene reports *Complex Method* on a function that ends in, or assigns,
+`(<expr>) ? MagickTrue : MagickFalse` where `<expr>` is a comparison or a chain of
+comparisons joined by `&&` and `||` (the form Recipe P gives its predicates; `policy.c`'s
+`IsPolicyPathSeparator`, `IsNewPolicyPath`, `IsLimitPolicyDomain` and `IsPathAuthorized`).
+Each `?:` counts as a branch.
+
+**Not covered by:** Recipe P, which writes the ternary; Recipe CN, which merges nested
+tests. Neither removes one.
+
+**How:**
+
+1. Find `? MagickTrue : MagickFalse` (or `? MagickFalse : MagickTrue`, with the test's
+   sense kept as written) whose condition is a comparison (`==`, `!=`, `<`, ...), a `!`
+   test, or `&&` / `||` of those, all of which yield `0` or `1` in C.
+2. Delete the ternary and keep the condition: `return(a == b);`, `status = (a != b) &&
+   (c == d);`. A condition that is a bare value (`return(p ? MagickTrue : MagickFalse);`,
+   `x & mask`) is refused: its value is not `0` or `1`.
+3. `MagickFalse` is `0` and `MagickTrue` is `1` (`MagickCore/magick-type.h`); check it
+   once by reading. A `MagickBooleanType` function returning, or a variable of that type
+   assigned, an `int` of `0` or `1` is the same value.
+4. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL`; otherwise revert the
+   step. Run `tools/ci_warnings.sh <file>` and keep the step only if it prints `OK`.
+
+**Before:**
+
+```c
+  return(((policy_info[i]->domain == CachePolicyDomain) ||
+    (policy_info[i]->domain == ResourcePolicyDomain)) ? MagickTrue : MagickFalse);
+```
+
+**After:**
+
+```c
+  return((policy_info[i]->domain == CachePolicyDomain) ||
+    (policy_info[i]->domain == ResourcePolicyDomain));
+```
+
+**Careful:**
+
+- Recipe P's predicates keep the ternary for the sake of the type; where the object file
+  is unchanged and the warnings clean, the form is the same program.
+- A condition whose value can be other than `0` or `1` (a bit test, a pointer) must keep
+  the ternary: step 2.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD` and `tools/ci_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-12, from `policy.c` (campaign B, M120): seven ternaries, the
+file 6.21 to 6.38, object code identical. Added by Claude Code (Claude Sonnet 5.5) under
+the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -12584,3 +13130,11 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | AMEND | CT | Step 5: a member the helper only reads, whose variable another block of the loop writes and whose uses include a macro that names the variable, is bound `T *const v = *targets->v;` with its uses unchanged; the helper that writes it uses `(*v)`. *Careful* gives the argument | `widget.c`'s `XFontBrowserWidget` (campaign A, W18 lane c, wide build): the action-redraw block assigns the caller's `font_info` (`font_info=XLoadQueryFont(...)`, never restored), and `QuantumMargin`, used by almost every other block, expands to `font_info->max_bounds.width`; an input-struct copy would change what those blocks read after the redraw, a pointer-to-pointer member written `(*font_info)` would not compile inside the macro | owner |
 | 2026-11-12 | NEW | GC | Guard Returns from a Conjunction: `if (A1 && ... && An) return(T); return(F);` (`T`, `F` constants, `n` at least three, no logical-or operator) becomes one `if (Ai') return(F);` per operand in order and `return(T);`, `Ai'` the inverse as Recipe G says (`!(Ai)` for floating-point operands, calls and bare values). *Careful* gives the argument (left-to-right short circuit, each operand evaluated at most once, same order) | `opencl.c`'s `IsSameOpenCLDevice` and `IsBenchmarkedOpenCLDevice` (campaign A, W19 lane a, wide build): the file's two *Complex Conditional* functions, twins on two struct types that no predicate or merge reaches (six operands, eight parameters); one as guards 6.33 to 6.83, both 7.36 | owner |
 | 2026-11-12 | NEW | GD | Guard Returns from a Disjunction: `if (A1 or A2 or ... or An) return(F);` (`F` a constant or a bare `return;`, `n` at least three, no `&&`) becomes one `if (Ai) return(F);` per operand in order. *Careful* gives the argument (left-to-right short circuit, each operand evaluated at most once, same order) | `accelerate.c`'s `AccelerateGrayscaleImage` (campaign A, W19 lane a, wide build): its three-trait failure test is the file's only *Complex Conditional*; Recipe P's predicate 3.19 to 3.19 (a new clone function), three guards 3.19 to 3.27 | owner |
+| 2026-11-09 | NEW | EJ | Join an Else and its Sole If: `else` and the `if` on the next line become `else if` on one line, whitespace only; proof `obj_identical.sh` | `color.c`'s DOCTYPE skipper (extraction verbatim 4.24 to 4.09; with the chain joined 4.42) and the hex-digit loops of `QueryColorCompliance`; unbraced `else`/`if` nesting counts as a level for CodeScene | mandate (2026-10-24) |
+| 2026-11-12 | NEW | NG | Drop the `NULL` guard before a release routine that returns at once on `NULL` (`x=DestroyString(x)`); proof by reading the callee, evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (3 guards) and `DestroyPolicyElement` (4): a file at the 1,000-line limit loses 0.25 to *Lines of Code in a Single File* when an extraction adds lines; 4.58 to 4.88 with the guards gone | mandate (2026-10-24) |
+| 2026-11-12 | NEW | SF | Flatten a first-letter `switch` over `LocaleCompare` groups into an `if`/`else if` chain; evidence oracle | `policy.c`'s `SetPolicyInfoAttribute` (cc 20 to 7, 5.02 to 5.29); the same shape stands in seven other files | mandate (2026-10-24) |
+| 2026-11-12 | NEW | RC | Extract a switch group that returns `R` or breaks to a constant `return(F);` into a function ending in `return(F);`; evidence oracle | `policy.c`'s `SetMagickSecurityPolicyValue` (three domain groups; 5.29 to 5.45); SR and Z refuse a `return` in the group, E step 7 takes the tail only | mandate (2026-10-24) |
+| 2026-11-12 | NEW | QS | Replace the quote-state and bracket-depth loop that skips a DOCTYPE by `SkipQuotedText` and `SkipDoctypeElement`; evidence oracle | `policy.c`'s `LoadPolicyCache` (5.45 to 5.76); E with EJ leaves a cc 12 helper the gate refuses | mandate (2026-10-24) |
+| 2026-11-12 | NEW | LF | Move a loop's leading run of `if (<test>) continue;` into one `Is<Name>` predicate; evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (5.88 to 5.93); P names one expression and keeps its `if` | mandate (2026-10-24) |
+| 2026-11-12 | NEW | DL | Drop `case` labels that fall straight into `default:`; proof `obj_identical.sh` | `policy.c`'s `SetMagickSecurityPolicyValue` (five enumerator labels; 6.02 to 6.21, object code identical) | mandate (2026-10-24) |
+| 2026-11-12 | NEW | DT | Drop `? MagickTrue : MagickFalse` after a comparison or a chain of them; proof `obj_identical.sh` and `ci_warnings.sh` | `policy.c` (seven sites in seven functions; 6.21 to 6.38, object code identical); P writes the ternary and nothing removes it | mandate (2026-10-24) |

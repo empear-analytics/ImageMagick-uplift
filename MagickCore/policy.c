@@ -153,6 +153,20 @@ static MagickBooleanType
   LoadPolicyCache(const PolicyLoadTarget *,const char *,const char *,
     const size_t);
 
+static void SetBuiltInPolicyInfo(PolicyInfo *policy_info,
+  const PolicyMapInfo *p)
+{
+  (void) memset(policy_info,0,sizeof(*policy_info));
+  policy_info->path=(char *) "[built-in]";
+  policy_info->domain=p->domain;
+  policy_info->rights=p->rights;
+  policy_info->name=(char *) p->name;
+  policy_info->pattern=(char *) p->pattern;
+  policy_info->value=(char *) p->value;
+  policy_info->exempt=MagickTrue;
+  policy_info->signature=MagickCoreSignature;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -247,15 +261,7 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
         CatchException(exception);
         continue;
       }
-    (void) memset(policy_info,0,sizeof(*policy_info));
-    policy_info->path=(char *) "[built-in]";
-    policy_info->domain=p->domain;
-    policy_info->rights=p->rights;
-    policy_info->name=(char *) p->name;
-    policy_info->pattern=(char *) p->pattern;
-    policy_info->value=(char *) p->value;
-    policy_info->exempt=MagickTrue;
-    policy_info->signature=MagickCoreSignature;
+    SetBuiltInPolicyInfo(policy_info,p);
     status=AppendValueToLinkedList(cache,policy_info);
     if (status == MagickFalse)
       {
@@ -268,6 +274,42 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
   return(cache);
 }
 
+static void StripPolicyWhitespace(char *policyname)
+{
+  char
+    *q;
+
+  for (q=policyname; *q != '\0'; q++)
+  {
+    if (isspace((int) ((unsigned char) *q)) == 0)
+      continue;
+    (void) CopyMagickString(q,q+1,MagickPathExtent);
+    q--;
+  }
+}
+
+static PolicyDomain StripPolicyDomain(char *policyname)
+{
+  char
+    *q;
+
+  PolicyDomain
+    domain;
+
+  domain=UndefinedPolicyDomain;
+  for (q=policyname; *q != '\0'; q++)
+  {
+    if (*q != ':')
+      continue;
+    *q='\0';
+    domain=(PolicyDomain) ParseCommandOption(MagickPolicyDomainOptions,
+      MagickTrue,policyname);
+    (void) CopyMagickString(policyname,q+1,MagickPathExtent);
+    break;
+  }
+  return(domain);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -296,8 +338,7 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
 static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
 {
   char
-    policyname[MagickPathExtent],
-    *q;
+    policyname[MagickPathExtent];
 
   ElementInfo
     *p;
@@ -317,27 +358,11 @@ static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
   *policyname='\0';
   if (name != (const char *) NULL)
     (void) CopyMagickString(policyname,name,MagickPathExtent);
-  for (q=policyname; *q != '\0'; q++)
-  {
-    if (isspace((int) ((unsigned char) *q)) == 0)
-      continue;
-    (void) CopyMagickString(q,q+1,MagickPathExtent);
-    q--;
-  }
+  StripPolicyWhitespace(policyname);
   /*
     Strip domain from policy name (e.g. resource:map).
   */
-  domain=UndefinedPolicyDomain;
-  for (q=policyname; *q != '\0'; q++)
-  {
-    if (*q != ':')
-      continue;
-    *q='\0';
-    domain=(PolicyDomain) ParseCommandOption(MagickPolicyDomainOptions,
-      MagickTrue,policyname);
-    (void) CopyMagickString(policyname,q+1,MagickPathExtent);
-    break;
-  }
+  domain=StripPolicyDomain(policyname);
   /*
     Search for policy tag.
   */
@@ -616,7 +641,12 @@ static inline MagickBooleanType IsPolicyPathSeparator(const char c)
   if ((c == '/') || (c == '\\'))
     return(MagickTrue);
 #endif
-  return(c == *DirectorySeparator ? MagickTrue : MagickFalse);
+  return(c == *DirectorySeparator);
+}
+
+static inline MagickBooleanType IsPolicyPathComponentCharacter(const char c)
+{
+  return((c != '\0') && (IsPolicyPathSeparator(c) == MagickFalse));
 }
 
 static inline MagickBooleanType IsPathContainsSymlink(const char *path)
@@ -656,7 +686,7 @@ static inline MagickBooleanType IsPathContainsSymlink(const char *path)
     /*
       Copy next component into a temporary buffer.
     */
-    while ((*p != '\0') && (IsPolicyPathSeparator(*p) == MagickFalse) &&
+    while ((IsPolicyPathComponentCharacter(*p) != MagickFalse) &&
            ((i+1) < (ssize_t) sizeof(component)))
       component[i++]=(*p++);
     component[i]='\0';
@@ -687,14 +717,11 @@ static inline MagickBooleanType IsPathContainsSymlink(const char *path)
     (void) memcpy(partial+offset,component,i);
     offset+=i;
     partial[offset]='\0';
-    if (*p != '\0')
-      {
-        /*
-          Check whether this prefix is a symlink.
-        */
-        if (is_symlink_utf8(partial) != MagickFalse)
-          return(MagickTrue);
-      }
+    /*
+      Check whether this prefix is a symlink.
+    */
+    if ((*p != '\0') && (is_symlink_utf8(partial) != MagickFalse))
+      return(MagickTrue);
     /*
       Skip separator.
     */
@@ -710,15 +737,13 @@ MagickExport MagickBooleanType IsPathAuthorized(const PolicyRights rights,
   MagickBooleanType symlink_follow_allowed = IsRightsAuthorizedByName(
     SystemPolicyDomain,"symlink",rights,"follow");
   MagickBooleanType status =
-    ((IsRightsAuthorized(PathPolicyDomain,rights,path) != MagickFalse) &&
+    (IsRightsAuthorized(PathPolicyDomain,rights,path) != MagickFalse) &&
     ((symlink_follow_allowed != MagickFalse) ||
-     (is_symlink_utf8(path) == MagickFalse))) ? MagickTrue : MagickFalse;
+     (is_symlink_utf8(path) == MagickFalse));
   if ((status != MagickFalse) && (symlink_follow_allowed == MagickFalse))
-    {
-      if ((is_symlink_utf8(path) != MagickFalse) ||
-          (IsPathContainsSymlink(path) != MagickFalse))
-        status=MagickFalse;
-    }
+    if ((is_symlink_utf8(path) != MagickFalse) ||
+        (IsPathContainsSymlink(path) != MagickFalse))
+      status=MagickFalse;
   if (status != MagickFalse)
     status=IsFileResourceIdentityValid(path);
   return(status);
@@ -759,7 +784,7 @@ static MagickBooleanType IsPolicyCacheInstantiated(ExceptionInfo *exception)
         policy_cache=AcquirePolicyCache(PolicyFilename,exception);
       UnlockSemaphoreInfo(policy_semaphore);
     }
-  return(policy_cache != (LinkedListInfo *) NULL ? MagickTrue : MagickFalse);
+  return(policy_cache != (LinkedListInfo *) NULL);
 }
 
 /*
@@ -820,6 +845,53 @@ static MagickBooleanType IsCanonicalRightsAuthorized(
   if ((canonical_denied_mask & rights) != 0)
     status=MagickFalse;
   return(status);
+}
+
+static MagickBooleanType IsPolicyForName(const PolicyInfo *policy,
+  const PolicyDomain domain,const char *name)
+{
+  if (policy->domain != domain)
+    return(MagickFalse);
+  if ((name != (char *) NULL) && (LocaleCompare(name,policy->name) != 0))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static char *AcquireCanonicalCandidate(const char *canonical_directory,
+  const char *filename)
+{
+  char
+    *canonical_candidate;
+
+  size_t
+    length;
+
+  if ((canonical_directory == (const char *) NULL) || (*filename == '\0'))
+    return((char *) NULL);
+  length=strlen(canonical_directory)+strlen(filename)+2;
+  canonical_candidate=(char *) AcquireCriticalMemory(length*
+    sizeof(*canonical_candidate));
+  if (canonical_candidate != (char *) NULL)
+    (void) FormatLocaleString(canonical_candidate,length,"%s%s%s",
+      canonical_directory,DirectorySeparator,filename);
+  return(canonical_candidate);
+}
+
+static MagickBooleanType IsGlobMatch(const char *path,const char *pattern)
+{
+  return(path != (const char *) NULL ? GlobExpression(path,pattern,
+    MagickFalse) : MagickFalse);
+}
+
+static MagickBooleanType IsCanonicalMatch(const char *canonical_path,
+  const char *canonical_candidate,const char *canonical_directory,
+  const char *pattern)
+{
+  if (IsGlobMatch(canonical_path,pattern) != MagickFalse)
+    return(MagickTrue);
+  if (IsGlobMatch(canonical_candidate,pattern) != MagickFalse)
+    return(MagickTrue);
+  return(IsGlobMatch(canonical_directory,pattern));
 }
 
 MagickExport MagickBooleanType IsRightsAuthorizedByName(
@@ -885,9 +957,7 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
       match = MagickFalse,
       matched_canonical = MagickFalse;
 
-    if (policy->domain != domain)
-      continue;
-    if ((name != (char *) NULL) && (LocaleCompare(name,policy->name) != 0))
+    if (IsPolicyForName(policy,domain,name) == MagickFalse)
       continue;
     match=GlobExpression(pattern,policy->pattern,MagickFalse);
     if (policy->domain == PathPolicyDomain)
@@ -901,40 +971,17 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
             GetPathComponent(pattern,HeadPath,directory);
             GetPathComponent(pattern,TailPath,filename);
             canonical_directory=realpath_utf8(directory);
-            if ((canonical_directory != (char *) NULL) && (*filename != '\0'))
-              {
-                size_t
-                  length;
-
-                length=strlen(canonical_directory)+strlen(filename)+2;
-                canonical_candidate=(char *) AcquireCriticalMemory(length*
-                  sizeof(*canonical_candidate));
-                if (canonical_candidate != (char *) NULL)
-                  (void) FormatLocaleString(canonical_candidate,length,"%s%s%s",
-                    canonical_directory,DirectorySeparator,filename);
-              }
+            canonical_candidate=AcquireCanonicalCandidate(canonical_directory,
+              filename);
             canonical_path=realpath_utf8(pattern);
           }
         /*
           Match against directory, basename, and canonical path.
         */
-        if ((canonical_directory != (char *) NULL) && (match == MagickFalse))
-          match=GlobExpression(canonical_directory,policy->pattern,MagickFalse);
-        if ((canonical_candidate != (char *) NULL) && (match == MagickFalse))
-          match=GlobExpression(canonical_candidate,policy->pattern,MagickFalse);
-        if ((canonical_path != (char *) NULL) && (match == MagickFalse))
-          match=GlobExpression(canonical_path,policy->pattern,MagickFalse);
-        if ((canonical_path != (char *) NULL) &&
-            (GlobExpression(canonical_path,policy->pattern,MagickFalse) != MagickFalse))
-          matched_canonical=MagickTrue;
-        else
-          if ((canonical_candidate != (char *) NULL) &&
-              (GlobExpression(canonical_candidate,policy->pattern,MagickFalse) != MagickFalse))
-            matched_canonical=MagickTrue;
-          else
-           if ((canonical_directory != (char *) NULL) &&
-               (GlobExpression(canonical_directory,policy->pattern,MagickFalse) != MagickFalse))
-             matched_canonical=MagickTrue;
+        matched_canonical=IsCanonicalMatch(canonical_path,canonical_candidate,
+          canonical_directory,policy->pattern);
+        if (match == MagickFalse)
+          match=matched_canonical;
       }
     if (match == MagickFalse)
       continue;
@@ -950,12 +997,9 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
       }
   }
   UnlockSemaphoreInfo(policy_semaphore);
-  if (canonical_directory != (char *) NULL)
-    canonical_directory=DestroyString(canonical_directory);
-  if (canonical_candidate != (char *) NULL)
-    canonical_candidate=DestroyString(canonical_candidate);
-  if (canonical_path != (char *) NULL)
-    canonical_path=DestroyString(canonical_path);
+  canonical_directory=DestroyString(canonical_directory);
+  canonical_candidate=DestroyString(canonical_candidate);
+  canonical_path=DestroyString(canonical_path);
   /*
     Is rights authorized?
   */
@@ -1007,18 +1051,44 @@ MagickExport MagickBooleanType IsRightsAuthorized(const PolicyDomain domain,
 static inline MagickBooleanType IsNewPolicyPath(const char *path,
   const PolicyInfo **policy_info,const ssize_t i)
 {
-  return((((path == (const char *) NULL) ||
+  return(((path == (const char *) NULL) ||
     (LocaleCompare(path,policy_info[i]->path) != 0)) &&
-    (policy_info[i]->path != (char *) NULL)) ? MagickTrue : MagickFalse);
+    (policy_info[i]->path != (char *) NULL));
 }
 
 static inline MagickBooleanType IsLimitPolicyDomain(
   const PolicyInfo **policy_info,const ssize_t i)
 {
-  return(((policy_info[i]->domain == CachePolicyDomain) ||
+  return((policy_info[i]->domain == CachePolicyDomain) ||
     (policy_info[i]->domain == ResourcePolicyDomain) ||
-    (policy_info[i]->domain == SystemPolicyDomain)) ? MagickTrue :
-    MagickFalse);
+    (policy_info[i]->domain == SystemPolicyDomain));
+}
+
+static void ListPolicyLimit(FILE *file,const PolicyInfo **policy_info,
+  const ssize_t i)
+{
+  if (policy_info[i]->name != (char *) NULL)
+    (void) FormatLocaleFile(file,"    name: %s\n",policy_info[i]->name);
+  if (policy_info[i]->value != (char *) NULL)
+    (void) FormatLocaleFile(file,"    value: %s\n",policy_info[i]->value);
+}
+
+static void ListPolicyRights(FILE *file,const PolicyInfo **policy_info,
+  const ssize_t i)
+{
+  (void) FormatLocaleFile(file,"    rights: ");
+  if (policy_info[i]->rights == NoPolicyRights)
+    (void) FormatLocaleFile(file,"None ");
+  if ((policy_info[i]->rights & ReadPolicyRights) != 0)
+    (void) FormatLocaleFile(file,"Read ");
+  if ((policy_info[i]->rights & WritePolicyRights) != 0)
+    (void) FormatLocaleFile(file,"Write ");
+  if ((policy_info[i]->rights & ExecutePolicyRights) != 0)
+    (void) FormatLocaleFile(file,"Execute ");
+  (void) FormatLocaleFile(file,"\n");
+  if (policy_info[i]->pattern != (char *) NULL)
+    (void) FormatLocaleFile(file,"    pattern: %s\n",
+      policy_info[i]->pattern);
 }
 
 MagickExport MagickBooleanType ListPolicyInfo(FILE *file,
@@ -1057,28 +1127,9 @@ MagickExport MagickBooleanType ListPolicyInfo(FILE *file,
       policy_info[i]->domain);
     (void) FormatLocaleFile(file,"  Policy: %s\n",domain);
     if (IsLimitPolicyDomain(policy_info,i) != MagickFalse)
-      {
-        if (policy_info[i]->name != (char *) NULL)
-          (void) FormatLocaleFile(file,"    name: %s\n",policy_info[i]->name);
-        if (policy_info[i]->value != (char *) NULL)
-          (void) FormatLocaleFile(file,"    value: %s\n",policy_info[i]->value);
-      }
+      ListPolicyLimit(file,policy_info,i);
     else
-      {
-        (void) FormatLocaleFile(file,"    rights: ");
-        if (policy_info[i]->rights == NoPolicyRights)
-          (void) FormatLocaleFile(file,"None ");
-        if ((policy_info[i]->rights & ReadPolicyRights) != 0)
-          (void) FormatLocaleFile(file,"Read ");
-        if ((policy_info[i]->rights & WritePolicyRights) != 0)
-          (void) FormatLocaleFile(file,"Write ");
-        if ((policy_info[i]->rights & ExecutePolicyRights) != 0)
-          (void) FormatLocaleFile(file,"Execute ");
-        (void) FormatLocaleFile(file,"\n");
-        if (policy_info[i]->pattern != (char *) NULL)
-          (void) FormatLocaleFile(file,"    pattern: %s\n",
-            policy_info[i]->pattern);
-      }
+      ListPolicyRights(file,policy_info,i);
   }
   policy_info=(const PolicyInfo **) RelinquishMagickMemory((void *)
     policy_info);
@@ -1126,14 +1177,10 @@ static void *DestroyPolicyElement(void *policy_info)
   p=(PolicyInfo *) policy_info;
   if (p->exempt == MagickFalse)
     {
-      if (p->value != (char *) NULL)
-        p->value=DestroyString(p->value);
-      if (p->pattern != (char *) NULL)
-        p->pattern=DestroyString(p->pattern);
-      if (p->name != (char *) NULL)
-        p->name=DestroyString(p->name);
-      if (p->path != (char *) NULL)
-        p->path=DestroyString(p->path);
+      p->value=DestroyString(p->value);
+      p->pattern=DestroyString(p->pattern);
+      p->name=DestroyString(p->name);
+      p->path=DestroyString(p->path);
     }
   p=(PolicyInfo *) RelinquishMagickMemory(p);
   return((void *) NULL);
@@ -1162,73 +1209,78 @@ static void GetIncludePath(const char *filename,const char *token,
 static void SetPolicyInfoAttribute(PolicyInfo *policy_info,const char *keyword,
   const char *token)
 {
-  switch (*keyword)
+  if (LocaleCompare((char *) keyword,"domain") == 0)
+    policy_info->domain=(PolicyDomain) ParseCommandOption(
+      MagickPolicyDomainOptions,MagickTrue,token);
+  else if (LocaleCompare((char *) keyword,"name") == 0)
+    policy_info->name=AcquirePolicyString(token,1);
+  else if (LocaleCompare((char *) keyword,"pattern") == 0)
+    policy_info->pattern=AcquirePolicyString(token,1);
+  else if (LocaleCompare((char *) keyword,"rights") == 0)
+    policy_info->rights=(PolicyRights) ParseCommandOption(
+      MagickPolicyRightsOptions,MagickTrue,token);
+  else if (LocaleCompare((char *) keyword,"stealth") == 0)
+    policy_info->stealth=IsStringTrue(token);
+  else if (LocaleCompare((char *) keyword,"value") == 0)
+    policy_info->value=AcquirePolicyString(token,1);
+}
+
+static const char *SkipQuotedText(const char *q)
+{
+  const char
+    quote = (*q),
+    *p = q+1;
+
+  /*
+    Return the last character of the quoted text: the closing quote, or the
+    last character of the string if the quote is not closed.
+  */
+  while ((*p != '\0') && (*p != quote))
+    p++;
+  return(*p == '\0' ? p-1 : p);
+}
+
+static const char *SkipDoctypeElement(const char *q)
+{
+  int
+    bracket_depth = 0;
+
+  while (*q != '\0')
   {
-    case 'D':
-    case 'd':
-    {
-      if (LocaleCompare((char *) keyword,"domain") == 0)
-        {
-          policy_info->domain=(PolicyDomain) ParseCommandOption(
-            MagickPolicyDomainOptions,MagickTrue,token);
-          break;
-        }
-      break;
-    }
-    case 'N':
-    case 'n':
-    {
-      if (LocaleCompare((char *) keyword,"name") == 0)
-        {
-          policy_info->name=AcquirePolicyString(token,1);
-          break;
-        }
-      break;
-    }
-    case 'P':
-    case 'p':
-    {
-      if (LocaleCompare((char *) keyword,"pattern") == 0)
-        {
-          policy_info->pattern=AcquirePolicyString(token,1);
-          break;
-        }
-      break;
-    }
-    case 'R':
-    case 'r':
-    {
-      if (LocaleCompare((char *) keyword,"rights") == 0)
-        {
-          policy_info->rights=(PolicyRights) ParseCommandOption(
-            MagickPolicyRightsOptions,MagickTrue,token);
-          break;
-        }
-      break;
-    }
-    case 'S':
-    case 's':
-    {
-      if (LocaleCompare((char *) keyword,"stealth") == 0)
-        {
-          policy_info->stealth=IsStringTrue(token);
-          break;
-        }
-      break;
-    }
-    case 'V':
-    case 'v':
-    {
-      if (LocaleCompare((char *) keyword,"value") == 0)
-        {
-          policy_info->value=AcquirePolicyString(token,1);
-          break;
-        }
-      break;
-    }
-    default:
-      break;
+    if (strchr("\"'",*q) != (char *) NULL)
+      q=SkipQuotedText(q);
+    else if (*q == '[')
+      bracket_depth++;
+    else if ((*q == ']') && (bracket_depth > 0))
+      bracket_depth--;
+    else if ((*q == '>') && (bracket_depth == 0))
+      return(q+1);   /* consume final '>' */
+    q++;
   }
+  return(q);
+}
+
+static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
+  const char *policy,const char *filename,const size_t depth);
+
+static MagickBooleanType LoadPolicyInclude(const PolicyLoadTarget *target,
+  const char *filename,const char *token,const size_t depth)
+{
+  char
+    path[MagickPathExtent],
+    *file_xml;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  GetIncludePath(filename,token,path);
+  file_xml=FileToXML(path,~0UL);
+  if (file_xml != (char *) NULL)
+    {
+      status=LoadPolicyCache(target,file_xml,path,depth+1);
+      file_xml=DestroyString(file_xml);
+    }
+  return(status);
 }
 
 static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
@@ -1278,41 +1330,10 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
     (void) CopyMagickString(keyword,token,MagickPathExtent);
     if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
       {
-        int
-          bracket_depth = 0,
-          quote = 0;
-
         /*
           DOCTYPE element.
         */
-        for ( ; *q != '\0'; q++)
-        {
-          if (quote != 0)
-            {
-              if (*q == quote)
-                quote=0;
-            }
-          else
-            {
-              if ((*q == '"') || (*q == '\''))
-                quote=(*q);
-              else
-                if (*q == '[')
-                  bracket_depth++;
-                else
-                  if (*q == ']')
-                    {
-                      if (bracket_depth > 0)
-                        bracket_depth--;
-                    }
-                  else
-                    if ((*q == '>') && (bracket_depth == 0))
-                      {
-                        q++;   /* consume final '>' */
-                        break;
-                      }
-            }
-        }
+        q=SkipDoctypeElement(q);
         continue;
       }
     if (LocaleNCompare(keyword,"<!--",4) == 0)
@@ -1342,22 +1363,8 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
                 (void) ThrowMagickException(exception,GetMagickModule(),
                   ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
               else
-                {
-                  const PolicyLoadTarget include_target = { cache, exception };
-
-                  char
-                    path[MagickPathExtent],
-                    *file_xml;
-
-                  GetIncludePath(filename,token,path);
-                  file_xml=FileToXML(path,~0UL);
-                  if (file_xml != (char *) NULL)
-                    {
-                      status&=(MagickStatusType) LoadPolicyCache(
-                        &include_target,file_xml,path,depth+1);
-                      file_xml=DestroyString(file_xml);
-                    }
-                }
+                status&=(MagickStatusType) LoadPolicyInclude(target,filename,
+                  token,depth);
             }
         }
         continue;
@@ -1395,7 +1402,7 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
     SetPolicyInfoAttribute(policy_info,keyword,token);
   }
   token=(char *) RelinquishMagickMemory(token);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return(status != 0);
 }
 
 /*
@@ -1560,6 +1567,83 @@ MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
   return(status);
 }
 
+static MagickSizeType GetPolicyLimit(const char *value)
+{
+  MagickSizeType
+    limit;
+
+  limit=MagickResourceInfinity;
+  if (LocaleCompare("unlimited",value) != 0)
+    limit=StringToMagickSizeType(value,100.0);
+  return(limit);
+}
+
+static MagickBooleanType SetCachePolicyValue(const char *name,
+  const char *value)
+{
+  if (LocaleCompare(name,"memory-map") == 0)
+    {
+      if (LocaleCompare(value,"anonymous") != 0)
+        return(MagickFalse);
+      ResetCacheAnonymousMemory();
+      ResetStreamAnonymousMemory();
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static MagickBooleanType SetResourcePolicyValue(const char *name,
+  const char *value)
+{
+  ssize_t
+    type;
+
+  type=ParseCommandOption(MagickResourceOptions,MagickFalse,name);
+  if (type >= 0)
+    {
+      MagickSizeType
+        limit;
+
+      limit=GetPolicyLimit(value);
+      if ((ResourceType) type == TimeResource)
+        limit=(MagickSizeType) ParseMagickTimeToLive(value);
+      return(SetMagickResourceLimit((ResourceType) type,limit));
+    }
+  return(MagickFalse);
+}
+
+static MagickBooleanType SetSystemPolicyValue(const char *name,
+  const char *value)
+{
+  if (LocaleCompare(name,"max-memory-request") == 0)
+    {
+      SetMaxMemoryRequest(GetPolicyLimit(value));
+      return(MagickTrue);
+    }
+  if (LocaleCompare(name,"max-profile-size") == 0)
+    {
+      SetMaxProfileSize(GetPolicyLimit(value));
+      return(MagickTrue);
+    }
+  if (LocaleCompare(name,"memory-map") == 0)
+    {
+      if (LocaleCompare(value,"anonymous") != 0)
+        return(MagickFalse);
+      ResetVirtualAnonymousMemory();
+      return(MagickTrue);
+    }
+  if (LocaleCompare(name,"precision") == 0)
+    {
+      int
+        limit;
+
+      limit=StringToInteger(value);
+      SetMagickPrecision(limit);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1604,84 +1688,11 @@ MagickExport MagickBooleanType SetMagickSecurityPolicyValue(
   switch (domain)
   {
     case CachePolicyDomain:
-    {
-      if (LocaleCompare(name,"memory-map") == 0)
-        {
-          if (LocaleCompare(value,"anonymous") != 0)
-            return(MagickFalse);
-          ResetCacheAnonymousMemory();
-          ResetStreamAnonymousMemory();
-          return(MagickTrue);
-        }
-      break;
-    }
+      return(SetCachePolicyValue(name,value));
     case ResourcePolicyDomain:
-    {
-      ssize_t
-        type;
-
-      type=ParseCommandOption(MagickResourceOptions,MagickFalse,name);
-      if (type >= 0)
-        {
-          MagickSizeType
-            limit;
-
-          limit=MagickResourceInfinity;
-          if (LocaleCompare("unlimited",value) != 0)
-            limit=StringToMagickSizeType(value,100.0);
-          if ((ResourceType) type == TimeResource)
-            limit=(MagickSizeType) ParseMagickTimeToLive(value);
-          return(SetMagickResourceLimit((ResourceType) type,limit));
-        }
-      break;
-    }
+      return(SetResourcePolicyValue(name,value));
     case SystemPolicyDomain:
-    {
-      if (LocaleCompare(name,"max-memory-request") == 0)
-        {
-          MagickSizeType
-            limit;
-
-          limit=MagickResourceInfinity;
-          if (LocaleCompare("unlimited",value) != 0)
-            limit=StringToMagickSizeType(value,100.0);
-          SetMaxMemoryRequest(limit);
-          return(MagickTrue);
-        }
-      if (LocaleCompare(name,"max-profile-size") == 0)
-        {
-          MagickSizeType
-            limit;
-
-          limit=MagickResourceInfinity;
-          if (LocaleCompare("unlimited",value) != 0)
-            limit=StringToMagickSizeType(value,100.0);
-          SetMaxProfileSize(limit);
-          return(MagickTrue);
-        }
-      if (LocaleCompare(name,"memory-map") == 0)
-        {
-          if (LocaleCompare(value,"anonymous") != 0)
-            return(MagickFalse);
-          ResetVirtualAnonymousMemory();
-          return(MagickTrue);
-        }
-      if (LocaleCompare(name,"precision") == 0)
-        {
-          int
-            limit;
-
-          limit=StringToInteger(value);
-          SetMagickPrecision(limit);
-          return(MagickTrue);
-        }
-      break;
-    }
-    case CoderPolicyDomain:
-    case DelegatePolicyDomain:
-    case FilterPolicyDomain:
-    case ModulePolicyDomain:
-    case PathPolicyDomain:
+      return(SetSystemPolicyValue(name,value));
     default:
       break;
   }

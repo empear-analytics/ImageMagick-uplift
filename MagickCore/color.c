@@ -1018,6 +1018,13 @@ MagickPrivate void ColorComponentTerminus(void)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsColorNameCompliant(const ColorInfo *color,
+  const ComplianceType compliance,const char *colorname)
+{
+  return((((color->compliance & compliance) != 0) &&
+    (LocaleCompare(colorname,color->name) == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport const ColorInfo *GetColorCompliance(const char *name,
   const ComplianceType compliance,ExceptionInfo *exception)
 {
@@ -1065,8 +1072,7 @@ MagickExport const ColorInfo *GetColorCompliance(const char *name,
   while (p != (ElementInfo *) NULL)
   {
     color=(const ColorInfo *) p->value;
-    if (((color->compliance & compliance) != 0) &&
-        (LocaleCompare(colorname,color->name) == 0))
+    if (IsColorNameCompliant(color,compliance,colorname) != MagickFalse)
       break;
     p=p->next;
   }
@@ -1184,6 +1190,33 @@ static inline MagickBooleanType IsLCHColorspace(
     (colorspace == LCHuvColorspace)) ? MagickTrue : MagickFalse);
 }
 
+static void SetRedComponent(const PixelInfo *pixel,
+  const ComplianceType compliance,double *color,double *scale)
+{
+  *color=pixel->red;
+  if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
+    *scale=360.0;
+  if ((compliance != NoCompliance) &&
+      (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
+    *scale=100.0;
+  if (pixel->colorspace == XYZColorspace)
+    (*color)/=2.55;
+  if (pixel->colorspace == OklchColorspace)
+    *scale=1.0;
+}
+
+static void FormatScaledComponent(const PixelInfo *pixel,const double scale,
+  const double color,char *component)
+{
+  if ((scale != 100.0) ||
+      (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
+    (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
+      GetMagickPrecision(),scale*QuantumScale*color);
+  else
+    (void) FormatLocaleString(component,MagickPathExtent,"%.*g%%",
+      GetMagickPrecision(),scale*QuantumScale*color);
+}
+
 MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   const PixelChannel channel,const ComplianceType compliance,char *tuple)
 {
@@ -1207,16 +1240,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   {
     case RedPixelChannel:
     {
-      color=pixel->red;
-      if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
-        scale=360.0;
-      if ((compliance != NoCompliance) &&
-          (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
-        scale=100.0;
-      if (pixel->colorspace == XYZColorspace)
-        color/=2.55;
-      if (pixel->colorspace == OklchColorspace)
-        scale=1.0;
+      SetRedComponent(pixel,compliance,&color,&scale);
       break;
     }
     case GreenPixelChannel:
@@ -1272,13 +1296,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
     (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
       GetMagickPrecision(),RadiansToDegrees(scale*QuantumScale*color));
   else
-    if ((scale != 100.0) ||
-        (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
-      (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
-        GetMagickPrecision(),scale*QuantumScale*color);
-      else
-        (void) FormatLocaleString(component,MagickPathExtent,"%.*g%%",
-          GetMagickPrecision(),scale*QuantumScale*color);
+    FormatScaledComponent(pixel,scale,color,component);
   (void) ConcatenateMagickString(tuple,component,MagickPathExtent);
 }
 
@@ -1507,12 +1525,9 @@ MagickExport char **GetColorList(const char *pattern,
 %
 */
 
-static void ConcatenateHexColorComponent(const PixelInfo *pixel,
-  const PixelChannel channel,char *tuple)
+static double GetHexChannelValue(const PixelInfo *pixel,
+  const PixelChannel channel)
 {
-  char
-    component[MagickPathExtent];
-
   double
     color;
 
@@ -1547,6 +1562,19 @@ static void ConcatenateHexColorComponent(const PixelInfo *pixel,
     default:
       break;
   }
+  return(color);
+}
+
+static void ConcatenateHexColorComponent(const PixelInfo *pixel,
+  const PixelChannel channel,char *tuple)
+{
+  char
+    component[MagickPathExtent];
+
+  double
+    color;
+
+  color=GetHexChannelValue(pixel,channel);
   if (pixel->depth > 32)
     {
       (void) FormatLocaleString(component,MagickPathExtent,"%08lX%08lX",
@@ -1575,6 +1603,46 @@ static void ConcatenateHexColorComponent(const PixelInfo *pixel,
   return;
 }
 
+static void ConcatenateHexColor(const PixelInfo *pixel,char *tuple)
+{
+  /*
+    Convert pixel to hex color.
+  */
+  (void) ConcatenateMagickString(tuple,"#",MagickPathExtent);
+  ConcatenateHexColorComponent(pixel,RedPixelChannel,tuple);
+  ConcatenateHexColorComponent(pixel,GreenPixelChannel,tuple);
+  ConcatenateHexColorComponent(pixel,BluePixelChannel,tuple);
+  if (pixel->colorspace == CMYKColorspace)
+    ConcatenateHexColorComponent(pixel,BlackPixelChannel,tuple);
+  if (pixel->alpha_trait != UndefinedPixelTrait)
+    ConcatenateHexColorComponent(pixel,AlphaPixelChannel,tuple);
+}
+
+static void ConcatenateColorComponents(const PixelInfo *color,char *tuple)
+{
+  if ((color->colorspace == LinearGRAYColorspace) ||
+      (color->colorspace == GRAYColorspace))
+    ConcatenateColorComponent(color,GrayPixelChannel,SVGCompliance,tuple);
+  else
+    {
+      ConcatenateColorComponent(color,RedPixelChannel,SVGCompliance,tuple);
+      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+      ConcatenateColorComponent(color,GreenPixelChannel,SVGCompliance,tuple);
+      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+      ConcatenateColorComponent(color,BluePixelChannel,SVGCompliance,tuple);
+    }
+  if (color->colorspace == CMYKColorspace)
+    {
+      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+      ConcatenateColorComponent(color,BlackPixelChannel,SVGCompliance,tuple);
+    }
+  if (color->alpha_trait != UndefinedPixelTrait)
+    {
+      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+      ConcatenateColorComponent(color,AlphaPixelChannel,SVGCompliance,tuple);
+    }
+}
+
 MagickExport void GetColorTuple(const PixelInfo *pixel,
   const MagickBooleanType hex,char *tuple)
 {
@@ -1588,17 +1656,7 @@ MagickExport void GetColorTuple(const PixelInfo *pixel,
   *tuple='\0';
   if (hex != MagickFalse)
     {
-      /*
-        Convert pixel to hex color.
-      */
-      (void) ConcatenateMagickString(tuple,"#",MagickPathExtent);
-      ConcatenateHexColorComponent(pixel,RedPixelChannel,tuple);
-      ConcatenateHexColorComponent(pixel,GreenPixelChannel,tuple);
-      ConcatenateHexColorComponent(pixel,BluePixelChannel,tuple);
-      if (pixel->colorspace == CMYKColorspace)
-        ConcatenateHexColorComponent(pixel,BlackPixelChannel,tuple);
-      if (pixel->alpha_trait != UndefinedPixelTrait)
-        ConcatenateHexColorComponent(pixel,AlphaPixelChannel,tuple);
+      ConcatenateHexColor(pixel,tuple);
       return;
     }
   /*
@@ -1612,27 +1670,7 @@ MagickExport void GetColorTuple(const PixelInfo *pixel,
   if (color.alpha_trait != UndefinedPixelTrait)
     (void) ConcatenateMagickString(tuple,"a",MagickPathExtent);
   (void) ConcatenateMagickString(tuple,"(",MagickPathExtent);
-  if ((color.colorspace == LinearGRAYColorspace) ||
-      (color.colorspace == GRAYColorspace))
-    ConcatenateColorComponent(&color,GrayPixelChannel,SVGCompliance,tuple);
-  else
-    {
-      ConcatenateColorComponent(&color,RedPixelChannel,SVGCompliance,tuple);
-      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-      ConcatenateColorComponent(&color,GreenPixelChannel,SVGCompliance,tuple);
-      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-      ConcatenateColorComponent(&color,BluePixelChannel,SVGCompliance,tuple);
-    }
-  if (color.colorspace == CMYKColorspace)
-    {
-      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-      ConcatenateColorComponent(&color,BlackPixelChannel,SVGCompliance,tuple);
-    }
-  if (color.alpha_trait != UndefinedPixelTrait)
-    {
-      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-      ConcatenateColorComponent(&color,AlphaPixelChannel,SVGCompliance,tuple);
-    }
+  ConcatenateColorComponents(&color,tuple);
   (void) ConcatenateMagickString(tuple,")",MagickPathExtent);
   LocaleLower(tuple);
   return;
@@ -1793,6 +1831,28 @@ MagickPrivate MagickBooleanType IsEquivalentIntensity(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ListColorHeader(FILE *file,const ColorInfo *color_info)
+{
+  if (color_info->path != (char *) NULL)
+    (void) FormatLocaleFile(file,"\nPath: %s\n\n",color_info->path);
+  (void) FormatLocaleFile(file,
+    "Name                  Color                  "
+    "                       Compliance\n");
+  (void) FormatLocaleFile(file,
+    "-------------------------------------------------"
+    "------------------------------\n");
+}
+
+static void ListColorCompliance(FILE *file,const ColorInfo *color_info)
+{
+  if ((color_info->compliance & SVGCompliance) != 0)
+    (void) FormatLocaleFile(file,"SVG ");
+  if ((color_info->compliance & X11Compliance) != 0)
+    (void) FormatLocaleFile(file,"X11 ");
+  if ((color_info->compliance & XPMCompliance) != 0)
+    (void) FormatLocaleFile(file,"XPM ");
+}
+
 MagickExport MagickBooleanType ListColorInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1826,26 +1886,12 @@ MagickExport MagickBooleanType ListColorInfo(FILE *file,
       continue;
     if ((path == (const char *) NULL) ||
         (LocaleCompare(path,color_info[i]->path) != 0))
-      {
-        if (color_info[i]->path != (char *) NULL)
-          (void) FormatLocaleFile(file,"\nPath: %s\n\n",color_info[i]->path);
-        (void) FormatLocaleFile(file,
-          "Name                  Color                  "
-          "                       Compliance\n");
-        (void) FormatLocaleFile(file,
-          "-------------------------------------------------"
-          "------------------------------\n");
-      }
+      ListColorHeader(file,color_info[i]);
     path=color_info[i]->path;
     (void) FormatLocaleFile(file,"%-21.21s ",color_info[i]->name);
     GetColorTuple(&color_info[i]->color,MagickFalse,tuple);
     (void) FormatLocaleFile(file,"%-45.45s ",tuple);
-    if ((color_info[i]->compliance & SVGCompliance) != 0)
-      (void) FormatLocaleFile(file,"SVG ");
-    if ((color_info[i]->compliance & X11Compliance) != 0)
-      (void) FormatLocaleFile(file,"X11 ");
-    if ((color_info[i]->compliance & XPMCompliance) != 0)
-      (void) FormatLocaleFile(file,"XPM ");
+    ListColorCompliance(file,color_info[i]);
     (void) FormatLocaleFile(file,"\n");
   }
   color_info=(const ColorInfo **) RelinquishMagickMemory((void *) color_info);
@@ -1979,6 +2025,124 @@ static ColorInfo *AcquireColorInfo(const char *filename)
   return(color_info);
 }
 
+static MagickStatusType LoadIncludedColorFile(const ColorLoadTarget *target,
+  const char *filename,const char *token,const size_t depth,
+  MagickStatusType status)
+{
+  LinkedListInfo
+    *cache = target->cache;
+
+  ExceptionInfo
+    *exception = target->exception;
+
+  if (depth >= MagickMaxRecursionDepth)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+  else
+    {
+      const ColorLoadTarget include_target = { cache, exception };
+
+      char
+        path[MagickPathExtent],
+        *file_xml;
+
+      GetIncludePath(filename,token,path);
+      file_xml=FileToXML(path,~0UL);
+      if (file_xml != (char *) NULL)
+        {
+          status&=(MagickStatusType) LoadColorCache(
+            &include_target,file_xml,path,depth+1);
+          file_xml=DestroyString(file_xml);
+        }
+    }
+  return(status);
+}
+
+static const char *SkipDoctypeElement(const char *q)
+{
+  int
+    bracket_depth = 0,
+    quote = 0;
+
+  for ( ; *q != '\0'; q++)
+  {
+    if (quote != 0)
+      {
+        if (*q == quote)
+          quote=0;
+      }
+    else if ((*q == '"') || (*q == '\''))
+      quote=(*q);
+    else if (*q == '[')
+      bracket_depth++;
+    else if (*q == ']')
+      {
+        if (bracket_depth > 0)
+          bracket_depth--;
+      }
+    else if ((*q == '>') && (bracket_depth == 0))
+      {
+        q++;   /* consume final '>' */
+        break;
+      }
+  }
+  return(q);
+}
+
+static MagickStatusType LoadIncludeElement(const ColorLoadTarget *target,
+  const char *filename,const size_t depth,const size_t extent,char *token,
+  const char **q,MagickStatusType status)
+{
+  char
+    keyword[MagickPathExtent];
+
+  while (IsIncludeElementOpen(token,*q) != MagickFalse)
+  {
+    (void) CopyMagickString(keyword,token,MagickPathExtent);
+    (void) GetNextToken(*q,q,extent,token);
+    if (*token != '=')
+      continue;
+    (void) GetNextToken(*q,q,extent,token);
+    if (LocaleCompare(keyword,"file") == 0)
+      status=LoadIncludedColorFile(target,filename,token,depth,status);
+  }
+  return(status);
+}
+
+static MagickStatusType AppendColorInfoToCache(LinkedListInfo *cache,
+  ColorInfo *color_info,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AppendValueToLinkedList(cache,color_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",color_info->name);
+  return(status);
+}
+
+static const char *SkipCommentElement(const char *q,const size_t extent,
+  char *token)
+{
+  while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
+    (void) GetNextToken(q,&q,extent,token);
+  return(q);
+}
+
+static const char *ReadColorInfoAttribute(ColorInfo *color_info,
+  const char *keyword,const char *q,const size_t extent,char *token,
+  ExceptionInfo *exception)
+{
+  (void) GetNextToken(q,(const char **) NULL,extent,token);
+  if (*token != '=')
+    return(q);
+  (void) GetNextToken(q,&q,extent,token);
+  (void) GetNextToken(q,&q,extent,token);
+  SetColorInfoAttribute(color_info,keyword,token,exception);
+  return(q);
+}
+
 static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2026,41 +2190,10 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
     (void) CopyMagickString(keyword,token,MagickPathExtent);
     if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
       {
-        int
-          bracket_depth = 0,
-          quote = 0;
-
         /*
           DOCTYPE element.
         */
-        for ( ; *q != '\0'; q++)
-        {
-          if (quote != 0)
-            {
-              if (*q == quote)
-                quote=0;
-            }
-          else
-            {
-              if ((*q == '"') || (*q == '\''))
-                quote=(*q);
-              else
-                if (*q == '[')
-                  bracket_depth++;
-                else
-                  if (*q == ']')
-                    {
-                      if (bracket_depth > 0)
-                        bracket_depth--;
-                    }
-                  else
-                    if ((*q == '>') && (bracket_depth == 0))
-                      {
-                        q++;   /* consume final '>' */
-                        break;
-                      }
-            }
-        }
+        q=SkipDoctypeElement(q);
         continue;
       }
     if (LocaleNCompare(keyword,"<!--",4) == 0)
@@ -2068,8 +2201,7 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
         /*
           Comment element.
         */
-        while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
-          (void) GetNextToken(q,&q,extent,token);
+        q=SkipCommentElement(q,extent,token);
         continue;
       }
     if (LocaleCompare(keyword,"<include") == 0)
@@ -2077,37 +2209,8 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
         /*
           Include element.
         */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          (void) CopyMagickString(keyword,token,MagickPathExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
-            continue;
-          (void) GetNextToken(q,&q,extent,token);
-          if (LocaleCompare(keyword,"file") == 0)
-            {
-              if (depth >= MagickMaxRecursionDepth)
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-              else
-                {
-                  const ColorLoadTarget include_target = { cache, exception };
-
-                  char
-                    path[MagickPathExtent],
-                    *file_xml;
-
-                  GetIncludePath(filename,token,path);
-                  file_xml=FileToXML(path,~0UL);
-                  if (file_xml != (char *) NULL)
-                    {
-                      status&=(MagickStatusType) LoadColorCache(
-                        &include_target,file_xml,path,depth+1);
-                      file_xml=DestroyString(file_xml);
-                    }
-                }
-            }
-        }
+        status=LoadIncludeElement(target,filename,depth,extent,token,&q,
+          status);
         continue;
       }
     if (LocaleCompare(keyword,"<color") == 0)
@@ -2123,20 +2226,11 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
     if ((LocaleCompare(keyword,"/>") == 0) ||
         (LocaleCompare(keyword,"</policy>") == 0))
       {
-        status=AppendValueToLinkedList(cache,color_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",
-            color_info->name);
+        status=AppendColorInfoToCache(cache,color_info,exception);
         color_info=(ColorInfo *) NULL;
         continue;
       }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    SetColorInfoAttribute(color_info,keyword,token,exception);
+    q=ReadColorInfoAttribute(color_info,keyword,q,extent,token,exception);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);
@@ -2176,6 +2270,67 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
 %
 */
 
+static char *SkipCSSSeparators(char *q,MagickStatusType *flags)
+{
+  while (isspace((int) ((unsigned char) *q)) != 0)
+    q++;
+  if (*q == ',')
+    q++;
+  if (*q == '/')
+    {
+      *flags|=AlphaValue;
+      q++;
+    }
+  return(q);
+}
+
+static void SetCSSComponent(GeometryInfo *geometry_info,const ssize_t i,
+  const double intensity,char **q,MagickStatusType *flags)
+{
+  switch (i)
+  {
+    case 0:
+    {
+      geometry_info->rho=intensity;
+      *flags|=RhoValue;
+      if (LocaleNCompare(*q,"deg",3) == 0)
+        *q+=(ptrdiff_t) 3;
+      break;
+    }
+    case 1:
+    {
+      geometry_info->sigma=intensity;
+      *flags|=SigmaValue;
+      break;
+    }
+    case 2:
+    {
+      geometry_info->xi=intensity;
+      *flags|=XiValue;
+      break;
+    }
+    case 3:
+    {
+      geometry_info->psi=intensity;
+      *flags|=PsiValue;
+      break;
+    }
+    case 4:
+    {
+      geometry_info->chi=intensity;
+      *flags|=ChiValue;
+      break;
+    }
+  }
+}
+
+static inline MagickBooleanType IsCSSComponentOpen(const ssize_t i,
+  const char *q)
+{
+  return(((i < 5) && (*q != ')') && (*q != '\0')) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickStatusType ParseCSSColor(const char *magick_restrict color,
   GeometryInfo *geometry_info)
 {
@@ -2195,7 +2350,7 @@ static MagickStatusType ParseCSSColor(const char *magick_restrict color,
   q=(char *) color;
   if (*q == '(')
     q++;
-  for (i=0; (i < 5) && (*q != ')') && (*q != '\0'); i++)
+  for (i=0; IsCSSComponentOpen(i,q) != MagickFalse; i++)
   {
     char
       *p;
@@ -2212,50 +2367,8 @@ static MagickStatusType ParseCSSColor(const char *magick_restrict color,
         intensity*=0.01*255.0;
         q++;
       }
-    switch (i)
-    {
-      case 0:
-      {
-        geometry_info->rho=intensity;
-        flags|=RhoValue;
-        if (LocaleNCompare(q,"deg",3) == 0)
-          q+=(ptrdiff_t) 3;
-        break;
-      }
-      case 1:
-      {
-        geometry_info->sigma=intensity;
-        flags|=SigmaValue;
-        break;
-      }
-      case 2:
-      {
-        geometry_info->xi=intensity;
-        flags|=XiValue;
-        break;
-      }
-      case 3:
-      {
-        geometry_info->psi=intensity;
-        flags|=PsiValue;
-        break;
-      }
-      case 4:
-      {
-        geometry_info->chi=intensity;
-        flags|=ChiValue;
-        break;
-      }
-    }
-    while (isspace((int) ((unsigned char) *q)) != 0)
-      q++;
-    if (*q == ',')
-      q++;
-    if (*q == '/')
-      {
-        flags|=AlphaValue;
-        q++;
-      }
+    SetCSSComponent(geometry_info,i,intensity,&q,&flags);
+    q=SkipCSSSeparators(q,&flags);
   }
   return(flags);
 }
@@ -2270,6 +2383,21 @@ static inline MagickBooleanType IsInvalidHexAlphaLength(const size_t n)
 {
   return(((n != 4) && (n != 8) && (n != 16) && (n != 32) && (n != 64)) ?
     MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsDecimalDigitCharacter(const char c)
+{
+  return(((c >= '0') && (c <= '9')) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUpperHexLetter(const char c)
+{
+  return(((c >= 'A') && (c <= 'F')) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsLowerHexLetter(const char c)
+{
+  return(((c >= 'a') && (c <= 'f')) ? MagickTrue : MagickFalse);
 }
 
 static inline MagickBooleanType IsHueColorspaceName(const char *colorspace)
@@ -2554,6 +2682,98 @@ static MagickBooleanType QueryColorFunction(const char *name,
   return(MagickTrue);
 }
 
+static MagickBooleanType ReadHexRGBDigits(const char *name,const size_t n,
+  PixelPacket *pixel)
+{
+  char
+    c;
+
+  ssize_t
+    i;
+
+  do
+  {
+    (*pixel).red=(*pixel).green;
+    (*pixel).green=(*pixel).blue;
+    (*pixel).blue=0;
+    for (i=(ssize_t) (n/3-1); i >= 0; i--)
+    {
+      c=(*name++);
+      (*pixel).blue<<=4;
+      if (IsDecimalDigitCharacter(c) != MagickFalse)
+        (*pixel).blue|=(unsigned int) (c-'0');
+      else if (IsUpperHexLetter(c) != MagickFalse)
+        (*pixel).blue|=(unsigned int) (c-('A'-10));
+      else if (IsLowerHexLetter(c) != MagickFalse)
+        (*pixel).blue|=(unsigned int) (c-('a'-10));
+      else
+        return(MagickFalse);
+    }
+  } while (isxdigit((int) ((unsigned char) *name)) != 0);
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetHexColor(PixelInfo *color,
+  const PixelPacket *pixel,const size_t depth,const size_t n)
+{
+  QuantumAny
+    range;
+
+  color->colorspace=sRGBColorspace;
+  color->depth=depth;
+  color->alpha_trait=UndefinedPixelTrait;
+  range=GetQuantumRange(depth);
+  color->red=(double) ScaleAnyToQuantum((*pixel).red,range);
+  color->green=(double) ScaleAnyToQuantum((*pixel).green,range);
+  color->blue=(double) ScaleAnyToQuantum((*pixel).blue,range);
+  color->alpha=(double) OpaqueAlpha;
+  if ((n % 3) != 0)
+    {
+      color->alpha_trait=BlendPixelTrait;
+      color->alpha=(double) ScaleAnyToQuantum((*pixel).alpha,range);
+    }
+  color->black=0.0;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ReadHexRGBADigits(const char *name,const size_t n,
+  PixelPacket *pixel,ExceptionInfo *exception)
+{
+  char
+    c;
+
+  ssize_t
+    i;
+
+  if (IsInvalidHexAlphaLength(n) != MagickFalse)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"UnrecognizedColor","`%s'",name);
+      return(MagickFalse);
+    }
+  do
+  {
+    (*pixel).red=(*pixel).green;
+    (*pixel).green=(*pixel).blue;
+    (*pixel).blue=(*pixel).alpha;
+    (*pixel).alpha=0;
+    for (i=(ssize_t) (n/4-1); i >= 0; i--)
+    {
+      c=(*name++);
+      (*pixel).alpha<<=4;
+      if (IsDecimalDigitCharacter(c) != MagickFalse)
+        (*pixel).alpha|=(unsigned int) (c-'0');
+      else if (IsUpperHexLetter(c) != MagickFalse)
+        (*pixel).alpha|=(unsigned int) c-('A'-10);
+      else if (IsLowerHexLetter(c) != MagickFalse)
+        (*pixel).alpha|=(unsigned int) c-('a'-10);
+      else
+        return(MagickFalse);
+    }
+  } while (isxdigit((int) ((unsigned char) *name)) != 0);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2562,9 +2782,6 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
 
   const ColorInfo
     *p;
-
-  ssize_t
-    i;
 
   /*
     Initialize color return value.
@@ -2585,14 +2802,8 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   GetPixelInfo((Image *) NULL,color);
   if (*name == '#')
     {
-      char
-        c;
-
       PixelPacket
         pixel = { 0, 0, 0, 0, 0 };
-
-      QuantumAny
-        range;
 
       size_t
         depth,
@@ -2605,76 +2816,17 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
       for (n=0; isxdigit((int) ((unsigned char) name[n])) != 0; n++) ;
       if (IsHexColorLength(n) != MagickFalse)
         {
-          do
-          {
-            pixel.red=pixel.green;
-            pixel.green=pixel.blue;
-            pixel.blue=0;
-            for (i=(ssize_t) (n/3-1); i >= 0; i--)
-            {
-              c=(*name++);
-              pixel.blue<<=4;
-              if ((c >= '0') && (c <= '9'))
-                pixel.blue|=(unsigned int) (c-'0');
-              else
-                if ((c >= 'A') && (c <= 'F'))
-                  pixel.blue|=(unsigned int) (c-('A'-10));
-                else
-                  if ((c >= 'a') && (c <= 'f'))
-                    pixel.blue|=(unsigned int) (c-('a'-10));
-                  else
-                    return(MagickFalse);
-            }
-          } while (isxdigit((int) ((unsigned char) *name)) != 0);
+          if (ReadHexRGBDigits(name,n,&pixel) == MagickFalse)
+            return(MagickFalse);
           depth=4*(n/3);
         }
       else
         {
-          if (IsInvalidHexAlphaLength(n) != MagickFalse)
-            {
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                OptionWarning,"UnrecognizedColor","`%s'",name);
-              return(MagickFalse);
-            }
-          do
-          {
-            pixel.red=pixel.green;
-            pixel.green=pixel.blue;
-            pixel.blue=pixel.alpha;
-            pixel.alpha=0;
-            for (i=(ssize_t) (n/4-1); i >= 0; i--)
-            {
-              c=(*name++);
-              pixel.alpha<<=4;
-              if ((c >= '0') && (c <= '9'))
-                pixel.alpha|=(unsigned int) (c-'0');
-              else
-                if ((c >= 'A') && (c <= 'F'))
-                  pixel.alpha|=(unsigned int) c-('A'-10);
-                else
-                  if ((c >= 'a') && (c <= 'f'))
-                    pixel.alpha|=(unsigned int) c-('a'-10);
-                  else
-                    return(MagickFalse);
-            }
-          } while (isxdigit((int) ((unsigned char) *name)) != 0);
+          if (ReadHexRGBADigits(name,n,&pixel,exception) == MagickFalse)
+            return(MagickFalse);
           depth=4*(n/4);
         }
-      color->colorspace=sRGBColorspace;
-      color->depth=depth;
-      color->alpha_trait=UndefinedPixelTrait;
-      range=GetQuantumRange(depth);
-      color->red=(double) ScaleAnyToQuantum(pixel.red,range);
-      color->green=(double) ScaleAnyToQuantum(pixel.green,range);
-      color->blue=(double) ScaleAnyToQuantum(pixel.blue,range);
-      color->alpha=(double) OpaqueAlpha;
-      if ((n % 3) != 0)
-        {
-          color->alpha_trait=BlendPixelTrait;
-          color->alpha=(double) ScaleAnyToQuantum(pixel.alpha,range);
-        }
-      color->black=0.0;
-      return(MagickTrue);
+      return(SetHexColor(color,&pixel,depth,n));
     }
   q=strchr(name,'(');
   if (q != (char *) NULL)
@@ -2750,6 +2902,30 @@ static inline MagickBooleanType IsColorNameMatch(const ColorInfo *value,
     MagickTrue : MagickFalse);
 }
 
+static void FindColorName(const PixelInfo *color,const double alpha,
+  const ComplianceType compliance,char *name)
+{
+  ElementInfo
+    *p;
+
+  LockSemaphoreInfo(color_semaphore);
+  p=GetHeadElementInLinkedList(color_cache);
+  while (p != (ElementInfo *) NULL)
+  {
+    const ColorInfo
+      *value;
+
+    value=(const ColorInfo *) p->value;
+    if (IsColorNameMatch(value,color,alpha,compliance) != MagickFalse)
+      {
+        (void) CopyMagickString(name,value->name,MagickPathExtent);
+        break;
+      }
+    p=p->next;
+  }
+  UnlockSemaphoreInfo(color_semaphore);
+}
+
 MagickExport MagickBooleanType QueryColorname(
   const Image *magick_unused(image),const PixelInfo *color,
   const ComplianceType compliance,char *name,ExceptionInfo *exception)
@@ -2759,9 +2935,6 @@ MagickExport MagickBooleanType QueryColorname(
 
   double
     alpha;
-
-  ElementInfo
-    *p;
 
   magick_unreferenced(image);
   *name='\0';
@@ -2781,21 +2954,6 @@ MagickExport MagickBooleanType QueryColorname(
   alpha=color->alpha_trait != UndefinedPixelTrait ? (double) color->alpha :
     (double) OpaqueAlpha;
   (void) GetColorInfo("*",exception);
-  LockSemaphoreInfo(color_semaphore);
-  p=GetHeadElementInLinkedList(color_cache);
-  while (p != (ElementInfo *) NULL)
-  {
-    const ColorInfo
-      *value;
-    
-    value=(const ColorInfo *) p->value;
-    if (IsColorNameMatch(value,color,alpha,compliance) != MagickFalse)
-      {
-        (void) CopyMagickString(name,value->name,MagickPathExtent);
-        break;
-      }
-    p=p->next;
-  }
-  UnlockSemaphoreInfo(color_semaphore);
+  FindColorName(color,alpha,compliance,name);
   return(MagickTrue);
 }
