@@ -840,6 +840,24 @@ static Image *SelectImageScenes(Image *image,const char *scenes,
   return(image);
 }
 
+static MagickBooleanType InvokeDecodeDelegate(ImageInfo *read_info,
+  Image *image,const DelegateInfo *delegate_info,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  (void) CopyMagickString(image->filename,read_info->filename,
+    MagickPathExtent);
+  *read_info->filename='\0';
+  if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
+    LockSemaphoreInfo(delegate_info->semaphore);
+  status=InvokeDelegate(read_info,image,read_info->magick,(char *) NULL,
+    exception);
+  if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
+    UnlockSemaphoreInfo(delegate_info->semaphore);
+  return(status);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -959,15 +977,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
           read_info=DestroyImageInfo(read_info);
           return((Image *) NULL);
         }
-      (void) CopyMagickString(image->filename,read_info->filename,
-        MagickPathExtent);
-      *read_info->filename='\0';
-      if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
-        LockSemaphoreInfo(delegate_info->semaphore);
-      status=InvokeDelegate(read_info,image,read_info->magick,(char *) NULL,
-        exception);
-      if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
-        UnlockSemaphoreInfo(delegate_info->semaphore);
+      status=InvokeDecodeDelegate(read_info,image,delegate_info,exception);
       image=DestroyImageList(image);
       read_info->temporary=MagickTrue;
       if (status != MagickFalse)
