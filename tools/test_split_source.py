@@ -40,11 +40,12 @@ MagickExport int KeptRoot(int x)
 
 
 class SplitSource(unittest.TestCase):
-    def split(self, body, roots=("FamilyRoot",), extra_h=""):
+    def split(self, body, roots=("FamilyRoot",), extra_h="", objects_h=False):
         self.tmp = tempfile.TemporaryDirectory()
         self.dir = self.tmp.name
         self.addCleanup(self.tmp.cleanup)
         open(os.path.join(self.dir, "synth.h"), "w").write(HEADER_H + extra_h)
+        if objects_h: open(os.path.join(self.dir, "objs.h"), "w").write("const char *kObjTable = \"x\";\n")
         self.src = os.path.join(self.dir, "synth.c")
         open(self.src, "w").write(HEAD + "\n" + INCLUDES + body)
         self.out = os.path.join(self.dir, "out")
@@ -133,6 +134,22 @@ class SplitSource(unittest.TestCase):
         self.assertNotIn("KeptRoot", new)
         self.assertNotIn("FamilyRoot", old)
         self.assert_both_compile()
+
+    def test_header_that_defines_objects_stays_in_the_original(self):
+        r = self.split('#include "objs.h"\n' + FAMILY + KEPT.replace("x*2", "(int) kObjTable[0]"), objects_h=True)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        self.assertIn("objs.h defines objects", r.stdout)
+        old = open(os.path.join(self.out, "synth.c")).read()
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        self.assertIn('#include "objs.h"', old)
+        self.assertNotIn("objs.h", new)
+        self.assertIn('#include "synth.h"', new)
+
+    def test_header_that_defines_objects_refused_when_the_family_names_one(self):
+        fam = FAMILY.replace("return(FamilyHelper(x));", "return(FamilyHelper(x)+kObjTable[0]);")
+        r = self.split('#include "objs.h"\n' + fam + KEPT, objects_h=True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("kObjTable", r.stderr)
 
     def test_planted_defect_unclosed_conditional_does_not_compile(self):
         r = self.split("#if defined(DELEGATE)\n" + FAMILY + KEPT + "#endif\n")

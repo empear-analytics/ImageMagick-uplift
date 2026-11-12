@@ -21,7 +21,10 @@ in FILE that only the family uses. --copy-macro NAME (repeatable) defines a one-
 2026-11-11), each refused when the kept part names it; a two-line forward declaration
 of a moved static at the top of FILE moves to NEW. A trailing run of conditional lines
 in FILE's include block that holds every macro the block defines (a delegate's headers)
-is left out of NEW's copy when the family names none of those macros. A file-level
+is left out of NEW's copy when the family names none of those macros. A quoted `#include` of a header of the same directory that defines objects (a file-scope initialised
+variable, as accelerate-kernels-private.h's `accelerateKernels`) is left out of NEW's copy of the include
+block, since both files would define the variable, when no line of the family names a variable or macro
+that header defines; the split is refused when one does. A file-level
 `#if defined(...)` ... `#else` ... `#endif` block that holds whole functions of the family
 (a delegate's code and its stub of the same public function) moves whole, its directives
 included, when its `#endif` follows the family's last function; a function defined in both
@@ -96,6 +99,14 @@ def open_directives(lines):
             if not stack: return None
             stack.pop()
     return stack
+
+def object_header_names(path):
+    """The names a header at PATH defines that make it unfit for two files: each file-scope initialised object
+    (`const char *name =` in column 0) and each #define; empty when PATH has no such object definition."""
+    if not os.path.exists(path): return set()
+    text = re.sub(r"/\*.*?\*/", "", open(path, errors="replace").read(), flags=re.S)
+    objects = set(re.findall(r"(?m)^(?!typedef|static|extern|return|#)(?:const\s+)?\w[\w \t\*]*?[ \t\*](\w+)\s*(?:\[[^\]]*\])?\s*=(?!=)", text))
+    return objects | set(re.findall(r"(?m)^\s*#\s*define\s+(\w+)", text)) if objects else set()
 
 def macro_block_start(L, c):
     """First line of the #define, or the #if ... #endif holding one, that ends at L[c - 1]."""
@@ -401,6 +412,17 @@ if defined("\n".join(L[inc_a:inc_b + 1])):
     print("include block: the conditional lines %d-%d (macros %s) stay in the original only" %
         (last + 2, inc_b + 1, sorted(tail_macros)))
     inc_b = last
+include_lines = L[inc_a:inc_b + 1]
+region_code = re.sub(r'"(?:\\.|[^"\\])*"', '""', re.sub(r"/\*.*?\*/", "", region, flags=re.S))
+for k, line in enumerate(list(include_lines)):
+    mi = re.match(r'^#include "(?:[\w.-]+/)*([\w.-]+\.h)"\s*$', line)
+    names_in = object_header_names(os.path.join(os.path.dirname(path), mi.group(1))) if mi else set()
+    if not names_in: continue
+    named = sorted(n for n in names_in if re.search(r"\b%s\b" % n, region_code))
+    if named: sys.exit("refused: the family names %s, defined by %s, which defines objects and cannot be included by both files" % (named, mi.group(1)))
+    include_lines[k] = None
+    print("include block: %s defines objects and stays in the original only" % mi.group(1))
+include_lines = [l for l in include_lines if l is not None]
 extra = declaration_block("Typedef declarations.", moved_types, "\n\n") + \
     declaration_block("Define declarations.", moved_macros + macro_lines) + \
     declaration_block("Forward declarations.", forward)
@@ -427,7 +449,7 @@ for (a, b), br in zip(cuts, branch):
     if k != cur: pieces.append(L[enc[-1]["else"][0]]); cur = k
     pieces.append("\n".join(L[a:b]))
 region_out = "\n\n".join(pieces)
-text = "\n".join(hdr) + "\n\n" + "".join(l + "\n" for l in pre) + "\n".join(L[inc_a:inc_b + 1]) + "\n" + \
+text = "\n".join(hdr) + "\n\n" + "".join(l + "\n" for l in pre) + "\n".join(include_lines) + "\n" + \
     "".join(l + "\n" for l in post) + "\n" + extra + region_out + "\n" + "".join(l + "\n" for l in closers)
 if enc:
     head = text[:text.index(region_out)].split("\n")
