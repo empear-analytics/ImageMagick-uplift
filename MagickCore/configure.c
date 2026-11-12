@@ -824,6 +824,39 @@ static MagickBooleanType IsConfigureCacheInstantiated(ExceptionInfo *exception)
   return(configure_cache != (LinkedListInfo *) NULL ? MagickTrue : MagickFalse);
 }
 
+static void PrintConfigureHeader(FILE *file,const ConfigureInfo *configure_info)
+{
+  if (configure_info->path != (char *) NULL)
+    (void) FormatLocaleFile(file,"\nPath: %s\n\n",configure_info->path);
+  (void) FormatLocaleFile(file,"Name                  Value\n");
+  (void) FormatLocaleFile(file,
+    "-------------------------------------------------"
+    "------------------------------\n");
+}
+
+static void PrintConfigureEntry(FILE *file,const ConfigureInfo *configure_info)
+{
+  const char
+    *name,
+    *value;
+
+  ssize_t
+    j;
+
+  name="unknown";
+  if (configure_info->name != (char *) NULL)
+    name=configure_info->name;
+  (void) FormatLocaleFile(file,"%s",name);
+  for (j=(ssize_t) strlen(name); j <= 20; j++)
+    (void) FormatLocaleFile(file," ");
+  (void) FormatLocaleFile(file," ");
+  value="unknown";
+  if (configure_info->value != (char *) NULL)
+    value=configure_info->value;
+  (void) FormatLocaleFile(file,"%s",value);
+  (void) FormatLocaleFile(file,"\n");
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -852,9 +885,7 @@ MagickExport MagickBooleanType ListConfigureInfo(FILE *file,
   ExceptionInfo *exception)
 {
   const char
-    *name,
-    *path,
-    *value;
+    *path;
 
   const ConfigureInfo
     **configure_info;
@@ -864,9 +895,6 @@ MagickExport MagickBooleanType ListConfigureInfo(FILE *file,
 
   size_t
     number_options;
-
-  ssize_t
-    j;
 
   if (file == (const FILE *) NULL)
     file=stdout;
@@ -880,28 +908,9 @@ MagickExport MagickBooleanType ListConfigureInfo(FILE *file,
       continue;
     if ((path == (const char *) NULL) ||
         (LocaleCompare(path,configure_info[i]->path) != 0))
-      {
-        if (configure_info[i]->path != (char *) NULL)
-          (void) FormatLocaleFile(file,"\nPath: %s\n\n",
-            configure_info[i]->path);
-        (void) FormatLocaleFile(file,"Name                  Value\n");
-        (void) FormatLocaleFile(file,
-          "-------------------------------------------------"
-          "------------------------------\n");
-      }
+      PrintConfigureHeader(file,configure_info[i]);
     path=configure_info[i]->path;
-    name="unknown";
-    if (configure_info[i]->name != (char *) NULL)
-      name=configure_info[i]->name;
-    (void) FormatLocaleFile(file,"%s",name);
-    for (j=(ssize_t) strlen(name); j <= 20; j++)
-      (void) FormatLocaleFile(file," ");
-    (void) FormatLocaleFile(file," ");
-    value="unknown";
-    if (configure_info[i]->value != (char *) NULL)
-      value=configure_info[i]->value;
-    (void) FormatLocaleFile(file,"%s",value);
-    (void) FormatLocaleFile(file,"\n");
+    PrintConfigureEntry(file,configure_info[i]);
   }
   (void) fflush(file);
   configure_info=(const ConfigureInfo **) RelinquishMagickMemory((void *)
