@@ -15700,6 +15700,20 @@ static void XScreenMotion(Display *display,XWindows *windows,XEvent *event,
     }
 }
 
+static void XScreenUnmap(Display *display,XWindows *windows,XEvent *event)
+{
+  if (event->xunmap.window == windows->magnify.id)
+    {
+      windows->magnify.mapped=MagickFalse;
+      return;
+    }
+  if (event->xunmap.window == windows->info.id)
+    {
+      windows->info.mapped=MagickFalse;
+      return;
+    }
+}
+
 static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
@@ -15746,16 +15760,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
     }
     case UnmapNotify:
     {
-      if (event->xunmap.window == windows->magnify.id)
-        {
-          windows->magnify.mapped=MagickFalse;
-          break;
-        }
-      if (event->xunmap.window == windows->info.id)
-        {
-          windows->info.mapped=MagickFalse;
-          break;
-        }
+      XScreenUnmap(display,windows,event);
       break;
     }
     default:
