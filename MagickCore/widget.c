@@ -4644,6 +4644,32 @@ static void KeyDialogPress(const DialogContext *context,
   XDrawMatteText(display,&windows->widget,reply_info);
 }
 
+static void KeyDialogRelease(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  static char
+    command[MagickPathExtent];
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key release.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  if (key_symbol == XK_Control_L)
+    (*state)&=(unsigned int) (~ControlState);
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -4880,21 +4906,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
       }
       case KeyRelease:
       {
-        static char
-          command[MagickPathExtent];
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key release.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if (key_symbol == XK_Control_L)
-          state&=(unsigned int) (~ControlState);
+        KeyDialogRelease(&context,event,&targets);
         break;
       }
       case LeaveNotify:
