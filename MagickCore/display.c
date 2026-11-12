@@ -7255,6 +7255,64 @@ static void XDrawMotion(const DrawEditContext *context,
       ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
 }
 
+typedef struct _DrawPreviewInput
+{
+  ElementType
+    element;
+
+  int
+    number_coordinates;
+
+  XPoint
+    *coordinate_info;
+
+  unsigned int
+    distance;
+
+  XSegment
+    line_info;
+
+  RectangleInfo
+    rectangle_info;
+} DrawPreviewInput;
+
+static void XPreviewLine(const DrawEditContext *context,
+  const DrawPreviewInput *preview,double *degrees)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    distance = preview->distance;
+
+  const XSegment
+    line_info = preview->line_info;
+
+  char
+    text[MagickPathExtent];
+
+  if (distance > 9)
+    {
+      /*
+        Display angle of the line.
+      */
+      (*degrees)=RadiansToDegrees(-atan2((double) (line_info.y2-
+        line_info.y1),(double) (line_info.x2-line_info.x1)));
+      (void) FormatLocaleString(text,MagickPathExtent," %g",
+        (double) (*degrees));
+      XInfoWidget(display,windows,text);
+      XHighlightLine(display,windows->image.id,
+        windows->image.highlight_context,&line_info);
+    }
+  else
+    if (windows->info.mapped != MagickFalse)
+      (void) XWithdrawWindow(display,windows->info.id,
+        windows->info.screen);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7342,6 +7400,9 @@ static MagickBooleanType XDrawEditImage(Display *display,
 
   DrawEditContext
     draw_context;
+
+  DrawPreviewInput
+    preview_input;
 
   const DrawShapeTargets
     shape_targets = { &line_info, &rectangle_info, &coordinate_info, &state,
@@ -7544,6 +7605,12 @@ static MagickBooleanType XDrawEditImage(Display *display,
     state=DefaultState;
     do
     {
+      preview_input.element=element;
+      preview_input.number_coordinates=number_coordinates;
+      preview_input.coordinate_info=coordinate_info;
+      preview_input.distance=distance;
+      preview_input.line_info=line_info;
+      preview_input.rectangle_info=rectangle_info;
       switch (element)
       {
         case PointElement:
@@ -7563,23 +7630,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         }
         case LineElement:
         {
-          if (distance > 9)
-            {
-              /*
-                Display angle of the line.
-              */
-              degrees=RadiansToDegrees(-atan2((double) (line_info.y2-
-                line_info.y1),(double) (line_info.x2-line_info.x1)));
-              (void) FormatLocaleString(text,MagickPathExtent," %g",
-                (double) degrees);
-              XInfoWidget(display,windows,text);
-              XHighlightLine(display,windows->image.id,
-                windows->image.highlight_context,&line_info);
-            }
-          else
-            if (windows->info.mapped != MagickFalse)
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
+          XPreviewLine(&draw_context,&preview_input,&degrees);
           break;
         }
         case RectangleElement:
