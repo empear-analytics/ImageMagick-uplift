@@ -686,33 +686,17 @@ static MagickBooleanType XAcquireAnnotateImage(
   return(MagickTrue);
 }
 
-MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
-  const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
-  ExceptionInfo *exception)
+static MagickBooleanType XDrawAnnotateText(Display *display,
+  const XAnnotateInfo *annotate_info,XImage **annotate_ximage)
 {
-  AnnotatePixels
-    annotate_pixels;
-
   GC
     annotate_context;
-
-  Image
-    *annotate_image;
-
-  int
-    x,
-    y;
-
-  PixelTrait
-    alpha_trait;
 
   Pixmap
     annotate_pixmap;
 
   unsigned int
-    depth,
-    height,
-    width;
+    depth;
 
   Window
     root_window;
@@ -720,21 +704,6 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   XGCValues
     context_values;
 
-  XImage
-    *annotate_ximage;
-
-  /*
-    Initialize annotated image.
-  */
-  assert(display != (Display *) NULL);
-  assert(pixel != (XPixelInfo *) NULL);
-  assert(annotate_info != (XAnnotateInfo *) NULL);
-  assert(image != (Image *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  /*
-    Initialize annotated pixmap.
-  */
   root_window=XRootWindow(display,XDefaultScreen(display));
   depth=(unsigned int) XDefaultDepth(display,XDefaultScreen(display));
   annotate_pixmap=XCreatePixmap(display,root_window,annotate_info->width,
@@ -761,11 +730,52 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   /*
     Initialize annotated X image.
   */
-  annotate_ximage=XGetImage(display,annotate_pixmap,0,0,annotate_info->width,
+  (*annotate_ximage)=XGetImage(display,annotate_pixmap,0,0,annotate_info->width,
     annotate_info->height,AllPlanes,ZPixmap);
-  if (annotate_ximage == (XImage *) NULL)
+  if ((*annotate_ximage) == (XImage *) NULL)
     return(MagickFalse);
   (void) XFreePixmap(display,annotate_pixmap);
+  return(MagickTrue);
+}
+
+MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
+  const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
+  ExceptionInfo *exception)
+{
+  AnnotatePixels
+    annotate_pixels;
+
+  Image
+    *annotate_image;
+
+  int
+    x,
+    y;
+
+  PixelTrait
+    alpha_trait;
+
+  unsigned int
+    height,
+    width;
+
+  XImage
+    *annotate_ximage;
+
+  /*
+    Initialize annotated image.
+  */
+  assert(display != (Display *) NULL);
+  assert(pixel != (XPixelInfo *) NULL);
+  assert(annotate_info != (XAnnotateInfo *) NULL);
+  assert(image != (Image *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  /*
+    Initialize annotated pixmap.
+  */
+  if (XDrawAnnotateText(display,annotate_info,&annotate_ximage) == MagickFalse)
+    return(MagickFalse);
   /*
     Initialize annotated image.
   */
