@@ -422,3 +422,42 @@ was not taken (one bump already clears the finding). Plateau at 9.09: Lines of C
   `sizeof(**histogram)`, so it is over-allocated (harmless). Tooling: `verify_wt.sh --function` exits on the stale
   `casemap.json` (rebuild it once, in the foreground, when no lane is running); the pre-commit hook needs a login shell
   (`bash -ls`) to find `node`.
+
+## Lane a, sixth round: xwindow.c 2.42 -> 2.47 (wide build, merged)
+
+29 commits; whole wide catalogue 14,145 cases, 0 diverged (147 s, no load timeouts). Every step: wide oracle `--function`
+(0 diverged), guard and `--calls`, `ci_linux_warnings`, `obj_modulo.sh` (IDENTICAL or MODULO-IDENTICAL, except the
+FontToList step), review diff with no new finding. Raises: 98c07a8cb `XFreeResources` leaves Bumpy Road and Complex Method
+2.43; `XGetWindowInfo` three E steps (574da6590, d5f0b2aab, 19a685f9a, the last leaving all three categories) 2.45;
+`XDisplayImageInfo` four E steps (433219d9e..4f40a08e7) 2.46; `XAnnotateImage` N pair 4addf55fa then 68b5bca0b 2.47, then
+five flat steps (ccf43ff25 E, 5a229598a E, b518fd7b5 O, 8144d45a2 V, a0e9b254d V; it ends with only Excess Number of
+Function Arguments). Flat steps that each leave a category: 80979adfd playbook (Recipe MA step 2 amended); 2775cadde MA
+`XGetMapInfo` (leaves Bumpy Road and Complex Method); `XBestIconSize` 1233c0655, 7b4727732, a0721b2aa E; `XBestPixel`
+46cb9d18a, c790f817a E; `XFreeResources` 6e8f4ffbc E; `FontToList` 3fdb5c3ba E and b00817bcd P (obj_modulo shows
+register-choice differences in `XBestFont`, which inlines `FontToList`; the oracle is clean); 5944898d3
+`XGetResourceDatabase`, b7a569ca8 `XError`, ca8ecde26 `XMakePixmap`, ffd3f0250 `XRemoteCommand` (E, unreached: guard plus
+IDENTICAL object code). **Order matters (probed):** leaving Bumpy Road and Complex Method while the function stays a Large
+Method lowers the file (`XGetWindowInfo` alone 2.36; `XAnnotateImage` with Complex Method gone and 71 lines left 2.41), so
+the Large Method goes first or all three categories leave in the last step.
+- **Recipe text (80979adfd, Decided by `owner`, 2026-11-10 OK): Recipe MA step 2 amended:** (b) the operand the block
+  evaluates first and unconditionally may differ (the `x` of a leading `if ((x & M) != 0)`, or the right operand of the
+  block's first statement); (c) a copy may name two lvalues `e.m1` and `e.m2` of one base `e` (two different members, each
+  with its own declared type and its own pointer parameter `T1 *value1,T2 *value2`); Careful: two different members of one
+  object never alias.
+- **Plateau 2.47:** a padded stub of the non-pinned functions gives 4.07 (beyond what the helper count allows); stubbing
+  one function at a time: `XGetWindowImage`, `XRefreshWindow`, `XRenderImage` and `XSelectWindow` give +0.02 each, every
+  other function +0.00. Blockers: `XRefreshWindow` (`#if` shape and shared-memory code pin cc 15), `XRenderImage` (nine
+  function-local statics; the init block needs a targets struct of eight), `XSelectWindow` (hoisted macro
+  `MinimumCropArea`, twin draw ifs, a ButtonPress group writing four variables), `XGetWindowImage` (block statics);
+  `XGetResourceClass` needs Recipe D (b), whose text wants a raise (helper `XResourceClassCharacter`, flat probe 2.47);
+  `XUserPreferences` is whole-body `#if`; three functions are `#if`-pinned.
+- **Tool gap that matters for CI:** `ci_linux_warnings.sh` did not flag a `&param` of type `const T **` passed where
+  `const T *` is expected (a first `XTransferAnnotatePixels` attempt, not committed); only the oracle caught it (29
+  diverged). MSVC reports this as C2664, the kind of error that broke Windows CI on W16. `struct_fill_check` does not read
+  the sibling-struct N form; `casemap.py` with `WIDE=1` starts a re-index (use the wide lcov for reach).
+- Possible upstream: `XAnnotateImage` and `XDrawImage`: the transfer loop clobbers `y` and the later `XParseGeometry`
+  leaves it alone when the geometry has no y, so the composite offset is the loop's end row; `XGetWindowInfo` sets
+  `window->y` from `XDisplayWidth`; `XDisplayImageInfo` leaks the unique file and descriptor when `fdopen` fails;
+  `XMakeWindow`'s shape test is dead after the unconditional `shape=MagickFalse`; `XSelectWindow` reads
+  `event.xbutton.button` after the loop whatever the last event type was; `XFreeResources` has a dead store
+  `font_info=NULL`.
