@@ -1268,6 +1268,48 @@ MagickPrivate void LogComponentTerminus(void)
   RelinquishSemaphoreInfo(&log_semaphore);
 }
 
+static void WriteLogToSystem(const LogInfo *log_info,const char *text)
+{
+  if ((log_info->handler_mask & ConsoleHandler) != 0)
+    {
+      (void) FormatLocaleFile(stderr,"%s\n",text);
+      (void) fflush(stderr);
+    }
+  if ((log_info->handler_mask & DebugHandler) != 0)
+    {
+#if defined(MAGICKCORE_WINDOWS_SUPPORT)
+      OutputDebugString(text);
+      OutputDebugString("\n");
+#endif
+    }
+  if ((log_info->handler_mask & EventHandler) != 0)
+    {
+#if defined(MAGICKCORE_WINDOWS_SUPPORT)
+      (void) NTReportEvent(text,MagickFalse);
+#endif
+    }
+}
+
+static void WriteLogToStreams(const LogInfo *log_info,const LogEventType type,
+  const char *text)
+{
+  if ((log_info->handler_mask & MethodHandler) != 0)
+    {
+      if (log_info->method != (MagickLogMethod) NULL)
+        log_info->method(type,text);
+    }
+  if ((log_info->handler_mask & StdoutHandler) != 0)
+    {
+      (void) FormatLocaleFile(stdout,"%s\n",text);
+      (void) fflush(stdout);
+    }
+  if ((log_info->handler_mask & StderrHandler) != 0)
+    {
+      (void) FormatLocaleFile(stderr,"%s\n",text);
+      (void) fflush(stderr);
+    }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1718,41 +1760,10 @@ MagickExport MagickBooleanType LogMagickEventList(const LogEventType type,
       UnlockSemaphoreInfo(log_info->event_semaphore);
       return(MagickFalse);
     }
-  if ((log_info->handler_mask & ConsoleHandler) != 0)
-    {
-      (void) FormatLocaleFile(stderr,"%s\n",text);
-      (void) fflush(stderr);
-    }
-  if ((log_info->handler_mask & DebugHandler) != 0)
-    {
-#if defined(MAGICKCORE_WINDOWS_SUPPORT)
-      OutputDebugString(text);
-      OutputDebugString("\n");
-#endif
-    }
-  if ((log_info->handler_mask & EventHandler) != 0)
-    {
-#if defined(MAGICKCORE_WINDOWS_SUPPORT)
-      (void) NTReportEvent(text,MagickFalse);
-#endif
-    }
+  WriteLogToSystem(log_info,text);
   if (WriteLogFile(log_info,text) == MagickFalse)
     return(MagickFalse);
-  if ((log_info->handler_mask & MethodHandler) != 0)
-    {
-      if (log_info->method != (MagickLogMethod) NULL)
-        log_info->method(type,text);
-    }
-  if ((log_info->handler_mask & StdoutHandler) != 0)
-    {
-      (void) FormatLocaleFile(stdout,"%s\n",text);
-      (void) fflush(stdout);
-    }
-  if ((log_info->handler_mask & StderrHandler) != 0)
-    {
-      (void) FormatLocaleFile(stderr,"%s\n",text);
-      (void) fflush(stderr);
-    }
+  WriteLogToStreams(log_info,type,text);
   text=(char  *) RelinquishMagickMemory(text);
   (void) ContinueTimer((TimerInfo *) &log_info->timer);
   UnlockSemaphoreInfo(log_info->event_semaphore);
