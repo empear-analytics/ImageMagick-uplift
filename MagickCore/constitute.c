@@ -788,6 +788,46 @@ static MagickBooleanType OpenSeekableReadStream(const ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static void SetReadImageNames(Image *next,const char *magick,
+  const char *magick_filename)
+{
+  char
+    magick_path[MagickPathExtent];
+
+  GetPathComponent(magick_filename,MagickPath,magick_path);
+  if ((*magick_path == '\0') && (*next->magick == '\0'))
+    (void) CopyMagickString(next->magick,magick,MagickPathExtent);
+  (void) CopyMagickString(next->magick_filename,magick_filename,
+    MagickPathExtent);
+}
+
+static void SyncReadImageMetadata(ImageInfo *read_info,Image *next,
+  ConstituteInfo *constitute_info,ExceptionInfo *exception)
+{
+  if (next->magick_columns == 0)
+    next->magick_columns=next->columns;
+  if (next->magick_rows == 0)
+    next->magick_rows=next->rows;
+  (void) GetImageProperty(next,"exif:*",exception);
+  (void) GetImageProperty(next,"icc:*",exception);
+  (void) GetImageProperty(next,"iptc:*",exception);
+  (void) GetImageProperty(next,"xmp:*",exception);
+  SyncOrientationFromProperties(next,constitute_info,exception);
+  SyncResolutionFromProperties(next,constitute_info,exception);
+  if (next->page.width == 0)
+    next->page.width=next->columns;
+  if (next->page.height == 0)
+    next->page.height=next->rows;
+  SetInterpretedProperty(read_info,next,"caption",constitute_info->caption,
+    exception);
+  SetInterpretedProperty(read_info,next,"comment",constitute_info->comment,
+    exception);
+  SetInterpretedProperty(read_info,next,"label",constitute_info->label,
+    exception);
+  if (LocaleCompare(next->magick,"TEXT") == 0)
+    (void) ParseAbsoluteGeometry("0x0+0+0",&next->page);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -995,42 +1035,14 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   InitializeConstituteInfo(read_info,&constitute_info);
   for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
   {
-    char
-      magick_path[MagickPathExtent];
-
     const StringInfo
       *profile;
 
     next->taint=MagickFalse;
-    GetPathComponent(magick_filename,MagickPath,magick_path);
-    if ((*magick_path == '\0') && (*next->magick == '\0'))
-      (void) CopyMagickString(next->magick,magick,MagickPathExtent);
-    (void) CopyMagickString(next->magick_filename,magick_filename,
-      MagickPathExtent);
+    SetReadImageNames(next,magick,magick_filename);
     if (IsBlobTemporary(image) != MagickFalse)
       (void) CopyMagickString(next->filename,filename,MagickPathExtent);
-    if (next->magick_columns == 0)
-      next->magick_columns=next->columns;
-    if (next->magick_rows == 0)
-      next->magick_rows=next->rows;
-    (void) GetImageProperty(next,"exif:*",exception);
-    (void) GetImageProperty(next,"icc:*",exception);
-    (void) GetImageProperty(next,"iptc:*",exception);
-    (void) GetImageProperty(next,"xmp:*",exception);
-    SyncOrientationFromProperties(next,&constitute_info,exception);
-    SyncResolutionFromProperties(next,&constitute_info,exception);
-    if (next->page.width == 0)
-      next->page.width=next->columns;
-    if (next->page.height == 0)
-      next->page.height=next->rows;
-    SetInterpretedProperty(read_info,next,"caption",constitute_info.caption,
-      exception);
-    SetInterpretedProperty(read_info,next,"comment",constitute_info.comment,
-      exception);
-    SetInterpretedProperty(read_info,next,"label",constitute_info.label,
-      exception);
-    if (LocaleCompare(next->magick,"TEXT") == 0)
-      (void) ParseAbsoluteGeometry("0x0+0+0",&next->page);
+    SyncReadImageMetadata(read_info,next,&constitute_info,exception);
     if ((read_info->extract != (char *) NULL) &&
         (read_info->stream == (StreamHandler) NULL))
       next=ApplyExtractGeometry(read_info,next,exception);
