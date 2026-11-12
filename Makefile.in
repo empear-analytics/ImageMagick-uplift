@@ -528,7 +528,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/vision.c MagickCore/vision-components.c MagickCore/vision.h MagickCore/widget.c \
 	MagickCore/widget.h MagickCore/widget-private.h \
 	MagickCore/xml-tree.c MagickCore/xml-tree.h \
-	MagickCore/xml-tree-private.h MagickCore/xwindow.c MagickCore/xwindow-visual.c \
+	MagickCore/xml-tree-private.h MagickCore/xwindow.c MagickCore/xwindow-visual.c MagickCore/xwindow-import.c \
 	MagickCore/xwindow.h MagickCore/nt-feature.c \
 	MagickCore/nt-base.c coders/aai.c coders/aai.h coders/art.c \
 	coders/art.h coders/ase.c coders/ase.h coders/ashlar.c \
@@ -759,7 +759,8 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xml-tree.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.lo \
-	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo
 @CYGWIN_BUILD_TRUE@@WIN32_NATIVE_BUILD_FALSE@am__objects_2 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo
 @WIN32_NATIVE_BUILD_TRUE@am__objects_2 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-base.lo \
 @WIN32_NATIVE_BUILD_TRUE@	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo
@@ -2465,6 +2466,7 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xml-tree.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Plo \
 	MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-animate.Plo \
 	MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo \
 	MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo \
@@ -5792,6 +5794,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow.c \
   MagickCore/xwindow-visual.c \
+  MagickCore/xwindow-import.c \
   MagickCore/xwindow.h
 
 @CYGWIN_BUILD_FALSE@@WIN32_NATIVE_BUILD_FALSE@MAGICKCORE_PLATFORM_SRCS = 
@@ -7406,6 +7409,9 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.l
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
@@ -8979,6 +8985,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xml-tree.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-animate.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo@am__quote@ # am--include-marker
@@ -10401,6 +10408,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-v
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/xwindow-visual.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo `test -f 'MagickCore/xwindow-visual.c' || echo '$(srcdir)/'`MagickCore/xwindow-visual.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo: MagickCore/xwindow-import.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo `test -f 'MagickCore/xwindow-import.c' || echo '$(srcdir)/'`MagickCore/xwindow-import.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/xwindow-import.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo `test -f 'MagickCore/xwindow-import.c' || echo '$(srcdir)/'`MagickCore/xwindow-import.c
 
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo: MagickCore/nt-feature.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo `test -f 'MagickCore/nt-feature.c' || echo '$(srcdir)/'`MagickCore/nt-feature.c
@@ -14173,6 +14187,7 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xml-tree.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-animate.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo
@@ -14746,6 +14761,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xml-tree.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-animate.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo
