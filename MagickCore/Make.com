@@ -110,6 +110,7 @@ $call Make montage.c
 $call Make montage-info.c
 $call Make morphology.c
 $call Make opencl.c
+$call Make opencl-device.c
 $call Make option.c
 $call Make paint.c
 $call Make paint-floodfill.c
@@ -175,6 +176,8 @@ $call Make vms.c
 $call Make widget.c
 $call Make xml-tree.c
 $call Make xwindow.c
+$call Make xwindow-visual.c
+$call Make xwindow-import.c
 $ set default [-.filters]
 $ call Make analyze.c
 $ set default [-.magickwand]

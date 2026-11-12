@@ -5,22 +5,30 @@ Recipe S, *Preprocessor branches* exception of 2026-11-11: a split may move an `
 verbatim with the function that holds it when a build that compiles that branch shows the moved functions'
 instructions unchanged. This compiles the original file as it stood at OLDREV and the new file as it is in
 the working tree, both with the flags of build-oracle/BUILD (cand-wide for X11/OpenCL, ci-gcc-min or
-ci-gcc-dlg for the non-HDRI branches, ci-gcc-noatanh for the `#else` side of MAGICKCORE_HAVE_ATANH:
-tools/ci_linux_warnings.sh configures it), at -g0, disassembles every function the new file defines in both
+ci-gcc-dlg for the non-HDRI branches), at -g0, disassembles every function the new file defines in both
 objects, and compares them function by function, matched by name (so the order the compiler laid the
 functions out in does not matter), line by line. Allowed differences, each counted in the output:
   - a `__LINE__` immediate (`mov $N,%ecx` / `%edx`) shifted by a constant per function,
   - a .rodata reference (resolved to the 16 bytes it points at; `__FILE__` strings differ),
   - a compiler constant-pool label number (.LCPI<n>_<m>), a rip-relative offset,
-  - the label of a call or jump the linker resolves (`call <name>` followed by its relocation line: objdump prints the
-    symbol at the next instruction, which for a call ending a function is whichever function the object lays out next);
-    the relocation line that names the real target is compared as every other line,
-  - the alignment padding (`nop` forms) that ends a function after its last `ret`, `jmp` or noreturn call: how much
-    depends on the function the object lays out next, and nothing executes it (counted as functions whose padding
-    differs),
   - a string-literal label number (clang's .L.str.<n>), when both labels hold the same bytes: each
     reference is resolved to the NUL-terminated string the label points at (the path the object was
     compiled from reads as __FILE__ in both), so a changed literal still prints DIFFERENT.
+  - a `.data.rel.ro` reference (a table of string pointers a `switch` was turned into): the offset in the
+    section differs when other tables stand before it, so each reference is resolved to the strings the
+    consecutive pointer slots from that offset point at (to the end of the run of slots), and a changed
+    string or slot count still prints DIFFERENT,
+  - a `.bss` or `.data` reference (a function's `static` variable): the offset in the section differs when
+    other variables stand before it, so each reference is resolved to the symbol (name and size) it points
+    into, plus the offset inside it, and a reference to another variable still prints DIFFERENT,
+  - the label objdump prints for a `call` or `jmp` whose target a relocation names (the line after it, which
+    is compared): the placeholder address resolves to whatever symbol stands at it in each object,
+  - the address of a function taken from another object: `lea F(%rip),%r` with an R_X86_64_PC32 relocation
+    when F stands in the same object, `mov F@GOTPCREL(%rip),%r` with an R_X86_64_REX_GOTPCRELX relocation
+    when it does not (the moved code takes the address of XError, which stays in the original); both are
+    read as the lea form and the symbol and addend are compared,
+and the alignment padding after a function's last instruction (nop forms), which depends on what follows
+the function in its object, is not compared.
 Prints IDENTICAL-MODULO-LAYOUT or DIFFERENT (with the first differing lines) and exits 0 or 1.
 """
 import os, re, subprocess, sys, tempfile
@@ -43,53 +51,86 @@ def string_labels(obj, src):
     texts = {label: sections[sec][int(at, 16):].split(b"\0", 1)[0] for at, sec, label in symbols}
     return {label: "__FILE__" if text == src.encode() else text.hex() for label, text in texts.items()}
 
-PADDING = re.compile(r"(data16 )*(cs )?(nop\w*(\s.*)?|xchg\s+%ax,%ax)\s*$")
+def pointer_slots(obj, strs, src):
+    """Map each slot offset of .data.rel.ro of OBJ to what its 64-bit relocation points at: the hex of the
+    NUL-terminated string (a string-literal label or a .rodata.str section), else symbol and addend."""
+    sections = {}
+    slots = {}
+    for off, sym, add in re.findall(r"(?m)^([0-9a-f]+) R_X86_64_64\s+(\S+?)\+0x([0-9a-f]+)$",
+                                    sh("objdump", "-r", "-j", ".data.rel.ro", obj, text=True).stdout):
+        if sym.startswith(".rodata.str"):
+            if sym not in sections: sections[sym] = section_bytes(obj, sym)
+            text = sections[sym][int(add, 16):].split(b"\0", 1)[0]
+            slots[int(off, 16)] = "__FILE__" if text == src.encode() else text.hex()
+        elif sym.startswith(".L.str"): slots[int(off, 16)] = strs.get(sym, "?")
+        else: slots[int(off, 16)] = "%s+%s" % (sym, add)
+    return slots
 
-def strip_padding(lines):
-    """Remove from LINES the alignment padding that ends a function and return how many lines it was. The assembler
-    pads a function out to the alignment of the next one, so how many bytes of `nop` stand after the last instruction
-    depends on what the object lays out next (none when the function is last in its section), not on the code. It
-    follows an instruction after which control does not continue (`ret`, an unconditional `jmp`, `ud2`, or a call
-    that ends the function, to a function such as __assert_fail that does not return) and is never executed; a
-    `nop` anywhere else stays in the line compare."""
-    n = len(lines)
-    while n > 1 and PADDING.match(lines[n - 1]): n -= 1
-    cut = len(lines) - n
-    last = next((x for x in reversed(lines[:n]) if not x.startswith("R_")), "")
-    if cut and not re.match(r"(ret|retq|jmp|ud2|call|rep ret|bnd jmp|notrack jmp)\b", last): return 0
-    del lines[n:]
-    return cut
+def data_symbols(obj):
+    """Map a section (.bss, .data) of OBJ to its (value, size, name) object symbols."""
+    syms = {}
+    for value, sec, size, name in re.findall(r"(?m)^([0-9a-f]+) .{7} (\.bss|\.data)\s+([0-9a-f]+) (\S+)$",
+                                             sh("objdump", "-t", obj, text=True).stdout):
+        if name != sec: syms.setdefault(sec, []).append((int(value, 16), int(size, 16), name))
+    return syms
 
-def mark_call_placeholders(lines):
-    """A call or jump the assembler left to the linker has an operand of 0, which objdump prints as the symbol at the
-    next instruction: the function's own name in the middle of a function, and whichever function the object lays out
-    next when the call is the last instruction (a call to __assert_fail that ends a function). That label is the layout,
-    not the code; the relocation line that follows names the real target and is still compared line by line. The label
-    is marked <placeholder:NAME> so that classify() can count a difference in NAME alone."""
-    for i in range(len(lines) - 1):
-        if re.match(r"(call|jmp)\s+<[^>]*>\s*$", lines[i]) and re.match(r"R_[A-Z0-9_]+\s", lines[i + 1]):
-            lines[i] = re.sub(r"<([^>]*)>", r"<placeholder:\1>", lines[i])
+def symbol_at(syms, sec, target):
+    """`sec[name:size+offset]` for the symbol of section SEC that the address TARGET (in the section) falls in, or None."""
+    for value, size, name in syms.get(sec, []):
+        if value <= target < value + size: return "%s[%s:%d+%d]" % (sec, name, size, target - value)
+    return None
+
+def table_at(slots, off):
+    """The run of resolved pointer slots of SLOTS from offset OFF to the first gap, joined, or None."""
+    run = []
+    while off in slots: run.append(slots[off]); off += 8
+    return ",".join(run) if run else None
+
+def drop_padding(lines):
+    """LINES without the alignment padding (nop forms) after the last instruction."""
+    while len(lines) > 1 and re.match(r"^(cs |data16 )*(nop[wlq]?\b|xchg\s+%ax,%ax)", lines[-1]): lines = lines[:-1]
+    return lines
 
 def disasm(obj, names, src):
     ro = sh("objcopy", "-O", "binary", "--only-section=.rodata", obj, "/dev/stdout").stdout
     strs = string_labels(obj, src)
-    out, keep, cur = {}, False, None
+    slots = pointer_slots(obj, strs, src)
+    syms = data_symbols(obj)
+    out, at, keep, cur = {}, {}, False, None
     for line in sh("objdump", "-d", "--no-show-raw-insn", "-r", obj, text=True).stdout.splitlines():
         m = re.match(r"^[0-9a-f]+ <(.*)>:$", line)
         if m:
             keep = m.group(1) in names
             cur = m.group(1)
-            if keep: out[cur] = ["<%s>" % cur]
+            if keep: out[cur] = ["<%s>" % cur]; at[cur] = [None]
             continue
         if not keep or not line.strip(): continue
+        addr = int(re.match(r"^\s*([0-9a-f]+):", line).group(1), 16)
         line = re.sub(r"^\s*[0-9a-f]+:\s*", "", line)
         line = re.sub(r"\b[0-9a-f]+ <([A-Za-z_0-9.]+)(\+0x[0-9a-f]+)?>", r"<\1>", line)
         line = re.sub(r"\.rodata\+0x([0-9a-f]+)", lambda mm: ".rodata[%s]" % ro[int(mm.group(1), 16):int(mm.group(1), 16) + 16].hex(), line)
         line = re.sub(r"(\.L\.str(?:\.\d+)?)(?=[-+\s]|$)", lambda mm: "%s[%s]" % (mm.group(1), strs.get(mm.group(1), "?")), line)
-        out[cur].append(line)
-    pads = {name: strip_padding(lines) for name, lines in out.items()}
-    for lines in out.values(): mark_call_placeholders(lines)
-    return out, pads
+        def resolve(mm):
+            table = table_at(slots, int(mm.group(2), 16) * (1 if mm.group(1) == "+" else -1) + 4)
+            return mm.group(0) if table is None else ".data.rel.ro[%s]" % table
+        line = re.sub(r"\.data\.rel\.ro([+-])0x([0-9a-f]+)", resolve, line)
+        out[cur].append(line); at[cur].append(addr)
+    for name, lines in out.items():
+        for k in range(len(lines) - 1):
+            # a PC-relative reference to a variable: the target is the addend plus 4 plus the bytes of any
+            # immediate between the displacement and the end of the instruction, found from the addresses
+            m = re.match(r"^R_X86_64_PC32\s+(\.bss|\.data)(?:([+-])0x([0-9a-f]+))?\s*$", lines[k])
+            if m:
+                nxt = next((at[name][j] for j in range(k + 1, len(lines)) if not lines[j].startswith("R_X86_64_")), None)
+                addend = int(m.group(3) or "0", 16) * (-1 if m.group(2) == "-" else 1)
+                ref = symbol_at(syms, m.group(1), addend + 4 + (0 if nxt is None else nxt - at[name][k] - 4))
+                if ref: lines[k] = "R_X86_64_PC32\t" + ref
+            if re.match(r"^(call|jmp)\s+<", lines[k]) and lines[k + 1].startswith("R_X86_64_"):
+                lines[k] = re.sub(r"<.*>", "<RELOC>", lines[k])
+            if re.match(r"^mov\s+0x0\(%rip\),%\w+", lines[k]) and re.match(r"^R_X86_64_REX_GOTPCRELX\s", lines[k + 1]):
+                lines[k] = re.sub(r"^mov(\s+)", r"lea\1", lines[k])
+                lines[k + 1] = lines[k + 1].replace("R_X86_64_REX_GOTPCRELX", "R_X86_64_PC32", 1)
+    return {name: drop_padding(lines) for name, lines in out.items()}
 
 def label_kind(x, y):
     """The kind of label number X and Y differ in alone, or None."""
@@ -100,8 +141,6 @@ def label_kind(x, y):
 
 def classify(x, y):
     if "rodata" in x and "rodata" in y: return "rodata reference"
-    ph = lambda s: re.sub(r"<placeholder:[^>]*>", "<placeholder>", s)
-    if "<placeholder:" in x and ph(x) == ph(y): return "call placeholder label"
     kind = label_kind(x, y)
     if kind: return kind
     if re.match(r"mov\s+\$0x[0-9a-f]+,%(e[cd]x|r[cd]x)$", x) and re.sub(r"0x[0-9a-f]+", "N", x) == re.sub(r"0x[0-9a-f]+", "N", y):
@@ -165,13 +204,11 @@ def main():
     compile_both(bdir, old, new, tmp)
     nm = sh("nm", "--defined-only", os.path.join(tmp, "new.o"), text=True).stdout.split("\n")
     names = {l.split()[2] for l in nm if len(l.split()) == 3 and l.split()[1] in "tT"}
-    a, pads_a = disasm(os.path.join(tmp, "old.o"), names, oldsrc)
-    b, pads_b = disasm(os.path.join(tmp, "new.o"), names, os.path.join(root, new))
+    a = disasm(os.path.join(tmp, "old.o"), names, oldsrc)
+    b = disasm(os.path.join(tmp, "new.o"), names, os.path.join(root, new))
     la, lb = sum(map(len, a.values())), sum(map(len, b.values()))
     print("%s: %d functions, %d vs %d lines" % (build, len(names), la, lb))
     kinds, bad = compare_by_name(a, b)
-    moved = sum(1 for n in pads_a if pads_a[n] != pads_b.get(n, 0))
-    if moved: kinds["trailing alignment padding"] = moved
     report(kinds, bad)
 
 main()

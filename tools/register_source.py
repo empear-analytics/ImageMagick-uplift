@@ -62,7 +62,9 @@ def makefile_in(s):
         # MagickCore entries only: MagickWand has sources of the same name (montage.c)
         if (("_la-%s." % orig) in line and "libMagickCore_" in line) or \
                 line == "  MagickCore/%s.c \\" % orig:
-            out += [line, sub(line)]
+            # the last entry of the object list has no continuation: it gains one and the new entry ends the list
+            if line.endswith(lo): line += " \\"; out += [line, sub(line)[:-2]]
+            else: out += [line, sub(line)]
             n += 1
             i += 1
             continue
