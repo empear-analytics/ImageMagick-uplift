@@ -8781,6 +8781,78 @@ static void MagnifyBitPlanesLSB(const MagnifyBitPlanes *planes,
   }
 }
 
+typedef struct _MagnifyBitColumns
+{
+  unsigned int
+    width,
+    magnify;
+
+  XImage
+    *ximage;
+
+  unsigned char
+    background,
+    foreground;
+
+  unsigned int
+    scanline_pad;
+
+  unsigned char
+    *p,
+    p_bit,
+    q_bit,
+    byte;
+} MagnifyBitColumns;
+
+static unsigned char *MagnifyBitColumnsLSB(const MagnifyBitColumns *columns,
+  unsigned char *q)
+{
+  XImage
+    *const ximage = columns->ximage;
+
+  const unsigned char
+    background = columns->background,
+    foreground = columns->foreground;
+
+  const unsigned int
+    magnify = columns->magnify,
+    scanline_pad = columns->scanline_pad,
+    width = columns->width;
+
+  unsigned char
+    byte = columns->byte,
+    *p = columns->p,
+    p_bit = columns->p_bit,
+    q_bit = columns->q_bit;
+
+  unsigned int
+    k;
+
+  for (k=0; k < width; k+=magnify)
+  {
+    /*
+      Propagate pixel magnify columns.
+    */
+    {
+      const MagnifyBitPlanes
+        planes = { magnify, ximage, p, p_bit, background,
+          foreground };
+
+      MagnifyBitPlanesLSB(&planes,&byte,&q_bit,&q);
+    }
+    p_bit+=ximage->bits_per_pixel;
+    if (p_bit == 8)
+      {
+        p++;
+        p_bit=0;
+      }
+    if (q_bit != 0)
+      *q=byte >> (8-q_bit);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+  return(q);
+}
+
 static void MagnifyBitPlanesMSB(const MagnifyBitPlanes *planes,
   unsigned char *byte,unsigned char *q_bit,unsigned char **q)
 {
@@ -8980,33 +9052,25 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
             */
             for (j=0; j < magnify; j++)
             {
+              MagnifyBitColumns
+                columns;
+
               p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
                 ((x*ximage->bits_per_pixel) >> 3);
               p_bit=(unsigned char) (x*ximage->bits_per_pixel) & 0x07;
               q_bit=0;
               byte=0;
-              for (k=0; k < width; k+=magnify)
-              {
-                /*
-                  Propagate pixel magnify columns.
-                */
-                {
-                  const MagnifyBitPlanes
-                    planes = { magnify, ximage, p, p_bit, background,
-                      foreground };
-
-                  MagnifyBitPlanesLSB(&planes,&byte,&q_bit,&q);
-                }
-                p_bit+=ximage->bits_per_pixel;
-                if (p_bit == 8)
-                  {
-                    p++;
-                    p_bit=0;
-                  }
-                if (q_bit != 0)
-                  *q=byte >> (8-q_bit);
-                q+=(ptrdiff_t) scanline_pad;
-              }
+              columns.width=width;
+              columns.magnify=magnify;
+              columns.ximage=ximage;
+              columns.background=background;
+              columns.foreground=foreground;
+              columns.scanline_pad=scanline_pad;
+              columns.p=p;
+              columns.p_bit=p_bit;
+              columns.q_bit=q_bit;
+              columns.byte=byte;
+              q=MagnifyBitColumnsLSB(&columns,q);
             }
             y++;
           }
