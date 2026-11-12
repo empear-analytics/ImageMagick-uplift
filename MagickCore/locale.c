@@ -1205,6 +1205,31 @@ static void GetIncludePath(const char *filename,const char *token,
     (void) ConcatenateMagickString(path,token,MagickPathExtent);
 }
 
+static MagickBooleanType LoadLocaleInclude(const LocaleLoadTarget *target,
+  const char *filename,const char *token,const size_t depth)
+{
+  const LocaleLoadTarget include_target = { target->cache, target->locale,
+    target->exception };
+
+  char
+    path[MagickPathExtent],
+    *file_xml;
+
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  *path='\0';
+  GetIncludePath(filename,token,path);
+  file_xml=FileToXML(path,~0UL);
+  if (file_xml != (char *) NULL)
+    {
+      status=LoadLocaleCache(&include_target,file_xml,path,depth+1);
+      file_xml=DestroyString(file_xml);
+    }
+  return(status);
+}
+
 static const char *SkipQuotedText(const char *q)
 {
   const char
@@ -1352,24 +1377,8 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
                 (void) ThrowMagickException(exception,GetMagickModule(),
                   ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
               else
-                {
-                  const LocaleLoadTarget include_target = { cache, locale,
-                    exception };
-
-                  char
-                    path[MagickPathExtent],
-                    *file_xml;
-
-                  *path='\0';
-                  GetIncludePath(filename,token,path);
-                  file_xml=FileToXML(path,~0UL);
-                  if (file_xml != (char *) NULL)
-                    {
-                      status&=(MagickStatusType) LoadLocaleCache(
-                        &include_target,file_xml,path,depth+1);
-                      file_xml=DestroyString(file_xml);
-                    }
-                }
+                status&=(MagickStatusType) LoadLocaleInclude(target,filename,
+                  token,depth);
             }
         }
         continue;
