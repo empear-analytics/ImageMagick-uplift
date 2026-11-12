@@ -418,6 +418,19 @@ blocks of nested logic). Each bump is a missing function.
    one other value. The callee receives the same address and writes the same bytes of
    the caller's array; an array is never assigned or reseated as a whole, so nothing
    else of it changes, as for the pixel rows a block writes through `q`.
+   One the block writes before it reads it on every path, that nothing after the block
+   reads, and whose only use left in the caller would be a store before the block that
+   nothing else reads (a column counter `x` set by `x=0;` above a loop that the block's
+   own `for` restarts), so that declaring it in the new function would leave that store
+   set but never used (`-Wunused-but-set-variable`, an error in the CI jobs; no recipe
+   deletes the store), passes as a pointer `T *v` on Recipe O step 2's last paragraph's
+   terms (2026-11-12): a plain local whose address the caller takes nowhere else, every
+   use in the block written `(*v)`, an `&v` given to a callee written `v`, the call
+   passing `&v`; the function still returns its one value. The block overwrites the
+   value on entry before it reads it and nothing reads the value left behind, so each
+   path stores and reads the same values as before, through the pointer; the caller's
+   store keeps a use. Check by reading every path of the block and every use of the
+   variable in the caller.
 5. If the block is inside an OpenMP loop, check the rule above before you cut.
 6. If the block can throw - `ThrowBinaryException`, `ThrowImageException` and friends
    expand to a `return` - the new function must return a status the caller checks, and
@@ -512,7 +525,13 @@ first, `static`, and declarations at the top of the block as the surrounding cod
 
 **Evidence level:** guard.
 
-**Provenance:** founding recipe (2026-09-29).
+**Provenance:** founding recipe (2026-09-29). Step 4's pointer form for a temporary
+whose caller store would be left unused: 2026-11-12, from `xwindow.c`'s
+`XMakeImageMSBFirst` (campaign A, W18 lane a, wide build), reached by no case: its
+matte row loop writes `q` (the returned value) and the column counter `x`, whose
+caller store `x=0;` nothing else reads once the XYBitmap and matte loops have left
+(added by Claude Code, Claude Sonnet 5.5, under the owner's OK of 2026-11-10 to
+evolve the recipes).
 
 ---
 
@@ -12128,3 +12147,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | SG | Spread an Enclosing Guard over the Tests Inside It: `if (G) { if (A1) X1 else if (A2) X2 ... }` becomes the chain of `((G) && (Ak))` tests, and `if (G) { S if (B) T }` becomes `if (G) S` and `if ((G) && (B)) T`, for a side-effect-free `G` (in the second form, one that `S` does not write); `tools/guard_spread_check.py` checks the rewrite token by token | `accelerate.c`'s `ComputeContrastStretchImage` (campaign A, W18 lane a, wide build), which no case reaches: four per-channel stretch-map blocks (shape a) and the histogram unmap (shape b) are five of its six bumps; Recipe CN refuses (statements before the nested test, or an else chain), moving them gives four helpers that clone each other (probe 3.08 to 3.01), and the unmap's `goto` and throw cannot move at the unreached level. Probe: 3.08 to 3.15, bumps 5 to 1 | owner |
 | 2026-11-12 | AMEND | V, Y | V step 2 (and Y step 4's `*v`): the one written variable `v` may be an array of the caller's that the block only indexes (`v[e]`, read or assigned) and passes whole to no callee; it goes as a pointer parameter `T *v`, as Recipe E step 3 passes an accumulator array, and `v[e]` stays as written in the new function (the array's name is the address of its first element, C11 6.3.2.1p3, so `v[e]` is the same element) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W18 lane a, wide build): the loop that creates the two temporary buffers, `for (k = 0; k < 2; k++) { tempImageBuffer[k] = clCreateBuffer(...); if (clStatus != CL_SUCCESS) { throw; goto cleanup; } }`, is one of its three bumps; it writes the array `tempImageBuffer` element by element and leaves through `goto cleanup;`, which Recipe V step 2 (a plain local) and Recipe I step 2 (no array) refuse, and Recipe AR refuses a `goto`. The function leaves Bumpy Road Ahead (bumps 2 to 1, after the cleanup loop left) | owner |
 | 2026-11-12 | AMEND | SG | Shape (c): `if (G) { S if (B) T } else E` becomes `if (G) { S } else E` and `if ((G) && (B)) T`, when `G` has no side effect and neither `S` nor `E` writes anything `G` reads (`E` runs only when `G` was false, and `G` is evaluated again after it); `tools/guard_spread_check.py` checks it as well | `accelerate.c`'s `ComputeResizeImage` (campaign A, W18 lane a, wide build): after its first arm becomes a helper call, `if (xFactor > yFactor) { fills; if (call == MagickFalse) goto cleanup; } else {...}` keeps the exit test nested in the arm, Recipe I and Recipe E cannot take an exit test out of the arm, and the selection's two arms are the function's last two bumps. A probe: the function leaves Bumpy Road Ahead, so does the file, accelerate.c 3.17 to 3.19 | owner |
+| 2026-11-12 | AMEND | E | Step 4: a temporary the block writes before it reads, that nothing after the block reads, whose only use left in the caller would be a store before the block (so that declaring it in the new function leaves the store set but never used, `-Wunused-but-set-variable`), passes as a pointer `T *v` on Recipe O step 2's last paragraph's terms: every use `(*v)`, `&v` to a callee written `v`, the call passing `&v`, the function still returning its one value | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W18 lane a, wide build), reached by no case, so Recipe O is not available there: its matte row loop writes `q` (returned) and the column counter `x`, whose caller store `x=0;` nothing else reads once the XYBitmap and matte loops have left; taking both loops out of the function ends its Deep, Nested Complexity (probe: 2.03 to 2.06, with the LSB twin 1.99 to 2.03) | owner |
