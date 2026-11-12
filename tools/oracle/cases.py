@@ -6990,6 +6990,30 @@ def _windrv_cases():
         for degrees in ("17", "45", "-33", "95", "180", "212.5", "310", "-100"):
             yield _windrv("shearrotate %s %s" % (name, degrees),
                           ("shearrotate", img(name), degrees, "out.miff"), ["out.miff"])
+    # compare.c: IsImagesEqual, which only the API reaches: equal images, a difference in the
+    # first pixels, a difference only in the alpha channel (seen or masked out by a channel
+    # mask, so that channels without an update trait are skipped), images of different size
+    # and of different channel counts
+    for first, second, channels in (
+            ("rose", "rose", None), ("rose", "rose_blur", None), ("rose", "rose_alpha", None),
+            ("rose_alpha", "rose", None), ("rose", "rose_alpha", "RGB"), ("rose_alpha", "rose", "RGB"),
+            ("rose_alpha", "rose_alpha", "Alpha"), ("rose", "rose_alpha", "Alpha"),
+            ("rose", "rose_blur", "Blue"), ("rose", "hdri", None), ("hdri", "rose", "Green"),
+            ("gray16", "rose", None), ("rose", "gray16", None), ("cmyk", "rose", None),
+            ("rose", "tall", None), ("tall", "rose", None), ("tall", "tall", None),
+            ("rose", "wide", None), ("wide", "rose", None), ("tiny", "rose", None), ("tiny", "tiny", None),
+            ("wide", "wide", "Red")):
+        yield _windrv("imagesequal %s %s %s" % (first, second, channels or "all"),
+                      tuple(["imagesequal", img(first), img(second)] + ([channels] if channels else [])))
+    # segment.c: GetImageDynamicThreshold, which only the API reaches: images with several
+    # histogram peaks (rose, its blur, with alpha, a palette image), flat or two-valued ones
+    # (a 1x1 image, a gradient, a bilevel image), thin images, floating-point and CMYK pixels,
+    # each with a few cluster and smoothing thresholds
+    for name in ("rose", "rose_blur", "rose_alpha", "palette", "gray16", "bilevel", "tiny",
+                 "tall", "wide", "hdri", "cmyk"):
+        for cluster, smooth in (("0", "0"), ("5", "2"), ("10", "3")):
+            yield _windrv("dynthreshold %s %s %s" % (name, cluster, smooth),
+                          ("dynthreshold", img(name), cluster, smooth))
     # timer.c: -bench (AcquireTimerInfo) and -duration (ContinueTimer) in magick-cli.c; the
     # oracle masks the report's timings (owner's decision, 2026-10-04). A duration far longer
     # than the run keeps every iteration, so the output is the same each time.

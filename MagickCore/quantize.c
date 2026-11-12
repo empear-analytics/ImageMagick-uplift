@@ -3338,6 +3338,19 @@ static MagickBooleanType RefineKmeansClusters(const KmeansRefinement *refine,
   return(status);
 }
 
+static MagickBooleanType SeedKmeansFromColorList(Image *image,
+  const char *colors,const size_t number_colors,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=AcquireImageColormap(image,number_colors,exception);
+  if (status == MagickFalse)
+    return(status);
+  SeedKmeansFromColors(image,colors,exception);
+  return(status);
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -3374,24 +3387,17 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
     return(MagickFalse);
   colors=GetImageArtifact(image,"kmeans:seed-colors");
   if (colors == (const char *) NULL)
-    {
-      /*
-        Seed clusters from color quantization.
-      */
-      status=SeedKmeansFromQuantization(image,number_colors,exception);
-      if (status == MagickFalse)
-        return(status);
-    }
+    /*
+      Seed clusters from color quantization.
+    */
+    status=SeedKmeansFromQuantization(image,number_colors,exception);
   else
-    {
-      /*
-        Seed clusters from color list (e.g. red;green;blue).
-      */
-      status=AcquireImageColormap(image,number_colors,exception);
-      if (status == MagickFalse)
-        return(status);
-      SeedKmeansFromColors(image,colors,exception);
-    }
+    /*
+      Seed clusters from color list (e.g. red;green;blue).
+    */
+    status=SeedKmeansFromColorList(image,colors,number_colors,exception);
+  if (status == MagickFalse)
+    return(status);
   /*
     Iterative refinement.
   */

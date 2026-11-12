@@ -856,6 +856,57 @@ static cl_uint FindStretchWhiteBin(const Image *image,
   return(i);
 }
 
+static MagickBooleanType StretchesRedChannel(const Image *image,
+  const cl_float4 black,const cl_float4 white)
+{
+  return((((image->channel_mask & RedChannel) != 0) &&
+    (black.x != white.x)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType StretchesGreenChannel(const Image *image,
+  const cl_float4 black,const cl_float4 white)
+{
+  return((((image->channel_mask & GreenChannel) != 0) &&
+    (black.y != white.y)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType StretchesBlueChannel(const Image *image,
+  const cl_float4 black,const cl_float4 white)
+{
+  return((((image->channel_mask & BlueChannel) != 0) &&
+    (black.z != white.z)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType StretchesAlphaChannel(const Image *image,
+  const cl_float4 black,const cl_float4 white)
+{
+  return((((image->channel_mask & AlphaChannel) != 0) &&
+    (black.w != white.w)) ? MagickTrue : MagickFalse);
+}
+
+static void StretchColormap(Image *image,PixelPacket *stretch_map,
+  const cl_float4 black,const cl_float4 white)
+{
+  cl_uint
+    i;
+
+  for (i=0; i < (cl_uint) image->colors; i++)
+  {
+    if (StretchesRedChannel(image,black,white) != MagickFalse)
+      image->colormap[i].red=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
+    if (StretchesGreenChannel(image,black,white) != MagickFalse)
+      image->colormap[i].green=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
+    if (StretchesBlueChannel(image,black,white) != MagickFalse)
+      image->colormap[i].blue=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
+    if (StretchesAlphaChannel(image,black,white) != MagickFalse)
+      image->colormap[i].alpha=stretch_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
+  }
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const double black_point,const double white_point,
   ExceptionInfo *exception)
@@ -1034,13 +1085,11 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
 
   /* unmap, don't block gpu to use this buffer again.  */
   if (ALIGNED(histogram,cl_uint4))
-  {
     clStatus = clEnv->library->clEnqueueUnmapMemObject(queue, histogramBuffer, histogram, 0, NULL, NULL);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
-      goto cleanup;
-    }
+  if ((ALIGNED(histogram,cl_uint4)) && (clStatus != CL_SUCCESS))
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
+    goto cleanup;
   }
 
   /* recreate input buffer later, in case image updated */
@@ -1103,54 +1152,54 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   (void) memset(stretch_map,0,(MaxMap+1)*sizeof(*stretch_map));
   for (i=0; i <= (ssize_t) MaxMap; i++)
   {
-    if ((image->channel_mask & RedChannel) != 0)
-    {
-      if (i < (cl_uint) black.x)
-        stretch_map[i].red=0;
+    if (((image->channel_mask & RedChannel) != 0) &&
+        (i < (cl_uint) black.x))
+      stretch_map[i].red=0;
+    else
+      if (((image->channel_mask & RedChannel) != 0) &&
+          (i > (cl_uint) white.x))
+        stretch_map[i].red=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.x)
-          stretch_map[i].red=(unsigned int) QuantumRange;
-        else
-          if (black.x != white.x)
-            stretch_map[i].red=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.x)/(white.x-black.x)));
-    }
-    if ((image->channel_mask & GreenChannel) != 0)
-    {
-      if (i < (cl_uint) black.y)
-        stretch_map[i].green=0;
+        if (((image->channel_mask & RedChannel) != 0) &&
+            (black.x != white.x))
+          stretch_map[i].red=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.x)/(white.x-black.x)));
+    if (((image->channel_mask & GreenChannel) != 0) &&
+        (i < (cl_uint) black.y))
+      stretch_map[i].green=0;
+    else
+      if (((image->channel_mask & GreenChannel) != 0) &&
+          (i > (cl_uint) white.y))
+        stretch_map[i].green=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.y)
-          stretch_map[i].green=(unsigned int) QuantumRange;
-        else
-          if (black.y != white.y)
-            stretch_map[i].green=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.y)/(white.y-black.y)));
-    }
-    if ((image->channel_mask & BlueChannel) != 0)
-    {
-      if (i < (cl_uint) black.z)
-        stretch_map[i].blue=0;
+        if (((image->channel_mask & GreenChannel) != 0) &&
+            (black.y != white.y))
+          stretch_map[i].green=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.y)/(white.y-black.y)));
+    if (((image->channel_mask & BlueChannel) != 0) &&
+        (i < (cl_uint) black.z))
+      stretch_map[i].blue=0;
+    else
+      if (((image->channel_mask & BlueChannel) != 0) &&
+          (i > (cl_uint) white.z))
+        stretch_map[i].blue=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.z)
-          stretch_map[i].blue=(unsigned int) QuantumRange;
-        else
-          if (black.z != white.z)
-            stretch_map[i].blue=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.z)/(white.z-black.z)));
-    }
-    if ((image->channel_mask & AlphaChannel) != 0)
-    {
-      if (i < (cl_uint) black.w)
-        stretch_map[i].alpha=0;
+        if (((image->channel_mask & BlueChannel) != 0) &&
+            (black.z != white.z))
+          stretch_map[i].blue=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.z)/(white.z-black.z)));
+    if (((image->channel_mask & AlphaChannel) != 0) &&
+        (i < (cl_uint) black.w))
+      stretch_map[i].alpha=0;
+    else
+      if (((image->channel_mask & AlphaChannel) != 0) &&
+          (i > (cl_uint) white.w))
+        stretch_map[i].alpha=(unsigned int) QuantumRange;
       else
-        if (i > (cl_uint) white.w)
-          stretch_map[i].alpha=(unsigned int) QuantumRange;
-        else
-          if (black.w != white.w)
-            stretch_map[i].alpha=(unsigned int) ScaleMapToQuantum(
-              (MagickRealType) (MaxMap*(i-black.w)/(white.w-black.w)));
-    }
+        if (((image->channel_mask & AlphaChannel) != 0) &&
+            (black.w != white.w))
+          stretch_map[i].alpha=(unsigned int) ScaleMapToQuantum(
+            (MagickRealType) (MaxMap*(i-black.w)/(white.w-black.w)));
   }
 
   /*
@@ -1163,25 +1212,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
     /*
        Stretch colormap.
        */
-    for (i=0; i < (cl_uint) image->colors; i++)
-    {
-      if (((image->channel_mask & RedChannel) != 0) &&
-          (black.x != white.x))
-        image->colormap[i].red=stretch_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
-      if (((image->channel_mask & GreenChannel) != 0) &&
-          (black.y != white.y))
-        image->colormap[i].green=stretch_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
-      if (((image->channel_mask & BlueChannel) != 0) &&
-          (black.z != white.z))
-        image->colormap[i].blue=stretch_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
-      if (((image->channel_mask & AlphaChannel) != 0) &&
-          (black.w != white.w))
-        image->colormap[i].alpha=stretch_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
-    }
+    StretchColormap(image,stretch_map,black,white);
   }
 
   /*
@@ -1356,6 +1387,66 @@ MagickPrivate MagickBooleanType AccelerateContrastStretchImage(
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _TempBufferInfo
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+} TempBufferInfo;
+
+static MagickBooleanType CreateTempImageBuffers(const TempBufferInfo *info,
+  cl_mem *tempImageBuffer,ExceptionInfo *exception)
+{
+  const MagickCLDevice
+    device = info->device;
+
+  const MagickCLEnv
+    clEnv = info->clEnv;
+
+  const cl_mem_flags
+    mem_flags = info->mem_flags;
+
+  const size_t
+    length = info->length;
+
+  cl_int
+    clStatus;
+
+  int
+    k;
+
+  for (k = 0; k < 2; k++)
+  {
+    tempImageBuffer[k] = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), NULL, &clStatus);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
+static void ReleaseTempImageBuffers(MagickCLEnv clEnv,cl_mem *tempImageBuffer)
+{
+  int
+    k;
+
+  for (k = 0; k < 2; k++)
+  {
+    if (tempImageBuffer[k]!=NULL)
+      clEnv->library->clReleaseMemObject(tempImageBuffer[k]);
+  }
+}
+
 static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   ExceptionInfo*exception)
 {
@@ -1464,14 +1555,12 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
 
   mem_flags = CL_MEM_READ_WRITE;
   length = image->columns * image->rows;
-  for (k = 0; k < 2; k++)
   {
-    tempImageBuffer[k] = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), NULL, &clStatus);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    const TempBufferInfo
+      info = { clEnv, device, mem_flags, length };
+
+    if (CreateTempImageBuffers(&info,tempImageBuffer,exception) == MagickFalse)
       goto cleanup;
-    }
   }
 
   filteredImage = CloneImage(image,0,0,MagickTrue,exception);
@@ -1707,11 +1796,7 @@ cleanup:
     ReleaseOpenCLDevice(device);
   if (imageBuffer!=NULL)
     clEnv->library->clReleaseMemObject(imageBuffer);
-  for (k = 0; k < 2; k++)
-  {
-    if (tempImageBuffer[k]!=NULL)
-      clEnv->library->clReleaseMemObject(tempImageBuffer[k]);
-  }
+  ReleaseTempImageBuffers(clEnv,tempImageBuffer);
   if (filteredImageBuffer!=NULL)
     clEnv->library->clReleaseMemObject(filteredImageBuffer);
   if (hullPass1!=NULL)
@@ -1885,6 +1970,67 @@ static void IntegrateEqualizeHistogram(const Image *image,
     if ((image->channel_mask & AlphaChannel) != 0)
       intensity.w+=histogram[i].s[3];
     map[i]=intensity;
+  }
+}
+
+static MagickBooleanType EqualizesRedChannel(const Image *image,
+  const cl_float4 white,const cl_float4 black)
+{
+  return((((image->channel_mask & RedChannel) != 0) &&
+    (white.x != black.x)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType EqualizesGreenChannel(const Image *image,
+  const cl_float4 white,const cl_float4 black)
+{
+  return((((image->channel_mask & GreenChannel) != 0) &&
+    (white.y != black.y)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType EqualizesBlueChannel(const Image *image,
+  const cl_float4 white,const cl_float4 black)
+{
+  return((((image->channel_mask & BlueChannel) != 0) &&
+    (white.z != black.z)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType EqualizesAlphaChannel(const Image *image,
+  const cl_float4 white,const cl_float4 black)
+{
+  return((((image->channel_mask & AlphaChannel) != 0) &&
+    (white.w != black.w)) ? MagickTrue : MagickFalse);
+}
+
+static void EqualizeColormap(Image *image,PixelPacket *equalize_map,
+  const cl_float4 white,const cl_float4 black)
+{
+  cl_uint
+    i;
+
+  for (i=0; i < (cl_uint) image->colors; i++)
+  {
+    if ((image->channel_mask & SyncChannels) != 0)
+    {
+      EqualizeLevels
+        levels;
+
+      levels.white=white;
+      levels.black=black;
+      EqualizeColormapSync(image,equalize_map,i,&levels);
+      continue;
+    }
+    if (EqualizesRedChannel(image,white,black) != MagickFalse)
+      image->colormap[i].red=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
+    if (EqualizesGreenChannel(image,white,black) != MagickFalse)
+      image->colormap[i].green=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
+    if (EqualizesBlueChannel(image,white,black) != MagickFalse)
+      image->colormap[i].blue=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
+    if (EqualizesAlphaChannel(image,white,black) != MagickFalse)
+      image->colormap[i].alpha=equalize_map[
+        ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
   }
 }
 
@@ -2077,16 +2223,16 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
           (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
       continue;
     }
-    if (((image->channel_mask & RedChannel) != 0) && (white.x != black.x))
+    if (EqualizesRedChannel(image,white,black) != MagickFalse)
       equalize_map[i].red=(unsigned int) ScaleMapToQuantum(
         (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
-    if (((image->channel_mask & GreenChannel) != 0) && (white.y != black.y))
+    if (EqualizesGreenChannel(image,white,black) != MagickFalse)
       equalize_map[i].green=(unsigned int) ScaleMapToQuantum(
         (MagickRealType) ((MaxMap*(map[i].y-black.y))/(white.y-black.y)));
-    if (((image->channel_mask & BlueChannel) != 0) && (white.z != black.z))
+    if (EqualizesBlueChannel(image,white,black) != MagickFalse)
       equalize_map[i].blue=(unsigned int) ScaleMapToQuantum(
         (MagickRealType) ((MaxMap*(map[i].z-black.z))/(white.z-black.z)));
-    if (((image->channel_mask & AlphaChannel) != 0) && (white.w != black.w))
+    if (EqualizesAlphaChannel(image,white,black) != MagickFalse)
       equalize_map[i].alpha=(unsigned int) ScaleMapToQuantum(
         (MagickRealType) ((MaxMap*(map[i].w-black.w))/(white.w-black.w)));
   }
@@ -2096,31 +2242,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     /*
        Equalize colormap.
        */
-    for (i=0; i < (cl_uint) image->colors; i++)
-    {
-      if ((image->channel_mask & SyncChannels) != 0)
-      {
-        EqualizeLevels
-          levels;
-
-        levels.white=white;
-        levels.black=black;
-        EqualizeColormapSync(image,equalize_map,i,&levels);
-        continue;
-      }
-      if (((image->channel_mask & RedChannel) != 0) && (white.x != black.x))
-        image->colormap[i].red=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].red)].red;
-      if (((image->channel_mask & GreenChannel) != 0) && (white.y != black.y))
-        image->colormap[i].green=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].green)].green;
-      if (((image->channel_mask & BlueChannel) != 0) && (white.z != black.z))
-        image->colormap[i].blue=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].blue)].blue;
-      if (((image->channel_mask & AlphaChannel) != 0) && (white.w != black.w))
-        image->colormap[i].alpha=equalize_map[
-          ScaleQuantumToMap((const Quantum) image->colormap[i].alpha)].alpha;
-    }
+    EqualizeColormap(image,equalize_map,white,black);
   }
 
   /*
@@ -2597,6 +2719,79 @@ MagickPrivate MagickBooleanType AccelerateGrayscaleImage(Image* image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _LocalContrastLaunchInfo
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_kernel
+    blurRowKernel;
+
+  const Image
+    *image;
+
+  unsigned int
+    passes;
+} LocalContrastLaunchInfo;
+
+static MagickBooleanType LaunchLocalContrastBlurRow(
+  const LocalContrastLaunchInfo *info,ExceptionInfo *exception)
+{
+  const Image
+    *const image = info->image;
+
+  const MagickCLDevice
+    device = info->device;
+
+  const MagickCLEnv
+    clEnv = info->clEnv;
+
+  const cl_command_queue
+    queue = info->queue;
+
+  const cl_kernel
+    blurRowKernel = info->blurRowKernel;
+
+  const unsigned int
+    passes = info->passes;
+
+  cl_event
+    event;
+
+  cl_int
+    clStatus;
+
+  int x;
+  for (x = 0; x < (int) passes; ++x) {
+    size_t gsize[2];
+    size_t wsize[2];
+    size_t goffset[2];
+
+    gsize[0] = 256;
+    gsize[1] = (image->rows + passes - 1) / passes;
+    wsize[0] = 256;
+    wsize[1] = 1;
+    goffset[0] = 0;
+    goffset[1] = x * gsize[1];
+
+    clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, blurRowKernel, 2, goffset, gsize, wsize, 0, NULL, &event);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+      return(MagickFalse);
+    }
+    clEnv->library->clFlush(queue);
+    RecordProfileData(device,blurRowKernel,event);
+  }
+  return(MagickTrue);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -2798,28 +2993,11 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
 
     /* launch the kernel */
     {
-      int x;
-      for (x = 0; x < (int) passes; ++x) {
-        size_t gsize[2];
-        size_t wsize[2];
-        size_t goffset[2];
+      const LocalContrastLaunchInfo
+        info = { clEnv, device, queue, blurRowKernel, image, passes };
 
-        gsize[0] = 256;
-        gsize[1] = (image->rows + passes - 1) / passes;
-        wsize[0] = 256;
-        wsize[1] = 1;
-        goffset[0] = 0;
-        goffset[1] = x * gsize[1];
-
-        clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, blurRowKernel, 2, goffset, gsize, wsize, 0, NULL, &event);
-        if (clStatus != CL_SUCCESS)
-        {
-          (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-          goto cleanup;
-        }
-        clEnv->library->clFlush(queue);
-        RecordProfileData(device,blurRowKernel,event);
-      }
+      if (LaunchLocalContrastBlurRow(&info,exception) == MagickFalse)
+        goto cleanup;
     }
 
     {
@@ -2908,13 +3086,10 @@ cleanup:
     ReleaseOpenCLCommandQueue(device, queue);
   if (device != NULL)
     ReleaseOpenCLDevice(device);
-  if (outputReady == MagickFalse)
+  if ((outputReady == MagickFalse) && (filteredImage != NULL))
   {
-    if (filteredImage != NULL)
-    {
-      DestroyImage(filteredImage);
-      filteredImage = NULL;
-    }
+    DestroyImage(filteredImage);
+    filteredImage = NULL;
   }
 
   return(filteredImage);
@@ -4006,6 +4181,121 @@ cleanup:
   return(outputReady);
 }
 
+typedef struct _ResizeArmInfo
+{
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  const Image
+    *image;
+
+  Image
+    *filteredImage;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer,
+    cubicCoefficientsBuffer;
+
+  cl_uint
+    number_channels;
+
+  size_t
+    resizedColumns,
+    resizedRows;
+
+  const ResizeFilter
+    *resizeFilter;
+
+  float
+    xFactor,
+    yFactor;
+} ResizeArmInfo;
+
+typedef struct _ResizeArmTargets
+{
+  cl_mem
+    *tempImageBuffer;
+
+  MagickBooleanType
+    *outputReady;
+} ResizeArmTargets;
+
+static MagickBooleanType ResizeHorizontalThenVertical(
+  const ResizeArmInfo *info,ExceptionInfo *exception,
+  const ResizeArmTargets *targets)
+{
+  const Image
+    *const image = info->image;
+
+  const MagickCLDevice
+    device = info->device;
+
+  const cl_command_queue
+    queue = info->queue;
+
+  Image
+    *const filteredImage = info->filteredImage;
+
+  const cl_mem
+    cubicCoefficientsBuffer = info->cubicCoefficientsBuffer,
+    filteredImageBuffer = info->filteredImageBuffer,
+    imageBuffer = info->imageBuffer;
+
+  const cl_uint
+    number_channels = info->number_channels;
+
+  const size_t
+    resizedColumns = info->resizedColumns,
+    resizedRows = info->resizedRows;
+
+  const ResizeFilter
+    *const resizeFilter = info->resizeFilter;
+
+  const float
+    xFactor = info->xFactor,
+    yFactor = info->yFactor;
+
+  cl_mem
+    *const tempImageBuffer = targets->tempImageBuffer;
+
+  MagickBooleanType
+    *const outputReady = targets->outputReady;
+
+  size_t
+    length;
+
+  length=resizedColumns*image->rows*number_channels;
+  *tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
+    sizeof(CLQuantum),(void *) NULL);
+  if (*tempImageBuffer == (cl_mem) NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
+    return(MagickFalse);
+  }
+
+  *outputReady=resizeHorizontalFilter(device,queue,image,filteredImage,
+    imageBuffer,number_channels,(cl_uint) image->columns,
+    (cl_uint) image->rows,*tempImageBuffer,(cl_uint) resizedColumns,
+    (cl_uint) image->rows,resizeFilter,cubicCoefficientsBuffer,xFactor,
+    exception);
+  if (*outputReady == MagickFalse)
+    return(MagickFalse);
+
+  *outputReady=resizeVerticalFilter(device,queue,image,filteredImage,
+    *tempImageBuffer,number_channels,(cl_uint) resizedColumns,
+    (cl_uint) image->rows,filteredImageBuffer,(cl_uint) resizedColumns,
+    (cl_uint) resizedRows,resizeFilter,cubicCoefficientsBuffer,yFactor,
+    exception);
+  if (*outputReady == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   const size_t resizedColumns,const size_t resizedRows,
   const ResizeFilter *resizeFilter,ExceptionInfo *exception)
@@ -4038,6 +4328,12 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
 
   Image
     *filteredImage;
+
+  ResizeArmInfo
+    info;
+
+  ResizeArmTargets
+    targets;
 
   size_t
     i,
@@ -4087,31 +4383,21 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   yFactor=(float) resizedRows/(float) image->rows;
   if (xFactor > yFactor)
   {
-    length=resizedColumns*image->rows*number_channels;
-    tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
-      sizeof(CLQuantum),(void *) NULL);
-    if (tempImageBuffer == (cl_mem) NULL)
-    {
-      (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-        ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
-      goto cleanup;
-    }
-
-    outputReady=resizeHorizontalFilter(device,queue,image,filteredImage,
-      imageBuffer,number_channels,(cl_uint) image->columns,
-      (cl_uint) image->rows,tempImageBuffer,(cl_uint) resizedColumns,
-      (cl_uint) image->rows,resizeFilter,cubicCoefficientsBuffer,xFactor,
-      exception);
-    if (outputReady == MagickFalse)
-      goto cleanup;
-
-    outputReady=resizeVerticalFilter(device,queue,image,filteredImage,
-      tempImageBuffer,number_channels,(cl_uint) resizedColumns,
-      (cl_uint) image->rows,filteredImageBuffer,(cl_uint) resizedColumns,
-      (cl_uint) resizedRows,resizeFilter,cubicCoefficientsBuffer,yFactor,
-      exception);
-    if (outputReady == MagickFalse)
-      goto cleanup;
+    info.device=device;
+    info.queue=queue;
+    info.image=image;
+    info.filteredImage=filteredImage;
+    info.imageBuffer=imageBuffer;
+    info.filteredImageBuffer=filteredImageBuffer;
+    info.cubicCoefficientsBuffer=cubicCoefficientsBuffer;
+    info.number_channels=number_channels;
+    info.resizedColumns=resizedColumns;
+    info.resizedRows=resizedRows;
+    info.resizeFilter=resizeFilter;
+    info.xFactor=xFactor;
+    info.yFactor=yFactor;
+    targets.tempImageBuffer=(&tempImageBuffer);
+    targets.outputReady=(&outputReady);
   }
   else
   {
@@ -4141,6 +4427,9 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
     if (outputReady == MagickFalse)
       goto cleanup;
   }
+  if ((xFactor > yFactor) &&
+      (ResizeHorizontalThenVertical(&info,exception,&targets) == MagickFalse))
+    goto cleanup;
 
 cleanup:
 

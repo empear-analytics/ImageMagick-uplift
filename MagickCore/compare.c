@@ -185,19 +185,295 @@ static void HighlightCompareRow(const CompareHighlightRow *row,
   }
 }
 
-MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
-  const MetricType metric,double *distortion,ExceptionInfo *exception)
+static MagickBooleanType PrepareCompareHighlight(Image **difference_image,
+  Image **highlight_image,MagickBooleanType *status,ExceptionInfo *exception)
+{
+  *status=SetImageStorageClass(*highlight_image,DirectClass,exception);
+  if (*status == MagickFalse)
+    {
+      *difference_image=DestroyImage(*difference_image);
+      *highlight_image=DestroyImage(*highlight_image);
+      return(MagickFalse);
+    }
+  (void) SetImageMask(*highlight_image,ReadPixelMask,(Image *) NULL,exception);
+  (void) SetImageAlphaChannel(*highlight_image,OpaqueAlphaChannel,exception);
+  return(MagickTrue);
+}
+
+typedef struct _CompareImageTargets
+{
+  size_t
+    *columns,
+    *rows;
+
+  Image
+    **difference_image,
+    **highlight_image;
+
+  MagickBooleanType
+    *status;
+} CompareImageTargets;
+
+static MagickBooleanType AcquireCompareImages(const Image *image,
+  const Image *reconstruct_image,ExceptionInfo *exception,
+  const CompareImageTargets *targets)
+{
+  Image
+    *clone_image,
+    **const difference_image = targets->difference_image,
+    **const highlight_image = targets->highlight_image;
+
+  MagickBooleanType
+    *const status = targets->status;
+
+  RectangleInfo
+    geometry;
+
+  size_t
+    *const columns = targets->columns,
+    *const rows = targets->rows;
+
+  SetImageCompareBounds(image,reconstruct_image,columns,rows);
+  SetGeometry(image,&geometry);
+  geometry.width=*columns;
+  geometry.height=*rows;
+  clone_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (clone_image == (Image *) NULL)
+    return(MagickFalse);
+  (void) SetImageMask(clone_image,ReadPixelMask,(Image *) NULL,exception);
+  *difference_image=ExtentImage(clone_image,&geometry,exception);
+  clone_image=DestroyImage(clone_image);
+  if (*difference_image == (Image *) NULL)
+    return(MagickFalse);
+  (void) ResetImagePage(*difference_image,"0x0+0+0");
+  (void) SetImageAlphaChannel(*difference_image,OpaqueAlphaChannel,exception);
+  *highlight_image=CloneImage(image,*columns,*rows,MagickTrue,exception);
+  if (*highlight_image == (Image *) NULL)
+    {
+      *difference_image=DestroyImage(*difference_image);
+      return(MagickFalse);
+    }
+  return(PrepareCompareHighlight(difference_image,highlight_image,status,
+    exception));
+}
+
+typedef struct _CompareColorTargets
+{
+  PixelInfo
+    *highlight,
+    *lowlight,
+    *masklight;
+} CompareColorTargets;
+
+static void GetCompareHighlight(const Image *image,PixelInfo *highlight,
+  ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  (void) QueryColorCompliance("#f1001ecc",AllCompliance,highlight,exception);
+  artifact=GetImageArtifact(image,"compare:highlight-color");
+  if (artifact != (const char *) NULL)
+    (void) QueryColorCompliance(artifact,AllCompliance,highlight,exception);
+}
+
+static void GetCompareColors(const Image *image,ExceptionInfo *exception,
+  const CompareColorTargets *targets)
+{
+  const char
+    *artifact;
+
+  PixelInfo
+    *const highlight = targets->highlight,
+    *const lowlight = targets->lowlight,
+    *const masklight = targets->masklight;
+
+  GetCompareHighlight(image,highlight,exception);
+  (void) QueryColorCompliance("#ffffffcc",AllCompliance,lowlight,exception);
+  artifact=GetImageArtifact(image,"compare:lowlight-color");
+  if (artifact != (const char *) NULL)
+    (void) QueryColorCompliance(artifact,AllCompliance,lowlight,exception);
+  (void) QueryColorCompliance("#888888cc",AllCompliance,masklight,exception);
+  artifact=GetImageArtifact(image,"compare:masklight-color");
+  if (artifact != (const char *) NULL)
+    (void) QueryColorCompliance(artifact,AllCompliance,masklight,exception);
+}
+
+typedef struct _CompareRowsInfo
+{
+  Image
+    *image;
+
+  const Image
+    *reconstruct_image;
+
+  Image
+    *highlight_image;
+
+  PixelInfo
+    highlight,
+    lowlight,
+    masklight;
+
+  size_t
+    columns,
+    rows;
+
+  ExceptionInfo
+    *exception;
+} CompareRowsInfo;
+
+static void SyncCompareRow(CacheView *highlight_view,
+  MagickBooleanType *status,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    sync;
+
+  sync=SyncCacheViewAuthenticPixels(highlight_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+typedef struct _CompareRowInput
+{
+  Image
+    *image;
+
+  const Image
+    *reconstruct_image;
+
+  Image
+    *highlight_image;
+
+  PixelInfo
+    highlight,
+    lowlight,
+    masklight;
+
+  size_t
+    columns;
+
+  CacheView
+    *image_view,
+    *reconstruct_view,
+    *highlight_view;
+
+  ExceptionInfo
+    *exception;
+} CompareRowInput;
+
+static void CompareRow(const CompareRowInput *input,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *const image = input->image,
+    *const highlight_image = input->highlight_image;
+
+  const Image
+    *const reconstruct_image = input->reconstruct_image;
+
+  const PixelInfo
+    highlight = input->highlight,
+    lowlight = input->lowlight,
+    masklight = input->masklight;
+
+  const size_t
+    columns = input->columns;
+
+  CacheView
+    *const image_view = input->image_view,
+    *const reconstruct_view = input->reconstruct_view,
+    *const highlight_view = input->highlight_view;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  const Quantum
+    *magick_restrict p,
+    *magick_restrict q;
+
+  Quantum
+    *magick_restrict r;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
+  q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
+  r=QueueCacheViewAuthenticPixels(highlight_view,0,y,columns,1,exception);
+  if (IsCompareRowMissing(p,q,r) != MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  {
+    const CompareHighlightRow
+      row = { image, reconstruct_image, highlight_image, highlight, lowlight,
+        masklight, columns };
+
+    HighlightCompareRow(&row,p,q,r);
+  }
+  SyncCompareRow(highlight_view,status,exception);
+}
+
+static MagickBooleanType HighlightCompareRows(const CompareRowsInfo *info,
+  MagickBooleanType status)
 {
   CacheView
     *highlight_view,
     *image_view,
     *reconstruct_view;
 
-  const char
-    *artifact;
+  Image
+    *const image = info->image,
+    *const highlight_image = info->highlight_image;
+
+  const Image
+    *const reconstruct_image = info->reconstruct_image;
+
+  const PixelInfo
+    highlight = info->highlight,
+    lowlight = info->lowlight,
+    masklight = info->masklight;
+
+  const size_t
+    columns = info->columns,
+    rows = info->rows;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  ssize_t
+    y;
+
+  image_view=AcquireVirtualCacheView(image,exception);
+  reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
+  highlight_view=AcquireAuthenticCacheView(highlight_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,highlight_image,rows,1)
+#endif
+  for (y=0; y < (ssize_t) rows; y++)
+  {
+    const CompareRowInput
+      input = { image, reconstruct_image, highlight_image, highlight, lowlight,
+        masklight, columns, image_view, reconstruct_view, highlight_view,
+        exception };
+
+    CompareRow(&input,y,&status);
+  }
+  highlight_view=DestroyCacheView(highlight_view);
+  reconstruct_view=DestroyCacheView(reconstruct_view);
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
+  const MetricType metric,double *distortion,ExceptionInfo *exception)
+{
+  CompareRowsInfo
+    info;
 
   Image
-    *clone_image,
     *difference_image,
     *highlight_image;
 
@@ -209,15 +485,15 @@ MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
     lowlight,
     masklight;
 
-  RectangleInfo
-    geometry;
-
   size_t
     columns,
     rows;
 
-  ssize_t
-    y;
+  const CompareImageTargets
+    targets = { &columns, &rows, &difference_image, &highlight_image, &status };
+
+  const CompareColorTargets
+    colors = { &highlight, &lowlight, &masklight };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -231,97 +507,23 @@ MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
     exception);
   if (status == MagickFalse)
     return((Image *) NULL);
-  SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
-  SetGeometry(image,&geometry);
-  geometry.width=columns;
-  geometry.height=rows;
-  clone_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (clone_image == (Image *) NULL)
+  if (AcquireCompareImages(image,reconstruct_image,exception,&targets) ==
+      MagickFalse)
     return((Image *) NULL);
-  (void) SetImageMask(clone_image,ReadPixelMask,(Image *) NULL,exception);
-  difference_image=ExtentImage(clone_image,&geometry,exception);
-  clone_image=DestroyImage(clone_image);
-  if (difference_image == (Image *) NULL)
-    return((Image *) NULL);
-  (void) ResetImagePage(difference_image,"0x0+0+0");
-  (void) SetImageAlphaChannel(difference_image,OpaqueAlphaChannel,exception);
-  highlight_image=CloneImage(image,columns,rows,MagickTrue,exception);
-  if (highlight_image == (Image *) NULL)
-    {
-      difference_image=DestroyImage(difference_image);
-      return((Image *) NULL);
-    }
-  status=SetImageStorageClass(highlight_image,DirectClass,exception);
-  if (status == MagickFalse)
-    {
-      difference_image=DestroyImage(difference_image);
-      highlight_image=DestroyImage(highlight_image);
-      return((Image *) NULL);
-    }
-  (void) SetImageMask(highlight_image,ReadPixelMask,(Image *) NULL,exception);
-  (void) SetImageAlphaChannel(highlight_image,OpaqueAlphaChannel,exception);
-  (void) QueryColorCompliance("#f1001ecc",AllCompliance,&highlight,exception);
-  artifact=GetImageArtifact(image,"compare:highlight-color");
-  if (artifact != (const char *) NULL)
-    (void) QueryColorCompliance(artifact,AllCompliance,&highlight,exception);
-  (void) QueryColorCompliance("#ffffffcc",AllCompliance,&lowlight,exception);
-  artifact=GetImageArtifact(image,"compare:lowlight-color");
-  if (artifact != (const char *) NULL)
-    (void) QueryColorCompliance(artifact,AllCompliance,&lowlight,exception);
-  (void) QueryColorCompliance("#888888cc",AllCompliance,&masklight,exception);
-  artifact=GetImageArtifact(image,"compare:masklight-color");
-  if (artifact != (const char *) NULL)
-    (void) QueryColorCompliance(artifact,AllCompliance,&masklight,exception);
+  GetCompareColors(image,exception,&colors);
   /*
     Generate difference image.
   */
-  image_view=AcquireVirtualCacheView(image,exception);
-  reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
-  highlight_view=AcquireAuthenticCacheView(highlight_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,highlight_image,rows,1)
-#endif
-  for (y=0; y < (ssize_t) rows; y++)
-  {
-    const Quantum
-      *magick_restrict p,
-      *magick_restrict q;
-
-    CompareHighlightRow
-      row;
-
-    MagickBooleanType
-      sync;
-
-    Quantum
-      *magick_restrict r;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
-    q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
-    r=QueueCacheViewAuthenticPixels(highlight_view,0,y,columns,1,exception);
-    if (IsCompareRowMissing(p,q,r) != MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.reconstruct_image=reconstruct_image;
-    row.highlight_image=highlight_image;
-    row.highlight=highlight;
-    row.lowlight=lowlight;
-    row.masklight=masklight;
-    row.columns=columns;
-    HighlightCompareRow(&row,p,q,r);
-    sync=SyncCacheViewAuthenticPixels(highlight_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
-  }
-  highlight_view=DestroyCacheView(highlight_view);
-  reconstruct_view=DestroyCacheView(reconstruct_view);
-  image_view=DestroyCacheView(image_view);
+  info.image=image;
+  info.reconstruct_image=reconstruct_image;
+  info.highlight_image=highlight_image;
+  info.highlight=highlight;
+  info.lowlight=lowlight;
+  info.masklight=masklight;
+  info.columns=columns;
+  info.rows=rows;
+  info.exception=exception;
+  status=HighlightCompareRows(&info,status);
   if ((status != MagickFalse) && (difference_image != (Image *) NULL))
     status=CompositeImage(difference_image,highlight_image,image->compose,
       MagickTrue,0,0,exception);
@@ -387,6 +589,43 @@ static ssize_t FindUnequalPixelChannel(const Image *image,
   return(i);
 }
 
+typedef struct _CompareColumnScan
+{
+  const Image
+    *image,
+    *reconstruct_image;
+
+  size_t
+    columns;
+} CompareColumnScan;
+
+static MagickBooleanType IsCompareRowEqual(const CompareColumnScan *scan,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict q)
+{
+  const Image
+    *const image = scan->image,
+    *const reconstruct_image = scan->reconstruct_image;
+
+  const size_t
+    columns = scan->columns;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) columns; x++)
+  {
+    ssize_t
+      i;
+
+    i=FindUnequalPixelChannel(image,reconstruct_image,p,q);
+    if (i < (ssize_t) GetPixelChannels(image))
+      return(MagickFalse);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType IsImagesEqual(const Image *image,
   const Image *reconstruct_image,ExceptionInfo *exception)
 {
@@ -414,25 +653,17 @@ MagickExport MagickBooleanType IsImagesEqual(const Image *image,
       *magick_restrict p,
       *magick_restrict q;
 
-    ssize_t
-      x;
+    CompareColumnScan
+      scan;
 
     p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
     q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
     if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL))
       break;
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      ssize_t
-        i;
-
-      i=FindUnequalPixelChannel(image,reconstruct_image,p,q);
-      if (i < (ssize_t) GetPixelChannels(image))
-        break;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-    }
-    if (x < (ssize_t) columns)
+    scan.image=image;
+    scan.reconstruct_image=reconstruct_image;
+    scan.columns=columns;
+    if (IsCompareRowEqual(&scan,p,q) == MagickFalse)
       break;
   }
   reconstruct_view=DestroyCacheView(reconstruct_view);

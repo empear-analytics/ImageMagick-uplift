@@ -1399,6 +1399,63 @@ static int ShearRotateCmd(int argc,char **argv,ExceptionInfo *exception)
   return(status);
 }
 
+/* compare.c: IsImagesEqual, which neither the command line nor any library function calls */
+static int ImagesEqualCmd(int argc,char **argv,ExceptionInfo *exception)
+{
+  /* imagesequal IMAGE RECONSTRUCT [CHANNELS]: prints IsImagesEqual of the two images; CHANNELS
+     (a channel option such as RGB or Alpha) is set as the first image's channel mask, so the
+     other channels carry no update trait */
+  Image *image, *reconstruct_image;
+  ssize_t channels;
+
+  if (argc < 4)
+    return(Fail(exception,"imagesequal: IMAGE RECONSTRUCT [CHANNELS]"));
+  image=Read(argv[2],exception);
+  if (image == (Image *) NULL)
+    return(Fail(exception,"read"));
+  reconstruct_image=Read(argv[3],exception);
+  if (reconstruct_image == (Image *) NULL)
+    {
+      image=DestroyImage(image);
+      return(Fail(exception,"read"));
+    }
+  if (argc > 4)
+    {
+      channels=ParseChannelOption(argv[4]);
+      if (channels < 0)
+        return(Fail(exception,"channels"));
+      (void) SetImageChannelMask(image,(ChannelType) channels);
+    }
+  (void) printf("%d\n",(int) IsImagesEqual(image,reconstruct_image,exception));
+  Report(exception);
+  reconstruct_image=DestroyImage(reconstruct_image);
+  image=DestroyImage(image);
+  return(0);
+}
+
+/* segment.c: GetImageDynamicThreshold, which neither the command line nor any library function calls */
+static int DynThresholdCmd(int argc,char **argv,ExceptionInfo *exception)
+{
+  /* dynthreshold IMAGE CLUSTER SMOOTH: prints the status and the (red, green, blue) that
+     GetImageDynamicThreshold returns for the image with the two thresholds */
+  Image *image;
+  MagickBooleanType status;
+  PixelInfo pixel;
+
+  if (argc < 5)
+    return(Fail(exception,"dynthreshold: IMAGE CLUSTER SMOOTH"));
+  image=Read(argv[2],exception);
+  if (image == (Image *) NULL)
+    return(Fail(exception,"read"));
+  status=GetImageDynamicThreshold(image,atof(argv[3]),atof(argv[4]),&pixel,
+    exception);
+  (void) printf("%d %.17g %.17g %.17g\n",(int) status,pixel.red,pixel.green,
+    pixel.blue);
+  Report(exception);
+  image=DestroyImage(image);
+  return(0);
+}
+
 /* policy.c: SetMagickSecurityPolicy, which only the API reaches */
 static int SecPolicyCmd(int argc,char **argv,ExceptionInfo *exception)
 {
@@ -2906,6 +2963,8 @@ int main(int argc,char **argv)
   else if (strcmp(argv[1],"matrix") == 0) status=MatrixCmd(argc,argv,exception);
   else if (strcmp(argv[1],"resample") == 0) status=ResampleCmd(argc,argv,exception);
   else if (strcmp(argv[1],"shearrotate") == 0) status=ShearRotateCmd(argc,argv,exception);
+  else if (strcmp(argv[1],"imagesequal") == 0) status=ImagesEqualCmd(argc,argv,exception);
+  else if (strcmp(argv[1],"dynthreshold") == 0) status=DynThresholdCmd(argc,argv,exception);
   else if (strcmp(argv[1],"glob") == 0) status=GlobCmd(argc,argv,exception);
   else if (strcmp(argv[1],"tokenize") == 0) status=TokenizeCmd(argc,argv,exception);
   else if (strcmp(argv[1],"color") == 0) status=ColorCmd(argc,argv,exception);

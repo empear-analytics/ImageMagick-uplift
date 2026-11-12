@@ -73,12 +73,52 @@ selection*):
 It prints OK or FAIL with the line that broke the rule. Argument types against
 parameter types, and the OpenMP condition of the step, are checked by reading.
 """
+import glob
+import os
 import re
 import subprocess
 import sys
 from collections import Counter
 
 TRIVIAL = {"", "{", "}", "/*", "*/"}
+
+
+def declared_return_type(func):
+    """The return type of `func` as its header declares it, spaces removed (`char**`), or
+    None. Reads MagickCore/*.h: the declaration is `extern MagickExport <base>` on one line
+    and `  *...*func(...)` on a following indented line, or all on one line."""
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "MagickCore")
+    for header in sorted(glob.glob(os.path.join(root, "*.h"))):
+        lines = open(header, errors="replace").read().split("\n")
+        for i, line in enumerate(lines):
+            m = re.search(r"(\**)\s*\b" + re.escape(func) + r"\(", line)
+            if not m or line.lstrip().startswith(("#", "/")):
+                continue
+            stars, head = m.group(1), line[:m.start()]
+            if re.fullmatch(r"\s*", head):  # the declarator is on its own indented line
+                j = i - 1
+                while j >= 0 and (not lines[j] or lines[j][0] in " \t"):
+                    j -= 1
+                head = lines[j] if j >= 0 else ""
+            head = re.sub(r"\b(extern|MagickExport|MagickPrivate)\b", "", head)
+            if not re.fullmatch(r"[\w\s]+", head):
+                continue  # a call or a cast inside an inline function, not a declaration
+            return re.sub(r"\s+", "", head) + stars
+    return None
+
+
+def strip_identity_casts(line):
+    """Recipe D, *Casts to a call's own return type, and a repeated (void)*: drop
+    `(T) f(` where f's header declaration returns exactly T, and a `(void)` before
+    another `(void)` cast."""
+    line = re.sub(r"\(void\)\s*\(void\)", "(void)", line)
+
+    def one(m):
+        ret = declared_return_type(m.group(2))
+        if ret is not None and ret == re.sub(r"\s+", "", m.group(1)):
+            return m.group(2) + "("
+        return m.group(0)
+    return re.sub(r"\(([A-Za-z_][\w\s]*?\s*\**)\)\s*(\w+)\(", one, line)
 
 
 def split_args(text):
@@ -228,6 +268,7 @@ def main(argv):
     text = open(path).read()
     params, body = helper_def(text, helper)
     removed, added = diff_lines(path)
+    removed = [strip_identity_casts(r) for r in removed]
     proto_lines = set()
     for i, line in enumerate(added):
         if not (re.fullmatch(r"static [\w\s\*]+", line) and i + 1 < len(added)
