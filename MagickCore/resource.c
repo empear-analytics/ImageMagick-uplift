@@ -176,6 +176,13 @@ static void LockResourceSemaphore(const ResourceType type)
   }
 }
 
+static void FormatResourceSize(const MagickSizeType size,
+  const MagickBooleanType bi,char *format)
+{
+  (void) FormatMagickSize(size,bi,(bi != MagickFalse) ? "B" :
+    (const char *) NULL,MagickFormatExtent,format);
+}
+
 static void UnlockResourceSemaphore(const ResourceType type)
 {
   switch (type)
@@ -385,12 +392,9 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
         resource_limit[MagickFormatExtent],
         resource_request[MagickFormatExtent];
 
-      (void) FormatMagickSize(size,bi,(bi != MagickFalse) ? "B" :
-        (const char *) NULL,MagickFormatExtent,resource_request);
-      (void) FormatMagickSize((MagickSizeType) current,bi,(bi != MagickFalse) ?
-        "B" : (const char *) NULL,MagickFormatExtent,resource_current);
-      (void) FormatMagickSize(limit,bi,(bi != MagickFalse) ? "B" :
-        (const char *) NULL,MagickFormatExtent,resource_limit);
+      FormatResourceSize(size,bi,resource_request);
+      FormatResourceSize((MagickSizeType) current,bi,resource_current);
+      FormatResourceSize(limit,bi,resource_limit);
       (void) LogMagickEvent(ResourceEvent,GetMagickModule(),"%s: %s/%s/%s",
         CommandOptionToMnemonic(MagickResourceOptions,(ssize_t) type),
         resource_request,resource_current,resource_limit);
@@ -1058,12 +1062,9 @@ MagickExport void RelinquishMagickResource(const ResourceType type,
         resource_limit[MagickFormatExtent],
         resource_request[MagickFormatExtent];
 
-      (void) FormatMagickSize(size,bi,(bi != MagickFalse) ? "B" :
-        (const char *) NULL,MagickFormatExtent,resource_request);
-      (void) FormatMagickSize(current,bi,(bi != MagickFalse) ? "B" :
-        (const char *) NULL,MagickFormatExtent,resource_current);
-      (void) FormatMagickSize(limit,bi,(bi != MagickFalse) ? "B" :
-        (const char *) NULL,MagickFormatExtent,resource_limit);
+      FormatResourceSize(size,bi,resource_request);
+      FormatResourceSize(current,bi,resource_current);
+      FormatResourceSize(limit,bi,resource_limit);
       (void) LogMagickEvent(ResourceEvent,GetMagickModule(),"%s: %s/%s/%s",
         CommandOptionToMnemonic(MagickResourceOptions,(ssize_t) type),
           resource_request,resource_current,resource_limit);
