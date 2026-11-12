@@ -892,6 +892,11 @@ MagickExport char **DestroyStringList(char **list)
 %    o escape: the quoted string termination character to escape (e.g. '"').
 %
 */
+static inline MagickBooleanType NeedsEscape(const char c,const char escape)
+{
+  return((c == '\\') || (c == escape) ? MagickTrue : MagickFalse);
+}
+
 MagickExport char *EscapeString(const char *source,const char escape)
 {
   char
@@ -910,7 +915,7 @@ MagickExport char *EscapeString(const char *source,const char escape)
   length=0;
   for (p=source; *p != '\0'; p++)
   {
-    if ((*p == '\\') || (*p == escape))
+    if (NeedsEscape(*p,escape) != MagickFalse)
       {
         if (~length < 1)
           ThrowFatalException(ResourceLimitFatalError,"UnableToEscapeString");
@@ -928,7 +933,7 @@ MagickExport char *EscapeString(const char *source,const char escape)
   q=destination;
   for (p=source; *p != '\0'; p++)
   {
-    if ((*p == '\\') || (*p == escape))
+    if (NeedsEscape(*p,escape) != MagickFalse)
       *q++='\\';
     *q++=(*p);
   }
