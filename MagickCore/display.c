@@ -16858,6 +16858,41 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   (void) XSync(display,MagickFalse);
   return(window_info.id == root_window ? MagickTrue : MagickFalse);
 }
+
+static void XPositionCommandAndWidget(Display *display,XWindows *windows,
+  const XEvent event)
+{
+  XWindowChanges
+    window_changes;
+
+  if ((windows->command.geometry == (char *) NULL) &&
+      (windows->command.mapped == MagickFalse))
+    {
+      windows->command.x=event.xconfigure.x-(int)
+        windows->command.width-25;
+      windows->command.y=event.xconfigure.y;
+      XConstrainWindowPosition(display,&windows->command);
+      window_changes.x=windows->command.x;
+      window_changes.y=windows->command.y;
+      (void) XReconfigureWMWindow(display,windows->command.id,
+        windows->command.screen,(unsigned int) (CWX | CWY),
+        &window_changes);
+    }
+  if ((windows->widget.geometry == (char *) NULL) &&
+      (windows->widget.mapped == MagickFalse))
+    {
+      windows->widget.x=event.xconfigure.x+
+        event.xconfigure.width/10;
+      windows->widget.y=event.xconfigure.y+
+        event.xconfigure.height/10;
+      XConstrainWindowPosition(display,&windows->widget);
+      window_changes.x=windows->widget.x;
+      window_changes.y=windows->widget.y;
+      (void) XReconfigureWMWindow(display,windows->widget.id,
+        windows->widget.screen,(unsigned int) (CWX | CWY),
+        &window_changes);
+    }
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18412,33 +18447,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
                 /*
                   Position the transient windows relative of the Image window.
                 */
-                if ((windows->command.geometry == (char *) NULL) &&
-                    (windows->command.mapped == MagickFalse))
-                  {
-                    windows->command.x=event.xconfigure.x-(int)
-                      windows->command.width-25;
-                    windows->command.y=event.xconfigure.y;
-                    XConstrainWindowPosition(display,&windows->command);
-                    window_changes.x=windows->command.x;
-                    window_changes.y=windows->command.y;
-                    (void) XReconfigureWMWindow(display,windows->command.id,
-                      windows->command.screen,(unsigned int) (CWX | CWY),
-                      &window_changes);
-                  }
-                if ((windows->widget.geometry == (char *) NULL) &&
-                    (windows->widget.mapped == MagickFalse))
-                  {
-                    windows->widget.x=event.xconfigure.x+
-                      event.xconfigure.width/10;
-                    windows->widget.y=event.xconfigure.y+
-                      event.xconfigure.height/10;
-                    XConstrainWindowPosition(display,&windows->widget);
-                    window_changes.x=windows->widget.x;
-                    window_changes.y=windows->widget.y;
-                    (void) XReconfigureWMWindow(display,windows->widget.id,
-                      windows->widget.screen,(unsigned int) (CWX | CWY),
-                      &window_changes);
-                  }
+                XPositionCommandAndWidget(display,windows,event);
                 if ((windows->magnify.geometry == (char *) NULL) &&
                     (windows->magnify.mapped == MagickFalse))
                   {
