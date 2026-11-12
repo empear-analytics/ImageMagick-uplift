@@ -16928,6 +16928,21 @@ static void XPositionMagnifyAndPan(Display *display,XWindows *windows,
         &window_changes);
     }
 }
+
+static void XUpdatePanWindow(Display *display,XWindows *windows,
+  const XEvent event)
+{
+  if ((event.xconfigure.width < windows->image.ximage->width) ||
+      (event.xconfigure.height < windows->image.ximage->height))
+    {
+      (void) XMapRaised(display,windows->pan.id);
+      XDrawPanRectangle(display,windows);
+    }
+  else
+    if (windows->pan.mapped != MagickFalse)
+      (void) XWithdrawWindow(display,windows->pan.id,
+        windows->pan.screen);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18508,16 +18523,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             /*
               Update pan window configuration.
             */
-            if ((event.xconfigure.width < windows->image.ximage->width) ||
-                (event.xconfigure.height < windows->image.ximage->height))
-              {
-                (void) XMapRaised(display,windows->pan.id);
-                XDrawPanRectangle(display,windows);
-              }
-            else
-              if (windows->pan.mapped != MagickFalse)
-                (void) XWithdrawWindow(display,windows->pan.id,
-                  windows->pan.screen);
+            XUpdatePanWindow(display,windows,event);
             break;
           }
         if (event.xconfigure.window == windows->magnify.id)
