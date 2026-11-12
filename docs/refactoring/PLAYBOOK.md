@@ -10891,7 +10891,12 @@ whole groups and keeps their nesting in the new function.
    gains the member after the last, the initialiser the address `&v` after the last,
    in the commit of that helper; the helpers made earlier bind only the members they
    write, so their text does not change, and the entries before the new one keep their
-   positions. Six members stay the limit.
+   positions. Six members stay the limit, except for a struct that serves every block of one event
+   loop (the cases of its `switch` and its `if (state & ...)` blocks, as `XColorBrowserWidget`'s do): it
+   may hold one member per local of the loop's state (2026-11-12, later). Each block still writes two
+   to six of them (step 2), each helper binds only the members it names, a member it only reads
+   included, and reads or writes it as `(*v)` (the same address), and the members are the addresses of
+   distinct locals.
 4. Cut the block into a new `static void` function directly above the caller. It takes
    the variables the block only reads by value, or in one `const` input struct filled
    as Recipe Y steps 3 to 5 say (Recipe N step 2's conditions for struct values and its
@@ -10906,6 +10911,10 @@ whole groups and keeps their nesting in the new function.
    `AnimateEventContext`, shared by the helpers of the event switch's cases). The
    argument is N step 8's for the reads and this recipe's for the writes, which do not
    meet: a written variable goes by the targets struct, never by the input struct.
+   A `const` targets struct of another helper that the block passes on as `&t` (`XColorBrowserWidget`'s
+   list press hands `&targets` to `SelectFontBrowserEntry`) goes as one more parameter `const T *t`,
+   after the input struct and before this recipe's targets struct, and each `&t` of the block is
+   written `t`, as Recipe SR step 3 passes a targets struct on (2026-11-12, later).
 5. At the top of its body bind, per member the block writes and in member order,
    `V *const v = targets->v;` (and the input struct's members as Recipe N step 4 does).
    Write each written variable `v` as `(*v)` at every use, reads included, `&v` as `v`;
@@ -11035,6 +11044,15 @@ static void SelectListBrowserEntry(const ListBrowserPress *press,
   address `&v` gave the callee; no member is copied, so none is read that the block
   did not read, and a callee that fills the whole structure through the pointer
   (`XParseColor`) fills the static itself, as before.
+- A targets struct of more than six members (step 3) gives no member a second name and no helper a
+  write it did not make: every member is the address of its own local, fixed at the declaration; a
+  helper binds the members its block names and no other, so a member it does not name is not touched.
+  The count of members is the count of locals the loop's blocks share between them, which the blocks
+  already named one by one; each block still writes at most six, so the argument of Recipe I's
+  *Careful* is applied per block as before.
+- A pass-through `const` targets struct (step 4) is the same object the caller declared, read by the
+  callee through the pointer the block passed (`&t`); the parameter holds that address, so `t` in the
+  helper is the value `&t` had, and the call the block made receives it unchanged.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved) and steps 1, 2, 4 and 7 checked by reading; or, when no case reaches
@@ -12342,3 +12360,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | WORDING | CR | Step 4: the targets struct comes after the input struct and before a by-value parameter that the block reads and then writes (`XAnnotateKeyPress`'s `key_symbol`, assigned by its `XK_bracketleft` group), instead of "last" | `display.c`'s `XAnnotateEditImage`: its CR helpers take `(text_input, targets, value)`; the first wording would have put `key_symbol` before `targets` | owner |
 | 2026-11-12 | AMEND | E | Step 4: a temporary the block writes before it reads, that nothing after the block reads, whose only use left in the caller would be a store before the block (so that declaring it in the new function leaves the store set but never used, `-Wunused-but-set-variable`), passes as a pointer `T *v` on Recipe O step 2's last paragraph's terms: every use `(*v)`, `&v` to a callee written `v`, the call passing `&v`, the function still returning its one value | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W18 lane a, wide build), reached by no case, so Recipe O is not available there: its matte row loop writes `q` (returned) and the column counter `x`, whose caller store `x=0;` nothing else reads once the XYBitmap and matte loops have left; taking both loops out of the function ends its Deep, Nested Complexity (probe: 2.03 to 2.06, with the LSB twin 1.99 to 2.03) | owner |
 | 2026-11-12 | AMEND | I | Step 2: a block-scope `static` of the caller (arithmetic, enumeration or pointer type, not an array) whose address the caller takes only in the targets initialiser may be a written variable, on Recipe CT step 2's and Recipe O step 2's terms; *Careful* repeats their argument (one object of static storage duration at one address, nothing copied, same exits) | `xwindow.c`'s `XGetWindowImage` (campaign A, W18 lane a, wide build): its colormap block writes `number_colors`, `colors` and the `static` `colormap_info`, leaves through `return((Image *) NULL);` on two paths, and holds the function at depth 5; I step 2 refused the static (CT and O already admit it) | owner |
+| 2026-11-12 | AMEND | CT | Step 3: a targets struct that serves every block of one event loop (the cases of its `switch` and its `if (state & ...)` blocks) may hold more than six members, one per local of the loop's state; each block still writes two to six of them, each helper binds only the members it names (reads included, as `(*v)`). Step 4: a `const` targets struct of another helper that the block passes on as `&t` goes as one more parameter `const T *t`, each `&t` written `t` (Recipe SR step 3's form). *Careful* gives both arguments | `widget.c`'s `XColorBrowserWidget`, `XFileBrowserWidget`, `XFontBrowserWidget` and `XListBrowserWidget` (campaign A, W18 lane c, wide build): each event loop shares fourteen widgets, its state word, delay and list counters between about twenty blocks (cases and state blocks), each of which writes two to six of them; a struct capped at six members needs three or four types per browser and a helper of five parameters, and the list press hands the browser's earlier `targets` to `SelectFontBrowserEntry` | owner |
