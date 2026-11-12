@@ -8568,6 +8568,40 @@ static unsigned char *MagnifyColumns8Bit(const unsigned int width,
   return(q);
 }
 
+typedef struct _MagnifyMultiByte
+{
+  unsigned int
+    width,
+    magnify,
+    bytes_per_pixel;
+} MagnifyMultiByte;
+
+static unsigned char *MagnifyColumnsMultiByte(
+  const MagnifyMultiByte *multi_byte,unsigned char *p,unsigned char *q)
+{
+  const unsigned int
+    bytes_per_pixel = multi_byte->bytes_per_pixel,
+    magnify = multi_byte->magnify,
+    width = multi_byte->width;
+
+  unsigned int
+    k,
+    l,
+    m;
+
+  for (k=0; k < width; k+=magnify)
+  {
+    /*
+      Propagate pixel magnify columns.
+    */
+    for (l=0; l < magnify; l++)
+      for (m=0; m < bytes_per_pixel; m++)
+        *q++=(*(p+m));
+    p+=(ptrdiff_t) bytes_per_pixel;
+  }
+  return(q);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -8875,13 +8909,18 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
       default:
       {
         unsigned int
-          bytes_per_pixel,
-          m;
+          bytes_per_pixel;
+
+        MagnifyMultiByte
+          multi_byte;
 
         /*
           Magnify multi-byte X image.
         */
         bytes_per_pixel=(unsigned int) ximage->bits_per_pixel >> 3;
+        multi_byte.width=width;
+        multi_byte.magnify=magnify;
+        multi_byte.bytes_per_pixel=bytes_per_pixel;
         for (i=0; i < (ssize_t) height; i+=magnify)
         {
           /*
@@ -8891,16 +8930,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
           {
             p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
               ((x*ximage->bits_per_pixel) >> 3);
-            for (k=0; k < width; k+=magnify)
-            {
-              /*
-                Propagate pixel magnify columns.
-              */
-              for (l=0; l < magnify; l++)
-                for (m=0; m < bytes_per_pixel; m++)
-                  *q++=(*(p+m));
-              p+=(ptrdiff_t) bytes_per_pixel;
-            }
+            q=MagnifyColumnsMultiByte(&multi_byte,p,q);
             q+=(ptrdiff_t) scanline_pad;
           }
           y++;
