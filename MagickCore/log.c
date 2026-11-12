@@ -1387,6 +1387,20 @@ static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
   *q='\0';
 }
 
+static const char *GetModuleBasename(const char *module)
+{
+  const char
+    *r;
+
+  for (r=module+strlen(module)-1; r > module; r--)
+    if (*r == *DirectorySeparator)
+      {
+        r++;
+        break;
+      }
+  return(r);
+}
+
 static ptrdiff_t FormatLogSpecifier(char *q,const size_t extent,
   const char specifier)
 {
@@ -1573,16 +1587,8 @@ static char *TranslateEvent(const LogEventLocation *location,
       }
       case 'm':
       {
-        const char
-          *r;
-
-        for (r=module+strlen(module)-1; r > module; r--)
-          if (*r == *DirectorySeparator)
-            {
-              r++;
-              break;
-            }
-        q+=(ptrdiff_t) CopyMagickString(q,r,extent-(q-text));
+        q+=(ptrdiff_t) CopyMagickString(q,GetModuleBasename(module),
+          extent-(q-text));
         break;
       }
       case 'r':
