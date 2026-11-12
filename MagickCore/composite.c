@@ -3291,7 +3291,9 @@ typedef struct _CompositeRowInputs
     geometry_info;
 
   MagickBooleanType
-    union_coverage;
+    union_coverage,
+    canvas_alpha,
+    source_alpha;
 } CompositeRowInputs;
 
 static void SetCompositeCoverageModulus(const CompositeRowInputs *row,
@@ -3485,6 +3487,56 @@ typedef struct _CompositePixelInputs
     *source_pixel;
 } CompositePixelInputs;
 
+static const CompositeOperator
+  CanvasAlphaOperators[] =
+  {
+    AtopCompositeOp,
+    CopyBlackCompositeOp,
+    CopyBlueCompositeOp,
+    CopyCyanCompositeOp,
+    CopyGreenCompositeOp,
+    CopyMagentaCompositeOp,
+    CopyRedCompositeOp,
+    CopyYellowCompositeOp,
+    SrcAtopCompositeOp,
+    DstCompositeOp,
+    NoCompositeOp
+  };
+
+static MagickBooleanType IsCanvasAlphaOperator(const CompositeOperator compose)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators)); i++)
+    if (CanvasAlphaOperators[i] == compose)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
+static const CompositeOperator
+  SourceAlphaOperators[] =
+  {
+    BlurCompositeOp,
+    CopyCompositeOp,
+    DisplaceCompositeOp,
+    DistortCompositeOp,
+    DstAtopCompositeOp,
+    ReplaceCompositeOp,
+    SrcCompositeOp
+  };
+
+static MagickBooleanType IsSourceAlphaOperator(const CompositeOperator compose)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators)); i++)
+    if (SourceAlphaOperators[i] == compose)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 static void CompositeAlphaChannel(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,Quantum *magick_restrict q,
   MagickRealType *pixel)
@@ -3509,26 +3561,21 @@ static void CompositeAlphaChannel(const CompositeRowInputs *row,
     Sa = authentic->Sa,
     Si = authentic->Si;
 
+  if (row->canvas_alpha != MagickFalse)
+    {
+      (*pixel)=(double) QuantumRange*Da;
+      return;
+    }
+  if (row->source_alpha != MagickFalse)
+    {
+      (*pixel)=(double) QuantumRange*Sa;
+      return;
+    }
   switch (compose)
   {
     case AlphaCompositeOp:
     {
       (*pixel)=(double) QuantumRange*Sa;
-      break;
-    }
-    case AtopCompositeOp:
-    case CopyBlackCompositeOp:
-    case CopyBlueCompositeOp:
-    case CopyCyanCompositeOp:
-    case CopyGreenCompositeOp:
-    case CopyMagentaCompositeOp:
-    case CopyRedCompositeOp:
-    case CopyYellowCompositeOp:
-    case SrcAtopCompositeOp:
-    case DstCompositeOp:
-    case NoCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*Da;
       break;
     }
     case BumpmapCompositeOp:
@@ -3563,17 +3610,6 @@ static void CompositeAlphaChannel(const CompositeRowInputs *row,
     case CopyAlphaCompositeOp:
     {
       (*pixel)=GetCopyAlpha(source_image,Si,Sa);
-      break;
-    }
-    case BlurCompositeOp:
-    case CopyCompositeOp:
-    case DisplaceCompositeOp:
-    case DistortCompositeOp:
-    case DstAtopCompositeOp:
-    case ReplaceCompositeOp:
-    case SrcCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*Sa;
       break;
     }
     case DarkenIntensityCompositeOp:
@@ -5327,6 +5363,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     row.source_image=source_image;
     row.compose=compose;
     row.union_coverage=IsUnionCoverageOperator(compose);
+    row.canvas_alpha=IsCanvasAlphaOperator(compose);
+    row.source_alpha=IsSourceAlphaOperator(compose);
     row.clip_to_self=clip_to_self;
     row.x_offset=x_offset;
     row.y_offset=y_offset;
