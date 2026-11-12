@@ -97,6 +97,18 @@ class SplitSource(unittest.TestCase):
         self.assertEqual(new.count("#endif"), 1)
         self.assert_both_compile()
 
+    def test_forward_declaration_of_a_pointer_returning_static_moves(self):
+        fam = ("static const char\n  *FamilyName(const int);\n"
+               "\nstatic const char *FamilyName(const int x)\n{\n  return(x == 0 ? \"a\" : \"b\");\n}\n"
+               + FAMILY.replace("return(FamilyHelper(x));", "return(FamilyHelper(x)+(FamilyName(x)[0] == 0));"))
+        r = self.split("#if defined(DELEGATE)\n" + fam + KEPT + "#endif\n")
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        old = open(os.path.join(self.out, "synth.c")).read()
+        self.assertEqual(new.count("*FamilyName(const int);"), 1)
+        self.assertNotIn("FamilyName", old)
+        self.assert_both_compile()
+
     def test_stub_of_a_moved_root_moves_under_the_else_line(self):
         stub = "\nMagickExport int FamilyRoot(int x)\n{\n  return(-1);\n}\n"
         r = self.split("#if defined(DELEGATE)\n" + FAMILY + "#else" + stub + "#endif\n" + KEPT)

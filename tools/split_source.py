@@ -134,9 +134,9 @@ def drop_empty_banner(lines, banner):
     lines[:] = text.split("\n")
 
 def take_forward_declarations(lines, statics):
-    """Remove from LINES the two-line forward declarations `static T` / `  Name(...);` of STATICS; return them."""
+    """Remove from LINES the two-line forward declarations `static T` / `  Name(...);` (or `  *Name(...);`) of STATICS; return them."""
     text = "\n".join(lines)
-    found = re.findall(r"(?m)^(static [\w \*]+\n  (\w+)\(.*\);)\n", text)
+    found = re.findall(r"(?m)^(static [\w \*]+\n  \*?(\w+)\(.*\);)\n", text)
     taken = [decl for decl, name in found if name in statics]
     for decl in taken: text = text.replace(decl + "\n", "", 1)
     lines[:] = text.split("\n")
