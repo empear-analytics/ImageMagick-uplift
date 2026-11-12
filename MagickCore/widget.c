@@ -2126,6 +2126,27 @@ static void ClientColorBrowserMessage(const ColorBrowserContext *context,
     }
 }
 
+static size_t ReleaseWidgetKey(XWindows *windows,const XEvent event,
+  size_t state)
+{
+  static char
+    command[MagickPathExtent];
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key release.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return(state);
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  if (key_symbol == XK_Control_L)
+    state&=(unsigned int) (~ControlState);
+  return(state);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2926,21 +2947,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case KeyRelease:
       {
-        static char
-          command[MagickPathExtent];
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key release.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if (key_symbol == XK_Control_L)
-          state&=(unsigned int) (~ControlState);
+        state=ReleaseWidgetKey(windows,event,state);
         break;
       }
       case LeaveNotify:
