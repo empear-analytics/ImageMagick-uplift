@@ -9855,6 +9855,66 @@ static void UpdateFontBrowserSlider(const FontBrowserContext *context,
   (*state)&=(unsigned int) (~UpdateListState);
 }
 
+static MagickBooleanType WaitFontEvent(const FontBrowserContext *context,
+  XEvent *event,const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  int
+    *const fonts = widgets->fonts;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  if ((*north_info).raised && (*south_info).raised)
+    (void) XIfEvent(display,event,XScreenEvent,(char *) windows);
+  else
+    {
+      /*
+        Brief delay before advancing scroll bar.
+      */
+      XDelay(display,(*delay));
+      (*delay)=SuspendTime;
+      (void) XCheckIfEvent(display,event,XScreenEvent,(char *) windows);
+      if (((*north_info).raised == MagickFalse) && ((*slider_info).id > 0))
+        {
+          /*
+            Move slider up.
+          */
+          (*slider_info).id--;
+          (*state)|=RedrawListState;
+        }
+      if (((*south_info).raised == MagickFalse) &&
+          ((*slider_info).id < (*fonts)))
+        {
+          /*
+            Move slider down.
+          */
+          (*slider_info).id++;
+          (*state)|=RedrawListState;
+        }
+      if ((*event).type != ButtonRelease)
+        return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -10072,35 +10132,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     /*
       Wait for next event.
     */
-    if (north_info.raised && south_info.raised)
-      (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    else
-      {
-        /*
-          Brief delay before advancing scroll bar.
-        */
-        XDelay(display,delay);
-        delay=SuspendTime;
-        (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            slider_info.id--;
-            state|=RedrawListState;
-          }
-        if ((south_info.raised == MagickFalse) && (slider_info.id < fonts))
-          {
-            /*
-              Move slider down.
-            */
-            slider_info.id++;
-            state|=RedrawListState;
-          }
-        if (event.type != ButtonRelease)
-          continue;
-      }
+    if (WaitFontEvent(&font_context,&event,&font_widgets) != MagickFalse)
+      continue;
     switch (event.type)
     {
       case ButtonPress:
