@@ -958,12 +958,9 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
       }
   }
   UnlockSemaphoreInfo(policy_semaphore);
-  if (canonical_directory != (char *) NULL)
-    canonical_directory=DestroyString(canonical_directory);
-  if (canonical_candidate != (char *) NULL)
-    canonical_candidate=DestroyString(canonical_candidate);
-  if (canonical_path != (char *) NULL)
-    canonical_path=DestroyString(canonical_path);
+  canonical_directory=DestroyString(canonical_directory);
+  canonical_candidate=DestroyString(canonical_candidate);
+  canonical_path=DestroyString(canonical_path);
   /*
     Is rights authorized?
   */
@@ -1142,14 +1139,10 @@ static void *DestroyPolicyElement(void *policy_info)
   p=(PolicyInfo *) policy_info;
   if (p->exempt == MagickFalse)
     {
-      if (p->value != (char *) NULL)
-        p->value=DestroyString(p->value);
-      if (p->pattern != (char *) NULL)
-        p->pattern=DestroyString(p->pattern);
-      if (p->name != (char *) NULL)
-        p->name=DestroyString(p->name);
-      if (p->path != (char *) NULL)
-        p->path=DestroyString(p->path);
+      p->value=DestroyString(p->value);
+      p->pattern=DestroyString(p->pattern);
+      p->name=DestroyString(p->name);
+      p->path=DestroyString(p->path);
     }
   p=(PolicyInfo *) RelinquishMagickMemory(p);
   return((void *) NULL);
