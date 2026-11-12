@@ -5173,6 +5173,35 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
 %    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
 */
+static void XInitializeWindowGeometry(Display *display,const XPixelInfo *pixel,
+  const XResourceInfo *resource_info,XWindowInfo *window)
+{
+  window->cursor=XCreateFontCursor(display,XC_left_ptr);
+  window->busy_cursor=XCreateFontCursor(display,XC_watch);
+  window->geometry=(char *) NULL;
+  window->icon_geometry=(char *) NULL;
+  if (resource_info->icon_geometry != (char *) NULL)
+    (void) CloneString(&window->icon_geometry,resource_info->icon_geometry);
+  window->crop_geometry=(char *) NULL;
+  window->flags=(size_t) PSize;
+  window->width=1;
+  window->height=1;
+  window->min_width=1;
+  window->min_height=1;
+  window->width_inc=1;
+  window->height_inc=1;
+  window->border_width=resource_info->border_width;
+  window->annotate_context=pixel->annotate_context;
+  window->highlight_context=pixel->highlight_context;
+  window->widget_context=pixel->widget_context;
+  window->shadow_stipple=(Pixmap) NULL;
+  window->highlight_stipple=(Pixmap) NULL;
+  window->use_pixmap=MagickTrue;
+  window->immutable=MagickFalse;
+  window->shape=MagickFalse;
+  window->data=0;
+}
+
 MagickPrivate void XGetWindowInfo(Display *display,XVisualInfo *visual_info,
   XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
   XResourceInfo *resource_info,XWindowInfo *window)
@@ -5250,30 +5279,7 @@ MagickPrivate void XGetWindowInfo(Display *display,XVisualInfo *visual_info,
   window->map_info=map_info;
   window->pixel_info=pixel;
   window->font_info=font_info;
-  window->cursor=XCreateFontCursor(display,XC_left_ptr);
-  window->busy_cursor=XCreateFontCursor(display,XC_watch);
-  window->geometry=(char *) NULL;
-  window->icon_geometry=(char *) NULL;
-  if (resource_info->icon_geometry != (char *) NULL)
-    (void) CloneString(&window->icon_geometry,resource_info->icon_geometry);
-  window->crop_geometry=(char *) NULL;
-  window->flags=(size_t) PSize;
-  window->width=1;
-  window->height=1;
-  window->min_width=1;
-  window->min_height=1;
-  window->width_inc=1;
-  window->height_inc=1;
-  window->border_width=resource_info->border_width;
-  window->annotate_context=pixel->annotate_context;
-  window->highlight_context=pixel->highlight_context;
-  window->widget_context=pixel->widget_context;
-  window->shadow_stipple=(Pixmap) NULL;
-  window->highlight_stipple=(Pixmap) NULL;
-  window->use_pixmap=MagickTrue;
-  window->immutable=MagickFalse;
-  window->shape=MagickFalse;
-  window->data=0;
+  XInitializeWindowGeometry(display,pixel,resource_info,window);
   window->mask=(int) (CWBackingStore | CWBackPixel | CWBackPixmap |
     CWBitGravity | CWBorderPixel | CWColormap | CWCursor | CWDontPropagate |
     CWEventMask | CWOverrideRedirect | CWSaveUnder | CWWinGravity);
