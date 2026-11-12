@@ -2959,14 +2959,9 @@ static void XFreeWindowContexts(Display *display,const XVisualInfo *visual_info,
     }
 }
 
-MagickPrivate void XFreeResources(Display *display,XVisualInfo *visual_info,
-  XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
-  XResourceInfo *resource_info,XWindowInfo *window_info)
+static void XFreeWindowInfo(Display *display,const XVisualInfo *visual_info,
+  XWindowInfo *window_info)
 {
-  assert(display != (Display *) NULL);
-  assert(resource_info != (XResourceInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   if (window_info != (XWindowInfo *) NULL)
     {
       /*
@@ -2976,6 +2971,17 @@ MagickPrivate void XFreeResources(Display *display,XVisualInfo *visual_info,
         XDestroyImage(window_info->ximage);
       XFreeWindowContexts(display,visual_info,window_info);
     }
+}
+
+MagickPrivate void XFreeResources(Display *display,XVisualInfo *visual_info,
+  XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
+  XResourceInfo *resource_info,XWindowInfo *window_info)
+{
+  assert(display != (Display *) NULL);
+  assert(resource_info != (XResourceInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  XFreeWindowInfo(display,visual_info,window_info);
   /*
     Free font.
   */
