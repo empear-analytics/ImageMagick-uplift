@@ -493,6 +493,29 @@ static void FillPathTemplate(char *path,const size_t length)
   key=DestroyStringInfo(key);
 }
 
+static MagickBooleanType AddTemporaryResource(const char *path)
+{
+  MagickBooleanType
+    status;
+
+  struct stat
+    *attributes;
+
+  LockResourceSemaphore(FileResource);
+  if (temporary_resources == (SplayTreeInfo *) NULL)
+    temporary_resources=NewSplayTree(CompareSplayTreeString,
+      DestroyTemporaryResources,RelinquishMagickMemory);
+  UnlockSemaphoreInfo(resource_semaphore[FileResource]);
+  attributes=(struct stat *) AcquireCriticalMemory(sizeof(struct stat));
+  status=GetPathAttributes(path,attributes);
+  if (status == MagickFalse)
+    attributes=(struct stat *) RelinquishMagickMemory(attributes);
+  else
+    status=AddValueToSplayTree(temporary_resources,ConstantString(path),
+      attributes);
+  return(status);
+}
+
 MagickExport int AcquireUniqueFileResource(char *path)
 {
   int
@@ -503,9 +526,6 @@ MagickExport int AcquireUniqueFileResource(char *path)
 
   ssize_t
     i;
-
-  struct stat
-    *attributes;
 
   assert(path != (char *) NULL);
   if ((GetLogEventMask() & ResourceEvent) != 0)
@@ -548,18 +568,7 @@ MagickExport int AcquireUniqueFileResource(char *path)
     (void) LogMagickEvent(ResourceEvent,GetMagickModule(),"%s",path);
   if (file == -1)
     return(file);
-  LockResourceSemaphore(FileResource);
-  if (temporary_resources == (SplayTreeInfo *) NULL)
-    temporary_resources=NewSplayTree(CompareSplayTreeString,
-      DestroyTemporaryResources,RelinquishMagickMemory);
-  UnlockSemaphoreInfo(resource_semaphore[FileResource]);
-  attributes=(struct stat *) AcquireCriticalMemory(sizeof(struct stat));
-  status=GetPathAttributes(path,attributes);
-  if (status == MagickFalse)
-    attributes=(struct stat *) RelinquishMagickMemory(attributes);
-  else
-    status=AddValueToSplayTree(temporary_resources,ConstantString(path),
-      attributes);
+  status=AddTemporaryResource(path);
   if (status == MagickFalse)
     file=close_utf8(file)-1;
   return(file);
