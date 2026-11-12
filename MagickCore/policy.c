@@ -1695,11 +1695,6 @@ MagickExport MagickBooleanType SetMagickSecurityPolicyValue(
       return(SetResourcePolicyValue(name,value));
     case SystemPolicyDomain:
       return(SetSystemPolicyValue(name,value));
-    case CoderPolicyDomain:
-    case DelegatePolicyDomain:
-    case FilterPolicyDomain:
-    case ModulePolicyDomain:
-    case PathPolicyDomain:
     default:
       break;
   }
