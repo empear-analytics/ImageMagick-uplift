@@ -2147,6 +2147,64 @@ static size_t ReleaseWidgetKey(XWindows *windows,const XEvent event,
   return(state);
 }
 
+static void SelectColorBrowserReply(const ColorBrowserContext *context,
+  const XEvent event,const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  Status
+    status;
+
+  Atom
+    type;
+
+  int
+    format;
+
+  unsigned char
+    *data;
+
+  unsigned long
+    after,
+    length;
+
+  /*
+    Obtain response from primary selection.
+  */
+  if (event.xselection.property == (Atom) None)
+    return;
+  status=XGetWindowProperty(display,event.xselection.requestor,
+    event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
+    &format,&length,&after,&data);
+  if (IsUnusableSelection(status,type,format,length) != MagickFalse)
+    return;
+  if ((Extent((*reply_info).text)+(int) length) >= (MagickPathExtent-1))
+    (void) XBell(display,0);
+  else
+    {
+      /*
+        Insert primary selection in reply text.
+      */
+      *(data+length)='\0';
+      XEditText(display,reply_info,(KeySym) XK_Insert,(char *) data,
+        (*state));
+      XDrawMatteText(display,&windows->widget,reply_info);
+      (*state)|=JumpListState;
+      (*state)|=RedrawActionState;
+    }
+  (void) XFree((void *) data);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3026,44 +3084,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case SelectionNotify:
       {
-        Atom
-          type;
-
-        int
-          format;
-
-        unsigned char
-          *data;
-
-        unsigned long
-          after,
-          length;
-
-        /*
-          Obtain response from primary selection.
-        */
-        if (event.xselection.property == (Atom) None)
-          break;
-        status=XGetWindowProperty(display,event.xselection.requestor,
-          event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
-          &format,&length,&after,&data);
-        if (IsUnusableSelection(status,type,format,length) != MagickFalse)
-          break;
-        if ((Extent(reply_info.text)+(int) length) >= (MagickPathExtent-1))
-          (void) XBell(display,0);
-        else
-          {
-            /*
-              Insert primary selection in reply text.
-            */
-            *(data+length)='\0';
-            XEditText(display,&reply_info,(KeySym) XK_Insert,(char *) data,
-              state);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-            state|=JumpListState;
-            state|=RedrawActionState;
-          }
-        (void) XFree((void *) data);
+        SelectColorBrowserReply(&color_context,event,&color_widgets);
         break;
       }
       case SelectionRequest:
