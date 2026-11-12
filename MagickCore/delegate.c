@@ -1183,6 +1183,13 @@ static MagickBooleanType DecodeDelegatePercent(const char **p,char **q,
   return(MagickFalse);
 }
 
+static const char *SkipDelegateSpace(const char *p)
+{
+  while ((isspace((int) ((unsigned char) *p)) != 0) && (*p != '\0'))
+    p++;
+  return(p);
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
@@ -1211,9 +1218,7 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-image");
   if (embed_text == (const char *) NULL)
     return(ConstantString(""));
-  p=embed_text;
-  while ((isspace((int) ((unsigned char) *p)) != 0) && (*p != '\0'))
-    p++;
+  p=SkipDelegateSpace(embed_text);
   if (*p == '\0')
     return(ConstantString(""));
   /*
