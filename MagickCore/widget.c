@@ -8533,7 +8533,9 @@ typedef struct _FontBrowserWidgets
   XWidgetInfo
     *list_info,
     *mode_info,
-    *expose_info;
+    *expose_info,
+    *text_info,
+    *selection_info;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -8560,7 +8562,8 @@ typedef struct _FontBrowserContext
     width;
 
   char
-    *reply;
+    *reply,
+    *text;
 } FontBrowserContext;
 
 static void ClientFontBrowserMessage(const FontBrowserContext *context,
@@ -9377,6 +9380,46 @@ static void InitializeFontBrowserList(const FontBrowserContext *context,
     (*state)|=JumpListState;
 }
 
+static void InitializeFontBrowserText(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  const unsigned int
+    height = context->height;
+
+  char
+    *const text = context->text;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  XFontStruct
+    *const font_info = *widgets->font_info;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info,
+    *const text_info = widgets->text_info,
+    *const selection_info = widgets->selection_info;
+
+  /*
+    Initialize text information.
+  */
+  *text='\0';
+  XGetWidgetInfo(text,text_info);
+  (*text_info).center=MagickFalse;
+  (*text_info).width=(*reply_info).width;
+  (*text_info).height=height;
+  (*text_info).x=(*list_info).x-(QuantumMargin >> 1);
+  (*text_info).y=QuantumMargin;
+  /*
+    Initialize selection information.
+  */
+  XGetWidgetInfo((char *) NULL,selection_info);
+  (*selection_info).center=MagickFalse;
+  (*selection_info).width=(*list_info).width;
+  (*selection_info).height=(unsigned int) ((9*height) >> 3);
+  (*selection_info).x=(*list_info).x;
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9450,7 +9493,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     font_widgets = { &reply_info, &state, &back_info,
       &reset_info, &action_info, &cancel_info, &slider_info, &fonts,
       &scroll_info, &visible_fonts, &north_info, &delay, &south_info, &i,
-      &font_info, &fontlist, &list_info, &mode_info, &expose_info };
+      &font_info, &fontlist, &list_info, &mode_info, &expose_info, &text_info,
+      &selection_info };
 
   FontBrowserContext
     font_context;
@@ -9576,6 +9620,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   font_context.action=action;
   font_context.width=width;
   font_context.reply=reply;
+  font_context.text=text;
   do
   {
     if (state & UpdateConfigurationState)
@@ -9584,24 +9629,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
         InitializeFontBrowserReply(&font_context,&font_widgets);
         InitializeFontBrowserScroll(&font_context,&font_widgets);
         InitializeFontBrowserList(&font_context,&font_widgets);
-        /*
-          Initialize text information.
-        */
-        *text='\0';
-        XGetWidgetInfo(text,&text_info);
-        text_info.center=MagickFalse;
-        text_info.width=reply_info.width;
-        text_info.height=height;
-        text_info.x=list_info.x-(QuantumMargin >> 1);
-        text_info.y=QuantumMargin;
-        /*
-          Initialize selection information.
-        */
-        XGetWidgetInfo((char *) NULL,&selection_info);
-        selection_info.center=MagickFalse;
-        selection_info.width=list_info.width;
-        selection_info.height=(unsigned int) ((9*height) >> 3);
-        selection_info.x=list_info.x;
+        InitializeFontBrowserText(&font_context,&font_widgets);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
     if (state & RedrawWidgetState)
