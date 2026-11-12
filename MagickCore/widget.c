@@ -5047,6 +5047,55 @@ static void HandleDialogKeyEvent(const DialogContext *context,
   }
 }
 
+static void HandleDialogEvent(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      PressDialogButton(context,event,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      ReleaseDialogButtons(context,event,targets);
+      break;
+    }
+    case ClientMessage:
+    {
+      ClientDialogMessage(context,event,targets);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleDialogKeyEvent(context,event,targets);
+      break;
+    }
+  }
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -5176,44 +5225,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
       Wait for next event.
     */
     (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        PressDialogButton(&context,event,&targets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        ReleaseDialogButtons(&context,event,&targets);
-        break;
-      }
-      case ClientMessage:
-      {
-        ClientDialogMessage(&context,event,&targets);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
-      default:
-      {
-        HandleDialogKeyEvent(&context,event,&targets);
-        break;
-      }
-    }
+    HandleDialogEvent(&context,event,&targets);
   } while ((state & ExitState) == 0);
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
