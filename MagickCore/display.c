@@ -15569,12 +15569,12 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
           XPanImage(display,windows,event,exception);
           break;
         }
-      if (event->xbutton.window == windows->image.id)
-        if (event->xbutton.button == Button2)
-          {
-            XMagnifyAtButton(display,windows,event,exception);
-            break;
-          }
+      if ((event->xbutton.window == windows->image.id) &&
+          (event->xbutton.button == Button2))
+        {
+          XMagnifyAtButton(display,windows,event,exception);
+          break;
+        }
       break;
     }
     case ClientMessage:
@@ -15639,18 +15639,18 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
           XRefreshWindow(display,&windows->image,event);
           break;
         }
-      if (event->xexpose.window == windows->pan.id)
-        if (event->xexpose.count == 0)
-          {
-            XDrawPanRectangle(display,windows);
-            break;
-          }
-      if (event->xexpose.window == windows->magnify.id)
-        if (event->xexpose.count == 0)
-          {
-            XMakeMagnifyImage(display,windows,exception);
-            break;
-          }
+      if ((event->xexpose.window == windows->pan.id) &&
+          (event->xexpose.count == 0))
+        {
+          XDrawPanRectangle(display,windows);
+          break;
+        }
+      if ((event->xexpose.window == windows->magnify.id) &&
+          (event->xexpose.count == 0))
+        {
+          XMakeMagnifyImage(display,windows,exception);
+          break;
+        }
       break;
     }
     case KeyPress:
@@ -15690,17 +15690,17 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
     case MotionNotify:
     {
       while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
-      if (event->xmotion.window == windows->image.id)
-        if (windows->magnify.mapped != MagickFalse)
-          {
-            /*
-              Update magnified image.
-            */
-            x=event->xmotion.x;
-            y=event->xmotion.y;
-            XSetMagnifyPosition(windows,x,y);
-            XMakeMagnifyImage(display,windows,exception);
-          }
+      if ((event->xmotion.window == windows->image.id) &&
+          (windows->magnify.mapped != MagickFalse))
+        {
+          /*
+            Update magnified image.
+          */
+          x=event->xmotion.x;
+          y=event->xmotion.y;
+          XSetMagnifyPosition(windows,x,y);
+          XMakeMagnifyImage(display,windows,exception);
+        }
       break;
     }
     case UnmapNotify:
