@@ -1387,6 +1387,37 @@ static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
   *q='\0';
 }
 
+static ptrdiff_t FormatLogSpecifier(char *q,const size_t extent,
+  const char specifier)
+{
+  switch (specifier)
+  {
+    case 'c':
+      return((ptrdiff_t) CopyMagickString(q,GetClientName(),extent));
+    case 'i':
+      return((ptrdiff_t) FormatLocaleString(q,extent,"%.17g",(double)
+        GetMagickThreadSignature()));
+    case 'n':
+      return((ptrdiff_t) CopyMagickString(q,GetLogName(),extent));
+    case 'p':
+      return((ptrdiff_t) FormatLocaleString(q,extent,"%.17g",(double)
+        getpid()));
+    case 'v':
+      return((ptrdiff_t) CopyMagickString(q,MagickLibVersionText,extent));
+    case '%':
+    {
+      *q=specifier;
+      return(1);
+    }
+    default:
+    {
+      q[0]='%';
+      q[1]=specifier;
+      return(2);
+    }
+  }
+}
+
 static char *TranslateEvent(const LogEventLocation *location,
   const char *domain,const char *event)
 {
@@ -1519,11 +1550,6 @@ static char *TranslateEvent(const LogEventLocation *location,
       break;
     switch (*p)
     {
-      case 'c':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,GetClientName(),extent-(q-text));
-        break;
-      }
       case 'd':
       {
         q+=(ptrdiff_t) CopyMagickString(q,domain,extent-(q-text));
@@ -1537,12 +1563,6 @@ static char *TranslateEvent(const LogEventLocation *location,
       case 'f':
       {
         q+=(ptrdiff_t) CopyMagickString(q,function,extent-(q-text));
-        break;
-      }
-      case 'i':
-      {
-        q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%.17g",(double)
-          GetMagickThreadSignature());
         break;
       }
       case 'l':
@@ -1565,17 +1585,6 @@ static char *TranslateEvent(const LogEventLocation *location,
         q+=(ptrdiff_t) CopyMagickString(q,r,extent-(q-text));
         break;
       }
-      case 'n':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,GetLogName(),extent-(q-text));
-        break;
-      }
-      case 'p':
-      {
-        q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%.17g",(double)
-          getpid());
-        break;
-      }
       case 'r':
       {
         q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%lu:%02lu.%03lu",
@@ -1594,20 +1603,9 @@ static char *TranslateEvent(const LogEventLocation *location,
         q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%0.3fu",user_time);
         break;
       }
-      case 'v':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,MagickLibVersionText,extent-(q-text));
-        break;
-      }
-      case '%':
-      {
-        *q++=(*p);
-        break;
-      }
       default:
       {
-        *q++='%';
-        *q++=(*p);
+        q+=FormatLogSpecifier(q,extent-(q-text),*p);
         break;
       }
     }
