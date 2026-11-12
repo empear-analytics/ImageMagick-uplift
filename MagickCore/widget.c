@@ -3666,6 +3666,37 @@ static void HandleColorEvent(const ColorBrowserContext *context,
   }
 }
 
+static void RespondToColorBrowserEvents(const ColorBrowserContext *context,
+  const FontBrowserTargets *targets,const ColorBrowserTargets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    event;
+
+  do
+  {
+    UpdateColorBrowserLayout(context,widgets);
+    RedrawColorBrowserWidget(context,widgets);
+    if ((*state) & UpdateListState)
+      {
+        if (ReloadColorList(context,widgets) == MagickFalse)
+          break;
+        UpdateColorBrowserSlider(context,widgets);
+      }
+    JumpColorBrowserList(context,widgets);
+    RedrawColorBrowserList(context,widgets);
+    RedrawColorBrowserAction(context,widgets);
+    /*
+      Wait for next event.
+    */
+    if (WaitColorEvent(context,&event,widgets) != MagickFalse)
+      continue;
+    HandleColorEvent(context,event,targets,widgets);
+  } while (((*state) & ExitState) == 0);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3703,9 +3734,6 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
 
   XColor
     color;
-
-  XEvent
-    event;
 
   XFontStruct
     *font_info;
@@ -3855,26 +3883,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   color_context.width=width;
   color_context.reply=reply;
   color_context.text=text;
-  do
-  {
-    UpdateColorBrowserLayout(&color_context,&color_widgets);
-    RedrawColorBrowserWidget(&color_context,&color_widgets);
-    if (state & UpdateListState)
-      {
-        if (ReloadColorList(&color_context,&color_widgets) == MagickFalse)
-          break;
-        UpdateColorBrowserSlider(&color_context,&color_widgets);
-      }
-    JumpColorBrowserList(&color_context,&color_widgets);
-    RedrawColorBrowserList(&color_context,&color_widgets);
-    RedrawColorBrowserAction(&color_context,&color_widgets);
-    /*
-      Wait for next event.
-    */
-    if (WaitColorEvent(&color_context,&event,&color_widgets) != MagickFalse)
-      continue;
-    HandleColorEvent(&color_context,event,&targets,&color_widgets);
-  } while ((state & ExitState) == 0);
+  RespondToColorBrowserEvents(&color_context,&targets,&color_widgets);
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
   XCheckRefreshWindows(display,windows);
