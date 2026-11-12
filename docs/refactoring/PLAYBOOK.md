@@ -13867,6 +13867,90 @@ atop and src operators, Recipe LP kept the finding (flat). Added by Claude Code
 
 ---
 
+## Recipe MP - Merge Membership Predicates over a Table Parameter
+
+**Use when:** a file holds two or more `static` membership predicates of Recipe TB's shape, each
+over a `static const` table of its own (Recipe RH writes one per label run), and the file's function
+count stands at the threshold the score pays for (*Number of Functions in a Single Module*: 110), so
+that the next helper of a chain would cost the one-time drop. `composite.c`'s five (`IsUnionCoverageOperator`,
+`IsCanvasAlphaOperator`, `IsSourceAlphaOperator`, `IsPixelInfoInputOperator`, `IsIntensityInputOperator`)
+differ only in the name of the table they scan.
+
+**Not covered by:** Recipe TB and RH, which make one predicate per run; a fold of twin functions identical
+after renaming their parameters (here the differing name is a file-scope table, not a parameter); Recipe CF
+and TI, whose twins differ in a called function or an expression; Recipe D, which merges blocks.
+
+**How:**
+
+1. The predicates. Two or more `static` functions `P1 ... Pn`, defined in the file's order, of the form
+   `static MagickBooleanType P(const E compose) { size_t i; for (i=0; i < (sizeof(T)/sizeof(*T)); i++)
+   if (T[i] == compose) return(MagickTrue); return(MagickFalse); }` with `E` one enumeration type and `T` a
+   `static const E` array of the file, a different one for each predicate. Check by script that each body is
+   the same token sequence once `T` is written as one name. No use of any `Pk` is anything but a call whose
+   argument is an expression without side effects (never its address).
+2. One predicate per commit. The first commit turns `P1` into `static MagickBooleanType IsListed<Name>(const E
+   *list,const size_t count,const E compose)` (`<Name>` the common noun of the type, `IsListedOperator` for
+   `CompositeOperator`), body `size_t i; for (i=0; i < count; i++) if (list[i] == compose) return(MagickTrue);
+   return(MagickFalse);`, and each call `P1(a)` into `IsListedOperator(T1,(sizeof(T1)/sizeof(*T1)),a)`.
+   Each later commit deletes one `Pk` (and the blank line after it) and writes each call `Pk(a)` as
+   `IsListedOperator(Tk,(sizeof(Tk)/sizeof(*Tk)),a)`; the shared function stands above its first use.
+3. Nothing else changes: the tables, their order and the statements around each call stay as they were.
+4. Check by script that the working file is `HEAD`'s with exactly those edits (the definition of `Pk`
+   removed, each call rewritten), that `T` at each call is the table `Pk` scanned, and that no `Pk` is left
+   named anywhere.
+5. `refactor_guard.py`: the literals `OK`, or `WARN` listing only the `0` of a deleted loop's `i=0`
+   removed; `--calls`: the shared function `+1` call per call site, the deleted predicate's callers one
+   fewer each, nothing else. Where a predicate runs once per row (as Recipe RH's do) no timing is needed;
+   a predicate called per pixel or per channel takes Recipe TB step 2's timing.
+
+**Before:**
+
+```c
+static MagickBooleanType IsCanvasAlphaOperator(const CompositeOperator compose)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators)); i++)
+    if (CanvasAlphaOperators[i] == compose)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+...
+    row.canvas_alpha=IsCanvasAlphaOperator(compose);
+```
+
+**After:**
+
+```c
+    row.canvas_alpha=IsListedOperator(CanvasAlphaOperators,
+      sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
+```
+
+with the definition of `IsCanvasAlphaOperator` gone and `IsListedOperator` (the first predicate, made general by
+step 2) above the first call.
+
+**Careful:**
+
+- Same loop, same values. `IsListedOperator` runs the loop each predicate ran over its own table: `list`
+  is the table's first element (an array of `E` decays to a pointer to it, and `list[i]` is `T[i]`), `count` is
+  the value `sizeof(T)/sizeof(*T)` the loop bound was (a constant of type `size_t`, now passed), and `compose`
+  is the argument each caller passed, evaluated once, at the same place. The comparison, the early
+  `return(MagickTrue)` and the final `return(MagickFalse)` are unchanged, so every call returns what the
+  predicate it replaces returned.
+- Nothing outside the file can tell: each predicate and table is `static`, no address of a predicate is taken
+  (step 1), and the shared function is `static` too.
+- A function deleted is a function folded into its twin; the tables stay, so no data is touched.
+
+**Evidence level:** oracle (the cases that reach a caller), steps 1 and 4 by script.
+
+**Provenance:** 2026-11-12, from `composite.c` (campaign A, W21 lane c): Recipe RH made five predicates and the
+SetVirtualCompositeChannels use would be the sixth, taking the file from 110 functions to 111 (3.69 to 3.59 in
+a probe); folding five into one frees four slots (a probe of the whole fold: 3.69 to 3.69). Added by Claude
+Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -14916,3 +15000,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | ME | Merge Mirrored Twins That Leave Through a Constant Return: copies of one block that leave the function through `return(c);` (Recipe Y steps 1 and 2; `c` may differ between copies), in two mirrored sides (Recipe MT step 1's alignment) whose copies differ in one member-access value, become one `static inline MagickBooleanType` function taking the input struct, a constant selector, the value and the written variable by pointer; each copy becomes `if (Helper(...) == MagickFalse) return(c);` with its own constant. *Careful* gives the argument (the conditional evaluates only the copy's run, in its order; the constants stay in the callers) | `visual-effects-plasma.c`'s `PlasmaImageProxy` (campaign A, W21 round four, lane d): four edge-pixel blocks (left/right along a column, bottom/top along a row) that Recipes MT, Y, SV and W refuse; helpers per side cloned (8.15), precomputed coordinates moved `errno`-writing casts; a probe of the chain this recipe opens: 8.50 to 9.09 | mandate (2026-10-24) |
 | 2026-11-12 | NEW | RH | Hoist a Label Run into a Row Flag: a run of eight or more `case` labels of `row->compose` in a `static void` per-pixel function becomes a `static const` table and a membership predicate (Recipe TB's loop), evaluated once per row where the row struct is filled into a new `MagickBooleanType` member, and the group becomes `if (row->flag != MagickFalse) { B return; }` ahead of the `switch`. *Careful* gives the argument (`compose` is not written after the fill, labels disjoint, the function ends where the `switch` ended) | `composite.c`'s `SetCompositeCoverage` (32 labels) and `CompositeAlphaChannel` (11 and 7) (campaign A, W19 lane c): Recipe TB's loop on the pixel path measured +46 to +91 instructions per pixel (+4% to +9%), Recipe LP keeps the finding; with the flag, +0.5% to +1.5% of a 400x400 composite, no new finding; a hybrid probe with the other five Complex Methods of the pixel path emptied: 3.69 to 3.83 | owner |
 | 2026-11-12 | AMEND | RH | New step 8, the if/else form: the `switch` may stand before other statements and hold up to two runs, each with its own table, predicate and flag; its groups become an `if` / `else if` / `else` chain, and the flags may be filled by the initialiser of a `const` struct local. *Careful* gives the argument (one group selected by value; groups disjoint; the statements after run in every case) | `composite.c`'s `SetVirtualCompositeChannels` (a nine-label run inside the channel loop, `virtual_inputs` initialised once per row) and `CompositeImagePixel` (two runs of six and four labels that set `Si`, `Di` and the pixel infos before the channel loop) (campaign A, W19 lane c): both are Complex Methods held by their label runs, and the stub of the five remaining pixel-path methods measured 3.83 | owner |
+| 2026-11-12 | NEW | MP | Merge Membership Predicates over a Table Parameter: the `static` predicates of Recipe TB's shape, each over its own `static const` table, become one that takes the table and its element count; each call passes `T,sizeof(T)/sizeof(*T)`, one predicate per commit, the others deleted. *Careful* gives the argument (same loop, same table, same count, same argument) | `composite.c`'s five RH predicates (campaign A, W21 lane c): the file stands at 110 functions and the chain needs a sixth for `SetVirtualCompositeChannels` (111: 3.69 to 3.59); folding the five frees four slots, whole fold probe 3.69 to 3.69 | owner |
