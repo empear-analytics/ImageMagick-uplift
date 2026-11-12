@@ -1436,15 +1436,14 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
                 break;
               continue;
             }
-          if (LocaleCompare(keyword,"file") == 0)
-            {
-              if (depth >= MagickMaxRecursionDepth)
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-              else
-                status&=(MagickStatusType) LoadLocaleInclude(target,filename,
-                  token,depth);
-            }
+          if (LocaleCompare(keyword,"file") != 0)
+            continue;
+          if (depth >= MagickMaxRecursionDepth)
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+          else
+            status&=(MagickStatusType) LoadLocaleInclude(target,filename,
+              token,depth);
         }
         continue;
       }
