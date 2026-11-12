@@ -2260,6 +2260,24 @@ static MagickBooleanType RunDelegateStep(const DelegateExecution *execution,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireDelegateOutputFilename(ImageInfo *image_info,
+  const Image *image,const MagickBooleanType temporary,
+  ExceptionInfo *exception)
+{
+  if (*image_info->filename != '\0')
+    return(MagickTrue);
+  if (AcquireUniqueFilename(image_info->filename) == MagickFalse)
+    {
+      if (temporary != MagickFalse)
+        (void) RelinquishUniqueFileResource(image->filename);
+      ThrowFileException(exception,FileOpenError,
+        "UnableToCreateTemporaryFile",image_info->filename);
+      return(MagickFalse);
+    }
+  image_info->temporary=MagickTrue;
+  return(MagickTrue);
+}
+
 static char **DestroyDelegateCommands(char **commands,ssize_t i)
 {
   for ( ; commands[i] != (char *) NULL; i++)
@@ -2321,18 +2339,9 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
         "NoTagFound","`%s'",decode ? decode : encode);
       return(MagickFalse);
     }
-  if (*image_info->filename == '\0')
-    {
-      if (AcquireUniqueFilename(image_info->filename) == MagickFalse)
-        {
-          if (temporary != MagickFalse)
-            (void) RelinquishUniqueFileResource(image->filename);
-          ThrowFileException(exception,FileOpenError,
-            "UnableToCreateTemporaryFile",image_info->filename);
-          return(MagickFalse);
-        }
-      image_info->temporary=MagickTrue;
-    }
+  if (AcquireDelegateOutputFilename(image_info,image,temporary,exception) ==
+      MagickFalse)
+    return(MagickFalse);
   if (IsTwoStepDelegate(delegate_info,decode,encode) != MagickFalse)
     {
       DelegateInvocation
