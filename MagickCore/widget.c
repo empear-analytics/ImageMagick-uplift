@@ -2079,6 +2079,12 @@ typedef struct _ColorBrowserTargets
 
   size_t
     *state;
+
+  XWidgetInfo
+    *grab_info,
+    *reset_info,
+    *action_info,
+    *cancel_info;
 } ColorBrowserTargets;
 
 typedef struct _ColorBrowserContext
@@ -2205,6 +2211,61 @@ static void SelectColorBrowserReply(const ColorBrowserContext *context,
   (void) XFree((void *) data);
 }
 
+static void ToggleColorBrowserButtons(const ColorBrowserContext *context,
+  const XEvent event,const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const grab_info = widgets->grab_info,
+    *const reset_info = widgets->reset_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  if ((*grab_info).raised == MatteIsActive((*grab_info),event.xmotion))
+    {
+      /*
+        Grab button status changed.
+      */
+      (*grab_info).raised=!(*grab_info).raised;
+      XDrawBeveledButton(display,&windows->widget,grab_info);
+      return;
+    }
+  if ((*reset_info).raised == MatteIsActive((*reset_info),event.xmotion))
+    {
+      /*
+        Reset button status changed.
+      */
+      (*reset_info).raised=!(*reset_info).raised;
+      XDrawBeveledButton(display,&windows->widget,reset_info);
+      return;
+    }
+  if ((*action_info).raised == MatteIsActive((*action_info),event.xmotion))
+    {
+      /*
+        Action button status changed.
+      */
+      (*action_info).raised=(*action_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if ((*cancel_info).raised == MatteIsActive((*cancel_info),event.xmotion))
+    {
+      /*
+        Cancel button status changed.
+      */
+      (*cancel_info).raised=(*cancel_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2285,7 +2346,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     targets = { &reply_info, &state, &selection_info, &list_info };
 
   const ColorBrowserTargets
-    color_widgets = { &reply_info, &state };
+    color_widgets = { &reply_info, &state,
+      &grab_info, &reset_info, &action_info, &cancel_info };
 
   ColorBrowserContext
     color_context;
@@ -3036,44 +3098,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
           }
         if (state & InactiveWidgetState)
           break;
-        if (grab_info.raised == MatteIsActive(grab_info,event.xmotion))
-          {
-            /*
-              Grab button status changed.
-            */
-            grab_info.raised=!grab_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&grab_info);
-            break;
-          }
-        if (reset_info.raised == MatteIsActive(reset_info,event.xmotion))
-          {
-            /*
-              Reset button status changed.
-            */
-            reset_info.raised=!reset_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&reset_info);
-            break;
-          }
-        if (action_info.raised == MatteIsActive(action_info,event.xmotion))
-          {
-            /*
-              Action button status changed.
-            */
-            action_info.raised=action_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        if (cancel_info.raised == MatteIsActive(cancel_info,event.xmotion))
-          {
-            /*
-              Cancel button status changed.
-            */
-            cancel_info.raised=cancel_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
+        ToggleColorBrowserButtons(&color_context,event,&color_widgets);
         break;
       }
       case SelectionClear:
