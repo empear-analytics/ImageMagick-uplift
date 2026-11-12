@@ -277,46 +277,29 @@ static MagickBooleanType MatchMimeString(const MimeInfo *q,
   return(MagickFalse);
 }
 
+static MagickBooleanType IsMimeNumeric(const MimeInfo *q)
+{
+  return((q->data_type == ByteData) || (q->data_type == ShortData) ||
+    (q->data_type == LongData) ? MagickTrue : MagickFalse);
+}
+
+static ssize_t ReadMimeValue(const MimeInfo *q,const unsigned char *r)
+{
+  if (q->data_type == ShortData)
+    return(ReadMimeShortValue(q,r));
+  if (q->data_type == LongData)
+    return(ReadMimeLongValue(q,r));
+  return((ssize_t) (*r));
+}
+
 static MagickBooleanType MatchMimeData(const MimeInfo *q,
   const unsigned char *magic,const size_t length)
 {
-  const unsigned char
-    *r;
-
-  ssize_t
-    value;
-
-  switch (q->data_type)
-  {
-    case ByteData:
-    {
-      if ((size_t) (q->offset+4) > length)
-        break;
-      r=magic+q->offset;
-      value=(ssize_t) (*r++);
-      return(MatchMimeValue(q,value));
-    }
-    case ShortData:
-    {
-      if ((size_t) (q->offset+4) > length)
-        break;
-      r=magic+q->offset;
-      value=ReadMimeShortValue(q,r);
-      return(MatchMimeValue(q,value));
-    }
-    case LongData:
-    {
-      if ((size_t) (q->offset+4) > length)
-        break;
-      r=magic+q->offset;
-      value=ReadMimeLongValue(q,r);
-      return(MatchMimeValue(q,value));
-    }
-    case StringData:
-    default:
-      return(MatchMimeString(q,magic,length));
-  }
-  return(MagickFalse);
+  if (IsMimeNumeric(q) == MagickFalse)
+    return(MatchMimeString(q,magic,length));
+  if ((size_t) (q->offset+4) > length)
+    return(MagickFalse);
+  return(MatchMimeValue(q,ReadMimeValue(q,magic+q->offset)));
 }
 
 static MagickBooleanType IsMimeOutranked(const MimeInfo *q,
