@@ -2114,6 +2114,9 @@ typedef struct _ColorBrowserTargets
     *expose_info,
     *text_info,
     *selection_info;
+
+  MagickStatusType
+    *mask;
 } ColorBrowserTargets;
 
 typedef struct _ColorBrowserContext
@@ -3565,6 +3568,54 @@ static void HandleColorSelectionEvent(const ColorBrowserContext *context,
   }
 }
 
+static void HandleColorKeyEvent(const ColorBrowserContext *context,
+  const XEvent event,const ColorBrowserTargets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  MagickStatusType
+    *const mask = widgets->mask;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      PressColorBrowserKey(context,event,widgets);
+      break;
+    }
+    case KeyRelease:
+    {
+      (*state)=ReleaseWidgetKey(windows,event,(*state));
+      break;
+    }
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case MapNotify:
+    {
+      (*mask)&=(unsigned int) (~CWX);
+      (*mask)&=(unsigned int) (~CWY);
+      break;
+    }
+    case MotionNotify:
+    {
+      MoveColorBrowserButtons(context,event,widgets);
+      break;
+    }
+    default:
+    {
+      HandleColorSelectionEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3639,7 +3690,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       &grab_info, &reset_info, &action_info, &cancel_info, &slider_info,
       &colors, &scroll_info, &visible_colors, &north_info, &delay, &south_info,
       &mode_info, &colorlist, &list_info, &expose_info, &text_info,
-      &selection_info };
+      &selection_info, &mask };
 
   ColorBrowserContext
     color_context;
@@ -3804,35 +3855,9 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
         state=ExposeWidgetWindow(windows,event,state);
         break;
       }
-      case KeyPress:
-      {
-        PressColorBrowserKey(&color_context,event,&color_widgets);
-        break;
-      }
-      case KeyRelease:
-      {
-        state=ReleaseWidgetKey(windows,event,state);
-        break;
-      }
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MapNotify:
-      {
-        mask&=(unsigned int) (~CWX);
-        mask&=(unsigned int) (~CWY);
-        break;
-      }
-      case MotionNotify:
-      {
-        MoveColorBrowserButtons(&color_context,event,&color_widgets);
-        break;
-      }
       default:
       {
-        HandleColorSelectionEvent(&color_context,event,&color_widgets);
+        HandleColorKeyEvent(&color_context,event,&color_widgets);
         break;
       }
     }
