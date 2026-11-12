@@ -3280,6 +3280,52 @@ static void RedrawColorBrowserList(const ColorBrowserContext *context,
     }
 }
 
+static void RedrawColorBrowserAction(const ColorBrowserContext *context,
+  const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const mode_info = widgets->mode_info;
+
+  XColor
+    color;
+
+  if ((*state) & RedrawActionState)
+    {
+      static char
+        colorname[MagickPathExtent];
+
+      /*
+        Display the selected color in a drawing area.
+      */
+      color=windows->widget.pixel_info->matte_color;
+      (void) XParseColor(display,windows->widget.map_info->colormap,
+        (*reply_info).text,&windows->widget.pixel_info->matte_color);
+      XBestPixel(display,windows->widget.map_info->colormap,(XColor *) NULL,
+        (unsigned int) windows->widget.visual_info->colormap_size,
+        &windows->widget.pixel_info->matte_color);
+      (*mode_info).text=colorname;
+      (void) FormatLocaleString((*mode_info).text,MagickPathExtent,
+        "#%02x%02x%02x",windows->widget.pixel_info->matte_color.red,
+        windows->widget.pixel_info->matte_color.green,
+        windows->widget.pixel_info->matte_color.blue);
+      XDrawBeveledButton(display,&windows->widget,mode_info);
+      windows->widget.pixel_info->matte_color=color;
+      (*state)&=(unsigned int) (~RedrawActionState);
+    }
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3522,29 +3568,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
     JumpColorBrowserList(&color_context,&color_widgets);
     RedrawColorBrowserList(&color_context,&color_widgets);
-    if (state & RedrawActionState)
-      {
-        static char
-          colorname[MagickPathExtent];
-
-        /*
-          Display the selected color in a drawing area.
-        */
-        color=windows->widget.pixel_info->matte_color;
-        (void) XParseColor(display,windows->widget.map_info->colormap,
-          reply_info.text,&windows->widget.pixel_info->matte_color);
-        XBestPixel(display,windows->widget.map_info->colormap,(XColor *) NULL,
-          (unsigned int) windows->widget.visual_info->colormap_size,
-          &windows->widget.pixel_info->matte_color);
-        mode_info.text=colorname;
-        (void) FormatLocaleString(mode_info.text,MagickPathExtent,
-          "#%02x%02x%02x",windows->widget.pixel_info->matte_color.red,
-          windows->widget.pixel_info->matte_color.green,
-          windows->widget.pixel_info->matte_color.blue);
-        XDrawBeveledButton(display,&windows->widget,&mode_info);
-        windows->widget.pixel_info->matte_color=color;
-        state&=(unsigned int) (~RedrawActionState);
-      }
+    RedrawColorBrowserAction(&color_context,&color_widgets);
     /*
       Wait for next event.
     */
