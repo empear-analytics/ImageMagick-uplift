@@ -7831,6 +7831,62 @@ M120), 5.88 to 5.93. Added by Claude Code (Claude Sonnet 5.5) under the mandate 
 
 ---
 
+## Recipe DL - Drop Case Labels That Share the Default
+
+**Use when:** CodeScene reports *Complex Method* on a function whose `switch` lists
+labels that do nothing but fall into `default:`, as `policy.c`'s
+`SetMagickSecurityPolicyValue` lists five `PolicyDomain` values
+(`case CoderPolicyDomain: ... case PathPolicyDomain: default: break;`). Each label counts
+as a branch.
+
+**Not covered by:** Recipe SD and its relatives, which split groups into functions;
+Recipe NS, which names a constant selection; Recipe EI, which chains guards. None removes
+a label.
+
+**How:**
+
+1. In a `switch`, find a run of `case` labels directly followed by `default:` and then
+   the default group's statements, with no statement between the labels. The run is
+   written together with `default:` in one group (all fall into the same statements).
+2. Delete those `case` labels and keep `default:` and its statements unchanged.
+3. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
+   the step. (A build that warns on enumerators missing from a `switch` with a
+   `default:` (`-Wswitch-enum`) is not the oracle build; the step is refused where the
+   project's own flags include it.)
+
+**Before:**
+
+```c
+    case CoderPolicyDomain:
+    case DelegatePolicyDomain:
+    case PathPolicyDomain:
+    default:
+      break;
+```
+
+**After:**
+
+```c
+    default:
+      break;
+```
+
+**Careful:**
+
+- A label with its own statements, or one that falls into a group other than the
+  `default` one, is not covered: step 1 refuses it.
+- The labels documented which enumerators the function means to ignore. A comment on the
+  `default:` may keep that, at no cost to the score.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`.
+
+**Provenance:** 2026-11-12, from `policy.c`'s `SetMagickSecurityPolicyValue` (campaign B,
+M120): cc 12 to 7, the file 6.02 to 6.21, object file unchanged. Added by Claude Code
+(Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -8138,3 +8194,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | RC | Extract a switch group that returns `R` or breaks to a constant `return(F);` into a function ending in `return(F);`; evidence oracle | `policy.c`'s `SetMagickSecurityPolicyValue` (three domain groups; 5.29 to 5.45); SR and Z refuse a `return` in the group, E step 7 takes the tail only | mandate (2026-10-24) |
 | 2026-11-12 | NEW | QS | Replace the quote-state and bracket-depth loop that skips a DOCTYPE by `SkipQuotedText` and `SkipDoctypeElement`; evidence oracle | `policy.c`'s `LoadPolicyCache` (5.45 to 5.76); E with EJ leaves a cc 12 helper the gate refuses | mandate (2026-10-24) |
 | 2026-11-12 | NEW | LF | Move a loop's leading run of `if (<test>) continue;` into one `Is<Name>` predicate; evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (5.88 to 5.93); P names one expression and keeps its `if` | mandate (2026-10-24) |
+| 2026-11-12 | NEW | DL | Drop `case` labels that fall straight into `default:`; proof `obj_identical.sh` | `policy.c`'s `SetMagickSecurityPolicyValue` (five enumerator labels; 6.02 to 6.21, object code identical) | mandate (2026-10-24) |
