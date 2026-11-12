@@ -418,6 +418,19 @@ blocks of nested logic). Each bump is a missing function.
    one other value. The callee receives the same address and writes the same bytes of
    the caller's array; an array is never assigned or reseated as a whole, so nothing
    else of it changes, as for the pixel rows a block writes through `q`.
+   One the block writes before it reads it on every path, that nothing after the block
+   reads, and whose only use left in the caller would be a store before the block that
+   nothing else reads (a column counter `x` set by `x=0;` above a loop that the block's
+   own `for` restarts), so that declaring it in the new function would leave that store
+   set but never used (`-Wunused-but-set-variable`, an error in the CI jobs; no recipe
+   deletes the store), passes as a pointer `T *v` on Recipe O step 2's last paragraph's
+   terms (2026-11-12): a plain local whose address the caller takes nowhere else, every
+   use in the block written `(*v)`, an `&v` given to a callee written `v`, the call
+   passing `&v`; the function still returns its one value. The block overwrites the
+   value on entry before it reads it and nothing reads the value left behind, so each
+   path stores and reads the same values as before, through the pointer; the caller's
+   store keeps a use. Check by reading every path of the block and every use of the
+   variable in the caller.
 5. If the block is inside an OpenMP loop, check the rule above before you cut.
 6. If the block can throw - `ThrowBinaryException`, `ThrowImageException` and friends
    expand to a `return` - the new function must return a status the caller checks, and
@@ -512,7 +525,13 @@ first, `static`, and declarations at the top of the block as the surrounding cod
 
 **Evidence level:** guard.
 
-**Provenance:** founding recipe (2026-09-29).
+**Provenance:** founding recipe (2026-09-29). Step 4's pointer form for a temporary
+whose caller store would be left unused: 2026-11-12, from `xwindow.c`'s
+`XMakeImageMSBFirst` (campaign A, W18 lane a, wide build), reached by no case: its
+matte row loop writes `q` (the returned value) and the column counter `x`, whose
+caller store `x=0;` nothing else reads once the XYBitmap and matte loops have left
+(added by Claude Code, Claude Sonnet 5.5, under the owner's OK of 2026-11-10 to
+evolve the recipes).
 
 ---
 
@@ -12305,3 +12324,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | AMEND | FT | Step 1 and step 3: the case `B` that `A` falls into may instead be the failure guard `if (Q(a1,...,an) == MagickFalse) return(c);` followed by `break;`, `Q` a `static MagickBooleanType` function made by Recipe CR, W or I and `c` a constant; `A` gets the guard's two lines and a `break;` in place of `magick_fallthrough;`. *Careful* gives the argument | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's default key group (draw a character, then `magick_fallthrough;` when the line is full) falls into the Return group, which Recipe CR made `if (XAdvanceTextLine(...) == MagickFalse) return(MagickFalse); break;`; FT's void-call form refuses it, so the default group's four depth-4 tests cannot move | owner |
 | 2026-11-12 | AMEND | SR | Step 1: a kept group may write the controlling variable `e` when no group falls through into a moved group (the `switch` evaluates `e` once and a kept group never reaches a moved one). Step 3: the input struct may be shared and filled once before the `switch` (SD step 8), and a `const` targets struct that a moved group passes on as `&targets` goes as one more parameter, written `targets`. *Not covered by* and *Careful* unchanged | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's key `switch` holds one group (`XK_bracketleft`: `key_symbol=XK_Escape;`) that writes `e`, which SR step 1 refused, beside the default and Return groups that call the failing helpers; a stub of the whole `switch` as one helper measures cc 9 (Complex Method), so those two groups go to a second one | owner |
 | 2026-11-12 | WORDING | CR | Step 4: the targets struct comes after the input struct and before a by-value parameter that the block reads and then writes (`XAnnotateKeyPress`'s `key_symbol`, assigned by its `XK_bracketleft` group), instead of "last" | `display.c`'s `XAnnotateEditImage`: its CR helpers take `(text_input, targets, value)`; the first wording would have put `key_symbol` before `targets` | owner |
+| 2026-11-12 | AMEND | E | Step 4: a temporary the block writes before it reads, that nothing after the block reads, whose only use left in the caller would be a store before the block (so that declaring it in the new function leaves the store set but never used, `-Wunused-but-set-variable`), passes as a pointer `T *v` on Recipe O step 2's last paragraph's terms: every use `(*v)`, `&v` to a callee written `v`, the call passing `&v`, the function still returning its one value | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W18 lane a, wide build), reached by no case, so Recipe O is not available there: its matte row loop writes `q` (returned) and the column counter `x`, whose caller store `x=0;` nothing else reads once the XYBitmap and matte loops have left; taking both loops out of the function ends its Deep, Nested Complexity (probe: 2.03 to 2.06, with the LSB twin 1.99 to 2.03) | owner |

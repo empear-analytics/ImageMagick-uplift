@@ -2167,6 +2167,100 @@ MagickPrivate void XDisplayImageInfo(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _XDitherTables
+{
+  int
+    i,
+    j;
+
+  const short
+    (*dither_red)[16];
+
+  unsigned char
+    *(*red_map)[16];
+
+  const short
+    (*dither_green)[16];
+
+  unsigned char
+    *(*green_map)[16];
+
+  const short
+    (*dither_blue)[16];
+
+  unsigned char
+    *(*blue_map)[16];
+} XDitherTables;
+
+static void SetRedDitherEntry(const XDitherTables *tables,const int x)
+{
+  const int
+    i = tables->i,
+    j = tables->j;
+
+  const short
+    (*dither_red)[16] = tables->dither_red;
+
+  unsigned char
+    *(*red_map)[16] = tables->red_map;
+
+  int
+    value;
+
+  value=x-16;
+  if (x < 48)
+    value=x/2+8;
+  value+=dither_red[i][j];
+  red_map[i][j][x]=(unsigned char)
+    ((value < 0) ? 0 : (value > 255) ? 255 : value);
+}
+
+static void SetGreenDitherEntry(const XDitherTables *tables,const int x)
+{
+  const int
+    i = tables->i,
+    j = tables->j;
+
+  const short
+    (*dither_green)[16] = tables->dither_green;
+
+  unsigned char
+    *(*green_map)[16] = tables->green_map;
+
+  int
+    value;
+
+  value=x-16;
+  if (x < 48)
+    value=x/2+8;
+  value+=dither_green[i][j];
+  green_map[i][j][x]=(unsigned char)
+    ((value < 0) ? 0 : (value > 255) ? 255 : value);
+}
+
+static void SetBlueDitherEntry(const XDitherTables *tables,const int x)
+{
+  const int
+    i = tables->i,
+    j = tables->j;
+
+  const short
+    (*dither_blue)[16] = tables->dither_blue;
+
+  unsigned char
+    *(*blue_map)[16] = tables->blue_map;
+
+  int
+    value;
+
+  value=x-32;
+  if (x < 112)
+    value=x/2+24;
+  value+=(int) (dither_blue[i][j] << 1);
+  blue_map[i][j][x]=(unsigned char)
+    ((value < 0) ? 0 : (value > 255) ? 255 : value);
+}
+
 static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
 {
   static const short int
@@ -2198,7 +2292,6 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   int
     i,
     j,
-    value,
     x,
     y;
 
@@ -2215,6 +2308,9 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
 
   unsigned int
     scanline_pad;
+
+  XDitherTables
+    tables;
 
   /*
     Allocate and initialize dither maps.
@@ -2234,27 +2330,22 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   */
   for (i=0; i < 2; i++)
     for (j=0; j < 16; j++)
+    {
+      tables.i=i;
+      tables.j=j;
+      tables.dither_red=dither_red;
+      tables.red_map=red_map;
+      tables.dither_green=dither_green;
+      tables.green_map=green_map;
+      tables.dither_blue=dither_blue;
+      tables.blue_map=blue_map;
       for (x=0; x < 256; x++)
       {
-        value=x-16;
-        if (x < 48)
-          value=x/2+8;
-        value+=dither_red[i][j];
-        red_map[i][j][x]=(unsigned char)
-          ((value < 0) ? 0 : (value > 255) ? 255 : value);
-        value=x-16;
-        if (x < 48)
-          value=x/2+8;
-        value+=dither_green[i][j];
-        green_map[i][j][x]=(unsigned char)
-          ((value < 0) ? 0 : (value > 255) ? 255 : value);
-        value=x-32;
-        if (x < 112)
-          value=x/2+24;
-        value+=(int) (dither_blue[i][j] << 1);
-        blue_map[i][j][x]=(unsigned char)
-          ((value < 0) ? 0 : (value > 255) ? 255 : value);
+        SetRedDitherEntry(&tables,x);
+        SetGreenDitherEntry(&tables,x);
+        SetBlueDitherEntry(&tables,x);
       }
+    }
   /*
     Dither image.
   */
@@ -6981,6 +7072,129 @@ static void XPackContinuousMultiByteLSB(const XImageRowSource *source,
   }
 }
 
+typedef struct _XBitmapPacking
+{
+  Image
+    *canvas;
+
+  unsigned short
+    polarity;
+
+  unsigned char
+    background,
+    foreground;
+
+  CacheView
+    *canvas_view;
+
+  ExceptionInfo
+    *exception;
+
+  unsigned int
+    scanline_pad;
+} XBitmapPacking;
+
+static unsigned char *XPackBitmapRowLSB(const XBitmapPacking *bitmap,
+  const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = bitmap->canvas;
+
+  const unsigned short
+    polarity = bitmap->polarity;
+
+  const unsigned char
+    background = bitmap->background,
+    foreground = bitmap->foreground;
+
+  int
+    x;
+
+  unsigned char
+    bit,
+    byte;
+
+  bit=0;
+  byte=0;
+  for (x=0; x < (int) canvas->columns; x++)
+  {
+    byte>>=1;
+    if (GetPixelIndex(canvas,p) == (Quantum) polarity)
+      byte|=foreground;
+    else
+      byte|=background;
+    bit++;
+    if (bit == 8)
+      {
+        *q++=byte;
+        bit=0;
+        byte=0;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  if (bit != 0)
+    *q=byte >> (8-bit);
+  return(q);
+}
+
+static void XPackBitmapLSB(const XBitmapPacking *bitmap,unsigned char *q)
+{
+  Image
+    *const canvas = bitmap->canvas;
+
+  CacheView
+    *const canvas_view = bitmap->canvas_view;
+
+  ExceptionInfo
+    *const exception = bitmap->exception;
+
+  const unsigned int
+    scanline_pad = bitmap->scanline_pad;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
+      exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackBitmapRowLSB(bitmap,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+static void XPackMatteRowLSB(const Image *canvas,const Quantum *p,
+  unsigned char **q,int *x)
+{
+  unsigned char
+    bit,
+    byte;
+
+  bit=0;
+  byte=0;
+  for ((*x)=(int) canvas->columns-1; (*x) >= 0; (*x)--)
+  {
+    byte>>=1;
+    if (GetPixelAlpha(canvas,p) > (QuantumRange/2))
+      byte|=0x80;
+    bit++;
+    if (bit == 8)
+      {
+        *(*q)++=byte;
+        bit=0;
+        byte=0;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  if (bit != 0)
+    *(*q)=byte >> (8-bit);
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7010,10 +7224,6 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
 
   unsigned char
     *q;
-
-  unsigned char
-    bit,
-    byte;
 
   unsigned int
     scanline_pad;
@@ -7088,6 +7298,9 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
         background,
         foreground;
 
+      XBitmapPacking
+        bitmap;
+
       /*
         Convert canvas to big-endian bitmap.
       */
@@ -7102,34 +7315,14 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
       if (canvas->colors == 2)
         polarity=GetPixelInfoIntensity(image,&canvas->colormap[0]) <
           GetPixelInfoIntensity(image,&canvas->colormap[1]);
-      for (y=0; y < (int) canvas->rows; y++)
-      {
-        p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
-          exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        bit=0;
-        byte=0;
-        for (x=0; x < (int) canvas->columns; x++)
-        {
-          byte>>=1;
-          if (GetPixelIndex(canvas,p) == (Quantum) polarity)
-            byte|=foreground;
-          else
-            byte|=background;
-          bit++;
-          if (bit == 8)
-            {
-              *q++=byte;
-              bit=0;
-              byte=0;
-            }
-          p+=(ptrdiff_t) GetPixelChannels(canvas);
-        }
-        if (bit != 0)
-          *q=byte >> (8-bit);
-        q+=(ptrdiff_t) scanline_pad;
-      }
+      bitmap.canvas=canvas;
+      bitmap.polarity=polarity;
+      bitmap.background=background;
+      bitmap.foreground=foreground;
+      bitmap.canvas_view=canvas_view;
+      bitmap.exception=exception;
+      bitmap.scanline_pad=scanline_pad;
+      XPackBitmapLSB(&bitmap,q);
     }
   else
     if (window->pixel_info->colors != 0)
@@ -7202,24 +7395,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
           exception);
         if (p == (const Quantum *) NULL)
           break;
-        bit=0;
-        byte=0;
-        for (x=(int) canvas->columns-1; x >= 0; x--)
-        {
-          byte>>=1;
-          if (GetPixelAlpha(canvas,p) > (QuantumRange/2))
-            byte|=0x80;
-          bit++;
-          if (bit == 8)
-            {
-              *q++=byte;
-              bit=0;
-              byte=0;
-            }
-          p+=(ptrdiff_t) GetPixelChannels(canvas);
-        }
-        if (bit != 0)
-          *q=byte >> (8-bit);
+        XPackMatteRowLSB(canvas,p,&q,&x);
         q+=(ptrdiff_t) scanline_pad;
       }
     }
@@ -8050,6 +8226,77 @@ static void XPackContinuousMultiByteMSB(const XImageRowSource *source,
   }
 }
 
+static unsigned char *XPackBitmapRowMSB(const XBitmapPacking *bitmap,
+  const Quantum *p,unsigned char *q)
+{
+  Image
+    *const canvas = bitmap->canvas;
+
+  const unsigned short
+    polarity = bitmap->polarity;
+
+  const unsigned char
+    background = bitmap->background,
+    foreground = bitmap->foreground;
+
+  int
+    x;
+
+  unsigned char
+    bit,
+    byte;
+
+  bit=0;
+  byte=0;
+  for (x=(int) canvas->columns-1; x >= 0; x--)
+  {
+    byte<<=1;
+    if (GetPixelIndex(canvas,p) == (Quantum) polarity)
+      byte|=foreground;
+    else
+      byte|=background;
+    bit++;
+    if (bit == 8)
+      {
+        *q++=byte;
+        bit=0;
+        byte=0;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  if (bit != 0)
+    *q=byte << (8-bit);
+  return(q);
+}
+
+static unsigned char *XPackMatteRowMSB(const Image *canvas,const Quantum *p,
+  unsigned char *q,int *x)
+{
+  unsigned char
+    bit,
+    byte;
+
+  bit=0;
+  byte=0;
+  for ((*x)=(int) canvas->columns-1; (*x) >= 0; (*x)--)
+  {
+    byte<<=1;
+    if (GetPixelAlpha(canvas,p) > (QuantumRange/2))
+      byte|=0x01;
+    bit++;
+    if (bit == 8)
+      {
+        *q++=byte;
+        bit=0;
+        byte=0;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(canvas);
+  }
+  if (bit != 0)
+    *q=byte << (8-bit);
+  return(q);
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -8079,10 +8326,6 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
 
   unsigned char
     *q;
-
-  unsigned char
-    bit,
-    byte;
 
   unsigned int
     scanline_pad;
@@ -8157,6 +8400,9 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
         background,
         foreground;
 
+      XBitmapPacking
+        bitmap;
+
       /*
         Convert canvas to big-endian bitmap.
       */
@@ -8171,32 +8417,20 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
       if (canvas->colors == 2)
         polarity=GetPixelInfoIntensity(image,&canvas->colormap[0]) <
           GetPixelInfoIntensity(image,&canvas->colormap[1]);
+      bitmap.canvas=canvas;
+      bitmap.polarity=polarity;
+      bitmap.background=background;
+      bitmap.foreground=foreground;
+      bitmap.canvas_view=canvas_view;
+      bitmap.exception=exception;
+      bitmap.scanline_pad=scanline_pad;
       for (y=0; y < (int) canvas->rows; y++)
       {
         p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
           exception);
         if (p == (const Quantum *) NULL)
           break;
-        bit=0;
-        byte=0;
-        for (x=(int) canvas->columns-1; x >= 0; x--)
-        {
-          byte<<=1;
-          if (GetPixelIndex(canvas,p) == (Quantum) polarity)
-            byte|=foreground;
-          else
-            byte|=background;
-          bit++;
-          if (bit == 8)
-            {
-              *q++=byte;
-              bit=0;
-              byte=0;
-            }
-          p+=(ptrdiff_t) GetPixelChannels(canvas);
-        }
-        if (bit != 0)
-          *q=byte << (8-bit);
+        q=XPackBitmapRowMSB(&bitmap,p,q);
         q+=(ptrdiff_t) scanline_pad;
       }
     }
@@ -8271,24 +8505,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
           exception);
         if (p == (const Quantum *) NULL)
           break;
-        bit=0;
-        byte=0;
-        for (x=(int) canvas->columns-1; x >= 0; x--)
-        {
-          byte<<=1;
-          if (GetPixelAlpha(canvas,p) > (QuantumRange/2))
-            byte|=0x01;
-          bit++;
-          if (bit == 8)
-            {
-              *q++=byte;
-              bit=0;
-              byte=0;
-            }
-          p+=(ptrdiff_t) GetPixelChannels(canvas);
-        }
-        if (bit != 0)
-          *q=byte << (8-bit);
+        q=XPackMatteRowMSB(canvas,p,q,&x);
         q+=(ptrdiff_t) scanline_pad;
       }
     }
@@ -8332,6 +8549,556 @@ static inline MagickBooleanType IsMagnifyWithinHalf(const unsigned int magnify,
     (magnify <= (height >> 1)))) ? MagickTrue : MagickFalse);
 }
 
+static unsigned char *MagnifyColumns8Bit(const unsigned int width,
+  const unsigned int magnify,unsigned char *p,unsigned char *q)
+{
+  unsigned int
+    k,
+    l;
+
+  for (k=0; k < width; k+=magnify)
+  {
+    /*
+      Propagate pixel magnify columns.
+    */
+    for (l=0; l < magnify; l++)
+      *q++=(*p);
+    p++;
+  }
+  return(q);
+}
+
+typedef struct _MagnifyMultiByte
+{
+  unsigned int
+    width,
+    magnify,
+    bytes_per_pixel,
+    height;
+
+  XImage
+    *ximage;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    scanline_pad;
+
+  unsigned char
+    *q;
+} MagnifyMultiByte;
+
+static unsigned char *MagnifyColumnsMultiByte(
+  const MagnifyMultiByte *multi_byte,unsigned char *p,unsigned char *q)
+{
+  const unsigned int
+    bytes_per_pixel = multi_byte->bytes_per_pixel,
+    magnify = multi_byte->magnify,
+    width = multi_byte->width;
+
+  unsigned int
+    k,
+    l,
+    m;
+
+  for (k=0; k < width; k+=magnify)
+  {
+    /*
+      Propagate pixel magnify columns.
+    */
+    for (l=0; l < magnify; l++)
+      for (m=0; m < bytes_per_pixel; m++)
+        *q++=(*(p+m));
+    p+=(ptrdiff_t) bytes_per_pixel;
+  }
+  return(q);
+}
+
+typedef struct _Magnify8BitRows
+{
+  unsigned int
+    height,
+    magnify;
+
+  XImage
+    *ximage;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    width,
+    scanline_pad;
+
+  unsigned char
+    *q;
+} Magnify8BitRows;
+
+static void MagnifyRows8Bit(const Magnify8BitRows *magnify_rows)
+{
+  XImage
+    *const ximage = magnify_rows->ximage;
+
+  const int
+    x = magnify_rows->x;
+
+  const unsigned int
+    height = magnify_rows->height,
+    magnify = magnify_rows->magnify,
+    scanline_pad = magnify_rows->scanline_pad,
+    width = magnify_rows->width;
+
+  int
+    y = magnify_rows->y;
+
+  ssize_t
+    i;
+
+  unsigned char
+    *p,
+    *q = magnify_rows->q;
+
+  unsigned int
+    j;
+
+  for (i=0; i < (ssize_t) height; i+=magnify)
+  {
+    /*
+      Propagate pixel magnify rows.
+    */
+    for (j=0; j < magnify; j++)
+    {
+      p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
+        ((x*ximage->bits_per_pixel) >> 3);
+      q=MagnifyColumns8Bit(width,magnify,p,q);
+      q+=(ptrdiff_t) scanline_pad;
+    }
+    y++;
+  }
+}
+
+static void MagnifyRowsMultiByte(const MagnifyMultiByte *multi_byte)
+{
+  XImage
+    *const ximage = multi_byte->ximage;
+
+  const int
+    x = multi_byte->x;
+
+  const unsigned int
+    height = multi_byte->height,
+    magnify = multi_byte->magnify,
+    scanline_pad = multi_byte->scanline_pad;
+
+  int
+    y = multi_byte->y;
+
+  ssize_t
+    i;
+
+  unsigned char
+    *p,
+    *q = multi_byte->q;
+
+  unsigned int
+    j;
+
+  for (i=0; i < (ssize_t) height; i+=magnify)
+  {
+    /*
+      Propagate pixel magnify rows.
+    */
+    for (j=0; j < magnify; j++)
+    {
+      p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
+        ((x*ximage->bits_per_pixel) >> 3);
+      q=MagnifyColumnsMultiByte(multi_byte,p,q);
+      q+=(ptrdiff_t) scanline_pad;
+    }
+    y++;
+  }
+}
+
+typedef struct _MagnifyBitPlanes
+{
+  unsigned int
+    magnify;
+
+  XImage
+    *ximage;
+
+  unsigned char
+    *p,
+    p_bit,
+    background,
+    foreground;
+} MagnifyBitPlanes;
+
+static void MagnifyBitPlanesLSB(const MagnifyBitPlanes *planes,
+  unsigned char *byte,unsigned char *q_bit,unsigned char **q)
+{
+  XImage
+    *const ximage = planes->ximage;
+
+  const unsigned char
+    background = planes->background,
+    foreground = planes->foreground,
+    p_bit = planes->p_bit;
+
+  const unsigned int
+    magnify = planes->magnify;
+
+  unsigned char
+    *const p = planes->p;
+
+  unsigned int
+    l,
+    plane;
+
+  for (l=0; l < magnify; l++)
+  {
+    /*
+      Propagate each bit plane.
+    */
+    for (plane=0; (int) plane < ximage->bits_per_pixel; plane++)
+    {
+      (*byte)>>=1;
+      if (*p & (0x01 << (p_bit+plane)))
+        (*byte)|=foreground;
+      else
+        (*byte)|=background;
+      (*q_bit)++;
+      if ((*q_bit) == 8)
+        {
+          *(*q)++=(*byte);
+          (*q_bit)=0;
+          (*byte)=0;
+        }
+    }
+  }
+}
+
+typedef struct _MagnifyBitColumns
+{
+  unsigned int
+    width,
+    magnify;
+
+  XImage
+    *ximage;
+
+  unsigned char
+    background,
+    foreground;
+
+  unsigned int
+    scanline_pad;
+
+  unsigned char
+    *p,
+    p_bit,
+    q_bit,
+    byte;
+} MagnifyBitColumns;
+
+static unsigned char *MagnifyBitColumnsLSB(const MagnifyBitColumns *columns,
+  unsigned char *q)
+{
+  XImage
+    *const ximage = columns->ximage;
+
+  const unsigned char
+    background = columns->background,
+    foreground = columns->foreground;
+
+  const unsigned int
+    magnify = columns->magnify,
+    scanline_pad = columns->scanline_pad,
+    width = columns->width;
+
+  unsigned char
+    byte = columns->byte,
+    *p = columns->p,
+    p_bit = columns->p_bit,
+    q_bit = columns->q_bit;
+
+  unsigned int
+    k;
+
+  for (k=0; k < width; k+=magnify)
+  {
+    /*
+      Propagate pixel magnify columns.
+    */
+    {
+      const MagnifyBitPlanes
+        planes = { magnify, ximage, p, p_bit, background,
+          foreground };
+
+      MagnifyBitPlanesLSB(&planes,&byte,&q_bit,&q);
+    }
+    p_bit+=ximage->bits_per_pixel;
+    if (p_bit == 8)
+      {
+        p++;
+        p_bit=0;
+      }
+    if (q_bit != 0)
+      *q=byte >> (8-q_bit);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+  return(q);
+}
+
+static void MagnifyBitPlanesMSB(const MagnifyBitPlanes *planes,
+  unsigned char *byte,unsigned char *q_bit,unsigned char **q)
+{
+  XImage
+    *const ximage = planes->ximage;
+
+  const unsigned char
+    background = planes->background,
+    foreground = planes->foreground,
+    p_bit = planes->p_bit;
+
+  const unsigned int
+    magnify = planes->magnify;
+
+  unsigned char
+    *const p = planes->p;
+
+  unsigned int
+    l,
+    plane;
+
+  for (l=0; l < magnify; l++)
+  {
+    /*
+      Propagate each bit plane.
+    */
+    for (plane=0; (int) plane < ximage->bits_per_pixel; plane++)
+    {
+      (*byte)<<=1;
+      if (*p & (0x80 >> (p_bit+plane)))
+        (*byte)|=foreground;
+      else
+        (*byte)|=background;
+      (*q_bit)++;
+      if ((*q_bit) == 8)
+        {
+          *(*q)++=(*byte);
+          (*q_bit)=0;
+          (*byte)=0;
+        }
+    }
+  }
+}
+
+static unsigned char *MagnifyBitColumnsMSB(const MagnifyBitColumns *columns,
+  unsigned char *q)
+{
+  XImage
+    *const ximage = columns->ximage;
+
+  const unsigned char
+    background = columns->background,
+    foreground = columns->foreground;
+
+  const unsigned int
+    magnify = columns->magnify,
+    scanline_pad = columns->scanline_pad,
+    width = columns->width;
+
+  unsigned char
+    byte = columns->byte,
+    *p = columns->p,
+    p_bit = columns->p_bit,
+    q_bit = columns->q_bit;
+
+  unsigned int
+    k;
+
+  for (k=0; k < width; k+=magnify)
+  {
+    /*
+      Propagate pixel magnify columns.
+    */
+    {
+      const MagnifyBitPlanes
+        planes = { magnify, ximage, p, p_bit, background,
+          foreground };
+
+      MagnifyBitPlanesMSB(&planes,&byte,&q_bit,&q);
+    }
+    p_bit+=ximage->bits_per_pixel;
+    if (p_bit == 8)
+      {
+        p++;
+        p_bit=0;
+      }
+    if (q_bit != 0)
+      *q=byte << (8-q_bit);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+  return(q);
+}
+
+typedef struct _MagnifyBitRows
+{
+  unsigned int
+    height,
+    magnify;
+
+  XImage
+    *ximage;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    width,
+    scanline_pad;
+
+  unsigned char
+    background,
+    foreground,
+    *q;
+} MagnifyBitRows;
+
+static void MagnifyBitRowsLSB(const MagnifyBitRows *bit_rows)
+{
+  XImage
+    *const ximage = bit_rows->ximage;
+
+  const int
+    x = bit_rows->x;
+
+  const unsigned char
+    background = bit_rows->background,
+    foreground = bit_rows->foreground;
+
+  const unsigned int
+    height = bit_rows->height,
+    magnify = bit_rows->magnify,
+    scanline_pad = bit_rows->scanline_pad,
+    width = bit_rows->width;
+
+  int
+    y = bit_rows->y;
+
+  ssize_t
+    i;
+
+  unsigned char
+    byte,
+    *p,
+    p_bit,
+    q_bit,
+    *q = bit_rows->q;
+
+  unsigned int
+    j;
+
+  for (i=0; i < (ssize_t) height; i+=magnify)
+  {
+    /*
+      Propagate pixel magnify rows.
+    */
+    for (j=0; j < magnify; j++)
+    {
+      MagnifyBitColumns
+        columns;
+
+      p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
+        ((x*ximage->bits_per_pixel) >> 3);
+      p_bit=(unsigned char) (x*ximage->bits_per_pixel) & 0x07;
+      q_bit=0;
+      byte=0;
+      columns.width=width;
+      columns.magnify=magnify;
+      columns.ximage=ximage;
+      columns.background=background;
+      columns.foreground=foreground;
+      columns.scanline_pad=scanline_pad;
+      columns.p=p;
+      columns.p_bit=p_bit;
+      columns.q_bit=q_bit;
+      columns.byte=byte;
+      q=MagnifyBitColumnsLSB(&columns,q);
+    }
+    y++;
+  }
+}
+
+static void MagnifyBitRowsMSB(const MagnifyBitRows *bit_rows)
+{
+  XImage
+    *const ximage = bit_rows->ximage;
+
+  const int
+    x = bit_rows->x;
+
+  const unsigned char
+    background = bit_rows->background,
+    foreground = bit_rows->foreground;
+
+  const unsigned int
+    height = bit_rows->height,
+    magnify = bit_rows->magnify,
+    scanline_pad = bit_rows->scanline_pad,
+    width = bit_rows->width;
+
+  int
+    y = bit_rows->y;
+
+  ssize_t
+    i;
+
+  unsigned char
+    byte,
+    *p,
+    p_bit,
+    q_bit,
+    *q = bit_rows->q;
+
+  unsigned int
+    j;
+
+  for (i=0; i < (ssize_t) height; i+=magnify)
+  {
+    /*
+      Propagate pixel magnify rows.
+    */
+    for (j=0; j < magnify; j++)
+    {
+      MagnifyBitColumns
+        columns;
+
+      p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
+        ((x*ximage->bits_per_pixel) >> 3);
+      p_bit=(unsigned char) (x*ximage->bits_per_pixel) & 0x07;
+      q_bit=0;
+      byte=0;
+      columns.width=width;
+      columns.magnify=magnify;
+      columns.ximage=ximage;
+      columns.background=background;
+      columns.foreground=foreground;
+      columns.scanline_pad=scanline_pad;
+      columns.p=p;
+      columns.p_bit=p_bit;
+      columns.q_bit=q_bit;
+      columns.byte=byte;
+      q=MagnifyBitColumnsMSB(&columns,q);
+    }
+    y++;
+  }
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -8351,7 +9118,6 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
     i;
 
   unsigned char
-    *p,
     *q;
 
   ssize_t
@@ -8365,9 +9131,6 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
 
   unsigned int
     height,
-    j,
-    k,
-    l,
     magnify,
     scanline_pad,
     width;
@@ -8452,13 +9215,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
     {
       unsigned char
         background,
-        byte,
-        foreground,
-        p_bit,
-        q_bit;
-
-      unsigned int
-        plane;
+        foreground;
 
       XPixelInfo
         *pixel_info;
@@ -8468,6 +9225,9 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
       {
         case LSBFirst:
         {
+          MagnifyBitRows
+            bit_rows;
+
           /*
             Magnify little-endian bitmap.
           */
@@ -8481,65 +9241,28 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
               foreground=(unsigned char)
                 (XPixelIntensity(&pixel_info->background_color) <
                  XPixelIntensity(&pixel_info->foreground_color) ?  0x80 : 0x00);
-              if (windows->magnify.depth > 1)
-                Swap(background,foreground);
             }
-          for (i=0; i < (ssize_t) height; i+=magnify)
-          {
-            /*
-              Propagate pixel magnify rows.
-            */
-            for (j=0; j < magnify; j++)
-            {
-              p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
-                ((x*ximage->bits_per_pixel) >> 3);
-              p_bit=(unsigned char) (x*ximage->bits_per_pixel) & 0x07;
-              q_bit=0;
-              byte=0;
-              for (k=0; k < width; k+=magnify)
-              {
-                /*
-                  Propagate pixel magnify columns.
-                */
-                for (l=0; l < magnify; l++)
-                {
-                  /*
-                    Propagate each bit plane.
-                  */
-                  for (plane=0; (int) plane < ximage->bits_per_pixel; plane++)
-                  {
-                    byte>>=1;
-                    if (*p & (0x01 << (p_bit+plane)))
-                      byte|=foreground;
-                    else
-                      byte|=background;
-                    q_bit++;
-                    if (q_bit == 8)
-                      {
-                        *q++=byte;
-                        q_bit=0;
-                        byte=0;
-                      }
-                  }
-                }
-                p_bit+=ximage->bits_per_pixel;
-                if (p_bit == 8)
-                  {
-                    p++;
-                    p_bit=0;
-                  }
-                if (q_bit != 0)
-                  *q=byte >> (8-q_bit);
-                q+=(ptrdiff_t) scanline_pad;
-              }
-            }
-            y++;
-          }
+          if ((ximage->format == XYBitmap) && (windows->magnify.depth > 1))
+            Swap(background,foreground);
+          bit_rows.height=height;
+          bit_rows.magnify=magnify;
+          bit_rows.ximage=ximage;
+          bit_rows.x=x;
+          bit_rows.y=y;
+          bit_rows.width=width;
+          bit_rows.scanline_pad=scanline_pad;
+          bit_rows.background=background;
+          bit_rows.foreground=foreground;
+          bit_rows.q=q;
+          MagnifyBitRowsLSB(&bit_rows);
           break;
         }
         case MSBFirst:
         default:
         {
+          MagnifyBitRows
+            bit_rows;
+
           /*
             Magnify big-endian bitmap.
           */
@@ -8553,60 +9276,20 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
               foreground=(unsigned char)
                 (XPixelIntensity(&pixel_info->background_color) <
                  XPixelIntensity(&pixel_info->foreground_color) ?  0x01 : 0x00);
-              if (windows->magnify.depth > 1)
-                Swap(background,foreground);
             }
-          for (i=0; i < (ssize_t) height; i+=magnify)
-          {
-            /*
-              Propagate pixel magnify rows.
-            */
-            for (j=0; j < magnify; j++)
-            {
-              p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
-                ((x*ximage->bits_per_pixel) >> 3);
-              p_bit=(unsigned char) (x*ximage->bits_per_pixel) & 0x07;
-              q_bit=0;
-              byte=0;
-              for (k=0; k < width; k+=magnify)
-              {
-                /*
-                  Propagate pixel magnify columns.
-                */
-                for (l=0; l < magnify; l++)
-                {
-                  /*
-                    Propagate each bit plane.
-                  */
-                  for (plane=0; (int) plane < ximage->bits_per_pixel; plane++)
-                  {
-                    byte<<=1;
-                    if (*p & (0x80 >> (p_bit+plane)))
-                      byte|=foreground;
-                    else
-                      byte|=background;
-                    q_bit++;
-                    if (q_bit == 8)
-                      {
-                        *q++=byte;
-                        q_bit=0;
-                        byte=0;
-                      }
-                  }
-                }
-                p_bit+=ximage->bits_per_pixel;
-                if (p_bit == 8)
-                  {
-                    p++;
-                    p_bit=0;
-                  }
-                if (q_bit != 0)
-                  *q=byte << (8-q_bit);
-                q+=(ptrdiff_t) scanline_pad;
-              }
-            }
-            y++;
-          }
+          if ((ximage->format == XYBitmap) && (windows->magnify.depth > 1))
+            Swap(background,foreground);
+          bit_rows.height=height;
+          bit_rows.magnify=magnify;
+          bit_rows.ximage=ximage;
+          bit_rows.x=x;
+          bit_rows.y=y;
+          bit_rows.width=width;
+          bit_rows.scanline_pad=scanline_pad;
+          bit_rows.background=background;
+          bit_rows.foreground=foreground;
+          bit_rows.q=q;
+          MagnifyBitRowsMSB(&bit_rows);
           break;
         }
       }
@@ -8617,66 +9300,45 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
       case 6:
       case 8:
       {
+        Magnify8BitRows
+          magnify_rows;
+
         /*
           Magnify 8 bit X image.
         */
-        for (i=0; i < (ssize_t) height; i+=magnify)
-        {
-          /*
-            Propagate pixel magnify rows.
-          */
-          for (j=0; j < magnify; j++)
-          {
-            p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
-              ((x*ximage->bits_per_pixel) >> 3);
-            for (k=0; k < width; k+=magnify)
-            {
-              /*
-                Propagate pixel magnify columns.
-              */
-              for (l=0; l < magnify; l++)
-                *q++=(*p);
-              p++;
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
-          y++;
-        }
+        magnify_rows.height=height;
+        magnify_rows.magnify=magnify;
+        magnify_rows.ximage=ximage;
+        magnify_rows.x=x;
+        magnify_rows.y=y;
+        magnify_rows.width=width;
+        magnify_rows.scanline_pad=scanline_pad;
+        magnify_rows.q=q;
+        MagnifyRows8Bit(&magnify_rows);
         break;
       }
       default:
       {
         unsigned int
-          bytes_per_pixel,
-          m;
+          bytes_per_pixel;
+
+        MagnifyMultiByte
+          multi_byte;
 
         /*
           Magnify multi-byte X image.
         */
         bytes_per_pixel=(unsigned int) ximage->bits_per_pixel >> 3;
-        for (i=0; i < (ssize_t) height; i+=magnify)
-        {
-          /*
-            Propagate pixel magnify rows.
-          */
-          for (j=0; j < magnify; j++)
-          {
-            p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
-              ((x*ximage->bits_per_pixel) >> 3);
-            for (k=0; k < width; k+=magnify)
-            {
-              /*
-                Propagate pixel magnify columns.
-              */
-              for (l=0; l < magnify; l++)
-                for (m=0; m < bytes_per_pixel; m++)
-                  *q++=(*(p+m));
-              p+=(ptrdiff_t) bytes_per_pixel;
-            }
-            q+=(ptrdiff_t) scanline_pad;
-          }
-          y++;
-        }
+        multi_byte.width=width;
+        multi_byte.magnify=magnify;
+        multi_byte.bytes_per_pixel=bytes_per_pixel;
+        multi_byte.height=height;
+        multi_byte.ximage=ximage;
+        multi_byte.x=x;
+        multi_byte.y=y;
+        multi_byte.scanline_pad=scanline_pad;
+        multi_byte.q=q;
+        MagnifyRowsMultiByte(&multi_byte);
         break;
       }
     }
