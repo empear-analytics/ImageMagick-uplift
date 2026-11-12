@@ -520,15 +520,10 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
   if ((1UL*QuantumRange) <= MaxMap)
   RestoreMSCWarning
     {
-      DepthMapImage
-        map_image;
+      const DepthMapImage
+        map_image = { image, image_view, exception, current_depth,
+          number_threads, status };
 
-      map_image.image=image;
-      map_image.image_view=image_view;
-      map_image.exception=exception;
-      map_image.current_depth=current_depth;
-      map_image.number_threads=number_threads;
-      map_image.status=status;
       return(GetMappedImageDepth(&map_image));
     }
 #endif
