@@ -9518,6 +9518,56 @@ static void RedrawFontBrowserWidget(const FontBrowserContext *context,
     }
 }
 
+static void JumpFontBrowserList(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  char
+    *const reply = context->reply;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  int
+    *const fonts = widgets->fonts;
+
+  unsigned int
+    *const visible_fonts = widgets->visible_fonts;
+
+  int
+    *const i = widgets->i;
+
+  char
+    ***const fontlist = widgets->fontlist;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info,
+    *const selection_info = widgets->selection_info;
+
+  if ((*state) & JumpListState)
+    {
+      FontBrowserMatch
+        match;
+
+      /*
+        Jump scroll to match user font.
+      */
+      (*list_info).id=(~0);
+      match.fontlist=(*fontlist);
+      match.fonts=(*fonts);
+      match.reply=reply;
+      MatchFontBrowserReply(&match,list_info,i);
+      if (((*i) < (*slider_info).id) || ((*i) >= ((*slider_info).id+
+        (int) (*visible_fonts))))
+        (*slider_info).id=(*i)-((int) (*visible_fonts) >> 1);
+      (*selection_info).id=(~0);
+      (*state)|=RedrawListState;
+      (*state)&=(unsigned int) (~JumpListState);
+    }
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9783,25 +9833,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
         XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
         state&=(unsigned int) (~UpdateListState);
       }
-    if (state & JumpListState)
-      {
-        FontBrowserMatch
-          match;
-
-        /*
-          Jump scroll to match user font.
-        */
-        list_info.id=(~0);
-        match.fontlist=fontlist;
-        match.fonts=fonts;
-        match.reply=reply;
-        MatchFontBrowserReply(&match,&list_info,&i);
-        if ((i < slider_info.id) || (i >= (slider_info.id+(int) visible_fonts)))
-          slider_info.id=i-((int) visible_fonts >> 1);
-        selection_info.id=(~0);
-        state|=RedrawListState;
-        state&=(unsigned int) (~JumpListState);
-      }
+    JumpFontBrowserList(&font_context,&font_widgets);
     if (state & RedrawListState)
       {
         /*
