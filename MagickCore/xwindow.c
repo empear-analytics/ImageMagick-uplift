@@ -5762,12 +5762,28 @@ static void LogXWindowVisual(const XWindows *windows)
     }
 }
 
-MagickPrivate XWindows *XInitializeWindows(Display *display,
-  XResourceInfo *resource_info)
+static void GetXWindowGroupLeader(Display *display,XResourceInfo *resource_info,
+  XWindows *windows)
 {
   Window
     root_window;
 
+  root_window=XRootWindow(display,windows->visual_info->screen);
+  windows->group_leader.id=(Window) NULL;
+  if (resource_info->window_group != (char *) NULL)
+    {
+      if (isdigit((int) ((unsigned char) *resource_info->window_group)) != 0)
+        windows->group_leader.id=XWindowByID(display,root_window,(Window)
+          strtol((char *) resource_info->window_group,(char **) NULL,0));
+      if (windows->group_leader.id == (Window) NULL)
+        windows->group_leader.id=
+          XWindowByName(display,root_window,resource_info->window_group);
+    }
+}
+
+MagickPrivate XWindows *XInitializeWindows(Display *display,
+  XResourceInfo *resource_info)
+{
   XWindows
     *windows;
 
@@ -5863,17 +5879,7 @@ MagickPrivate XWindows *XInitializeWindows(Display *display,
   /*
     Determine group leader if we have one.
   */
-  root_window=XRootWindow(display,windows->visual_info->screen);
-  windows->group_leader.id=(Window) NULL;
-  if (resource_info->window_group != (char *) NULL)
-    {
-      if (isdigit((int) ((unsigned char) *resource_info->window_group)) != 0)
-        windows->group_leader.id=XWindowByID(display,root_window,(Window)
-          strtol((char *) resource_info->window_group,(char **) NULL,0));
-      if (windows->group_leader.id == (Window) NULL)
-        windows->group_leader.id=
-          XWindowByName(display,root_window,resource_info->window_group);
-    }
+  GetXWindowGroupLeader(display,resource_info,windows);
   return(windows);
 }
 
