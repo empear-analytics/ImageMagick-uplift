@@ -12720,6 +12720,74 @@ the mandate of 2026-10-24.
 
 ---
 
+## Recipe LL - Replace an Override Ladder by Descending Returns
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function that maps
+one integer to a value by a run of `if (x >= LIMIT) var=VALUE;` statements, after a
+default assignment, with the limits written in ascending order (`type.c`'s
+`LoadFontConfigFonts`: nine `width >= FC_WIDTH_*` tests and nine `weight >= FC_WEIGHT_*`
+tests, each overriding the one before).
+
+**Not covered by:** Recipe E, which moves the ladder unchanged and so keeps its cc; Recipe
+SF, which flattens a `switch`; Recipe KT, which replaces a keyed run by a table.
+
+**How:**
+
+1. The run is `var=DEFAULT;` (or the default is the value already in `var`), then
+   `if (x >= L1) var=V1;` ... `if (x >= Ln) var=Vn;`, each test on the same unmodified
+   `x`, each branch one assignment to the same `var`, no other statement between them.
+2. Read each limit's value from the header (macro chains such as
+   `FC_WEIGHT_NORMAL` to `FC_WEIGHT_REGULAR` followed) and check that `L1 < L2 < ... <
+   Ln`. With ascending limits the last test that holds is the one with the greatest
+   limit not above `x`, so the ladder yields `Vk` for the greatest `Lk <= x` and the
+   default when none holds. A limit out of order, or two equal, refuses the step.
+3. Write a `static inline` function taking `const <type> x` and returning the value, with
+   `if (x >= Ln) return(Vn);` for the limits from the greatest down, then
+   `return(DEFAULT);`. A function with more than five tests is split at one limit `Lm`:
+   the outer function tests `x >= Lm` and calls an inner function holding the tests from
+   `Ln` down to just above `Lm` (its fall-through value is the value at `Lm`), then
+   continues with the lower tests. Each function stays under cc 9.
+4. The caller assigns `var=Name(x);` where the default assignment and the ladder were.
+   A statement that reads `var` inside the ladder, or `x` modified in it, refuses the
+   step.
+
+**Before:**
+
+```c
+    type_info->weight=400;
+    status=FcPatternGetInteger(font_set->fonts[i],FC_WEIGHT,0,&weight);
+    if (weight >= FC_WEIGHT_THIN)
+      type_info->weight=100;
+    /* ... eight more ascending tests ... */
+    if (weight >= FC_WEIGHT_BLACK)
+      type_info->weight=900;
+```
+
+**After:**
+
+```c
+    status=FcPatternGetInteger(font_set->fonts[i],FC_WEIGHT,0,&weight);
+    type_info->weight=GetFontConfigWeight(weight);
+```
+
+**Careful:**
+
+- Step 2 is the argument. The default stays what the member had when no test holds, and
+  the helper returns the same constant for `x` below every limit.
+- `x` may be uninitialised where the library call fails; the helper receives the same
+  value the ladder tested.
+- The object code differs, so `obj_identical.sh` does not apply.
+
+**Evidence level:** oracle, for the function the step changes (`casemap.py` first), and
+the reading of step 2 in the commit message.
+
+**Provenance:** 2026-11-12, from `type.c`'s `LoadFontConfigFonts` (campaign B, M121):
+cc 41 to 23, the file 5.08 to 5.16. Added by Claude Code (Claude Sonnet 5.5) under the
+mandate of 2026-10-24.
+
+---
+
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -13138,3 +13206,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | LF | Move a loop's leading run of `if (<test>) continue;` into one `Is<Name>` predicate; evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (5.88 to 5.93); P names one expression and keeps its `if` | mandate (2026-10-24) |
 | 2026-11-12 | NEW | DL | Drop `case` labels that fall straight into `default:`; proof `obj_identical.sh` | `policy.c`'s `SetMagickSecurityPolicyValue` (five enumerator labels; 6.02 to 6.21, object code identical) | mandate (2026-10-24) |
 | 2026-11-12 | NEW | DT | Drop `? MagickTrue : MagickFalse` after a comparison or a chain of them; proof `obj_identical.sh` and `ci_warnings.sh` | `policy.c` (seven sites in seven functions; 6.21 to 6.38, object code identical); P writes the ternary and nothing removes it | mandate (2026-10-24) |
+| 2026-11-12 | NEW | LL | Replace an ascending `if (x >= L) var=V;` ladder by descending returns in a helper; proof oracle plus the monotone-limits reading | `type.c` `LoadFontConfigFonts` (stretch and weight ladders; cc 41 to 23, 5.08 to 5.16); E keeps the ladder's cc | mandate (2026-10-24) |
