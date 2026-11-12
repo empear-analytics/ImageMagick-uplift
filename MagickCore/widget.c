@@ -10191,6 +10191,89 @@ static void MapFontBrowserWidget(Display *display,XWindows *windows,
   windows->widget.mapped=MagickFalse;
 }
 
+typedef struct _FontBrowserRunTargets
+{
+  int
+    *fonts,
+    *i;
+
+  XFontStruct
+    **font_info;
+
+  char
+    ***fontlist,
+    ***listhead;
+
+  MagickStatusType
+    *mask;
+} FontBrowserRunTargets;
+
+static MagickBooleanType RunFontBrowser(const FontBrowserContext *context,
+  const FontBrowserRunTargets *run_targets)
+{
+  int
+    *const fonts = run_targets->fonts,
+    *const i = run_targets->i;
+
+  XFontStruct
+    **const font_info = run_targets->font_info;
+
+  char
+    ***const fontlist = run_targets->fontlist,
+    ***const listhead = run_targets->listhead;
+
+  MagickStatusType
+    *const mask = run_targets->mask;
+
+  unsigned int
+    visible_fonts;
+
+  size_t
+    delay,
+    state;
+
+  XWidgetInfo
+    action_info,
+    back_info,
+    cancel_info,
+    expose_info,
+    list_info,
+    mode_info,
+    north_info,
+    reply_info,
+    reset_info,
+    scroll_info,
+    selection_info,
+    slider_info,
+    south_info,
+    text_info;
+
+  const FontBrowserTargets
+    targets = { &reply_info, &state, &selection_info, &list_info };
+
+  const FontBrowserWidgets
+    font_widgets = { &reply_info, &state, &back_info,
+      &reset_info, &action_info, &cancel_info, &slider_info, fonts,
+      &scroll_info, &visible_fonts, &north_info, &delay, &south_info, i,
+      font_info, fontlist, &list_info, &mode_info, &expose_info, &text_info,
+      &selection_info, listhead, mask };
+
+  /*
+    Respond to X events.
+  */
+  XGetWidgetInfo((char *) NULL,&slider_info);
+  XGetWidgetInfo((char *) NULL,&north_info);
+  XGetWidgetInfo((char *) NULL,&south_info);
+  XGetWidgetInfo((char *) NULL,&expose_info);
+  XGetWidgetInfo((char *) NULL,&selection_info);
+  visible_fonts=0;
+  delay=SuspendTime << 2;
+  state=UpdateConfigurationState;
+  if (RespondToFontEvents(context,&targets,&font_widgets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -10217,41 +10300,13 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   unsigned int
     height,
     text_width,
-    visible_fonts,
     width;
-
-  size_t
-    delay,
-    state;
 
   XFontStruct
     *font_info;
 
-  XWidgetInfo
-    action_info,
-    back_info,
-    cancel_info,
-    expose_info,
-    list_info,
-    mode_info,
-    north_info,
-    reply_info,
-    reset_info,
-    scroll_info,
-    selection_info,
-    slider_info,
-    south_info,
-    text_info;
-
-  const FontBrowserTargets
-    targets = { &reply_info, &state, &selection_info, &list_info };
-
-  const FontBrowserWidgets
-    font_widgets = { &reply_info, &state, &back_info,
-      &reset_info, &action_info, &cancel_info, &slider_info, &fonts,
-      &scroll_info, &visible_fonts, &north_info, &delay, &south_info, &i,
-      &font_info, &fontlist, &list_info, &mode_info, &expose_info, &text_info,
-      &selection_info, &listhead, &mask };
+  const FontBrowserRunTargets
+    run_targets = { &fonts, &i, &font_info, &fontlist, &listhead, &mask };
 
   FontBrowserContext
     font_context;
@@ -10323,17 +10378,6 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     windows->widget.height=windows->widget.min_height;
   XConstrainWindowPosition(display,&windows->widget);
   MapFontBrowserWidget(display,windows,mask);
-  /*
-    Respond to X events.
-  */
-  XGetWidgetInfo((char *) NULL,&slider_info);
-  XGetWidgetInfo((char *) NULL,&north_info);
-  XGetWidgetInfo((char *) NULL,&south_info);
-  XGetWidgetInfo((char *) NULL,&expose_info);
-  XGetWidgetInfo((char *) NULL,&selection_info);
-  visible_fonts=0;
-  delay=SuspendTime << 2;
-  state=UpdateConfigurationState;
   font_context.display=display;
   font_context.windows=windows;
   font_context.glob_pattern=glob_pattern;
@@ -10345,7 +10389,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   font_context.width=width;
   font_context.reply=reply;
   font_context.text=text;
-  if (RespondToFontEvents(&font_context,&targets,&font_widgets) == MagickFalse)
+  if (RunFontBrowser(&font_context,&run_targets) == MagickFalse)
     return;
   WithdrawBrowserWidget(display,windows);
   FreeFontBrowserList(listhead,fontlist);
