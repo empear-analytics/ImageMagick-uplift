@@ -2324,6 +2324,18 @@ static char **HexTextList(const char *text,size_t *lines)
   return(textlist);
 }
 
+static MagickBooleanType IsPlainText(const char *text)
+{
+  const char
+    *p;
+
+  for (p=text; *p != '\0'; p++)
+    if (((int) ((unsigned char) *p) < 32) &&
+        (isspace((int) ((unsigned char) *p)) == 0))
+      break;
+  return(*p == '\0' ? MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2355,9 +2367,6 @@ MagickExport char **StringToStrings(const char *text,size_t *count)
   char
     **textlist;
 
-  const char
-    *p;
-
   size_t
     lines;
 
@@ -2367,11 +2376,7 @@ MagickExport char **StringToStrings(const char *text,size_t *count)
         *count=0;
       return((char **) NULL);
     }
-  for (p=text; *p != '\0'; p++)
-    if (((int) ((unsigned char) *p) < 32) &&
-        (isspace((int) ((unsigned char) *p)) == 0))
-      break;
-  if (*p == '\0')
+  if (IsPlainText(text) != MagickFalse)
     textlist=AsciiTextList(text,&lines);
   else
     textlist=HexTextList(text,&lines);
