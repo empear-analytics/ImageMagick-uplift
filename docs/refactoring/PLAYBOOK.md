@@ -13789,6 +13789,18 @@ split a run of groups and give the run's body to each copy; Recipe NS, which nam
    `+1` for the filling call, nothing else; time the step as Recipe CF step 7 says (callgrind
    instruction counts over operators from and outside the run): the lookup now runs once per row.
 
+8. *If/else form (2026-11-12).* The `switch` may stand anywhere in the function, with statements after it, and
+   may hold up to two runs `G1`, `G2` whose labels together with `default:` number eight or more, when every
+   group of the `switch` (the runs and `default:`) ends in its one closing `break;` and holds no other `break` of
+   it, and no group writes the selector. The `switch` becomes `if (<s>.<f1> != MagickFalse) B1' else if
+   (<s>.<f2> != MagickFalse) B2'`, each `Bi'` the group's body without its closing `break;`, followed by
+   `else D'` when `default:` holds a body (the same without its `break;`) and by nothing when it holds `break;`
+   alone. Each run gets its own table, predicate and flag (steps 3 and 4). The selector's struct may instead be
+   a `const` local of the function that calls it (`const S s = { ..., compose, ... };`, filled by this one
+   initialiser and never by assignment): the flags are further members of `S`, last in its member order, and the
+   initialiser gets `Is<Name>(compose)` for each, in that order, with `compose` the initialiser's own value for
+   that member; that function runs once per row, as the one that fills `S` in step 1.
+
 **Before:**
 
 ```c
@@ -13835,6 +13847,13 @@ with `UnionCoverageOperators[]`, `IsUnionCoverageOperator(compose)`, the member 
 - The fill is a store of a `MagickBooleanType` into a member of a struct declared in the loop body, executed once per
   row where the other members are; no shared variable is read or written, so the OpenMP argument of the
   other recipes that fill that struct holds.
+- If/else form. A `switch` selects exactly one group by the value of its selector, and every group ends in its one
+  `break;` (step 8), which leaves the `switch` and nothing else, so the selected group's body runs once and
+  control reaches the statement after the `switch`. The chain tests the runs' flags in order; the runs' label
+  sets and `default:`'s are disjoint, each flag is true exactly when the selector equals one of its run's
+  labels, so exactly the body the `switch` chose runs, `else` taking the selector values that no run names, as
+  `default:` did; the statements after it run in every case, as after the `switch`. The selector is `const` or
+  written by no group, so it is the same value in the flags and the original test.
 - Cost: one table scan per row replaces one `switch` per pixel; every pixel now tests one member.
 
 **Evidence level:** oracle (the cases that reach the function), steps 6 and 7 by script, the
@@ -14896,3 +14915,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
 | 2026-11-13 | NEW | ME | Merge Mirrored Twins That Leave Through a Constant Return: copies of one block that leave the function through `return(c);` (Recipe Y steps 1 and 2; `c` may differ between copies), in two mirrored sides (Recipe MT step 1's alignment) whose copies differ in one member-access value, become one `static inline MagickBooleanType` function taking the input struct, a constant selector, the value and the written variable by pointer; each copy becomes `if (Helper(...) == MagickFalse) return(c);` with its own constant. *Careful* gives the argument (the conditional evaluates only the copy's run, in its order; the constants stay in the callers) | `visual-effects-plasma.c`'s `PlasmaImageProxy` (campaign A, W21 round four, lane d): four edge-pixel blocks (left/right along a column, bottom/top along a row) that Recipes MT, Y, SV and W refuse; helpers per side cloned (8.15), precomputed coordinates moved `errno`-writing casts; a probe of the chain this recipe opens: 8.50 to 9.09 | mandate (2026-10-24) |
 | 2026-11-12 | NEW | RH | Hoist a Label Run into a Row Flag: a run of eight or more `case` labels of `row->compose` in a `static void` per-pixel function becomes a `static const` table and a membership predicate (Recipe TB's loop), evaluated once per row where the row struct is filled into a new `MagickBooleanType` member, and the group becomes `if (row->flag != MagickFalse) { B return; }` ahead of the `switch`. *Careful* gives the argument (`compose` is not written after the fill, labels disjoint, the function ends where the `switch` ended) | `composite.c`'s `SetCompositeCoverage` (32 labels) and `CompositeAlphaChannel` (11 and 7) (campaign A, W19 lane c): Recipe TB's loop on the pixel path measured +46 to +91 instructions per pixel (+4% to +9%), Recipe LP keeps the finding; with the flag, +0.5% to +1.5% of a 400x400 composite, no new finding; a hybrid probe with the other five Complex Methods of the pixel path emptied: 3.69 to 3.83 | owner |
+| 2026-11-12 | AMEND | RH | New step 8, the if/else form: the `switch` may stand before other statements and hold up to two runs, each with its own table, predicate and flag; its groups become an `if` / `else if` / `else` chain, and the flags may be filled by the initialiser of a `const` struct local. *Careful* gives the argument (one group selected by value; groups disjoint; the statements after run in every case) | `composite.c`'s `SetVirtualCompositeChannels` (a nine-label run inside the channel loop, `virtual_inputs` initialised once per row) and `CompositeImagePixel` (two runs of six and four labels that set `Si`, `Di` and the pixel infos before the channel loop) (campaign A, W19 lane c): both are Complex Methods held by their label runs, and the stub of the five remaining pixel-path methods measured 3.83 | owner |
