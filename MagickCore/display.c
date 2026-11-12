@@ -11106,6 +11106,33 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   image_info=DestroyImageInfo(image_info);
   return(nexus);
 }
+
+static void XUpdateMagnifyInfo(Display *display,XWindows *windows,const int x,
+  const int y)
+{
+  char
+    text[MagickPathExtent];
+
+  if (windows->info.mapped != MagickFalse)
+    {
+      if ((x < (windows->info.x+(int) windows->info.width)) &&
+          (y < (windows->info.y+(int) windows->info.height)))
+        (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+    }
+  else
+    if ((x > (windows->info.x+(int) windows->info.width)) ||
+        (y > (windows->info.y+(int) windows->info.height)))
+      (void) XMapWindow(display,windows->info.id);
+  if (windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
+        windows->magnify.x,windows->magnify.y);
+      XInfoWidget(display,windows,text);
+    }
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -11142,9 +11169,6 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
 static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
-  char
-    text[MagickPathExtent];
-
   int
     x,
     y;
@@ -11166,25 +11190,7 @@ static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
     /*
       Map and unmap Info widget as text cursor crosses its boundaries.
     */
-    if (windows->info.mapped != MagickFalse)
-      {
-        if ((x < (windows->info.x+(int) windows->info.width)) &&
-            (y < (windows->info.y+(int) windows->info.height)))
-          (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-      }
-    else
-      if ((x > (windows->info.x+(int) windows->info.width)) ||
-          (y > (windows->info.y+(int) windows->info.height)))
-        (void) XMapWindow(display,windows->info.id);
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-          windows->magnify.x,windows->magnify.y);
-        XInfoWidget(display,windows,text);
-      }
+    XUpdateMagnifyInfo(display,windows,x,y);
     /*
       Wait for next event.
     */
