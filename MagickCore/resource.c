@@ -1347,6 +1347,23 @@ MagickPrivate void ResourceComponentTerminus(void)
 %    o limit: the maximum limit for the resource.
 %
 */
+static MagickSizeType GetPolicyLimit(const char *name,
+  const MagickSizeType limit)
+{
+  char
+    *value;
+
+  MagickSizeType
+    policy_limit;
+
+  value=GetPolicyValue(name);
+  if (value == (char *) NULL)
+    return(limit);
+  policy_limit=MagickMin(limit,StringToMagickSizeType(value,100.0));
+  value=DestroyString(value);
+  return(policy_limit);
+}
+
 MagickExport MagickBooleanType SetMagickResourceLimit(const ResourceType type,
   const MagickSizeType limit)
 {
@@ -1363,84 +1380,44 @@ MagickExport MagickBooleanType SetMagickResourceLimit(const ResourceType type,
   {
     case AreaResource:
     {
-      value=GetPolicyValue("resource:area");
-      if (value == (char *) NULL)
-        resource_info.area_limit=limit;
-      else
-        resource_info.area_limit=MagickMin(limit,StringToMagickSizeType(value,
-          100.0));
+      resource_info.area_limit=GetPolicyLimit("resource:area",limit);
       break;
     }
     case DiskResource:
     {
-      value=GetPolicyValue("resource:disk");
-      if (value == (char *) NULL)
-        resource_info.disk_limit=limit;
-      else
-        resource_info.disk_limit=MagickMin(limit,StringToMagickSizeType(value,
-          100.0));
+      resource_info.disk_limit=GetPolicyLimit("resource:disk",limit);
       break;
     }
     case FileResource:
     {
-      value=GetPolicyValue("resource:file");
-      if (value == (char *) NULL)
-        resource_info.file_limit=limit;
-      else
-        resource_info.file_limit=MagickMin(limit,StringToMagickSizeType(value,
-          100.0));
+      resource_info.file_limit=GetPolicyLimit("resource:file",limit);
       break;
     }
     case HeightResource:
     {
-      value=GetPolicyValue("resource:height");
-      if (value == (char *) NULL)
-        resource_info.height_limit=limit;
-      else
-        resource_info.height_limit=MagickMin(limit,StringToMagickSizeType(
-          value,100.0));
+      resource_info.height_limit=GetPolicyLimit("resource:height",limit);
       resource_info.height_limit=MagickMin(resource_info.height_limit,
         (MagickSizeType) MAGICK_SSIZE_MAX);
       break;
     }
     case ListLengthResource:
     {
-      value=GetPolicyValue("resource:list-length");
-      if (value == (char *) NULL)
-        resource_info.list_length_limit=limit;
-      else
-        resource_info.list_length_limit=MagickMin(limit,
-          StringToMagickSizeType(value,100.0));
+      resource_info.list_length_limit=GetPolicyLimit("resource:list-length",limit);
       break;
     }
     case MapResource:
     {
-      value=GetPolicyValue("resource:map");
-      if (value == (char *) NULL)
-        resource_info.map_limit=limit;
-      else
-        resource_info.map_limit=MagickMin(limit,StringToMagickSizeType(
-          value,100.0));
+      resource_info.map_limit=GetPolicyLimit("resource:map",limit);
       break;
     }
     case MemoryResource:
     {
-      value=GetPolicyValue("resource:memory");
-      if (value == (char *) NULL)
-        resource_info.memory_limit=limit;
-      else
-        resource_info.memory_limit=MagickMin(limit,StringToMagickSizeType(
-          value,100.0));
+      resource_info.memory_limit=GetPolicyLimit("resource:memory",limit);
       break;
     }
     case ThreadResource:
     {
-      value=GetPolicyValue("resource:thread");
-      if (value == (char *) NULL)
-        resource_info.thread_limit=limit;
-      else
-        resource_info.thread_limit=MagickMin(limit,StringToMagickSizeType(
-          value,100.0));
+      resource_info.thread_limit=GetPolicyLimit("resource:thread",limit);
       if (resource_info.thread_limit > GetOpenMPMaximumThreads())
         resource_info.thread_limit=GetOpenMPMaximumThreads();
       else
@@ -1470,12 +1447,7 @@ MagickExport MagickBooleanType SetMagickResourceLimit(const ResourceType type,
     }
     case WidthResource:
     {
-      value=GetPolicyValue("resource:width");
-      if (value == (char *) NULL)
-        resource_info.width_limit=limit;
-      else
-        resource_info.width_limit=MagickMin(limit,StringToMagickSizeType(value,
-          100.0));
+      resource_info.width_limit=GetPolicyLimit("resource:width",limit);
       resource_info.width_limit=MagickMin(resource_info.width_limit,
         (MagickSizeType) MAGICK_SSIZE_MAX);
       break;
