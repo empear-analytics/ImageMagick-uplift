@@ -1332,6 +1332,19 @@ static const char *ReadMessageName(const char *q,const size_t extent,
   return(q);
 }
 
+static const char *SkipLocaleAttributes(const char *q,const size_t extent,
+  char *token)
+{
+  while ((*token != '>') && (*q != '\0'))
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    if (*token != '=')
+      continue;
+    (void) GetNextToken(q,&q,extent,token);
+  }
+  return(q);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1440,14 +1453,7 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         /*
           Locale element.
         */
-        while ((*token != '>') && (*q != '\0'))
-        {
-          (void) CopyMagickString(keyword,token,MagickLocaleExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
-            continue;
-          (void) GetNextToken(q,&q,extent,token);
-        }
+        q=SkipLocaleAttributes(q,extent,token);
         continue;
       }
     if (LocaleCompare(keyword,"</locale>") == 0)
