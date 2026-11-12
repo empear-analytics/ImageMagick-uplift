@@ -3067,6 +3067,85 @@ static void UpdateColorBrowserLayout(const ColorBrowserContext *context,
     }
 }
 
+static void RedrawColorBrowserWidget(const ColorBrowserContext *context,
+  const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const grab_info = widgets->grab_info,
+    *const reset_info = widgets->reset_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info,
+    *const slider_info = widgets->slider_info,
+    *const scroll_info = widgets->scroll_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info,
+    *const text_info = widgets->text_info,
+    *const selection_info = widgets->selection_info;
+
+  int
+    x,
+    y;
+
+  if ((*state) & RedrawWidgetState)
+    {
+      /*
+        Redraw Color Browser window.
+      */
+      x=QuantumMargin;
+      y=(*text_info).y+(int) (((*text_info).height-height) >> 1)+
+        font_info->ascent;
+      (void) XDrawString(display,windows->widget.id,
+        windows->widget.annotate_context,x,y,ColorPatternText,
+        Extent(ColorPatternText));
+      (void) CopyMagickString((*text_info).text,glob_pattern,MagickPathExtent);
+      XDrawWidgetText(display,&windows->widget,text_info);
+      XDrawBeveledButton(display,&windows->widget,grab_info);
+      XDrawBeveledButton(display,&windows->widget,reset_info);
+      XDrawBeveledMatte(display,&windows->widget,list_info);
+      XDrawBeveledMatte(display,&windows->widget,scroll_info);
+      XDrawTriangleNorth(display,&windows->widget,north_info);
+      XDrawBeveledButton(display,&windows->widget,slider_info);
+      XDrawTriangleSouth(display,&windows->widget,south_info);
+      x=QuantumMargin;
+      y=(*reply_info).y+(int) (((*reply_info).height-height) >> 1)+
+        font_info->ascent;
+      (void) XDrawString(display,windows->widget.id,
+        windows->widget.annotate_context,x,y,ColornameText,
+        Extent(ColornameText));
+      XDrawBeveledMatte(display,&windows->widget,reply_info);
+      XDrawMatteText(display,&windows->widget,reply_info);
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+      (*selection_info).id=(~0);
+      (*state)|=RedrawActionState;
+      (*state)|=RedrawListState;
+      (*state)&=(unsigned int) (~RedrawWidgetState);
+    }
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3078,10 +3157,6 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
 
   ExceptionInfo
     *exception;
-
-  int
-    x,
-    y;
 
   int
     i;
@@ -3263,41 +3338,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   do
   {
     UpdateColorBrowserLayout(&color_context,&color_widgets);
-    if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw Color Browser window.
-        */
-        x=QuantumMargin;
-        y=text_info.y+(int) ((text_info.height-height) >> 1)+font_info->ascent;
-        (void) XDrawString(display,windows->widget.id,
-          windows->widget.annotate_context,x,y,ColorPatternText,
-          Extent(ColorPatternText));
-        (void) CopyMagickString(text_info.text,glob_pattern,MagickPathExtent);
-        XDrawWidgetText(display,&windows->widget,&text_info);
-        XDrawBeveledButton(display,&windows->widget,&grab_info);
-        XDrawBeveledButton(display,&windows->widget,&reset_info);
-        XDrawBeveledMatte(display,&windows->widget,&list_info);
-        XDrawBeveledMatte(display,&windows->widget,&scroll_info);
-        XDrawTriangleNorth(display,&windows->widget,&north_info);
-        XDrawBeveledButton(display,&windows->widget,&slider_info);
-        XDrawTriangleSouth(display,&windows->widget,&south_info);
-        x=QuantumMargin;
-        y=reply_info.y+(int) ((reply_info.height-height) >> 1)+
-          font_info->ascent;
-        (void) XDrawString(display,windows->widget.id,
-          windows->widget.annotate_context,x,y,ColornameText,
-          Extent(ColornameText));
-        XDrawBeveledMatte(display,&windows->widget,&reply_info);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        XDrawBeveledButton(display,&windows->widget,&action_info);
-        XDrawBeveledButton(display,&windows->widget,&cancel_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        selection_info.id=(~0);
-        state|=RedrawActionState;
-        state|=RedrawListState;
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
+    RedrawColorBrowserWidget(&color_context,&color_widgets);
     if (state & UpdateListState)
       {
         const ColorBrowserUpdateTargets
