@@ -71,6 +71,7 @@ $call Make effect-preview.c
 $call Make effect-blur.c
 $call Make effect-blur-adaptive.c
 $call Make enhance.c
+$call Make enhance-color.c
 $call Make enhance-clahe.c
 $call Make enhance-tone.c
 $call Make enhance-level-colors.c

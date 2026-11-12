@@ -163,6 +163,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/effect-blur-adaptive.c \
   MagickCore/effect.h \
   MagickCore/enhance.c \
+  MagickCore/enhance-color.c \
   MagickCore/enhance-clahe.c \
   MagickCore/enhance-tone.c \
   MagickCore/enhance-level-colors.c \
