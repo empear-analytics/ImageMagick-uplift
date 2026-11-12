@@ -2167,6 +2167,42 @@ MagickPrivate void XDisplayImageInfo(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _XDitherTables
+{
+  int
+    i,
+    j;
+
+  const short
+    (*dither_red)[16];
+
+  unsigned char
+    *(*red_map)[16];
+} XDitherTables;
+
+static void SetRedDitherEntry(const XDitherTables *tables,const int x)
+{
+  const int
+    i = tables->i,
+    j = tables->j;
+
+  const short
+    (*dither_red)[16] = tables->dither_red;
+
+  unsigned char
+    *(*red_map)[16] = tables->red_map;
+
+  int
+    value;
+
+  value=x-16;
+  if (x < 48)
+    value=x/2+8;
+  value+=dither_red[i][j];
+  red_map[i][j][x]=(unsigned char)
+    ((value < 0) ? 0 : (value > 255) ? 255 : value);
+}
+
 static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
 {
   static const short int
@@ -2216,6 +2252,9 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   unsigned int
     scanline_pad;
 
+  XDitherTables
+    tables;
+
   /*
     Allocate and initialize dither maps.
   */
@@ -2234,14 +2273,14 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   */
   for (i=0; i < 2; i++)
     for (j=0; j < 16; j++)
+    {
+      tables.i=i;
+      tables.j=j;
+      tables.dither_red=dither_red;
+      tables.red_map=red_map;
       for (x=0; x < 256; x++)
       {
-        value=x-16;
-        if (x < 48)
-          value=x/2+8;
-        value+=dither_red[i][j];
-        red_map[i][j][x]=(unsigned char)
-          ((value < 0) ? 0 : (value > 255) ? 255 : value);
+        SetRedDitherEntry(&tables,x);
         value=x-16;
         if (x < 48)
           value=x/2+8;
@@ -2255,6 +2294,7 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
         blue_map[i][j][x]=(unsigned char)
           ((value < 0) ? 0 : (value > 255) ? 255 : value);
       }
+    }
   /*
     Dither image.
   */
