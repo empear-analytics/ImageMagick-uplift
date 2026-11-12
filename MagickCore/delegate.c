@@ -2703,6 +2703,28 @@ static void SetDelegateInfoAttribute(DelegateInfo *delegate_info,
     SetDelegateThreadSupport(delegate_info,token);
 }
 
+static MagickBooleanType SkipDelegateElement(const char **q,
+  const char *keyword,const size_t extent,char *token)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    {
+      /*
+        DOCTYPE element.
+      */
+      *q=SkipDoctypeElement(*q);
+      return(MagickTrue);
+    }
+  if (LocaleNCompare(keyword,"<!--",4) == 0)
+    {
+      /*
+        Comment element.
+      */
+      *q=SkipCommentElement(*q,extent,token);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static MagickBooleanType IsIncludeFileAttribute(const char **q,
   const size_t extent,char *keyword,char *token)
 {
@@ -2784,22 +2806,8 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        /*
-          DOCTYPE element.
-        */
-        q=SkipDoctypeElement(q);
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        q=SkipCommentElement(q,extent,token);
-        continue;
-      }
+    if (SkipDelegateElement(&q,keyword,extent,token) != MagickFalse)
+      continue;
     if (LocaleCompare(keyword,"<include") == 0)
       {
         /*
