@@ -6891,6 +6891,63 @@ static void XReadStippleFile(const DrawEditContext *context,
       filename);
 }
 
+static void XSelectDrawStipple(const DrawEditContext *context,const int id,
+  const DrawStyleTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const DrawMenu = context->DrawMenu;
+
+  char
+    *const command = context->command;
+
+  const Window
+    root_window = context->root_window;
+
+  Pixmap
+    *const stipple = targets->stipple;
+
+  const char
+    *StipplesMenu[] =
+    {
+      "Brick",
+      "Diagonal",
+      "Scales",
+      "Vertical",
+      "Wavy",
+      "Translucent",
+      "Opaque",
+      (char *) NULL,
+      (char *) NULL,
+    };
+
+  int
+    entry;
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  StipplesMenu[7]="Open...";
+  entry=XMenuWidget(display,windows,DrawMenu[id],StipplesMenu,
+    command);
+  if (entry < 0)
+    return;
+  if ((*stipple) != (Pixmap) NULL)
+    (void) XFreePixmap(display,(*stipple));
+  (*stipple)=(Pixmap) NULL;
+  if (entry != 7)
+    {
+      (*stipple)=XCreateStippleBitmap(display,root_window,entry);
+      return;
+    }
+  XReadStippleFile(context,targets);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -6938,7 +6995,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
     cursor;
 
   int
-    entry,
     id,
     number_coordinates,
     x,
@@ -7085,37 +7141,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
             }
             case DrawStippleCommand:
             {
-              const char
-                *StipplesMenu[] =
-                {
-                  "Brick",
-                  "Diagonal",
-                  "Scales",
-                  "Vertical",
-                  "Wavy",
-                  "Translucent",
-                  "Opaque",
-                  (char *) NULL,
-                  (char *) NULL,
-                };
-
-              /*
-                Select a command from the pop-up menu.
-              */
-              StipplesMenu[7]="Open...";
-              entry=XMenuWidget(display,windows,DrawMenu[id],StipplesMenu,
-                command);
-              if (entry < 0)
-                break;
-              if (stipple != (Pixmap) NULL)
-                (void) XFreePixmap(display,stipple);
-              stipple=(Pixmap) NULL;
-              if (entry != 7)
-                {
-                  stipple=XCreateStippleBitmap(display,root_window,entry);
-                  break;
-                }
-              XReadStippleFile(&draw_context,&style_targets);
+              XSelectDrawStipple(&draw_context,id,&style_targets);
               break;
             }
             case DrawWidthCommand:
