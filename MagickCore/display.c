@@ -17677,6 +17677,13 @@ static Image *XMapImageWindow(const DisplayEventContext *context,
   windows->image.mapped=MagickTrue;
   return(nexus);
 }
+
+static void XFocusImageWindow(Display *display,XWindows *windows)
+{
+  if (windows->backdrop.id != (Window) NULL)
+    (void) XSetInputFocus(display,windows->image.id,RevertToParent,
+      CurrentTime);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -19397,17 +19404,13 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xunmap.window == windows->popup.id)
           {
-            if (windows->backdrop.id != (Window) NULL)
-              (void) XSetInputFocus(display,windows->image.id,RevertToParent,
-                CurrentTime);
+            XFocusImageWindow(display,windows);
             windows->popup.mapped=MagickFalse;
             break;
           }
         if (event.xunmap.window == windows->widget.id)
           {
-            if (windows->backdrop.id != (Window) NULL)
-              (void) XSetInputFocus(display,windows->image.id,RevertToParent,
-                CurrentTime);
+            XFocusImageWindow(display,windows);
             windows->widget.mapped=MagickFalse;
             break;
           }
