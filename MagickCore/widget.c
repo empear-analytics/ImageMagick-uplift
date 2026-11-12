@@ -4904,6 +4904,47 @@ static void UpdateDialogLayout(const DialogContext *context,
     }
 }
 
+static void RedrawDialogWidget(const DialogContext *context,
+  const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    anomaly = context->anomaly;
+
+  XWidgetInfo
+    *const special_info = targets->special_info,
+    *const action_info = targets->action_info,
+    *const cancel_info = targets->cancel_info,
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
+
+  XWidgetInfo
+    *const text_info = targets->text_info;
+
+  if ((*state) & RedrawWidgetState)
+    {
+      /*
+        Redraw Dialog widget.
+      */
+      XDrawWidgetText(display,&windows->widget,text_info);
+      XDrawBeveledMatte(display,&windows->widget,reply_info);
+      XDrawMatteText(display,&windows->widget,reply_info);
+      if (anomaly)
+        XDrawBeveledButton(display,&windows->widget,special_info);
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+      (*state)&=(unsigned int) (~RedrawWidgetState);
+    }
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -5028,21 +5069,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   do
   {
     UpdateDialogLayout(&context,&targets);
-    if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw Dialog widget.
-        */
-        XDrawWidgetText(display,&windows->widget,&text_info);
-        XDrawBeveledMatte(display,&windows->widget,&reply_info);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        if (anomaly)
-          XDrawBeveledButton(display,&windows->widget,&special_info);
-        XDrawBeveledButton(display,&windows->widget,&action_info);
-        XDrawBeveledButton(display,&windows->widget,&cancel_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
+    RedrawDialogWidget(&context,&targets);
     /*
       Wait for next event.
     */
