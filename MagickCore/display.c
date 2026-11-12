@@ -15565,6 +15565,24 @@ static void XScreenButton(Display *display,XWindows *windows,XEvent *event,
     }
 }
 
+static void XScreenClientMessage(Display *display,XWindows *windows,
+  XEvent *event)
+{
+  /*
+    If client window delete message, exit.
+  */
+  if (event->xclient.message_type != windows->wm_protocols)
+    return;
+  if (*event->xclient.data.l != (long) windows->wm_delete_window)
+    return;
+  if (event->xclient.window == windows->magnify.id)
+    {
+      (void) XWithdrawWindow(display,windows->magnify.id,
+        windows->magnify.screen);
+      return;
+    }
+}
+
 static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
@@ -15585,19 +15603,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
     }
     case ClientMessage:
     {
-      /*
-        If client window delete message, exit.
-      */
-      if (event->xclient.message_type != windows->wm_protocols)
-        break;
-      if (*event->xclient.data.l != (long) windows->wm_delete_window)
-        break;
-      if (event->xclient.window == windows->magnify.id)
-        {
-          (void) XWithdrawWindow(display,windows->magnify.id,
-            windows->magnify.screen);
-          break;
-        }
+      XScreenClientMessage(display,windows,event);
       break;
     }
     case ConfigureNotify:
