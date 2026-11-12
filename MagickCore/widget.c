@@ -3441,6 +3441,66 @@ static void UpdateColorBrowserSlider(const ColorBrowserContext *context,
   (*state)&=(unsigned int) (~UpdateListState);
 }
 
+static MagickBooleanType WaitColorEvent(const ColorBrowserContext *context,
+  XEvent *event,const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const colors = widgets->colors;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  if ((*north_info).raised && (*south_info).raised)
+    (void) XIfEvent(display,event,XScreenEvent,(char *) windows);
+  else
+    {
+      /*
+        Brief delay before advancing scroll bar.
+      */
+      XDelay(display,(*delay));
+      (*delay)=SuspendTime;
+      (void) XCheckIfEvent(display,event,XScreenEvent,(char *) windows);
+      if (((*north_info).raised == MagickFalse) && ((*slider_info).id > 0))
+        {
+          /*
+            Move slider up.
+          */
+          (*slider_info).id--;
+          (*state)|=RedrawListState;
+        }
+      if (((*south_info).raised == MagickFalse) &&
+          ((*slider_info).id < (int) (*colors)))
+        {
+          /*
+            Move slider down.
+          */
+          (*slider_info).id++;
+          (*state)|=RedrawListState;
+        }
+      if ((*event).type != ButtonRelease)
+        return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3646,36 +3706,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     /*
       Wait for next event.
     */
-    if (north_info.raised && south_info.raised)
-      (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    else
-      {
-        /*
-          Brief delay before advancing scroll bar.
-        */
-        XDelay(display,delay);
-        delay=SuspendTime;
-        (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            slider_info.id--;
-            state|=RedrawListState;
-          }
-        if ((south_info.raised == MagickFalse) &&
-            (slider_info.id < (int) colors))
-          {
-            /*
-              Move slider down.
-            */
-            slider_info.id++;
-            state|=RedrawListState;
-          }
-        if (event.type != ButtonRelease)
-          continue;
-      }
+    if (WaitColorEvent(&color_context,&event,&color_widgets) != MagickFalse)
+      continue;
     switch (event.type)
     {
       case ButtonPress:
