@@ -10309,9 +10309,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   font_context.text=text;
   if (RespondToFontEvents(&font_context,&targets,&font_widgets) == MagickFalse)
     return;
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
-  XCheckRefreshWindows(display,windows);
+  WithdrawBrowserWidget(display,windows);
   /*
     Free font list.
   */
