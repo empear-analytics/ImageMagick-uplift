@@ -496,6 +496,30 @@ static MagickBooleanType FinishImageDepth(Image *image,const size_t depth,
   return(status);
 }
 
+#if !defined(MAGICKCORE_HDRI_SUPPORT)
+static void MapPixelToDepth(const Image *image,const Quantum *depth_map,
+  Quantum *q)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel
+      channel;
+
+    PixelTrait
+      traits;
+
+    channel=GetPixelChannelChannel(image,j);
+    traits=GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[j]=depth_map[ScaleQuantumToMap(q[j])];
+  }
+}
+#endif
+
 MagickExport MagickBooleanType SetImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -586,23 +610,7 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
           }
         for (x=0; x < (ssize_t) image->columns; x++)
         {
-          ssize_t
-            j;
-
-          for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-          {
-            PixelChannel
-              channel;
-
-            PixelTrait
-              traits;
-
-            channel=GetPixelChannelChannel(image,j);
-            traits=GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) == 0)
-              continue;
-            q[j]=depth_map[ScaleQuantumToMap(q[j])];
-          }
+          MapPixelToDepth(image,depth_map,q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
