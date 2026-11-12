@@ -2103,7 +2103,8 @@ typedef struct _ColorBrowserTargets
     *delay;
 
   XWidgetInfo
-    *south_info;
+    *south_info,
+    *mode_info;
 } ColorBrowserTargets;
 
 typedef struct _ColorBrowserContext
@@ -2612,6 +2613,62 @@ static void PressColorBrowserReply(const ColorBrowserContext *context,
     windows->widget.id,event.xbutton.time);
 }
 
+static void PressColorBrowserButtons(const ColorBrowserContext *context,
+  const XEvent event,const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const grab_info = widgets->grab_info,
+    *const reset_info = widgets->reset_info,
+    *const mode_info = widgets->mode_info;
+
+  if (MatteIsActive((*grab_info),event.xbutton))
+    {
+      /*
+        User pressed Grab button.
+      */
+      (*grab_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,grab_info);
+      return;
+    }
+  if (MatteIsActive((*reset_info),event.xbutton))
+    {
+      /*
+        User pressed Reset button.
+      */
+      (*reset_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,reset_info);
+      return;
+    }
+  if (MatteIsActive((*mode_info),event.xbutton))
+    {
+      /*
+        User pressed mode button.
+      */
+      CopyColorBrowserMode((*mode_info),(*reply_info));
+      (void) CopyMagickString(primary_selection,(*reply_info).text,
+        MagickPathExtent);
+      (void) XSetSelectionOwner(display,XA_PRIMARY,windows->widget.id,
+        event.xbutton.time);
+      (*reply_info).highlight=XGetSelectionOwner(display,XA_PRIMARY) ==
+        windows->widget.id ? MagickTrue : MagickFalse;
+      (*reply_info).marker=(*reply_info).text;
+      (*reply_info).cursor=(*reply_info).text+Extent((*reply_info).text);
+      XDrawMatteText(display,&windows->widget,reply_info);
+      return;
+    }
+  PressColorBrowserReply(context,event,widgets);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2694,8 +2751,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const ColorBrowserTargets
     color_widgets = { &reply_info, &state,
       &grab_info, &reset_info, &action_info, &cancel_info, &slider_info,
-      &colors, &scroll_info, &visible_colors, &north_info, &delay,
-      &south_info };
+      &colors, &scroll_info, &visible_colors, &north_info, &delay, &south_info,
+      &mode_info };
 
   ColorBrowserContext
     color_context;
@@ -3190,42 +3247,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
             SelectFontBrowserEntry(&press,glob_pattern,&targets);
             break;
           }
-        if (MatteIsActive(grab_info,event.xbutton))
-          {
-            /*
-              User pressed Grab button.
-            */
-            grab_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&grab_info);
-            break;
-          }
-        if (MatteIsActive(reset_info,event.xbutton))
-          {
-            /*
-              User pressed Reset button.
-            */
-            reset_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&reset_info);
-            break;
-          }
-        if (MatteIsActive(mode_info,event.xbutton))
-          {
-            /*
-              User pressed mode button.
-            */
-            CopyColorBrowserMode(mode_info,reply_info);
-            (void) CopyMagickString(primary_selection,reply_info.text,
-              MagickPathExtent);
-            (void) XSetSelectionOwner(display,XA_PRIMARY,windows->widget.id,
-              event.xbutton.time);
-            reply_info.highlight=XGetSelectionOwner(display,XA_PRIMARY) ==
-              windows->widget.id ? MagickTrue : MagickFalse;
-            reply_info.marker=reply_info.text;
-            reply_info.cursor=reply_info.text+Extent(reply_info.text);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-            break;
-          }
-        PressColorBrowserReply(&color_context,event,&color_widgets);
+        PressColorBrowserButtons(&color_context,event,&color_widgets);
         break;
       }
       case ButtonRelease:
