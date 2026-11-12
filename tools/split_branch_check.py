@@ -15,6 +15,9 @@ functions out in does not matter), line by line. Allowed differences, each count
   - the label of a call or jump the linker resolves (`call <name>` followed by its relocation line: objdump prints the
     symbol at the next instruction, which for a call ending a function is whichever function the object lays out next);
     the relocation line that names the real target is compared as every other line,
+  - the alignment padding (`nop` forms) that ends a function after its last `ret`, `jmp` or noreturn call: how much
+    depends on the function the object lays out next, and nothing executes it (counted as functions whose padding
+    differs),
   - a string-literal label number (clang's .L.str.<n>), when both labels hold the same bytes: each
     reference is resolved to the NUL-terminated string the label points at (the path the object was
     compiled from reads as __FILE__ in both), so a changed literal still prints DIFFERENT.
@@ -39,6 +42,23 @@ def string_labels(obj, src):
     sections = {sec: section_bytes(obj, sec) for _, sec, _ in symbols}
     texts = {label: sections[sec][int(at, 16):].split(b"\0", 1)[0] for at, sec, label in symbols}
     return {label: "__FILE__" if text == src.encode() else text.hex() for label, text in texts.items()}
+
+PADDING = re.compile(r"(data16 )*(cs )?(nop\w*(\s.*)?|xchg\s+%ax,%ax)\s*$")
+
+def strip_padding(lines):
+    """Remove from LINES the alignment padding that ends a function and return how many lines it was. The assembler
+    pads a function out to the alignment of the next one, so how many bytes of `nop` stand after the last instruction
+    depends on what the object lays out next (none when the function is last in its section), not on the code. It
+    follows an instruction after which control does not continue (`ret`, an unconditional `jmp`, `ud2`, or a call
+    that ends the function, to a function such as __assert_fail that does not return) and is never executed; a
+    `nop` anywhere else stays in the line compare."""
+    n = len(lines)
+    while n > 1 and PADDING.match(lines[n - 1]): n -= 1
+    cut = len(lines) - n
+    last = next((x for x in reversed(lines[:n]) if not x.startswith("R_")), "")
+    if cut and not re.match(r"(ret|retq|jmp|ud2|call|rep ret|bnd jmp|notrack jmp)\b", last): return 0
+    del lines[n:]
+    return cut
 
 def mark_call_placeholders(lines):
     """A call or jump the assembler left to the linker has an operand of 0, which objdump prints as the symbol at the
@@ -67,8 +87,9 @@ def disasm(obj, names, src):
         line = re.sub(r"\.rodata\+0x([0-9a-f]+)", lambda mm: ".rodata[%s]" % ro[int(mm.group(1), 16):int(mm.group(1), 16) + 16].hex(), line)
         line = re.sub(r"(\.L\.str(?:\.\d+)?)(?=[-+\s]|$)", lambda mm: "%s[%s]" % (mm.group(1), strs.get(mm.group(1), "?")), line)
         out[cur].append(line)
+    pads = {name: strip_padding(lines) for name, lines in out.items()}
     for lines in out.values(): mark_call_placeholders(lines)
-    return out
+    return out, pads
 
 def label_kind(x, y):
     """The kind of label number X and Y differ in alone, or None."""
@@ -144,11 +165,13 @@ def main():
     compile_both(bdir, old, new, tmp)
     nm = sh("nm", "--defined-only", os.path.join(tmp, "new.o"), text=True).stdout.split("\n")
     names = {l.split()[2] for l in nm if len(l.split()) == 3 and l.split()[1] in "tT"}
-    a = disasm(os.path.join(tmp, "old.o"), names, oldsrc)
-    b = disasm(os.path.join(tmp, "new.o"), names, os.path.join(root, new))
+    a, pads_a = disasm(os.path.join(tmp, "old.o"), names, oldsrc)
+    b, pads_b = disasm(os.path.join(tmp, "new.o"), names, os.path.join(root, new))
     la, lb = sum(map(len, a.values())), sum(map(len, b.values()))
     print("%s: %d functions, %d vs %d lines" % (build, len(names), la, lb))
     kinds, bad = compare_by_name(a, b)
+    moved = sum(1 for n in pads_a if pads_a[n] != pads_b.get(n, 0))
+    if moved: kinds["trailing alignment padding"] = moved
     report(kinds, bad)
 
 main()
