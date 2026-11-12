@@ -4507,6 +4507,98 @@ static ColormapInfo *FindWindowColormap(ColormapInfo *colormap_info,
   return(p);
 }
 
+typedef struct _WindowColormapInput
+{
+  Display
+    *display;
+
+  const WindowInfo
+    *window_info;
+
+  int
+    id;
+
+  XImage
+    *ximage;
+} WindowColormapInput;
+
+typedef struct _WindowColormapTargets
+{
+  unsigned int
+    *number_colors;
+
+  XColor
+    **colors;
+
+  ColormapInfo
+    **colormap_info;
+} WindowColormapTargets;
+
+static MagickBooleanType XGetWindowColormap(const WindowColormapInput *input,
+  const WindowColormapTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  const WindowInfo
+    *const window_info = input->window_info;
+
+  const int
+    id = input->id;
+
+  XImage
+    *const ximage = input->ximage;
+
+  unsigned int
+    *const number_colors = targets->number_colors;
+
+  XColor
+    **const colors = targets->colors;
+
+  ColormapInfo
+    **const colormap_info = targets->colormap_info;
+
+  if (window_info[id].colormap != (Colormap) NULL)
+    {
+      ColormapInfo
+        *p;
+
+      /*
+        Search colormap list for window colormap.
+      */
+      (*number_colors)=(unsigned int) window_info[id].visual->map_entries;
+      p=FindWindowColormap((*colormap_info),window_info,id);
+      if (p == (ColormapInfo *) NULL)
+        {
+          /*
+            Get the window colormap.
+          */
+          (*colors)=(XColor *) AcquireQuantumMemory((*number_colors),
+            sizeof(*(*colors)));
+          if ((*colors) == (XColor *) NULL)
+            {
+              XDestroyImage(ximage);
+              return(MagickFalse);
+            }
+          XInitializeWindowColors(window_info,id,(*number_colors),(*colors));
+          (void) XQueryColors(display,window_info[id].colormap,(*colors),
+            (int) (*number_colors));
+          /*
+            Append colormap to colormap list.
+          */
+          p=(ColormapInfo *) AcquireMagickMemory(sizeof(*p));
+          if (p == (ColormapInfo *) NULL)
+            return(MagickFalse);
+          p->colormap=window_info[id].colormap;
+          p->colors=(*colors);
+          p->next=(*colormap_info);
+          (*colormap_info)=p;
+        }
+      (*colors)=p->colors;
+    }
+  return(MagickTrue);
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4689,6 +4781,9 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
       XImage
         *ximage;
 
+      const WindowColormapTargets
+        targets = { &number_colors,&colors,&colormap_info };
+
       /*
         Get X image for each window in the list.
       */
@@ -4715,44 +4810,13 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
         */
         number_colors=0;
         colors=(XColor *) NULL;
-        if (window_info[id].colormap != (Colormap) NULL)
-          {
-            ColormapInfo
-              *p;
+        {
+          const WindowColormapInput
+            input = { display, window_info, id, ximage };
 
-            /*
-              Search colormap list for window colormap.
-            */
-            number_colors=(unsigned int) window_info[id].visual->map_entries;
-            p=FindWindowColormap(colormap_info,window_info,id);
-            if (p == (ColormapInfo *) NULL)
-              {
-                /*
-                  Get the window colormap.
-                */
-                colors=(XColor *) AcquireQuantumMemory(number_colors,
-                  sizeof(*colors));
-                if (colors == (XColor *) NULL)
-                  {
-                    XDestroyImage(ximage);
-                    return((Image *) NULL);
-                  }
-                XInitializeWindowColors(window_info,id,number_colors,colors);
-                (void) XQueryColors(display,window_info[id].colormap,colors,
-                  (int) number_colors);
-                /*
-                  Append colormap to colormap list.
-                */
-                p=(ColormapInfo *) AcquireMagickMemory(sizeof(*p));
-                if (p == (ColormapInfo *) NULL)
-                  return((Image *) NULL);
-                p->colormap=window_info[id].colormap;
-                p->colors=colors;
-                p->next=colormap_info;
-                colormap_info=p;
-              }
-            colors=p->colors;
-          }
+          if (XGetWindowColormap(&input,&targets) == MagickFalse)
+            return((Image *) NULL);
+        }
         /*
           Allocate image structure.
         */
