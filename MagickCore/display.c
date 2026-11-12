@@ -15622,6 +15622,28 @@ static void XScreenConfigure(Display *display,XWindows *windows,XEvent *event,
     }
 }
 
+static void XScreenExpose(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  if (event->xexpose.window == windows->image.id)
+    {
+      XRefreshWindow(display,&windows->image,event);
+      return;
+    }
+  if ((event->xexpose.window == windows->pan.id) &&
+      (event->xexpose.count == 0))
+    {
+      XDrawPanRectangle(display,windows);
+      return;
+    }
+  if ((event->xexpose.window == windows->magnify.id) &&
+      (event->xexpose.count == 0))
+    {
+      XMakeMagnifyImage(display,windows,exception);
+      return;
+    }
+}
+
 static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
@@ -15652,23 +15674,7 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
     }
     case Expose:
     {
-      if (event->xexpose.window == windows->image.id)
-        {
-          XRefreshWindow(display,&windows->image,event);
-          break;
-        }
-      if ((event->xexpose.window == windows->pan.id) &&
-          (event->xexpose.count == 0))
-        {
-          XDrawPanRectangle(display,windows);
-          break;
-        }
-      if ((event->xexpose.window == windows->magnify.id) &&
-          (event->xexpose.count == 0))
-        {
-          XMakeMagnifyImage(display,windows,exception);
-          break;
-        }
+      XScreenExpose(display,windows,event,exception);
       break;
     }
     case KeyPress:
