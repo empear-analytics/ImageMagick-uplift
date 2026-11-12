@@ -17014,6 +17014,12 @@ typedef struct _DisplayEventContext
 
   XPixelInfo
     *icon_pixel;
+
+  const char *const
+    **Menus;
+
+  DisplayCommand
+    **Commands;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -17939,6 +17945,46 @@ static MagickBooleanType XCheckImageTimer(const DisplayEventContext *context,
   return(MagickFalse);
 }
 
+static MagickBooleanType XSelectCommandMenuEntry(
+  const DisplayEventContext *context,const int id,
+  DisplayCommand *display_command)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const CommandMenu = context->CommandMenu;
+
+  char
+    *const command = context->command;
+
+  const char *const
+    **const Menus = context->Menus;
+
+  DisplayCommand
+    **const Commands = context->Commands;
+
+  int
+    entry;
+
+  if (id < MagickMenus)
+    {
+      /*
+        Select a command from a pop-up menu.
+      */
+      entry=XMenuWidget(display,windows,CommandMenu[id],Menus[id],
+        command);
+      if (entry < 0)
+        return(MagickTrue);
+      (void) CopyMagickString(command,Menus[id][entry],MagickPathExtent);
+      (*display_command)=Commands[id][entry];
+    }
+  return(MagickFalse);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -18301,7 +18347,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     *nexus;
 
   int
-    entry,
     id;
 
   KeySym
@@ -18974,6 +19019,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.icon_visual=icon_visual;
   event_context.icon_map=icon_map;
   event_context.icon_pixel=icon_pixel;
+  event_context.Menus=Menus;
+  event_context.Commands=Commands;
   do
   {
     /*
@@ -19004,18 +19051,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           continue;
         (void) CopyMagickString(command,CommandMenu[id],MagickPathExtent);
         display_command=CommandMenus[id];
-        if (id < MagickMenus)
-          {
-            /*
-              Select a command from a pop-up menu.
-            */
-            entry=XMenuWidget(display,windows,CommandMenu[id],Menus[id],
-              command);
-            if (entry < 0)
-              continue;
-            (void) CopyMagickString(command,Menus[id][entry],MagickPathExtent);
-            display_command=Commands[id][entry];
-          }
+        if (XSelectCommandMenuEntry(&event_context,id,&display_command) !=
+            MagickFalse)
+          continue;
         if (display_command != NullCommand)
           nexus=XMagickCommand(display,resource_info,windows,display_command,
             &display_image,exception);
