@@ -3903,6 +3903,78 @@ static void MoveConfirmButtons(Display *display,XWindows *windows,XEvent event,
 #define DismissButtonText  "Dismiss"
 #define YesButtonText  "Yes"
 
+typedef struct _ConfirmContext
+{
+  XWindows
+    *windows;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    height;
+
+  const char
+    *description;
+} ConfirmContext;
+
+static void UpdateConfirmButtons(const ConfirmContext *context,
+  const ConfirmTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  const char
+    *const description = context->description;
+
+  XWidgetInfo
+    *const cancel_info = targets->cancel_info,
+    *const dismiss_info = targets->dismiss_info,
+    *const yes_info = targets->yes_info;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      /*
+        Initialize button information.
+      */
+      XGetWidgetInfo(CancelButtonText,cancel_info);
+      (*cancel_info).width=(unsigned int) QuantumMargin+
+        WidgetTextWidth(font_info,CancelButtonText);
+      (*cancel_info).height=(unsigned int) ((3*height) >> 1);
+      (*cancel_info).x=(int) windows->widget.width-(int) (*cancel_info).width-
+        QuantumMargin;
+      (*cancel_info).y=(int) (windows->widget.height-
+        ((*cancel_info).height << 1));
+      (*dismiss_info)=(*cancel_info);
+      (*dismiss_info).text=(char *) DismissButtonText;
+      if (LocaleCompare(description,"Do you want to save it") == 0)
+        (*dismiss_info).text=(char *) "Don't Save";
+      (*dismiss_info).width=(unsigned int) QuantumMargin+
+        WidgetTextWidth(font_info,(*dismiss_info).text);
+      (*dismiss_info).x=(int)
+        ((windows->widget.width >> 1)-((*dismiss_info).width >> 1));
+      (*yes_info)=(*cancel_info);
+      (*yes_info).text=(char *) YesButtonText;
+      if (LocaleCompare(description,"Do you want to save it") == 0)
+        (*yes_info).text=(char *) "Save";
+      (*yes_info).width=(unsigned int) QuantumMargin+
+        WidgetTextWidth(font_info,(*yes_info).text);
+      if ((*yes_info).width < (*cancel_info).width)
+        (*yes_info).width=(*cancel_info).width;
+      (*yes_info).x=QuantumMargin;
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -3940,6 +4012,9 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
 
   const ConfirmTargets
     targets = { &cancel_info, &dismiss_info, &yes_info, &state, &confirm };
+
+  ConfirmContext
+    context;
   /*
     Determine Confirm widget attributes.
   */
@@ -4001,39 +4076,13 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   confirm=0;
   state=UpdateConfigurationState;
   XSetCursorState(display,windows,MagickTrue);
+  context.windows=windows;
+  context.font_info=font_info;
+  context.height=height;
+  context.description=description;
   do
   {
-    if (state & UpdateConfigurationState)
-      {
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(CancelButtonText,&cancel_info);
-        cancel_info.width=(unsigned int) QuantumMargin+
-          WidgetTextWidth(font_info,CancelButtonText);
-        cancel_info.height=(unsigned int) ((3*height) >> 1);
-        cancel_info.x=(int) windows->widget.width-(int) cancel_info.width-
-          QuantumMargin;
-        cancel_info.y=(int) (windows->widget.height-(cancel_info.height << 1));
-        dismiss_info=cancel_info;
-        dismiss_info.text=(char *) DismissButtonText;
-        if (LocaleCompare(description,"Do you want to save it") == 0)
-          dismiss_info.text=(char *) "Don't Save";
-        dismiss_info.width=(unsigned int) QuantumMargin+
-          WidgetTextWidth(font_info,dismiss_info.text);
-        dismiss_info.x=(int)
-          ((windows->widget.width >> 1)-(dismiss_info.width >> 1));
-        yes_info=cancel_info;
-        yes_info.text=(char *) YesButtonText;
-        if (LocaleCompare(description,"Do you want to save it") == 0)
-          yes_info.text=(char *) "Save";
-        yes_info.width=(unsigned int) QuantumMargin+
-          WidgetTextWidth(font_info,yes_info.text);
-        if (yes_info.width < cancel_info.width)
-          yes_info.width=cancel_info.width;
-        yes_info.x=QuantumMargin;
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
+    UpdateConfirmButtons(&context,&targets);
     if (state & RedrawWidgetState)
       {
         /*
