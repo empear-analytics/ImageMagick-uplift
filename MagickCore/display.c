@@ -7354,6 +7354,36 @@ static void XPreviewLongLine(const DrawEditContext *context,
       windows->image.highlight_context,&line_info);
 }
 
+static void XPreviewPoint(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const int
+    number_coordinates = preview->number_coordinates;
+
+  XPoint
+    *const coordinate_info = preview->coordinate_info;
+
+  char
+    text[MagickPathExtent];
+
+  if (number_coordinates > 1)
+    {
+      (void) XDrawLines(display,windows->image.id,
+        windows->image.highlight_context,coordinate_info,
+        number_coordinates,CoordModeOrigin);
+      (void) FormatLocaleString(text,MagickPathExtent," %+d%+d",
+        coordinate_info[number_coordinates-1].x,
+        coordinate_info[number_coordinates-1].y);
+      XInfoWidget(display,windows,text);
+    }
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7657,16 +7687,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         case PointElement:
         default:
         {
-          if (number_coordinates > 1)
-            {
-              (void) XDrawLines(display,windows->image.id,
-                windows->image.highlight_context,coordinate_info,
-                number_coordinates,CoordModeOrigin);
-              (void) FormatLocaleString(text,MagickPathExtent," %+d%+d",
-                coordinate_info[number_coordinates-1].x,
-                coordinate_info[number_coordinates-1].y);
-              XInfoWidget(display,windows,text);
-            }
+          XPreviewPoint(&draw_context,&preview_input);
           break;
         }
         case LineElement:
