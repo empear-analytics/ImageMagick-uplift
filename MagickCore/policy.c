@@ -1533,6 +1533,72 @@ static MagickSizeType GetPolicyLimit(const char *value)
   return(limit);
 }
 
+static MagickBooleanType SetCachePolicyValue(const char *name,
+  const char *value)
+{
+  if (LocaleCompare(name,"memory-map") == 0)
+    {
+      if (LocaleCompare(value,"anonymous") != 0)
+        return(MagickFalse);
+      ResetCacheAnonymousMemory();
+      ResetStreamAnonymousMemory();
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static MagickBooleanType SetResourcePolicyValue(const char *name,
+  const char *value)
+{
+  ssize_t
+    type;
+
+  type=ParseCommandOption(MagickResourceOptions,MagickFalse,name);
+  if (type >= 0)
+    {
+      MagickSizeType
+        limit;
+
+      limit=GetPolicyLimit(value);
+      if ((ResourceType) type == TimeResource)
+        limit=(MagickSizeType) ParseMagickTimeToLive(value);
+      return(SetMagickResourceLimit((ResourceType) type,limit));
+    }
+  return(MagickFalse);
+}
+
+static MagickBooleanType SetSystemPolicyValue(const char *name,
+  const char *value)
+{
+  if (LocaleCompare(name,"max-memory-request") == 0)
+    {
+      SetMaxMemoryRequest(GetPolicyLimit(value));
+      return(MagickTrue);
+    }
+  if (LocaleCompare(name,"max-profile-size") == 0)
+    {
+      SetMaxProfileSize(GetPolicyLimit(value));
+      return(MagickTrue);
+    }
+  if (LocaleCompare(name,"memory-map") == 0)
+    {
+      if (LocaleCompare(value,"anonymous") != 0)
+        return(MagickFalse);
+      ResetVirtualAnonymousMemory();
+      return(MagickTrue);
+    }
+  if (LocaleCompare(name,"precision") == 0)
+    {
+      int
+        limit;
+
+      limit=StringToInteger(value);
+      SetMagickPrecision(limit);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1577,65 +1643,11 @@ MagickExport MagickBooleanType SetMagickSecurityPolicyValue(
   switch (domain)
   {
     case CachePolicyDomain:
-    {
-      if (LocaleCompare(name,"memory-map") == 0)
-        {
-          if (LocaleCompare(value,"anonymous") != 0)
-            return(MagickFalse);
-          ResetCacheAnonymousMemory();
-          ResetStreamAnonymousMemory();
-          return(MagickTrue);
-        }
-      break;
-    }
+      return(SetCachePolicyValue(name,value));
     case ResourcePolicyDomain:
-    {
-      ssize_t
-        type;
-
-      type=ParseCommandOption(MagickResourceOptions,MagickFalse,name);
-      if (type >= 0)
-        {
-          MagickSizeType
-            limit;
-
-          limit=GetPolicyLimit(value);
-          if ((ResourceType) type == TimeResource)
-            limit=(MagickSizeType) ParseMagickTimeToLive(value);
-          return(SetMagickResourceLimit((ResourceType) type,limit));
-        }
-      break;
-    }
+      return(SetResourcePolicyValue(name,value));
     case SystemPolicyDomain:
-    {
-      if (LocaleCompare(name,"max-memory-request") == 0)
-        {
-          SetMaxMemoryRequest(GetPolicyLimit(value));
-          return(MagickTrue);
-        }
-      if (LocaleCompare(name,"max-profile-size") == 0)
-        {
-          SetMaxProfileSize(GetPolicyLimit(value));
-          return(MagickTrue);
-        }
-      if (LocaleCompare(name,"memory-map") == 0)
-        {
-          if (LocaleCompare(value,"anonymous") != 0)
-            return(MagickFalse);
-          ResetVirtualAnonymousMemory();
-          return(MagickTrue);
-        }
-      if (LocaleCompare(name,"precision") == 0)
-        {
-          int
-            limit;
-
-          limit=StringToInteger(value);
-          SetMagickPrecision(limit);
-          return(MagickTrue);
-        }
-      break;
-    }
+      return(SetSystemPolicyValue(name,value));
     case CoderPolicyDomain:
     case DelegatePolicyDomain:
     case FilterPolicyDomain:
