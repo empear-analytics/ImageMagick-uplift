@@ -172,6 +172,7 @@ $call Make vms.c
 $call Make widget.c
 $call Make xml-tree.c
 $call Make xwindow.c
+$call Make xwindow-visual.c
 $ set default [-.filters]
 $ call Make analyze.c
 $ set default [-.magickwand]

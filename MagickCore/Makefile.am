@@ -370,6 +370,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xml-tree.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow.c \
+  MagickCore/xwindow-visual.c \
   MagickCore/xwindow.h
 
 if WIN32_NATIVE_BUILD
