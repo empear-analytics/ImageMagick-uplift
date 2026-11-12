@@ -512,9 +512,7 @@ MagickExport int AcquireUniqueFileResource(char *path)
     (void) LogMagickEvent(ResourceEvent,GetMagickModule(),"...");
   if (random_info == (RandomInfo *) NULL)
     {
-      if (resource_semaphore[FileResource] == (SemaphoreInfo *) NULL)
-        ActivateSemaphoreInfo(&resource_semaphore[FileResource]);
-      LockSemaphoreInfo(resource_semaphore[FileResource]);
+      LockResourceSemaphore(FileResource);
       if (random_info == (RandomInfo *) NULL)
         random_info=AcquireRandomInfo();
       UnlockSemaphoreInfo(resource_semaphore[FileResource]);
@@ -550,9 +548,7 @@ MagickExport int AcquireUniqueFileResource(char *path)
     (void) LogMagickEvent(ResourceEvent,GetMagickModule(),"%s",path);
   if (file == -1)
     return(file);
-  if (resource_semaphore[FileResource] == (SemaphoreInfo *) NULL)
-    ActivateSemaphoreInfo(&resource_semaphore[FileResource]);
-  LockSemaphoreInfo(resource_semaphore[FileResource]);
+  LockResourceSemaphore(FileResource);
   if (temporary_resources == (SplayTreeInfo *) NULL)
     temporary_resources=NewSplayTree(CompareSplayTreeString,
       DestroyTemporaryResources,RelinquishMagickMemory);
@@ -904,9 +900,7 @@ MagickExport MagickBooleanType ListMagickResourceInfo(FILE *file,
 
   if (file == (const FILE *) NULL)
     file=stdout;
-  if (resource_semaphore[FileResource] == (SemaphoreInfo *) NULL)
-    ActivateSemaphoreInfo(&resource_semaphore[FileResource]);
-  LockSemaphoreInfo(resource_semaphore[FileResource]);
+  LockResourceSemaphore(FileResource);
   (void) FormatMagickSize(resource_info.width_limit,MagickFalse,"P",
     MagickFormatExtent,width_limit);
   (void) FormatMagickSize(resource_info.height_limit,MagickFalse,"P",
@@ -1090,9 +1084,7 @@ MagickExport MagickBooleanType RelinquishUniqueFileResource(const char *path)
   status=MagickFalse;
   if ((GetLogEventMask() & ResourceEvent) != 0)
     (void) LogMagickEvent(ResourceEvent,GetMagickModule(),"%s",path);
-  if (resource_semaphore[FileResource] == (SemaphoreInfo *) NULL)
-    ActivateSemaphoreInfo(&resource_semaphore[FileResource]);
-  LockSemaphoreInfo(resource_semaphore[FileResource]);
+  LockResourceSemaphore(FileResource);
   if (temporary_resources != (SplayTreeInfo *) NULL)
     status=DeleteNodeFromSplayTree(temporary_resources,(const void *) path);
   UnlockSemaphoreInfo(resource_semaphore[FileResource]);
