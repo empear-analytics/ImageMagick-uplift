@@ -8488,6 +8488,60 @@ static MagickBooleanType UpdateFontBrowserList(const FontBrowserUpdate *update,
   return(MagickTrue);
 }
 
+typedef struct _FontBrowserWidgets
+{
+  XWidgetInfo
+    *reply_info;
+
+  size_t
+    *state;
+} FontBrowserWidgets;
+
+typedef struct _FontBrowserContext
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+} FontBrowserContext;
+
+static void ClientFontBrowserMessage(const FontBrowserContext *context,
+  const XEvent event,const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  /*
+    If client window delete message, exit.
+  */
+  if (event.xclient.message_type != windows->wm_protocols)
+    return;
+  if (*event.xclient.data.l == (int) windows->wm_take_focus)
+    {
+      (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
+        (Time) event.xclient.data.l[1]);
+      return;
+    }
+  if (*event.xclient.data.l != (int) windows->wm_delete_window)
+    return;
+  if (event.xclient.window == windows->widget.id)
+    {
+      *(*reply_info).text='\0';
+      (*state)|=ExitState;
+      return;
+    }
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8562,6 +8616,12 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
 
   const FontBrowserTargets
     targets = { &reply_info, &state, &selection_info, &list_info };
+
+  const FontBrowserWidgets
+    font_widgets = { &reply_info, &state };
+
+  FontBrowserContext
+    font_context;
 
   /*
     Get font list and sort in ascending order.
@@ -8674,6 +8734,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   visible_fonts=0;
   delay=SuspendTime << 2;
   state=UpdateConfigurationState;
+  font_context.display=display;
+  font_context.windows=windows;
   do
   {
     if (state & UpdateConfigurationState)
@@ -9222,25 +9284,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
       }
       case ClientMessage:
       {
-        /*
-          If client window delete message, exit.
-        */
-        if (event.xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event.xclient.data.l == (int) windows->wm_take_focus)
-          {
-            (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
-              (Time) event.xclient.data.l[1]);
-            break;
-          }
-        if (*event.xclient.data.l != (int) windows->wm_delete_window)
-          break;
-        if (event.xclient.window == windows->widget.id)
-          {
-            *reply_info.text='\0';
-            state|=ExitState;
-            break;
-          }
+        ClientFontBrowserMessage(&font_context,event,&font_widgets);
         break;
       }
       case ConfigureNotify:
