@@ -3506,17 +3506,6 @@ static const CompositeOperator
     NoCompositeOp
   };
 
-static MagickBooleanType IsCanvasAlphaOperator(const CompositeOperator compose)
-{
-  size_t
-    i;
-
-  for (i=0; i < (sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators)); i++)
-    if (CanvasAlphaOperators[i] == compose)
-      return(MagickTrue);
-  return(MagickFalse);
-}
-
 static const CompositeOperator
   SourceAlphaOperators[] =
   {
@@ -5459,7 +5448,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     row.compose=compose;
     row.union_coverage=IsListedOperator(UnionCoverageOperators,
       sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
-    row.canvas_alpha=IsCanvasAlphaOperator(compose);
+    row.canvas_alpha=IsListedOperator(CanvasAlphaOperators,
+      sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
     row.source_alpha=IsSourceAlphaOperator(compose);
     row.pixel_info_inputs=IsPixelInfoInputOperator(compose);
     row.intensity_inputs=IsIntensityInputOperator(compose);
