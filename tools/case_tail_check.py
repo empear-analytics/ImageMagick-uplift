@@ -170,6 +170,15 @@ def split_body(body, targets_ptr, input_ptr, target_names, input_names):
     pending, k = [], 0
     while k < len(lines):
         b = lines[k]
+        live = re.fullmatch(r"\*const (\w+) = \*(\w+)->(\w+)[,;]?", b)
+        if live and live.group(2) == targets_ptr and live.group(1) == live.group(3) \
+                and live.group(1) in target_names:
+            # a member the loop's other blocks write (a font pointer that XLoadQueryFont replaces)
+            # is read once at the top, `T *const v = *targets->v;`, and its uses stay as they are
+            # (Recipe CT step 5 as amended on 2026-11-12, later): the value is the caller's
+            pending = []
+            k += 1
+            continue
         m = BINDING.match(b)
         if m and m.group(2) in (targets_ptr, input_ptr):
             name, ptr, member = m.groups()
