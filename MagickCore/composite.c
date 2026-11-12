@@ -3593,6 +3593,78 @@ static void CompositeAlphaMultiplyRun(const CompositeRowInputs *row,
   }
 }
 
+static void CompositeAlphaDarkenRun(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,MagickRealType *pixel)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickBooleanType
+    compose_sync = row->compose_sync;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Di = authentic->Di,
+    Sa = authentic->Sa,
+    Si = authentic->Si;
+
+  switch (compose)
+  {
+    case DarkenIntensityCompositeOp:
+    {
+      IntensityAlphaInputs
+        intensity;
+
+      intensity.compose_sync=compose_sync;
+      intensity.Sa=Sa;
+      intensity.Da=Da;
+      intensity.Si=Si;
+      intensity.Di=Di;
+      (*pixel)=GetDarkenIntensityAlpha(&intensity,(*pixel));
+      break;
+    }
+    case DifferenceCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*fabs((double) (Sa-Da));
+      break;
+    }
+    case FreezeCompositeOp:
+    {
+      (*pixel)=GetFreezeAlpha(Sa,Da);
+      break;
+    }
+    case InterpolateCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*(0.5-0.25*cos(MagickPI*Sa)-0.25*
+        cos(MagickPI*Da));
+      break;
+    }
+    case LightenIntensityCompositeOp:
+    {
+      IntensityAlphaInputs
+        intensity;
+
+      intensity.compose_sync=compose_sync;
+      intensity.Sa=Sa;
+      intensity.Da=Da;
+      intensity.Si=Si;
+      intensity.Di=Di;
+      (*pixel)=GetLightenIntensityAlpha(&intensity,(*pixel));
+      break;
+    }
+    case ModulateCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*Da;
+      break;
+    }
+    default:
+    {
+      CompositeAlphaMultiplyRun(row,authentic,pixel);
+      break;
+    }
+  }
+}
+
 static void CompositeAlphaChannel(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,Quantum *magick_restrict q,
   MagickRealType *pixel)
@@ -3604,15 +3676,11 @@ static void CompositeAlphaChannel(const CompositeRowInputs *row,
   const CompositeOperator
     compose = row->compose;
 
-  const MagickBooleanType
-    compose_sync = row->compose_sync;
-
   const Quantum
     *const p = authentic->p;
 
   const MagickRealType
     Da = authentic->Da,
-    Di = authentic->Di,
     Sa = authentic->Sa,
     Si = authentic->Si;
 
@@ -3667,56 +3735,9 @@ static void CompositeAlphaChannel(const CompositeRowInputs *row,
       (*pixel)=GetCopyAlpha(source_image,Si,Sa);
       break;
     }
-    case DarkenIntensityCompositeOp:
-    {
-      IntensityAlphaInputs
-        intensity;
-
-      intensity.compose_sync=compose_sync;
-      intensity.Sa=Sa;
-      intensity.Da=Da;
-      intensity.Si=Si;
-      intensity.Di=Di;
-      (*pixel)=GetDarkenIntensityAlpha(&intensity,(*pixel));
-      break;
-    }
-    case DifferenceCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*fabs((double) (Sa-Da));
-      break;
-    }
-    case FreezeCompositeOp:
-    {
-      (*pixel)=GetFreezeAlpha(Sa,Da);
-      break;
-    }
-    case InterpolateCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*(0.5-0.25*cos(MagickPI*Sa)-0.25*
-        cos(MagickPI*Da));
-      break;
-    }
-    case LightenIntensityCompositeOp:
-    {
-      IntensityAlphaInputs
-        intensity;
-
-      intensity.compose_sync=compose_sync;
-      intensity.Sa=Sa;
-      intensity.Da=Da;
-      intensity.Si=Si;
-      intensity.Di=Di;
-      (*pixel)=GetLightenIntensityAlpha(&intensity,(*pixel));
-      break;
-    }
-    case ModulateCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*Da;
-      break;
-    }
     default:
     {
-      CompositeAlphaMultiplyRun(row,authentic,pixel);
+      CompositeAlphaDarkenRun(row,authentic,pixel);
       break;
     }
   }
