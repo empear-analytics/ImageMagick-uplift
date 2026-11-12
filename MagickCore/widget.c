@@ -4431,6 +4431,9 @@ typedef struct _DialogTargets
     *action_info,
     *cancel_info,
     *reply_info;
+
+  size_t
+    *state;
 } DialogTargets;
 
 typedef struct _DialogContext
@@ -4523,6 +4526,38 @@ static void PressDialogButton(const DialogContext *context,
     windows->widget.id,event.xbutton.time);
 }
 
+static void ReleaseDialogButtons(const DialogContext *context,
+  const XEvent event,const DialogTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const action_info = targets->action_info,
+    *const cancel_info = targets->cancel_info,
+    *const reply_info = targets->reply_info;
+
+  size_t
+    *const state = targets->state;
+
+  DialogRelease
+    release;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  release.display=display;
+  release.windows=windows;
+  release.event=event;
+  ReleaseDialogAction(&release,action_info,state);
+  release.display=display;
+  release.windows=windows;
+  release.event=event;
+  ReleaseDialogCancel(&release,reply_info,cancel_info,state);
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -4563,7 +4598,8 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
     window_changes;
 
   const DialogTargets
-    targets = { &special_info, &action_info, &cancel_info, &reply_info };
+    targets = { &special_info, &action_info, &cancel_info, &reply_info,
+      &state };
 
   DialogContext
     context;
@@ -4728,19 +4764,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        DialogRelease
-          release;
-
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        release.display=display;
-        release.windows=windows;
-        release.event=event;
-        ReleaseDialogAction(&release,&action_info,&state);
-        release.display=display;
-        release.windows=windows;
-        release.event=event;
-        ReleaseDialogCancel(&release,&reply_info,&cancel_info,&state);
+        ReleaseDialogButtons(&context,event,&targets);
         break;
       }
       case ClientMessage:
