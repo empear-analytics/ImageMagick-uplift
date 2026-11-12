@@ -12409,6 +12409,16 @@ static void XRequestImageSize(Display *display,XWindows *windows,
       (void) CloneString(&image_info->size,geometry);
     }
 }
+
+static void XDestroyTextList(char **textlist)
+{
+  int
+    i;
+
+  for (i=0; textlist[i] != (char *) NULL; i++)
+    textlist[i]=DestroyString(textlist[i]);
+  textlist=(char **) RelinquishMagickMemory(textlist);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12506,16 +12516,11 @@ static Image *XOpenImage(Display *display,XResourceInfo *resource_info,
           char
             title[MagickPathExtent];
 
-          int
-            i;
-
           (void) FormatLocaleString(title,MagickPathExtent,
             "Unknown format: %s",filename);
           XTextViewWidget(display,resource_info,windows,MagickTrue,title,
             (const char **) textlist);
-          for (i=0; textlist[i] != (char *) NULL; i++)
-            textlist[i]=DestroyString(textlist[i]);
-          textlist=(char **) RelinquishMagickMemory(textlist);
+          XDestroyTextList(textlist);
         }
       text=DestroyString(text);
     }
