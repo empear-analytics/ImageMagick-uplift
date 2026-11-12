@@ -3807,6 +3807,41 @@ static void ReleaseConfirmButtons(Display *display,XWindows *windows,
     }
 }
 
+static void KeyConfirmYes(Display *display,XWindows *windows,const XEvent event,
+  const ConfirmTargets *targets)
+{
+  XWidgetInfo
+    *const yes_info = targets->yes_info;
+
+  int
+    *const confirm = targets->confirm;
+
+  size_t
+    *const state = targets->state;
+
+  static char
+    command[MagickPathExtent];
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      (*yes_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,yes_info);
+      (*confirm)=1;
+      (*state)|=ExitState;
+      return;
+    }
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -4009,27 +4044,7 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
       }
       case KeyPress:
       {
-        static char
-          command[MagickPathExtent];
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            yes_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&yes_info);
-            confirm=1;
-            state|=ExitState;
-            break;
-          }
+        KeyConfirmYes(display,windows,event,&targets);
         break;
       }
       case LeaveNotify:
