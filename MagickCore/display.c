@@ -17624,6 +17624,32 @@ static void XImageWindowKeyPress(const DisplayEventContext *context,
     (*nexus)=XMagickCommand(display,resource_info,windows,
       display_command,display_image,exception);
 }
+
+static void XPanWindowKeyPress(const DisplayEventContext *context,
+  const KeySym key_symbol)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  if ((key_symbol == XK_q) || (key_symbol == XK_Escape))
+    (void) XWithdrawWindow(display,windows->pan.id,
+      windows->pan.screen);
+  else
+    if ((key_symbol == XK_F1) || (key_symbol == XK_Help))
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Pan",ImagePanHelp);
+    else
+      XTranslateImage(display,windows,*image,key_symbol);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -19130,15 +19156,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             exception);
         if (event.xkey.window == windows->pan.id)
           {
-            if ((key_symbol == XK_q) || (key_symbol == XK_Escape))
-              (void) XWithdrawWindow(display,windows->pan.id,
-                windows->pan.screen);
-            else
-              if ((key_symbol == XK_F1) || (key_symbol == XK_Help))
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Pan",ImagePanHelp);
-              else
-                XTranslateImage(display,windows,*image,key_symbol);
+            XPanWindowKeyPress(&event_context,key_symbol);
           }
         delay=display_image->delay/(size_t) MagickMax(
           display_image->ticks_per_second,1L);
