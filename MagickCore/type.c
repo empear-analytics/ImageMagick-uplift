@@ -1211,16 +1211,14 @@ static TypeInfo *SetTypeInfoAttribute(TypeInfo *type_info,const char *keyword,
     type_info->foundry=ConstantString(token);
   else if (LocaleCompare((char *) keyword,"fullname") == 0)
     type_info->description=ConstantString(token);
-  else if (LocaleCompare((char *) keyword,"glyphs") == 0)
-    {
-      if (SetTypeNodePath(filename,font_path,token,&type_info->glyphs) == MagickFalse)
-        type_info=(TypeInfo *) DestroyTypeNode(type_info);
-    }
-  else if (LocaleCompare((char *) keyword,"metrics") == 0)
-    {
-      if (SetTypeNodePath(filename,font_path,token,&type_info->metrics) == MagickFalse)
-        type_info=(TypeInfo *) DestroyTypeNode(type_info);
-    }
+  else if ((LocaleCompare((char *) keyword,"glyphs") == 0) &&
+           (SetTypeNodePath(filename,font_path,token,&type_info->glyphs) ==
+            MagickFalse))
+    type_info=(TypeInfo *) DestroyTypeNode(type_info);
+  else if ((LocaleCompare((char *) keyword,"metrics") == 0) &&
+           (SetTypeNodePath(filename,font_path,token,&type_info->metrics) ==
+            MagickFalse))
+    type_info=(TypeInfo *) DestroyTypeNode(type_info);
   else if (LocaleCompare((char *) keyword,"name") == 0)
     type_info->name=ConstantString(token);
   else if (LocaleCompare((char *) keyword,"stealth") == 0)
