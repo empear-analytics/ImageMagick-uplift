@@ -8602,6 +8602,70 @@ static unsigned char *MagnifyColumnsMultiByte(
   return(q);
 }
 
+typedef struct _Magnify8BitRows
+{
+  unsigned int
+    height,
+    magnify;
+
+  XImage
+    *ximage;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    width,
+    scanline_pad;
+
+  unsigned char
+    *q;
+} Magnify8BitRows;
+
+static void MagnifyRows8Bit(const Magnify8BitRows *magnify_rows)
+{
+  XImage
+    *const ximage = magnify_rows->ximage;
+
+  const int
+    x = magnify_rows->x;
+
+  const unsigned int
+    height = magnify_rows->height,
+    magnify = magnify_rows->magnify,
+    scanline_pad = magnify_rows->scanline_pad,
+    width = magnify_rows->width;
+
+  int
+    y = magnify_rows->y;
+
+  ssize_t
+    i;
+
+  unsigned char
+    *p,
+    *q = magnify_rows->q;
+
+  unsigned int
+    j;
+
+  for (i=0; i < (ssize_t) height; i+=magnify)
+  {
+    /*
+      Propagate pixel magnify rows.
+    */
+    for (j=0; j < magnify; j++)
+    {
+      p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
+        ((x*ximage->bits_per_pixel) >> 3);
+      q=MagnifyColumns8Bit(width,magnify,p,q);
+      q+=(ptrdiff_t) scanline_pad;
+    }
+    y++;
+  }
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -8887,23 +8951,21 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
       case 6:
       case 8:
       {
+        Magnify8BitRows
+          magnify_rows;
+
         /*
           Magnify 8 bit X image.
         */
-        for (i=0; i < (ssize_t) height; i+=magnify)
-        {
-          /*
-            Propagate pixel magnify rows.
-          */
-          for (j=0; j < magnify; j++)
-          {
-            p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
-              ((x*ximage->bits_per_pixel) >> 3);
-            q=MagnifyColumns8Bit(width,magnify,p,q);
-            q+=(ptrdiff_t) scanline_pad;
-          }
-          y++;
-        }
+        magnify_rows.height=height;
+        magnify_rows.magnify=magnify;
+        magnify_rows.ximage=ximage;
+        magnify_rows.x=x;
+        magnify_rows.y=y;
+        magnify_rows.width=width;
+        magnify_rows.scanline_pad=scanline_pad;
+        magnify_rows.q=q;
+        MagnifyRows8Bit(&magnify_rows);
         break;
       }
       default:
