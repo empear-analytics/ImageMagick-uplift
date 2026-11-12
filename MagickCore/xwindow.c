@@ -5781,6 +5781,25 @@ static void GetXWindowGroupLeader(Display *display,XResourceInfo *resource_info,
     }
 }
 
+static void InitializeXWindowColormaps(XWindows *windows)
+{
+  windows->map_info=XAllocStandardColormap();
+  windows->icon_map=XAllocStandardColormap();
+  if ((windows->map_info == (XStandardColormap *) NULL) ||
+      (windows->icon_map == (XStandardColormap *) NULL))
+    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
+      "...");
+  windows->map_info->colormap=(Colormap) NULL;
+  windows->icon_map->colormap=(Colormap) NULL;
+  windows->pixel_info->pixels=(unsigned long *) NULL;
+  windows->pixel_info->annotate_context=(GC) NULL;
+  windows->pixel_info->highlight_context=(GC) NULL;
+  windows->pixel_info->widget_context=(GC) NULL;
+  windows->font_info=(XFontStruct *) NULL;
+  windows->icon_pixel->annotate_context=(GC) NULL;
+  windows->icon_pixel->pixels=(unsigned long *) NULL;
+}
+
 MagickPrivate XWindows *XInitializeWindows(Display *display,
   XResourceInfo *resource_info)
 {
@@ -5837,21 +5856,7 @@ MagickPrivate XWindows *XInitializeWindows(Display *display,
   /*
     Allocate standard colormap.
   */
-  windows->map_info=XAllocStandardColormap();
-  windows->icon_map=XAllocStandardColormap();
-  if ((windows->map_info == (XStandardColormap *) NULL) ||
-      (windows->icon_map == (XStandardColormap *) NULL))
-    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
-      "...");
-  windows->map_info->colormap=(Colormap) NULL;
-  windows->icon_map->colormap=(Colormap) NULL;
-  windows->pixel_info->pixels=(unsigned long *) NULL;
-  windows->pixel_info->annotate_context=(GC) NULL;
-  windows->pixel_info->highlight_context=(GC) NULL;
-  windows->pixel_info->widget_context=(GC) NULL;
-  windows->font_info=(XFontStruct *) NULL;
-  windows->icon_pixel->annotate_context=(GC) NULL;
-  windows->icon_pixel->pixels=(unsigned long *) NULL;
+  InitializeXWindowColormaps(windows);
   /*
     Allocate visual.
   */
