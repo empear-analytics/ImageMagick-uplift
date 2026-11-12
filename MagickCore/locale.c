@@ -1277,6 +1277,22 @@ static const char *SkipCommentElement(const char *q,const size_t extent,
   return(q);
 }
 
+static const char *ReadMessageText(const char *q,char *message)
+{
+  const char
+    *p;
+
+  for (p=q; (*q != '<') && (*q != '\0'); q++) ;
+  while (isspace((int) ((unsigned char) *p)) != 0)
+    p++;
+  q--;
+  while ((isspace((int) ((unsigned char) *q)) != 0) && (q > p))
+    q--;
+  (void) CopyMagickString(message,p,MagickMin((size_t) (q-p+2),
+    MagickLocaleExtent));
+  return(q);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1306,9 +1322,6 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
 
   MagickStatusType
     status;
-
-  char
-    *p;
 
   size_t
     extent;
@@ -1426,14 +1439,7 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
               (void) ConcatenateMagickString(tag,"/",MagickLocaleExtent);
             }
         }
-        for (p=(char *) q; (*q != '<') && (*q != '\0'); q++) ;
-        while (isspace((int) ((unsigned char) *p)) != 0)
-          p++;
-        q--;
-        while ((isspace((int) ((unsigned char) *q)) != 0) && (q > p))
-          q--;
-        (void) CopyMagickString(message,p,MagickMin((size_t) (q-p+2),
-          MagickLocaleExtent));
+        q=ReadMessageText(q,message);
         locale_info=(LocaleInfo *) AcquireCriticalMemory(sizeof(*locale_info));
         (void) memset(locale_info,0,sizeof(*locale_info));
         locale_info->path=ConstantString(filename);
