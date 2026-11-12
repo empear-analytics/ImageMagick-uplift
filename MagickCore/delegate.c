@@ -1389,27 +1389,26 @@ static MagickBooleanType IsBidirectionalMismatch(
   return(MagickTrue);
 }
 
+static MagickBooleanType IsDelegateMatch(const DelegateInfo *delegate_info,
+  const char *decode,const char *encode)
+{
+  if (delegate_info->mode > 0)
+    return(LocaleCompare(delegate_info->decode,decode) == 0 ? MagickTrue :
+      MagickFalse);
+  if (delegate_info->mode < 0)
+    return(LocaleCompare(delegate_info->encode,encode) == 0 ? MagickTrue :
+      MagickFalse);
+  return(IsBidirectionalMismatch(delegate_info,decode,encode) == MagickFalse ?
+    MagickTrue : MagickFalse);
+}
+
 static void FindDelegateElement(const char *decode,const char *encode,
   ElementInfo **p,const DelegateInfo **delegate_info)
 {
   while (*p != (ElementInfo *) NULL)
   {
     *delegate_info=(const DelegateInfo* ) (*p)->value;
-    if ((*delegate_info)->mode > 0)
-      {
-        if (LocaleCompare((*delegate_info)->decode,decode) == 0)
-          break;
-        *p=(*p)->next;
-        continue;
-      }
-    if ((*delegate_info)->mode < 0)
-      {
-        if (LocaleCompare((*delegate_info)->encode,encode) == 0)
-          break;
-        *p=(*p)->next;
-        continue;
-      }
-    if (IsBidirectionalMismatch(*delegate_info,decode,encode) == MagickFalse)
+    if (IsDelegateMatch(*delegate_info,decode,encode) != MagickFalse)
       break;
     *p=(*p)->next;
   }
