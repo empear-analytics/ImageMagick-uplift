@@ -6603,6 +6603,9 @@ typedef struct _DrawStyleTargets
 
   unsigned int
     *pen_id;
+
+  unsigned int
+    *line_width;
 } DrawStyleTargets;
 
 static void XSelectDrawColor(const DrawEditContext *context,const int id,
@@ -6689,6 +6692,62 @@ static void XSelectDrawColor(const DrawEditContext *context,const int id,
   windows->pixel_info->pen_colors[pen_number]=color;
   (*pen_id)=(unsigned int) pen_number;
   (*draw_info).stencil=OpaqueStencil;
+}
+
+static void XSelectDrawWidth(const DrawEditContext *context,const int id,
+  const DrawStyleTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const DrawMenu = context->DrawMenu;
+
+  char
+    *const command = context->command;
+
+  unsigned int
+    *const line_width = targets->line_width;
+
+  const char
+    *const WidthsMenu[] =
+    {
+      "1",
+      "2",
+      "4",
+      "8",
+      "16",
+      "Dialog...",
+      (char *) NULL,
+    };
+
+  static char
+    width[MagickPathExtent] = "0";
+
+  int
+    entry;
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  entry=XMenuWidget(display,windows,DrawMenu[id],WidthsMenu,
+    command);
+  if (entry < 0)
+    return;
+  if (entry != 5)
+    {
+      (*line_width)=(unsigned int) StringToUnsignedLong(
+        WidthsMenu[entry]);
+      return;
+    }
+  (void) XDialogWidget(display,windows,"Ok","Enter line width:",
+    width);
+  if (*width == '\0')
+    return;
+  (*line_width)=(unsigned int) StringToUnsignedLong(width);
 }
 
 static MagickBooleanType XDrawEditImage(Display *display,
@@ -6784,7 +6843,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
     draw_context;
 
   const DrawStyleTargets
-    style_targets = { &draw_info, &pen_id };
+    style_targets = { &draw_info, &pen_id, &line_width };
 
   /*
     Allocate polygon info.
@@ -7003,39 +7062,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
             }
             case DrawWidthCommand:
             {
-              const char
-                *const WidthsMenu[] =
-                {
-                  "1",
-                  "2",
-                  "4",
-                  "8",
-                  "16",
-                  "Dialog...",
-                  (char *) NULL,
-                };
-
-              static char
-                width[MagickPathExtent] = "0";
-
-              /*
-                Select a command from the pop-up menu.
-              */
-              entry=XMenuWidget(display,windows,DrawMenu[id],WidthsMenu,
-                command);
-              if (entry < 0)
-                break;
-              if (entry != 5)
-                {
-                  line_width=(unsigned int) StringToUnsignedLong(
-                    WidthsMenu[entry]);
-                  break;
-                }
-              (void) XDialogWidget(display,windows,"Ok","Enter line width:",
-                width);
-              if (*width == '\0')
-                break;
-              line_width=(unsigned int) StringToUnsignedLong(width);
+              XSelectDrawWidth(&draw_context,id,&style_targets);
               break;
             }
             case DrawUndoCommand:
