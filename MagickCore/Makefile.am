@@ -242,6 +242,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/nt-base-private.h \
   MagickCore/nt-feature.h \
   MagickCore/opencl.c \
+  MagickCore/opencl-device.c \
   MagickCore/opencl.h \
   MagickCore/opencl-private.h \
   MagickCore/option.c \
@@ -370,6 +371,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xml-tree.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow.c \
+  MagickCore/xwindow-visual.c \
+  MagickCore/xwindow-import.c \
   MagickCore/xwindow.h
 
 if WIN32_NATIVE_BUILD

@@ -986,6 +986,12 @@ is worth it.
    block (a delegate's headers and the macros it supplies, as `fourier.c`'s FFTW and
    `complex.h` block) is left out of the copy when no line of the family, comments and
    strings aside, names one of those macros. The original keeps the run unchanged.
+   A second exception (2026-11-12): a quoted `#include` of a header of the same directory
+   that *defines objects* (a file-scope initialised variable in column 0, as
+   `accelerate-kernels-private.h`'s `const char *accelerateKernels =`) is left out of the
+   copy as well, when no line of the family, comments and strings aside, names an object
+   or a macro that header defines. Both files including it would define the object twice
+   (a link error); the split is refused when the family names one.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -1003,6 +1009,11 @@ is worth it.
   expands to the same tokens in the one file that uses it, and the kept file used none.
   `refactor_guard.py --combined` therefore counts every literal once, as before; say in
   the message which tables and macros moved.
+- An include left out under step 2's second exception is neither moved nor edited either:
+  the original keeps the line, and the header's objects stay defined once, in the original's
+  object. The family names none of them (the tool checks, with the header's macros), so every
+  token of the moved text means what it meant, and the object code of every moved function
+  is compared unchanged (`tools/split_branch_check.py`, as for the run below).
 - An include run left out under step 2 is neither moved nor edited: the original keeps
   it, uncompiled branches included, as it stood. The family compiles without it, so it
   needs nothing the run declares: a call of a function only a dropped header declares
@@ -12823,3 +12834,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | GD | Guard Returns from a Disjunction: `if (A1 or A2 or ... or An) return(F);` (`F` a constant or a bare `return;`, `n` at least three, no `&&`) becomes one `if (Ai) return(F);` per operand in order. *Careful* gives the argument (left-to-right short circuit, each operand evaluated at most once, same order) | `accelerate.c`'s `AccelerateGrayscaleImage` (campaign A, W19 lane a, wide build): its three-trait failure test is the file's only *Complex Conditional*; Recipe P's predicate 3.19 to 3.19 (a new clone function), three guards 3.19 to 3.27 | owner |
 | 2026-11-12 | NEW | KL | Replace Case Groups Sharing a Tail with a Keyed Lookup: a run of one-label groups of a `switch` that are the same statements on a string literal and a numeric literal become one copy in the `default:` group, reading both from a `static const` table found by a lookup function; the groups that differ stay. *Careful* gives the argument (the `switch` value held once, the lookup finds an element exactly when a deleted group carried the label, constants converted as before) | `morphology.c`'s `AcquireFreiChenKernel` (campaign A, W19 lane d): cases 15 to 19; Recipe KT refuses the tail, SC leaves five labels, a helper clones `AcquireFreiChenEdgeBasisKernel`; probe 6.35 to 6.63, cc 16 to 8 | owner |
 | 2026-11-12 | NEW | KD | Replace a Constant-Assigning Label Run with a Table Lookup: the groups of a `switch` that are `v=c;` `break;` (several labels to a group) become a `static const` table of `{label, literal}` read through a lookup function, `if (entry != NULL) v=entry->value; else` the `default:` group's text; *Careful* gives the argument (`e` evaluated once, the lookup finds an element exactly when a deleted group carried the label, the literal converted to `v`'s type as before) | `morphology.c`'s `MorphologyApply` (campaign A, W19 lane d): the stage-count `switch` (`SmoothMorphology` 4, seven labels 2, `default:` calling `SetIteratedMorphologyLimits`); probe cc 22 to 14, 6.63 to 6.70 | owner |
+| 2026-11-12 | AMEND | S | Step 2: a quoted `#include` of a header that defines objects (a file-scope initialised variable in column 0) is left out of the new file's include block, when no line of the family names an object or macro of that header; the split is refused when one does. *Careful* gives the argument | `opencl.c`'s device-property family (campaign A, W19 lane a, wide build): the copied include block included `accelerate-kernels-private.h`, which defines `accelerateKernels` and `accelerateKernels2`, and the pair failed to link (multiple definition); the family names neither, and the moved functions' object code compares unchanged | owner |
