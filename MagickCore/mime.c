@@ -270,6 +270,74 @@ static ElementInfo *MatchMimeValue(const MimeInfo *q,const ssize_t value,
   return(element_info);
 }
 
+static ElementInfo *MatchMimeString(const MimeInfo *q,
+  const unsigned char *magic,const size_t length,ElementInfo *p,
+  ElementInfo *element_info)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= (ssize_t) q->extent; i++)
+  {
+    if ((size_t) (q->offset+i+(ssize_t) q->length) > length)
+      break;
+    if (memcmp(magic+q->offset+i,q->magic,q->length) == 0)
+      {
+        element_info=p;
+        break;
+      }
+  }
+  return(element_info);
+}
+
+static ElementInfo *MatchMimeData(const MimeInfo *q,const unsigned char *magic,
+  const size_t length,ElementInfo *p,ElementInfo *element_info)
+{
+  const unsigned char
+    *r;
+
+  ssize_t
+    value;
+
+  switch (q->data_type)
+  {
+    case ByteData:
+    {
+      if ((size_t) (q->offset+4) > length)
+        break;
+      r=magic+q->offset;
+      value=(ssize_t) (*r++);
+      element_info=MatchMimeValue(q,value,p,element_info);
+      break;
+    }
+    case ShortData:
+    {
+      if ((size_t) (q->offset+4) > length)
+        break;
+      r=magic+q->offset;
+      value=ReadMimeShortValue(q,r);
+      element_info=MatchMimeValue(q,value,p,element_info);
+      break;
+    }
+    case LongData:
+    {
+      if ((size_t) (q->offset+4) > length)
+        break;
+      r=magic+q->offset;
+      value=ReadMimeLongValue(q,r);
+      element_info=MatchMimeValue(q,value,p,element_info);
+      break;
+    }
+    case StringData:
+    default:
+    {
+      element_info=MatchMimeString(q,magic,length,p,element_info);
+      break;
+    }
+  }
+  return(element_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -310,15 +378,6 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
     *element_info,
     *p;
 
-  const unsigned char
-    *r;
-
-  ssize_t
-    i;
-
-  ssize_t
-    value;
-
   assert(exception != (ExceptionInfo *) NULL);
   if (IsMimeCacheInstantiated(exception) == MagickFalse)
     return((const MimeInfo *) NULL);
@@ -355,51 +414,7 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
         p=p->next;
         continue;
       }
-    switch (q->data_type)
-    {
-      case ByteData:
-      {
-        if ((size_t) (q->offset+4) > length)
-          break;
-        r=magic+q->offset;
-        value=(ssize_t) (*r++);
-        element_info=MatchMimeValue(q,value,p,element_info);
-        break;
-      }
-      case ShortData:
-      {
-        if ((size_t) (q->offset+4) > length)
-          break;
-        r=magic+q->offset;
-        value=ReadMimeShortValue(q,r);
-        element_info=MatchMimeValue(q,value,p,element_info);
-        break;
-      }
-      case LongData:
-      {
-        if ((size_t) (q->offset+4) > length)
-          break;
-        r=magic+q->offset;
-        value=ReadMimeLongValue(q,r);
-        element_info=MatchMimeValue(q,value,p,element_info);
-        break;
-      }
-      case StringData:
-      default:
-      {
-        for (i=0; i <= (ssize_t) q->extent; i++)
-        {
-          if ((size_t) (q->offset+i+(ssize_t) q->length) > length)
-            break;
-          if (memcmp(magic+q->offset+i,q->magic,q->length) == 0)
-            {
-              element_info=p;
-              break;
-            }
-        }
-        break;
-      }
-    }
+    element_info=MatchMimeData(q,magic,length,p,element_info);
     p=p->next;
   }
   if (element_info != (ElementInfo *) NULL)
