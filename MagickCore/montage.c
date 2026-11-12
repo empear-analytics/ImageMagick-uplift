@@ -1428,6 +1428,13 @@ static MagickBooleanType AdvanceMontagePage(const MontageNextPage *next,
   return(MagickTrue);
 }
 
+static Image *DestroyMontageTexture(Image *texture)
+{
+  if (texture != (Image *) NULL)
+    texture=DestroyImage(texture);
+  return(texture);
+}
+
 static void LogMontageImages(const Image *images)
 {
   if (IsEventLogging() != MagickFalse)
@@ -1641,8 +1648,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     }
   }
   tile_image=DestroyImage(tile_image);
-  if (texture != (Image *) NULL)
-    texture=DestroyImage(texture);
+  texture=DestroyMontageTexture(texture);
   title=DestroyString(title);
   primary_list=(Image **) RelinquishMagickMemory(primary_list);
   draw_info=DestroyDrawInfo(draw_info);
