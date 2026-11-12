@@ -8536,6 +8536,12 @@ typedef struct _FontBrowserWidgets
     *expose_info,
     *text_info,
     *selection_info;
+
+  char
+    ***listhead;
+
+  MagickStatusType
+    *mask;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -9653,6 +9659,668 @@ static void RedrawFontBrowserList(const FontBrowserContext *context,
     }
 }
 
+static void RedrawFontBrowserAction(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XFontStruct
+    **const font_info = widgets->font_info;
+
+  XWidgetInfo
+    *const mode_info = widgets->mode_info;
+
+  if ((*state) & RedrawActionState)
+    {
+      XFontStruct
+        *save_info;
+
+      /*
+        Display the selected font in a drawing area.
+      */
+      save_info=windows->widget.font_info;
+      (*font_info)=XLoadQueryFont(display,(*reply_info).text);
+      if ((*font_info) != (XFontStruct *) NULL)
+        {
+          windows->widget.font_info=(*font_info);
+          (void) XSetFont(display,windows->widget.widget_context,
+            (*font_info)->fid);
+        }
+      XDrawBeveledButton(display,&windows->widget,mode_info);
+      windows->widget.font_info=save_info;
+      if ((*font_info) != (XFontStruct *) NULL)
+        {
+          (void) XSetFont(display,windows->widget.widget_context,
+            windows->widget.font_info->fid);
+          (void) XFreeFont(display,(*font_info));
+        }
+      XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+      XDrawMatteText(display,&windows->widget,reply_info);
+      (*state)&=(unsigned int) (~RedrawActionState);
+    }
+}
+
+static MagickBooleanType ReloadFontList(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern,
+    *const back_pattern = context->back_pattern,
+    *const reply = context->reply;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  int
+    *const fonts = widgets->fonts;
+
+  char
+    ***const fontlist = widgets->fontlist,
+    ***const listhead = widgets->listhead;
+
+  const FontBrowserUpdateTargets
+    update_targets = { action_info, fontlist, fonts };
+
+  FontBrowserUpdate
+    update;
+
+  /*
+    Update font list.
+  */
+  update.display=display;
+  update.windows=windows;
+  update.reply=reply;
+  update.glob_pattern=glob_pattern;
+  update.back_pattern=back_pattern;
+  update.listhead=(*listhead);
+  if (UpdateFontBrowserList(&update,&update_targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType SortFontList(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    *const fonts = widgets->fonts,
+    *const i = widgets->i;
+
+  char
+    ***const fontlist = widgets->fontlist,
+    ***const listhead = widgets->listhead;
+
+  /*
+    Sort font list in ascending order.
+  */
+  (*listhead)=(*fontlist);
+  (*fontlist)=(char **) AcquireQuantumMemory((size_t) (*fonts),
+    sizeof(*(*fontlist)));
+  if ((*fontlist) == (char **) NULL)
+    {
+      XNoticeWidget(display,windows,"MemoryAllocationFailed",
+        "UnableToViewFonts");
+      return(MagickFalse);
+    }
+  for ((*i)=0; (*i) < (*fonts); (*i)++)
+    (*fontlist)[(*i)]=(*listhead)[(*i)];
+  qsort((void *) (*fontlist),(size_t) (*fonts),sizeof(*(*fontlist)),
+    FontCompare);
+  return(MagickTrue);
+}
+
+static void UpdateFontBrowserSlider(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  int
+    *const fonts = widgets->fonts;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_fonts = widgets->visible_fonts;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info,
+    *const expose_info = widgets->expose_info,
+    *const text_info = widgets->text_info,
+    *const selection_info = widgets->selection_info;
+
+  (*slider_info).height=(unsigned int) ((int) (*scroll_info).height-
+    (((*slider_info).min_y-(*scroll_info).y+1) << 1)+1);
+  if ((*fonts) > (int) (*visible_fonts))
+    (*slider_info).height=((*visible_fonts)*(*slider_info).height)/
+    (unsigned int)
+      (*fonts);
+  (*slider_info).max_y=(*south_info).y-(int) (*south_info).bevel_width-(int)
+    (*slider_info).bevel_width-2;
+  (*slider_info).id=0;
+  (*slider_info).y=(*slider_info).min_y;
+  (*expose_info).y=(*slider_info).y;
+  (*selection_info).id=(~0);
+  (*list_info).id=(~0);
+  (*state)|=RedrawListState;
+  /*
+    Redraw font name & reply.
+  */
+  *(*reply_info).text='\0';
+  (*reply_info).cursor=(*reply_info).text;
+  (void) CopyMagickString((*text_info).text,glob_pattern,MagickPathExtent);
+  XDrawWidgetText(display,&windows->widget,text_info);
+  XDrawMatteText(display,&windows->widget,reply_info);
+  XDrawBeveledMatte(display,&windows->widget,scroll_info);
+  XDrawTriangleNorth(display,&windows->widget,north_info);
+  XDrawBeveledButton(display,&windows->widget,slider_info);
+  XDrawTriangleSouth(display,&windows->widget,south_info);
+  XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+  (*state)&=(unsigned int) (~UpdateListState);
+}
+
+static MagickBooleanType WaitFontEvent(const FontBrowserContext *context,
+  XEvent *event,const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  int
+    *const fonts = widgets->fonts;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  if ((*north_info).raised && (*south_info).raised)
+    (void) XIfEvent(display,event,XScreenEvent,(char *) windows);
+  else
+    {
+      /*
+        Brief delay before advancing scroll bar.
+      */
+      XDelay(display,(*delay));
+      (*delay)=SuspendTime;
+      (void) XCheckIfEvent(display,event,XScreenEvent,(char *) windows);
+      if (((*north_info).raised == MagickFalse) && ((*slider_info).id > 0))
+        {
+          /*
+            Move slider up.
+          */
+          (*slider_info).id--;
+          (*state)|=RedrawListState;
+        }
+      if (((*south_info).raised == MagickFalse) &&
+          ((*slider_info).id < (*fonts)))
+        {
+          /*
+            Move slider down.
+          */
+          (*slider_info).id++;
+          (*state)|=RedrawListState;
+        }
+      if ((*event).type != ButtonRelease)
+        return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static void HandleFontSelectionEvent(const FontBrowserContext *context,
+  XEvent event,const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  switch (event.type)
+  {
+    case SelectionClear:
+    {
+      (*reply_info).highlight=MagickFalse;
+      XDrawMatteText(display,&windows->widget,reply_info);
+      break;
+    }
+    case SelectionNotify:
+    {
+      SelectFontBrowserReply(context,event,widgets);
+      break;
+    }
+    case SelectionRequest:
+    {
+      XSelectionEvent
+        notify;
+
+      XSelectionRequestEvent
+        *request;
+
+      /*
+        Set XA_PRIMARY selection.
+      */
+      request=(&(event.xselectionrequest));
+      (void) XChangeProperty(request->display,request->requestor,
+        request->property,request->target,8,PropModeReplace,
+        (unsigned char *) primary_selection,Extent(primary_selection));
+      notify.type=SelectionNotify;
+      notify.display=request->display;
+      notify.requestor=request->requestor;
+      notify.selection=request->selection;
+      notify.target=request->target;
+      notify.time=request->time;
+      if (request->property == None)
+        notify.property=request->target;
+      else
+        notify.property=request->property;
+      (void) XSendEvent(request->display,request->requestor,False,0,
+        (XEvent *) &notify);
+    }
+    default:
+      break;
+  }
+}
+
+static void HandleFontKeyEvent(const FontBrowserContext *context,
+  XEvent event,const FontBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  MagickStatusType
+    *const mask = widgets->mask;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      PressFontBrowserKey(context,event,widgets);
+      break;
+    }
+    case KeyRelease:
+    {
+      (*state)=ReleaseWidgetKey(windows,event,(*state));
+      break;
+    }
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case MapNotify:
+    {
+      (*mask)&=(unsigned int) (~CWX);
+      (*mask)&=(unsigned int) (~CWY);
+      break;
+    }
+    case MotionNotify:
+    {
+      MoveFontBrowserButtons(context,event,widgets);
+      break;
+    }
+    default:
+    {
+      HandleFontSelectionEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
+static void HandleFontEvent(const FontBrowserContext *context,
+  const XEvent event,const FontBrowserTargets *targets,
+  const FontBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      PressFontBrowserScroll(context,event,targets,widgets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      ReleaseFontBrowserScroll(context,event,widgets);
+      break;
+    }
+    case ClientMessage:
+    {
+      ClientFontBrowserMessage(context,event,widgets);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleFontKeyEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
+static MagickBooleanType RespondToFontEvents(const FontBrowserContext *context,
+  const FontBrowserTargets *targets,const FontBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    event;
+
+  do
+  {
+    UpdateFontBrowserLayout(context,widgets);
+    RedrawFontBrowserWidget(context,widgets);
+    if ((*state) & UpdateListState)
+      {
+        if (ReloadFontList(context,widgets) == MagickFalse)
+          break;
+        if (SortFontList(context,widgets) == MagickFalse)
+          return(MagickFalse);
+        UpdateFontBrowserSlider(context,widgets);
+      }
+    JumpFontBrowserList(context,widgets);
+    RedrawFontBrowserList(context,widgets);
+    RedrawFontBrowserAction(context,widgets);
+    /*
+      Wait for next event.
+    */
+    if (WaitFontEvent(context,&event,widgets) != MagickFalse)
+      continue;
+    HandleFontEvent(context,event,targets,widgets);
+  } while (((*state) & ExitState) == 0);
+  return(MagickTrue);
+}
+
+static void FreeFontBrowserList(char **listhead,char **fontlist)
+{
+  /*
+    Free font list.
+  */
+  (void) XFreeFontNames(listhead);
+  fontlist=(char **) RelinquishMagickMemory(fontlist);
+}
+
+static unsigned int GetFontBrowserWidth(XFontStruct *font_info,
+  const char *action)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,(char *) action);
+  if (WidgetTextWidth(font_info,CancelButtonText) > width)
+    width=WidgetTextWidth(font_info,CancelButtonText);
+  if (WidgetTextWidth(font_info,ResetButtonText) > width)
+    width=WidgetTextWidth(font_info,ResetButtonText);
+  if (WidgetTextWidth(font_info,BackButtonText) > width)
+    width=WidgetTextWidth(font_info,BackButtonText);
+  width+=(unsigned int) QuantumMargin;
+  if (WidgetTextWidth(font_info,FontPatternText) > width)
+    width=WidgetTextWidth(font_info,FontPatternText);
+  if (WidgetTextWidth(font_info,FontnameText) > width)
+    width=WidgetTextWidth(font_info,FontnameText);
+  return(width);
+}
+
+static unsigned int WidestFontBrowserName(XFontStruct *font_info,
+  char **fontlist,int fonts)
+{
+  int
+    i;
+
+  unsigned int
+    text_width;
+
+  text_width=0;
+  for (i=0; i < fonts; i++)
+    if (WidgetTextWidth(font_info,fontlist[i]) > text_width)
+      text_width=WidgetTextWidth(font_info,fontlist[i]);
+  return(text_width);
+}
+
+static void MapFontBrowserWidget(Display *display,XWindows *windows,
+  MagickStatusType mask)
+{
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  /*
+    Map Font Browser widget.
+  */
+  (void) CopyMagickString(windows->widget.name,"Browse and Select a Font",
+    MagickPathExtent);
+  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
+  if (status != False)
+    {
+      XSetWMName(display,windows->widget.id,&window_name);
+      XSetWMIconName(display,windows->widget.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  window_changes.width=(int) windows->widget.width;
+  window_changes.height=(int) windows->widget.height;
+  window_changes.x=windows->widget.x;
+  window_changes.y=windows->widget.y;
+  (void) XReconfigureWMWindow(display,windows->widget.id,
+    windows->widget.screen,mask,&window_changes);
+  (void) XMapRaised(display,windows->widget.id);
+  windows->widget.mapped=MagickFalse;
+}
+
+typedef struct _FontBrowserRunTargets
+{
+  int
+    *fonts,
+    *i;
+
+  XFontStruct
+    **font_info;
+
+  char
+    ***fontlist,
+    ***listhead;
+
+  MagickStatusType
+    *mask;
+} FontBrowserRunTargets;
+
+static MagickBooleanType RunFontBrowser(const FontBrowserContext *context,
+  const FontBrowserRunTargets *run_targets)
+{
+  int
+    *const fonts = run_targets->fonts,
+    *const i = run_targets->i;
+
+  XFontStruct
+    **const font_info = run_targets->font_info;
+
+  char
+    ***const fontlist = run_targets->fontlist,
+    ***const listhead = run_targets->listhead;
+
+  MagickStatusType
+    *const mask = run_targets->mask;
+
+  unsigned int
+    visible_fonts;
+
+  size_t
+    delay,
+    state;
+
+  XWidgetInfo
+    action_info,
+    back_info,
+    cancel_info,
+    expose_info,
+    list_info,
+    mode_info,
+    north_info,
+    reply_info,
+    reset_info,
+    scroll_info,
+    selection_info,
+    slider_info,
+    south_info,
+    text_info;
+
+  const FontBrowserTargets
+    targets = { &reply_info, &state, &selection_info, &list_info };
+
+  const FontBrowserWidgets
+    font_widgets = { &reply_info, &state, &back_info,
+      &reset_info, &action_info, &cancel_info, &slider_info, fonts,
+      &scroll_info, &visible_fonts, &north_info, &delay, &south_info, i,
+      font_info, fontlist, &list_info, &mode_info, &expose_info, &text_info,
+      &selection_info, listhead, mask };
+
+  /*
+    Respond to X events.
+  */
+  XGetWidgetInfo((char *) NULL,&slider_info);
+  XGetWidgetInfo((char *) NULL,&north_info);
+  XGetWidgetInfo((char *) NULL,&south_info);
+  XGetWidgetInfo((char *) NULL,&expose_info);
+  XGetWidgetInfo((char *) NULL,&selection_info);
+  visible_fonts=0;
+  delay=SuspendTime << 2;
+  state=UpdateConfigurationState;
+  if (RespondToFontEvents(context,&targets,&font_widgets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireFontList(Display *display,XWindows *windows,
+  char *glob_pattern,const FontBrowserRunTargets *run_targets)
+{
+  int
+    *const fonts = run_targets->fonts,
+    *const i = run_targets->i;
+
+  char
+    ***const fontlist = run_targets->fontlist,
+    ***const listhead = run_targets->listhead;
+
+  (*fontlist)=XListFonts(display,glob_pattern,32767,fonts);
+  if ((*fonts) == 0)
+    {
+      /*
+        Pattern failed, obtain all the fonts.
+      */
+      XNoticeWidget(display,windows,"Unable to obtain fonts names:",
+        glob_pattern);
+      (void) CopyMagickString(glob_pattern,"*",MagickPathExtent);
+      (*fontlist)=XListFonts(display,glob_pattern,32767,fonts);
+      if ((*fontlist) == (char **) NULL)
+        {
+          XNoticeWidget(display,windows,"Unable to obtain fonts names:",
+            glob_pattern);
+          return(MagickFalse);
+        }
+    }
+  /*
+    Sort font list in ascending order.
+  */
+  (*listhead)=(*fontlist);
+  (*fontlist)=(char **) AcquireQuantumMemory((size_t) (*fonts),
+    sizeof(*(*fontlist)));
+  if ((*fontlist) == (char **) NULL)
+    {
+      XNoticeWidget(display,windows,"MemoryAllocationFailed",
+        "UnableToViewFonts");
+      return(MagickFalse);
+    }
+  for ((*i)=0; (*i) < (*fonts); (*i)++)
+    (*fontlist)[(*i)]=(*listhead)[(*i)];
+  qsort((void *) (*fontlist),(size_t) (*fonts),sizeof(*(*fontlist)),
+    FontCompare);
+  return(MagickTrue);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9676,59 +10344,16 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   static MagickStatusType
     mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
 
-  Status
-    status;
-
   unsigned int
     height,
     text_width,
-    visible_fonts,
     width;
-
-  size_t
-    delay,
-    state;
-
-  XEvent
-    event;
 
   XFontStruct
     *font_info;
 
-  XTextProperty
-    window_name;
-
-  XWidgetInfo
-    action_info,
-    back_info,
-    cancel_info,
-    expose_info,
-    list_info,
-    mode_info,
-    north_info,
-    reply_info,
-    reset_info,
-    scroll_info,
-    selection_info,
-    slider_info,
-    south_info,
-    text_info;
-
-  XWindowChanges
-    window_changes;
-
-  const FontBrowserTargets
-    targets = { &reply_info, &state, &selection_info, &list_info };
-
-  const FontBrowserWidgets
-    font_widgets = { &reply_info, &state, &back_info,
-      &reset_info, &action_info, &cancel_info, &slider_info, &fonts,
-      &scroll_info, &visible_fonts, &north_info, &delay, &south_info, &i,
-      &font_info, &fontlist, &list_info, &mode_info, &expose_info, &text_info,
-      &selection_info };
-
-  FontBrowserContext
-    font_context;
+  const FontBrowserRunTargets
+    run_targets = { &fonts, &i, &font_info, &fontlist, &listhead, &mask };
 
   /*
     Get font list and sort in ascending order.
@@ -9743,57 +10368,14 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   XCheckRefreshWindows(display,windows);
   (void) CopyMagickString(back_pattern,glob_pattern,MagickPathExtent);
   (void) CopyMagickString(reset_pattern,"*",MagickPathExtent);
-  fontlist=XListFonts(display,glob_pattern,32767,&fonts);
-  if (fonts == 0)
-    {
-      /*
-        Pattern failed, obtain all the fonts.
-      */
-      XNoticeWidget(display,windows,"Unable to obtain fonts names:",
-        glob_pattern);
-      (void) CopyMagickString(glob_pattern,"*",MagickPathExtent);
-      fontlist=XListFonts(display,glob_pattern,32767,&fonts);
-      if (fontlist == (char **) NULL)
-        {
-          XNoticeWidget(display,windows,"Unable to obtain fonts names:",
-            glob_pattern);
-          return;
-        }
-    }
-  /*
-    Sort font list in ascending order.
-  */
-  listhead=fontlist;
-  fontlist=(char **) AcquireQuantumMemory((size_t) fonts,sizeof(*fontlist));
-  if (fontlist == (char **) NULL)
-    {
-      XNoticeWidget(display,windows,"MemoryAllocationFailed",
-        "UnableToViewFonts");
-      return;
-    }
-  for (i=0; i < fonts; i++)
-    fontlist[i]=listhead[i];
-  qsort((void *) fontlist,(size_t) fonts,sizeof(*fontlist),FontCompare);
+  if (AcquireFontList(display,windows,glob_pattern,&run_targets) == MagickFalse)
+    return;
   /*
     Determine Font Browser widget attributes.
   */
   font_info=windows->widget.font_info;
-  text_width=0;
-  for (i=0; i < fonts; i++)
-    if (WidgetTextWidth(font_info,fontlist[i]) > text_width)
-      text_width=WidgetTextWidth(font_info,fontlist[i]);
-  width=WidgetTextWidth(font_info,(char *) action);
-  if (WidgetTextWidth(font_info,CancelButtonText) > width)
-    width=WidgetTextWidth(font_info,CancelButtonText);
-  if (WidgetTextWidth(font_info,ResetButtonText) > width)
-    width=WidgetTextWidth(font_info,ResetButtonText);
-  if (WidgetTextWidth(font_info,BackButtonText) > width)
-    width=WidgetTextWidth(font_info,BackButtonText);
-  width+=(unsigned int) QuantumMargin;
-  if (WidgetTextWidth(font_info,FontPatternText) > width)
-    width=WidgetTextWidth(font_info,FontPatternText);
-  if (WidgetTextWidth(font_info,FontnameText) > width)
-    width=WidgetTextWidth(font_info,FontnameText);
+  text_width=WidestFontBrowserName(font_info,fontlist,fonts);
+  width=GetFontBrowserWidth(font_info,action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   /*
     Position Font Browser widget.
@@ -9810,285 +10392,18 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   if (windows->widget.height < windows->widget.min_height)
     windows->widget.height=windows->widget.min_height;
   XConstrainWindowPosition(display,&windows->widget);
-  /*
-    Map Font Browser widget.
-  */
-  (void) CopyMagickString(windows->widget.name,"Browse and Select a Font",
-    MagickPathExtent);
-  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
-  if (status != False)
-    {
-      XSetWMName(display,windows->widget.id,&window_name);
-      XSetWMIconName(display,windows->widget.id,&window_name);
-      (void) XFree((void *) window_name.value);
-    }
-  window_changes.width=(int) windows->widget.width;
-  window_changes.height=(int) windows->widget.height;
-  window_changes.x=windows->widget.x;
-  window_changes.y=windows->widget.y;
-  (void) XReconfigureWMWindow(display,windows->widget.id,
-    windows->widget.screen,mask,&window_changes);
-  (void) XMapRaised(display,windows->widget.id);
-  windows->widget.mapped=MagickFalse;
-  /*
-    Respond to X events.
-  */
-  XGetWidgetInfo((char *) NULL,&slider_info);
-  XGetWidgetInfo((char *) NULL,&north_info);
-  XGetWidgetInfo((char *) NULL,&south_info);
-  XGetWidgetInfo((char *) NULL,&expose_info);
-  XGetWidgetInfo((char *) NULL,&selection_info);
-  visible_fonts=0;
-  delay=SuspendTime << 2;
-  state=UpdateConfigurationState;
-  font_context.display=display;
-  font_context.windows=windows;
-  font_context.glob_pattern=glob_pattern;
-  font_context.back_pattern=back_pattern;
-  font_context.reset_pattern=reset_pattern;
-  font_context.primary_selection=primary_selection;
-  font_context.height=height;
-  font_context.action=action;
-  font_context.width=width;
-  font_context.reply=reply;
-  font_context.text=text;
-  do
+  MapFontBrowserWidget(display,windows,mask);
   {
-    UpdateFontBrowserLayout(&font_context,&font_widgets);
-    RedrawFontBrowserWidget(&font_context,&font_widgets);
-    if (state & UpdateListState)
-      {
-        const FontBrowserUpdateTargets
-          update_targets = { &action_info, &fontlist, &fonts };
+    const FontBrowserContext
+      font_context = { display, windows,
+        glob_pattern, back_pattern, reset_pattern, primary_selection, height,
+        action, width, reply, text };
 
-        FontBrowserUpdate
-          update;
-
-        /*
-          Update font list.
-        */
-        update.display=display;
-        update.windows=windows;
-        update.reply=reply;
-        update.glob_pattern=glob_pattern;
-        update.back_pattern=back_pattern;
-        update.listhead=listhead;
-        if (UpdateFontBrowserList(&update,&update_targets) == MagickFalse)
-          break;
-        /*
-          Sort font list in ascending order.
-        */
-        listhead=fontlist;
-        fontlist=(char **) AcquireQuantumMemory((size_t) fonts,
-          sizeof(*fontlist));
-        if (fontlist == (char **) NULL)
-          {
-            XNoticeWidget(display,windows,"MemoryAllocationFailed",
-              "UnableToViewFonts");
-            return;
-          }
-        for (i=0; i < fonts; i++)
-          fontlist[i]=listhead[i];
-        qsort((void *) fontlist,(size_t) fonts,sizeof(*fontlist),FontCompare);
-        slider_info.height=(unsigned int) ((int) scroll_info.height-
-          ((slider_info.min_y-scroll_info.y+1) << 1)+1);
-        if (fonts > (int) visible_fonts)
-          slider_info.height=(visible_fonts*slider_info.height)/(unsigned int)
-            fonts;
-        slider_info.max_y=south_info.y-(int) south_info.bevel_width-(int)
-          slider_info.bevel_width-2;
-        slider_info.id=0;
-        slider_info.y=slider_info.min_y;
-        expose_info.y=slider_info.y;
-        selection_info.id=(~0);
-        list_info.id=(~0);
-        state|=RedrawListState;
-        /*
-          Redraw font name & reply.
-        */
-        *reply_info.text='\0';
-        reply_info.cursor=reply_info.text;
-        (void) CopyMagickString(text_info.text,glob_pattern,MagickPathExtent);
-        XDrawWidgetText(display,&windows->widget,&text_info);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        XDrawBeveledMatte(display,&windows->widget,&scroll_info);
-        XDrawTriangleNorth(display,&windows->widget,&north_info);
-        XDrawBeveledButton(display,&windows->widget,&slider_info);
-        XDrawTriangleSouth(display,&windows->widget,&south_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        state&=(unsigned int) (~UpdateListState);
-      }
-    JumpFontBrowserList(&font_context,&font_widgets);
-    RedrawFontBrowserList(&font_context,&font_widgets);
-    if (state & RedrawActionState)
-      {
-        XFontStruct
-          *save_info;
-
-        /*
-          Display the selected font in a drawing area.
-        */
-        save_info=windows->widget.font_info;
-        font_info=XLoadQueryFont(display,reply_info.text);
-        if (font_info != (XFontStruct *) NULL)
-          {
-            windows->widget.font_info=font_info;
-            (void) XSetFont(display,windows->widget.widget_context,
-              font_info->fid);
-          }
-        XDrawBeveledButton(display,&windows->widget,&mode_info);
-        windows->widget.font_info=save_info;
-        if (font_info != (XFontStruct *) NULL)
-          {
-            (void) XSetFont(display,windows->widget.widget_context,
-              windows->widget.font_info->fid);
-            (void) XFreeFont(display,font_info);
-          }
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        state&=(unsigned int) (~RedrawActionState);
-      }
-    /*
-      Wait for next event.
-    */
-    if (north_info.raised && south_info.raised)
-      (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    else
-      {
-        /*
-          Brief delay before advancing scroll bar.
-        */
-        XDelay(display,delay);
-        delay=SuspendTime;
-        (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            slider_info.id--;
-            state|=RedrawListState;
-          }
-        if ((south_info.raised == MagickFalse) && (slider_info.id < fonts))
-          {
-            /*
-              Move slider down.
-            */
-            slider_info.id++;
-            state|=RedrawListState;
-          }
-        if (event.type != ButtonRelease)
-          continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        PressFontBrowserScroll(&font_context,event,&targets,&font_widgets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        ReleaseFontBrowserScroll(&font_context,event,&font_widgets);
-        break;
-      }
-      case ClientMessage:
-      {
-        ClientFontBrowserMessage(&font_context,event,&font_widgets);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
-      case KeyPress:
-      {
-        PressFontBrowserKey(&font_context,event,&font_widgets);
-        break;
-      }
-      case KeyRelease:
-      {
-        state=ReleaseWidgetKey(windows,event,state);
-        break;
-      }
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MapNotify:
-      {
-        mask&=(unsigned int) (~CWX);
-        mask&=(unsigned int) (~CWY);
-        break;
-      }
-      case MotionNotify:
-      {
-        MoveFontBrowserButtons(&font_context,event,&font_widgets);
-        break;
-      }
-      case SelectionClear:
-      {
-        reply_info.highlight=MagickFalse;
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        break;
-      }
-      case SelectionNotify:
-      {
-        SelectFontBrowserReply(&font_context,event,&font_widgets);
-        break;
-      }
-      case SelectionRequest:
-      {
-        XSelectionEvent
-          notify;
-
-        XSelectionRequestEvent
-          *request;
-
-        /*
-          Set XA_PRIMARY selection.
-        */
-        request=(&(event.xselectionrequest));
-        (void) XChangeProperty(request->display,request->requestor,
-          request->property,request->target,8,PropModeReplace,
-          (unsigned char *) primary_selection,Extent(primary_selection));
-        notify.type=SelectionNotify;
-        notify.display=request->display;
-        notify.requestor=request->requestor;
-        notify.selection=request->selection;
-        notify.target=request->target;
-        notify.time=request->time;
-        if (request->property == None)
-          notify.property=request->target;
-        else
-          notify.property=request->property;
-        (void) XSendEvent(request->display,request->requestor,False,0,
-          (XEvent *) &notify);
-      }
-      default:
-        break;
-    }
-  } while ((state & ExitState) == 0);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
-  XCheckRefreshWindows(display,windows);
-  /*
-    Free font list.
-  */
-  (void) XFreeFontNames(listhead);
-  fontlist=(char **) RelinquishMagickMemory(fontlist);
+    if (RunFontBrowser(&font_context,&run_targets) == MagickFalse)
+      return;
+  }
+  WithdrawBrowserWidget(display,windows);
+  FreeFontBrowserList(listhead,fontlist);
 }
 
 /*
