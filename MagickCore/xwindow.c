@@ -9241,9 +9241,9 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
               foreground=(unsigned char)
                 (XPixelIntensity(&pixel_info->background_color) <
                  XPixelIntensity(&pixel_info->foreground_color) ?  0x80 : 0x00);
-              if (windows->magnify.depth > 1)
-                Swap(background,foreground);
             }
+          if ((ximage->format == XYBitmap) && (windows->magnify.depth > 1))
+            Swap(background,foreground);
           bit_rows.height=height;
           bit_rows.magnify=magnify;
           bit_rows.ximage=ximage;
@@ -9276,9 +9276,9 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
               foreground=(unsigned char)
                 (XPixelIntensity(&pixel_info->background_color) <
                  XPixelIntensity(&pixel_info->foreground_color) ?  0x01 : 0x00);
-              if (windows->magnify.depth > 1)
-                Swap(background,foreground);
             }
+          if ((ximage->format == XYBitmap) && (windows->magnify.depth > 1))
+            Swap(background,foreground);
           bit_rows.height=height;
           bit_rows.magnify=magnify;
           bit_rows.ximage=ximage;
