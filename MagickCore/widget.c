@@ -10077,6 +10077,40 @@ static void HandleFontEvent(const FontBrowserContext *context,
   }
 }
 
+static MagickBooleanType RespondToFontEvents(const FontBrowserContext *context,
+  const FontBrowserTargets *targets,const FontBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    event;
+
+  do
+  {
+    UpdateFontBrowserLayout(context,widgets);
+    RedrawFontBrowserWidget(context,widgets);
+    if ((*state) & UpdateListState)
+      {
+        if (ReloadFontList(context,widgets) == MagickFalse)
+          break;
+        if (SortFontList(context,widgets) == MagickFalse)
+          return(MagickFalse);
+        UpdateFontBrowserSlider(context,widgets);
+      }
+    JumpFontBrowserList(context,widgets);
+    RedrawFontBrowserList(context,widgets);
+    RedrawFontBrowserAction(context,widgets);
+    /*
+      Wait for next event.
+    */
+    if (WaitFontEvent(context,&event,widgets) != MagickFalse)
+      continue;
+    HandleFontEvent(context,event,targets,widgets);
+  } while (((*state) & ExitState) == 0);
+  return(MagickTrue);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -10112,9 +10146,6 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   size_t
     delay,
     state;
-
-  XEvent
-    event;
 
   XFontStruct
     *font_info;
@@ -10276,28 +10307,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   font_context.width=width;
   font_context.reply=reply;
   font_context.text=text;
-  do
-  {
-    UpdateFontBrowserLayout(&font_context,&font_widgets);
-    RedrawFontBrowserWidget(&font_context,&font_widgets);
-    if (state & UpdateListState)
-      {
-        if (ReloadFontList(&font_context,&font_widgets) == MagickFalse)
-          break;
-        if (SortFontList(&font_context,&font_widgets) == MagickFalse)
-          return;
-        UpdateFontBrowserSlider(&font_context,&font_widgets);
-      }
-    JumpFontBrowserList(&font_context,&font_widgets);
-    RedrawFontBrowserList(&font_context,&font_widgets);
-    RedrawFontBrowserAction(&font_context,&font_widgets);
-    /*
-      Wait for next event.
-    */
-    if (WaitFontEvent(&font_context,&event,&font_widgets) != MagickFalse)
-      continue;
-    HandleFontEvent(&font_context,event,&targets,&font_widgets);
-  } while ((state & ExitState) == 0);
+  if (RespondToFontEvents(&font_context,&targets,&font_widgets) == MagickFalse)
+    return;
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
   XCheckRefreshWindows(display,windows);
