@@ -1790,6 +1790,12 @@ typedef struct _AnnotateTargets
   int
     *x,
     *y;
+
+  XEvent
+    *text_event;
+
+  size_t
+    *state;
 } AnnotateTargets;
 
 static void XGoToPreviousTextLine(const AnnotateTargets *targets)
@@ -1814,6 +1820,845 @@ static void XGoToPreviousTextLine(const AnnotateTargets *targets)
   if ((*annotate_info)->width != 0)
     (*p)+=(ptrdiff_t) strlen((*annotate_info)->text);
 }
+
+typedef struct _AnnotateMenuInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *AnnotateMenu;
+
+  int
+    id;
+
+  char
+    *command;
+} AnnotateMenuInput;
+
+typedef struct _AnnotateFontTargets
+{
+  unsigned int
+    *font_id;
+} AnnotateFontTargets;
+
+static void XSelectAnnotateFont(const AnnotateMenuInput *menu,
+  const AnnotateFontTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XResourceInfo
+    *const resource_info = menu->resource_info;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const AnnotateMenu = menu->AnnotateMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  unsigned int
+    *const font_id = targets->font_id;
+
+  const char
+    *FontMenu[MaxNumberFonts];
+
+  int
+    font_number;
+
+  ssize_t
+    i;
+
+  XFontStruct
+    *font_info;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < MaxNumberFonts; i++)
+    FontMenu[i]=resource_info->font_name[i];
+  FontMenu[MaxNumberFonts-2]="Browser...";
+  FontMenu[MaxNumberFonts-1]=(const char *) NULL;
+  /*
+    Select a font name from the pop-up menu.
+  */
+  font_number=XMenuWidget(display,windows,AnnotateMenu[id],
+    (const char **) FontMenu,command);
+  if (font_number < 0)
+    return;
+  if (font_number == (MaxNumberFonts-2))
+    {
+      static char
+        font_name[MagickPathExtent] = "fixed";
+
+      /*
+        Select a font name from a browser.
+      */
+      resource_info->font_name[font_number]=font_name;
+      XFontBrowserWidget(display,windows,"Select",font_name);
+      if (*font_name == '\0')
+        return;
+    }
+  /*
+    Initialize font info.
+  */
+  font_info=XLoadQueryFont(display,resource_info->font_name[
+    font_number]);
+  if (font_info == (XFontStruct *) NULL)
+    {
+      XNoticeWidget(display,windows,"Unable to load font:",
+        resource_info->font_name[font_number]);
+      return;
+    }
+  (*font_id)=(unsigned int) font_number;
+  (void) XFreeFont(display,font_info);
+}
+
+typedef struct _AnnotateFontColorTargets
+{
+  MagickBooleanType
+    *transparent_pen;
+
+  XColor
+    *color;
+
+  unsigned int
+    *pen_id;
+} AnnotateFontColorTargets;
+
+static void XSelectAnnotateFontColor(const AnnotateMenuInput *menu,
+  const AnnotateFontColorTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XResourceInfo
+    *const resource_info = menu->resource_info;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const AnnotateMenu = menu->AnnotateMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  MagickBooleanType
+    *const transparent_pen = targets->transparent_pen;
+
+  XColor
+    *const color = targets->color;
+
+  unsigned int
+    *const pen_id = targets->pen_id;
+
+  const char
+    *ColorMenu[MaxNumberPens+1];
+
+  int
+    pen_number;
+
+  ssize_t
+    i;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="transparent";
+  ColorMenu[MaxNumberPens-1]="Browser...";
+  ColorMenu[MaxNumberPens]=(const char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,AnnotateMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  (*transparent_pen)=pen_number == (MaxNumberPens-2) ? MagickTrue :
+    MagickFalse;
+  if ((*transparent_pen) != MagickFalse)
+    return;
+  if (pen_number == (MaxNumberPens-1))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set pen color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],color);
+  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
+    (unsigned int) MaxColors,color);
+  windows->pixel_info->pen_colors[pen_number]=(*color);
+  (*pen_id)=(unsigned int) pen_number;
+}
+
+typedef struct _AnnotateBoxColorTargets
+{
+  MagickBooleanType
+    *transparent_box;
+
+  XColor
+    *color;
+
+  unsigned int
+    *box_id;
+} AnnotateBoxColorTargets;
+
+static void XSelectAnnotateBoxColor(const AnnotateMenuInput *menu,
+  const AnnotateBoxColorTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XResourceInfo
+    *const resource_info = menu->resource_info;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const AnnotateMenu = menu->AnnotateMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  MagickBooleanType
+    *const transparent_box = targets->transparent_box;
+
+  XColor
+    *const color = targets->color;
+
+  unsigned int
+    *const box_id = targets->box_id;
+
+  const char
+    *ColorMenu[MaxNumberPens+1];
+
+  int
+    pen_number;
+
+  ssize_t
+    i;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="transparent";
+  ColorMenu[MaxNumberPens-1]="Browser...";
+  ColorMenu[MaxNumberPens]=(const char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,AnnotateMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  (*transparent_box)=pen_number == (MaxNumberPens-2) ? MagickTrue :
+    MagickFalse;
+  if ((*transparent_box) != MagickFalse)
+    return;
+  if (pen_number == (MaxNumberPens-1))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set pen color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],color);
+  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
+    (unsigned int) MaxColors,color);
+  windows->pixel_info->pen_colors[pen_number]=(*color);
+  (*box_id)=(unsigned int) pen_number;
+}
+
+typedef struct _AnnotateRotateTargets
+{
+  double
+    *degrees;
+} AnnotateRotateTargets;
+
+static void XSelectAnnotateRotation(const AnnotateMenuInput *menu,
+  const AnnotateRotateTargets *targets)
+{
+  Display
+    *const display = menu->display;
+
+  XWindows
+    *const windows = menu->windows;
+
+  const char
+    *const *const AnnotateMenu = menu->AnnotateMenu;
+
+  const int
+    id = menu->id;
+
+  char
+    *const command = menu->command;
+
+  double
+    *const degrees = targets->degrees;
+
+  int
+    entry;
+
+  const char
+    *const RotateMenu[] =
+    {
+      "-90",
+      "-45",
+      "-30",
+      "0",
+      "30",
+      "45",
+      "90",
+      "180",
+      "Dialog...",
+      (char *) NULL,
+    };
+
+  static char
+    angle[MagickPathExtent] = "30.0";
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  entry=XMenuWidget(display,windows,AnnotateMenu[id],RotateMenu,
+    command);
+  if (entry < 0)
+    return;
+  if (entry != 8)
+    {
+      (*degrees)=StringToDouble(RotateMenu[entry],(char **) NULL);
+      return;
+    }
+  (void) XDialogWidget(display,windows,"OK","Enter rotation angle:",
+    angle);
+  if (*angle == '\0')
+    return;
+  (*degrees)=StringToDouble(angle,(char **) NULL);
+}
+
+static void XRedrawTextLines(Display *display,XWindows *windows,
+  XAnnotateInfo *annotate_info,GC annotate_context)
+{
+  XAnnotateInfo
+    *text_info;
+
+  text_info=annotate_info;
+  while (text_info != (XAnnotateInfo *) NULL)
+  {
+    if (annotate_info->stencil == ForegroundStencil)
+      (void) XDrawString(display,windows->image.id,annotate_context,
+        text_info->x,text_info->y,text_info->text,
+        (int) strlen(text_info->text));
+    else
+      (void) XDrawImageString(display,windows->image.id,
+        annotate_context,text_info->x,text_info->y,text_info->text,
+        (int) strlen(text_info->text));
+    text_info=text_info->previous;
+  }
+}
+
+static void XEraseTextCharacter(Display *display,XWindows *windows,
+  XFontStruct *font_info,const AnnotateTargets *targets)
+{
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  XEvent
+    *const text_event = targets->text_event;
+
+  /*
+    Erase one character.
+  */
+  if ((*p) == (*annotate_info)->text)
+    {
+      if ((*annotate_info)->previous == (XAnnotateInfo *) NULL)
+        return;
+      else
+        {
+          XGoToPreviousTextLine(targets);
+          return;
+        }
+    }
+  (*p)--;
+  (*x)-=XTextWidth(font_info,(*p),1);
+  (*text_event).xexpose.x=(*x);
+  (*text_event).xexpose.y=(*y)-font_info->max_bounds.ascent;
+  XRefreshWindow(display,&windows->image,text_event);
+}
+
+static void XEraseTextLine(Display *display,XWindows *windows,
+  XFontStruct *font_info,const AnnotateTargets *targets)
+{
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x;
+
+  XEvent
+    *const text_event = targets->text_event;
+
+  /*
+    Erase the entire line of text.
+  */
+  while ((*p) != (*annotate_info)->text)
+  {
+    (*p)--;
+    (*x)-=XTextWidth(font_info,(*p),1);
+    (*text_event).xexpose.x=(*x);
+    XRefreshWindow(display,&windows->image,text_event);
+  }
+}
+
+static MagickBooleanType XAdvanceTextLine(XWindows *windows,
+  XFontStruct *font_info,const AnnotateTargets *targets)
+{
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  /*
+    Advance to the next line of text.
+  */
+  *(*p)='\0';
+  (*annotate_info)->width=(unsigned int) XTextWidth(font_info,
+    (*annotate_info)->text,(int) strlen((*annotate_info)->text));
+  if ((*annotate_info)->next != (XAnnotateInfo *) NULL)
+    {
+      /*
+        Line of text already exists.
+      */
+      (*annotate_info)=(*annotate_info)->next;
+      (*x)=(*annotate_info)->x;
+      (*y)=(*annotate_info)->y;
+      (*p)=(*annotate_info)->text;
+      return(MagickTrue);
+    }
+  (*annotate_info)->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
+    sizeof(*(*annotate_info)->next));
+  if ((*annotate_info)->next == (XAnnotateInfo *) NULL)
+    return(MagickFalse);
+  *(*annotate_info)->next=(*(*annotate_info));
+  (*annotate_info)->next->previous=(*annotate_info);
+  (*annotate_info)=(*annotate_info)->next;
+  (*annotate_info)->text=(char *) AcquireQuantumMemory((size_t) (
+   (ssize_t)  windows->image.width/MagickMax((ssize_t)
+   font_info->min_bounds.width,1)+2L),sizeof(*(*annotate_info)->text));
+  if ((*annotate_info)->text == (char *) NULL)
+    return(MagickFalse);
+  (*annotate_info)->y+=(ssize_t) (*annotate_info)->height;
+  if ((*annotate_info)->y > (int) windows->image.height)
+    (*annotate_info)->y=(int) (*annotate_info)->height;
+  (*annotate_info)->next=(XAnnotateInfo *) NULL;
+  (*x)=(*annotate_info)->x;
+  (*y)=(*annotate_info)->y;
+  (*p)=(*annotate_info)->text;
+  return(MagickTrue);
+}
+
+typedef struct _AnnotateTextInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  GC
+    annotate_context;
+
+  XFontStruct
+    *font_info;
+
+  char
+    *command;
+
+  size_t
+    state;
+} AnnotateTextInput;
+
+static MagickBooleanType XInsertTextCharacter(
+  const AnnotateTextInput *text_input,const AnnotateTargets *targets)
+{
+  Display
+    *const display = text_input->display;
+
+  XWindows
+    *const windows = text_input->windows;
+
+  const GC
+    annotate_context = text_input->annotate_context;
+
+  XFontStruct
+    *const font_info = text_input->font_info;
+
+  char
+    *const command = text_input->command;
+
+  const size_t
+    state = text_input->state;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  /*
+    Draw a single character on the Image window.
+  */
+  if ((state & ModifierState) != 0)
+    return(MagickTrue);
+  if (*command == '\0')
+    return(MagickTrue);
+  *(*p)=(*command);
+  if ((*annotate_info)->stencil == ForegroundStencil)
+    (void) XDrawString(display,windows->image.id,annotate_context,
+      (*x),(*y),(*p),1);
+  else
+    (void) XDrawImageString(display,windows->image.id,
+      annotate_context,(*x),(*y),(*p),1);
+  (*x)+=XTextWidth(font_info,(*p),1);
+  (*p)++;
+  if (((*x)+font_info->max_bounds.width) < (int) windows->image.width)
+    return(MagickTrue);
+  if (XAdvanceTextLine(windows,font_info,targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static KeySym XModifyKeySymbol(const size_t state,KeySym key_symbol)
+{
+  if ((state & ModifierState) != 0)
+    switch ((int) key_symbol)
+    {
+      case XK_u:
+      case XK_U:
+      {
+        key_symbol=DeleteCommand;
+        break;
+      }
+      default:
+        break;
+    }
+  return(key_symbol);
+}
+
+static MagickBooleanType XTypeTextKey(const AnnotateTextInput *text_input,
+  const AnnotateTargets *targets,const KeySym key_symbol)
+{
+  XWindows
+    *const windows = text_input->windows;
+
+  XFontStruct
+    *const font_info = text_input->font_info;
+
+  switch ((int) key_symbol)
+  {
+    default:
+    {
+      if (XInsertTextCharacter(text_input,targets) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+    case XK_Return:
+    case XK_KP_Enter:
+    {
+      if (XAdvanceTextLine(windows,font_info,targets) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XAnnotateKeyPress(
+  const AnnotateTextInput *text_input,const AnnotateTargets *targets,
+  KeySym key_symbol)
+{
+  Display
+    *const display = text_input->display;
+
+  XWindows
+    *const windows = text_input->windows;
+
+  XFontStruct
+    *const font_info = text_input->font_info;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  XEvent
+    *const text_event = targets->text_event;
+
+  size_t
+    *const state = targets->state;
+
+  switch ((int) key_symbol)
+  {
+    case XK_BackSpace:
+    {
+      XEraseTextCharacter(display,windows,font_info,targets);
+      break;
+    }
+    case XK_bracketleft:
+    {
+      key_symbol=XK_Escape;
+      break;
+    }
+    case DeleteCommand:
+    {
+      XEraseTextLine(display,windows,font_info,targets);
+      break;
+    }
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Finished annotating.
+      */
+      (*annotate_info)->width=(unsigned int) XTextWidth(font_info,
+        (*annotate_info)->text,(int) strlen((*annotate_info)->text));
+      XRefreshWindow(display,&windows->image,text_event);
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+    {
+      if (XTypeTextKey(text_input,targets,key_symbol) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XPasteSelectionCharacter(
+  const AnnotateTextInput *text_input,const AnnotateTargets *targets,
+  unsigned char *data,const ssize_t i)
+{
+  Display
+    *const display = text_input->display;
+
+  XWindows
+    *const windows = text_input->windows;
+
+  const GC
+    annotate_context = text_input->annotate_context;
+
+  XFontStruct
+    *const font_info = text_input->font_info;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  if ((char) data[i] != '\n')
+    {
+      /*
+        Draw a single character on the Image window.
+      */
+      *(*p)=(char) data[i];
+      (void) XDrawString(display,windows->image.id,annotate_context,
+        (*x),(*y),(*p),1);
+      (*x)+=XTextWidth(font_info,(*p),1);
+      (*p)++;
+      if (((*x)+font_info->max_bounds.width) < (int) windows->image.width)
+        return(MagickTrue);
+    }
+  /*
+    Advance to the next line of text.
+  */
+  *(*p)='\0';
+  (*annotate_info)->width=(unsigned int) XTextWidth(font_info,
+    (*annotate_info)->text,(int) strlen((*annotate_info)->text));
+  if ((*annotate_info)->next != (XAnnotateInfo *) NULL)
+    {
+      /*
+        Line of text already exists.
+      */
+      (*annotate_info)=(*annotate_info)->next;
+      (*x)=(*annotate_info)->x;
+      (*y)=(*annotate_info)->y;
+      (*p)=(*annotate_info)->text;
+      return(MagickTrue);
+    }
+  (*annotate_info)->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
+    sizeof(*(*annotate_info)->next));
+  if ((*annotate_info)->next == (XAnnotateInfo *) NULL)
+    return(MagickFalse);
+  *(*annotate_info)->next=(*(*annotate_info));
+  (*annotate_info)->next->previous=(*annotate_info);
+  (*annotate_info)=(*annotate_info)->next;
+  (*annotate_info)->text=(char *) AcquireQuantumMemory((size_t)
+    (windows->image.width/MagickMax((ssize_t)
+    font_info->min_bounds.width,1)+2L),sizeof(*(*annotate_info)->text));
+  if ((*annotate_info)->text == (char *) NULL)
+    return(MagickFalse);
+  (*annotate_info)->y+=(ssize_t) (*annotate_info)->height;
+  if ((*annotate_info)->y > (int) windows->image.height)
+    (*annotate_info)->y=(int) (*annotate_info)->height;
+  (*annotate_info)->next=(XAnnotateInfo *) NULL;
+  (*x)=(*annotate_info)->x;
+  (*y)=(*annotate_info)->y;
+  (*p)=(*annotate_info)->text;
+  return(MagickTrue);
+}
+
+static MagickBooleanType XPasteSelectionText(
+  const AnnotateTextInput *text_input,const XEvent *event,
+  const AnnotateTargets *targets)
+{
+  Display
+    *const display = text_input->display;
+
+  Atom
+    type;
+
+  int
+    format;
+
+  unsigned char
+    *data;
+
+  unsigned long
+    after,
+    length;
+
+  int
+    status;
+
+  ssize_t
+    i;
+
+  /*
+    Obtain response from primary selection.
+  */
+  if ((*event).xselection.property == (Atom) None)
+    return(MagickTrue);
+  status=XGetWindowProperty(display,(*event).xselection.requestor,
+    (*event).xselection.property,0L,(long) MagickPathExtent,True,XA_STRING,
+    &type,&format,&length,&after,&data);
+  if (IsSelectionUnusable(status,type,format,length) != MagickFalse)
+    return(MagickTrue);
+  /*
+    Annotate Image window with primary selection.
+  */
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    if (XPasteSelectionCharacter(text_input,targets,data,i) ==
+        MagickFalse)
+      return(MagickFalse);
+  }
+  (void) XFree((void *) data);
+  return(MagickTrue);
+}
+
+static void XSetBoxPixelIndex(XWindows *windows,const unsigned int box_id)
+{
+  ssize_t
+    i;
+
+  windows->pixel_info->box_color=windows->pixel_info->pen_colors[box_id];
+  if (windows->pixel_info->colors != 0)
+    for (i=0; i < (ssize_t) windows->pixel_info->colors; i++)
+      if (windows->pixel_info->pixels[i] ==
+          windows->pixel_info->pen_colors[box_id].pixel)
+        {
+          windows->pixel_info->box_index=(unsigned short) i;
+          break;
+        }
+}
+
+static void XSetPenPixelIndex(XWindows *windows,const unsigned int pen_id)
+{
+  ssize_t
+    i;
+
+  windows->pixel_info->pen_color=windows->pixel_info->pen_colors[pen_id];
+  if (windows->pixel_info->colors != 0)
+    for (i=0; i < (ssize_t) windows->pixel_info->colors; i++)
+      if (windows->pixel_info->pixels[i] ==
+          windows->pixel_info->pen_colors[pen_id].pixel)
+        {
+          windows->pixel_info->pen_index=(unsigned short) i;
+          break;
+        }
+}
+
+static void
+  XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
@@ -1870,9 +2715,6 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     *p,
     text[MagickPathExtent];
 
-  const char
-    *ColorMenu[MaxNumberPens+1];
-
   Cursor
     cursor;
 
@@ -1881,7 +2723,6 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
 
   int
     id,
-    pen_number,
     status,
     x,
     y;
@@ -1891,9 +2732,6 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
 
   size_t
     state;
-
-  ssize_t
-    i;
 
   unsigned int
     height,
@@ -1914,7 +2752,19 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     text_event;
 
   const AnnotateTargets
-    targets = { &annotate_info, &p, &x, &y };
+    targets = { &annotate_info, &p, &x, &y, &text_event, &state };
+
+  const AnnotateRotateTargets
+    rotate_targets = { &degrees };
+
+  const AnnotateBoxColorTargets
+    box_color_targets = { &transparent_box, &color, &box_id };
+
+  const AnnotateFontColorTargets
+    font_color_targets = { &transparent_pen, &color, &pen_id };
+
+  const AnnotateFontTargets
+    font_targets = { &font_id };
 
   /*
     Map Command widget.
@@ -1962,184 +2812,58 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         {
           case AnnotateNameCommand:
           {
-            const char
-              *FontMenu[MaxNumberFonts];
+            AnnotateMenuInput
+              annotate_input;
 
-            int
-              font_number;
-
-            /*
-              Initialize menu selections.
-            */
-            for (i=0; i < MaxNumberFonts; i++)
-              FontMenu[i]=resource_info->font_name[i];
-            FontMenu[MaxNumberFonts-2]="Browser...";
-            FontMenu[MaxNumberFonts-1]=(const char *) NULL;
-            /*
-              Select a font name from the pop-up menu.
-            */
-            font_number=XMenuWidget(display,windows,AnnotateMenu[id],
-              (const char **) FontMenu,command);
-            if (font_number < 0)
-              break;
-            if (font_number == (MaxNumberFonts-2))
-              {
-                static char
-                  font_name[MagickPathExtent] = "fixed";
-
-                /*
-                  Select a font name from a browser.
-                */
-                resource_info->font_name[font_number]=font_name;
-                XFontBrowserWidget(display,windows,"Select",font_name);
-                if (*font_name == '\0')
-                  break;
-              }
-            /*
-              Initialize font info.
-            */
-            font_info=XLoadQueryFont(display,resource_info->font_name[
-              font_number]);
-            if (font_info == (XFontStruct *) NULL)
-              {
-                XNoticeWidget(display,windows,"Unable to load font:",
-                  resource_info->font_name[font_number]);
-                break;
-              }
-            font_id=(unsigned int) font_number;
-            (void) XFreeFont(display,font_info);
+            annotate_input.display=display;
+            annotate_input.resource_info=resource_info;
+            annotate_input.windows=windows;
+            annotate_input.AnnotateMenu=AnnotateMenu;
+            annotate_input.id=id;
+            annotate_input.command=command;
+            XSelectAnnotateFont(&annotate_input,&font_targets);
             break;
           }
           case AnnotateFontColorCommand:
           {
-            /*
-              Initialize menu selections.
-            */
-            for (i=0; i < (int) (MaxNumberPens-2); i++)
-              ColorMenu[i]=resource_info->pen_colors[i];
-            ColorMenu[MaxNumberPens-2]="transparent";
-            ColorMenu[MaxNumberPens-1]="Browser...";
-            ColorMenu[MaxNumberPens]=(const char *) NULL;
-            /*
-              Select a pen color from the pop-up menu.
-            */
-            pen_number=XMenuWidget(display,windows,AnnotateMenu[id],
-              (const char **) ColorMenu,command);
-            if (pen_number < 0)
-              break;
-            transparent_pen=pen_number == (MaxNumberPens-2) ? MagickTrue :
-              MagickFalse;
-            if (transparent_pen != MagickFalse)
-              break;
-            if (pen_number == (MaxNumberPens-1))
-              {
-                static char
-                  color_name[MagickPathExtent] = "gray";
+            AnnotateMenuInput
+              annotate_input;
 
-                /*
-                  Select a pen color from a dialog.
-                */
-                resource_info->pen_colors[pen_number]=color_name;
-                XColorBrowserWidget(display,windows,"Select",color_name);
-                if (*color_name == '\0')
-                  break;
-              }
-            /*
-              Set pen color.
-            */
-            (void) XParseColor(display,windows->map_info->colormap,
-              resource_info->pen_colors[pen_number],&color);
-            XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-              (unsigned int) MaxColors,&color);
-            windows->pixel_info->pen_colors[pen_number]=color;
-            pen_id=(unsigned int) pen_number;
+            annotate_input.display=display;
+            annotate_input.resource_info=resource_info;
+            annotate_input.windows=windows;
+            annotate_input.AnnotateMenu=AnnotateMenu;
+            annotate_input.id=id;
+            annotate_input.command=command;
+            XSelectAnnotateFontColor(&annotate_input,&font_color_targets);
             break;
           }
           case AnnotateBackgroundColorCommand:
           {
-            /*
-              Initialize menu selections.
-            */
-            for (i=0; i < (int) (MaxNumberPens-2); i++)
-              ColorMenu[i]=resource_info->pen_colors[i];
-            ColorMenu[MaxNumberPens-2]="transparent";
-            ColorMenu[MaxNumberPens-1]="Browser...";
-            ColorMenu[MaxNumberPens]=(const char *) NULL;
-            /*
-              Select a pen color from the pop-up menu.
-            */
-            pen_number=XMenuWidget(display,windows,AnnotateMenu[id],
-              (const char **) ColorMenu,command);
-            if (pen_number < 0)
-              break;
-            transparent_box=pen_number == (MaxNumberPens-2) ? MagickTrue :
-              MagickFalse;
-            if (transparent_box != MagickFalse)
-              break;
-            if (pen_number == (MaxNumberPens-1))
-              {
-                static char
-                  color_name[MagickPathExtent] = "gray";
+            AnnotateMenuInput
+              annotate_input;
 
-                /*
-                  Select a pen color from a dialog.
-                */
-                resource_info->pen_colors[pen_number]=color_name;
-                XColorBrowserWidget(display,windows,"Select",color_name);
-                if (*color_name == '\0')
-                  break;
-              }
-            /*
-              Set pen color.
-            */
-            (void) XParseColor(display,windows->map_info->colormap,
-              resource_info->pen_colors[pen_number],&color);
-            XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-              (unsigned int) MaxColors,&color);
-            windows->pixel_info->pen_colors[pen_number]=color;
-            box_id=(unsigned int) pen_number;
+            annotate_input.display=display;
+            annotate_input.resource_info=resource_info;
+            annotate_input.windows=windows;
+            annotate_input.AnnotateMenu=AnnotateMenu;
+            annotate_input.id=id;
+            annotate_input.command=command;
+            XSelectAnnotateBoxColor(&annotate_input,&box_color_targets);
             break;
           }
           case AnnotateRotateCommand:
           {
-            int
-              entry;
+            AnnotateMenuInput
+              annotate_input;
 
-            const char
-              *const RotateMenu[] =
-              {
-                "-90",
-                "-45",
-                "-30",
-                "0",
-                "30",
-                "45",
-                "90",
-                "180",
-                "Dialog...",
-                (char *) NULL,
-              };
-
-            static char
-              angle[MagickPathExtent] = "30.0";
-
-            /*
-              Select a command from the pop-up menu.
-            */
-            entry=XMenuWidget(display,windows,AnnotateMenu[id],RotateMenu,
-              command);
-            if (entry < 0)
-              break;
-            if (entry != 8)
-              {
-                degrees=StringToDouble(RotateMenu[entry],(char **) NULL);
-                break;
-              }
-            (void) XDialogWidget(display,windows,"OK","Enter rotation angle:",
-              angle);
-            if (*angle == '\0')
-              break;
-            degrees=StringToDouble(angle,(char **) NULL);
+            annotate_input.display=display;
+            annotate_input.resource_info=resource_info;
+            annotate_input.windows=windows;
+            annotate_input.AnnotateMenu=AnnotateMenu;
+            annotate_input.id=id;
+            annotate_input.command=command;
+            XSelectAnnotateRotation(&annotate_input,&rotate_targets);
             break;
           }
           case AnnotateHelpCommand:
@@ -2225,17 +2949,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         */
         x=event.xmotion.x;
         y=event.xmotion.y;
-        if (windows->info.mapped != MagickFalse)
-          {
-            if ((x < (windows->info.x+(int) windows->info.width)) &&
-                (y < (windows->info.y+(int) windows->info.height)))
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
-          }
-        else
-          if ((x > (windows->info.x+(int) windows->info.width)) ||
-              (y > (windows->info.y+(int) windows->info.height)))
-            (void) XMapWindow(display,windows->info.id);
+        XTrackInfoWidget(display,windows,x,y);
         break;
       }
       default:
@@ -2393,26 +3107,11 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       {
         if (event.xexpose.count == 0)
           {
-            XAnnotateInfo
-              *text_info;
-
             /*
               Refresh Image window.
             */
             XRefreshWindow(display,&windows->image,(XEvent *) NULL);
-            text_info=annotate_info;
-            while (text_info != (XAnnotateInfo *) NULL)
-            {
-              if (annotate_info->stencil == ForegroundStencil)
-                (void) XDrawString(display,windows->image.id,annotate_context,
-                  text_info->x,text_info->y,text_info->text,
-                  (int) strlen(text_info->text));
-              else
-                (void) XDrawImageString(display,windows->image.id,
-                  annotate_context,text_info->x,text_info->y,text_info->text,
-                  (int) strlen(text_info->text));
-              text_info=text_info->previous;
-            }
+            XRedrawTextLines(display,windows,annotate_info,annotate_context);
             (void) XDrawString(display,windows->image.id,annotate_context,
               x,y,"_",1);
           }
@@ -2420,6 +3119,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       }
       case KeyPress:
       {
+        AnnotateTextInput
+          text_input;
+
         int
           length;
 
@@ -2434,137 +3136,15 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         if (((event.xkey.state & ControlMask) != 0) ||
             ((event.xkey.state & Mod1Mask) != 0))
           state|=ModifierState;
-        if ((state & ModifierState) != 0)
-          switch ((int) key_symbol)
-          {
-            case XK_u:
-            case XK_U:
-            {
-              key_symbol=DeleteCommand;
-              break;
-            }
-            default:
-              break;
-          }
-        switch ((int) key_symbol)
-        {
-          case XK_BackSpace:
-          {
-            /*
-              Erase one character.
-            */
-            if (p == annotate_info->text)
-              {
-                if (annotate_info->previous == (XAnnotateInfo *) NULL)
-                  break;
-                else
-                  {
-                    XGoToPreviousTextLine(&targets);
-                    break;
-                  }
-              }
-            p--;
-            x-=XTextWidth(font_info,p,1);
-            text_event.xexpose.x=x;
-            text_event.xexpose.y=y-font_info->max_bounds.ascent;
-            XRefreshWindow(display,&windows->image,&text_event);
-            break;
-          }
-          case XK_bracketleft:
-          {
-            key_symbol=XK_Escape;
-            break;
-          }
-          case DeleteCommand:
-          {
-            /*
-              Erase the entire line of text.
-            */
-            while (p != annotate_info->text)
-            {
-              p--;
-              x-=XTextWidth(font_info,p,1);
-              text_event.xexpose.x=x;
-              XRefreshWindow(display,&windows->image,&text_event);
-            }
-            break;
-          }
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Finished annotating.
-            */
-            annotate_info->width=(unsigned int) XTextWidth(font_info,
-              annotate_info->text,(int) strlen(annotate_info->text));
-            XRefreshWindow(display,&windows->image,&text_event);
-            state|=ExitState;
-            break;
-          }
-          default:
-          {
-            /*
-              Draw a single character on the Image window.
-            */
-            if ((state & ModifierState) != 0)
-              break;
-            if (*command == '\0')
-              break;
-            *p=(*command);
-            if (annotate_info->stencil == ForegroundStencil)
-              (void) XDrawString(display,windows->image.id,annotate_context,
-                x,y,p,1);
-            else
-              (void) XDrawImageString(display,windows->image.id,
-                annotate_context,x,y,p,1);
-            x+=XTextWidth(font_info,p,1);
-            p++;
-            if ((x+font_info->max_bounds.width) < (int) windows->image.width)
-              break;
-            magick_fallthrough;
-          }
-          case XK_Return:
-          case XK_KP_Enter:
-          {
-            /*
-              Advance to the next line of text.
-            */
-            *p='\0';
-            annotate_info->width=(unsigned int) XTextWidth(font_info,
-              annotate_info->text,(int) strlen(annotate_info->text));
-            if (annotate_info->next != (XAnnotateInfo *) NULL)
-              {
-                /*
-                  Line of text already exists.
-                */
-                annotate_info=annotate_info->next;
-                x=annotate_info->x;
-                y=annotate_info->y;
-                p=annotate_info->text;
-                break;
-              }
-            annotate_info->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
-              sizeof(*annotate_info->next));
-            if (annotate_info->next == (XAnnotateInfo *) NULL)
-              return(MagickFalse);
-            *annotate_info->next=(*annotate_info);
-            annotate_info->next->previous=annotate_info;
-            annotate_info=annotate_info->next;
-            annotate_info->text=(char *) AcquireQuantumMemory((size_t) (
-             (ssize_t)  windows->image.width/MagickMax((ssize_t)
-             font_info->min_bounds.width,1)+2L),sizeof(*annotate_info->text));
-            if (annotate_info->text == (char *) NULL)
-              return(MagickFalse);
-            annotate_info->y+=(ssize_t) annotate_info->height;
-            if (annotate_info->y > (int) windows->image.height)
-              annotate_info->y=(int) annotate_info->height;
-            annotate_info->next=(XAnnotateInfo *) NULL;
-            x=annotate_info->x;
-            y=annotate_info->y;
-            p=annotate_info->text;
-            break;
-          }
-        }
+        key_symbol=XModifyKeySymbol(state,key_symbol);
+        text_input.display=display;
+        text_input.windows=windows;
+        text_input.annotate_context=annotate_context;
+        text_input.font_info=font_info;
+        text_input.command=command;
+        text_input.state=state;
+        if (XAnnotateKeyPress(&text_input,&targets,key_symbol) == MagickFalse)
+          return(MagickFalse);
         break;
       }
       case KeyRelease:
@@ -2579,85 +3159,17 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       }
       case SelectionNotify:
       {
-        Atom
-          type;
+        AnnotateTextInput
+          text_input;
 
-        int
-          format;
-
-        unsigned char
-          *data;
-
-        unsigned long
-          after,
-          length;
-
-        /*
-          Obtain response from primary selection.
-        */
-        if (event.xselection.property == (Atom) None)
-          break;
-        status=XGetWindowProperty(display,event.xselection.requestor,
-          event.xselection.property,0L,(long) MagickPathExtent,True,XA_STRING,
-          &type,&format,&length,&after,&data);
-        if (IsSelectionUnusable(status,type,format,length) != MagickFalse)
-          break;
-        /*
-          Annotate Image window with primary selection.
-        */
-        for (i=0; i < (ssize_t) length; i++)
-        {
-          if ((char) data[i] != '\n')
-            {
-              /*
-                Draw a single character on the Image window.
-              */
-              *p=(char) data[i];
-              (void) XDrawString(display,windows->image.id,annotate_context,
-                x,y,p,1);
-              x+=XTextWidth(font_info,p,1);
-              p++;
-              if ((x+font_info->max_bounds.width) < (int) windows->image.width)
-                continue;
-            }
-          /*
-            Advance to the next line of text.
-          */
-          *p='\0';
-          annotate_info->width=(unsigned int) XTextWidth(font_info,
-            annotate_info->text,(int) strlen(annotate_info->text));
-          if (annotate_info->next != (XAnnotateInfo *) NULL)
-            {
-              /*
-                Line of text already exists.
-              */
-              annotate_info=annotate_info->next;
-              x=annotate_info->x;
-              y=annotate_info->y;
-              p=annotate_info->text;
-              continue;
-            }
-          annotate_info->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
-            sizeof(*annotate_info->next));
-          if (annotate_info->next == (XAnnotateInfo *) NULL)
-            return(MagickFalse);
-          *annotate_info->next=(*annotate_info);
-          annotate_info->next->previous=annotate_info;
-          annotate_info=annotate_info->next;
-          annotate_info->text=(char *) AcquireQuantumMemory((size_t)
-            (windows->image.width/MagickMax((ssize_t)
-            font_info->min_bounds.width,1)+2L),sizeof(*annotate_info->text));
-          if (annotate_info->text == (char *) NULL)
-            return(MagickFalse);
-          annotate_info->y+=(ssize_t) annotate_info->height;
-          if (annotate_info->y > (int) windows->image.height)
-            annotate_info->y=(int) annotate_info->height;
-          annotate_info->next=(XAnnotateInfo *) NULL;
-          x=annotate_info->x;
-          y=annotate_info->y;
-          p=annotate_info->text;
-        }
-        (void) XFree((void *) data);
+        text_input.display=display;
+        text_input.windows=windows;
+        text_input.annotate_context=annotate_context;
+        text_input.font_info=font_info;
+        text_input.command=command;
+        text_input.state=state;
+        if (XPasteSelectionText(&text_input,&event,&targets) == MagickFalse)
+          return(MagickFalse);
         break;
       }
       default:
@@ -2696,24 +3208,8 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     /*
       Determine pixel index for box and pen color.
     */
-    windows->pixel_info->box_color=windows->pixel_info->pen_colors[box_id];
-    if (windows->pixel_info->colors != 0)
-      for (i=0; i < (ssize_t) windows->pixel_info->colors; i++)
-        if (windows->pixel_info->pixels[i] ==
-            windows->pixel_info->pen_colors[box_id].pixel)
-          {
-            windows->pixel_info->box_index=(unsigned short) i;
-            break;
-          }
-    windows->pixel_info->pen_color=windows->pixel_info->pen_colors[pen_id];
-    if (windows->pixel_info->colors != 0)
-      for (i=0; i < (ssize_t) windows->pixel_info->colors; i++)
-        if (windows->pixel_info->pixels[i] ==
-            windows->pixel_info->pen_colors[pen_id].pixel)
-          {
-            windows->pixel_info->pen_index=(unsigned short) i;
-            break;
-          }
+    XSetBoxPixelIndex(windows,box_id);
+    XSetPenPixelIndex(windows,pen_id);
     /*
       Define the annotate geometry string.
     */

@@ -4223,7 +4223,11 @@ function).
 1. The `switch` has a `default:` label; its controlling expression `e` is a variable, or
    an expression of variables with no call, assignment or increment, that no statement
    inside the `switch` writes (checked by reading, aliasing included). It lies outside
-   every OpenMP region and contains no `#pragma` line.
+   every OpenMP region and contains no `#pragma` line. A statement of a *kept* group
+   may write a variable `e` (2026-11-12) when no group falls through into a moved group
+   (step 2): the `switch` evaluates `e` once, a kept group runs only on a path that
+   never reaches a moved group, so the value the new function's `switch` is given is
+   the one the original dispatched on.
 2. Choose the groups that move: the group carrying `default:`, and others beside it.
    Each moved group ends with a `break;` of this `switch` or with `return(R);`, holds no
    other exit (no `continue`, `goto`, other `return`, or `break` of an enclosing loop),
@@ -4239,7 +4243,14 @@ function).
    value, and declares one `const` local per member at the top (N step 4); the call
    group of step 5 declares the `Name` local at the top of its block and assigns every
    member from its variable, in declaration order, directly before the call (N steps 5
-   and 6). Splits of one `switch` may share one `Name` (N step 8, *Sibling blocks*).
+   and 6). Splits of one `switch` may share one `Name` (N step 8, *Sibling blocks*),
+   declared once at the top of the block that holds the `switch` and filled once directly
+   before it, as Recipe SD step 8 does (the moved groups then pass `&name` on, written
+   `name`). A `const` targets struct of Recipe CT that a moved group passes on to
+   helpers as `&targets` (it writes nothing itself) goes as one more parameter `const T
+   *targets`, after the input struct, each `&targets` of the groups written `targets`
+   (Recipe N step 2's pass-through of an address the block passes to a callee); the
+   groups' own text is otherwise unchanged (2026-11-12).
 4. Cut the moved groups, labels and bodies, in their order, into a new `static
    MagickBooleanType` function directly above the caller, whose body is `switch (e)
    { ... }` with the same text of `e`, followed by `return(MagickTrue);`. Each
@@ -10840,7 +10851,12 @@ whole groups and keeps their nesting in the new function.
    the top of its body, with the addresses as its initialiser (`const T targets = { &a,
    &b, ... };`). A later block of the same function whose written variables are among
    its members takes the same struct instead of a new one and binds only the members
-   it writes; a variable outside the struct cannot be added to it later.
+   it writes. A variable outside the struct may be added to it as a new last member
+   (2026-11-12), when the block that writes it is moved under this recipe: the typedef
+   gains the member after the last, the initialiser the address `&v` after the last,
+   in the commit of that helper; the helpers made earlier bind only the members they
+   write, so their text does not change, and the entries before the new one keep their
+   positions. Six members stay the limit.
 4. Cut the block into a new `static void` function directly above the caller. It takes
    the variables the block only reads by value, or in one `const` input struct filled
    as Recipe Y steps 3 to 5 say (Recipe N step 2's conditions for struct values and its
@@ -10943,6 +10959,11 @@ static void SelectListBrowserEntry(const ListBrowserPress *press,
   and the second falls off its end; either way the caller runs the case's own `break;`
   next, so the `switch` ends at the same point after the same statements, as in Recipe
   E step 7's `void` form.
+- A member added to the targets struct by a later commit (step 3) changes no earlier
+  helper: each binds `V *const v = targets->v;` by member name, so a member after its
+  own is never read by it, and the initialiser's earlier entries stand where they stood;
+  the new member's address is the address of a caller local, taken like the others
+  (step 2), so the new helper writes that local and nothing else of it changes.
 - The written variables stay the caller's own locals, read and written directly
   everywhere else; only their addresses travel, fixed at the declaration and bound once
   to `*const` locals in the helper, so each `(*v)` is the object `v` named, read and
@@ -11393,15 +11414,19 @@ end in `break;`.
    (nothing after it in the group), and the next case `B` is directly below it. `B`'s
    whole body, after an earlier step of this catalogue (Recipe N, CT or E step 7), is
    one expression statement `Q(a1,...,an);` followed by `break;`, `Q` a `static void`
-   function; `B` declares nothing and runs nothing else.
+   function; `B` declares nothing and runs nothing else. Or (2026-11-12), after Recipe
+   CR, W or I, the failure guard `if (Q(a1,...,an) == MagickFalse) return(c);` followed
+   by `break;`, `Q` a `static MagickBooleanType` function and `c` a constant, the
+   guard's two lines being `B`'s whole body.
 2. Every name in the arguments `a1,...,an` is declared outside both cases (in a block that
    encloses the `switch`), so it means the same object in `A` as in `B`. Nothing runs
    between the end of `A`'s group and `B`'s call (`B`'s label is the next thing and `B`
    declares nothing), so the call placed in `A` reads the values the fall-through
    carried (checked by reading).
 3. In `A` replace `magick_fallthrough;` by the call `Q(a1,...,an);` copied from `B`,
-   character for character, followed by `break;`. `B` stays as it is, entered by its own
-   label.
+   character for character, followed by `break;` (in the guard form, by the guard's two
+   lines, the `if` and its `return(c);`, copied likewise, then `break;`). `B` stays as it
+   is, entered by its own label.
 4. Check by reading that `A` now ends in `break;` on every path and `B` is untouched; the
    next step is the Recipe that moves `A` (CT, whose helper then holds the call).
 
@@ -11458,7 +11483,10 @@ end in `break;`.
   run the same call with the same arguments at the same point and break; the paths that
   left `A` earlier are untouched, and a dispatch on `B`'s label still runs `B`'s body.
   Nothing ran between the end of `A` and the call in the original (step 1), and nothing
-  runs between them now.
+  runs between them now. In the guard form the same holds for the two statements: the
+  fall-through ran `B`'s `if` first and `Q`'s result decided `return(c);` or `break;`; the
+  copy in `A` evaluates the same call at the same point and returns the same `c` or
+  breaks, so `A`'s paths end as `B`'s body ended.
 - The call appears twice in the text: `refactor_guard.py --calls` reports `+1` for `Q`
   (the one added call), which is this recipe's expected movement and nothing else.
 - Removing `magick_fallthrough;` removes a `-Wimplicit-fallthrough` annotation the case no
@@ -11598,6 +11626,150 @@ its `switch` when the region crop fails, so that OC (block followed by `continue
 (whole body or tail) and the break/return recipes refuse it; a probe of the chain with this
 recipe takes the function out of *Deep, Nested Complexity* and *Brain Method*. Added by
 Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe CR - Extract a Tail That Ends Its Case or Iteration or Returns Failure
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Brain Method*, *Bumpy Road
+Ahead* or *Large Method*, and the block that would fix it is the tail of a `switch` case or
+of a sequential loop's body, so that every path out of it either ends the case or the
+iteration (by falling off its end, or through `break;` or `continue;` from inside it, which
+do the same) or leaves the function through `return(c);` of one constant, as `display.c`'s
+`XAnnotateEditImage` does for the text it adds to the annotation: the Return key's case
+(`if (annotate_info->next != NULL) { ...; break; }`, then two allocations that
+`return(MagickFalse);` when they fail) and the loop that pastes a selection, whose body
+`continue`s or returns.
+
+**Not covered by:** Recipe CT, whose step 1 refuses a `return` in the block (and whose helper
+is `void`); Recipe E step 7, whose `switch` form takes no `return` and whose `continue;`
+form no `return` either; Recipes I and W, which refuse the mix of a `break;` (or a
+`continue;`) that leaves the block and a `return` (I step 1: only `return(c);`, or only
+`break;`; W step 1: no `break` or `continue` that leaves it); Recipe LC, whose block is
+followed by statements that stay; Recipes BR and RV, whose `break;` ends a loop or that
+return different values.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#` line. It is (a) the run of
+   statements of a `switch` case after which the case runs only its closing `break;` on every
+   path (Recipe CT step 1's position: the whole body but that `break;`, or the last
+   statement of a branch that ends the case), or (b) the statements that end the body of a
+   sequential loop, after which the iteration ends (the whole body, or its last
+   statements). Every `break;` in it that leaves it ends that `switch` (a), every
+   `continue;` that leaves it continues that loop (b); a `break` or `continue` of a loop or
+   `switch` nested inside it stays as it is. It has no `goto`, and every `return` in it is
+   `return(c);` with one constant `c` (written alike); at least one such `return` stands.
+2. The variables of the caller the block writes and the caller reads after it go in one
+   `const` targets struct as Recipe CT steps 2 and 3 say (zero, or two to six; a single
+   one by pointer when it is a plain local); temporaries it writes before reading are
+   declared in the new function (Recipe E step 4); variables it declares move with it.
+3. Cut the block into a new `static MagickBooleanType` function directly above the caller.
+   Each `break;` or `continue;` that left it becomes `return(MagickTrue);`, each
+   `return(c);` becomes `return(MagickFalse);`, one for one, and the function ends with
+   `return(MagickTrue);`. Written variables are bound and written as CT step 5 says; nothing
+   else in the text changes.
+4. Pass what the block only reads by value, or in one `const` input struct as CT step 4
+   says, then `const T *targets` (before any value the block reads and writes, which
+   goes by value, E step 4): at most four parameters.
+5. Where the block stood write `if (Helper(...) == MagickFalse) return(c);`, with the
+   block's own `c`. In (a) the case's own `break;` follows it; in (b) the call is the last
+   statement of the body. Check every argument, member and binding by reading.
+
+**Before:**
+
+```c
+          case XK_Return:
+          case XK_KP_Enter:
+          {
+            *p='\0';
+            ...
+            if (annotate_info->next != (XAnnotateInfo *) NULL)
+              {
+                annotate_info=annotate_info->next;
+                ...
+                break;
+              }
+            annotate_info->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
+              sizeof(*annotate_info->next));
+            if (annotate_info->next == (XAnnotateInfo *) NULL)
+              return(MagickFalse);
+            ...
+            p=annotate_info->text;
+            break;
+          }
+```
+
+**After:**
+
+```c
+static MagickBooleanType XAdvanceTextLine(XWindows *windows,
+  XFontStruct *font_info,const AnnotateTargets *targets)
+{
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+  ...
+  *(*p)='\0';
+  ...
+  if ((*annotate_info)->next != (XAnnotateInfo *) NULL)
+    {
+      (*annotate_info)=(*annotate_info)->next;
+      ...
+      return(MagickTrue);
+    }
+  (*annotate_info)->next=(XAnnotateInfo *) AcquireQuantumMemory(1,
+    sizeof(*(*annotate_info)->next));
+  if ((*annotate_info)->next == (XAnnotateInfo *) NULL)
+    return(MagickFalse);
+  ...
+  return(MagickTrue);
+}
+...
+          case XK_Return:
+          case XK_KP_Enter:
+          {
+            if (XAdvanceTextLine(windows,font_info,&targets) == MagickFalse)
+              return(MagickFalse);
+            break;
+          }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, path by path. A path that reached a `break;` (a) or a
+  `continue;` (b) ended the case or the iteration at once, running nothing after the block
+  (steps 1 and 5); in the helper it is `return(MagickTrue);`, the caller does not return,
+  and runs the case's `break;` (a) or ends the body (b), at the same point after the same
+  statements. A path that fell off the end of the block did the same and is the helper's
+  last `return(MagickTrue);`. A path that reached `return(c);` ran the same statements and
+  the helper returns `MagickFalse`, on which the caller returns the same `c` directly after
+  the call, nothing in between.
+- The written variables stay the caller's own locals, read and written directly
+  everywhere else; only their addresses travel, bound once to `*const` locals, so each
+  `(*v)` is the object `v` named at the same point (Recipe CT's argument). A by-value
+  input is a copy taken at the call, and the block wrote none of its inputs.
+- The helper's result is the block's status, not a value of the function: the caller
+  tests it for the one `return(c);` and for nothing else. A `return` of two different
+  values is Recipe RV's, a `break;` that ends a loop around the block is Recipe BR's.
+- The failure paths are mostly allocation failures that no case reaches: the oracle
+  checks the paths its cases take, the rest are checked by reading each `return(c);`
+  against its `return(MagickFalse);`, with `tools/case_tail_check.py --returns` and
+  `tools/obj_modulo.sh` for the lines no case reaches.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved) and steps 1, 2 and 4 checked by reading; or, when no case reaches
+some of the moved lines, guard: the same, plus `tools/case_tail_check.py FILE Targets Helper
+--returns` printing `OK` and `tools/obj_modulo.sh` (`WIDE=1` for the wide-build files)
+printing `IDENTICAL` or `MODULO-IDENTICAL`.
+
+**Provenance:** 2026-11-12, from `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b,
+wide build): the text loop's Return key and the selection-paste loop leave through `break;`
+or `continue;` on some paths and through `return(MagickFalse);` when an allocation fails, and
+write four locals the loop reads afterwards; CT refuses the `return`, I and W the mix. Their
+`if` that tests the result sits at depth 3 when the call stands in the event `switch`'s
+case, and depth 4 inside the key `switch`, which the next steps (Recipe W on the whole key
+`switch`) lift. Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
 
 ---
 
@@ -12128,3 +12300,8 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | SG | Spread an Enclosing Guard over the Tests Inside It: `if (G) { if (A1) X1 else if (A2) X2 ... }` becomes the chain of `((G) && (Ak))` tests, and `if (G) { S if (B) T }` becomes `if (G) S` and `if ((G) && (B)) T`, for a side-effect-free `G` (in the second form, one that `S` does not write); `tools/guard_spread_check.py` checks the rewrite token by token | `accelerate.c`'s `ComputeContrastStretchImage` (campaign A, W18 lane a, wide build), which no case reaches: four per-channel stretch-map blocks (shape a) and the histogram unmap (shape b) are five of its six bumps; Recipe CN refuses (statements before the nested test, or an else chain), moving them gives four helpers that clone each other (probe 3.08 to 3.01), and the unmap's `goto` and throw cannot move at the unreached level. Probe: 3.08 to 3.15, bumps 5 to 1 | owner |
 | 2026-11-12 | AMEND | V, Y | V step 2 (and Y step 4's `*v`): the one written variable `v` may be an array of the caller's that the block only indexes (`v[e]`, read or assigned) and passes whole to no callee; it goes as a pointer parameter `T *v`, as Recipe E step 3 passes an accumulator array, and `v[e]` stays as written in the new function (the array's name is the address of its first element, C11 6.3.2.1p3, so `v[e]` is the same element) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W18 lane a, wide build): the loop that creates the two temporary buffers, `for (k = 0; k < 2; k++) { tempImageBuffer[k] = clCreateBuffer(...); if (clStatus != CL_SUCCESS) { throw; goto cleanup; } }`, is one of its three bumps; it writes the array `tempImageBuffer` element by element and leaves through `goto cleanup;`, which Recipe V step 2 (a plain local) and Recipe I step 2 (no array) refuse, and Recipe AR refuses a `goto`. The function leaves Bumpy Road Ahead (bumps 2 to 1, after the cleanup loop left) | owner |
 | 2026-11-12 | AMEND | SG | Shape (c): `if (G) { S if (B) T } else E` becomes `if (G) { S } else E` and `if ((G) && (B)) T`, when `G` has no side effect and neither `S` nor `E` writes anything `G` reads (`E` runs only when `G` was false, and `G` is evaluated again after it); `tools/guard_spread_check.py` checks it as well | `accelerate.c`'s `ComputeResizeImage` (campaign A, W18 lane a, wide build): after its first arm becomes a helper call, `if (xFactor > yFactor) { fills; if (call == MagickFalse) goto cleanup; } else {...}` keeps the exit test nested in the arm, Recipe I and Recipe E cannot take an exit test out of the arm, and the selection's two arms are the function's last two bumps. A probe: the function leaves Bumpy Road Ahead, so does the file, accelerate.c 3.17 to 3.19 | owner |
+| 2026-11-12 | AMEND | CT | Step 3: a variable outside the targets struct may be added as a new last member (typedef and initialiser each gain one entry after the last) in the commit of the helper that writes it; the earlier helpers bind only the members they write and do not change. *Careful* gives the argument | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): `AnnotateTargets` (`annotate_info`, `p`, `x`, `y`) serves the text loop's line-advance blocks, and the BackSpace and Delete keys also write the cursor event `text_event`, which the step's "cannot be added later" refused; the text loop's key switch holds eleven depth-4 sites that need those helpers | owner |
+| 2026-11-12 | NEW | CR | Extract a Tail That Ends Its Case or Iteration or Returns Failure: the tail of a `switch` case or of a sequential loop's body that leaves through `break;` or `continue;` (the same as falling off its end) on some paths and through `return(c);` of one constant on others moves to a `static MagickBooleanType` function (each `break;`/`continue;` is `return(MagickTrue);`, each `return(c);` is `return(MagickFalse);`, the end `return(MagickTrue);`), written variables by Recipe CT's targets struct; the caller writes `if (Helper(...) == MagickFalse) return(c);`, followed by the case's `break;` | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's Return key and its selection-paste loop body leave through `break;`/`continue;` on some paths and `return(MagickFalse);` when an allocation fails, and write `annotate_info`, `p`, `x` and `y`; CT (no `return`), I and W (no mixed exits), E step 7 and LC refuse them | owner |
+| 2026-11-12 | AMEND | FT | Step 1 and step 3: the case `B` that `A` falls into may instead be the failure guard `if (Q(a1,...,an) == MagickFalse) return(c);` followed by `break;`, `Q` a `static MagickBooleanType` function made by Recipe CR, W or I and `c` a constant; `A` gets the guard's two lines and a `break;` in place of `magick_fallthrough;`. *Careful* gives the argument | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's default key group (draw a character, then `magick_fallthrough;` when the line is full) falls into the Return group, which Recipe CR made `if (XAdvanceTextLine(...) == MagickFalse) return(MagickFalse); break;`; FT's void-call form refuses it, so the default group's four depth-4 tests cannot move | owner |
+| 2026-11-12 | AMEND | SR | Step 1: a kept group may write the controlling variable `e` when no group falls through into a moved group (the `switch` evaluates `e` once and a kept group never reaches a moved one). Step 3: the input struct may be shared and filled once before the `switch` (SD step 8), and a `const` targets struct that a moved group passes on as `&targets` goes as one more parameter, written `targets`. *Not covered by* and *Careful* unchanged | `display.c`'s `XAnnotateEditImage` (campaign A, W18 lane b, wide build): the text loop's key `switch` holds one group (`XK_bracketleft`: `key_symbol=XK_Escape;`) that writes `e`, which SR step 1 refused, beside the default and Return groups that call the failing helpers; a stub of the whole `switch` as one helper measures cc 9 (Complex Method), so those two groups go to a second one | owner |
+| 2026-11-12 | WORDING | CR | Step 4: the targets struct comes after the input struct and before a by-value parameter that the block reads and then writes (`XAnnotateKeyPress`'s `key_symbol`, assigned by its `XK_bracketleft` group), instead of "last" | `display.c`'s `XAnnotateEditImage`: its CR helpers take `(text_input, targets, value)`; the first wording would have put `key_symbol` before `targets` | owner |
