@@ -14,7 +14,12 @@ NEW's name (letters taken from the other MagickCore headers) and TITLE, and
 FILE's include block. Register NEW with tools/register_source.py.
 
 Also moved: a forward declaration of a moved static, and a typedef struct elsewhere
-in FILE that only the family uses. --copy-macro NAME (repeatable) defines a one-line
+in FILE that only the family uses. A function-pointer typedef (`typedef T` / `  (*Name)(...);`)
+between or directly above the moved functions moves with them when the kept part names none
+of its names (it refuses the split when the kept part does). A function that names a macro
+calls what the macro's definitions name, in every branch and through further macros
+(`#define ScaledSig(x) ... ScaledSigmoidal(...)`), so a static reached only through a macro
+moves with its callers, and one the kept part also calls is shared. --copy-macro NAME (repeatable) defines a one-line
 `#define NAME "literal"` of the kept part again in NEW (Recipe S step 2). A file-scope
 `static const` table between the moved functions moves with them, and a one-line
 `#define` of the original that only the family uses moves to NEW (step 2 as amended
@@ -80,6 +85,22 @@ def typedef_names(L, starts):
         while not re.match(r"^} \w+;$", L[n]): n += 1
         names.append(L[n][2:-1])
     return names
+
+def continues_above(L, s):
+    """True when the statement that L[s] belongs to goes on above it: L[s] is no `typedef` line, and the line above is
+    neither blank nor the end of a statement, a block or a comment."""
+    if L[s].startswith("typedef"): return False
+    above = L[s - 1].rstrip()
+    return bool(above) and not above.endswith((";", "{", "}", "*/"))
+
+def function_pointer_typedef(L, e):
+    """(first line, names) of a `typedef T` / `  (*Name)(...);` function-pointer typedef (one or more declarators)
+    that ends at L[e], else None."""
+    s = e
+    while s > 0 and continues_above(L, s): s -= 1
+    text = " ".join(x.strip() for x in L[s:e + 1])
+    if not re.fullmatch(r"typedef[^;{}]*\(\*\w+\)\([^;{}]*\);", text): return None
+    return s, re.findall(r"\(\*(\w+)\)", text)
 
 def static_table(L, n):
     """(last line, name) of a file-scope `static const` table declared from L[n], else None."""
@@ -160,7 +181,25 @@ names = {d[0] for d in defs}
 # a function defined once in each branch of an #if/#else (a delegate's code and its stub) calls what either one calls
 body = collections.defaultdict(str)
 for d in defs: body[d[0]] += re.sub(r"/\*.*?\*/", "", "\n".join(L[d[1]:d[2] + 1]), flags=re.S) + "\n"
-calls = {n: {x for x in names if x != n and re.search(r"\b%s\b" % re.escape(x), body[n])} for n in names}
+# a macro's body names functions too (`#define ScaledSig(x) ... ScaledSigmoidal(...)`): a function that names a macro
+# calls what the macro's definitions name, in every branch of a conditional, through further macros
+macro_text = collections.defaultdict(str)
+for k, line in enumerate(L):
+    dm = re.match(r"^#\s*define\s+(\w+)", line)
+    if not dm: continue
+    e = k
+    while L[e].rstrip().endswith("\\") and e + 1 < len(L): e += 1
+    macro_text[dm.group(1)] += re.sub(r"/\*.*?\*/", "", "\n".join(L[k:e + 1]), flags=re.S) + "\n"
+def macro_expansion(text):
+    """TEXT and the text of every macro definition it names, through further macros."""
+    seen = set(); out = [text]; todo = [text]
+    while todo:
+        t = todo.pop()
+        for mname in macro_text:
+            if mname not in seen and re.search(r"\b%s\b" % re.escape(mname), t):
+                seen.add(mname); out.append(macro_text[mname]); todo.append(macro_text[mname])
+    return "\n".join(out)
+calls = {n: {x for x in names if x != n and re.search(r"\b%s\b" % re.escape(x), macro_expansion(body[n]))} for n in names}
 static = {d[0] for d in defs if d[3]}
 reach = set(roots); st = list(roots)
 while st:
@@ -202,11 +241,14 @@ for run in runs:
             outside = "\n".join(L[:t] + L[last[2] + 1:])
             if not re.search(r"\b%s\b" % m.group(1), outside):
                 a = t; typedefs.append(m.group(1)); continue
+        fp = function_pointer_typedef(L, c - 1)
+        if fp and not any(re.search(r"\b%s\b" % n, "\n".join(L[:fp[0]] + L[last[2] + 1:])) for n in fp[1]):
+            a = fp[0]; continue
         u = macro_block_start(L, c)
         if u is None: break
         a = u
     b = last[2] + 1
-    incomment = False; intype = False; bad = []; depth = 0; inner = []; inproto = False; table_end = -1
+    incomment = False; intype = False; bad = []; depth = 0; inner = []; inproto = False; table_end = -1; fp_end = -1
     for n in range(a, b):
         if any(s <= n <= e for s, e in spans): continue
         t = L[n].strip()
@@ -217,6 +259,12 @@ for run in runs:
             inproto = not t.endswith(";"); continue
         if intype:
             intype = not re.match(r"^} \w+;$", L[n]); continue
+        if n <= fp_end: continue
+        if L[n].startswith("typedef"):
+            e = next(k for k in range(n, len(L)) if L[k].rstrip().endswith(";"))
+            fp = function_pointer_typedef(L, e)
+            if fp and fp[0] == n:
+                fp_end = e; typedefs.extend(fp[1]); continue
         if n <= table_end: continue
         table = static_table(L, n)
         if table:
@@ -287,6 +335,11 @@ for tname in sorted(set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M))):
 types = set(re.findall(r"^typedef\s+(?:struct|enum|union)\s+(\w+)", rest, re.M)) | \
     set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M)) | \
     {t.lstrip("_") for t in re.findall(r"^struct\s+(\w+)\s*$", rest, re.M)}
+for k, line in enumerate(rest_lines):
+    if line.startswith("typedef") and "(*" in line + " ".join(rest_lines[k + 1:k + 2]):
+        e = next(x for x in range(k, len(rest_lines)) if rest_lines[x].rstrip().endswith(";"))
+        fp = function_pointer_typedef(rest_lines, e)
+        if fp and fp[0] == k: types.update(fp[1])
 for tname in sorted(types):
     if re.search(r"\b%s\b" % tname, region): sys.exit("refused: type %s defined outside the region and used in it" % tname)
 # a file-scope variable the original keeps must not be used by the region
