@@ -318,6 +318,87 @@ static void SyncCompareRow(CacheView *highlight_view,
     (*status)=MagickFalse;
 }
 
+typedef struct _CompareRowInput
+{
+  Image
+    *image;
+
+  const Image
+    *reconstruct_image;
+
+  Image
+    *highlight_image;
+
+  PixelInfo
+    highlight,
+    lowlight,
+    masklight;
+
+  size_t
+    columns;
+
+  CacheView
+    *image_view,
+    *reconstruct_view,
+    *highlight_view;
+
+  ExceptionInfo
+    *exception;
+} CompareRowInput;
+
+static void CompareRow(const CompareRowInput *input,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *const image = input->image,
+    *const highlight_image = input->highlight_image;
+
+  const Image
+    *const reconstruct_image = input->reconstruct_image;
+
+  const PixelInfo
+    highlight = input->highlight,
+    lowlight = input->lowlight,
+    masklight = input->masklight;
+
+  const size_t
+    columns = input->columns;
+
+  CacheView
+    *const image_view = input->image_view,
+    *const reconstruct_view = input->reconstruct_view,
+    *const highlight_view = input->highlight_view;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  const Quantum
+    *magick_restrict p,
+    *magick_restrict q;
+
+  Quantum
+    *magick_restrict r;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
+  q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
+  r=QueueCacheViewAuthenticPixels(highlight_view,0,y,columns,1,exception);
+  if (IsCompareRowMissing(p,q,r) != MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  {
+    const CompareHighlightRow
+      row = { image, reconstruct_image, highlight_image, highlight, lowlight,
+        masklight, columns };
+
+    HighlightCompareRow(&row,p,q,r);
+  }
+  SyncCompareRow(highlight_view,status,exception);
+}
+
 static MagickBooleanType HighlightCompareRows(const CompareRowsInfo *info,
   MagickBooleanType status)
 {
@@ -357,31 +438,12 @@ static MagickBooleanType HighlightCompareRows(const CompareRowsInfo *info,
 #endif
   for (y=0; y < (ssize_t) rows; y++)
   {
-    const Quantum
-      *magick_restrict p,
-      *magick_restrict q;
+    const CompareRowInput
+      input = { image, reconstruct_image, highlight_image, highlight, lowlight,
+        masklight, columns, image_view, reconstruct_view, highlight_view,
+        exception };
 
-    Quantum
-      *magick_restrict r;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
-    q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
-    r=QueueCacheViewAuthenticPixels(highlight_view,0,y,columns,1,exception);
-    if (IsCompareRowMissing(p,q,r) != MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    {
-      const CompareHighlightRow
-        row = { image, reconstruct_image, highlight_image, highlight, lowlight,
-          masklight, columns };
-
-      HighlightCompareRow(&row,p,q,r);
-    }
-    SyncCompareRow(highlight_view,&status,exception);
+    CompareRow(&input,y,&status);
   }
   highlight_view=DestroyCacheView(highlight_view);
   reconstruct_view=DestroyCacheView(reconstruct_view);
