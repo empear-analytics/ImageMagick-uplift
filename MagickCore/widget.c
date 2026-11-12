@@ -3196,6 +3196,90 @@ static void JumpColorBrowserList(const ColorBrowserContext *context,
     }
 }
 
+static void RedrawColorBrowserList(const ColorBrowserContext *context,
+  const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const colors = widgets->colors;
+
+  unsigned int
+    *const visible_colors = widgets->visible_colors;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info;
+
+  char
+    ***const colorlist = widgets->colorlist;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info,
+    *const expose_info = widgets->expose_info,
+    *const selection_info = widgets->selection_info;
+
+  int
+    i;
+
+  if ((*state) & RedrawListState)
+    {
+      /*
+        Determine slider id and position.
+      */
+      if ((*slider_info).id >= (int) ((*colors)-(*visible_colors)))
+        (*slider_info).id=(int) ((*colors)-(*visible_colors));
+      if (((*slider_info).id < 0) || ((*colors) <= (*visible_colors)))
+        (*slider_info).id=0;
+      (*slider_info).y=(*slider_info).min_y;
+      if ((*colors) != 0)
+        (*slider_info).y+=(int) (*slider_info).id*((*slider_info).max_y-
+          (*slider_info).min_y+1)/(int) (*colors);
+      if ((*slider_info).id != (*selection_info).id)
+        {
+          FontBrowserNames
+            names;
+
+          /*
+            Redraw scroll bar and file names.
+          */
+          (*selection_info).id=(*slider_info).id;
+          (*selection_info).y=(*list_info).y+(int) (height >> 3)+2;
+          names.display=display;
+          names.windows=windows;
+          names.fontlist=(*colorlist);
+          names.fonts=(int) (*colors);
+          names.visible_fonts=(*visible_colors);
+          names.list_info=(*list_info);
+          names.slider_info=(*slider_info);
+          DrawFontBrowserNames(&names,selection_info,&i);
+          /*
+            Update slider.
+          */
+          (*expose_info)=PlaceTextViewExpose((*expose_info),(*slider_info));
+          XDrawTriangleNorth(display,&windows->widget,north_info);
+          XDrawMatte(display,&windows->widget,expose_info);
+          XDrawBeveledButton(display,&windows->widget,slider_info);
+          XDrawTriangleSouth(display,&windows->widget,south_info);
+          (*expose_info).y=(*slider_info).y;
+        }
+      (*state)&=(unsigned int) (~RedrawListState);
+    }
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3437,49 +3521,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
         state&=(unsigned int) (~UpdateListState);
       }
     JumpColorBrowserList(&color_context,&color_widgets);
-    if (state & RedrawListState)
-      {
-        /*
-          Determine slider id and position.
-        */
-        if (slider_info.id >= (int) (colors-visible_colors))
-          slider_info.id=(int) (colors-visible_colors);
-        if ((slider_info.id < 0) || (colors <= visible_colors))
-          slider_info.id=0;
-        slider_info.y=slider_info.min_y;
-        if (colors != 0)
-          slider_info.y+=(int) slider_info.id*(slider_info.max_y-
-            slider_info.min_y+1)/(int) colors;
-        if (slider_info.id != selection_info.id)
-          {
-            FontBrowserNames
-              names;
-
-            /*
-              Redraw scroll bar and file names.
-            */
-            selection_info.id=slider_info.id;
-            selection_info.y=list_info.y+(int) (height >> 3)+2;
-            names.display=display;
-            names.windows=windows;
-            names.fontlist=colorlist;
-            names.fonts=(int) colors;
-            names.visible_fonts=visible_colors;
-            names.list_info=list_info;
-            names.slider_info=slider_info;
-            DrawFontBrowserNames(&names,&selection_info,&i);
-            /*
-              Update slider.
-            */
-            expose_info=PlaceTextViewExpose(expose_info,slider_info);
-            XDrawTriangleNorth(display,&windows->widget,&north_info);
-            XDrawMatte(display,&windows->widget,&expose_info);
-            XDrawBeveledButton(display,&windows->widget,&slider_info);
-            XDrawTriangleSouth(display,&windows->widget,&south_info);
-            expose_info.y=slider_info.y;
-          }
-        state&=(unsigned int) (~RedrawListState);
-      }
+    RedrawColorBrowserList(&color_context,&color_widgets);
     if (state & RedrawActionState)
       {
         static char
