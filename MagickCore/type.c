@@ -1252,6 +1252,32 @@ static const char *SkipDoctypeElement(const char *q)
   return(q);
 }
 
+static MagickBooleanType LoadTypeInclude(const TypeLoadTarget *target,
+  const char *filename,const char *token,const size_t depth)
+{
+  char
+    path[MagickPathExtent],
+    *file_xml;
+
+  ExceptionInfo
+    *sans_exception;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  *path='\0';
+  GetIncludePath(filename,token,path);
+  sans_exception=AcquireExceptionInfo();
+  file_xml=FileToString(path,~0UL,sans_exception);
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  if (file_xml != (char *) NULL)
+    {
+      status=LoadTypeCache(target,file_xml,path,depth+1);
+      file_xml=(char *) RelinquishMagickMemory(file_xml);
+    }
+  return(status);
+}
+
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1343,28 +1369,8 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
                 (void) ThrowMagickException(exception,GetMagickModule(),
                   ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
               else
-                {
-                  const TypeLoadTarget include_target = { cache, exception };
-
-                  char
-                    path[MagickPathExtent],
-                    *file_xml;
-
-                  ExceptionInfo
-                    *sans_exception;
-
-                  *path='\0';
-                  GetIncludePath(filename,token,path);
-                  sans_exception=AcquireExceptionInfo();
-                  file_xml=FileToString(path,~0UL,sans_exception);
-                  sans_exception=DestroyExceptionInfo(sans_exception);
-                  if (file_xml != (char *) NULL)
-                    {
-                      status&=(MagickStatusType) LoadTypeCache(
-                        &include_target,file_xml,path,depth+1);
-                      file_xml=(char *) RelinquishMagickMemory(file_xml);
-                    }
-                }
+                status&=(MagickStatusType) LoadTypeInclude(target,filename,
+                  token,depth);
             }
         }
         continue;
