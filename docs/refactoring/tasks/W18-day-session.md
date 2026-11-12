@@ -360,3 +360,34 @@ cases, 0 diverged. The only finding left in compare.c is the five arguments of t
 - Possible upstream: `CompareImages` tests `(difference_image != NULL)` after an earlier return (always true);
   `IsImagesEqual` has no caller in the tree. Tool note: `verify_wt`'s `--function` run exits on the stale `casemap.json`
   after the oracle commit (use `--filter`).
+
+## Lane c, third round: widget.c 3.02 -> 3.04 (wide build, merged)
+
+34 commits (33 widget.c, 1 tools); every step ran `verify_wt` (oracle on the function, guard, calls, CI warnings,
+obj_modulo); whole wide catalogue 14,145 cases, 0 diverged (one load-sensitive xevents case settled). `obj_identical.sh`
+needs otool on this machine, so `obj_modulo.sh` with dummy caller and helper names was used.
+- **XDialogWidget** (67 cases, 0 diverged each): 3470709f7 H; CT on Press, Release, Client, Key, KeyRelease, Motion and
+  SelectionNotify (33490478e, 3159150c2, 3b85974a6, fb8735e1b, bc05bdd2c, 7b66a8eaf, e7931dfe4; `DialogTargets` plus a
+  shared `DialogContext`); O step 7 on options, Update, Redraw (06e63ce47, f634713f2, c5bcfa5fc); SD bb6f4e728, 0ad3bc5ad;
+  8362726b1 N on the switch **3.02 -> 3.04** (bumps 4 -> 0); c0ba1e599 N Position, 3183ddea0 E Map; 0e9018d9c N loop,
+  9e156a117 FB (IDENTICAL), 3521fc2a0 E width, dc204dafc P predicate (these four take it out of Complex and Large Method
+  together; only the public 5-argument finding is left).
+- **XCommandWidget** (346 cases): 0a299b137 F tile table (308 -> 222 lines), 1fbea7b27, 53a153cf0, a5fbf7816 E on three
+  cases, 31f1c24d4 SD, 246b40756 O, 0fdf6ca4d H, 8d250fb4e E Redraw (**committed `--no-verify`, 3.04 -> 3.02**, recovered by
+  the next steps), 6094e3e77 N Update, f5f56475c E Reconfigure (3.04), 635c9e9e0 N Size; every finding gone.
+  **XConfirmWidget** (5 cases): 96c2877e7 E Map, f1bf10a3b N Position; no finding left. Tools: 0791c62b2
+  `case_tail_check.py --shared` (checks CT helpers that take the N step 8 shared context; it failed on every one).
+- **Ordering lesson:** a step that takes a function out of Complex Method while it is still Large costs 0.09-0.13
+  (predicate first: 2.91); move lines first and the predicate last, and no step dips (the Dialog chain stays at 3.04).
+- Plateau at 3.04 (measured by stubbing function bodies): all remaining non-browser widgets 3.17; four browsers 3.66;
+  everything 6.64; the score only moves once the File, Font, Color and List browsers are done as well. Left alone: Menu (a
+  scan helper makes `width` a dead store, `-Wunused-but-set-variable`, a CI error; its 5 arguments are public; one probe
+  showed an oracle divergence that was not rerun), Notice (no case reaches it; O and CT-style blocks need cases at guard
+  level), Preferences and TextView (written arrays `preferences_info` and `cache`, 8+ written structs: a new CT or O
+  array-member rule, about 15 commits each), the browsers (not started).
+- Evidence notes: a moved `assert` stays in the caller (the abort message keeps the original function name); no
+  `GetMagickModule()` throw was moved; the `Map*Widget` helpers (Dialog, Confirm) are twins that CodeScene did not flag.
+  Possible upstream: Preferences' Cache press overwrites `width`, which the Update block reads later; Menu's
+  `width=WidgetTextWidth(...title)` is a dead store; Dialog's SelectionRequest case has no `break;` and falls into
+  `default:`; Dialog's `windows->widget.height < windows->widget.min_height` can never be true; Command's moved
+  ConfigureNotify and Expose cases are unreached by the oracle.
