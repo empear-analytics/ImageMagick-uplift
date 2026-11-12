@@ -3450,13 +3450,14 @@ static const CompositeOperator
     VividLightCompositeOp
   };
 
-static MagickBooleanType IsUnionCoverageOperator(const CompositeOperator compose)
+static MagickBooleanType IsListedOperator(const CompositeOperator *list,
+  const size_t count,const CompositeOperator compose)
 {
   size_t
     i;
 
-  for (i=0; i < (sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators)); i++)
-    if (UnionCoverageOperators[i] == compose)
+  for (i=0; i < count; i++)
+    if (list[i] == compose)
       return(MagickTrue);
   return(MagickFalse);
 }
@@ -5456,7 +5457,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     row.image=image;
     row.source_image=source_image;
     row.compose=compose;
-    row.union_coverage=IsUnionCoverageOperator(compose);
+    row.union_coverage=IsListedOperator(UnionCoverageOperators,
+      sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
     row.canvas_alpha=IsCanvasAlphaOperator(compose);
     row.source_alpha=IsSourceAlphaOperator(compose);
     row.pixel_info_inputs=IsPixelInfoInputOperator(compose);
