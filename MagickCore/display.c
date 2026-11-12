@@ -17650,6 +17650,33 @@ static void XPanWindowKeyPress(const DisplayEventContext *context,
     else
       XTranslateImage(display,windows,*image,key_symbol);
 }
+
+static Image *XMapImageWindow(const DisplayEventContext *context,
+  Image *display_image,Image *nexus)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  if (windows->backdrop.id != (Window) NULL)
+    (void) XInstallColormap(display,map_info->colormap);
+  if ((LocaleCompare(display_image->magick,"LOGO") == 0) &&
+      (LocaleCompare(display_image->filename,"LOGO") == 0))
+    nexus=XOpenImage(display,resource_info,windows,MagickFalse);
+  if (((int) windows->image.width < windows->image.ximage->width) ||
+      ((int) windows->image.height < windows->image.ximage->height))
+    (void) XMapRaised(display,windows->pan.id);
+  windows->image.mapped=MagickTrue;
+  return(nexus);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -19199,15 +19226,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xmap.window == windows->image.id)
           {
-            if (windows->backdrop.id != (Window) NULL)
-              (void) XInstallColormap(display,map_info->colormap);
-            if ((LocaleCompare(display_image->magick,"LOGO") == 0) &&
-                (LocaleCompare(display_image->filename,"LOGO") == 0))
-              nexus=XOpenImage(display,resource_info,windows,MagickFalse);
-            if (((int) windows->image.width < windows->image.ximage->width) ||
-                ((int) windows->image.height < windows->image.ximage->height))
-              (void) XMapRaised(display,windows->pan.id);
-            windows->image.mapped=MagickTrue;
+            nexus=XMapImageWindow(&event_context,display_image,nexus);
             break;
           }
         if (event.xmap.window == windows->magnify.id)
