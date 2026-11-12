@@ -10111,6 +10111,15 @@ static MagickBooleanType RespondToFontEvents(const FontBrowserContext *context,
   return(MagickTrue);
 }
 
+static void FreeFontBrowserList(char **listhead,char **fontlist)
+{
+  /*
+    Free font list.
+  */
+  (void) XFreeFontNames(listhead);
+  fontlist=(char **) RelinquishMagickMemory(fontlist);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -10310,11 +10319,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   if (RespondToFontEvents(&font_context,&targets,&font_widgets) == MagickFalse)
     return;
   WithdrawBrowserWidget(display,windows);
-  /*
-    Free font list.
-  */
-  (void) XFreeFontNames(listhead);
-  fontlist=(char **) RelinquishMagickMemory(fontlist);
+  FreeFontBrowserList(listhead,fontlist);
 }
 
 /*
