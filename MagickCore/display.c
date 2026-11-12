@@ -7078,6 +7078,42 @@ static RectangleInfo XFitSelectionRectangle(XWindows *windows,const int x,
   return(rectangle_info);
 }
 
+static RectangleInfo XDrawPolygonBounds(XPoint *coordinate_info,
+  const int number_coordinates,RectangleInfo rectangle_info)
+{
+  int
+    i,
+    x,
+    y;
+
+  /*
+    Determine polygon bounding box.
+  */
+  rectangle_info.x=(ssize_t) coordinate_info->x;
+  rectangle_info.y=(ssize_t) coordinate_info->y;
+  x=coordinate_info->x;
+  y=coordinate_info->y;
+  for (i=1; i < number_coordinates; i++)
+  {
+    if (coordinate_info[i].x > x)
+      x=coordinate_info[i].x;
+    if (coordinate_info[i].y > y)
+      y=coordinate_info[i].y;
+    if ((ssize_t) coordinate_info[i].x < rectangle_info.x)
+      rectangle_info.x=MagickMax((ssize_t) coordinate_info[i].x,0);
+    if ((ssize_t) coordinate_info[i].y < rectangle_info.y)
+      rectangle_info.y=MagickMax((ssize_t) coordinate_info[i].y,0);
+  }
+  rectangle_info.width=(size_t) (x-rectangle_info.x);
+  rectangle_info.height=(size_t) (y-rectangle_info.y);
+  for (i=0; i < number_coordinates; i++)
+  {
+    coordinate_info[i].x-=rectangle_info.x;
+    coordinate_info[i].y-=rectangle_info.y;
+  }
+  return(rectangle_info);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7138,9 +7174,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
 
   RectangleInfo
     rectangle_info;
-
-  int
-    i;
 
   unsigned int
     distance,
@@ -7616,31 +7649,8 @@ static MagickBooleanType XDrawEditImage(Display *display,
     (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
     if (IsPolygonElement(element) != MagickFalse)
       {
-        /*
-          Determine polygon bounding box.
-        */
-        rectangle_info.x=(ssize_t) coordinate_info->x;
-        rectangle_info.y=(ssize_t) coordinate_info->y;
-        x=coordinate_info->x;
-        y=coordinate_info->y;
-        for (i=1; i < number_coordinates; i++)
-        {
-          if (coordinate_info[i].x > x)
-            x=coordinate_info[i].x;
-          if (coordinate_info[i].y > y)
-            y=coordinate_info[i].y;
-          if ((ssize_t) coordinate_info[i].x < rectangle_info.x)
-            rectangle_info.x=MagickMax((ssize_t) coordinate_info[i].x,0);
-          if ((ssize_t) coordinate_info[i].y < rectangle_info.y)
-            rectangle_info.y=MagickMax((ssize_t) coordinate_info[i].y,0);
-        }
-        rectangle_info.width=(size_t) (x-rectangle_info.x);
-        rectangle_info.height=(size_t) (y-rectangle_info.y);
-        for (i=0; i < number_coordinates; i++)
-        {
-          coordinate_info[i].x-=rectangle_info.x;
-          coordinate_info[i].y-=rectangle_info.y;
-        }
+        rectangle_info=XDrawPolygonBounds(coordinate_info,number_coordinates,
+          rectangle_info);
       }
     else
       if (distance <= 9)
