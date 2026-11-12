@@ -1299,6 +1299,17 @@ static const char *SkipCommentElement(const char *q,const size_t extent,
   return(q);
 }
 
+static MagickBooleanType IsIncludeFileAttribute(const char **q,
+  const size_t extent,char *keyword,char *token)
+{
+  (void) CopyMagickString(keyword,token,MagickPathExtent);
+  (void) GetNextToken(*q,q,extent,token);
+  if (*token != '=')
+    return(MagickFalse);
+  (void) GetNextToken(*q,q,extent,token);
+  return(LocaleCompare(keyword,"file") == 0 ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType LoadTypeInclude(const TypeLoadTarget *target,
   const char *filename,const char *token,const size_t depth)
 {
@@ -1404,20 +1415,14 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
         */
         while (IsIncludeElementOpen(token,q) != MagickFalse)
         {
-          (void) CopyMagickString(keyword,token,MagickPathExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
+          if (IsIncludeFileAttribute(&q,extent,keyword,token) == MagickFalse)
             continue;
-          (void) GetNextToken(q,&q,extent,token);
-          if (LocaleCompare(keyword,"file") == 0)
-            {
-              if (depth >= MagickMaxRecursionDepth)
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
-              else
-                status&=(MagickStatusType) LoadTypeInclude(target,filename,
-                  token,depth);
-            }
+          if (depth >= MagickMaxRecursionDepth)
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
+          else
+            status&=(MagickStatusType) LoadTypeInclude(target,filename,token,
+              depth);
         }
         continue;
       }
