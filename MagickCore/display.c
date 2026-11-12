@@ -12310,6 +12310,50 @@ static MagickBooleanType XMatteEditImage(Display *display,
   (void) XFreeCursor(display,cursor);
   return(MagickTrue);
 }
+
+static MagickBooleanType XSelectCommandLineFile(Display *display,
+  XWindows *windows,char *filename)
+{
+  char
+    **filelist,
+    **files;
+
+  int
+    count,
+    status;
+
+  int
+    i,
+    j;
+
+  /*
+    Select next image from the command line.
+  */
+  status=XGetCommand(display,windows->image.id,&files,&count);
+  if (status == 0)
+    {
+      ThrowXWindowException(XServerError,"UnableToGetProperty","...");
+      return(MagickFalse);
+    }
+  filelist=(char **) AcquireQuantumMemory((size_t) count,sizeof(*filelist));
+  if (filelist == (char **) NULL)
+    {
+      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+        "...");
+      (void) XFreeStringList(files);
+      return(MagickFalse);
+    }
+  j=0;
+  for (i=1; i < count; i++)
+    if (*files[i] != '-')
+      filelist[j++]=files[i];
+  filelist[j]=(char *) NULL;
+  XListBrowserWidget(display,windows,&windows->widget,
+    (const char **) filelist,"Load","Select Image to Load:",filename);
+  filelist=(char **) RelinquishMagickMemory(filelist);
+  (void) XFreeStringList(files);
+  return(MagickTrue);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12367,44 +12411,8 @@ static Image *XOpenImage(Display *display,XResourceInfo *resource_info,
     XFileBrowserWidget(display,windows,"Open",filename);
   else
     {
-      char
-        **filelist,
-        **files;
-
-      int
-        count,
-        status;
-
-      int
-        i,
-        j;
-
-      /*
-        Select next image from the command line.
-      */
-      status=XGetCommand(display,windows->image.id,&files,&count);
-      if (status == 0)
-        {
-          ThrowXWindowException(XServerError,"UnableToGetProperty","...");
-          return((Image *) NULL);
-        }
-      filelist=(char **) AcquireQuantumMemory((size_t) count,sizeof(*filelist));
-      if (filelist == (char **) NULL)
-        {
-          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-            "...");
-          (void) XFreeStringList(files);
-          return((Image *) NULL);
-        }
-      j=0;
-      for (i=1; i < count; i++)
-        if (*files[i] != '-')
-          filelist[j++]=files[i];
-      filelist[j]=(char *) NULL;
-      XListBrowserWidget(display,windows,&windows->widget,
-        (const char **) filelist,"Load","Select Image to Load:",filename);
-      filelist=(char **) RelinquishMagickMemory(filelist);
-      (void) XFreeStringList(files);
+      if (XSelectCommandLineFile(display,windows,filename) == MagickFalse)
+        return((Image *) NULL);
     }
   if (*filename == '\0')
     return((Image *) NULL);
