@@ -2498,6 +2498,15 @@ MagickExport size_t StripMagickString(char *message)
   return((size_t) (q-p+1));
 }
 
+static void ReplaceMatch(char *p,const char *replace,
+  const size_t search_extent,const size_t replace_extent)
+{
+  if (search_extent != replace_extent)
+    (void) memmove(p+replace_extent,p+search_extent,
+      strlen(p+search_extent)+1);
+  (void) memcpy(p,replace,replace_extent);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2577,10 +2586,7 @@ MagickExport MagickBooleanType SubstituteString(char **string,
     /*
       Replace string.
     */
-    if (search_extent != replace_extent)
-      (void) memmove(p+replace_extent,p+search_extent,
-        strlen(p+search_extent)+1);
-    (void) memcpy(p,replace,replace_extent);
+    ReplaceMatch(p,replace,search_extent,replace_extent);
     p+=(ptrdiff_t) replace_extent-1;
   }
   return(status);
