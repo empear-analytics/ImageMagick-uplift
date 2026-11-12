@@ -39,7 +39,9 @@ def sh(*a, **k):
 def flags(build):
     mk = open(os.path.join(build, "Makefile")).read()
     get = lambda n: re.search(r"^%s = (.*)$" % n, mk, re.M).group(1)
-    return get("CC"), get("CPPFLAGS").split() + get("CFLAGS").split()
+    # -Werror only decides whether a diagnostic stops the compile; it does not change the code generated, and the X
+    # trees' flags turn upstream -Wunused-parameter diagnostics of the original file into errors (2026-11-12)
+    return get("CC"), [f for f in get("CPPFLAGS").split() + get("CFLAGS").split() if f != "-Werror"]
 
 def section_bytes(obj, sec):
     return sh("objcopy", "-O", "binary", "--only-section=" + sec, obj, "/dev/stdout").stdout
