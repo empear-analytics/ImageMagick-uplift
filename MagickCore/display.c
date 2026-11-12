@@ -7334,6 +7334,26 @@ static void XPreviewPolyline(const DrawEditContext *context,
       number_coordinates,CoordModeOrigin);
 }
 
+static void XPreviewLongLine(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    distance = preview->distance;
+
+  const XSegment
+    line_info = preview->line_info;
+
+  if (distance > 9)
+    XHighlightLine(display,windows->image.id,
+      windows->image.highlight_context,&line_info);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7722,9 +7742,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         }
         case LineElement:
         {
-          if (distance > 9)
-            XHighlightLine(display,windows->image.id,
-              windows->image.highlight_context,&line_info);
+          XPreviewLongLine(&draw_context,&preview_input);
           break;
         }
         case RectangleElement:
@@ -7749,9 +7767,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         case FillPolygonElement:
         {
           XPreviewPolyline(&draw_context,&preview_input);
-          if (distance > 9)
-            XHighlightLine(display,windows->image.id,
-              windows->image.highlight_context,&line_info);
+          XPreviewLongLine(&draw_context,&preview_input);
           break;
         }
       }
