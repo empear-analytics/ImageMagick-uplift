@@ -5,7 +5,8 @@ Recipe S, *Preprocessor branches* exception of 2026-11-11: a split may move an `
 verbatim with the function that holds it when a build that compiles that branch shows the moved functions'
 instructions unchanged. This compiles the original file as it stood at OLDREV and the new file as it is in
 the working tree, both with the flags of build-oracle/BUILD (cand-wide for X11/OpenCL, ci-gcc-min or
-ci-gcc-dlg for the non-HDRI branches), at -g0, disassembles every function the new file defines in both
+ci-gcc-dlg for the non-HDRI branches, ci-gcc-noatanh for the `#else` side of MAGICKCORE_HAVE_ATANH:
+tools/ci_linux_warnings.sh configures it), at -g0, disassembles every function the new file defines in both
 objects, and compares them function by function, matched by name (so the order the compiler laid the
 functions out in does not matter), line by line. Allowed differences, each counted in the output:
   - a `__LINE__` immediate (`mov $N,%ecx` / `%edx`) shifted by a constant per function,

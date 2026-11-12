@@ -12,11 +12,26 @@
 # delegate libraries. tools/ci_warnings.sh checks the macOS job's flags against
 # the oracle's HDRI build; neither sees what these jobs see.
 #
-# Six configurations, each configured once under build-oracle/ci-<cc>-<conf>:
+# Seven configurations, each configured once under build-oracle/ci-<cc>-<conf>:
 #   gcc and clang  x  min (no delegates, no X: the CI container),
 #                     dlg (the installed delegates and FFTW, as the Windows jobs
 #                     compile fourier.c and compare.c's FFT code; no X) and
 #                     x (X11, OpenCL and FFTW; see below)
+#   gcc only          noatanh: min configured with ac_cv_func_atanh=no, so that
+#                     configure finds no atanh() and MAGICKCORE_HAVE_ATANH is
+#                     undefined. Every other configuration defines it, so the
+#                     `#else` side of enhance.c's `#if defined(MAGICKCORE_HAVE_ATANH)`
+#                     blocks (Sigmoidal macros, InverseScaledSigmoidal) is compiled by
+#                     this one alone. It is the "available build" that tools/
+#                     split_branch_check.py needs for a split that moves such a block
+#                     (owner, 2026-11-12: AGENTS.md, Hard prohibitions). Reproduce it
+#                     by hand with
+#                       mkdir -p build-oracle/ci-gcc-noatanh && cd build-oracle/ci-gcc-noatanh &&
+#                       ac_cv_func_atanh=no CC=gcc CXX=g++ CFLAGS="<gcc flags below>" \
+#                         ../../configure --with-quantum-depth=16 --enable-hdri=no --without-perl \
+#                         --prefix=/usr <the min configuration's --without-* flags>
+#                     and check `grep ATANH MagickCore/magick-baseconfig.h` reads
+#                     `/* #undef HAVE_ATANH */`.
 # with main.yml's CFLAGS, -Werror left out so a file's diagnostics show at once,
 # and these added for MSVC (C4456/C4457/C4459 hides a declaration; C2440/C2664
 # const to non-const pointer or pointer-to-pointer, an `&` that makes `T **`
@@ -111,18 +126,22 @@ configure_tree() {  # <cc> <conf>
   local extra=("${MIN_FLAGS[@]}")
   [ "$conf" = dlg ] && extra=("${DLG_FLAGS[@]}")
   [ "$conf" = x ] && extra=("${X_FLAGS[@]}")
-  (cd "$b" && CC=$cc CXX=$cxx CFLAGS="$flags" CXXFLAGS="$flags" \
+  local noatanh=()   # configure's cache variable for "no atanh()": the #else side of HAVE_ATANH
+  [ "$conf" = noatanh ] && noatanh=(ac_cv_func_atanh=no)
+  (cd "$b" && env "${noatanh[@]}" CC=$cc CXX=$cxx CFLAGS="$flags" CXXFLAGS="$flags" \
      "$ROOT/configure" --with-quantum-depth=16 --enable-hdri=no --without-perl \
      --prefix=/usr "${extra[@]}" > configure.log 2>&1) \
     || { echo "configure failed, see $b/configure.log" >&2; return 1; }
 }
 
-CONFS="gcc-min clang-min gcc-dlg clang-dlg gcc-x clang-x"
+CONFS="gcc-min clang-min gcc-dlg clang-dlg gcc-x clang-x gcc-noatanh"
 for c in $CONFS; do configure_tree "${c%-*}" "${c#*-}" & done
 wait
 for c in $CONFS; do
   [ -f "$OUT/ci-$c/Makefile" ] || { echo "no $OUT/ci-$c/Makefile" >&2; exit 2; }
 done
+grep -q 'undef HAVE_ATANH' "$OUT/ci-gcc-noatanh/MagickCore/magick-baseconfig.h" \
+  || { echo "ci-gcc-noatanh still defines HAVE_ATANH: remove $OUT/ci-gcc-noatanh and rerun" >&2; exit 2; }
 
 compile_one() {  # <conf> <file>: prints "<diagnostic>\t<conf>"
   local c=$1 f=$2 b="$OUT/ci-$1" cc
