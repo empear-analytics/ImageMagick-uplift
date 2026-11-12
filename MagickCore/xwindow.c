@@ -3667,27 +3667,12 @@ static void GetResourcePenColors(XrmDatabase database,const char *client_name,
     (char *) "gray");
 }
 
-MagickExport void XGetResourceInfo(const ImageInfo *image_info,
-  XrmDatabase database,const char *client_name,XResourceInfo *resource_info)
+static void GetResourceDisplayOptions(XrmDatabase database,
+  const char *client_name,XResourceInfo *resource_info)
 {
   char
-    *directory,
     *resource_value;
 
-  /*
-    Initialize resource info fields.
-  */
-  assert(resource_info != (XResourceInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  (void) memset(resource_info,0,sizeof(*resource_info));
-  resource_info->resource_database=database;
-  resource_info->image_info=(ImageInfo *) image_info;
-  (void) SetImageInfoProgressMonitor(resource_info->image_info,
-    XMagickProgressMonitor,(void *) NULL);
-  resource_info->quantize_info=CloneQuantizeInfo((QuantizeInfo *) NULL);
-  resource_info->close_server=MagickTrue;
-  resource_info->client_name=AcquireString(client_name);
   resource_value=XGetResourceClass(database,client_name,"backdrop",
     (char *) "False");
   resource_info->backdrop=IsStringTrue(resource_value);
@@ -3725,6 +3710,30 @@ MagickExport void XGetResourceInfo(const ImageInfo *image_info,
   resource_value=XGetResourceClass(database,client_name,"displayWarnings",
     (char *) "True");
   resource_info->display_warnings=IsStringTrue(resource_value);
+}
+
+MagickExport void XGetResourceInfo(const ImageInfo *image_info,
+  XrmDatabase database,const char *client_name,XResourceInfo *resource_info)
+{
+  char
+    *directory,
+    *resource_value;
+
+  /*
+    Initialize resource info fields.
+  */
+  assert(resource_info != (XResourceInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  (void) memset(resource_info,0,sizeof(*resource_info));
+  resource_info->resource_database=database;
+  resource_info->image_info=(ImageInfo *) image_info;
+  (void) SetImageInfoProgressMonitor(resource_info->image_info,
+    XMagickProgressMonitor,(void *) NULL);
+  resource_info->quantize_info=CloneQuantizeInfo((QuantizeInfo *) NULL);
+  resource_info->close_server=MagickTrue;
+  resource_info->client_name=AcquireString(client_name);
+  GetResourceDisplayOptions(database,client_name,resource_info);
   GetResourceFontNames(database,client_name,resource_info);
   resource_info->foreground_color=XGetResourceInstance(database,client_name,
     "foreground",ForegroundColor);
