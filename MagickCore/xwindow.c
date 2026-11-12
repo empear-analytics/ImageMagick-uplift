@@ -9917,6 +9917,16 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
 %    o window: Specifies a pointer to a XWindowInfo structure.
 %
 */
+static void XLogPixmap(const unsigned int width,const unsigned int height)
+{
+  if ((GetLogEventMask() & X11Event) != 0)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"Pixmap:");
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"  width, height: %ux%u",
+        width,height);
+    }
+}
+
 static MagickBooleanType XMakePixmap(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window)
 {
@@ -9971,12 +9981,7 @@ static MagickBooleanType XMakePixmap(Display *display,
   if (window->shared_memory == MagickFalse)
     (void) XPutImage(display,window->pixmap,window->annotate_context,
       window->ximage,0,0,0,0,width,height);
-  if ((GetLogEventMask() & X11Event) != 0)
-    {
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"Pixmap:");
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  width, height: %ux%u",
-        width,height);
-    }
+  XLogPixmap(width,height);
   /*
     Restore cursor.
   */
