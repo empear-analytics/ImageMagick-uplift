@@ -10027,6 +10027,56 @@ static void HandleFontKeyEvent(const FontBrowserContext *context,
   }
 }
 
+static void HandleFontEvent(const FontBrowserContext *context,
+  const XEvent event,const FontBrowserTargets *targets,
+  const FontBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      PressFontBrowserScroll(context,event,targets,widgets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      ReleaseFontBrowserScroll(context,event,widgets);
+      break;
+    }
+    case ClientMessage:
+    {
+      ClientFontBrowserMessage(context,event,widgets);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleFontKeyEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -10246,44 +10296,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
     */
     if (WaitFontEvent(&font_context,&event,&font_widgets) != MagickFalse)
       continue;
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        PressFontBrowserScroll(&font_context,event,&targets,&font_widgets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        ReleaseFontBrowserScroll(&font_context,event,&font_widgets);
-        break;
-      }
-      case ClientMessage:
-      {
-        ClientFontBrowserMessage(&font_context,event,&font_widgets);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
-      default:
-      {
-        HandleFontKeyEvent(&font_context,event,&font_widgets);
-        break;
-      }
-    }
+    HandleFontEvent(&font_context,event,&targets,&font_widgets);
   } while ((state & ExitState) == 0);
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
