@@ -9751,6 +9751,42 @@ static MagickBooleanType ReloadFontList(const FontBrowserContext *context,
   return(MagickTrue);
 }
 
+static MagickBooleanType SortFontList(const FontBrowserContext *context,
+  const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    *const fonts = widgets->fonts,
+    *const i = widgets->i;
+
+  char
+    ***const fontlist = widgets->fontlist,
+    ***const listhead = widgets->listhead;
+
+  /*
+    Sort font list in ascending order.
+  */
+  (*listhead)=(*fontlist);
+  (*fontlist)=(char **) AcquireQuantumMemory((size_t) (*fonts),
+    sizeof(*(*fontlist)));
+  if ((*fontlist) == (char **) NULL)
+    {
+      XNoticeWidget(display,windows,"MemoryAllocationFailed",
+        "UnableToViewFonts");
+      return(MagickFalse);
+    }
+  for ((*i)=0; (*i) < (*fonts); (*i)++)
+    (*fontlist)[(*i)]=(*listhead)[(*i)];
+  qsort((void *) (*fontlist),(size_t) (*fonts),sizeof(*(*fontlist)),
+    FontCompare);
+  return(MagickTrue);
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -9958,21 +9994,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
       {
         if (ReloadFontList(&font_context,&font_widgets) == MagickFalse)
           break;
-        /*
-          Sort font list in ascending order.
-        */
-        listhead=fontlist;
-        fontlist=(char **) AcquireQuantumMemory((size_t) fonts,
-          sizeof(*fontlist));
-        if (fontlist == (char **) NULL)
-          {
-            XNoticeWidget(display,windows,"MemoryAllocationFailed",
-              "UnableToViewFonts");
-            return;
-          }
-        for (i=0; i < fonts; i++)
-          fontlist[i]=listhead[i];
-        qsort((void *) fontlist,(size_t) fonts,sizeof(*fontlist),FontCompare);
+        if (SortFontList(&font_context,&font_widgets) == MagickFalse)
+          return;
         slider_info.height=(unsigned int) ((int) scroll_info.height-
           ((slider_info.min_y-scroll_info.y+1) << 1)+1);
         if (fonts > (int) visible_fonts)
