@@ -2108,6 +2108,9 @@ typedef struct _ColorBrowserTargets
 
   char
     ***colorlist;
+
+  XWidgetInfo
+    *list_info;
 } ColorBrowserTargets;
 
 typedef struct _ColorBrowserContext
@@ -2713,6 +2716,78 @@ static void SelectColorBrowserEntry(const ColorBrowserContext *context,
   SelectFontBrowserEntry(&press,glob_pattern,targets);
 }
 
+static void PressColorBrowserScroll(const ColorBrowserContext *context,
+  const XEvent event,const FontBrowserTargets *targets,
+  const ColorBrowserTargets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const colors = widgets->colors;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_colors = widgets->visible_colors;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info;
+
+  if (MatteIsActive((*slider_info),event.xbutton))
+    {
+      /*
+        Track slider.
+      */
+      (*slider_info).active=MagickTrue;
+      return;
+    }
+  if ((MatteIsActive((*north_info),event.xbutton)) && ((*slider_info).id > 0))
+    {
+      /*
+        Move slider up.
+      */
+      (*north_info).raised=MagickFalse;
+      (*slider_info).id--;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((MatteIsActive((*south_info),event.xbutton)) &&
+      ((*slider_info).id < (int) (*colors)))
+    {
+      /*
+        Move slider down.
+      */
+      (*south_info).raised=MagickFalse;
+      (*slider_info).id++;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*scroll_info),event.xbutton))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=PageListBrowserSlider((*slider_info),event,
+        (*visible_colors));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*list_info),event.xbutton))
+    {
+      SelectColorBrowserEntry(context,event,targets,
+        widgets);
+      return;
+    }
+  PressColorBrowserButtons(context,event,widgets);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2796,7 +2871,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     color_widgets = { &reply_info, &state,
       &grab_info, &reset_info, &action_info, &cancel_info, &slider_info,
       &colors, &scroll_info, &visible_colors, &north_info, &delay, &south_info,
-      &mode_info, &colorlist };
+      &mode_info, &colorlist, &list_info };
 
   ColorBrowserContext
     color_context;
@@ -3239,51 +3314,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     {
       case ButtonPress:
       {
-        if (MatteIsActive(slider_info,event.xbutton))
-          {
-            /*
-              Track slider.
-            */
-            slider_info.active=MagickTrue;
-            break;
-          }
-        if ((MatteIsActive(north_info,event.xbutton)) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            north_info.raised=MagickFalse;
-            slider_info.id--;
-            state|=RedrawListState;
-            break;
-          }
-        if ((MatteIsActive(south_info,event.xbutton)) &&
-            (slider_info.id < (int) colors))
-          {
-            /*
-              Move slider down.
-            */
-            south_info.raised=MagickFalse;
-            slider_info.id++;
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(scroll_info,event.xbutton))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=PageListBrowserSlider(slider_info,event,visible_colors);
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(list_info,event.xbutton))
-          {
-            SelectColorBrowserEntry(&color_context,event,&targets,
-              &color_widgets);
-            break;
-          }
-        PressColorBrowserButtons(&color_context,event,&color_widgets);
+        PressColorBrowserScroll(&color_context,event,&targets,&color_widgets);
         break;
       }
       case ButtonRelease:
