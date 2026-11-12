@@ -2095,6 +2095,32 @@ static void XWriteFontInfo(FILE *file,const XResourceInfo *resource_info)
     (void) FormatLocaleFile(file,"Text font: %s\n\n",resource_info->text_font);
 }
 
+static void XWriteUndoInfo(FILE *file,const XResourceInfo *resource_info,
+  Image *undo_image)
+{
+  ssize_t
+    bytes;
+
+  size_t
+    number_pixels;
+
+  unsigned int
+    levels;
+
+  bytes=0;
+  for (levels=0; undo_image != (Image *) NULL; levels++)
+  {
+    number_pixels=undo_image->list->columns*undo_image->list->rows;
+    bytes+=(ssize_t) (number_pixels*sizeof(PixelInfo));
+    undo_image=GetPreviousImageInList(undo_image);
+  }
+  (void) FormatLocaleFile(file,"Undo Edit Cache\n  levels: %u\n",levels);
+  (void) FormatLocaleFile(file,"  bytes: %.17gmb\n",(double)
+    ((bytes+(1 << 19)) >> 20));
+  (void) FormatLocaleFile(file,"  limit: %.17gmb\n\n",(double)
+    resource_info->undo_cache);
+}
+
 MagickPrivate void XDisplayImageInfo(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,Image *undo_image,
   Image *image,ExceptionInfo *exception)
@@ -2112,15 +2138,6 @@ MagickPrivate void XDisplayImageInfo(Display *display,
 
   ssize_t
     i;
-
-  size_t
-    number_pixels;
-
-  ssize_t
-    bytes;
-
-  unsigned int
-    levels;
 
   /*
     Write info about the X server to a file.
@@ -2152,18 +2169,7 @@ MagickPrivate void XDisplayImageInfo(Display *display,
   /*
     Write info about the undo cache to a file.
   */
-  bytes=0;
-  for (levels=0; undo_image != (Image *) NULL; levels++)
-  {
-    number_pixels=undo_image->list->columns*undo_image->list->rows;
-    bytes+=(ssize_t) (number_pixels*sizeof(PixelInfo));
-    undo_image=GetPreviousImageInList(undo_image);
-  }
-  (void) FormatLocaleFile(file,"Undo Edit Cache\n  levels: %u\n",levels);
-  (void) FormatLocaleFile(file,"  bytes: %.17gmb\n",(double)
-    ((bytes+(1 << 19)) >> 20));
-  (void) FormatLocaleFile(file,"  limit: %.17gmb\n\n",(double)
-    resource_info->undo_cache);
+  XWriteUndoInfo(file,resource_info,undo_image);
   /*
     Write info about the image to a file.
   */
