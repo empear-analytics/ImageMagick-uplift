@@ -303,6 +303,42 @@ static void RaiseImageRowDepthStatus(MagickBooleanType *status,
     (*status)=MagickFalse;
 }
 
+#if !defined(MAGICKCORE_HDRI_SUPPORT)
+typedef struct _DepthMapScan
+{
+  const Image
+    *image;
+
+  size_t
+    *depth_map,
+    *current_depth;
+} DepthMapScan;
+
+static void RaiseMappedPixelDepth(const DepthMapScan *scan,const Quantum *p,
+  const int id)
+{
+  const Image
+    *const image = scan->image;
+
+  size_t
+    *const current_depth = scan->current_depth,
+    *const depth_map = scan->depth_map;
+
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if (depth_map[ScaleQuantumToMap(p[j])] > current_depth[id])
+      current_depth[id]=depth_map[ScaleQuantumToMap(p[j])];
+  }
+}
+#endif
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -385,6 +421,9 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
         const Quantum
           *magick_restrict p;
 
+        DepthMapScan
+          scan;
+
         ssize_t
           x;
 
@@ -393,20 +432,12 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
         p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
         if (p == (const Quantum *) NULL)
           continue;
+        scan.image=image;
+        scan.depth_map=depth_map;
+        scan.current_depth=current_depth;
         for (x=0; x < (ssize_t) image->columns; x++)
         {
-          ssize_t
-            j;
-
-          for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,j);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) == 0)
-              continue;
-            if (depth_map[ScaleQuantumToMap(p[j])] > current_depth[id])
-              current_depth[id]=depth_map[ScaleQuantumToMap(p[j])];
-          }
+          RaiseMappedPixelDepth(&scan,p,id);
           p+=(ptrdiff_t) GetPixelChannels(image);
         }
         if (current_depth[id] == MAGICKCORE_QUANTUM_DEPTH)
