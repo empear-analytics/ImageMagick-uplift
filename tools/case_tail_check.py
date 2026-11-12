@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Check the targets, the input fill, the bindings and the rewrite of a Recipe CT step.
 
-  case_tail_check.py FILE TARGETS HELPER [INPUT LOCAL] [--returns]
+  case_tail_check.py FILE TARGETS HELPER [INPUT LOCAL] [--returns] [--shared]
+
+With `--shared` the INPUT local is the shared struct of Recipe N step 8: its fill is one run
+of `LOCAL.m=m;` anywhere before the calls, not directly before this helper's call.
 
 With `--returns` the helper is the `static MagickBooleanType` function of Recipe CR (a
 tail that ends its case or iteration or returns failure): each `break;` or `continue;`
@@ -111,6 +114,20 @@ def check_fill(text, input_type, local, helper, names):
     if len(found) != 1:
         problems.append(f"expected one run of {local}.m=m; for {names} directly "
                         f"before {helper}(&{local},...), found {len(found)}")
+    for m, v in re.findall(re.escape(local) + r"\.(\w+)=([^;]*);", text):
+        if m != v.strip():
+            problems.append(f"{local}.{m}={v};")
+    return problems
+
+
+def check_fill_shared(text, local, names):
+    """The shared form (Recipe CT step 4, the sibling blocks of Recipe N step 8): one run of
+    LOCAL.m=m; for every member, in declaration order, filled once somewhere before the
+    calls (the loop); no other assignment to a member of LOCAL."""
+    fill = "".join(r"\s*" + re.escape(f"{local}.{n}={n};") for n in names)
+    problems = []
+    if len(re.findall(fill, text)) != 1:
+        problems.append(f"expected one run of {local}.m=m; for {names}")
     for m, v in re.findall(re.escape(local) + r"\.(\w+)=([^;]*);", text):
         if m != v.strip():
             problems.append(f"{local}.{m}={v};")
@@ -284,7 +301,8 @@ def diff_lines(path):
 def main(argv):
     global RETURNS
     RETURNS = "--returns" in argv
-    argv = [a for a in argv if a != "--returns"]
+    SHARED = "--shared" in argv
+    argv = [a for a in argv if a not in ("--returns", "--shared")]
     if len(argv) not in (4, 6):
         raise SystemExit(__doc__)
     path, targets_type, helper = argv[1:4]
@@ -304,7 +322,8 @@ def main(argv):
     tlocal, bad = check_targets(text, targets_type, target_names)
     problems += bad
     if input_type:
-        problems += check_fill(text, input_type, local, helper, input_names)
+        problems += (check_fill_shared(text, local, input_names) if SHARED
+                     else check_fill(text, input_type, local, helper, input_names))
     problems += check_position(text, helper)
     bound_t, bound_i, moved, bad = split_body(body, tptr, iptr, target_names, input_names)
     problems += bad
