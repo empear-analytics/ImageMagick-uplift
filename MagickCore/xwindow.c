@@ -8946,6 +8946,94 @@ static unsigned char *MagnifyBitColumnsMSB(const MagnifyBitColumns *columns,
   return(q);
 }
 
+typedef struct _MagnifyBitRows
+{
+  unsigned int
+    height,
+    magnify;
+
+  XImage
+    *ximage;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    width,
+    scanline_pad;
+
+  unsigned char
+    background,
+    foreground,
+    *q;
+} MagnifyBitRows;
+
+static void MagnifyBitRowsLSB(const MagnifyBitRows *bit_rows)
+{
+  XImage
+    *const ximage = bit_rows->ximage;
+
+  const int
+    x = bit_rows->x;
+
+  const unsigned char
+    background = bit_rows->background,
+    foreground = bit_rows->foreground;
+
+  const unsigned int
+    height = bit_rows->height,
+    magnify = bit_rows->magnify,
+    scanline_pad = bit_rows->scanline_pad,
+    width = bit_rows->width;
+
+  int
+    y = bit_rows->y;
+
+  ssize_t
+    i;
+
+  unsigned char
+    byte,
+    *p,
+    p_bit,
+    q_bit,
+    *q = bit_rows->q;
+
+  unsigned int
+    j;
+
+  for (i=0; i < (ssize_t) height; i+=magnify)
+  {
+    /*
+      Propagate pixel magnify rows.
+    */
+    for (j=0; j < magnify; j++)
+    {
+      MagnifyBitColumns
+        columns;
+
+      p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
+        ((x*ximage->bits_per_pixel) >> 3);
+      p_bit=(unsigned char) (x*ximage->bits_per_pixel) & 0x07;
+      q_bit=0;
+      byte=0;
+      columns.width=width;
+      columns.magnify=magnify;
+      columns.ximage=ximage;
+      columns.background=background;
+      columns.foreground=foreground;
+      columns.scanline_pad=scanline_pad;
+      columns.p=p;
+      columns.p_bit=p_bit;
+      columns.q_bit=q_bit;
+      columns.byte=byte;
+      q=MagnifyBitColumnsLSB(&columns,q);
+    }
+    y++;
+  }
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -9077,6 +9165,9 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
       {
         case LSBFirst:
         {
+          MagnifyBitRows
+            bit_rows;
+
           /*
             Magnify little-endian bitmap.
           */
@@ -9093,35 +9184,17 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
               if (windows->magnify.depth > 1)
                 Swap(background,foreground);
             }
-          for (i=0; i < (ssize_t) height; i+=magnify)
-          {
-            /*
-              Propagate pixel magnify rows.
-            */
-            for (j=0; j < magnify; j++)
-            {
-              MagnifyBitColumns
-                columns;
-
-              p=(unsigned char *) ximage->data+y*ximage->bytes_per_line+
-                ((x*ximage->bits_per_pixel) >> 3);
-              p_bit=(unsigned char) (x*ximage->bits_per_pixel) & 0x07;
-              q_bit=0;
-              byte=0;
-              columns.width=width;
-              columns.magnify=magnify;
-              columns.ximage=ximage;
-              columns.background=background;
-              columns.foreground=foreground;
-              columns.scanline_pad=scanline_pad;
-              columns.p=p;
-              columns.p_bit=p_bit;
-              columns.q_bit=q_bit;
-              columns.byte=byte;
-              q=MagnifyBitColumnsLSB(&columns,q);
-            }
-            y++;
-          }
+          bit_rows.height=height;
+          bit_rows.magnify=magnify;
+          bit_rows.ximage=ximage;
+          bit_rows.x=x;
+          bit_rows.y=y;
+          bit_rows.width=width;
+          bit_rows.scanline_pad=scanline_pad;
+          bit_rows.background=background;
+          bit_rows.foreground=foreground;
+          bit_rows.q=q;
+          MagnifyBitRowsLSB(&bit_rows);
           break;
         }
         case MSBFirst:
