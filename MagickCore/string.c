@@ -544,6 +544,36 @@ MagickExport void ConcatenateStringInfo(StringInfo *string_info,
   string_info->length=length;
 }
 
+static MagickBooleanType ReadFileIntoBuffer(const int file,char *string,
+  const size_t length)
+{
+  size_t
+    i;
+
+  ssize_t
+    count;
+
+  void
+    *map;
+
+  map=MapBlob(file,ReadMode,0,length);
+  if (map != (void *) NULL)
+    {
+      (void) memcpy(string,map,length);
+      (void) UnmapBlob(map,length);
+      return(MagickTrue);
+    }
+  (void) lseek(file,0,SEEK_SET);
+  for (i=0; i < length; i+=(size_t) count)
+  {
+    count=MagickRead(file,string+i,(size_t) MagickMin(length-i,(size_t)
+      MagickMaxBufferExtent));
+    if (count <= 0)
+      break;
+  }
+  return(i < length ? MagickFalse : MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -585,9 +615,6 @@ MagickExport StringInfo *ConfigureFileToStringInfo(const char *filename)
   StringInfo
     *string_info;
 
-  void
-    *map;
-
   assert(filename != (const char *) NULL);
   file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
   if (file == -1)
@@ -608,34 +635,11 @@ MagickExport StringInfo *ConfigureFileToStringInfo(const char *filename)
       file=close_utf8(file)-1;
       return((StringInfo *) NULL);
     }
-  map=MapBlob(file,ReadMode,0,length);
-  if (map != (void *) NULL)
+  if (ReadFileIntoBuffer(file,string,length) == MagickFalse)
     {
-      (void) memcpy(string,map,length);
-      (void) UnmapBlob(map,length);
-    }
-  else
-    {
-      size_t
-        i;
-
-      ssize_t
-        count;
-
-      (void) lseek(file,0,SEEK_SET);
-      for (i=0; i < length; i+=(size_t) count)
-      {
-        count=MagickRead(file,string+i,(size_t) MagickMin(length-i,(size_t)
-          MagickMaxBufferExtent));
-        if (count <= 0)
-          break;
-      }
-      if (i < length)
-        {
-          file=close_utf8(file)-1;
-          string=DestroyString(string);
-          return((StringInfo *) NULL);
-        }
+      file=close_utf8(file)-1;
+      string=DestroyString(string);
+      return((StringInfo *) NULL);
     }
   string[length]='\0';
   file=close_utf8(file)-1;
