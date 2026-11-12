@@ -941,6 +941,22 @@ MagickPrivate XFontStruct *XBestFont(Display *display,
 %    o image: the image.
 %
 */
+static unsigned int XIconWidth(const XIconSize *icon_size,
+  const double scale_factor,const unsigned int width)
+{
+  unsigned int
+    icon_width;
+
+  icon_width=(unsigned int) icon_size->min_width;
+  while ((int) icon_width < icon_size->max_width)
+  {
+    if (icon_width >= (unsigned int) (scale_factor*width+0.5))
+      break;
+    icon_width+=(unsigned int) icon_size->width_inc;
+  }
+  return(icon_width);
+}
+
 MagickPrivate void XBestIconSize(Display *display,XWindowInfo *window,
   Image *image)
 {
@@ -1013,13 +1029,7 @@ MagickPrivate void XBestIconSize(Display *display,XWindowInfo *window,
   scale_factor=(double) icon_size->max_width/width;
   if (scale_factor > ((double) icon_size->max_height/height))
     scale_factor=(double) icon_size->max_height/height;
-  icon_width=(unsigned int) icon_size->min_width;
-  while ((int) icon_width < icon_size->max_width)
-  {
-    if (icon_width >= (unsigned int) (scale_factor*width+0.5))
-      break;
-    icon_width+=(unsigned int) icon_size->width_inc;
-  }
+  icon_width=XIconWidth(icon_size,scale_factor,width);
   icon_height=(unsigned int) icon_size->min_height;
   while ((int) icon_height < icon_size->max_height)
   {
