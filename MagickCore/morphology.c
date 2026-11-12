@@ -6235,6 +6235,41 @@ static void SetIteratedMorphologyLimits(const MorphologyMethod method,
   }
 }
 
+typedef struct _MorphologyStageLimit
+{
+  MorphologyMethod
+    method;
+
+  size_t
+    limit;
+} MorphologyStageLimit;
+
+static const MorphologyStageLimit
+  MorphologyStageLimits[] =
+  {
+    { SmoothMorphology, 4 },  /* 4 primitive compound morphology */
+    { OpenMorphology, 2 },    /* 2 primitive compound morphology */
+    { OpenIntensityMorphology, 2 },
+    { TopHatMorphology, 2 },
+    { CloseMorphology, 2 },
+    { CloseIntensityMorphology, 2 },
+    { BottomHatMorphology, 2 },
+    { EdgeMorphology, 2 }
+  };
+
+static const MorphologyStageLimit *FindMorphologyStageLimit(
+  const MorphologyMethod method)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(MorphologyStageLimits)/
+       sizeof(*MorphologyStageLimits)); i++)
+    if (MorphologyStageLimits[i].method == method)
+      return(MorphologyStageLimits+i);
+  return((const MorphologyStageLimit *) NULL);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -6274,6 +6309,9 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyApplyTargets
     targets = { &curr_image, &rslt_image, &save_image, &work_image, &count };
 
+  const MorphologyStageLimit
+    *entry;
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(kernel != (KernelInfo *) NULL);
@@ -6305,23 +6343,11 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   stage_limit = 1;        /* assume method is not a compound */
   special = MagickFalse;   /* assume it is NOT a direct modify primitive */
   rslt_compose = compose; /* and we are composing multi-kernels as given */
-  switch( method ) {
-    case SmoothMorphology:  /* 4 primitive compound morphology */
-      stage_limit = 4;
-      break;
-    case OpenMorphology:    /* 2 primitive compound morphology */
-    case OpenIntensityMorphology:
-    case TopHatMorphology:
-    case CloseMorphology:
-    case CloseIntensityMorphology:
-    case BottomHatMorphology:
-    case EdgeMorphology:
-      stage_limit = 2;
-      break;
-    default:
-      SetIteratedMorphologyLimits(method,&limits);
-      break;
-  }
+  entry=FindMorphologyStageLimit(method);
+  if (entry != (const MorphologyStageLimit *) NULL)
+    stage_limit=entry->limit;
+  else
+    SetIteratedMorphologyLimits(method,&limits);
 
   /* Apply special methods with special requirements
   ** For example, single run only, or post-processing requirements
