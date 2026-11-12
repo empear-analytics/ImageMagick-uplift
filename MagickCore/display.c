@@ -6750,6 +6750,62 @@ static void XSelectDrawWidth(const DrawEditContext *context,const int id,
   (*line_width)=(unsigned int) StringToUnsignedLong(width);
 }
 
+static Pixmap XCreateStippleBitmap(Display *display,const Window root_window,
+  const int entry)
+{
+  Pixmap
+    stipple;
+
+  switch (entry)
+  {
+    case 0:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) BricksBitmap,BricksWidth,BricksHeight);
+      break;
+    }
+    case 1:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) DiagonalBitmap,DiagonalWidth,DiagonalHeight);
+      break;
+    }
+    case 2:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) ScalesBitmap,ScalesWidth,ScalesHeight);
+      break;
+    }
+    case 3:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) VerticalBitmap,VerticalWidth,VerticalHeight);
+      break;
+    }
+    case 4:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) WavyBitmap,WavyWidth,WavyHeight);
+      break;
+    }
+    case 5:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) HighlightBitmap,HighlightWidth,
+        HighlightHeight);
+      break;
+    }
+    case 6:
+    default:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) OpaqueBitmap,OpaqueWidth,OpaqueHeight);
+      break;
+    }
+  }
+  return(stipple);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -6981,53 +7037,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
               stipple=(Pixmap) NULL;
               if (entry != 7)
                 {
-                  switch (entry)
-                  {
-                    case 0:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) BricksBitmap,BricksWidth,BricksHeight);
-                      break;
-                    }
-                    case 1:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) DiagonalBitmap,DiagonalWidth,DiagonalHeight);
-                      break;
-                    }
-                    case 2:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) ScalesBitmap,ScalesWidth,ScalesHeight);
-                      break;
-                    }
-                    case 3:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) VerticalBitmap,VerticalWidth,VerticalHeight);
-                      break;
-                    }
-                    case 4:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) WavyBitmap,WavyWidth,WavyHeight);
-                      break;
-                    }
-                    case 5:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) HighlightBitmap,HighlightWidth,
-                        HighlightHeight);
-                      break;
-                    }
-                    case 6:
-                    default:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) OpaqueBitmap,OpaqueWidth,OpaqueHeight);
-                      break;
-                    }
-                  }
+                  stipple=XCreateStippleBitmap(display,root_window,entry);
                   break;
                 }
               XFileBrowserWidget(display,windows,"Stipple",filename);
