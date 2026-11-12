@@ -2151,6 +2151,17 @@ static size_t CountTextLines(const char *text)
   return(lines);
 }
 
+static char **DestroyTextList(char **textlist,const ssize_t count)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < count; i++)
+    textlist[i]=DestroyString(textlist[i]);
+  textlist=(char **) RelinquishMagickMemory(textlist);
+  return((char **) NULL);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2223,15 +2234,7 @@ MagickExport char **StringToStrings(const char *text,size_t *count)
         textlist[i]=(char *) AcquireQuantumMemory((size_t) (q-p)+1,
           sizeof(**textlist));
         if (textlist[i] == (char *) NULL)
-          {
-            ssize_t
-              j;
-
-            for (j=0; j < i; j++)
-              textlist[j]=DestroyString(textlist[j]);
-            textlist=(char **) RelinquishMagickMemory(textlist);
-            return((char **) NULL);
-          }
+          return(DestroyTextList(textlist,i));
         (void) memcpy(textlist[i],p,(size_t) (q-p));
         textlist[i][q-p]='\0';
         if (*q == '\r')
@@ -2267,12 +2270,7 @@ MagickExport char **StringToStrings(const char *text,size_t *count)
         textlist[i]=(char *) AcquireQuantumMemory(2UL*MagickPathExtent,
           sizeof(**textlist));
         if (textlist[i] == (char *) NULL)
-          {
-            for (j=0; j < i; j++)
-              textlist[j]=DestroyString(textlist[j]);
-            textlist=(char **) RelinquishMagickMemory(textlist);
-            return((char **) NULL);
-          }
+          return(DestroyTextList(textlist,i));
         (void) FormatLocaleString(textlist[i],MagickPathExtent,"0x%08lx: ",
           (long) (CharsPerLine*i));
         q=textlist[i]+strlen(textlist[i]);
@@ -2311,10 +2309,7 @@ MagickExport char **StringToStrings(const char *text,size_t *count)
           if (resized == (char *) NULL)
             {
               textlist[i]=(char *) NULL;
-              for (j=0; j < i; j++)
-                textlist[j]=DestroyString(textlist[j]);
-              textlist=(char **) RelinquishMagickMemory(textlist);
-              return((char **) NULL);
+              return(DestroyTextList(textlist,i));
             }
           textlist[i]=resized;
         }
