@@ -402,6 +402,16 @@ static MagickBooleanType IsFamilyMismatch(const char *name,const char *family)
   return(LocaleCompare(name,family) != 0 ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType IsFaceMismatch(const TypeInfo *p,
+  const StyleType style,const StretchType stretch,const size_t font_weight)
+{
+  if (IsStyleMismatch(p,style) != MagickFalse)
+    return(MagickTrue);
+  if (IsStretchMismatch(p,stretch) != MagickFalse)
+    return(MagickTrue);
+  return(p->weight != font_weight ? MagickTrue : MagickFalse);
+}
+
 static const TypeInfo *GetExactTypeInfo(const char *family,
   const StyleType style,const StretchType stretch,const size_t font_weight)
 {
@@ -425,17 +435,7 @@ static const TypeInfo *GetExactTypeInfo(const char *family,
         p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
         continue;
       }
-    if (IsStyleMismatch(p,style) != MagickFalse)
-      {
-        p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
-        continue;
-      }
-    if (IsStretchMismatch(p,stretch) != MagickFalse)
-      {
-        p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
-        continue;
-      }
-    if (p->weight != font_weight)
+    if (IsFaceMismatch(p,style,stretch,font_weight) != MagickFalse)
       {
         p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
         continue;
