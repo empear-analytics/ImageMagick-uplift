@@ -2641,6 +2641,22 @@ static void XSetBoxPixelIndex(XWindows *windows,const unsigned int box_id)
         }
 }
 
+static void XSetPenPixelIndex(XWindows *windows,const unsigned int pen_id)
+{
+  ssize_t
+    i;
+
+  windows->pixel_info->pen_color=windows->pixel_info->pen_colors[pen_id];
+  if (windows->pixel_info->colors != 0)
+    for (i=0; i < (ssize_t) windows->pixel_info->colors; i++)
+      if (windows->pixel_info->pixels[i] ==
+          windows->pixel_info->pen_colors[pen_id].pixel)
+        {
+          windows->pixel_info->pen_index=(unsigned short) i;
+          break;
+        }
+}
+
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
@@ -2716,9 +2732,6 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
 
   size_t
     state;
-
-  ssize_t
-    i;
 
   unsigned int
     height,
@@ -3196,15 +3209,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       Determine pixel index for box and pen color.
     */
     XSetBoxPixelIndex(windows,box_id);
-    windows->pixel_info->pen_color=windows->pixel_info->pen_colors[pen_id];
-    if (windows->pixel_info->colors != 0)
-      for (i=0; i < (ssize_t) windows->pixel_info->colors; i++)
-        if (windows->pixel_info->pixels[i] ==
-            windows->pixel_info->pen_colors[pen_id].pixel)
-          {
-            windows->pixel_info->pen_index=(unsigned short) i;
-            break;
-          }
+    XSetPenPixelIndex(windows,pen_id);
     /*
       Define the annotate geometry string.
     */
