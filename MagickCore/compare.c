@@ -185,6 +185,21 @@ static void HighlightCompareRow(const CompareHighlightRow *row,
   }
 }
 
+static MagickBooleanType PrepareCompareHighlight(Image **difference_image,
+  Image **highlight_image,MagickBooleanType *status,ExceptionInfo *exception)
+{
+  *status=SetImageStorageClass(*highlight_image,DirectClass,exception);
+  if (*status == MagickFalse)
+    {
+      *difference_image=DestroyImage(*difference_image);
+      *highlight_image=DestroyImage(*highlight_image);
+      return(MagickFalse);
+    }
+  (void) SetImageMask(*highlight_image,ReadPixelMask,(Image *) NULL,exception);
+  (void) SetImageAlphaChannel(*highlight_image,OpaqueAlphaChannel,exception);
+  return(MagickTrue);
+}
+
 typedef struct _CompareImageTargets
 {
   size_t
@@ -238,16 +253,8 @@ static MagickBooleanType AcquireCompareImages(const Image *image,
       *difference_image=DestroyImage(*difference_image);
       return(MagickFalse);
     }
-  *status=SetImageStorageClass(*highlight_image,DirectClass,exception);
-  if (*status == MagickFalse)
-    {
-      *difference_image=DestroyImage(*difference_image);
-      *highlight_image=DestroyImage(*highlight_image);
-      return(MagickFalse);
-    }
-  (void) SetImageMask(*highlight_image,ReadPixelMask,(Image *) NULL,exception);
-  (void) SetImageAlphaChannel(*highlight_image,OpaqueAlphaChannel,exception);
-  return(MagickTrue);
+  return(PrepareCompareHighlight(difference_image,highlight_image,status,
+    exception));
 }
 
 typedef struct _CompareColorTargets
