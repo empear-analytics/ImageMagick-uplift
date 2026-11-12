@@ -7048,6 +7048,36 @@ static void XDrawKeyPress(const DrawEditContext *context,
   }
 }
 
+static RectangleInfo XFitSelectionRectangle(XWindows *windows,const int x,
+  const int y,RectangleInfo rectangle_info)
+{
+  if (rectangle_info.x < 0)
+    rectangle_info.x=0;
+  else
+    if (rectangle_info.x > (ssize_t) windows->image.width)
+      rectangle_info.x=(ssize_t) windows->image.width;
+  if ((int) rectangle_info.x < x)
+    rectangle_info.width=(unsigned int) (x-rectangle_info.x);
+  else
+    {
+      rectangle_info.width=(unsigned int) (rectangle_info.x-x);
+      rectangle_info.x=(ssize_t) x;
+    }
+  if (rectangle_info.y < 0)
+    rectangle_info.y=0;
+  else
+    if (rectangle_info.y > (ssize_t) windows->image.height)
+      rectangle_info.y=(ssize_t) windows->image.height;
+  if ((int) rectangle_info.y < y)
+    rectangle_info.height=(unsigned int) (y-rectangle_info.y);
+  else
+    {
+      rectangle_info.height=(unsigned int) (rectangle_info.y-y);
+      rectangle_info.y=(ssize_t) y;
+    }
+  return(rectangle_info);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7580,30 +7610,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
          ((line_info.y2-line_info.y1+1)*(line_info.y2-line_info.y1+1)));
       if (IsSelectionMovedOrDone(rectangle_info,x,y,state) != MagickFalse)
         {
-          if (rectangle_info.x < 0)
-            rectangle_info.x=0;
-          else
-            if (rectangle_info.x > (ssize_t) windows->image.width)
-              rectangle_info.x=(ssize_t) windows->image.width;
-          if ((int) rectangle_info.x < x)
-            rectangle_info.width=(unsigned int) (x-rectangle_info.x);
-          else
-            {
-              rectangle_info.width=(unsigned int) (rectangle_info.x-x);
-              rectangle_info.x=(ssize_t) x;
-            }
-          if (rectangle_info.y < 0)
-            rectangle_info.y=0;
-          else
-            if (rectangle_info.y > (ssize_t) windows->image.height)
-              rectangle_info.y=(ssize_t) windows->image.height;
-          if ((int) rectangle_info.y < y)
-            rectangle_info.height=(unsigned int) (y-rectangle_info.y);
-          else
-            {
-              rectangle_info.height=(unsigned int) (rectangle_info.y-y);
-              rectangle_info.y=(ssize_t) y;
-            }
+          rectangle_info=XFitSelectionRectangle(windows,x,y,rectangle_info);
         }
     } while ((state & ExitState) == 0);
     (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
