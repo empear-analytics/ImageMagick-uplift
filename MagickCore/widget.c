@@ -3461,6 +3461,66 @@ static void HandleCommandWindowEvent(const CommandWidgetEvent *tile,int *id,
   }
 }
 
+static void HandleCommandEvent(const CommandWidgetEvent *tile,int *id,
+  size_t *state)
+{
+  Display
+    *const display = tile->display;
+
+  XWindows
+    *const windows = tile->windows;
+
+  XEvent
+    *const event = tile->event;
+
+  const unsigned int
+    number_selections = tile->number_selections;
+
+  if (event != (XEvent *) NULL)
+    switch (event->type)
+    {
+      case ButtonPress:
+      {
+        CommandWidgetEvent
+          command_event;
+
+        command_event.display=display;
+        command_event.windows=windows;
+        command_event.event=event;
+        command_event.number_selections=number_selections;
+        (*id)=PressCommandSelection(&command_event,(*id));
+        break;
+      }
+      case ButtonRelease:
+      {
+        CommandWidgetEvent
+          command_event;
+
+        command_event.display=display;
+        command_event.windows=windows;
+        command_event.event=event;
+        command_event.number_selections=number_selections;
+        (*id)=ReleaseCommandSelection(&command_event,(*id));
+        break;
+      }
+      case ClientMessage:
+      {
+        ClientCommandMessage(display,windows,event);
+        break;
+      }
+      case ConfigureNotify:
+      {
+        (*state)=ConfigureCommandWindow(windows,event,(*state));
+        break;
+      }
+      default:
+      {
+        HandleCommandWindowEvent(tile,id,state);
+        break;
+      }
+    }
+}
+
 MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   const char *const *selections,XEvent *event)
 {
@@ -3572,49 +3632,7 @@ MagickPrivate int XCommandWidget(Display *display,XWindows *windows,
   tile.windows=windows;
   tile.event=event;
   tile.number_selections=number_selections;
-  if (event != (XEvent *) NULL)
-    switch (event->type)
-    {
-      case ButtonPress:
-      {
-        CommandWidgetEvent
-          command_event;
-
-        command_event.display=display;
-        command_event.windows=windows;
-        command_event.event=event;
-        command_event.number_selections=number_selections;
-        id=PressCommandSelection(&command_event,id);
-        break;
-      }
-      case ButtonRelease:
-      {
-        CommandWidgetEvent
-          command_event;
-
-        command_event.display=display;
-        command_event.windows=windows;
-        command_event.event=event;
-        command_event.number_selections=number_selections;
-        id=ReleaseCommandSelection(&command_event,id);
-        break;
-      }
-      case ClientMessage:
-      {
-        ClientCommandMessage(display,windows,event);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureCommandWindow(windows,event,state);
-        break;
-      }
-      default:
-      {
-        HandleCommandWindowEvent(&tile,&id,&state);
-        break;
-      }
-    }
+  HandleCommandEvent(&tile,&id,&state);
   if (state & UpdateConfigurationState)
     {
       /*
