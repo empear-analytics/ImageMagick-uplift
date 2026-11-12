@@ -11,6 +11,9 @@ functions out in does not matter), line by line. Allowed differences, each count
   - a `__LINE__` immediate (`mov $N,%ecx` / `%edx`) shifted by a constant per function,
   - a .rodata reference (resolved to the 16 bytes it points at; `__FILE__` strings differ),
   - a compiler constant-pool label number (.LCPI<n>_<m>), a rip-relative offset,
+  - the label of a call or jump the linker resolves (`call <name>` followed by its relocation line: objdump prints the
+    symbol at the next instruction, which for a call ending a function is whichever function the object lays out next);
+    the relocation line that names the real target is compared as every other line,
   - a string-literal label number (clang's .L.str.<n>), when both labels hold the same bytes: each
     reference is resolved to the NUL-terminated string the label points at (the path the object was
     compiled from reads as __FILE__ in both), so a changed literal still prints DIFFERENT.
@@ -36,6 +39,16 @@ def string_labels(obj, src):
     texts = {label: sections[sec][int(at, 16):].split(b"\0", 1)[0] for at, sec, label in symbols}
     return {label: "__FILE__" if text == src.encode() else text.hex() for label, text in texts.items()}
 
+def mark_call_placeholders(lines):
+    """A call or jump the assembler left to the linker has an operand of 0, which objdump prints as the symbol at the
+    next instruction: the function's own name in the middle of a function, and whichever function the object lays out
+    next when the call is the last instruction (a call to __assert_fail that ends a function). That label is the layout,
+    not the code; the relocation line that follows names the real target and is still compared line by line. The label
+    is marked <placeholder:NAME> so that classify() can count a difference in NAME alone."""
+    for i in range(len(lines) - 1):
+        if re.match(r"(call|jmp)\s+<[^>]*>\s*$", lines[i]) and re.match(r"R_[A-Z0-9_]+\s", lines[i + 1]):
+            lines[i] = re.sub(r"<([^>]*)>", r"<placeholder:\1>", lines[i])
+
 def disasm(obj, names, src):
     ro = sh("objcopy", "-O", "binary", "--only-section=.rodata", obj, "/dev/stdout").stdout
     strs = string_labels(obj, src)
@@ -53,6 +66,7 @@ def disasm(obj, names, src):
         line = re.sub(r"\.rodata\+0x([0-9a-f]+)", lambda mm: ".rodata[%s]" % ro[int(mm.group(1), 16):int(mm.group(1), 16) + 16].hex(), line)
         line = re.sub(r"(\.L\.str(?:\.\d+)?)(?=[-+\s]|$)", lambda mm: "%s[%s]" % (mm.group(1), strs.get(mm.group(1), "?")), line)
         out[cur].append(line)
+    for lines in out.values(): mark_call_placeholders(lines)
     return out
 
 def label_kind(x, y):
@@ -64,6 +78,8 @@ def label_kind(x, y):
 
 def classify(x, y):
     if "rodata" in x and "rodata" in y: return "rodata reference"
+    ph = lambda s: re.sub(r"<placeholder:[^>]*>", "<placeholder>", s)
+    if "<placeholder:" in x and ph(x) == ph(y): return "call placeholder label"
     kind = label_kind(x, y)
     if kind: return kind
     if re.match(r"mov\s+\$0x[0-9a-f]+,%(e[cd]x|r[cd]x)$", x) and re.sub(r"0x[0-9a-f]+", "N", x) == re.sub(r"0x[0-9a-f]+", "N", y):
