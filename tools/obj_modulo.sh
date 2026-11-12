@@ -35,6 +35,10 @@ build=$root/build-oracle/cand
 # WIDE=1: the wide candidate (X11 and OpenCL), the only build that compiles
 # accelerate.c, animate.c, display.c, opencl.c, widget.c and xwindow.c.
 [ -n "${WIDE:-}" ] && build=$root/build-oracle/cand-wide
+# BUILD=<dir>: any other configured tree under build-oracle/, for code the oracle's HDRI build leaves
+# out (ci-clang-min, ci-clang-dlg: CI's non-HDRI configurations, which compile `#if !defined(
+# MAGICKCORE_HDRI_SUPPORT)` branches); EXTRA_CFLAGS="-O2 -w" adds optimisation to those trees' -O0 and drops their -Werror diagnostics.
+[ -n "${BUILD:-}" ] && build=$root/build-oracle/$BUILD
 cd "$build"
 cflags=$(sed -n 's/^CFLAGS = //p' Makefile)
 cppflags=$(sed -n 's/^CPPFLAGS = //p' Makefile)
@@ -72,7 +76,7 @@ do
   ( cd "$tmp/$side" &&
     eval clang -c -Wno-builtin-macro-redefined -D__LINE__=0 \
       "-D__FILE__=\\\"pp\\\"" -DHAVE_CONFIG_H -I"$build" -I"$root" \
-      -I"$build/config" -I"$root/$(dirname "$file")" $cppflags $cflags -g0 \
+      -I"$build/config" -I"$root/$(dirname "$file")" $cppflags $cflags ${EXTRA_CFLAGS:-} -g0 \
       -o "$tmp/$side.o" "$base" ) || { echo "BUILD FAILED ($side)"; exit 1; }
 done
 # An object file with no function in it proves nothing: the build does not
