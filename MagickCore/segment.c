@@ -1774,6 +1774,27 @@ static MagickBooleanType FormDynamicRegionClusters(short **extrema,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireDynamicHistograms(const Image *image,
+  ssize_t **histogram,short **extrema,ExceptionInfo *exception)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < MaxDimension; i++)
+  {
+    histogram[i]=(ssize_t *) AcquireQuantumMemory(256UL,sizeof(**histogram));
+    extrema[i]=(short *) AcquireQuantumMemory(256UL,sizeof(**histogram));
+    if ((histogram[i] == (ssize_t *) NULL) || (extrema[i] == (short *) NULL))
+      {
+        RelinquishHistogramsBelow(i,histogram,extrema);
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+        return(MagickFalse);
+      }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1793,9 +1814,6 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const DynamicRegionTargets
     region = { &cluster, &head, &red, &green, &blue };
 
-  ssize_t
-    i;
-
   short
     *extrema[MaxDimension];
 
@@ -1811,18 +1829,8 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   GetPixelInfo(image,pixel);
-  for (i=0; i < MaxDimension; i++)
-  {
-    histogram[i]=(ssize_t *) AcquireQuantumMemory(256UL,sizeof(**histogram));
-    extrema[i]=(short *) AcquireQuantumMemory(256UL,sizeof(**histogram));
-    if ((histogram[i] == (ssize_t *) NULL) || (extrema[i] == (short *) NULL))
-      {
-        RelinquishHistogramsBelow(i,histogram,extrema);
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-        return(MagickFalse);
-      }
-  }
+  if (AcquireDynamicHistograms(image,histogram,extrema,exception) == MagickFalse)
+    return(MagickFalse);
   /*
     Initialize histogram.
   */
