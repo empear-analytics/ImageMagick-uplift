@@ -16957,6 +16957,21 @@ typedef struct _DisplayEventContext
 
   ExceptionInfo
     *exception;
+
+  XPixelInfo
+    *pixel;
+
+  XStandardColormap
+    *map_info;
+
+  XWindowInfo
+    **magick_windows;
+
+  unsigned int
+    number_windows;
+
+  MagickStatusType
+    context_mask;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -17082,6 +17097,73 @@ static void XConfigurePanWindow(XWindows *windows,const XEvent event)
     }
   windows->pan.width=(unsigned int) event.xconfigure.width;
   windows->pan.height=(unsigned int) event.xconfigure.height;
+}
+
+static void XUpdateWindowColormaps(const DisplayEventContext *context,
+  XGCValues *context_values)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  XWindowInfo
+    **const magick_windows = context->magick_windows;
+
+  const unsigned int
+    number_windows = context->number_windows;
+
+  const MagickStatusType
+    context_mask = context->context_mask;
+
+  int
+    i;
+
+  /*
+    Update graphic context and window colormap.
+  */
+  for (i=0; i < (int) number_windows; i++)
+  {
+    if (magick_windows[i]->id == windows->icon.id)
+      continue;
+    (*context_values).background=pixel->background_color.pixel;
+    (*context_values).foreground=pixel->foreground_color.pixel;
+    (void) XChangeGC(display,magick_windows[i]->annotate_context,
+      context_mask,context_values);
+    (void) XChangeGC(display,magick_windows[i]->widget_context,
+      context_mask,context_values);
+    (*context_values).background=pixel->foreground_color.pixel;
+    (*context_values).foreground=pixel->background_color.pixel;
+    (*context_values).plane_mask=(*context_values).background ^
+      (*context_values).foreground;
+    (void) XChangeGC(display,magick_windows[i]->highlight_context,
+      (size_t) (context_mask | GCPlaneMask),
+      context_values);
+    magick_windows[i]->attributes.background_pixel=
+      pixel->background_color.pixel;
+    magick_windows[i]->attributes.border_pixel=
+      pixel->border_color.pixel;
+    magick_windows[i]->attributes.colormap=map_info->colormap;
+    (void) XChangeWindowAttributes(display,magick_windows[i]->id,
+      (unsigned long) magick_windows[i]->mask,
+      &magick_windows[i]->attributes);
+  }
+  if (windows->pan.mapped != MagickFalse)
+    {
+      (void) XSetWindowBackgroundPixmap(display,windows->pan.id,
+        windows->pan.pixmap);
+      (void) XClearWindow(display,windows->pan.id);
+      XDrawPanRectangle(display,windows);
+    }
+  if (windows->backdrop.id != (Window) NULL)
+    (void) XInstallColormap(display,map_info->colormap);
 }
 
 /*
@@ -18171,6 +18253,11 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.resource_info=resource_info;
   event_context.windows=windows;
   event_context.exception=exception;
+  event_context.pixel=pixel;
+  event_context.map_info=map_info;
+  event_context.magick_windows=magick_windows;
+  event_context.number_windows=number_windows;
+  event_context.context_mask=context_mask;
   do
   {
     /*
@@ -18477,44 +18564,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
               }
             if (*event.xclient.data.l == (long) windows->im_update_colormap)
               {
-                /*
-                  Update graphic context and window colormap.
-                */
-                for (i=0; i < (int) number_windows; i++)
-                {
-                  if (magick_windows[i]->id == windows->icon.id)
-                    continue;
-                  context_values.background=pixel->background_color.pixel;
-                  context_values.foreground=pixel->foreground_color.pixel;
-                  (void) XChangeGC(display,magick_windows[i]->annotate_context,
-                    context_mask,&context_values);
-                  (void) XChangeGC(display,magick_windows[i]->widget_context,
-                    context_mask,&context_values);
-                  context_values.background=pixel->foreground_color.pixel;
-                  context_values.foreground=pixel->background_color.pixel;
-                  context_values.plane_mask=context_values.background ^
-                    context_values.foreground;
-                  (void) XChangeGC(display,magick_windows[i]->highlight_context,
-                    (size_t) (context_mask | GCPlaneMask),
-                    &context_values);
-                  magick_windows[i]->attributes.background_pixel=
-                    pixel->background_color.pixel;
-                  magick_windows[i]->attributes.border_pixel=
-                    pixel->border_color.pixel;
-                  magick_windows[i]->attributes.colormap=map_info->colormap;
-                  (void) XChangeWindowAttributes(display,magick_windows[i]->id,
-                    (unsigned long) magick_windows[i]->mask,
-                    &magick_windows[i]->attributes);
-                }
-                if (windows->pan.mapped != MagickFalse)
-                  {
-                    (void) XSetWindowBackgroundPixmap(display,windows->pan.id,
-                      windows->pan.pixmap);
-                    (void) XClearWindow(display,windows->pan.id);
-                    XDrawPanRectangle(display,windows);
-                  }
-                if (windows->backdrop.id != (Window) NULL)
-                  (void) XInstallColormap(display,map_info->colormap);
+                XUpdateWindowColormaps(&event_context,&context_values);
                 break;
               }
             if (*event.xclient.data.l == (long) windows->im_former_image)
