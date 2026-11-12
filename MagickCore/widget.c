@@ -3842,6 +3842,24 @@ static void KeyConfirmYes(Display *display,XWindows *windows,const XEvent event,
     }
 }
 
+static void MoveConfirmYes(Display *display,XWindows *windows,
+  const XEvent event,const ConfirmTargets *targets)
+{
+  XWidgetInfo
+    *const yes_info = targets->yes_info;
+
+  if ((*yes_info).raised == MatteIsActive((*yes_info),event.xmotion))
+    {
+      /*
+        Yes button status changed.
+      */
+      (*yes_info).raised=(*yes_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,yes_info);
+      return;
+    }
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -4080,16 +4098,7 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
             XDrawBeveledButton(display,&windows->widget,&dismiss_info);
             break;
           }
-        if (yes_info.raised == MatteIsActive(yes_info,event.xmotion))
-          {
-            /*
-              Yes button status changed.
-            */
-            yes_info.raised=yes_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&yes_info);
-            break;
-          }
+        MoveConfirmYes(display,windows,event,&targets);
         break;
       }
       default:
