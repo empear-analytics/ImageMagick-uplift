@@ -4704,6 +4704,75 @@ static void XImportDirectClass(const WindowImageSource *source)
     XImportTrueColorRows(&direct_source);
 }
 
+static MagickBooleanType XImportWindowImage(const WindowImageSource *source)
+{
+  Image
+    *composite_image = source->composite_image;
+
+  CacheView
+    *const composite_view = source->composite_view;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  XImage
+    *const ximage = source->ximage;
+
+  XColor
+    *const colors = source->colors;
+
+  const unsigned int
+    number_colors = source->number_colors;
+
+  int
+    i;
+
+  Status
+    status;
+
+  switch (composite_image->storage_class)
+  {
+    case DirectClass:
+    default:
+    {
+      XImportDirectClass(source);
+      break;
+    }
+    case PseudoClass:
+    {
+      /*
+        Create colormap.
+      */
+      status=AcquireImageColormap(composite_image,number_colors,
+        exception) == MagickFalse ? 0 : 1;
+      if (status == MagickFalse)
+        {
+          XDestroyImage(ximage);
+          composite_image=DestroyImage(composite_image);
+          return(MagickFalse);
+        }
+      if (colors == (XColor *) NULL)
+        break;
+      for (i=0; i < (int) composite_image->colors; i++)
+      {
+        composite_image->colormap[colors[i].pixel].red=(double)
+          ScaleShortToQuantum(colors[i].red);
+        composite_image->colormap[colors[i].pixel].green=(double)
+          ScaleShortToQuantum(colors[i].green);
+        composite_image->colormap[colors[i].pixel].blue=(double)
+          ScaleShortToQuantum(colors[i].blue);
+      }
+      /*
+        Convert X image to PseudoClass packets.
+      */
+      XImportPseudoClassRows(composite_image,composite_view,ximage,
+        exception);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -4940,49 +5009,13 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
         composite_image->columns=(size_t) ximage->width;
         composite_image->rows=(size_t) ximage->height;
         composite_view=AcquireAuthenticCacheView(composite_image,exception);
-        switch (composite_image->storage_class)
         {
-          case DirectClass:
-          default:
-          {
-            const WindowImageSource
-              source = { composite_image, composite_view, exception, ximage,
-                colors, number_colors, window_info, id };
+          const WindowImageSource
+            source = { composite_image, composite_view, exception, ximage,
+              colors, number_colors, window_info, id };
 
-            XImportDirectClass(&source);
-            break;
-          }
-          case PseudoClass:
-          {
-            /*
-              Create colormap.
-            */
-            status=AcquireImageColormap(composite_image,number_colors,
-              exception) == MagickFalse ? 0 : 1;
-            if (status == MagickFalse)
-              {
-                XDestroyImage(ximage);
-                composite_image=DestroyImage(composite_image);
-                return((Image *) NULL);
-              }
-            if (colors == (XColor *) NULL)
-              break;
-            for (i=0; i < (int) composite_image->colors; i++)
-            {
-              composite_image->colormap[colors[i].pixel].red=(double)
-                ScaleShortToQuantum(colors[i].red);
-              composite_image->colormap[colors[i].pixel].green=(double)
-                ScaleShortToQuantum(colors[i].green);
-              composite_image->colormap[colors[i].pixel].blue=(double)
-                ScaleShortToQuantum(colors[i].blue);
-            }
-            /*
-              Convert X image to PseudoClass packets.
-            */
-            XImportPseudoClassRows(composite_image,composite_view,ximage,
-              exception);
-            break;
-          }
+          if (XImportWindowImage(&source) == MagickFalse)
+            return((Image *) NULL);
         }
         composite_view=DestroyCacheView(composite_view);
         XDestroyImage(ximage);
