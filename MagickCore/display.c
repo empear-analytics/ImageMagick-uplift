@@ -5762,18 +5762,18 @@ static void XCropExpose(const CropEventInput *event_input,XEvent *event)
   const char
     *const text = event_input->text;
 
-  if ((*event).xexpose.window == windows->image.id)
-    if ((*event).xexpose.count == 0)
-      {
-        (*event).xexpose.x=(int) highlight_info.x;
-        (*event).xexpose.y=(int) highlight_info.y;
-        (*event).xexpose.width=(int) highlight_info.width;
-        (*event).xexpose.height=(int) highlight_info.height;
-        XRefreshWindow(display,&windows->image,event);
-      }
-  if ((*event).xexpose.window == windows->info.id)
-    if ((*event).xexpose.count == 0)
-      XInfoWidget(display,windows,text);
+  if (((*event).xexpose.window == windows->image.id) &&
+      ((*event).xexpose.count == 0))
+    {
+      (*event).xexpose.x=(int) highlight_info.x;
+      (*event).xexpose.y=(int) highlight_info.y;
+      (*event).xexpose.width=(int) highlight_info.width;
+      (*event).xexpose.height=(int) highlight_info.height;
+      XRefreshWindow(display,&windows->image,event);
+    }
+  if (((*event).xexpose.window == windows->info.id) &&
+      ((*event).xexpose.count == 0))
+    XInfoWidget(display,windows,text);
 }
 
 static void XCropButtonPress(const CropEventInput *event_input,
