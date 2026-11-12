@@ -3146,6 +3146,56 @@ static void RedrawColorBrowserWidget(const ColorBrowserContext *context,
     }
 }
 
+static void JumpColorBrowserList(const ColorBrowserContext *context,
+  const ColorBrowserTargets *widgets)
+{
+  char
+    *const reply = context->reply;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const colors = widgets->colors;
+
+  unsigned int
+    *const visible_colors = widgets->visible_colors;
+
+  char
+    ***const colorlist = widgets->colorlist;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info,
+    *const selection_info = widgets->selection_info;
+
+  int
+    i;
+
+  if ((*state) & JumpListState)
+    {
+      FontBrowserMatch
+        match;
+
+      /*
+        Jump scroll to match user color.
+      */
+      (*list_info).id=(~0);
+      match.fontlist=(*colorlist);
+      match.fonts=(int) (*colors);
+      match.reply=reply;
+      MatchFontBrowserReply(&match,list_info,&i);
+      if ((i < (*slider_info).id) ||
+          (i >= (int) ((*slider_info).id+(int) (*visible_colors))))
+        (*slider_info).id=i-(int) ((*visible_colors) >> 1);
+      (*selection_info).id=(~0);
+      (*state)|=RedrawListState;
+      (*state)&=(unsigned int) (~JumpListState);
+    }
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3386,26 +3436,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
         XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
         state&=(unsigned int) (~UpdateListState);
       }
-    if (state & JumpListState)
-      {
-        FontBrowserMatch
-          match;
-
-        /*
-          Jump scroll to match user color.
-        */
-        list_info.id=(~0);
-        match.fontlist=colorlist;
-        match.fonts=(int) colors;
-        match.reply=reply;
-        MatchFontBrowserReply(&match,&list_info,&i);
-        if ((i < slider_info.id) ||
-            (i >= (int) (slider_info.id+(int) visible_colors)))
-          slider_info.id=i-(int) (visible_colors >> 1);
-        selection_info.id=(~0);
-        state|=RedrawListState;
-        state&=(unsigned int) (~JumpListState);
-      }
+    JumpColorBrowserList(&color_context,&color_widgets);
     if (state & RedrawListState)
       {
         /*
