@@ -518,12 +518,62 @@ static void SetAnnotatePenPixel(const Image *annotate_image,
     SetPixelAlpha(annotate_image,TransparentAlpha,q);
 }
 
+typedef struct _AnnotatePixels
+{
+  Image
+    *annotate_image;
+
+  XImage
+    *annotate_ximage;
+
+  const XPixelInfo
+    *pixel;
+
+  XAnnotateInfo
+    *annotate_info;
+
+  ExceptionInfo
+    *exception;
+} AnnotatePixels;
+
+static void XSetAnnotateRow(const AnnotatePixels *annotate_pixels,
+  Quantum *magick_restrict q,const int y)
+{
+  Image
+    *const annotate_image = annotate_pixels->annotate_image;
+
+  XImage
+    *const annotate_ximage = annotate_pixels->annotate_ximage;
+
+  const XPixelInfo
+    *const pixel = annotate_pixels->pixel;
+
+  XAnnotateInfo
+    *const annotate_info = annotate_pixels->annotate_info;
+
+  int
+    x;
+
+  for (x=0; x < (int) annotate_image->columns; x++)
+  {
+    SetPixelAlpha(annotate_image,OpaqueAlpha,q);
+    if (XGetPixel(annotate_ximage,x,y) == 0)
+      SetAnnotateBoxPixel(annotate_image,pixel,annotate_info,q);
+    else
+      SetAnnotatePenPixel(annotate_image,pixel,annotate_info,q);
+    q+=(ptrdiff_t) GetPixelChannels(annotate_image);
+  }
+}
+
 MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
   ExceptionInfo *exception)
 {
   CacheView
     *annotate_view;
+
+  AnnotatePixels
+    annotate_pixels;
 
   GC
     annotate_context;
@@ -618,12 +668,14 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
     (ssize_t) y,&annotate_image->background_color,exception);
   if (annotate_info->stencil == ForegroundStencil)
     annotate_image->alpha_trait=BlendPixelTrait;
+  annotate_pixels.annotate_image=annotate_image;
+  annotate_pixels.annotate_ximage=annotate_ximage;
+  annotate_pixels.pixel=pixel;
+  annotate_pixels.annotate_info=annotate_info;
+  annotate_pixels.exception=exception;
   annotate_view=AcquireAuthenticCacheView(annotate_image,exception);
   for (y=0; y < (int) annotate_image->rows; y++)
   {
-    int
-      x;
-
     Quantum
       *magick_restrict q;
 
@@ -631,15 +683,7 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
       annotate_image->columns,1,exception);
     if (q == (Quantum *) NULL)
       break;
-    for (x=0; x < (int) annotate_image->columns; x++)
-    {
-      SetPixelAlpha(annotate_image,OpaqueAlpha,q);
-      if (XGetPixel(annotate_ximage,x,y) == 0)
-        SetAnnotateBoxPixel(annotate_image,pixel,annotate_info,q);
-      else
-        SetAnnotatePenPixel(annotate_image,pixel,annotate_info,q);
-      q+=(ptrdiff_t) GetPixelChannels(annotate_image);
-    }
+    XSetAnnotateRow(&annotate_pixels,q,y);
     if (SyncCacheViewAuthenticPixels(annotate_view,exception) == MagickFalse)
       break;
   }
