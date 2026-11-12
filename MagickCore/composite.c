@@ -4735,17 +4735,6 @@ static const CompositeOperator
     LightenIntensityCompositeOp
   };
 
-static MagickBooleanType IsIntensityInputOperator(const CompositeOperator compose)
-{
-  size_t
-    i;
-
-  for (i=0; i < (sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators)); i++)
-    if (IntensityInputOperators[i] == compose)
-      return(MagickTrue);
-  return(MagickFalse);
-}
-
 static void CompositeImagePixel(const CompositeRowInputs *row,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
@@ -5432,7 +5421,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
     row.pixel_info_inputs=IsListedOperator(PixelInfoInputOperators,
       sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators),compose);
-    row.intensity_inputs=IsIntensityInputOperator(compose);
+    row.intensity_inputs=IsListedOperator(IntensityInputOperators,
+      sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators),compose);
     row.clip_to_self=clip_to_self;
     row.x_offset=x_offset;
     row.y_offset=y_offset;
