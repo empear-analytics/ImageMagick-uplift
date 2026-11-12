@@ -307,6 +307,17 @@ typedef struct _CompareRowsInfo
     *exception;
 } CompareRowsInfo;
 
+static void SyncCompareRow(CacheView *highlight_view,
+  MagickBooleanType *status,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    sync;
+
+  sync=SyncCacheViewAuthenticPixels(highlight_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType HighlightCompareRows(const CompareRowsInfo *info,
   MagickBooleanType status)
 {
@@ -350,9 +361,6 @@ static MagickBooleanType HighlightCompareRows(const CompareRowsInfo *info,
       *magick_restrict p,
       *magick_restrict q;
 
-    MagickBooleanType
-      sync;
-
     Quantum
       *magick_restrict r;
 
@@ -373,9 +381,7 @@ static MagickBooleanType HighlightCompareRows(const CompareRowsInfo *info,
 
       HighlightCompareRow(&row,p,q,r);
     }
-    sync=SyncCacheViewAuthenticPixels(highlight_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
+    SyncCompareRow(highlight_view,&status,exception);
   }
   highlight_view=DestroyCacheView(highlight_view);
   reconstruct_view=DestroyCacheView(reconstruct_view);
