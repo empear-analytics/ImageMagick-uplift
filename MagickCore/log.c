@@ -1818,6 +1818,23 @@ static inline MagickBooleanType IsHandlerSeparator(const char *p)
     (*p == ','))) ? MagickTrue : MagickFalse);
 }
 
+static ssize_t FindLogHandler(const char *p)
+{
+  ssize_t
+    i;
+
+  size_t
+    length;
+
+  for (i=0; *LogHandlers[i].name != '\0'; i++)
+  {
+    length=strlen(LogHandlers[i].name);
+    if (LocaleNCompare(p,LogHandlers[i].name,length) == 0)
+      break;
+  }
+  return(i);
+}
+
 static LogHandlerType ParseLogHandlers(const char *handlers)
 {
   LogHandlerType
@@ -1829,25 +1846,15 @@ static LogHandlerType ParseLogHandlers(const char *handlers)
   ssize_t
     i;
 
-  size_t
-    length;
-
   handler_mask=NoHandler;
   for (p=handlers; p != (char *) NULL; p=strchr(p,','))
   {
     while (IsHandlerSeparator(p) != MagickFalse)
       p++;
-    for (i=0; *LogHandlers[i].name != '\0'; i++)
-    {
-      length=strlen(LogHandlers[i].name);
-      if (LocaleNCompare(p,LogHandlers[i].name,length) == 0)
-        {
-          handler_mask=(LogHandlerType) (handler_mask | LogHandlers[i].handler);
-          break;
-        }
-    }
+    i=FindLogHandler(p);
     if (*LogHandlers[i].name == '\0')
       return(UndefinedHandler);
+    handler_mask=(LogHandlerType) (handler_mask | LogHandlers[i].handler);
   }
   return(handler_mask);
 }
