@@ -6774,6 +6774,34 @@ static void XSelectDrawWidth(const DrawEditContext *context,const int id,
   (*line_width)=(unsigned int) StringToUnsignedLong(width);
 }
 
+static void XCreateStippleBitmapTail(Display *display,const Window root_window,
+  const int entry,Pixmap *stipple)
+{
+  switch (entry)
+  {
+    case 4:
+    {
+      (*stipple)=XCreateBitmapFromData(display,root_window,
+        (char *) WavyBitmap,WavyWidth,WavyHeight);
+      break;
+    }
+    case 5:
+    {
+      (*stipple)=XCreateBitmapFromData(display,root_window,
+        (char *) HighlightBitmap,HighlightWidth,
+        HighlightHeight);
+      break;
+    }
+    case 6:
+    default:
+    {
+      (*stipple)=XCreateBitmapFromData(display,root_window,
+        (char *) OpaqueBitmap,OpaqueWidth,OpaqueHeight);
+      break;
+    }
+  }
+}
+
 static Pixmap XCreateStippleBitmap(Display *display,const Window root_window,
   const int entry)
 {
@@ -6806,24 +6834,9 @@ static Pixmap XCreateStippleBitmap(Display *display,const Window root_window,
         (char *) VerticalBitmap,VerticalWidth,VerticalHeight);
       break;
     }
-    case 4:
-    {
-      stipple=XCreateBitmapFromData(display,root_window,
-        (char *) WavyBitmap,WavyWidth,WavyHeight);
-      break;
-    }
-    case 5:
-    {
-      stipple=XCreateBitmapFromData(display,root_window,
-        (char *) HighlightBitmap,HighlightWidth,
-        HighlightHeight);
-      break;
-    }
-    case 6:
     default:
     {
-      stipple=XCreateBitmapFromData(display,root_window,
-        (char *) OpaqueBitmap,OpaqueWidth,OpaqueHeight);
+      XCreateStippleBitmapTail(display,root_window,entry,&stipple);
       break;
     }
   }
