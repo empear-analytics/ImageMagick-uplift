@@ -906,6 +906,86 @@ static inline MagickBooleanType IsIncludeElementOpen(const char *token,
     MagickTrue : MagickFalse);
 }
 
+static const char *SkipQuotedText(const char *q)
+{
+  const char
+    quote = (*q),
+    *p = q+1;
+
+  /*
+    Return the last character of the quoted text: the closing quote, or the
+    last character of the string if the quote is not closed.
+  */
+  while ((*p != '\0') && (*p != quote))
+    p++;
+  return(*p == '\0' ? p-1 : p);
+}
+
+static const char *SkipDoctypeElement(const char *q)
+{
+  int
+    bracket_depth = 0;
+
+  while (*q != '\0')
+  {
+    if (strchr("\"'",*q) != (char *) NULL)
+      q=SkipQuotedText(q);
+    else if (*q == '[')
+      bracket_depth++;
+    else if ((*q == ']') && (bracket_depth > 0))
+      bracket_depth--;
+    else if ((*q == '>') && (bracket_depth == 0))
+      return(q+1);   /* consume final '>' */
+    q++;
+  }
+  return(q);
+}
+
+static const char *SkipCommentElement(const char *q,const size_t extent,
+  char *token)
+{
+  while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
+    (void) GetNextToken(q,&q,extent,token);
+  return(q);
+}
+
+static MagickBooleanType IsIncludeFileAttribute(const char **q,
+  const size_t extent,char *keyword,char *token)
+{
+  (void) CopyMagickString(keyword,token,MagickPathExtent);
+  (void) GetNextToken(*q,q,extent,token);
+  if (*token != '=')
+    return(MagickFalse);
+  (void) GetNextToken(*q,q,extent,token);
+  return(LocaleCompare(keyword,"file") == 0 ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType LoadLogInclude(const LogLoadTarget *target,
+  const char *filename,const char *token,const size_t depth)
+{
+  char
+    path[MagickPathExtent],
+    *file_xml;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  GetPathComponent(filename,HeadPath,path);
+  if (*path != '\0')
+    (void) ConcatenateMagickString(path,DirectorySeparator,MagickPathExtent);
+  if (*token == *DirectorySeparator)
+    (void) CopyMagickString(path,token,MagickPathExtent);
+  else
+    (void) ConcatenateMagickString(path,token,MagickPathExtent);
+  file_xml=FileToXML(path,~0UL);
+  if (file_xml != (char *) NULL)
+    {
+      status=LoadLogCache(target,file_xml,path,depth+1);
+      file_xml=DestroyString(file_xml);
+    }
+  return(status);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -981,41 +1061,10 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
     (void) CopyMagickString(keyword,token,MagickPathExtent);
     if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
       {
-        int
-          bracket_depth = 0,
-          quote = 0;
-
         /*
           DOCTYPE element.
         */
-        for ( ; *q != '\0'; q++)
-        {
-          if (quote != 0)
-            {
-              if (*q == quote)
-                quote=0;
-            }
-          else
-            {
-              if ((*q == '"') || (*q == '\''))
-                quote=(*q);
-              else
-                if (*q == '[')
-                  bracket_depth++;
-                else
-                  if (*q == ']')
-                    {
-                      if (bracket_depth > 0)
-                        bracket_depth--;
-                    }
-                  else
-                    if ((*q == '>') && (bracket_depth == 0))
-                      {
-                        q++;   /* consume final '>' */
-                        break;
-                      }
-            }
-        }
+        q=SkipDoctypeElement(q);
         continue;
       }
     if (LocaleNCompare(keyword,"<!--",4) == 0)
@@ -1023,8 +1072,7 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
         /*
           Comment element.
         */
-        while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
-          (void) GetNextToken(q,&q,extent,token);
+        q=SkipCommentElement(q,extent,token);
         continue;
       }
     if (LocaleCompare(keyword,"<include") == 0)
@@ -1034,41 +1082,14 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
         */
         while (IsIncludeElementOpen(token,q) != MagickFalse)
         {
-          (void) CopyMagickString(keyword,token,MagickPathExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
+          if (IsIncludeFileAttribute(&q,extent,keyword,token) == MagickFalse)
             continue;
-          (void) GetNextToken(q,&q,extent,token);
-          if (LocaleCompare(keyword,"file") == 0)
-            {
-              if (depth >= MagickMaxRecursionDepth)
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-              else
-                {
-                  const LogLoadTarget include_target = { cache, exception };
-
-                  char
-                    path[MagickPathExtent],
-                    *file_xml;
-
-                  GetPathComponent(filename,HeadPath,path);
-                  if (*path != '\0')
-                    (void) ConcatenateMagickString(path,DirectorySeparator,
-                      MagickPathExtent);
-                  if (*token == *DirectorySeparator)
-                    (void) CopyMagickString(path,token,MagickPathExtent);
-                  else
-                    (void) ConcatenateMagickString(path,token,MagickPathExtent);
-                  file_xml=FileToXML(path,~0UL);
-                  if (file_xml != (char *) NULL)
-                    {
-                      status&=(MagickStatusType) LoadLogCache(
-                        &include_target,file_xml,path,depth+1);
-                      file_xml=DestroyString(file_xml);
-                    }
-                }
-            }
+          if (depth >= MagickMaxRecursionDepth)
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+          else
+            status&=(MagickStatusType) LoadLogInclude(target,filename,token,
+              depth);
         }
         continue;
       }
