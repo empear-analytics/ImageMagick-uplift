@@ -2084,7 +2084,11 @@ typedef struct _ColorBrowserTargets
     *grab_info,
     *reset_info,
     *action_info,
-    *cancel_info;
+    *cancel_info,
+    *slider_info;
+
+  size_t
+    *colors;
 } ColorBrowserTargets;
 
 typedef struct _ColorBrowserContext
@@ -2266,6 +2270,39 @@ static void ToggleColorBrowserButtons(const ColorBrowserContext *context,
     }
 }
 
+static void MoveColorBrowserButtons(const ColorBrowserContext *context,
+  XEvent event,const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const colors = widgets->colors;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
+  if ((*slider_info).active)
+    {
+      /*
+        Move slider matte.
+      */
+      (*slider_info)=TrackColorBrowserSlider((*slider_info),event,(*colors));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((*state) & InactiveWidgetState)
+    return;
+  ToggleColorBrowserButtons(context,event,widgets);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2347,7 +2384,8 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
 
   const ColorBrowserTargets
     color_widgets = { &reply_info, &state,
-      &grab_info, &reset_info, &action_info, &cancel_info };
+      &grab_info, &reset_info, &action_info, &cancel_info, &slider_info,
+      &colors };
 
   ColorBrowserContext
     color_context;
@@ -3083,22 +3121,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case MotionNotify:
       {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (slider_info.active)
-          {
-            /*
-              Move slider matte.
-            */
-            slider_info=TrackColorBrowserSlider(slider_info,event,colors);
-            state|=RedrawListState;
-            break;
-          }
-        if (state & InactiveWidgetState)
-          break;
-        ToggleColorBrowserButtons(&color_context,event,&color_widgets);
+        MoveColorBrowserButtons(&color_context,event,&color_widgets);
         break;
       }
       case SelectionClear:
