@@ -361,7 +361,7 @@ def main(argv):
         # old declaration's lines: they are not part of the block
         removed = [l for l in removed
                    if not (re.fullmatch(re.escape(tlocal) + r"\s*=\s*\{.*", l) or
-                           re.fullmatch(r"(?:&\w+,\s*)*&\w+\s*\};?", l) or
+                           re.fullmatch(r"(?:&\w+,\s*)*&\w+\s*(?:\};?|,)?", l) or
                            (re.fullmatch(r"\**(\w+)[;,]", l) and
                             re.fullmatch(r"\**(\w+)[;,]", l).group(1) in target_names + input_names))]
     removed_c = Counter(removed)
@@ -383,8 +383,33 @@ def main(argv):
                 moved_line = re.sub(r"&" + re.escape(local) + r"\b", iptr, moved_line)
             if tlocal and tptr:
                 moved_line = re.sub(r"&" + re.escape(tlocal) + r"\b", tptr, moved_line)
+            # a `const` targets struct of another helper passed on as `&t` goes as a parameter
+            # `const T *t` and is written `t` (Recipe CT step 4, 2026-11-12)
+            for other in re.findall(r"const\s+\w+\s*\*\s*(\w+)", params):
+                if other not in (tptr, iptr):
+                    moved_line = re.sub(r"&" + re.escape(other) + r"\b", other, moved_line)
             want[canonical(moved_line, bound_t)] += n
     have = Counter(canonical(b, bound_t) for b in moved)
+    # a line the prefix `(*v)` pushed past 80 columns is re-wrapped (Recipe CT, *Careful*): a
+    # removed line whose text, whitespace aside, is that of two to four consecutive helper
+    # lines that no removed line accounts for counts as moved
+    canon = [canonical(b, bound_t) for b in moved]
+    for line in list((want - have).elements()):
+        target = re.sub(r"[\s,;]+", "", line)
+        for i in range(len(canon)):
+            acc = ""
+            for j in range(i, min(i + 4, len(canon))):
+                acc += re.sub(r"[\s,;]+", "", canon[j])
+                if j > i and acc == target and all((have - want)[canon[k]] > 0
+                                                   for k in range(i, j + 1)):
+                    want[line] -= 1
+                    for k in range(i, j + 1):
+                        have[canon[k]] -= 1
+                    break
+            else:
+                continue
+            break
+    want, have = +want, +have
     for line, n in (want - have).items():
         problems.append(f"removed but not moved ({n}x): {line}")
     extra = have - want
