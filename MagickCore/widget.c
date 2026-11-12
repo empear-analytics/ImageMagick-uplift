@@ -5445,6 +5445,16 @@ static unsigned int GetDialogButtonWidth(XFontStruct *font_info,
   return(width);
 }
 
+static MagickBooleanType IsDialogOptionAction(const char *action)
+{
+  return(((LocaleCompare(action,"Background") == 0) ||
+    (LocaleCompare(action,"New") == 0) ||
+    (LocaleCompare(action,"Quantize") == 0) ||
+    (LocaleCompare(action,"Resize") == 0) ||
+    (LocaleCompare(action,"Save") == 0) ||
+    (LocaleCompare(action,"Shade") == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   const char *action,const char *query,char *reply)
 {
@@ -5506,12 +5516,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   /*
     Respond to X events.
   */
-  anomaly=(LocaleCompare(action,"Background") == 0) ||
-    (LocaleCompare(action,"New") == 0) ||
-    (LocaleCompare(action,"Quantize") == 0) ||
-    (LocaleCompare(action,"Resize") == 0) ||
-    (LocaleCompare(action,"Save") == 0) ||
-    (LocaleCompare(action,"Shade") == 0);
+  anomaly=(IsDialogOptionAction(action) != MagickFalse);
   state=UpdateConfigurationState;
   XSetCursorState(display,windows,MagickTrue);
   context.display=display;
