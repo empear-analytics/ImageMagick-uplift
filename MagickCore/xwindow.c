@@ -2054,6 +2054,39 @@ MagickPrivate void XDestroyWindowColors(Display *display,Window window)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
+  const XWindows *windows)
+{
+  (void) FormatLocaleFile(file,"X\n  visual: %s\n",
+    XVisualClassName((int) windows->image.storage_class));
+  (void) FormatLocaleFile(file,"  depth: %d\n",windows->image.ximage->depth);
+  if (windows->visual_info->colormap_size != 0)
+    (void) FormatLocaleFile(file,"  colormap size: %d\n",
+      windows->visual_info->colormap_size);
+  if (resource_info->colormap== SharedColormap)
+    (void) FormatLocaleFile(file,"  colormap type: Shared\n");
+  else
+    (void) FormatLocaleFile(file,"  colormap type: Private\n");
+  (void) FormatLocaleFile(file,"  geometry: %dx%d\n",
+    windows->image.ximage->width,windows->image.ximage->height);
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) FormatLocaleFile(file,"  crop geometry: %s\n",
+      windows->image.crop_geometry);
+  if (windows->image.pixmap == (Pixmap) NULL)
+    (void) FormatLocaleFile(file,"  type: X Image\n");
+  else
+    (void) FormatLocaleFile(file,"  type: Pixmap\n");
+  if (windows->image.shape != MagickFalse)
+    (void) FormatLocaleFile(file,"  non-rectangular shape: True\n");
+  else
+    (void) FormatLocaleFile(file,"  non-rectangular shape: False\n");
+  if (windows->image.shared_memory != MagickFalse)
+    (void) FormatLocaleFile(file,"  shared memory: True\n");
+  else
+    (void) FormatLocaleFile(file,"  shared memory: False\n");
+  (void) FormatLocaleFile(file,"\n");
+}
+
 MagickPrivate void XDisplayImageInfo(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,Image *undo_image,
   Image *image,ExceptionInfo *exception)
@@ -2106,34 +2139,7 @@ MagickPrivate void XDisplayImageInfo(Display *display,
   /*
     Write info about the X image to a file.
   */
-  (void) FormatLocaleFile(file,"X\n  visual: %s\n",
-    XVisualClassName((int) windows->image.storage_class));
-  (void) FormatLocaleFile(file,"  depth: %d\n",windows->image.ximage->depth);
-  if (windows->visual_info->colormap_size != 0)
-    (void) FormatLocaleFile(file,"  colormap size: %d\n",
-      windows->visual_info->colormap_size);
-  if (resource_info->colormap== SharedColormap)
-    (void) FormatLocaleFile(file,"  colormap type: Shared\n");
-  else
-    (void) FormatLocaleFile(file,"  colormap type: Private\n");
-  (void) FormatLocaleFile(file,"  geometry: %dx%d\n",
-    windows->image.ximage->width,windows->image.ximage->height);
-  if (windows->image.crop_geometry != (char *) NULL)
-    (void) FormatLocaleFile(file,"  crop geometry: %s\n",
-      windows->image.crop_geometry);
-  if (windows->image.pixmap == (Pixmap) NULL)
-    (void) FormatLocaleFile(file,"  type: X Image\n");
-  else
-    (void) FormatLocaleFile(file,"  type: Pixmap\n");
-  if (windows->image.shape != MagickFalse)
-    (void) FormatLocaleFile(file,"  non-rectangular shape: True\n");
-  else
-    (void) FormatLocaleFile(file,"  non-rectangular shape: False\n");
-  if (windows->image.shared_memory != MagickFalse)
-    (void) FormatLocaleFile(file,"  shared memory: True\n");
-  else
-    (void) FormatLocaleFile(file,"  shared memory: False\n");
-  (void) FormatLocaleFile(file,"\n");
+  XWriteVisualInfo(file,resource_info,windows);
   if (resource_info->font != (char *) NULL)
     (void) FormatLocaleFile(file,"Font: %s\n\n",resource_info->font);
   if (resource_info->text_font != (char *) NULL)
