@@ -12304,6 +12304,113 @@ to evolve the recipes.
 
 ---
 
+## Recipe KD - Replace a Constant-Assigning Label Run with a Table Lookup
+
+**Use when:** CodeScene reports *Complex Method* (or *Large Method*) on a function whose
+complexity includes a `switch` on an integer or enumeration whose every group but the
+`default:` one is `v=c;` and `break;`, one variable `v` and a numeric literal `c` per group,
+several labels sharing a group, with a `default:` group that does something else and
+falls out of the `switch` (a call, say), as `morphology.c`'s `MorphologyApply` has for
+the stage count of a compound method (`SmoothMorphology` 4, seven labels 2, `default:`
+calling `SetIteratedMorphologyLimits`).
+
+**Not covered by:** Recipe KT, whose groups assign the result of a call on a constant and
+whose `default:` shares a group or leaves the function; Recipe TB, whose function is the
+`switch` alone and whose cases return the constant; Recipe LP, which names the labels of
+one body as a predicate and keeps the labels in a new function (here two bodies, so two
+runs of labels); Recipes SD, SR, SW and ST, which move runs of groups into functions that
+keep every label.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region and holds no `#` line; `e` is a
+   variable or parameter of an integer or enumeration type, or an expression with no call,
+   assignment or increment, and nothing in the `switch` writes what it reads. Every label
+   is an integer literal or an enumeration constant, or `default:`. Each group but the
+   `default:` one is one or more labels followed by `v=c;` and `break;`, the same variable
+   `v` in every group, `c` a numeric literal (comments aside); no group falls through. The
+   `default:` group, whatever its statements, ends with `break;` or falls out of the
+   `switch`'s closing brace and holds no `continue`, `goto` or `return`.
+2. Directly above the function write a `typedef struct` of two members: `key`, of `e`'s
+   type, and `value`, of `v`'s type (a later use reuses it when both types match). Directly
+   above that function write a `static const` array of it with no size, one element
+   `{ L, c }` per label in the `switch`'s source order, `L` the label and `c` its group's
+   literal; a comment of a label or group stands on its element.
+3. Write a `static const` lookup function above the function, taking the key by value:
+   `for (i=0; i < (sizeof(K)/sizeof(*K)); i++)`, `if (K[i].key == key) return(K+i);`,
+   and a final `return((const E *) NULL);`.
+4. Declare `const E *entry;` in the function and replace the `switch`, from `switch` to its
+   closing brace, with `entry=Lookup(e);`, then `if (entry != (const E *) NULL)` followed
+   by `v=entry->value;` and `else` followed by the `default:` group's statements, its
+   comments and text unchanged but for indentation and for losing the trailing `break;`
+   (braces when there are several statements). Nothing else changes.
+5. Check by script that every label but `default:` is the key of exactly one element,
+   whose value is the literal of its group, that no element exists for another label,
+   that the `else` branch is the `default:` group's text, and that nothing else changed.
+6. `refactor_guard.py`: each literal of the deleted groups stands in the table (a
+   `WARN` for a count that dropped with every value present is the expected one);
+   `--calls` shows the lookup added once. The function is not on a per-pixel path (check
+   its callers by reading); otherwise time the step.
+
+**Before:**
+
+```c
+  switch( method ) {
+    case SmoothMorphology:  /* 4 primitive compound morphology */
+      stage_limit = 4;
+      break;
+    case OpenMorphology:    /* 2 primitive compound morphology */
+    case OpenIntensityMorphology:
+    ...
+    case EdgeMorphology:
+      stage_limit = 2;
+      break;
+    default:
+      SetIteratedMorphologyLimits(method,&limits);
+      break;
+  }
+```
+
+**After:**
+
+```c
+  stage=FindMorphologyStage(method);
+  if (stage != (const MorphologyStage *) NULL)
+    stage_limit=stage->limit;
+  else
+    SetIteratedMorphologyLimits(method,&limits);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The `switch` evaluated `e` once and ran the group of the
+  label equal to it, or `default:`. `Lookup(e)` evaluates the same text once at the same
+  point (nothing between the `switch` and the old position runs, and `e` is a plain value)
+  and finds the element whose key equals it exactly when a label of a deleted group was
+  that value (step 5; labels are distinct, so the first match is the only one); then
+  `v=entry->value;` stores the literal the group stored, converted to `v`'s type as the
+  assignment converted it (the member has `v`'s type, so the initialiser converts it the
+  same way). A value no label names gives no element, and the `else` branch runs the
+  `default:` group, as before.
+- Comparing an enumeration constant with `==` compares the same values the `case` labels
+  did (`switch` on an enumeration converts it to its integer type as `==` does).
+- The tables are `static const`, written once by their initialisers; no existing table
+  changes.
+- The lookup walks at most as many elements as there were labels, once per call, which
+  step 6 requires to be outside every pixel loop.
+
+**Evidence level:** oracle (the cases that reach the function), with step 5's script and
+step 6's guard fingerprint, and the caller check by reading.
+
+**Provenance:** 2026-11-12, from `morphology.c`'s `MorphologyApply` (campaign A, W19 lane
+d): the eight-label stage-count `switch` is 9 of its cc 22; Recipe KT refuses it (no call
+on a constant, a `default:` that falls out), Recipe LP keeps the labels in a new function
+(a helper holding them was cc 9 in a W17 probe). Probe: cc 22 to 14, 101 to 91 lines, the
+file 6.63 to 6.70, no finding on the lookup. Added by Claude Code (Claude Sonnet 5.5) under
+the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -12715,3 +12822,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | GC | Guard Returns from a Conjunction: `if (A1 && ... && An) return(T); return(F);` (`T`, `F` constants, `n` at least three, no logical-or operator) becomes one `if (Ai') return(F);` per operand in order and `return(T);`, `Ai'` the inverse as Recipe G says (`!(Ai)` for floating-point operands, calls and bare values). *Careful* gives the argument (left-to-right short circuit, each operand evaluated at most once, same order) | `opencl.c`'s `IsSameOpenCLDevice` and `IsBenchmarkedOpenCLDevice` (campaign A, W19 lane a, wide build): the file's two *Complex Conditional* functions, twins on two struct types that no predicate or merge reaches (six operands, eight parameters); one as guards 6.33 to 6.83, both 7.36 | owner |
 | 2026-11-12 | NEW | GD | Guard Returns from a Disjunction: `if (A1 or A2 or ... or An) return(F);` (`F` a constant or a bare `return;`, `n` at least three, no `&&`) becomes one `if (Ai) return(F);` per operand in order. *Careful* gives the argument (left-to-right short circuit, each operand evaluated at most once, same order) | `accelerate.c`'s `AccelerateGrayscaleImage` (campaign A, W19 lane a, wide build): its three-trait failure test is the file's only *Complex Conditional*; Recipe P's predicate 3.19 to 3.19 (a new clone function), three guards 3.19 to 3.27 | owner |
 | 2026-11-12 | NEW | KL | Replace Case Groups Sharing a Tail with a Keyed Lookup: a run of one-label groups of a `switch` that are the same statements on a string literal and a numeric literal become one copy in the `default:` group, reading both from a `static const` table found by a lookup function; the groups that differ stay. *Careful* gives the argument (the `switch` value held once, the lookup finds an element exactly when a deleted group carried the label, constants converted as before) | `morphology.c`'s `AcquireFreiChenKernel` (campaign A, W19 lane d): cases 15 to 19; Recipe KT refuses the tail, SC leaves five labels, a helper clones `AcquireFreiChenEdgeBasisKernel`; probe 6.35 to 6.63, cc 16 to 8 | owner |
+| 2026-11-12 | NEW | KD | Replace a Constant-Assigning Label Run with a Table Lookup: the groups of a `switch` that are `v=c;` `break;` (several labels to a group) become a `static const` table of `{label, literal}` read through a lookup function, `if (entry != NULL) v=entry->value; else` the `default:` group's text; *Careful* gives the argument (`e` evaluated once, the lookup finds an element exactly when a deleted group carried the label, the literal converted to `v`'s type as before) | `morphology.c`'s `MorphologyApply` (campaign A, W19 lane d): the stage-count `switch` (`SmoothMorphology` 4, seven labels 2, `default:` calling `SetIteratedMorphologyLimits`); probe cc 22 to 14, 6.63 to 6.70 | owner |
