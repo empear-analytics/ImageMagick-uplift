@@ -5422,6 +5422,26 @@ helper returns a status the caller tests, which here would always lead to the sa
    order (Recipe Z step 7, Recipe I); every path out of the helper returns to the
    `continue;`, as every path out of the block reached one (*Careful*). Checked by
    reading.
+   Calls of earlier helpers inside the block, and two targets structs (2026-11-12, later):
+   the block may hold calls of helpers that Recipe CT, SD or Z made earlier for the same
+   caller, written `Inner(&name,...,&targets);` with the caller's own shared input struct
+   `name` (N step 8) and its `const` targets struct. In the new helper such a call is
+   written `Inner(name,...,targets);`, passing on the `const` pointers the helper
+   received, as CT step 5 says; a block-local variable the call reads (`id`) goes by value
+   as it did, and is declared in the helper (E step 4). The variables the block writes
+   itself go in one targets struct, and those that only the inner calls write stay in the
+   targets struct the inner helpers took; the new helper takes `const Name *name` and
+   then each targets struct it binds from or passes on, in the order the caller declares
+   them (at most two), at most four parameters in all, and binds only the members its own
+   text writes (`T *const v = targets->v;`, `(*v)` at every use). A variable that stands in
+   both structs is bound from one of them only, so no two bound pointers name one object.
+   Why the behaviour is the same: each inner call receives the very pointers the caller's
+   call passed (the new helper's parameters are `&name` and `&targets` of the caller, the
+   same objects, `const`), the call stands where it stood in the block with the same other
+   arguments, so the same statements run in the same order, and the inner helpers write the
+   caller's variables through the addresses their struct holds; the new helper's own writes
+   go through its bound pointers, to variables no inner call writes at that point. Checked by
+   reading; `tools/case_tail_check.py` does not read this form.
 
 **Before:**
 
@@ -5527,7 +5547,13 @@ finding on the helper. Added by Claude Code (Claude Sonnet 5.5) under the mandat
 menu tables, the `command` buffer, resource info, exception) and writes `event`,
 `image`, `state` and `nexus`; the probe takes the function from 10 bumps to 9, 3.42 to
 3.48. Added by Claude Code (Claude Opus 5.5) under the owner's OK to evolve the recipes
-(2026-11-10).
+(2026-11-10). Step 7's calls of earlier helpers and two targets structs (2026-11-12, later,
+campaign A, W18 lane b, wide build): `display.c`'s `XDrawEditImage`, whose command-widget
+block in the first event loop calls five case helpers (colour, stipple, width, and the
+Undo, Help and Dismiss groups) with its two targets structs, and writes the element and
+the event itself; a stub of the block as one helper took the function out of *Deep,
+Nested Complexity* and *Brain Method* on a probe; added by
+Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -10922,7 +10948,15 @@ whole groups and keeps their nesting in the new function.
    `V *const v = targets->v;` (and the input struct's members as Recipe N step 4 does).
    Write each written variable `v` as `(*v)` at every use, reads included, `&v` as `v`;
    each `break;` that ended the `switch` becomes `return;`. Nothing else in the text
-   changes.
+   changes, with one exception (2026-11-12, later): a call in the block of a helper
+   this recipe made earlier for the same caller, `Inner(&name,...,&targets);` with the
+   caller's own shared input struct `name` (step 4) and targets struct `targets`, is
+   written in the helper `Inner(name,...,targets);`, passing on the two `const`
+   pointers it received, which hold those addresses (as Recipe SR step 3 passes a
+   `targets` on); its other arguments stay as they are. The helper binds from the
+   targets only the members its own text writes: a member that only the inner call
+   writes is not bound (the inner helper writes it through the same address), and a
+   member only the inner call reads from the input struct is not bound either.
 6. Where the block stood write the input struct's fill, if any, then the call
    `Helper(...,&targets);`, directly before the case's closing `break;`, which stays.
    Declare the input local at the top of the block that holds the call.
@@ -11006,6 +11040,14 @@ static void SelectListBrowserEntry(const ListBrowserPress *press,
   and the second falls off its end; either way the caller runs the case's own `break;`
   next, so the `switch` ends at the same point after the same statements, as in Recipe
   E step 7's `void` form.
+- Pass-through (step 5). The inner helper is handed `context` and `targets`, the
+  pointers its caller received, which are `&name` and `&targets` of the function that
+  stood where the block did: the same two objects, `const` for the inner helper as they
+  were. The call stays where it stood in the block, with the same other arguments, so
+  the same statements run before and after it in the same order; the inner helper
+  writes the caller's variables through the addresses the targets struct holds, the
+  outer helper writes only the members it binds, and no two of those name one object
+  (the members of one struct are distinct variables, step 2).
 - A member added to the targets struct by a later commit (step 3) changes no earlier
   helper: each binds `V *const v = targets->v;` by member name, so a member after its
   own is never read by it, and the initialiser's earlier entries stand where they stood;
@@ -11062,7 +11104,11 @@ LB and BR refuse them (see *Not covered by*), and both lie partly on lines no ca
 reaches. A probe of the whole chain: widget.c 1.44 to 1.59, `XListBrowserWidget`
 leaving *Brain Method* and *Deep, Nested Complexity*, no finding on either helper; with
 either step left out the function keeps both (1.48). Added by Claude Code (Claude Opus
-5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+5.5) under the owner's OK of 2026-11-10 to evolve the recipes. Step 5's pass-through
+(2026-11-12, later, campaign A, W18 lane b, wide build): `display.c`'s `XDrawEditImage`,
+whose stipple case (86 lines, Large Method as one helper) splits into a tail that reads
+the bitmap file and a head that calls it, and whose command-widget block calls the case
+helpers; added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10.
 
 ---
 
@@ -12355,3 +12401,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | AMEND | E | Step 4: a temporary the block writes before it reads, that nothing after the block reads, whose only use left in the caller would be a store before the block (so that declaring it in the new function leaves the store set but never used, `-Wunused-but-set-variable`), passes as a pointer `T *v` on Recipe O step 2's last paragraph's terms: every use `(*v)`, `&v` to a callee written `v`, the call passing `&v`, the function still returning its one value | `xwindow.c`'s `XMakeImageMSBFirst` (campaign A, W18 lane a, wide build), reached by no case, so Recipe O is not available there: its matte row loop writes `q` (returned) and the column counter `x`, whose caller store `x=0;` nothing else reads once the XYBitmap and matte loops have left; taking both loops out of the function ends its Deep, Nested Complexity (probe: 2.03 to 2.06, with the LSB twin 1.99 to 2.03) | owner |
 | 2026-11-12 | AMEND | I | Step 2: a block-scope `static` of the caller (arithmetic, enumeration or pointer type, not an array) whose address the caller takes only in the targets initialiser may be a written variable, on Recipe CT step 2's and Recipe O step 2's terms; *Careful* repeats their argument (one object of static storage duration at one address, nothing copied, same exits) | `xwindow.c`'s `XGetWindowImage` (campaign A, W18 lane a, wide build): its colormap block writes `number_colors`, `colors` and the `static` `colormap_info`, leaves through `return((Image *) NULL);` on two paths, and holds the function at depth 5; I step 2 refused the static (CT and O already admit it) | owner |
 | 2026-11-12 | AMEND | MA | Step 2: role (b) may be the right operand of the block's first statement (a read the block does not write); role (c) may name two lvalues `e.m1` and `e.m2` of one base, each with its own pointer parameter (step 3 lists `T1 *value1,T2 *value2`); *Careful* gives the argument (two different members never alias) | `xwindow.c`'s `XGetMapInfo` (campaign A, W18 lane a, wide build): its red, green and blue blocks each assign `map_info->X_max` from `visual_info->X_mask`, set `map_info->X_mult` and loop shifting both; one lvalue per copy refused them, so the three loops stayed (Bumpy Road Ahead, 3 bumps, and Complex Method, cc 11) | owner |
+| 2026-11-12 | AMEND | CT | Step 5: a call in the block of a helper this recipe made earlier for the same caller, `Inner(&name,...,&targets);`, is written `Inner(name,...,targets);` in the helper (the two `const` pointers passed on, as SR step 3 passes a `targets` on); the helper binds only the members its own text writes. *Careful* gives the argument | `display.c`'s `XDrawEditImage` (campaign A, W18 lane b, wide build): the stipple case as one helper is a Large Method (86 lines); its file-reading tail and its menu head are two helpers of this recipe, the head calling the tail, and the command-widget block (a later recipe's step) calls all the case helpers with the same two structs | owner |
+| 2026-11-12 | AMEND | OC | Step 7: the block may hold calls of helpers that Recipe CT, SD or Z made earlier for the same caller (`Inner(&name,...,&targets);`), written `Inner(name,...,targets);` in the new helper; the helper takes the shared input struct and up to two targets structs (those it binds from or passes on), at most four parameters, and binds only the members its own text writes. *Careful* (step 7) gives the argument | `display.c`'s `XDrawEditImage` (campaign A, W18 lane b, wide build): the command-widget block of the first event loop (`if (id < 0) continue;` and a `switch` of seven labels, whose colour, stipple, width and Undo/Help/Dismiss groups are helpers of CT and SD taking two structs) holds the function's last depth-4 sites and writes `element` and the event itself; step 7 allowed two to four written variables in one struct, and the groups' writes number eight in two structs. A probe of the block as one helper: the function leaves Deep, Nested Complexity and Brain Method | owner |

@@ -6578,6 +6578,1061 @@ static inline MagickBooleanType IsElementComplete(const ElementType element,
     MagickFalse);
 }
 
+typedef struct _DrawEditContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *DrawMenu;
+
+  char
+    *command;
+
+  Window
+    root_window;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    **image;
+
+  Cursor
+    cursor;
+
+  const ModeType
+    *DrawCommands;
+} DrawEditContext;
+
+typedef struct _DrawStyleTargets
+{
+  XDrawInfo
+    *draw_info;
+
+  unsigned int
+    *pen_id;
+
+  unsigned int
+    *line_width;
+
+  Pixmap
+    *stipple;
+
+  int
+    *x;
+
+  int
+    *y;
+} DrawStyleTargets;
+
+static void XSelectDrawColor(const DrawEditContext *context,const int id,
+  const DrawStyleTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const DrawMenu = context->DrawMenu;
+
+  char
+    *const command = context->command;
+
+  XDrawInfo
+    *const draw_info = targets->draw_info;
+
+  unsigned int
+    *const pen_id = targets->pen_id;
+
+  const char
+    *ColorMenu[MaxNumberPens+1];
+
+  int
+    pen_number;
+
+  MagickBooleanType
+    transparent;
+
+  XColor
+    color;
+
+  int
+    i;
+
+  /*
+    Initialize menu selections.
+  */
+  for (i=0; i < (int) (MaxNumberPens-2); i++)
+    ColorMenu[i]=resource_info->pen_colors[i];
+  ColorMenu[MaxNumberPens-2]="transparent";
+  ColorMenu[MaxNumberPens-1]="Browser...";
+  ColorMenu[MaxNumberPens]=(char *) NULL;
+  /*
+    Select a pen color from the pop-up menu.
+  */
+  pen_number=XMenuWidget(display,windows,DrawMenu[id],
+    (const char **) ColorMenu,command);
+  if (pen_number < 0)
+    return;
+  transparent=pen_number == (MaxNumberPens-2) ? MagickTrue :
+    MagickFalse;
+  if (transparent != MagickFalse)
+    {
+      (*draw_info).stencil=TransparentStencil;
+      return;
+    }
+  if (pen_number == (MaxNumberPens-1))
+    {
+      static char
+        color_name[MagickPathExtent] = "gray";
+
+      /*
+        Select a pen color from a dialog.
+      */
+      resource_info->pen_colors[pen_number]=color_name;
+      XColorBrowserWidget(display,windows,"Select",color_name);
+      if (*color_name == '\0')
+        return;
+    }
+  /*
+    Set pen color.
+  */
+  (void) XParseColor(display,windows->map_info->colormap,
+    resource_info->pen_colors[pen_number],&color);
+  XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
+    (unsigned int) MaxColors,&color);
+  windows->pixel_info->pen_colors[pen_number]=color;
+  (*pen_id)=(unsigned int) pen_number;
+  (*draw_info).stencil=OpaqueStencil;
+}
+
+static void XSelectDrawWidth(const DrawEditContext *context,const int id,
+  const DrawStyleTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const DrawMenu = context->DrawMenu;
+
+  char
+    *const command = context->command;
+
+  unsigned int
+    *const line_width = targets->line_width;
+
+  const char
+    *const WidthsMenu[] =
+    {
+      "1",
+      "2",
+      "4",
+      "8",
+      "16",
+      "Dialog...",
+      (char *) NULL,
+    };
+
+  static char
+    width[MagickPathExtent] = "0";
+
+  int
+    entry;
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  entry=XMenuWidget(display,windows,DrawMenu[id],WidthsMenu,
+    command);
+  if (entry < 0)
+    return;
+  if (entry != 5)
+    {
+      (*line_width)=(unsigned int) StringToUnsignedLong(
+        WidthsMenu[entry]);
+      return;
+    }
+  (void) XDialogWidget(display,windows,"Ok","Enter line width:",
+    width);
+  if (*width == '\0')
+    return;
+  (*line_width)=(unsigned int) StringToUnsignedLong(width);
+}
+
+static Pixmap XCreateStippleBitmap(Display *display,const Window root_window,
+  const int entry)
+{
+  Pixmap
+    stipple;
+
+  switch (entry)
+  {
+    case 0:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) BricksBitmap,BricksWidth,BricksHeight);
+      break;
+    }
+    case 1:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) DiagonalBitmap,DiagonalWidth,DiagonalHeight);
+      break;
+    }
+    case 2:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) ScalesBitmap,ScalesWidth,ScalesHeight);
+      break;
+    }
+    case 3:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) VerticalBitmap,VerticalWidth,VerticalHeight);
+      break;
+    }
+    case 4:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) WavyBitmap,WavyWidth,WavyHeight);
+      break;
+    }
+    case 5:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) HighlightBitmap,HighlightWidth,
+        HighlightHeight);
+      break;
+    }
+    case 6:
+    default:
+    {
+      stipple=XCreateBitmapFromData(display,root_window,
+        (char *) OpaqueBitmap,OpaqueWidth,OpaqueHeight);
+      break;
+    }
+  }
+  return(stipple);
+}
+
+static void XReadStippleFile(const DrawEditContext *context,
+  const DrawStyleTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const Window
+    root_window = context->root_window;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Pixmap
+    *const stipple = targets->stipple;
+
+  int
+    *const x = targets->x;
+
+  int
+    *const y = targets->y;
+
+  Image
+    *stipple_image;
+
+  ImageInfo
+    *image_info;
+
+  int
+    status;
+
+  static char
+    filename[MagickPathExtent] = "\0";
+
+  unsigned int
+    height,
+    width;
+
+  XFileBrowserWidget(display,windows,"Stipple",filename);
+  if (*filename == '\0')
+    return;
+  /*
+    Read image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  image_info=AcquireImageInfo();
+  (void) CopyMagickString(image_info->filename,filename,
+    MagickPathExtent);
+  stipple_image=ReadImage(image_info,exception);
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (stipple_image == (Image *) NULL)
+    return;
+  (void) AcquireUniqueFileResource(filename);
+  (void) FormatLocaleString(stipple_image->filename,
+    MagickPathExtent,"xbm:%s",filename);
+  (void) WriteImage(image_info,stipple_image,exception);
+  stipple_image=DestroyImage(stipple_image);
+  image_info=DestroyImageInfo(image_info);
+  status=XReadBitmapFile(display,root_window,filename,&width,
+    &height,stipple,x,y);
+  (void) RelinquishUniqueFileResource(filename);
+  if ((status != BitmapSuccess) != 0)
+    XNoticeWidget(display,windows,"Unable to read X bitmap image:",
+      filename);
+}
+
+static void XSelectDrawStipple(const DrawEditContext *context,const int id,
+  const DrawStyleTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const DrawMenu = context->DrawMenu;
+
+  char
+    *const command = context->command;
+
+  const Window
+    root_window = context->root_window;
+
+  Pixmap
+    *const stipple = targets->stipple;
+
+  const char
+    *StipplesMenu[] =
+    {
+      "Brick",
+      "Diagonal",
+      "Scales",
+      "Vertical",
+      "Wavy",
+      "Translucent",
+      "Opaque",
+      (char *) NULL,
+      (char *) NULL,
+    };
+
+  int
+    entry;
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  StipplesMenu[7]="Open...";
+  entry=XMenuWidget(display,windows,DrawMenu[id],StipplesMenu,
+    command);
+  if (entry < 0)
+    return;
+  if ((*stipple) != (Pixmap) NULL)
+    (void) XFreePixmap(display,(*stipple));
+  (*stipple)=(Pixmap) NULL;
+  if (entry != 7)
+    {
+      (*stipple)=XCreateStippleBitmap(display,root_window,entry);
+      return;
+    }
+  XReadStippleFile(context,targets);
+}
+
+typedef struct _DrawPointerTargets
+{
+  int
+    *x;
+
+  int
+    *y;
+
+  size_t
+    *state;
+
+  XEvent
+    *event;
+
+  ElementType
+    *element;
+} DrawPointerTargets;
+
+static void XDrawButtonPress(const DrawEditContext *context,
+  const XEvent event,const DrawPointerTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  int
+    *const x = targets->x;
+
+  int
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  if (event.xbutton.button != Button1)
+    return;
+  if (event.xbutton.window != windows->image.id)
+    return;
+  /*
+    exit loop.
+  */
+  (*x)=event.xbutton.x;
+  (*y)=event.xbutton.y;
+  (*state)|=ExitState;
+}
+
+static void XDrawKeyPress(const DrawEditContext *context,
+  const DrawPointerTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  XEvent
+    *const event = targets->event;
+
+  KeySym
+    key_symbol;
+
+  char
+    command[MagickPathExtent];
+
+  if ((*event).xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Rotation",ImageDrawHelp);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+}
+
+static RectangleInfo XFitSelectionRectangle(XWindows *windows,const int x,
+  const int y,RectangleInfo rectangle_info)
+{
+  if (rectangle_info.x < 0)
+    rectangle_info.x=0;
+  else
+    if (rectangle_info.x > (ssize_t) windows->image.width)
+      rectangle_info.x=(ssize_t) windows->image.width;
+  if ((int) rectangle_info.x < x)
+    rectangle_info.width=(unsigned int) (x-rectangle_info.x);
+  else
+    {
+      rectangle_info.width=(unsigned int) (rectangle_info.x-x);
+      rectangle_info.x=(ssize_t) x;
+    }
+  if (rectangle_info.y < 0)
+    rectangle_info.y=0;
+  else
+    if (rectangle_info.y > (ssize_t) windows->image.height)
+      rectangle_info.y=(ssize_t) windows->image.height;
+  if ((int) rectangle_info.y < y)
+    rectangle_info.height=(unsigned int) (y-rectangle_info.y);
+  else
+    {
+      rectangle_info.height=(unsigned int) (rectangle_info.y-y);
+      rectangle_info.y=(ssize_t) y;
+    }
+  return(rectangle_info);
+}
+
+static RectangleInfo XDrawPolygonBounds(XPoint *coordinate_info,
+  const int number_coordinates,RectangleInfo rectangle_info)
+{
+  int
+    i,
+    x,
+    y;
+
+  /*
+    Determine polygon bounding box.
+  */
+  rectangle_info.x=(ssize_t) coordinate_info->x;
+  rectangle_info.y=(ssize_t) coordinate_info->y;
+  x=coordinate_info->x;
+  y=coordinate_info->y;
+  for (i=1; i < number_coordinates; i++)
+  {
+    if (coordinate_info[i].x > x)
+      x=coordinate_info[i].x;
+    if (coordinate_info[i].y > y)
+      y=coordinate_info[i].y;
+    if ((ssize_t) coordinate_info[i].x < rectangle_info.x)
+      rectangle_info.x=MagickMax((ssize_t) coordinate_info[i].x,0);
+    if ((ssize_t) coordinate_info[i].y < rectangle_info.y)
+      rectangle_info.y=MagickMax((ssize_t) coordinate_info[i].y,0);
+  }
+  rectangle_info.width=(size_t) (x-rectangle_info.x);
+  rectangle_info.height=(size_t) (y-rectangle_info.y);
+  for (i=0; i < number_coordinates; i++)
+  {
+    coordinate_info[i].x-=rectangle_info.x;
+    coordinate_info[i].y-=rectangle_info.y;
+  }
+  return(rectangle_info);
+}
+
+typedef struct _DrawShapeInput
+{
+  ElementType
+    element;
+
+  unsigned int
+    distance;
+} DrawShapeInput;
+
+typedef struct _DrawShapeTargets
+{
+  XSegment
+    *line_info;
+
+  RectangleInfo
+    *rectangle_info;
+
+  XPoint
+    **coordinate_info;
+
+  size_t
+    *state;
+
+  int
+    *number_coordinates;
+
+  unsigned int
+    *max_coordinates;
+} DrawShapeTargets;
+
+static void XDrawButtonRelease(const DrawEditContext *context,
+  const DrawShapeInput *shape,const XEvent event,
+  const DrawShapeTargets *targets)
+{
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const ElementType
+    element = shape->element;
+
+  const unsigned int
+    distance = shape->distance;
+
+  XSegment
+    *const line_info = targets->line_info;
+
+  RectangleInfo
+    *const rectangle_info = targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = targets->coordinate_info;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const number_coordinates = targets->number_coordinates;
+
+  unsigned int
+    *const max_coordinates = targets->max_coordinates;
+
+  /*
+    User has committed to element.
+  */
+  (*line_info).x2=event.xbutton.x;
+  (*line_info).y2=event.xbutton.y;
+  (*rectangle_info).x=(ssize_t) event.xbutton.x;
+  (*rectangle_info).y=(ssize_t) event.xbutton.y;
+  (*coordinate_info)[(*number_coordinates)].x=event.xbutton.x;
+  (*coordinate_info)[(*number_coordinates)].y=event.xbutton.y;
+  if (IsElementComplete(element,distance) != MagickFalse)
+    {
+      (*state)|=ExitState;
+      return;
+    }
+  (*number_coordinates)++;
+  if ((*number_coordinates) < (int) (*max_coordinates))
+    {
+      (*line_info).x1=event.xbutton.x;
+      (*line_info).y1=event.xbutton.y;
+      return;
+    }
+  (*max_coordinates)<<=1;
+  (*coordinate_info)=(XPoint *) ResizeQuantumMemory((*coordinate_info),
+    (*max_coordinates),sizeof(*(*coordinate_info)));
+  if ((*coordinate_info) == (XPoint *) NULL)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
+}
+
+static void XDrawMotion(const DrawEditContext *context,
+  const DrawShapeInput *shape,const XEvent event,
+  const DrawShapeTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const ElementType
+    element = shape->element;
+
+  XSegment
+    *const line_info = targets->line_info;
+
+  RectangleInfo
+    *const rectangle_info = targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = targets->coordinate_info;
+
+  int
+    *const number_coordinates = targets->number_coordinates;
+
+  unsigned int
+    *const max_coordinates = targets->max_coordinates;
+
+  if (event.xmotion.window != windows->image.id)
+    return;
+  if (element != PointElement)
+    {
+      (*line_info).x2=event.xmotion.x;
+      (*line_info).y2=event.xmotion.y;
+      (*rectangle_info).x=(ssize_t) event.xmotion.x;
+      (*rectangle_info).y=(ssize_t) event.xmotion.y;
+      return;
+    }
+  (*coordinate_info)[(*number_coordinates)].x=event.xbutton.x;
+  (*coordinate_info)[(*number_coordinates)].y=event.xbutton.y;
+  (*number_coordinates)++;
+  if ((*number_coordinates) < (int) (*max_coordinates))
+    return;
+  (*max_coordinates)<<=1;
+  (*coordinate_info)=(XPoint *) ResizeQuantumMemory((*coordinate_info),
+    (*max_coordinates),sizeof(*(*coordinate_info)));
+  if ((*coordinate_info) == (XPoint *) NULL)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
+}
+
+typedef struct _DrawPreviewInput
+{
+  ElementType
+    element;
+
+  int
+    number_coordinates;
+
+  XPoint
+    *coordinate_info;
+
+  unsigned int
+    distance;
+
+  XSegment
+    line_info;
+
+  RectangleInfo
+    rectangle_info;
+} DrawPreviewInput;
+
+static void XPreviewLine(const DrawEditContext *context,
+  const DrawPreviewInput *preview,double *degrees)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    distance = preview->distance;
+
+  const XSegment
+    line_info = preview->line_info;
+
+  char
+    text[MagickPathExtent];
+
+  if (distance > 9)
+    {
+      /*
+        Display angle of the line.
+      */
+      (*degrees)=RadiansToDegrees(-atan2((double) (line_info.y2-
+        line_info.y1),(double) (line_info.x2-line_info.x1)));
+      (void) FormatLocaleString(text,MagickPathExtent," %g",
+        (double) (*degrees));
+      XInfoWidget(display,windows,text);
+      XHighlightLine(display,windows->image.id,
+        windows->image.highlight_context,&line_info);
+    }
+  else
+    if (windows->info.mapped != MagickFalse)
+      (void) XWithdrawWindow(display,windows->info.id,
+        windows->info.screen);
+}
+
+static void XPreviewPolyline(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const int
+    number_coordinates = preview->number_coordinates;
+
+  XPoint
+    *const coordinate_info = preview->coordinate_info;
+
+  if (number_coordinates > 1)
+    (void) XDrawLines(display,windows->image.id,
+      windows->image.highlight_context,coordinate_info,
+      number_coordinates,CoordModeOrigin);
+}
+
+static void XPreviewLongLine(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    distance = preview->distance;
+
+  const XSegment
+    line_info = preview->line_info;
+
+  if (distance > 9)
+    XHighlightLine(display,windows->image.id,
+      windows->image.highlight_context,&line_info);
+}
+
+static void XPreviewPoint(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const int
+    number_coordinates = preview->number_coordinates;
+
+  XPoint
+    *const coordinate_info = preview->coordinate_info;
+
+  char
+    text[MagickPathExtent];
+
+  if (number_coordinates > 1)
+    {
+      (void) XDrawLines(display,windows->image.id,
+        windows->image.highlight_context,coordinate_info,
+        number_coordinates,CoordModeOrigin);
+      (void) FormatLocaleString(text,MagickPathExtent," %+d%+d",
+        coordinate_info[number_coordinates-1].x,
+        coordinate_info[number_coordinates-1].y);
+      XInfoWidget(display,windows,text);
+    }
+}
+
+static void XPreviewRectangle(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const RectangleInfo
+    rectangle_info = preview->rectangle_info;
+
+  char
+    text[MagickPathExtent];
+
+  if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
+    {
+      /*
+        Display info and draw drawing rectangle.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) rectangle_info.width,
+        (double) rectangle_info.height,(double) rectangle_info.x,
+        (double) rectangle_info.y);
+      XInfoWidget(display,windows,text);
+      XHighlightRectangle(display,windows->image.id,
+        windows->image.highlight_context,&rectangle_info);
+    }
+  else
+    if (windows->info.mapped != MagickFalse)
+      (void) XWithdrawWindow(display,windows->info.id,
+        windows->info.screen);
+}
+
+static void XPreviewEllipse(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const RectangleInfo
+    rectangle_info = preview->rectangle_info;
+
+  char
+    text[MagickPathExtent];
+
+  if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
+    {
+      /*
+        Display info and draw drawing rectangle.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) rectangle_info.width,
+        (double) rectangle_info.height,(double) rectangle_info.x,
+        (double) rectangle_info.y);
+      XInfoWidget(display,windows,text);
+      XHighlightEllipse(display,windows->image.id,
+        windows->image.highlight_context,&rectangle_info);
+    }
+  else
+    if (windows->info.mapped != MagickFalse)
+      (void) XWithdrawWindow(display,windows->info.id,
+        windows->info.screen);
+}
+
+static void XPreviewRectangleErase(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const RectangleInfo
+    rectangle_info = preview->rectangle_info;
+
+  if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
+    XHighlightRectangle(display,windows->image.id,
+      windows->image.highlight_context,&rectangle_info);
+}
+
+static void XPreviewEllipseErase(const DrawEditContext *context,
+  const DrawPreviewInput *preview)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const RectangleInfo
+    rectangle_info = preview->rectangle_info;
+
+  if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
+    XHighlightEllipse(display,windows->image.id,
+      windows->image.highlight_context,&rectangle_info);
+}
+
+static void XDrawCommandAction(const DrawEditContext *context,const int id,
+  const DrawPointerTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const image = context->image;
+
+  const Cursor
+    cursor = context->cursor;
+
+  const ModeType
+    *const DrawCommands = context->DrawCommands;
+
+  size_t
+    *const state = targets->state;
+
+  switch (DrawCommands[id])
+  {
+    case DrawUndoCommand:
+    {
+      (void) XMagickCommand(display,resource_info,windows,UndoCommand,
+        image,exception);
+      break;
+    }
+    case DrawHelpCommand:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Rotation",ImageDrawHelp);
+      (void) XCheckDefineCursor(display,windows->image.id,cursor);
+      break;
+    }
+    case DrawDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void XDrawCommand(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawStyleTargets *style_targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const DrawMenu = context->DrawMenu;
+
+  XEvent
+    *const event = pointer_targets->event;
+
+  ElementType
+    *const element = pointer_targets->element;
+
+  int
+    id;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(display,windows,DrawMenu,event);
+  if (id < 0)
+    return;
+  switch (context->DrawCommands[id])
+  {
+    case DrawElementCommand:
+    {
+      const char
+        *const Elements[] =
+        {
+          "point",
+          "line",
+          "rectangle",
+          "fill rectangle",
+          "circle",
+          "fill circle",
+          "ellipse",
+          "fill ellipse",
+          "polygon",
+          "fill polygon",
+          (char *) NULL,
+        };
+
+      /*
+        Select a command from the pop-up menu.
+      */
+      (*element)=(ElementType) (XMenuWidget(display,windows,
+        DrawMenu[id],Elements,context->command)+1);
+      break;
+    }
+    case DrawColorCommand:
+    {
+      XSelectDrawColor(context,id,style_targets);
+      break;
+    }
+    case DrawStippleCommand:
+    {
+      XSelectDrawStipple(context,id,style_targets);
+      break;
+    }
+    case DrawWidthCommand:
+    {
+      XSelectDrawWidth(context,id,style_targets);
+      break;
+    }
+    default:
+    {
+      XDrawCommandAction(context,id,pointer_targets);
+      break;
+    }
+  }
+  (void) XCheckDefineCursor(display,windows->image.id,context->cursor);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -6625,8 +7680,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
     cursor;
 
   int
-    entry,
-    id,
     number_coordinates,
     x,
     y;
@@ -6639,9 +7692,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
 
   RectangleInfo
     rectangle_info;
-
-  int
-    i;
 
   unsigned int
     distance,
@@ -6666,6 +7716,25 @@ static MagickBooleanType XDrawEditImage(Display *display,
 
   XSegment
     line_info;
+
+  DrawEditContext
+    draw_context;
+
+  DrawPreviewInput
+    preview_input;
+
+  const DrawShapeTargets
+    shape_targets = { &line_info, &rectangle_info, &coordinate_info, &state,
+      &number_coordinates, &max_coordinates };
+
+  DrawShapeInput
+    shape_input;
+
+  const DrawPointerTargets
+    pointer_targets = { &x, &y, &state, &event, &element };
+
+  const DrawStyleTargets
+    style_targets = { &draw_info, &pen_id, &line_width, &stipple, &x, &y };
 
   /*
     Allocate polygon info.
@@ -6695,6 +7764,16 @@ static MagickBooleanType XDrawEditImage(Display *display,
   draw_info.stencil=OpaqueStencil;
   status=MagickTrue;
   cursor=XCreateFontCursor(display,XC_tcross);
+  draw_context.display=display;
+  draw_context.resource_info=resource_info;
+  draw_context.windows=windows;
+  draw_context.DrawMenu=DrawMenu;
+  draw_context.command=command;
+  draw_context.root_window=root_window;
+  draw_context.exception=exception;
+  draw_context.image=image;
+  draw_context.cursor=cursor;
+  draw_context.DrawCommands=DrawCommands;
   for ( ; ; )
   {
     XQueryPosition(display,windows->image.id,&x,&y);
@@ -6719,299 +7798,14 @@ static MagickBooleanType XDrawEditImage(Display *display,
       XScreenEvent(display,windows,&event,exception);
       if (event.xany.window == windows->command.id)
         {
-          /*
-            Select a command from the Command widget.
-          */
-          id=XCommandWidget(display,windows,DrawMenu,&event);
-          if (id < 0)
-            continue;
-          switch (DrawCommands[id])
-          {
-            case DrawElementCommand:
-            {
-              const char
-                *const Elements[] =
-                {
-                  "point",
-                  "line",
-                  "rectangle",
-                  "fill rectangle",
-                  "circle",
-                  "fill circle",
-                  "ellipse",
-                  "fill ellipse",
-                  "polygon",
-                  "fill polygon",
-                  (char *) NULL,
-                };
-
-              /*
-                Select a command from the pop-up menu.
-              */
-              element=(ElementType) (XMenuWidget(display,windows,
-                DrawMenu[id],Elements,command)+1);
-              break;
-            }
-            case DrawColorCommand:
-            {
-              const char
-                *ColorMenu[MaxNumberPens+1];
-
-              int
-                pen_number;
-
-              MagickBooleanType
-                transparent;
-
-              XColor
-                color;
-
-              /*
-                Initialize menu selections.
-              */
-              for (i=0; i < (int) (MaxNumberPens-2); i++)
-                ColorMenu[i]=resource_info->pen_colors[i];
-              ColorMenu[MaxNumberPens-2]="transparent";
-              ColorMenu[MaxNumberPens-1]="Browser...";
-              ColorMenu[MaxNumberPens]=(char *) NULL;
-              /*
-                Select a pen color from the pop-up menu.
-              */
-              pen_number=XMenuWidget(display,windows,DrawMenu[id],
-                (const char **) ColorMenu,command);
-              if (pen_number < 0)
-                break;
-              transparent=pen_number == (MaxNumberPens-2) ? MagickTrue :
-                MagickFalse;
-              if (transparent != MagickFalse)
-                {
-                  draw_info.stencil=TransparentStencil;
-                  break;
-                }
-              if (pen_number == (MaxNumberPens-1))
-                {
-                  static char
-                    color_name[MagickPathExtent] = "gray";
-
-                  /*
-                    Select a pen color from a dialog.
-                  */
-                  resource_info->pen_colors[pen_number]=color_name;
-                  XColorBrowserWidget(display,windows,"Select",color_name);
-                  if (*color_name == '\0')
-                    break;
-                }
-              /*
-                Set pen color.
-              */
-              (void) XParseColor(display,windows->map_info->colormap,
-                resource_info->pen_colors[pen_number],&color);
-              XBestPixel(display,windows->map_info->colormap,(XColor *) NULL,
-                (unsigned int) MaxColors,&color);
-              windows->pixel_info->pen_colors[pen_number]=color;
-              pen_id=(unsigned int) pen_number;
-              draw_info.stencil=OpaqueStencil;
-              break;
-            }
-            case DrawStippleCommand:
-            {
-              const char
-                *StipplesMenu[] =
-                {
-                  "Brick",
-                  "Diagonal",
-                  "Scales",
-                  "Vertical",
-                  "Wavy",
-                  "Translucent",
-                  "Opaque",
-                  (char *) NULL,
-                  (char *) NULL,
-                };
-
-              Image
-                *stipple_image;
-
-              ImageInfo
-                *image_info;
-
-              int
-                status;
-
-              static char
-                filename[MagickPathExtent] = "\0";
-
-              /*
-                Select a command from the pop-up menu.
-              */
-              StipplesMenu[7]="Open...";
-              entry=XMenuWidget(display,windows,DrawMenu[id],StipplesMenu,
-                command);
-              if (entry < 0)
-                break;
-              if (stipple != (Pixmap) NULL)
-                (void) XFreePixmap(display,stipple);
-              stipple=(Pixmap) NULL;
-              if (entry != 7)
-                {
-                  switch (entry)
-                  {
-                    case 0:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) BricksBitmap,BricksWidth,BricksHeight);
-                      break;
-                    }
-                    case 1:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) DiagonalBitmap,DiagonalWidth,DiagonalHeight);
-                      break;
-                    }
-                    case 2:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) ScalesBitmap,ScalesWidth,ScalesHeight);
-                      break;
-                    }
-                    case 3:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) VerticalBitmap,VerticalWidth,VerticalHeight);
-                      break;
-                    }
-                    case 4:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) WavyBitmap,WavyWidth,WavyHeight);
-                      break;
-                    }
-                    case 5:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) HighlightBitmap,HighlightWidth,
-                        HighlightHeight);
-                      break;
-                    }
-                    case 6:
-                    default:
-                    {
-                      stipple=XCreateBitmapFromData(display,root_window,
-                        (char *) OpaqueBitmap,OpaqueWidth,OpaqueHeight);
-                      break;
-                    }
-                  }
-                  break;
-                }
-              XFileBrowserWidget(display,windows,"Stipple",filename);
-              if (*filename == '\0')
-                break;
-              /*
-                Read image.
-              */
-              XSetCursorState(display,windows,MagickTrue);
-              XCheckRefreshWindows(display,windows);
-              image_info=AcquireImageInfo();
-              (void) CopyMagickString(image_info->filename,filename,
-                MagickPathExtent);
-              stipple_image=ReadImage(image_info,exception);
-              CatchException(exception);
-              XSetCursorState(display,windows,MagickFalse);
-              if (stipple_image == (Image *) NULL)
-                break;
-              (void) AcquireUniqueFileResource(filename);
-              (void) FormatLocaleString(stipple_image->filename,
-                MagickPathExtent,"xbm:%s",filename);
-              (void) WriteImage(image_info,stipple_image,exception);
-              stipple_image=DestroyImage(stipple_image);
-              image_info=DestroyImageInfo(image_info);
-              status=XReadBitmapFile(display,root_window,filename,&width,
-                &height,&stipple,&x,&y);
-              (void) RelinquishUniqueFileResource(filename);
-              if ((status != BitmapSuccess) != 0)
-                XNoticeWidget(display,windows,"Unable to read X bitmap image:",
-                  filename);
-              break;
-            }
-            case DrawWidthCommand:
-            {
-              const char
-                *const WidthsMenu[] =
-                {
-                  "1",
-                  "2",
-                  "4",
-                  "8",
-                  "16",
-                  "Dialog...",
-                  (char *) NULL,
-                };
-
-              static char
-                width[MagickPathExtent] = "0";
-
-              /*
-                Select a command from the pop-up menu.
-              */
-              entry=XMenuWidget(display,windows,DrawMenu[id],WidthsMenu,
-                command);
-              if (entry < 0)
-                break;
-              if (entry != 5)
-                {
-                  line_width=(unsigned int) StringToUnsignedLong(
-                    WidthsMenu[entry]);
-                  break;
-                }
-              (void) XDialogWidget(display,windows,"Ok","Enter line width:",
-                width);
-              if (*width == '\0')
-                break;
-              line_width=(unsigned int) StringToUnsignedLong(width);
-              break;
-            }
-            case DrawUndoCommand:
-            {
-              (void) XMagickCommand(display,resource_info,windows,UndoCommand,
-                image,exception);
-              break;
-            }
-            case DrawHelpCommand:
-            {
-              XTextViewHelp(display,resource_info,windows,MagickFalse,
-                "Help Viewer - Image Rotation",ImageDrawHelp);
-              (void) XCheckDefineCursor(display,windows->image.id,cursor);
-              break;
-            }
-            case DrawDismissCommand:
-            {
-              /*
-                Prematurely exit.
-              */
-              state|=EscapeState;
-              state|=ExitState;
-              break;
-            }
-            default:
-              break;
-          }
-          (void) XCheckDefineCursor(display,windows->image.id,cursor);
+          XDrawCommand(&draw_context,&pointer_targets,&style_targets);
           continue;
         }
       switch (event.type)
       {
         case ButtonPress:
         {
-          if (event.xbutton.button != Button1)
-            break;
-          if (event.xbutton.window != windows->image.id)
-            break;
-          /*
-            exit loop.
-          */
-          x=event.xbutton.x;
-          y=event.xbutton.y;
-          state|=ExitState;
+          XDrawButtonPress(&draw_context,event,&pointer_targets);
           break;
         }
         case ButtonRelease:
@@ -7020,41 +7814,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
           break;
         case KeyPress:
         {
-          KeySym
-            key_symbol;
-
-          if (event.xkey.window != windows->image.id)
-            break;
-          /*
-            Respond to a user key press.
-          */
-          (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-            sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-          switch ((int) key_symbol)
-          {
-            case XK_Escape:
-            case XK_F20:
-            {
-              /*
-                Prematurely exit.
-              */
-              state|=EscapeState;
-              state|=ExitState;
-              break;
-            }
-            case XK_F1:
-            case XK_Help:
-            {
-              XTextViewHelp(display,resource_info,windows,MagickFalse,
-                "Help Viewer - Image Rotation",ImageDrawHelp);
-              break;
-            }
-            default:
-            {
-              (void) XBell(display,0);
-              break;
-            }
-          }
+          XDrawKeyPress(&draw_context,&pointer_targets);
           break;
         }
         case MotionNotify:
@@ -7064,17 +7824,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
           */
           x=event.xmotion.x;
           y=event.xmotion.y;
-          if (windows->info.mapped != MagickFalse)
-            {
-              if ((x < (windows->info.x+(int) windows->info.width)) &&
-                  (y < (windows->info.y+(int) windows->info.height)))
-                (void) XWithdrawWindow(display,windows->info.id,
-                  windows->info.screen);
-            }
-          else
-            if ((x > (windows->info.x+(int) windows->info.width)) ||
-                (y > (windows->info.y+(int) windows->info.height)))
-              (void) XMapWindow(display,windows->info.id);
+          XTrackInfoWidget(display,windows,x,y);
           break;
         }
       }
@@ -7104,64 +7854,29 @@ static MagickBooleanType XDrawEditImage(Display *display,
     state=DefaultState;
     do
     {
+      preview_input.element=element;
+      preview_input.number_coordinates=number_coordinates;
+      preview_input.coordinate_info=coordinate_info;
+      preview_input.distance=distance;
+      preview_input.line_info=line_info;
+      preview_input.rectangle_info=rectangle_info;
       switch (element)
       {
         case PointElement:
         default:
         {
-          if (number_coordinates > 1)
-            {
-              (void) XDrawLines(display,windows->image.id,
-                windows->image.highlight_context,coordinate_info,
-                number_coordinates,CoordModeOrigin);
-              (void) FormatLocaleString(text,MagickPathExtent," %+d%+d",
-                coordinate_info[number_coordinates-1].x,
-                coordinate_info[number_coordinates-1].y);
-              XInfoWidget(display,windows,text);
-            }
+          XPreviewPoint(&draw_context,&preview_input);
           break;
         }
         case LineElement:
         {
-          if (distance > 9)
-            {
-              /*
-                Display angle of the line.
-              */
-              degrees=RadiansToDegrees(-atan2((double) (line_info.y2-
-                line_info.y1),(double) (line_info.x2-line_info.x1)));
-              (void) FormatLocaleString(text,MagickPathExtent," %g",
-                (double) degrees);
-              XInfoWidget(display,windows,text);
-              XHighlightLine(display,windows->image.id,
-                windows->image.highlight_context,&line_info);
-            }
-          else
-            if (windows->info.mapped != MagickFalse)
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
+          XPreviewLine(&draw_context,&preview_input,&degrees);
           break;
         }
         case RectangleElement:
         case FillRectangleElement:
         {
-          if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
-            {
-              /*
-                Display info and draw drawing rectangle.
-              */
-              (void) FormatLocaleString(text,MagickPathExtent,
-                " %.17gx%.17g%+.20g%+.20g",(double) rectangle_info.width,
-                (double) rectangle_info.height,(double) rectangle_info.x,
-                (double) rectangle_info.y);
-              XInfoWidget(display,windows,text);
-              XHighlightRectangle(display,windows->image.id,
-                windows->image.highlight_context,&rectangle_info);
-            }
-          else
-            if (windows->info.mapped != MagickFalse)
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
+          XPreviewRectangle(&draw_context,&preview_input);
           break;
         }
         case CircleElement:
@@ -7169,49 +7884,14 @@ static MagickBooleanType XDrawEditImage(Display *display,
         case EllipseElement:
         case FillEllipseElement:
         {
-          if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
-            {
-              /*
-                Display info and draw drawing rectangle.
-              */
-              (void) FormatLocaleString(text,MagickPathExtent,
-                " %.17gx%.17g%+.20g%+.20g",(double) rectangle_info.width,
-                (double) rectangle_info.height,(double) rectangle_info.x,
-                (double) rectangle_info.y);
-              XInfoWidget(display,windows,text);
-              XHighlightEllipse(display,windows->image.id,
-                windows->image.highlight_context,&rectangle_info);
-            }
-          else
-            if (windows->info.mapped != MagickFalse)
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
+          XPreviewEllipse(&draw_context,&preview_input);
           break;
         }
         case PolygonElement:
         case FillPolygonElement:
         {
-          if (number_coordinates > 1)
-            (void) XDrawLines(display,windows->image.id,
-              windows->image.highlight_context,coordinate_info,
-              number_coordinates,CoordModeOrigin);
-          if (distance > 9)
-            {
-              /*
-                Display angle of the line.
-              */
-              degrees=RadiansToDegrees(-atan2((double) (line_info.y2-
-                line_info.y1),(double) (line_info.x2-line_info.x1)));
-              (void) FormatLocaleString(text,MagickPathExtent," %g",
-                (double) degrees);
-              XInfoWidget(display,windows,text);
-              XHighlightLine(display,windows->image.id,
-                windows->image.highlight_context,&line_info);
-            }
-          else
-            if (windows->info.mapped != MagickFalse)
-              (void) XWithdrawWindow(display,windows->info.id,
-                windows->info.screen);
+          XPreviewPolyline(&draw_context,&preview_input);
+          XPreviewLine(&draw_context,&preview_input,&degrees);
           break;
         }
       }
@@ -7224,25 +7904,18 @@ static MagickBooleanType XDrawEditImage(Display *display,
         case PointElement:
         default:
         {
-          if (number_coordinates > 1)
-            (void) XDrawLines(display,windows->image.id,
-              windows->image.highlight_context,coordinate_info,
-              number_coordinates,CoordModeOrigin);
+          XPreviewPolyline(&draw_context,&preview_input);
           break;
         }
         case LineElement:
         {
-          if (distance > 9)
-            XHighlightLine(display,windows->image.id,
-              windows->image.highlight_context,&line_info);
+          XPreviewLongLine(&draw_context,&preview_input);
           break;
         }
         case RectangleElement:
         case FillRectangleElement:
         {
-          if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
-            XHighlightRectangle(display,windows->image.id,
-              windows->image.highlight_context,&rectangle_info);
+          XPreviewRectangleErase(&draw_context,&preview_input);
           break;
         }
         case CircleElement:
@@ -7250,84 +7923,33 @@ static MagickBooleanType XDrawEditImage(Display *display,
         case EllipseElement:
         case FillEllipseElement:
         {
-          if ((rectangle_info.width > 3) && (rectangle_info.height > 3))
-            XHighlightEllipse(display,windows->image.id,
-              windows->image.highlight_context,&rectangle_info);
+          XPreviewEllipseErase(&draw_context,&preview_input);
           break;
         }
         case PolygonElement:
         case FillPolygonElement:
         {
-          if (number_coordinates > 1)
-            (void) XDrawLines(display,windows->image.id,
-              windows->image.highlight_context,coordinate_info,
-              number_coordinates,CoordModeOrigin);
-          if (distance > 9)
-            XHighlightLine(display,windows->image.id,
-              windows->image.highlight_context,&line_info);
+          XPreviewPolyline(&draw_context,&preview_input);
+          XPreviewLongLine(&draw_context,&preview_input);
           break;
         }
       }
+      shape_input.element=element;
+      shape_input.distance=distance;
       switch (event.type)
       {
         case ButtonPress:
           break;
         case ButtonRelease:
         {
-          /*
-            User has committed to element.
-          */
-          line_info.x2=event.xbutton.x;
-          line_info.y2=event.xbutton.y;
-          rectangle_info.x=(ssize_t) event.xbutton.x;
-          rectangle_info.y=(ssize_t) event.xbutton.y;
-          coordinate_info[number_coordinates].x=event.xbutton.x;
-          coordinate_info[number_coordinates].y=event.xbutton.y;
-          if (IsElementComplete(element,distance) != MagickFalse)
-            {
-              state|=ExitState;
-              break;
-            }
-          number_coordinates++;
-          if (number_coordinates < (int) max_coordinates)
-            {
-              line_info.x1=event.xbutton.x;
-              line_info.y1=event.xbutton.y;
-              break;
-            }
-          max_coordinates<<=1;
-          coordinate_info=(XPoint *) ResizeQuantumMemory(coordinate_info,
-            max_coordinates,sizeof(*coordinate_info));
-          if (coordinate_info == (XPoint *) NULL)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
+          XDrawButtonRelease(&draw_context,&shape_input,event,&shape_targets);
           break;
         }
         case Expose:
           break;
         case MotionNotify:
         {
-          if (event.xmotion.window != windows->image.id)
-            break;
-          if (element != PointElement)
-            {
-              line_info.x2=event.xmotion.x;
-              line_info.y2=event.xmotion.y;
-              rectangle_info.x=(ssize_t) event.xmotion.x;
-              rectangle_info.y=(ssize_t) event.xmotion.y;
-              break;
-            }
-          coordinate_info[number_coordinates].x=event.xbutton.x;
-          coordinate_info[number_coordinates].y=event.xbutton.y;
-          number_coordinates++;
-          if (number_coordinates < (int) max_coordinates)
-            break;
-          max_coordinates<<=1;
-          coordinate_info=(XPoint *) ResizeQuantumMemory(coordinate_info,
-            max_coordinates,sizeof(*coordinate_info));
-          if (coordinate_info == (XPoint *) NULL)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
+          XDrawMotion(&draw_context,&shape_input,event,&shape_targets);
           break;
         }
         default:
@@ -7351,60 +7973,14 @@ static MagickBooleanType XDrawEditImage(Display *display,
          ((line_info.y2-line_info.y1+1)*(line_info.y2-line_info.y1+1)));
       if (IsSelectionMovedOrDone(rectangle_info,x,y,state) != MagickFalse)
         {
-          if (rectangle_info.x < 0)
-            rectangle_info.x=0;
-          else
-            if (rectangle_info.x > (ssize_t) windows->image.width)
-              rectangle_info.x=(ssize_t) windows->image.width;
-          if ((int) rectangle_info.x < x)
-            rectangle_info.width=(unsigned int) (x-rectangle_info.x);
-          else
-            {
-              rectangle_info.width=(unsigned int) (rectangle_info.x-x);
-              rectangle_info.x=(ssize_t) x;
-            }
-          if (rectangle_info.y < 0)
-            rectangle_info.y=0;
-          else
-            if (rectangle_info.y > (ssize_t) windows->image.height)
-              rectangle_info.y=(ssize_t) windows->image.height;
-          if ((int) rectangle_info.y < y)
-            rectangle_info.height=(unsigned int) (y-rectangle_info.y);
-          else
-            {
-              rectangle_info.height=(unsigned int) (rectangle_info.y-y);
-              rectangle_info.y=(ssize_t) y;
-            }
+          rectangle_info=XFitSelectionRectangle(windows,x,y,rectangle_info);
         }
     } while ((state & ExitState) == 0);
     (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
     if (IsPolygonElement(element) != MagickFalse)
       {
-        /*
-          Determine polygon bounding box.
-        */
-        rectangle_info.x=(ssize_t) coordinate_info->x;
-        rectangle_info.y=(ssize_t) coordinate_info->y;
-        x=coordinate_info->x;
-        y=coordinate_info->y;
-        for (i=1; i < number_coordinates; i++)
-        {
-          if (coordinate_info[i].x > x)
-            x=coordinate_info[i].x;
-          if (coordinate_info[i].y > y)
-            y=coordinate_info[i].y;
-          if ((ssize_t) coordinate_info[i].x < rectangle_info.x)
-            rectangle_info.x=MagickMax((ssize_t) coordinate_info[i].x,0);
-          if ((ssize_t) coordinate_info[i].y < rectangle_info.y)
-            rectangle_info.y=MagickMax((ssize_t) coordinate_info[i].y,0);
-        }
-        rectangle_info.width=(size_t) (x-rectangle_info.x);
-        rectangle_info.height=(size_t) (y-rectangle_info.y);
-        for (i=0; i < number_coordinates; i++)
-        {
-          coordinate_info[i].x-=rectangle_info.x;
-          coordinate_info[i].y-=rectangle_info.y;
-        }
+        rectangle_info=XDrawPolygonBounds(coordinate_info,number_coordinates,
+          rectangle_info);
       }
     else
       if (distance <= 9)
@@ -16282,6 +16858,882 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   (void) XSync(display,MagickFalse);
   return(window_info.id == root_window ? MagickTrue : MagickFalse);
 }
+
+static void XPositionCommandAndWidget(Display *display,XWindows *windows,
+  const XEvent event)
+{
+  XWindowChanges
+    window_changes;
+
+  if ((windows->command.geometry == (char *) NULL) &&
+      (windows->command.mapped == MagickFalse))
+    {
+      windows->command.x=event.xconfigure.x-(int)
+        windows->command.width-25;
+      windows->command.y=event.xconfigure.y;
+      XConstrainWindowPosition(display,&windows->command);
+      window_changes.x=windows->command.x;
+      window_changes.y=windows->command.y;
+      (void) XReconfigureWMWindow(display,windows->command.id,
+        windows->command.screen,(unsigned int) (CWX | CWY),
+        &window_changes);
+    }
+  if ((windows->widget.geometry == (char *) NULL) &&
+      (windows->widget.mapped == MagickFalse))
+    {
+      windows->widget.x=event.xconfigure.x+
+        event.xconfigure.width/10;
+      windows->widget.y=event.xconfigure.y+
+        event.xconfigure.height/10;
+      XConstrainWindowPosition(display,&windows->widget);
+      window_changes.x=windows->widget.x;
+      window_changes.y=windows->widget.y;
+      (void) XReconfigureWMWindow(display,windows->widget.id,
+        windows->widget.screen,(unsigned int) (CWX | CWY),
+        &window_changes);
+    }
+}
+
+static void XPositionMagnifyAndPan(Display *display,XWindows *windows,
+  const XEvent event)
+{
+  XWindowChanges
+    window_changes;
+
+  if ((windows->magnify.geometry == (char *) NULL) &&
+      (windows->magnify.mapped == MagickFalse))
+    {
+      windows->magnify.x=event.xconfigure.x+
+        event.xconfigure.width+25;
+      windows->magnify.y=event.xconfigure.y;
+      XConstrainWindowPosition(display,&windows->magnify);
+      window_changes.x=windows->magnify.x;
+      window_changes.y=windows->magnify.y;
+      (void) XReconfigureWMWindow(display,windows->magnify.id,
+        windows->magnify.screen,(unsigned int) (CWX | CWY),
+        &window_changes);
+    }
+  if ((windows->pan.geometry == (char *) NULL) &&
+      (windows->pan.mapped == MagickFalse))
+    {
+      windows->pan.x=event.xconfigure.x+(int)
+        event.xconfigure.width+25;
+      windows->pan.y=event.xconfigure.y+(int)
+        windows->magnify.height+50;
+      XConstrainWindowPosition(display,&windows->pan);
+      window_changes.x=windows->pan.x;
+      window_changes.y=windows->pan.y;
+      (void) XReconfigureWMWindow(display,windows->pan.id,
+        windows->pan.screen,(unsigned int) (CWX | CWY),
+        &window_changes);
+    }
+}
+
+static void XUpdatePanWindow(Display *display,XWindows *windows,
+  const XEvent event)
+{
+  if ((event.xconfigure.width < windows->image.ximage->width) ||
+      (event.xconfigure.height < windows->image.ximage->height))
+    {
+      (void) XMapRaised(display,windows->pan.id);
+      XDrawPanRectangle(display,windows);
+    }
+  else
+    if (windows->pan.mapped != MagickFalse)
+      (void) XWithdrawWindow(display,windows->pan.id,
+        windows->pan.screen);
+}
+
+typedef struct _DisplayEventContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  ExceptionInfo
+    *exception;
+
+  XPixelInfo
+    *pixel;
+
+  XStandardColormap
+    *map_info;
+
+  XWindowInfo
+    **magick_windows;
+
+  unsigned int
+    number_windows;
+
+  MagickStatusType
+    context_mask;
+
+  size_t
+    *state;
+
+  Window
+    root_window;
+
+  const char
+    *const *CommandMenu;
+
+  char
+    *command;
+
+  XVisualInfo
+    *visual_info;
+
+  const char
+    *const *VirtualMenu;
+
+  DisplayCommand
+    *VirtualCommands;
+
+  const char
+    *const *ShortCutsMenu;
+
+  DisplayCommand
+    *ShortCutsCommands;
+
+  Image
+    **image;
+
+  time_t
+    update_time;
+
+  XVisualInfo
+    *icon_visual;
+
+  XStandardColormap
+    *icon_map;
+
+  XPixelInfo
+    *icon_pixel;
+
+  const char *const
+    **Menus;
+
+  DisplayCommand
+    **Commands;
+} DisplayEventContext;
+
+static void XConfigureImageWindow(const DisplayEventContext *context,
+  const XEvent event,Image *display_image,const XPoint vid_info)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  /*
+    Image window has a new configuration.
+  */
+  if (event.xconfigure.send_event != 0)
+    {
+      /*
+        Position the transient windows relative of the Image window.
+      */
+      XPositionCommandAndWidget(display,windows,event);
+      XPositionMagnifyAndPan(display,windows,event);
+    }
+  if ((event.xconfigure.width == (int) windows->image.width) &&
+      (event.xconfigure.height == (int) windows->image.height))
+    return;
+  windows->image.width=(unsigned int) event.xconfigure.width;
+  windows->image.height=(unsigned int) event.xconfigure.height;
+  windows->image.x=0;
+  windows->image.y=0;
+  if (display_image->montage != (char *) NULL)
+    {
+      windows->image.x=vid_info.x;
+      windows->image.y=vid_info.y;
+    }
+  if (windows->image.mapped != MagickFalse &&
+      windows->image.stasis != MagickFalse)
+    {
+      /*
+        Update image window configuration.
+      */
+      windows->image.window_changes.width=event.xconfigure.width;
+      windows->image.window_changes.height=event.xconfigure.height;
+      (void) XConfigureImage(display,resource_info,windows,
+        display_image,exception);
+    }
+  /*
+    Update pan window configuration.
+  */
+  XUpdatePanWindow(display,windows,event);
+}
+
+static MagickStatusType XConfigureMagnifyWindow(
+  const DisplayEventContext *context,const XEvent event,Image *display_image,
+  MagickStatusType status)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  unsigned int
+    magnify;
+
+  XWindowChanges
+    window_changes;
+
+  /*
+    Magnify window has a new configuration.
+  */
+  windows->magnify.width=(unsigned int) event.xconfigure.width;
+  windows->magnify.height=(unsigned int) event.xconfigure.height;
+  if (windows->magnify.mapped == MagickFalse)
+    return(status);
+  magnify=1;
+  while ((int) magnify <= event.xconfigure.width)
+    magnify<<=1;
+  while ((int) magnify <= event.xconfigure.height)
+    magnify<<=1;
+  magnify>>=1;
+  if (((int) magnify != event.xconfigure.width) ||
+      ((int) magnify != event.xconfigure.height))
+    {
+      window_changes.width=(int) magnify;
+      window_changes.height=(int) magnify;
+      (void) XReconfigureWMWindow(display,windows->magnify.id,
+        windows->magnify.screen,(unsigned int) (CWWidth | CWHeight),
+        &window_changes);
+      return(status);
+    }
+  if (windows->magnify.mapped != MagickFalse &&
+      windows->magnify.stasis != MagickFalse)
+    {
+      status=XMakeImage(display,resource_info,&windows->magnify,
+        display_image,windows->magnify.width,windows->magnify.height,
+        exception);
+      XMakeMagnifyImage(display,windows,exception);
+    }
+  return(status);
+}
+
+static void XConfigurePanWindow(XWindows *windows,const XEvent event)
+{
+  /*
+    Pan icon window has a new configuration.
+  */
+  if (event.xconfigure.send_event != 0)
+    {
+      windows->pan.x=event.xconfigure.x;
+      windows->pan.y=event.xconfigure.y;
+    }
+  windows->pan.width=(unsigned int) event.xconfigure.width;
+  windows->pan.height=(unsigned int) event.xconfigure.height;
+}
+
+static void XUpdateWindowColormaps(const DisplayEventContext *context,
+  XGCValues *context_values)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  XWindowInfo
+    **const magick_windows = context->magick_windows;
+
+  const unsigned int
+    number_windows = context->number_windows;
+
+  const MagickStatusType
+    context_mask = context->context_mask;
+
+  int
+    i;
+
+  /*
+    Update graphic context and window colormap.
+  */
+  for (i=0; i < (int) number_windows; i++)
+  {
+    if (magick_windows[i]->id == windows->icon.id)
+      continue;
+    (*context_values).background=pixel->background_color.pixel;
+    (*context_values).foreground=pixel->foreground_color.pixel;
+    (void) XChangeGC(display,magick_windows[i]->annotate_context,
+      context_mask,context_values);
+    (void) XChangeGC(display,magick_windows[i]->widget_context,
+      context_mask,context_values);
+    (*context_values).background=pixel->foreground_color.pixel;
+    (*context_values).foreground=pixel->background_color.pixel;
+    (*context_values).plane_mask=(*context_values).background ^
+      (*context_values).foreground;
+    (void) XChangeGC(display,magick_windows[i]->highlight_context,
+      (size_t) (context_mask | GCPlaneMask),
+      context_values);
+    magick_windows[i]->attributes.background_pixel=
+      pixel->background_color.pixel;
+    magick_windows[i]->attributes.border_pixel=
+      pixel->border_color.pixel;
+    magick_windows[i]->attributes.colormap=map_info->colormap;
+    (void) XChangeWindowAttributes(display,magick_windows[i]->id,
+      (unsigned long) magick_windows[i]->mask,
+      &magick_windows[i]->attributes);
+  }
+  if (windows->pan.mapped != MagickFalse)
+    {
+      (void) XSetWindowBackgroundPixmap(display,windows->pan.id,
+        windows->pan.pixmap);
+      (void) XClearWindow(display,windows->pan.id);
+      XDrawPanRectangle(display,windows);
+    }
+  if (windows->backdrop.id != (Window) NULL)
+    (void) XInstallColormap(display,map_info->colormap);
+}
+
+static Image *XDropImage(const DisplayEventContext *context,const XEvent event,
+  Image *nexus)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  size_t
+    *const state = context->state;
+
+  const Window
+    root_window = context->root_window;
+
+  Atom
+    selection,
+    type;
+
+  int
+    format,
+    status;
+
+  unsigned char
+    *data;
+
+  unsigned long
+    after,
+    length;
+
+  /*
+    Display image named by the Drag-and-Drop selection.
+  */
+  if ((*event.xclient.data.l != 2) && (*event.xclient.data.l != 128))
+    return(nexus);
+  selection=XInternAtom(display,"DndSelection",MagickFalse);
+  status=XGetWindowProperty(display,root_window,selection,0L,(long)
+    MagickPathExtent,MagickFalse,(Atom) AnyPropertyType,&type,&format,
+    &length,&after,&data);
+  if ((status != Success) || (length == 0))
+    return(nexus);
+  if (*event.xclient.data.l == 2)
+    {
+      /*
+        Offix DND.
+      */
+      (void) CopyMagickString(resource_info->image_info->filename,
+        (char *) data,MagickPathExtent);
+    }
+  else
+    {
+      /*
+        XDND.
+      */
+      if (strncmp((char *) data, "file:", 5) != 0)
+        {
+          (void) XFree((void *) data);
+          return(nexus);
+        }
+      (void) CopyMagickString(resource_info->image_info->filename,
+        ((char *) data)+5,MagickPathExtent);
+    }
+  nexus=ReadImage(resource_info->image_info,exception);
+  CatchException(exception);
+  if (nexus != (Image *) NULL)
+    *state|=NextImageState | ExitState;
+  (void) XFree((void *) data);
+  return(nexus);
+}
+
+typedef struct _DisplayEventTargets
+{
+  Image
+    **nexus;
+
+  Image
+    **display_image;
+
+  XEvent
+    *event;
+
+  XPoint
+    *vid_info;
+} DisplayEventTargets;
+
+static void XSelectVirtualCommand(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    *const command = context->command;
+
+  const char
+    *const *const VirtualMenu = context->VirtualMenu;
+
+  DisplayCommand
+    *const VirtualCommands = context->VirtualCommands;
+
+  Image
+    **const nexus = targets->nexus;
+
+  Image
+    **const display_image = targets->display_image;
+
+  int
+    entry;
+
+  /*
+    Select a command from the Virtual menu.
+  */
+  entry=XMenuWidget(display,windows,"Commands",VirtualMenu,
+    command);
+  if (entry >= 0)
+    (*nexus)=XMagickCommand(display,resource_info,windows,
+      VirtualCommands[entry],display_image,exception);
+}
+
+static void XPressImageButton1(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const CommandMenu = context->CommandMenu;
+
+  if (resource_info->immutable)
+    {
+      XSelectVirtualCommand(context,targets);
+      return;
+    }
+  /*
+    Map/unmap Command widget.
+  */
+  if (windows->command.mapped != MagickFalse)
+    (void) XWithdrawWindow(display,windows->command.id,
+      windows->command.screen);
+  else
+    {
+      (void) XCommandWidget(display,windows,CommandMenu,
+        (XEvent *) NULL);
+      (void) XMapRaised(display,windows->command.id);
+    }
+}
+
+static void XPressImageButton3(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  size_t
+    *const state = context->state;
+
+  char
+    *const command = context->command;
+
+  const char
+    *const *const ShortCutsMenu = context->ShortCutsMenu;
+
+  DisplayCommand
+    *const ShortCutsCommands = context->ShortCutsCommands;
+
+  Image
+    **const nexus = targets->nexus;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  XPoint
+    *const vid_info = targets->vid_info;
+
+  int
+    entry;
+
+  if (resource_info->immutable)
+    {
+      XSelectVirtualCommand(context,targets);
+      return;
+    }
+  if ((*display_image)->montage != (char *) NULL)
+    {
+      /*
+        Open or delete a tile from a visual image directory.
+      */
+      (*nexus)=XTileImage(display,resource_info,windows,
+        (*display_image),event,exception);
+      if ((*nexus) != (Image *) NULL)
+        *state|=MontageImageState | NextImageState | ExitState;
+      (*vid_info).x=(short int) windows->image.x;
+      (*vid_info).y=(short int) windows->image.y;
+      return;
+    }
+  /*
+    Select a command from the Short Cuts menu.
+  */
+  entry=XMenuWidget(display,windows,"Short Cuts",ShortCutsMenu,
+    command);
+  if (entry >= 0)
+    (*nexus)=XMagickCommand(display,resource_info,windows,
+      ShortCutsCommands[entry],display_image,exception);
+}
+
+static void XPressImageWindow(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const image = context->image;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  switch ((*event).xbutton.button)
+  {
+    case Button1:
+    {
+      XPressImageButton1(context,targets);
+      break;
+    }
+    case Button2:
+    {
+      /*
+        User pressed the image magnify button.
+      */
+      (void) XMagickCommand(display,resource_info,windows,ZoomCommand,
+        display_image,exception);
+      XMagnifyImage(display,windows,event,exception);
+      break;
+    }
+    case Button3:
+    {
+      XPressImageButton3(context,targets);
+      break;
+    }
+    case Button4:
+    {
+      /*
+        Wheel up.
+      */
+      XTranslateImage(display,windows,*image,XK_Up);
+      break;
+    }
+    case Button5:
+    {
+      /*
+        Wheel down.
+      */
+      XTranslateImage(display,windows,*image,XK_Down);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void XPressMagnifyWindow(const DisplayEventContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    *const command = context->command;
+
+  const char
+    *const MagnifyMenu[] =
+    {
+      "2",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "3",
+      (char *) NULL,
+    };
+
+  int
+    factor;
+
+  static KeySym
+    MagnifyCommands[] =
+    {
+      XK_2,
+      XK_4,
+      XK_5,
+      XK_6,
+      XK_7,
+      XK_8,
+      XK_9,
+      XK_3
+    };
+
+  /*
+    Select a magnify factor from the pop-up menu.
+  */
+  factor=XMenuWidget(display,windows,"Magnify",MagnifyMenu,command);
+  if (factor >= 0)
+    XMagnifyWindowCommand(display,windows,0,MagnifyCommands[factor],
+      exception);
+}
+
+static void XPressPanWindow(const DisplayEventContext *context,XEvent *event)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const image = context->image;
+
+  switch ((*event).xbutton.button)
+  {
+    case Button4:
+    {
+      /*
+        Wheel up.
+      */
+      XTranslateImage(display,windows,*image,XK_Up);
+      break;
+    }
+    case Button5:
+    {
+      /*
+        Wheel down.
+      */
+      XTranslateImage(display,windows,*image,XK_Down);
+      break;
+    }
+    default:
+    {
+      XPanImage(display,windows,event,exception);
+      break;
+    }
+  }
+}
+
+static void XImageWindowKeyPress(const DisplayEventContext *context,
+  const XEvent event,const KeySym key_symbol,const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const nexus = targets->nexus;
+
+  Image
+    **const display_image = targets->display_image;
+
+  DisplayCommand
+    display_command;
+
+  display_command=XImageWindowCommand(display,resource_info,windows,
+    event.xkey.state,key_symbol,display_image,exception);
+  if (display_command != NullCommand)
+    (*nexus)=XMagickCommand(display,resource_info,windows,
+      display_command,display_image,exception);
+}
+
+static void XPanWindowKeyPress(const DisplayEventContext *context,
+  const KeySym key_symbol)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  if ((key_symbol == XK_q) || (key_symbol == XK_Escape))
+    (void) XWithdrawWindow(display,windows->pan.id,
+      windows->pan.screen);
+  else
+    if ((key_symbol == XK_F1) || (key_symbol == XK_Help))
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Pan",ImagePanHelp);
+    else
+      XTranslateImage(display,windows,*image,key_symbol);
+}
+
+static Image *XMapImageWindow(const DisplayEventContext *context,
+  Image *display_image,Image *nexus)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  if (windows->backdrop.id != (Window) NULL)
+    (void) XInstallColormap(display,map_info->colormap);
+  if ((LocaleCompare(display_image->magick,"LOGO") == 0) &&
+      (LocaleCompare(display_image->filename,"LOGO") == 0))
+    nexus=XOpenImage(display,resource_info,windows,MagickFalse);
+  if (((int) windows->image.width < windows->image.ximage->width) ||
+      ((int) windows->image.height < windows->image.ximage->height))
+    (void) XMapRaised(display,windows->pan.id);
+  windows->image.mapped=MagickTrue;
+  return(nexus);
+}
+
+static void XFocusImageWindow(Display *display,XWindows *windows)
+{
+  if (windows->backdrop.id != (Window) NULL)
+    (void) XSetInputFocus(display,windows->image.id,RevertToParent,
+      CurrentTime);
+}
+
+static void XUnmapIconWindow(const DisplayEventContext *context,
+  Image *display_image)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  XVisualInfo
+    *const icon_visual = context->icon_visual;
+
+  XStandardColormap
+    *const icon_map = context->icon_map;
+
+  XPixelInfo
+    *const icon_pixel = context->icon_pixel;
+
+  if (map_info->colormap == icon_map->colormap)
+    XConfigureImageColormap(display,resource_info,windows,
+      display_image,exception);
+  (void) XFreeStandardColormap(display,icon_visual,icon_map,
+    icon_pixel);
+  windows->icon.mapped=MagickFalse;
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -16353,13 +17805,189 @@ static Image *XReloadModifiedImage(XResourceInfo *resource_info,
   return(nexus);
 }
 
-MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
-  char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
-{
 #define MagnifySize  256  /* must be a power of 2 */
 #define MagickMenus  10
 #define MagickTitle  "Commands"
 
+static void XHandleProtocolMessage(const DisplayEventContext *context,
+  const XEvent event,XGCValues *context_values)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = context->state;
+
+  const char
+    *const *const CommandMenu = context->CommandMenu;
+
+  if (*event.xclient.data.l == (long) windows->im_update_widget)
+    {
+      (void) CloneString(&windows->command.name,MagickTitle);
+      windows->command.data=MagickMenus;
+      (void) XCommandWidget(display,windows,CommandMenu,
+        (XEvent *) NULL);
+      return;
+    }
+  if (*event.xclient.data.l == (long) windows->im_update_colormap)
+    {
+      XUpdateWindowColormaps(context,context_values);
+      return;
+    }
+  if (*event.xclient.data.l == (long) windows->im_former_image)
+    {
+      *state|=FormerImageState | ExitState;
+      return;
+    }
+  if (*event.xclient.data.l == (long) windows->im_next_image)
+    {
+      *state|=NextImageState | ExitState;
+      return;
+    }
+  if (*event.xclient.data.l == (long) windows->im_retain_colors)
+    {
+      *state|=RetainColorsState;
+      return;
+    }
+  if (*event.xclient.data.l == (long) windows->im_exit)
+    {
+      *state|=ExitState;
+      return;
+    }
+}
+
+static void XReloadModifiedDisplay(const DisplayEventContext *context,
+  Image *display_image,Image **nexus,time_t *timer)
+{
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  size_t
+    *const state = context->state;
+
+  const time_t
+    update_time = context->update_time;
+
+  MagickBooleanType
+    status;
+
+  struct stat
+    attributes;
+
+  size_t
+    delay;
+
+  /*
+    Determine if image file was modified.
+  */
+  status=GetPathAttributes(display_image->filename,&attributes);
+  if ((status != MagickFalse) &&
+      (update_time != attributes.st_mtime))
+    {
+      /*
+        Redisplay image.
+      */
+      (*nexus)=XReloadModifiedImage(resource_info,display_image,
+        state,exception);
+    }
+  delay=display_image->delay/(size_t) MagickMax(
+    display_image->ticks_per_second,1L);
+  (*timer)=GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1;
+}
+
+static void XUpdateImageTimer(const DisplayEventContext *context,
+  Image *display_image,Image **nexus,time_t *timer)
+{
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  size_t
+    *const state = context->state;
+
+  if ((*timer) < GetMagickTime())
+    {
+      if (resource_info->update == MagickFalse)
+        *state|=NextImageState | ExitState;
+      else
+        {
+          XReloadModifiedDisplay(context,display_image,nexus,timer);
+        }
+    }
+}
+
+static MagickBooleanType XCheckImageTimer(const DisplayEventContext *context,
+  Image *display_image,Image **nexus,time_t *timer)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  if ((display_image->delay != 0) || (resource_info->update != 0))
+    {
+      XUpdateImageTimer(context,display_image,nexus,timer);
+      if (XEventsQueued(display,QueuedAfterFlush) == 0)
+        {
+          /*
+            Do not block if delay > 0.
+          */
+          XDelay(display,SuspendTime << 2);
+          return(MagickTrue);
+        }
+    }
+  return(MagickFalse);
+}
+
+static MagickBooleanType XSelectCommandMenuEntry(
+  const DisplayEventContext *context,const int id,
+  DisplayCommand *display_command)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const CommandMenu = context->CommandMenu;
+
+  char
+    *const command = context->command;
+
+  const char *const
+    **const Menus = context->Menus;
+
+  DisplayCommand
+    **const Commands = context->Commands;
+
+  int
+    entry;
+
+  if (id < MagickMenus)
+    {
+      /*
+        Select a command from a pop-up menu.
+      */
+      entry=XMenuWidget(display,windows,CommandMenu[id],Menus[id],
+        command);
+      if (entry < 0)
+        return(MagickTrue);
+      (void) CopyMagickString(command,Menus[id][entry],MagickPathExtent);
+      (*display_command)=Commands[id][entry];
+    }
+  return(MagickFalse);
+}
+
+MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
+  char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
+{
   const char
     *const CommandMenu[] =
     {
@@ -16719,7 +18347,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     *nexus;
 
   int
-    entry,
     id;
 
   KeySym
@@ -16795,14 +18422,17 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     *icon_visual,
     *visual_info;
 
-  XWindowChanges
-    window_changes;
-
   XWindows
     *windows;
 
   XWMHints
     *manager_hints;
+
+  DisplayEventContext
+    event_context;
+
+  const DisplayEventTargets
+    event_targets = { &nexus, &display_image, &event, &vid_info };
 
   assert(image != (Image **) NULL);
   assert((*image)->signature == MagickCoreSignature);
@@ -17366,50 +18996,40 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   *state&=(unsigned int) (~FormerImageState);
   *state&=(unsigned int) (~MontageImageState);
   *state&=(unsigned int) (~NextImageState);
+  event_context.display=display;
+  event_context.resource_info=resource_info;
+  event_context.windows=windows;
+  event_context.exception=exception;
+  event_context.pixel=pixel;
+  event_context.map_info=map_info;
+  event_context.magick_windows=magick_windows;
+  event_context.number_windows=number_windows;
+  event_context.context_mask=context_mask;
+  event_context.state=state;
+  event_context.root_window=root_window;
+  event_context.CommandMenu=CommandMenu;
+  event_context.command=command;
+  event_context.visual_info=visual_info;
+  event_context.VirtualMenu=VirtualMenu;
+  event_context.VirtualCommands=VirtualCommands;
+  event_context.ShortCutsMenu=ShortCutsMenu;
+  event_context.ShortCutsCommands=ShortCutsCommands;
+  event_context.image=image;
+  event_context.update_time=update_time;
+  event_context.icon_visual=icon_visual;
+  event_context.icon_map=icon_map;
+  event_context.icon_pixel=icon_pixel;
+  event_context.Menus=Menus;
+  event_context.Commands=Commands;
   do
   {
     /*
       Handle a window event.
     */
     if (windows->image.mapped != MagickFalse)
-      if ((display_image->delay != 0) || (resource_info->update != 0))
-        {
-          if (timer < GetMagickTime())
-            {
-              if (resource_info->update == MagickFalse)
-                *state|=NextImageState | ExitState;
-              else
-                {
-                  MagickBooleanType
-                    status;
-
-                  /*
-                    Determine if image file was modified.
-                  */
-                  status=GetPathAttributes(display_image->filename,&attributes);
-                  if ((status != MagickFalse) &&
-                      (update_time != attributes.st_mtime))
-                    {
-                      /*
-                        Redisplay image.
-                      */
-                      nexus=XReloadModifiedImage(resource_info,display_image,
-                        state,exception);
-                    }
-                  delay=display_image->delay/(size_t) MagickMax(
-                    display_image->ticks_per_second,1L);
-                  timer=GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1;
-                }
-            }
-          if (XEventsQueued(display,QueuedAfterFlush) == 0)
-            {
-              /*
-                Do not block if delay > 0.
-              */
-              XDelay(display,SuspendTime << 2);
-              continue;
-            }
-        }
+      if (XCheckImageTimer(&event_context,display_image,&nexus,&timer) !=
+          MagickFalse)
+        continue;
     timestamp=GetMagickTime();
     (void) XNextEvent(display,&event);
     if ((windows->image.stasis == MagickFalse) ||
@@ -17431,18 +19051,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           continue;
         (void) CopyMagickString(command,CommandMenu[id],MagickPathExtent);
         display_command=CommandMenus[id];
-        if (id < MagickMenus)
-          {
-            /*
-              Select a command from a pop-up menu.
-            */
-            entry=XMenuWidget(display,windows,CommandMenu[id],Menus[id],
-              command);
-            if (entry < 0)
-              continue;
-            (void) CopyMagickString(command,Menus[id][entry],MagickPathExtent);
-            display_command=Commands[id][entry];
-          }
+        if (XSelectCommandMenuEntry(&event_context,id,&display_command) !=
+            MagickFalse)
+          continue;
         if (display_command != NullCommand)
           nexus=XMagickCommand(display,resource_info,windows,display_command,
             &display_image,exception);
@@ -17473,171 +19084,17 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xbutton.window == windows->image.id)
           {
-            switch (event.xbutton.button)
-            {
-              case Button1:
-              {
-                if (resource_info->immutable)
-                  {
-                    /*
-                      Select a command from the Virtual menu.
-                    */
-                    entry=XMenuWidget(display,windows,"Commands",VirtualMenu,
-                      command);
-                    if (entry >= 0)
-                      nexus=XMagickCommand(display,resource_info,windows,
-                        VirtualCommands[entry],&display_image,exception);
-                    break;
-                  }
-                /*
-                  Map/unmap Command widget.
-                */
-                if (windows->command.mapped != MagickFalse)
-                  (void) XWithdrawWindow(display,windows->command.id,
-                    windows->command.screen);
-                else
-                  {
-                    (void) XCommandWidget(display,windows,CommandMenu,
-                      (XEvent *) NULL);
-                    (void) XMapRaised(display,windows->command.id);
-                  }
-                break;
-              }
-              case Button2:
-              {
-                /*
-                  User pressed the image magnify button.
-                */
-                (void) XMagickCommand(display,resource_info,windows,ZoomCommand,
-                  &display_image,exception);
-                XMagnifyImage(display,windows,&event,exception);
-                break;
-              }
-              case Button3:
-              {
-                if (resource_info->immutable)
-                  {
-                    /*
-                      Select a command from the Virtual menu.
-                    */
-                    entry=XMenuWidget(display,windows,"Commands",VirtualMenu,
-                      command);
-                    if (entry >= 0)
-                      nexus=XMagickCommand(display,resource_info,windows,
-                        VirtualCommands[entry],&display_image,exception);
-                    break;
-                  }
-                if (display_image->montage != (char *) NULL)
-                  {
-                    /*
-                      Open or delete a tile from a visual image directory.
-                    */
-                    nexus=XTileImage(display,resource_info,windows,
-                      display_image,&event,exception);
-                    if (nexus != (Image *) NULL)
-                      *state|=MontageImageState | NextImageState | ExitState;
-                    vid_info.x=(short int) windows->image.x;
-                    vid_info.y=(short int) windows->image.y;
-                    break;
-                  }
-                /*
-                  Select a command from the Short Cuts menu.
-                */
-                entry=XMenuWidget(display,windows,"Short Cuts",ShortCutsMenu,
-                  command);
-                if (entry >= 0)
-                  nexus=XMagickCommand(display,resource_info,windows,
-                    ShortCutsCommands[entry],&display_image,exception);
-                break;
-              }
-              case Button4:
-              {
-                /*
-                  Wheel up.
-                */
-                XTranslateImage(display,windows,*image,XK_Up);
-                break;
-              }
-              case Button5:
-              {
-                /*
-                  Wheel down.
-                */
-                XTranslateImage(display,windows,*image,XK_Down);
-                break;
-              }
-              default:
-                break;
-            }
+            XPressImageWindow(&event_context,&event_targets);
             break;
           }
         if (event.xbutton.window == windows->magnify.id)
           {
-            const char
-              *const MagnifyMenu[] =
-              {
-                "2",
-                "4",
-                "5",
-                "6",
-                "7",
-                "8",
-                "9",
-                "3",
-                (char *) NULL,
-              };
-
-            int
-              factor;
-
-            static KeySym
-              MagnifyCommands[] =
-              {
-                XK_2,
-                XK_4,
-                XK_5,
-                XK_6,
-                XK_7,
-                XK_8,
-                XK_9,
-                XK_3
-              };
-
-            /*
-              Select a magnify factor from the pop-up menu.
-            */
-            factor=XMenuWidget(display,windows,"Magnify",MagnifyMenu,command);
-            if (factor >= 0)
-              XMagnifyWindowCommand(display,windows,0,MagnifyCommands[factor],
-                exception);
+            XPressMagnifyWindow(&event_context);
             break;
           }
         if (event.xbutton.window == windows->pan.id)
           {
-            switch (event.xbutton.button)
-            {
-              case Button4:
-              {
-                /*
-                  Wheel up.
-                */
-                XTranslateImage(display,windows,*image,XK_Up);
-                break;
-              }
-              case Button5:
-              {
-                /*
-                  Wheel down.
-                */
-                XTranslateImage(display,windows,*image,XK_Down);
-                break;
-              }
-              default:
-              {
-                XPanImage(display,windows,&event,exception);
-                break;
-              }
-            }
+            XPressPanWindow(&event_context,&event);
             break;
           }
         delay=display_image->delay/(size_t)
@@ -17662,132 +19119,12 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             event.xclient.data.l[0]);
         if (event.xclient.message_type == windows->im_protocols)
           {
-            if (*event.xclient.data.l == (long) windows->im_update_widget)
-              {
-                (void) CloneString(&windows->command.name,MagickTitle);
-                windows->command.data=MagickMenus;
-                (void) XCommandWidget(display,windows,CommandMenu,
-                  (XEvent *) NULL);
-                break;
-              }
-            if (*event.xclient.data.l == (long) windows->im_update_colormap)
-              {
-                /*
-                  Update graphic context and window colormap.
-                */
-                for (i=0; i < (int) number_windows; i++)
-                {
-                  if (magick_windows[i]->id == windows->icon.id)
-                    continue;
-                  context_values.background=pixel->background_color.pixel;
-                  context_values.foreground=pixel->foreground_color.pixel;
-                  (void) XChangeGC(display,magick_windows[i]->annotate_context,
-                    context_mask,&context_values);
-                  (void) XChangeGC(display,magick_windows[i]->widget_context,
-                    context_mask,&context_values);
-                  context_values.background=pixel->foreground_color.pixel;
-                  context_values.foreground=pixel->background_color.pixel;
-                  context_values.plane_mask=context_values.background ^
-                    context_values.foreground;
-                  (void) XChangeGC(display,magick_windows[i]->highlight_context,
-                    (size_t) (context_mask | GCPlaneMask),
-                    &context_values);
-                  magick_windows[i]->attributes.background_pixel=
-                    pixel->background_color.pixel;
-                  magick_windows[i]->attributes.border_pixel=
-                    pixel->border_color.pixel;
-                  magick_windows[i]->attributes.colormap=map_info->colormap;
-                  (void) XChangeWindowAttributes(display,magick_windows[i]->id,
-                    (unsigned long) magick_windows[i]->mask,
-                    &magick_windows[i]->attributes);
-                }
-                if (windows->pan.mapped != MagickFalse)
-                  {
-                    (void) XSetWindowBackgroundPixmap(display,windows->pan.id,
-                      windows->pan.pixmap);
-                    (void) XClearWindow(display,windows->pan.id);
-                    XDrawPanRectangle(display,windows);
-                  }
-                if (windows->backdrop.id != (Window) NULL)
-                  (void) XInstallColormap(display,map_info->colormap);
-                break;
-              }
-            if (*event.xclient.data.l == (long) windows->im_former_image)
-              {
-                *state|=FormerImageState | ExitState;
-                break;
-              }
-            if (*event.xclient.data.l == (long) windows->im_next_image)
-              {
-                *state|=NextImageState | ExitState;
-                break;
-              }
-            if (*event.xclient.data.l == (long) windows->im_retain_colors)
-              {
-                *state|=RetainColorsState;
-                break;
-              }
-            if (*event.xclient.data.l == (long) windows->im_exit)
-              {
-                *state|=ExitState;
-                break;
-              }
+            XHandleProtocolMessage(&event_context,event,&context_values);
             break;
           }
         if (event.xclient.message_type == windows->dnd_protocols)
           {
-            Atom
-              selection,
-              type;
-
-            int
-              format,
-              status;
-
-            unsigned char
-              *data;
-
-            unsigned long
-              after,
-              length;
-
-            /*
-              Display image named by the Drag-and-Drop selection.
-            */
-            if ((*event.xclient.data.l != 2) && (*event.xclient.data.l != 128))
-              break;
-            selection=XInternAtom(display,"DndSelection",MagickFalse);
-            status=XGetWindowProperty(display,root_window,selection,0L,(long)
-              MagickPathExtent,MagickFalse,(Atom) AnyPropertyType,&type,&format,
-              &length,&after,&data);
-            if ((status != Success) || (length == 0))
-              break;
-            if (*event.xclient.data.l == 2)
-              {
-                /*
-                  Offix DND.
-                */
-                (void) CopyMagickString(resource_info->image_info->filename,
-                  (char *) data,MagickPathExtent);
-              }
-            else
-              {
-                /*
-                  XDND.
-                */
-                if (strncmp((char *) data, "file:", 5) != 0)
-                  {
-                    (void) XFree((void *) data);
-                    break;
-                  }
-                (void) CopyMagickString(resource_info->image_info->filename,
-                  ((char *) data)+5,MagickPathExtent);
-              }
-            nexus=ReadImage(resource_info->image_info,exception);
-            CatchException(exception);
-            if (nexus != (Image *) NULL)
-              *state|=NextImageState | ExitState;
-            (void) XFree((void *) data);
+            nexus=XDropImage(&event_context,event,nexus);
             break;
           }
         /*
@@ -17825,161 +19162,19 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             event.xconfigure.y,event.xconfigure.send_event);
         if (event.xconfigure.window == windows->image.id)
           {
-            /*
-              Image window has a new configuration.
-            */
-            if (event.xconfigure.send_event != 0)
-              {
-                XWindowChanges
-                  window_changes;
-
-                /*
-                  Position the transient windows relative of the Image window.
-                */
-                if (windows->command.geometry == (char *) NULL)
-                  if (windows->command.mapped == MagickFalse)
-                    {
-                      windows->command.x=event.xconfigure.x-(int)
-                        windows->command.width-25;
-                      windows->command.y=event.xconfigure.y;
-                      XConstrainWindowPosition(display,&windows->command);
-                      window_changes.x=windows->command.x;
-                      window_changes.y=windows->command.y;
-                      (void) XReconfigureWMWindow(display,windows->command.id,
-                        windows->command.screen,(unsigned int) (CWX | CWY),
-                        &window_changes);
-                    }
-                if (windows->widget.geometry == (char *) NULL)
-                  if (windows->widget.mapped == MagickFalse)
-                    {
-                      windows->widget.x=event.xconfigure.x+
-                        event.xconfigure.width/10;
-                      windows->widget.y=event.xconfigure.y+
-                        event.xconfigure.height/10;
-                      XConstrainWindowPosition(display,&windows->widget);
-                      window_changes.x=windows->widget.x;
-                      window_changes.y=windows->widget.y;
-                      (void) XReconfigureWMWindow(display,windows->widget.id,
-                        windows->widget.screen,(unsigned int) (CWX | CWY),
-                        &window_changes);
-                    }
-                if (windows->magnify.geometry == (char *) NULL)
-                  if (windows->magnify.mapped == MagickFalse)
-                    {
-                      windows->magnify.x=event.xconfigure.x+
-                        event.xconfigure.width+25;
-                      windows->magnify.y=event.xconfigure.y;
-                      XConstrainWindowPosition(display,&windows->magnify);
-                      window_changes.x=windows->magnify.x;
-                      window_changes.y=windows->magnify.y;
-                      (void) XReconfigureWMWindow(display,windows->magnify.id,
-                        windows->magnify.screen,(unsigned int) (CWX | CWY),
-                        &window_changes);
-                    }
-                if (windows->pan.geometry == (char *) NULL)
-                  if (windows->pan.mapped == MagickFalse)
-                    {
-                      windows->pan.x=event.xconfigure.x+(int)
-                        event.xconfigure.width+25;
-                      windows->pan.y=event.xconfigure.y+(int)
-                        windows->magnify.height+50;
-                      XConstrainWindowPosition(display,&windows->pan);
-                      window_changes.x=windows->pan.x;
-                      window_changes.y=windows->pan.y;
-                      (void) XReconfigureWMWindow(display,windows->pan.id,
-                        windows->pan.screen,(unsigned int) (CWX | CWY),
-                        &window_changes);
-                    }
-              }
-            if ((event.xconfigure.width == (int) windows->image.width) &&
-                (event.xconfigure.height == (int) windows->image.height))
-              break;
-            windows->image.width=(unsigned int) event.xconfigure.width;
-            windows->image.height=(unsigned int) event.xconfigure.height;
-            windows->image.x=0;
-            windows->image.y=0;
-            if (display_image->montage != (char *) NULL)
-              {
-                windows->image.x=vid_info.x;
-                windows->image.y=vid_info.y;
-              }
-            if (windows->image.mapped != MagickFalse &&
-                windows->image.stasis != MagickFalse)
-              {
-                /*
-                  Update image window configuration.
-                */
-                windows->image.window_changes.width=event.xconfigure.width;
-                windows->image.window_changes.height=event.xconfigure.height;
-                (void) XConfigureImage(display,resource_info,windows,
-                  display_image,exception);
-              }
-            /*
-              Update pan window configuration.
-            */
-            if ((event.xconfigure.width < windows->image.ximage->width) ||
-                (event.xconfigure.height < windows->image.ximage->height))
-              {
-                (void) XMapRaised(display,windows->pan.id);
-                XDrawPanRectangle(display,windows);
-              }
-            else
-              if (windows->pan.mapped != MagickFalse)
-                (void) XWithdrawWindow(display,windows->pan.id,
-                  windows->pan.screen);
+            XConfigureImageWindow(&event_context,event,display_image,vid_info);
             break;
           }
         if (event.xconfigure.window == windows->magnify.id)
           {
-            unsigned int
-              magnify;
-
-            /*
-              Magnify window has a new configuration.
-            */
-            windows->magnify.width=(unsigned int) event.xconfigure.width;
-            windows->magnify.height=(unsigned int) event.xconfigure.height;
-            if (windows->magnify.mapped == MagickFalse)
-              break;
-            magnify=1;
-            while ((int) magnify <= event.xconfigure.width)
-              magnify<<=1;
-            while ((int) magnify <= event.xconfigure.height)
-              magnify<<=1;
-            magnify>>=1;
-            if (((int) magnify != event.xconfigure.width) ||
-                ((int) magnify != event.xconfigure.height))
-              {
-                window_changes.width=(int) magnify;
-                window_changes.height=(int) magnify;
-                (void) XReconfigureWMWindow(display,windows->magnify.id,
-                  windows->magnify.screen,(unsigned int) (CWWidth | CWHeight),
-                  &window_changes);
-                break;
-              }
-            if (windows->magnify.mapped != MagickFalse &&
-                windows->magnify.stasis != MagickFalse)
-              {
-                status=XMakeImage(display,resource_info,&windows->magnify,
-                  display_image,windows->magnify.width,windows->magnify.height,
-                  exception);
-                XMakeMagnifyImage(display,windows,exception);
-              }
+            status=XConfigureMagnifyWindow(&event_context,event,display_image,
+              status);
             break;
           }
         if (windows->magnify.mapped != MagickFalse &&
             (event.xconfigure.window == windows->pan.id))
           {
-            /*
-              Pan icon window has a new configuration.
-            */
-            if (event.xconfigure.send_event != 0)
-              {
-                windows->pan.x=event.xconfigure.x;
-                windows->pan.y=event.xconfigure.y;
-              }
-            windows->pan.width=(unsigned int) event.xconfigure.width;
-            windows->pan.height=(unsigned int) event.xconfigure.height;
+            XConfigurePanWindow(windows,event);
             break;
           }
         if (event.xconfigure.window == windows->icon.id)
@@ -18013,9 +19208,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
         /*
           Selectively install colormap.
         */
-        if (map_info->colormap != XDefaultColormap(display,visual_info->screen))
-          if (event.xcrossing.mode != NotifyUngrab)
-            XInstallColormap(display,map_info->colormap);
+        if ((map_info->colormap != XDefaultColormap(display,visual_info->screen)) &&
+            (event.xcrossing.mode != NotifyUngrab))
+          XInstallColormap(display,map_info->colormap);
         break;
       }
       case Expose:
@@ -18072,26 +19267,15 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             key_symbol,command);
         if (event.xkey.window == windows->image.id)
           {
-            display_command=XImageWindowCommand(display,resource_info,windows,
-              event.xkey.state,key_symbol,&display_image,exception);
-            if (display_command != NullCommand)
-              nexus=XMagickCommand(display,resource_info,windows,
-                display_command,&display_image,exception);
+            XImageWindowKeyPress(&event_context,event,key_symbol,
+              &event_targets);
           }
         if (event.xkey.window == windows->magnify.id)
           XMagnifyWindowCommand(display,windows,event.xkey.state,key_symbol,
             exception);
         if (event.xkey.window == windows->pan.id)
           {
-            if ((key_symbol == XK_q) || (key_symbol == XK_Escape))
-              (void) XWithdrawWindow(display,windows->pan.id,
-                windows->pan.screen);
-            else
-              if ((key_symbol == XK_F1) || (key_symbol == XK_Help))
-                XTextViewHelp(display,resource_info,windows,MagickFalse,
-                  "Help Viewer - Image Pan",ImagePanHelp);
-              else
-                XTranslateImage(display,windows,*image,key_symbol);
+            XPanWindowKeyPress(&event_context,key_symbol);
           }
         delay=display_image->delay/(size_t) MagickMax(
           display_image->ticks_per_second,1L);
@@ -18115,9 +19299,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
         /*
           Selectively uninstall colormap.
         */
-        if (map_info->colormap != XDefaultColormap(display,visual_info->screen))
-          if (event.xcrossing.mode != NotifyUngrab)
-            XUninstallColormap(display,map_info->colormap);
+        if ((map_info->colormap != XDefaultColormap(display,visual_info->screen)) &&
+            (event.xcrossing.mode != NotifyUngrab))
+          XUninstallColormap(display,map_info->colormap);
         break;
       }
       case MapNotify:
@@ -18134,17 +19318,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xmap.window == windows->image.id)
           {
-            if (windows->backdrop.id != (Window) NULL)
-              (void) XInstallColormap(display,map_info->colormap);
-            if (LocaleCompare(display_image->magick,"LOGO") == 0)
-              {
-                if (LocaleCompare(display_image->filename,"LOGO") == 0)
-                  nexus=XOpenImage(display,resource_info,windows,MagickFalse);
-              }
-            if (((int) windows->image.width < windows->image.ximage->width) ||
-                ((int) windows->image.height < windows->image.ximage->height))
-              (void) XMapRaised(display,windows->pan.id);
-            windows->image.mapped=MagickTrue;
+            nexus=XMapImageWindow(&event_context,display_image,nexus);
             break;
           }
         if (event.xmap.window == windows->magnify.id)
@@ -18300,12 +19474,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xunmap.window == windows->icon.id)
           {
-            if (map_info->colormap == icon_map->colormap)
-              XConfigureImageColormap(display,resource_info,windows,
-                display_image,exception);
-            (void) XFreeStandardColormap(display,icon_visual,icon_map,
-              icon_pixel);
-            windows->icon.mapped=MagickFalse;
+            XUnmapIconWindow(&event_context,display_image);
             break;
           }
         if (event.xunmap.window == windows->command.id)
@@ -18315,17 +19484,13 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           }
         if (event.xunmap.window == windows->popup.id)
           {
-            if (windows->backdrop.id != (Window) NULL)
-              (void) XSetInputFocus(display,windows->image.id,RevertToParent,
-                CurrentTime);
+            XFocusImageWindow(display,windows);
             windows->popup.mapped=MagickFalse;
             break;
           }
         if (event.xunmap.window == windows->widget.id)
           {
-            if (windows->backdrop.id != (Window) NULL)
-              (void) XSetInputFocus(display,windows->image.id,RevertToParent,
-                CurrentTime);
+            XFocusImageWindow(display,windows);
             windows->widget.mapped=MagickFalse;
             break;
           }
@@ -18381,18 +19546,17 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     }
   if (windows->pan.mapped != MagickFalse)
     (void) XWithdrawWindow(display,windows->pan.id,windows->pan.screen);
-  if (resource_info->backdrop == MagickFalse)
-    if (windows->backdrop.mapped)
-      {
-        (void) XWithdrawWindow(display,windows->backdrop.id,
-          windows->backdrop.screen);
-        (void) XDestroyWindow(display,windows->backdrop.id);
-        windows->backdrop.id=(Window) NULL;
-        (void) XWithdrawWindow(display,windows->image.id,
-          windows->image.screen);
-        (void) XDestroyWindow(display,windows->image.id);
-        windows->image.id=(Window) NULL;
-      }
+  if ((resource_info->backdrop == MagickFalse) && (windows->backdrop.mapped))
+    {
+      (void) XWithdrawWindow(display,windows->backdrop.id,
+        windows->backdrop.screen);
+      (void) XDestroyWindow(display,windows->backdrop.id);
+      windows->backdrop.id=(Window) NULL;
+      (void) XWithdrawWindow(display,windows->image.id,
+        windows->image.screen);
+      (void) XDestroyWindow(display,windows->image.id);
+      windows->image.id=(Window) NULL;
+    }
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   if (((*state & FormerImageState) != 0) || ((*state & NextImageState) != 0))
