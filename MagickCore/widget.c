@@ -2089,6 +2089,12 @@ typedef struct _ColorBrowserTargets
 
   size_t
     *colors;
+
+  XWidgetInfo
+    *scroll_info;
+
+  unsigned int
+    *visible_colors;
 } ColorBrowserTargets;
 
 typedef struct _ColorBrowserContext
@@ -2098,6 +2104,9 @@ typedef struct _ColorBrowserContext
 
   XWindows
     *windows;
+
+  char
+    *glob_pattern;
 } ColorBrowserContext;
 
 static void ClientColorBrowserMessage(const ColorBrowserContext *context,
@@ -2303,6 +2312,89 @@ static void MoveColorBrowserButtons(const ColorBrowserContext *context,
   ToggleColorBrowserButtons(context,event,widgets);
 }
 
+static void PressColorBrowserKey(const ColorBrowserContext *context,
+  const XEvent event,const ColorBrowserTargets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const colors = widgets->colors;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_colors = widgets->visible_colors;
+
+  XColor
+    color;
+
+  Status
+    status;
+
+  static char
+    command[MagickPathExtent];
+
+  static int
+    length;
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  length=XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if (AreaIsActive((*scroll_info),event.xkey))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=MoveFontBrowserSlider((*slider_info),key_symbol,
+        (*visible_colors),(int) (*colors));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      (*state)=ReadColorBrowserPattern((*reply_info),glob_pattern,(*state));
+      return;
+    }
+  if (key_symbol == XK_Control_L)
+    {
+      (*state)|=ControlState;
+      return;
+    }
+  (*reply_info)=ApplyListBrowserControlKey((*reply_info),key_symbol,(*state));
+  XEditText(display,reply_info,key_symbol,command,(*state));
+  XDrawMatteText(display,&windows->widget,reply_info);
+  (*state)|=JumpListState;
+  status=XParseColor(display,windows->widget.map_info->colormap,
+    (*reply_info).text,&color);
+  if (status != False)
+    (*state)|=RedrawActionState;
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -2385,7 +2477,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const ColorBrowserTargets
     color_widgets = { &reply_info, &state,
       &grab_info, &reset_info, &action_info, &cancel_info, &slider_info,
-      &colors };
+      &colors, &scroll_info, &visible_colors };
 
   ColorBrowserContext
     color_context;
@@ -2490,6 +2582,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   state=UpdateConfigurationState;
   color_context.display=display;
   color_context.windows=windows;
+  color_context.glob_pattern=glob_pattern;
   do
   {
     if (state & UpdateConfigurationState)
@@ -3056,51 +3149,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       }
       case KeyPress:
       {
-        static char
-          command[MagickPathExtent];
-
-        static int
-          length;
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        length=XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (AreaIsActive(scroll_info,event.xkey))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=MoveFontBrowserSlider(slider_info,key_symbol,
-              visible_colors,(int) colors);
-            state|=RedrawListState;
-            break;
-          }
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            state=ReadColorBrowserPattern(reply_info,glob_pattern,state);
-            break;
-          }
-        if (key_symbol == XK_Control_L)
-          {
-            state|=ControlState;
-            break;
-          }
-        reply_info=ApplyListBrowserControlKey(reply_info,key_symbol,state);
-        XEditText(display,&reply_info,key_symbol,command,state);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        state|=JumpListState;
-        status=XParseColor(display,windows->widget.map_info->colormap,
-          reply_info.text,&color);
-        if (status != False)
-          state|=RedrawActionState;
+        PressColorBrowserKey(&color_context,event,&color_widgets);
         break;
       }
       case KeyRelease:
