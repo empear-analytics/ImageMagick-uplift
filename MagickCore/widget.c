@@ -4048,6 +4048,34 @@ static void RedrawConfirmWidget(const ConfirmContext *context,
     }
 }
 
+static void HandleConfirmKeyEvent(Display *display,XWindows *windows,
+  const XEvent event,const ConfirmTargets *targets)
+{
+  size_t
+    *const state = targets->state;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      KeyConfirmYes(display,windows,event,targets);
+      break;
+    }
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      MoveConfirmButtons(display,windows,event,targets);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -4193,23 +4221,11 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
         state=ExposeWidgetWindow(windows,event,state);
         break;
       }
-      case KeyPress:
-      {
-        KeyConfirmYes(display,windows,event,&targets);
-        break;
-      }
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MotionNotify:
-      {
-        MoveConfirmButtons(display,windows,event,&targets);
-        break;
-      }
       default:
+      {
+        HandleConfirmKeyEvent(display,windows,event,&targets);
         break;
+      }
     }
   } while ((state & ExitState) == 0);
   XSetCursorState(display,windows,MagickFalse);
