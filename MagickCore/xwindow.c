@@ -1140,6 +1140,20 @@ static int XClosestColor(const XColor *colors,const unsigned int number_colors,
   return(j);
 }
 
+static unsigned int XQueryColormap(Display *display,const Colormap colormap,
+  XColor *colors,unsigned int number_colors)
+{
+  int
+    i;
+
+  for (i=0; i < (int) number_colors; i++)
+    colors[i].pixel=(size_t) i;
+  if (number_colors > 256)
+    number_colors=256;
+  (void) XQueryColors(display,colormap,colors,(int) number_colors);
+  return(number_colors);
+}
+
 MagickPrivate void XBestPixel(Display *display,const Colormap colormap,
   XColor *colors,unsigned int number_colors,XColor *color)
 {
@@ -1147,7 +1161,6 @@ MagickPrivate void XBestPixel(Display *display,const Colormap colormap,
     query_server;
 
   int
-    i,
     j;
 
   Status
@@ -1176,11 +1189,7 @@ MagickPrivate void XBestPixel(Display *display,const Colormap colormap,
             "...");
           return;
         }
-      for (i=0; i < (int) number_colors; i++)
-        colors[i].pixel=(size_t) i;
-      if (number_colors > 256)
-        number_colors=256;
-      (void) XQueryColors(display,colormap,colors,(int) number_colors);
+      number_colors=XQueryColormap(display,colormap,colors,number_colors);
     }
   j=XClosestColor(colors,number_colors,color);
   (void) XAllocColor(display,colormap,&colors[j]);
