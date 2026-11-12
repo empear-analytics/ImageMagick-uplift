@@ -17269,7 +17269,7 @@ typedef struct _DisplayEventTargets
     **display_image;
 } DisplayEventTargets;
 
-static void XPressImageButton1(const DisplayEventContext *context,
+static void XSelectVirtualCommand(const DisplayEventContext *context,
   const DisplayEventTargets *targets)
 {
   Display
@@ -17283,9 +17283,6 @@ static void XPressImageButton1(const DisplayEventContext *context,
 
   ExceptionInfo
     *const exception = context->exception;
-
-  const char
-    *const *const CommandMenu = context->CommandMenu;
 
   char
     *const command = context->command;
@@ -17305,16 +17302,34 @@ static void XPressImageButton1(const DisplayEventContext *context,
   int
     entry;
 
+  /*
+    Select a command from the Virtual menu.
+  */
+  entry=XMenuWidget(display,windows,"Commands",VirtualMenu,
+    command);
+  if (entry >= 0)
+    (*nexus)=XMagickCommand(display,resource_info,windows,
+      VirtualCommands[entry],display_image,exception);
+}
+
+static void XPressImageButton1(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  const char
+    *const *const CommandMenu = context->CommandMenu;
+
   if (resource_info->immutable)
     {
-      /*
-        Select a command from the Virtual menu.
-      */
-      entry=XMenuWidget(display,windows,"Commands",VirtualMenu,
-        command);
-      if (entry >= 0)
-        (*nexus)=XMagickCommand(display,resource_info,windows,
-          VirtualCommands[entry],display_image,exception);
+      XSelectVirtualCommand(context,targets);
       return;
     }
   /*
