@@ -3518,17 +3518,6 @@ static const CompositeOperator
     SrcCompositeOp
   };
 
-static MagickBooleanType IsSourceAlphaOperator(const CompositeOperator compose)
-{
-  size_t
-    i;
-
-  for (i=0; i < (sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators)); i++)
-    if (SourceAlphaOperators[i] == compose)
-      return(MagickTrue);
-  return(MagickFalse);
-}
-
 static void CompositeAlphaMultiplyRun(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,MagickRealType *pixel)
 {
@@ -5450,7 +5439,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
     row.canvas_alpha=IsListedOperator(CanvasAlphaOperators,
       sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
-    row.source_alpha=IsSourceAlphaOperator(compose);
+    row.source_alpha=IsListedOperator(SourceAlphaOperators,
+      sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
     row.pixel_info_inputs=IsPixelInfoInputOperator(compose);
     row.intensity_inputs=IsIntensityInputOperator(compose);
     row.clip_to_self=clip_to_self;
