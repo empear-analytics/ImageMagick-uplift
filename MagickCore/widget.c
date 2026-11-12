@@ -8505,6 +8505,12 @@ typedef struct _FontBrowserWidgets
 
   int
     *fonts;
+
+  XWidgetInfo
+    *scroll_info;
+
+  unsigned int
+    *visible_fonts;
 } FontBrowserWidgets;
 
 typedef struct _FontBrowserContext
@@ -8514,6 +8520,10 @@ typedef struct _FontBrowserContext
 
   XWindows
     *windows;
+
+  char
+    *glob_pattern,
+    *back_pattern;
 } FontBrowserContext;
 
 static void ClientFontBrowserMessage(const FontBrowserContext *context,
@@ -8698,6 +8708,81 @@ static void MoveFontBrowserButtons(const FontBrowserContext *context,
   ToggleFontBrowserButtons(context,event,widgets);
 }
 
+static void PressFontBrowserKey(const FontBrowserContext *context,
+  const XEvent event,const FontBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern,
+    *const back_pattern = context->back_pattern;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  int
+    *const fonts = widgets->fonts;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_fonts = widgets->visible_fonts;
+
+  static char
+    command[MagickPathExtent];
+
+  static int
+    length;
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  length=XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if (AreaIsActive((*scroll_info),event.xkey))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=MoveFontBrowserSlider((*slider_info),key_symbol,
+        (*visible_fonts),(*fonts));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      (*state)=ReadFontBrowserPattern((*reply_info),back_pattern,glob_pattern,
+        (*state));
+      return;
+    }
+  if (key_symbol == XK_Control_L)
+    {
+      (*state)|=ControlState;
+      return;
+    }
+  (*reply_info)=ApplyListBrowserControlKey((*reply_info),key_symbol,(*state));
+  XEditText(display,reply_info,key_symbol,command,(*state));
+  XDrawMatteText(display,&windows->widget,reply_info);
+  (*state)|=JumpListState;
+}
+
 MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8775,7 +8860,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
 
   const FontBrowserWidgets
     font_widgets = { &reply_info, &state, &back_info,
-      &reset_info, &action_info, &cancel_info, &slider_info, &fonts };
+      &reset_info, &action_info, &cancel_info, &slider_info, &fonts,
+      &scroll_info, &visible_fonts };
 
   FontBrowserContext
     font_context;
@@ -8893,6 +8979,8 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
   state=UpdateConfigurationState;
   font_context.display=display;
   font_context.windows=windows;
+  font_context.glob_pattern=glob_pattern;
+  font_context.back_pattern=back_pattern;
   do
   {
     if (state & UpdateConfigurationState)
@@ -9461,48 +9549,7 @@ MagickPrivate void XFontBrowserWidget(Display *display,XWindows *windows,
       }
       case KeyPress:
       {
-        static char
-          command[MagickPathExtent];
-
-        static int
-          length;
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        length=XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (AreaIsActive(scroll_info,event.xkey))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=MoveFontBrowserSlider(slider_info,key_symbol,
-              visible_fonts,fonts);
-            state|=RedrawListState;
-            break;
-          }
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            state=ReadFontBrowserPattern(reply_info,back_pattern,glob_pattern,
-              state);
-            break;
-          }
-        if (key_symbol == XK_Control_L)
-          {
-            state|=ControlState;
-            break;
-          }
-        reply_info=ApplyListBrowserControlKey(reply_info,key_symbol,state);
-        XEditText(display,&reply_info,key_symbol,command,state);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        state|=JumpListState;
+        PressFontBrowserKey(&font_context,event,&font_widgets);
         break;
       }
       case KeyRelease:
