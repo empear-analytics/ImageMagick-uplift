@@ -26,6 +26,14 @@ is left out of NEW's copy when the family names none of those macros. A file-lev
 (a delegate's code and its stub of the same public function) moves whole, its directives
 included, when its `#endif` follows the family's last function; a function defined in both
 branches calls what either definition calls (owner, 2026-11-11).
+
+When the family stands inside a file-level conditional that the rest of FILE keeps (a delegate's
+`#if defined(MAGICKCORE_X11_DELEGATE)` that wraps the whole file), NEW carries that conditional too:
+its `#if` line, if the copied include block does not hold it, the family, and its `#endif`, every
+directive verbatim. Family functions standing in the `#else` branch of that conditional (the stub of a
+moved public function) are carried under a copy of the `#else` line. A family that stands in an `#elif`
+branch, in different conditionals, or in the `#else` branch of an outer conditional is refused, and so
+is a NEW whose directives do not balance.
 """
 import collections, glob, os, re, sys
 
@@ -62,6 +70,32 @@ def conditional_start(L, end):
         elif re.match(r"#\s*(if|ifdef|ifndef)\b", w): depth -= 1
         if depth == 0: return u
     return None
+
+def conditional_records(L):
+    """Every #if ... #endif of L as {"if": line, "else": [lines of its #else/#elif], "end": line}, by #if line."""
+    recs = []; stack = []
+    for n, line in enumerate(L):
+        w = line.strip()
+        if re.match(r"#\s*(if|ifdef|ifndef)\b", w): recs.append({"if": n, "else": [], "end": None}); stack.append(recs[-1])
+        elif re.match(r"#\s*(else|elif)\b", w) and stack: stack[-1]["else"].append(n)
+        elif re.match(r"#\s*endif\b", w) and stack: stack.pop()["end"] = n
+    return recs
+
+def enclosing_conditionals(recs, a):
+    """The conditionals of RECS that are open at line A, outermost first, with the branch (0 for #if) A stands in."""
+    return [(r, sum(1 for e in r["else"] if e < a)) for r in recs if r["if"] < a and (r["end"] is None or r["end"] > a)]
+
+def open_directives(lines):
+    """The #if lines still open at the end of LINES, outermost first; None when an #endif or #else has no #if."""
+    stack = []
+    for line in lines:
+        w = line.strip()
+        if re.match(r"#\s*(if|ifdef|ifndef)\b", w): stack.append(w)
+        elif re.match(r"#\s*(else|elif)\b", w) and not stack: return None
+        elif re.match(r"#\s*endif\b", w):
+            if not stack: return None
+            stack.pop()
+    return stack
 
 def macro_block_start(L, c):
     """First line of the #define, or the #if ... #endif holding one, that ends at L[c - 1]."""
@@ -183,6 +217,7 @@ for k in idx:
     else: runs.append([k])
 spans = [(d[1], d[2]) for d in order if d[0] in moved]
 cuts = []; typedefs = []; tables = []
+recs = conditional_records(L)
 for run in runs:
     first, last = order[run[0]], order[run[-1]]
     # start: the comment directly above the first function
@@ -232,6 +267,8 @@ for run in runs:
             incomment = "*/" not in t[2:]; continue
         if re.match(r"#\s*(if|ifdef|ifndef)\b", t): depth += 1; continue
         if re.match(r"#\s*(else|elif)\b", t) and depth > 0: continue
+        # the #else of the conditional the whole run stands in (a moved function and its stub, side by side)
+        if re.match(r"#\s*else\b", t) and any(r["if"] < a and n in r["else"] and r["end"] >= b for r in recs): continue
         if re.match(r"#\s*endif\b", t) and depth > 0: depth -= 1; continue
         if t: bad.append((n + 1, t))
     # a file-level #if opened in the region whose #endif follows its last function moves whole, #endif included
@@ -358,7 +395,38 @@ if defined("\n".join(L[inc_a:inc_b + 1])):
 extra = declaration_block("Typedef declarations.", moved_types, "\n\n") + \
     declaration_block("Define declarations.", moved_macros + macro_lines) + \
     declaration_block("Forward declarations.", forward)
-text = "\n".join(hdr) + "\n\n" + "\n".join(L[inc_a:inc_b + 1]) + "\n\n" + extra + region + "\n"
+# the file-level conditionals the family stands in (a delegate's #if around the whole file) go to NEW as well
+runs_in = [enclosing_conditionals(recs, a) for a, b in cuts]
+if any([r["if"] for r, _ in e] != [r["if"] for r, _ in runs_in[0]] for e in runs_in):
+    sys.exit("refused: the moved runs stand in different conditionals")
+enc = [r for r, _ in runs_in[0]]
+branch = [[k for _, k in e] for e in runs_in]
+for lvl, r in enumerate(enc):
+    inner = lvl == len(enc) - 1
+    ks = {b[lvl] for b in branch}
+    if not inner and ks != {0}:
+        sys.exit("refused: the family stands in the #else or #elif branch of the outer conditional at line %d" % (r["if"] + 1))
+    if r["end"] is None: sys.exit("refused: the conditional at line %d has no #endif" % (r["if"] + 1))
+    if ks - {0} and (ks - {0, 1} or not re.match(r"#\s*else\b", L[r["else"][0]].strip())):
+        sys.exit("refused: the family stands in an #elif branch of the conditional at line %d" % (r["if"] + 1))
+pre = [L[r["if"]] for r in enc if r["if"] < inc_a]
+post = [L[r["if"]] for r in enc if r["if"] > inc_b]
+closers = [L[r["end"]] for r in reversed(enc)]
+pieces = []; cur = 0
+for (a, b), br in zip(cuts, branch):
+    k = br[-1] if br else 0
+    if k != cur: pieces.append(L[enc[-1]["else"][0]]); cur = k
+    pieces.append("\n".join(L[a:b]))
+region_out = "\n\n".join(pieces)
+text = "\n".join(hdr) + "\n\n" + "".join(l + "\n" for l in pre) + "\n".join(L[inc_a:inc_b + 1]) + "\n" + \
+    "".join(l + "\n" for l in post) + "\n" + extra + region_out + "\n" + "".join(l + "\n" for l in closers)
+if enc:
+    head = text[:text.index(region_out)].split("\n")
+    if open_directives(head) != [L[r["if"]].strip() for r in enc]:
+        sys.exit("refused: the new file's include block does not open the conditionals the family stands in")
+    print("conditionals carried: %s" % [(r["if"] + 1, r["end"] + 1) for r in enc])
+if open_directives(text.split("\n")) != []:
+    sys.exit("refused: the new file's #if, #else and #endif lines do not balance")
 dst_new = os.path.join(out, os.path.basename(new)) if out else new
 dst_old = os.path.join(out, os.path.basename(path)) if out else path
 open(dst_new, "w").write(text)
