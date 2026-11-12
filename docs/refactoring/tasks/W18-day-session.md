@@ -461,3 +461,36 @@ the Large Method goes first or all three categories leave in the last step.
   `XMakeWindow`'s shape test is dead after the unconditional `shape=MagickFalse`; `XSelectWindow` reads
   `event.xbutton.button` after the loop whatever the last event type was; `XFreeResources` has a dead store
   `font_info=NULL`.
+
+## Lane b, third round: display.c 1.97 -> 2.58 (wide build, merged)
+
+52 commits (50 refactor, 2 playbook); `XDrawEditImage` and `XDisplayImage` both leave Brain Method and Deep, Nested
+Complexity. Every step ran `verify_wt` (15 oracle cases for `XDrawEditImage`, 317 for `XDisplayImage`, 0 diverged) plus
+obj_modulo or obj_identical on unreached lines; whole wide catalogue 14,145 cases, 0 diverged (150 s; one single-run
+load-sensitive divergence reran clean alone). Raises (the rest flat inside probed chains, rule 2): **XDrawEditImage**
+d310956f8 CT colour 1.97 -> 1.94 (the only `--no-verify`: the one-time Lines of Code step, said in its message),
+50c4ac648 E `XCreateStippleBitmap` 1.97, 8b1e2daaf CT `XSelectDrawStipple` 2.03, 981bde064 SD `XDrawCommandAction` 2.07,
+9efafd8ab OC `XDrawCommand` 2.28 (leaves Brain Method and Deep Nesting); **XDisplayImage** a82640828 LC
+`XSelectCommandMenuEntry` 2.28 -> 2.58 (leaves Brain Method and Deep Nesting). Recipes used: CT (colour, width, stipple
+tail and head, button/key/motion, shape release/motion, XDisplayImage Button1/Button3/image window), E, N, Z
+(`XPreviewLine`, `XImageWindowKeyPress`), O (timer), D (Motion into `XTrackInfoWidget`; the polyline, long-line, focus and
+virtual-command copies), SD, OC, LC (timer, command menu), CN (eight pairs; the ninth would add two complex conditionals,
+measured 2.28 -> 2.23), H (macros hoisted, pp_identical IDENTICAL). `case_tail_check.py` cannot read the shared-context
+form (checked by reading, said in each message).
+- **Recipe text (Decided by `owner`, 2026-11-10 OK):** ffa5f523f CT step 5 (a call in the block of a helper this recipe made
+  earlier for the same caller, `Inner(&name,...,&targets);`, is written in the helper `Inner(name,...,targets);`, passing on
+  the two `const` pointers it received; the helper binds from the targets only the members its own text writes); cb23c728c
+  OC step 7 (the block may hold calls of helpers that CT, SD or Z made earlier, written `Inner(name,...,targets);` in the new
+  helper; it takes the shared input struct and up to two targets structs, at most four parameters, binding only the members
+  its own text writes).
+- Notes: one helper carries a finding (`XCreateStippleBitmap` is a pure label run, Complex Method cc 9: ruling of
+  2026-11-07); *Number of Functions in a Single Module* now appears (allowed when the chain lifts the file; it did); moved
+  `ThrowMagickException` calls now name the helper in `GetMagickModule()` (ButtonRelease and Motion list growth, both
+  unreached). Rejected: CN on the loop-head pair (2.23); a combined transient-window helper and the first timer helper
+  (bumps, Complex, Deep); twin immutable blocks in two helpers (new bumps, fixed by `XSelectVirtualCommand`).
+- Plateau: `XDrawEditImage` file-wide 2.58: Complex cc 64, Large 382 lines, two bumps, five arguments (signature);
+  `XDisplayImage`: Complex cc 186, Large 1,447 lines, 14 bumps; the setup before the loop (about 700 lines of window creation
+  and cleanup) is untouched and needs its own chain. Possible upstream: `XDrawEditImage`, after a failed
+  `ResizeQuantumMemory` in ButtonRelease/MotionNotify, throws and the next event writes through the NULL `coordinate_info`;
+  the stipple file branch passes `&x,&y` to `XReadBitmapFile`, which overwrites the pointer position with the bitmap hot
+  spot; `degrees=0.0` is a dead store; `XDisplayImage`'s Magnify configure branch's `status=XMakeImage(...)` is never read.
