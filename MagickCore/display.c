@@ -7114,6 +7114,96 @@ static RectangleInfo XDrawPolygonBounds(XPoint *coordinate_info,
   return(rectangle_info);
 }
 
+typedef struct _DrawShapeInput
+{
+  ElementType
+    element;
+
+  unsigned int
+    distance;
+} DrawShapeInput;
+
+typedef struct _DrawShapeTargets
+{
+  XSegment
+    *line_info;
+
+  RectangleInfo
+    *rectangle_info;
+
+  XPoint
+    **coordinate_info;
+
+  size_t
+    *state;
+
+  int
+    *number_coordinates;
+
+  unsigned int
+    *max_coordinates;
+} DrawShapeTargets;
+
+static void XDrawButtonRelease(const DrawEditContext *context,
+  const DrawShapeInput *shape,const XEvent event,
+  const DrawShapeTargets *targets)
+{
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const ElementType
+    element = shape->element;
+
+  const unsigned int
+    distance = shape->distance;
+
+  XSegment
+    *const line_info = targets->line_info;
+
+  RectangleInfo
+    *const rectangle_info = targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = targets->coordinate_info;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const number_coordinates = targets->number_coordinates;
+
+  unsigned int
+    *const max_coordinates = targets->max_coordinates;
+
+  /*
+    User has committed to element.
+  */
+  (*line_info).x2=event.xbutton.x;
+  (*line_info).y2=event.xbutton.y;
+  (*rectangle_info).x=(ssize_t) event.xbutton.x;
+  (*rectangle_info).y=(ssize_t) event.xbutton.y;
+  (*coordinate_info)[(*number_coordinates)].x=event.xbutton.x;
+  (*coordinate_info)[(*number_coordinates)].y=event.xbutton.y;
+  if (IsElementComplete(element,distance) != MagickFalse)
+    {
+      (*state)|=ExitState;
+      return;
+    }
+  (*number_coordinates)++;
+  if ((*number_coordinates) < (int) (*max_coordinates))
+    {
+      (*line_info).x1=event.xbutton.x;
+      (*line_info).y1=event.xbutton.y;
+      return;
+    }
+  (*max_coordinates)<<=1;
+  (*coordinate_info)=(XPoint *) ResizeQuantumMemory((*coordinate_info),
+    (*max_coordinates),sizeof(*(*coordinate_info)));
+  if ((*coordinate_info) == (XPoint *) NULL)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7201,6 +7291,13 @@ static MagickBooleanType XDrawEditImage(Display *display,
 
   DrawEditContext
     draw_context;
+
+  const DrawShapeTargets
+    shape_targets = { &line_info, &rectangle_info, &coordinate_info, &state,
+      &number_coordinates, &max_coordinates };
+
+  DrawShapeInput
+    shape_input;
 
   const DrawPointerTargets
     pointer_targets = { &x, &y, &state, &event };
@@ -7560,39 +7657,15 @@ static MagickBooleanType XDrawEditImage(Display *display,
           break;
         }
       }
+      shape_input.element=element;
+      shape_input.distance=distance;
       switch (event.type)
       {
         case ButtonPress:
           break;
         case ButtonRelease:
         {
-          /*
-            User has committed to element.
-          */
-          line_info.x2=event.xbutton.x;
-          line_info.y2=event.xbutton.y;
-          rectangle_info.x=(ssize_t) event.xbutton.x;
-          rectangle_info.y=(ssize_t) event.xbutton.y;
-          coordinate_info[number_coordinates].x=event.xbutton.x;
-          coordinate_info[number_coordinates].y=event.xbutton.y;
-          if (IsElementComplete(element,distance) != MagickFalse)
-            {
-              state|=ExitState;
-              break;
-            }
-          number_coordinates++;
-          if (number_coordinates < (int) max_coordinates)
-            {
-              line_info.x1=event.xbutton.x;
-              line_info.y1=event.xbutton.y;
-              break;
-            }
-          max_coordinates<<=1;
-          coordinate_info=(XPoint *) ResizeQuantumMemory(coordinate_info,
-            max_coordinates,sizeof(*coordinate_info));
-          if (coordinate_info == (XPoint *) NULL)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
+          XDrawButtonRelease(&draw_context,&shape_input,event,&shape_targets);
           break;
         }
         case Expose:
