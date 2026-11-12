@@ -3697,6 +3697,24 @@ static void RespondToColorBrowserEvents(const ColorBrowserContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
+static void CheckColorBrowserReply(Display *display,XWindows *windows,
+  char *reply)
+{
+  Status
+    status;
+
+  XColor
+    color;
+
+  if ((*reply == '\0') || (strchr(reply,'-') != (char *) NULL))
+    return;
+  status=XParseColor(display,windows->widget.map_info->colormap,reply,&color);
+  if (status != False)
+    return;
+  XNoticeWidget(display,windows,"Color is unknown to X server:",reply);
+  (void) CopyMagickString(reply,"gray",MagickPathExtent);
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3731,9 +3749,6 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     colors,
     delay,
     state;
-
-  XColor
-    color;
 
   XFontStruct
     *font_info;
@@ -3895,13 +3910,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   if (colorlist != (char **) NULL)
     colorlist=(char **) RelinquishMagickMemory(colorlist);
   exception=DestroyExceptionInfo(exception);
-  if ((*reply == '\0') || (strchr(reply,'-') != (char *) NULL))
-    return;
-  status=XParseColor(display,windows->widget.map_info->colormap,reply,&color);
-  if (status != False)
-    return;
-  XNoticeWidget(display,windows,"Color is unknown to X server:",reply);
-  (void) CopyMagickString(reply,"gray",MagickPathExtent);
+  CheckColorBrowserReply(display,windows,reply);
 }
 
 /*
