@@ -5466,9 +5466,6 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   DialogContext
     context;
 
-  DialogLayout
-    layout;
-
   /*
     Determine Dialog widget attributes.
   */
@@ -5486,13 +5483,12 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
     width=WidgetTextWidth(font_info,CancelButtonText);
   width+=(unsigned int) (3*QuantumMargin) >> 1;
   height=(unsigned int) (font_info->ascent+font_info->descent);
-  layout.display=display;
-  layout.font_info=font_info;
-  layout.width=width;
-  layout.height=height;
-  layout.query=query;
-  layout.reply=reply;
-  PositionDialogWidget(windows,&layout);
+  {
+    const DialogLayout
+      layout = { display, font_info, width, height, query, reply };
+
+    PositionDialogWidget(windows,&layout);
+  }
   /*
     Map Dialog widget.
   */
