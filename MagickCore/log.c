@@ -1407,6 +1407,15 @@ static const char *GetModuleBasename(const char *module)
   return(r);
 }
 
+static char GetLogEscape(const char *p)
+{
+  if ((*p == '\\') && (*(p+1) == 'r'))
+    return('\r');
+  if ((*p == '\\') && (*(p+1) == 'n'))
+    return('\n');
+  return('\0');
+}
+
 static char *TranslateEvent(const LogEventLocation *location,
   const char *domain,const char *event)
 {
@@ -1431,6 +1440,7 @@ static char *TranslateEvent(const LogEventLocation *location,
     *log_info;
 
   char
+    escape,
     *q;
 
   const char
@@ -1517,15 +1527,10 @@ static char *TranslateEvent(const LogEventLocation *location,
         \n   newline
         \r   carriage return
     */
-    if ((*p == '\\') && (*(p+1) == 'r'))
+    escape=GetLogEscape(p);
+    if (escape != '\0')
       {
-        *q++='\r';
-        p++;
-        continue;
-      }
-    if ((*p == '\\') && (*(p+1) == 'n'))
-      {
-        *q++='\n';
+        *q++=escape;
         p++;
         continue;
       }
