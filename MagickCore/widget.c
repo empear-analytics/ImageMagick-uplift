@@ -3616,6 +3616,56 @@ static void HandleColorKeyEvent(const ColorBrowserContext *context,
   }
 }
 
+static void HandleColorEvent(const ColorBrowserContext *context,
+  const XEvent event,const FontBrowserTargets *targets,
+  const ColorBrowserTargets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      PressColorBrowserScroll(context,event,targets,widgets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      ReleaseColorBrowserScroll(context,event,widgets);
+      break;
+    }
+    case ClientMessage:
+    {
+      ClientColorBrowserMessage(context,event,widgets);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleColorKeyEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -3823,44 +3873,7 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
     */
     if (WaitColorEvent(&color_context,&event,&color_widgets) != MagickFalse)
       continue;
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        PressColorBrowserScroll(&color_context,event,&targets,&color_widgets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        ReleaseColorBrowserScroll(&color_context,event,&color_widgets);
-        break;
-      }
-      case ClientMessage:
-      {
-        ClientColorBrowserMessage(&color_context,event,&color_widgets);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
-      default:
-      {
-        HandleColorKeyEvent(&color_context,event,&color_widgets);
-        break;
-      }
-    }
+    HandleColorEvent(&color_context,event,&targets,&color_widgets);
   } while ((state & ExitState) == 0);
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
