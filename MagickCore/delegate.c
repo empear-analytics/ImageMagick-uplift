@@ -2286,6 +2286,19 @@ static inline MagickBooleanType IsDelegateNameDenied(const char *name)
      MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType AcquireDelegateInputFilename(Image *image,
+  const MagickBooleanType temporary,ExceptionInfo *exception)
+{
+  if ((temporary != MagickFalse) && (AcquireUniqueFilename(image->filename) ==
+      MagickFalse))
+    {
+      ThrowFileException(exception,FileOpenError,"UnableToCreateTemporaryFile",
+        image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static char **DestroyDelegateCommands(char **commands,ssize_t i)
 {
   for ( ; commands[i] != (char *) NULL; i++)
@@ -2325,13 +2338,8 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   if (IsDelegateNameDenied(encode) != MagickFalse)
     ThrowPolicyException(encode,MagickFalse);
   temporary=(*image->filename == '\0') ? MagickTrue : MagickFalse;
-  if ((temporary != MagickFalse) && (AcquireUniqueFilename(image->filename) ==
-      MagickFalse))
-    {
-      ThrowFileException(exception,FileOpenError,"UnableToCreateTemporaryFile",
-        image->filename);
-      return(MagickFalse);
-    }
+  if (AcquireDelegateInputFilename(image,temporary,exception) == MagickFalse)
+    return(MagickFalse);
   delegate_info=GetDelegateInfo(decode,encode,exception);
   if (delegate_info == (DelegateInfo *) NULL)
     {
