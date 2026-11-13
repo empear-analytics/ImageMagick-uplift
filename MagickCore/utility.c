@@ -2021,11 +2021,23 @@ static MagickBooleanType ValidateTemporaryDirectory(char *directory)
   return(MagickTrue);
 }
 
+static void ApplyTemporaryPathPolicy(char **directory)
+{
+  char
+    *value;
+
+  value=GetPolicyValue("resource:temporary-path");
+  if (value != (char *) NULL)
+    {
+      (void) CloneString(&(*directory),value);
+      value=DestroyString(value);
+    }
+}
+
 MagickExport MagickBooleanType GetPathTemplate(char *path)
 {
   char
-    *directory,
-    *value;
+    *directory;
 
   (void) FormatLocaleString(path,MagickPathExtent,"magick-"
     MagickPathTemplate);
@@ -2046,12 +2058,7 @@ MagickExport MagickBooleanType GetPathTemplate(char *path)
 #endif
   if (directory == (char *) NULL)
     return(MagickFalse);
-  value=GetPolicyValue("resource:temporary-path");
-  if (value != (char *) NULL)
-    {
-      (void) CloneString(&directory,value);
-      value=DestroyString(value);
-    }
+  ApplyTemporaryPathPolicy(&directory);
   if (ValidateTemporaryDirectory(directory) == MagickFalse)
     return(MagickFalse);
   if (directory[strlen(directory)-1] == *DirectorySeparator)
