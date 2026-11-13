@@ -965,6 +965,25 @@ static void InitializeXWindowColormaps(XWindows *windows)
   windows->icon_pixel->pixels=(unsigned long *) NULL;
 }
 
+static void InitializeXWindowAtoms(Display *display,XWindows *windows)
+{
+  windows->display=display;
+  windows->wm_protocols=XInternAtom(display,"WM_PROTOCOLS",MagickFalse);
+  windows->wm_delete_window=XInternAtom(display,"WM_DELETE_WINDOW",MagickFalse);
+  windows->wm_take_focus=XInternAtom(display,"WM_TAKE_FOCUS",MagickFalse);
+  windows->im_protocols=XInternAtom(display,"IM_PROTOCOLS",MagickFalse);
+  windows->im_remote_command=
+    XInternAtom(display,"IM_REMOTE_COMMAND",MagickFalse);
+  windows->im_update_widget=XInternAtom(display,"IM_UPDATE_WIDGET",MagickFalse);
+  windows->im_update_colormap=
+    XInternAtom(display,"IM_UPDATE_COLORMAP",MagickFalse);
+  windows->im_former_image=XInternAtom(display,"IM_FORMER_IMAGE",MagickFalse);
+  windows->im_next_image=XInternAtom(display,"IM_NEXT_IMAGE",MagickFalse);
+  windows->im_retain_colors=XInternAtom(display,"IM_RETAIN_COLORS",MagickFalse);
+  windows->im_exit=XInternAtom(display,"IM_EXIT",MagickFalse);
+  windows->dnd_protocols=XInternAtom(display,"DndProtocol",MagickFalse);
+}
+
 MagickPrivate XWindows *XInitializeWindows(Display *display,
   XResourceInfo *resource_info)
 {
@@ -999,21 +1018,7 @@ MagickPrivate XWindows *XInitializeWindows(Display *display,
   /*
     Initialize windows structure.
   */
-  windows->display=display;
-  windows->wm_protocols=XInternAtom(display,"WM_PROTOCOLS",MagickFalse);
-  windows->wm_delete_window=XInternAtom(display,"WM_DELETE_WINDOW",MagickFalse);
-  windows->wm_take_focus=XInternAtom(display,"WM_TAKE_FOCUS",MagickFalse);
-  windows->im_protocols=XInternAtom(display,"IM_PROTOCOLS",MagickFalse);
-  windows->im_remote_command=
-    XInternAtom(display,"IM_REMOTE_COMMAND",MagickFalse);
-  windows->im_update_widget=XInternAtom(display,"IM_UPDATE_WIDGET",MagickFalse);
-  windows->im_update_colormap=
-    XInternAtom(display,"IM_UPDATE_COLORMAP",MagickFalse);
-  windows->im_former_image=XInternAtom(display,"IM_FORMER_IMAGE",MagickFalse);
-  windows->im_next_image=XInternAtom(display,"IM_NEXT_IMAGE",MagickFalse);
-  windows->im_retain_colors=XInternAtom(display,"IM_RETAIN_COLORS",MagickFalse);
-  windows->im_exit=XInternAtom(display,"IM_EXIT",MagickFalse);
-  windows->dnd_protocols=XInternAtom(display,"DndProtocol",MagickFalse);
+  InitializeXWindowAtoms(display,windows);
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   (void) XSynchronize(display,MagickFalse);
 #endif
