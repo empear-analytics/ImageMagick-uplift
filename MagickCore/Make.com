@@ -188,6 +188,7 @@ $call Make threshold.c
 $call Make threshold-adaptive.c
 $call Make threshold-auto.c
 $call Make type.c
+$call Make type-list.c
 $call Make utility.c
 $call Make version.c
 $call Make vision.c
