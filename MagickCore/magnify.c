@@ -179,6 +179,13 @@ static inline void CopyPixels(const MagnifyPixels *magnify,
       magnify->source[source_offset*(ssize_t) magnify->channels+i];
 }
 
+static inline void CopyPixelsIf(const MagnifyPixels *magnify,
+  const int selected,const ssize_t source_offset,
+  const ssize_t destination_offset)
+{
+  CopyPixels(magnify,selected != 0 ? source_offset : 4,destination_offset);
+}
+
 static inline void MixPixels(const MagnifyPixels *magnify,
   const ssize_t *source_offset,const size_t source_size,
   const ssize_t destination_offset)
@@ -1143,40 +1150,18 @@ static inline void Scale3X(const Image *magick_unused(source),
         CopyPixels(&magnify,4,i);
       return;
     }
-  if (PixelsEqual(pixels,3,1,channels))
-    CopyPixels(&magnify,3,0);
-  else
-    CopyPixels(&magnify,4,0);
+  CopyPixelsIf(&magnify,PixelsEqual(pixels,3,1,channels),3,0);
 
-  if (IsScale3XTopEdge(pixels,channels) != MagickFalse)
-    CopyPixels(&magnify,1,1);
-  else
-    CopyPixels(&magnify,4,1);
-  if (PixelsEqual(pixels,5,1,channels))
-    CopyPixels(&magnify,5,2);
-  else
-    CopyPixels(&magnify,4,2);
-  if (IsScale3XLeftEdge(pixels,channels) != MagickFalse)
-    CopyPixels(&magnify,3,3);
-  else
-    CopyPixels(&magnify,4,3);
+  CopyPixelsIf(&magnify,IsScale3XTopEdge(pixels,channels) != MagickFalse,1,1);
+  CopyPixelsIf(&magnify,PixelsEqual(pixels,5,1,channels),5,2);
+  CopyPixelsIf(&magnify,IsScale3XLeftEdge(pixels,channels) != MagickFalse,3,3);
   CopyPixels(&magnify,4,4);
-  if (IsScale3XRightEdge(pixels,channels) != MagickFalse)
-    CopyPixels(&magnify,5,5);
-  else
-    CopyPixels(&magnify,4,5);
-  if (PixelsEqual(pixels,3,7,channels))
-    CopyPixels(&magnify,3,6);
-  else
-    CopyPixels(&magnify,4,6);
-  if (IsScale3XBottomEdge(pixels,channels) != MagickFalse)
-    CopyPixels(&magnify,7,7);
-  else
-    CopyPixels(&magnify,4,7);
-  if (PixelsEqual(pixels,5,7,channels))
-    CopyPixels(&magnify,5,8);
-  else
-    CopyPixels(&magnify,4,8);
+  CopyPixelsIf(&magnify,
+    IsScale3XRightEdge(pixels,channels) != MagickFalse,5,5);
+  CopyPixelsIf(&magnify,PixelsEqual(pixels,3,7,channels),3,6);
+  CopyPixelsIf(&magnify,
+    IsScale3XBottomEdge(pixels,channels) != MagickFalse,7,7);
+  CopyPixelsIf(&magnify,PixelsEqual(pixels,5,7,channels),5,8);
 }
 
 static void CopyMagnifiedPixels(const MagnifyRow *row,const size_t channels,
