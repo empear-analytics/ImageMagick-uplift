@@ -6156,6 +6156,7 @@ static MagickBooleanType XCreateAlphaCanvas(
 typedef struct _XCanvasPacking
 {
   Image
+    *image,
     *canvas;
 
   CacheView
@@ -6163,6 +6164,9 @@ typedef struct _XCanvasPacking
 
   XImage
     *matte_image;
+
+  unsigned int
+    scanline_pad;
 
   int
     x;
@@ -6214,6 +6218,57 @@ static void XPackMatteImageLSB(const MakeImageContext *make_context,
         q+=(ptrdiff_t) scanline_pad;
       }
     }
+}
+
+static void XPackBitmapImageLSB(const MakeImageContext *make_context,
+  const XCanvasPacking *packing,unsigned char *q)
+{
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
+  Image
+    *const image = packing->image;
+
+  Image
+    *const canvas = packing->canvas;
+
+  CacheView
+    *const canvas_view = packing->canvas_view;
+
+  const unsigned int
+    scanline_pad = packing->scanline_pad;
+
+  unsigned short
+    polarity;
+
+  unsigned char
+    background,
+    foreground;
+
+  XBitmapPacking
+    bitmap;
+
+  /*
+    Convert canvas to big-endian bitmap.
+  */
+  background=(unsigned char)
+    (XPixelIntensity(&window->pixel_info->foreground_color) <
+     XPixelIntensity(&window->pixel_info->background_color) ? 0x80 : 0x00);
+  foreground=(unsigned char)
+    (XPixelIntensity(&window->pixel_info->background_color) <
+     XPixelIntensity(&window->pixel_info->foreground_color) ? 0x80 : 0x00);
+  polarity=XBitmapPolarity(image,canvas);
+  bitmap.canvas=canvas;
+  bitmap.polarity=polarity;
+  bitmap.background=background;
+  bitmap.foreground=foreground;
+  bitmap.canvas_view=canvas_view;
+  bitmap.exception=exception;
+  bitmap.scanline_pad=scanline_pad;
+  XPackBitmapLSB(&bitmap,q);
 }
 
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
@@ -6278,41 +6333,14 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   row_source.scanline_pad=scanline_pad;
   row_source.pixels=pixels;
   row_source.map_info=map_info;
+  packing.image=image;
   packing.canvas=canvas;
   packing.canvas_view=canvas_view;
   packing.matte_image=matte_image;
+  packing.scanline_pad=scanline_pad;
   packing.x=x;
   if (ximage->format == XYBitmap)
-    {
-      unsigned short
-        polarity;
-
-      unsigned char
-        background,
-        foreground;
-
-      XBitmapPacking
-        bitmap;
-
-      /*
-        Convert canvas to big-endian bitmap.
-      */
-      background=(unsigned char)
-        (XPixelIntensity(&window->pixel_info->foreground_color) <
-         XPixelIntensity(&window->pixel_info->background_color) ? 0x80 : 0x00);
-      foreground=(unsigned char)
-        (XPixelIntensity(&window->pixel_info->background_color) <
-         XPixelIntensity(&window->pixel_info->foreground_color) ? 0x80 : 0x00);
-      polarity=XBitmapPolarity(image,canvas);
-      bitmap.canvas=canvas;
-      bitmap.polarity=polarity;
-      bitmap.background=background;
-      bitmap.foreground=foreground;
-      bitmap.canvas_view=canvas_view;
-      bitmap.exception=exception;
-      bitmap.scanline_pad=scanline_pad;
-      XPackBitmapLSB(&bitmap,q);
-    }
+    XPackBitmapImageLSB(make_context,&packing,q);
   else
     if (window->pixel_info->colors != 0)
       XPackColormappedLSB(ximage,row_source,q);
