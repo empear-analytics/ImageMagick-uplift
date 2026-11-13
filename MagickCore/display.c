@@ -1802,6 +1802,9 @@ typedef struct _AnnotateTargets
 
   size_t
     *state;
+
+  XEvent
+    *event;
 } AnnotateTargets;
 
 static void XGoToPreviousTextLine(const AnnotateTargets *targets)
@@ -2803,6 +2806,31 @@ static void XAnnotatePointerCommand(const AnnotateContext *context,
   }
 }
 
+static void XAnnotatePointerPress(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != context->windows->image.id)
+    return;
+  /*
+    Change to text entering mode.
+  */
+  (*x)=(*event).xbutton.x;
+  (*y)=(*event).xbutton.y;
+  (*state)|=ExitState;
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -2864,7 +2892,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     context;
 
   const AnnotateTargets
-    targets = { &annotate_info, &p, &x, &y, &text_event, &state };
+    targets = { &annotate_info, &p, &x, &y, &text_event, &state, &event };
 
   const AnnotateRotateTargets
     rotate_targets = { &degrees };
@@ -2935,16 +2963,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     {
       case ButtonPress:
       {
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          Change to text entering mode.
-        */
-        x=event.xbutton.x;
-        y=event.xbutton.y;
-        state|=ExitState;
+        XAnnotatePointerPress(&context,&targets);
         break;
       }
       case ButtonRelease:
