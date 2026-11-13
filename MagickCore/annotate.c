@@ -3030,6 +3030,13 @@ static Image *ReadPostscriptImage(const DrawInfo *draw_info,
   return(annotate_image);
 }
 
+static MagickBooleanType IsIdentityAffine(const DrawInfo *draw_info)
+{
+  return((fabs(draw_info->affine.sx-draw_info->affine.sy) < MagickEpsilon) &&
+    (fabs(draw_info->affine.rx) < MagickEpsilon) &&
+    (fabs(draw_info->affine.ry) < MagickEpsilon) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RenderPostscript(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -3078,9 +3085,7 @@ static MagickBooleanType RenderPostscript(Image *image,
   /*
     Sample to compute bounding box.
   */
-  identity=(fabs(draw_info->affine.sx-draw_info->affine.sy) < MagickEpsilon) &&
-    (fabs(draw_info->affine.rx) < MagickEpsilon) &&
-    (fabs(draw_info->affine.ry) < MagickEpsilon) ? MagickTrue : MagickFalse;
+  identity=IsIdentityAffine(draw_info);
   extent=GetPostscriptExtent(draw_info);
   (void) FormatLocaleFile(file,"%g %g moveto\n",identity  != MagickFalse ? 0.0 :
     extent.x/2.0,extent.y/2.0);
