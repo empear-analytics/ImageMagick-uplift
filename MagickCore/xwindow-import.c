@@ -1467,6 +1467,78 @@ static void XCropToRootWindow(Display *display,RectangleInfo *crop_info)
     (*crop_info).height=(size_t) (display_height-(*crop_info).y);
 }
 
+typedef struct _WindowDescendInput
+{
+  Display
+    *display;
+
+  ExceptionInfo
+    *exception;
+
+  Window
+    window;
+
+  int
+    id;
+
+  unsigned int
+    level;
+
+  WindowInfo
+    *window_info;
+} WindowDescendInput;
+
+static void XDescendWindowHierarchy(const WindowDescendInput *descend,
+  int *number_windows)
+{
+  Display
+    *const display = descend->display;
+
+  ExceptionInfo
+    *const exception = descend->exception;
+
+  const Window
+    window = descend->window;
+
+  const int
+    id = descend->id;
+
+  const unsigned int
+    level = descend->level;
+
+  WindowInfo
+    *const window_info = descend->window_info;
+
+  Status
+    status;
+
+  Window
+    root_window;
+
+  if (level != 0)
+    {
+      unsigned int
+        number_children;
+
+      Window
+        *children;
+
+      /*
+        Descend the window hierarchy.
+      */
+      status=XQueryTree(display,window,&root_window,&window_info[id].parent,
+        &children,&number_children);
+      XEliminateOrphanedWindow(window_info,id,number_windows);
+      if ((status == True) && (number_children != 0))
+        {
+          const WindowImageContext
+            child_context = { display, exception };
+
+          XImportChildWindows(child_context,children,number_children,level);
+        }
+    }
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -1545,28 +1617,12 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
   crop_info.x-=x_offset;
   crop_info.y-=y_offset;
   window_info[id].crop_info=crop_info;
-  if (level != 0)
-    {
-      unsigned int
-        number_children;
+  {
+    const WindowDescendInput
+      descend = { display, exception, window, id, level, window_info };
 
-      Window
-        *children;
-
-      /*
-        Descend the window hierarchy.
-      */
-      status=XQueryTree(display,window,&root_window,&window_info[id].parent,
-        &children,&number_children);
-      XEliminateOrphanedWindow(window_info,id,&number_windows);
-      if ((status == True) && (number_children != 0))
-        {
-          const WindowImageContext
-            child_context = { display, exception };
-
-          XImportChildWindows(child_context,children,number_children,level);
-        }
-    }
+    XDescendWindowHierarchy(&descend,&number_windows);
+  }
   if (level <= 1)
     {
       Image
