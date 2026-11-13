@@ -4859,6 +4859,16 @@ static MagickBooleanType XColorEditStep(const ColorEditContext *context,
   return(MagickTrue);
 }
 
+static void XMapColorEditCommand(Display *display,XWindows *windows)
+{
+  (void) CloneString(&windows->command.name,"Color Edit");
+  windows->command.data=4;
+  (void) XCommandWidget(display,windows,ColorEditMenu,(XEvent *) NULL);
+  (void) XMapRaised(display,windows->command.id);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_update_widget,CurrentTime);
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -4911,12 +4921,7 @@ static MagickBooleanType XColorEditImage(Display *display,
   /*
     Map Command widget.
   */
-  (void) CloneString(&windows->command.name,"Color Edit");
-  windows->command.data=4;
-  (void) XCommandWidget(display,windows,ColorEditMenu,(XEvent *) NULL);
-  (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  XMapColorEditCommand(display,windows);
   /*
     Make cursor.
   */
