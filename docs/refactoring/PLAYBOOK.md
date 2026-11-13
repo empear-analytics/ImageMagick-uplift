@@ -12977,7 +12977,10 @@ keep every label.
 1. The `switch (e)` lies outside every OpenMP region and holds no `#` line; `e` is a
    variable or parameter of an integer or enumeration type, or an expression with no call,
    assignment or increment, and nothing in the `switch` writes what it reads. Every label
-   is an integer literal or an enumeration constant, or `default:`. Each group but the
+   is an integer literal, an enumeration constant or a character constant, or `default:`
+   (2026-11-13: a character constant has type `int` in C, so `key` is `int` and keeps the
+   value the `case` compared with the promoted `e`, as Recipe TB's *Integer labels* says;
+   `string-si.c`'s `GetSiPrefixExponent`, keyed on `(int) ((unsigned char) *q)`). Each group but the
    `default:` one is one or more labels followed by `v=c;` and `break;`, the same variable
    `v` in every group, `c` a numeric literal (comments aside); no group falls through. The
    `default:` group, whatever its statements, ends with `break;` or falls out of the
@@ -15455,3 +15458,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | W | Step 2: `R` may be a plain local of the caller that the block neither writes nor takes the address of; Lane: b | `splay-tree.c`'s `RemoveNodeFromSplayTree` (`return(value);`, `value` set before the block), the twin of `DeleteNodeFromSplayTree`'s `return(MagickFalse);` block (probe 8.54 to 8.81) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | RT | Step 8: copies differing in a numeric and a string literal (a table of two-member records), each writing its own renamed local, in a `void` caller whose exits are `return;`; Lane: b | `resource.c`'s `FormatTimeToLive` (six unit copies); with it the file's line budget admits the helpers of `AcquireMagickResource` (probe 8.46 to 8.97 over three steps) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | IX | Inline a Constant Extent Local into Its Loop Bound: a local set once from an integer constant expression of `sizeof`s and read only in `for` bounds is replaced by the parenthesised expression; evidence guard (`obj_identical.sh`); Lane: b | `static.c`'s `UnregisterStaticModules` (after Recipe D, *Code Duplication* with `UnregisterStaticModule` left; probe 9.09 to 9.68, object code identical) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | KC | Step 1: a label may be a character constant (type `int`; `key` of type `int`); Lane: b | `string-si.c`'s `GetSiPrefixExponent` (twenty-four letter labels each assigning a `double` exponent, cc 26; probe 8.50 to 9.09) | mandate (2026-10-24) |
