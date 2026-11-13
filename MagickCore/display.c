@@ -15378,6 +15378,24 @@ static void XRotateDragEvent(const XEvent event,
   }
 }
 
+static void XClampRotateSegment(const XWindows *windows,
+  XSegment *rotate_info)
+{
+  /*
+    Check boundary conditions.
+  */
+  if ((*rotate_info).x2 < 0)
+    (*rotate_info).x2=0;
+  else
+    if ((*rotate_info).x2 > (int) windows->image.width)
+      (*rotate_info).x2=(short) windows->image.width;
+  if ((*rotate_info).y2 < 0)
+    (*rotate_info).y2=0;
+  else
+    if ((*rotate_info).y2 > (int) windows->image.height)
+      (*rotate_info).y2=(short) windows->image.height;
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -15515,19 +15533,7 @@ static MagickBooleanType XRotateImage(Display *display,
           XHighlightLine(display,windows->image.id,
             windows->image.highlight_context,&rotate_info);
         XRotateDragEvent(event,&line_targets);
-        /*
-          Check boundary conditions.
-        */
-        if (rotate_info.x2 < 0)
-          rotate_info.x2=0;
-        else
-          if (rotate_info.x2 > (int) windows->image.width)
-            rotate_info.x2=(short) windows->image.width;
-        if (rotate_info.y2 < 0)
-          rotate_info.y2=0;
-        else
-          if (rotate_info.y2 > (int) windows->image.height)
-            rotate_info.y2=(short) windows->image.height;
+        XClampRotateSegment(windows,&rotate_info);
         /*
           Compute rotation angle from the slope of the line.
         */
