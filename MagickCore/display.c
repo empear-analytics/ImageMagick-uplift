@@ -4857,6 +4857,33 @@ static void XSetBlendAlpha(Image *image,CacheView *image_view,
   }
 }
 
+static MagickBooleanType XCreateBlendMattes(Image *image,Image *composite_image,
+  const double blend,ExceptionInfo *exception)
+{
+  if (blend != 0.0)
+    {
+      CacheView
+        *image_view;
+
+      Quantum
+        opacity;
+
+      /*
+        Create mattes for blending.
+      */
+      (void) SetImageAlphaChannel(composite_image,OpaqueAlphaChannel,exception);
+      opacity=(Quantum) (ScaleQuantumToChar(QuantumRange)-
+        ((ssize_t) ScaleQuantumToChar(QuantumRange)*blend)/100);
+      if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+      image->alpha_trait=BlendPixelTrait;
+      image_view=AcquireAuthenticCacheView(image,exception);
+      XSetBlendAlpha(image,image_view,opacity,exception);
+      image_view=DestroyCacheView(image_view);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5211,27 +5238,8 @@ static MagickBooleanType XCompositeImage(Display *display,
   if (compose == DisplaceCompositeOp)
     (void) SetImageArtifact(composite_image,"compose:args",
       displacement_geometry);
-  if (blend != 0.0)
-    {
-      CacheView
-        *image_view;
-
-      Quantum
-        opacity;
-
-      /*
-        Create mattes for blending.
-      */
-      (void) SetImageAlphaChannel(composite_image,OpaqueAlphaChannel,exception);
-      opacity=(Quantum) (ScaleQuantumToChar(QuantumRange)-
-        ((ssize_t) ScaleQuantumToChar(QuantumRange)*blend)/100);
-      if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-        return(MagickFalse);
-      image->alpha_trait=BlendPixelTrait;
-      image_view=AcquireAuthenticCacheView(image,exception);
-      XSetBlendAlpha(image,image_view,opacity,exception);
-      image_view=DestroyCacheView(image_view);
-    }
+  if (XCreateBlendMattes(image,composite_image,blend,exception) == MagickFalse)
+    return(MagickFalse);
   /*
     Composite image with X Image window.
   */
