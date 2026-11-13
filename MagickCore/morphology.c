@@ -2776,7 +2776,6 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       inputs.exception=exception;
       return(AcquireEdgeDetectionKernel(kernel,type,&inputs));
   }
-  return(kernel);
 }
 
 /*
