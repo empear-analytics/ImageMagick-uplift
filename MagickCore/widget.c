@@ -15666,6 +15666,9 @@ typedef struct _TextViewWidgets
 
   XWidgetInfo
     *selection_info;
+
+  MagickStatusType
+    *mask;
 } TextViewWidgets;
 
 typedef struct _TextViewContext
@@ -16068,6 +16071,46 @@ static void HandleTextViewSelectionEvent(const TextViewContext *context,
   }
 }
 
+static void HandleTextViewKeyEvent(const TextViewContext *context,
+  const XEvent event,const TextViewWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  MagickStatusType
+    *const mask = widgets->mask;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      PressTextViewKey(context,event,widgets);
+      break;
+    }
+    case KeyRelease:
+      break;
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case MapNotify:
+    {
+      (*mask)&=(unsigned int) (~CWX);
+      (*mask)&=(unsigned int) (~CWY);
+      break;
+    }
+    default:
+    {
+      HandleTextViewSelectionEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16124,7 +16167,7 @@ MagickPrivate void XTextViewWidget(Display *display,
   const TextViewWidgets
     view_widgets = { &north_info, &south_info, &delay, &slider_info,
       &dismiss_info, &state, &scroll_info, &visible_lines, &event, &list_info,
-      &selection_info };
+      &selection_info, &mask };
 
   TextViewContext
     view_context;
@@ -16430,27 +16473,9 @@ MagickPrivate void XTextViewWidget(Display *display,
         state=ExposeWidgetWindow(windows,event,state);
         break;
       }
-      case KeyPress:
-      {
-        PressTextViewKey(&view_context,event,&view_widgets);
-        break;
-      }
-      case KeyRelease:
-        break;
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MapNotify:
-      {
-        mask&=(unsigned int) (~CWX);
-        mask&=(unsigned int) (~CWY);
-        break;
-      }
       default:
       {
-        HandleTextViewSelectionEvent(&view_context,event,&view_widgets);
+        HandleTextViewKeyEvent(&view_context,event,&view_widgets);
         break;
       }
     }
