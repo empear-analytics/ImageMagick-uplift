@@ -9404,6 +9404,14 @@ static unsigned int XClipRefreshWidth(const XWindowInfo *window,const int x,
   return(width);
 }
 
+static unsigned int XClipRefreshHeight(const XWindowInfo *window,const int y,
+  unsigned int height)
+{
+  if ((window->ximage->height-(y+window->y)) < (int) height)
+    height=(unsigned int) (window->ximage->height-(y+window->y));
+  return(height);
+}
+
 MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   const XEvent *event)
 {
@@ -9457,8 +9465,7 @@ MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
     Check boundary conditions.
   */
   width=XClipRefreshWidth(window,x,width);
-  if ((window->ximage->height-(y+window->y)) < (int) height)
-    height=(unsigned int) (window->ximage->height-(y+window->y));
+  height=XClipRefreshHeight(window,y,height);
   /*
     Refresh image.
   */
