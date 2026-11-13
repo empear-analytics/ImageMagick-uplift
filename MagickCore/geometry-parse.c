@@ -541,6 +541,56 @@ static MagickBooleanType ParseGeometryOffsetValue(char **p,
   return(MagickTrue);
 }
 
+static void SkipGeometryWhitespace(char **p)
+{
+  while (isspace((int) ((unsigned char) **p)) != 0)
+    (*p)++;
+}
+
+static MagickStatusType ParseGeometryOffsets(char *p,MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  double
+    value;
+
+  SkipGeometryWhitespace(&p);
+  if (IsGeometryOffsetPrefix(p) == MagickFalse)
+    return(flags);
+  /*
+    Parse xi value.
+  */
+  if (ParseGeometryOffsetValue(&p,&flags,XiNegative,&value) != MagickFalse)
+    {
+      flags|=XiValue;
+      geometry_info->xi=value;
+    }
+  SkipGeometryWhitespace(&p);
+  if (IsGeometryOffsetPrefix(p) != MagickFalse)
+    {
+      /*
+        Parse psi value.
+      */
+      if (ParseGeometryOffsetValue(&p,&flags,PsiNegative,&value) != MagickFalse)
+        {
+          flags|=PsiValue;
+          geometry_info->psi=value;
+        }
+    }
+  SkipGeometryWhitespace(&p);
+  if (IsGeometryOffsetPrefix(p) != MagickFalse)
+    {
+      /*
+        Parse chi value.
+      */
+      if (ParseGeometryOffsetValue(&p,&flags,ChiNegative,&value) != MagickFalse)
+        {
+          flags|=ChiValue;
+          geometry_info->chi=value;
+        }
+    }
+  return(flags);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -743,47 +793,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
             }
         }
     }
-  while (isspace((int) ((unsigned char) *p)) != 0)
-    p++;
-  if (IsGeometryOffsetPrefix(p) != MagickFalse)
-    {
-      /*
-        Parse xi value.
-      */
-      if (ParseGeometryOffsetValue(&p,&flags,XiNegative,&value) != MagickFalse)
-        {
-          flags|=XiValue;
-          geometry_info->xi=value;
-        }
-      while (isspace((int) ((unsigned char) *p)) != 0)
-        p++;
-      if (IsGeometryOffsetPrefix(p) != MagickFalse)
-        {
-          /*
-            Parse psi value.
-          */
-          if (ParseGeometryOffsetValue(&p,&flags,PsiNegative,&value) !=
-              MagickFalse)
-            {
-              flags|=PsiValue;
-              geometry_info->psi=value;
-            }
-        }
-      while (isspace((int) ((unsigned char) *p)) != 0)
-        p++;
-      if (IsGeometryOffsetPrefix(p) != MagickFalse)
-        {
-          /*
-            Parse chi value.
-          */
-          if (ParseGeometryOffsetValue(&p,&flags,ChiNegative,&value) !=
-              MagickFalse)
-            {
-              flags|=ChiValue;
-              geometry_info->chi=value;
-            }
-        }
-    }
+  flags=ParseGeometryOffsets(p,flags,geometry_info);
   if (strchr(pedantic_geometry,':') != (char *) NULL)
     NormalizeSamplingFactor(flags,geometry_info);
   if (IsNegativeHeightGeometry(flags) != MagickFalse)
