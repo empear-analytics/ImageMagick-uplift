@@ -6934,6 +6934,25 @@ static void XCropSelectArea(const CropContext *context,
   XSetCursorState(context->display,context->windows,MagickFalse);
 }
 
+static MagickBooleanType XCropEscaped(const CropContext *context,
+  const CropTargets *targets)
+{
+  size_t
+    *const state = targets->state;
+
+  if (((*state) & EscapeState) != 0)
+    {
+      /*
+        User want to exit without cropping.
+      */
+      (void) XWithdrawWindow(context->display,context->windows->info.id,
+        context->windows->info.screen);
+      (void) XFreeCursor(context->display,context->cursor);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -7029,15 +7048,8 @@ static MagickBooleanType XCropImage(Display *display,
   XCropTrackPointer(&context,&targets);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
-  if ((state & EscapeState) != 0)
-    {
-      /*
-        User want to exit without cropping.
-      */
-      (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-      (void) XFreeCursor(display,cursor);
-      return(MagickTrue);
-    }
+  if (XCropEscaped(&context,&targets) == MagickFalse)
+    return(MagickTrue);
   XCropSelectArea(&context,&targets);
   if ((state & EscapeState) != 0)
     return(MagickTrue);
