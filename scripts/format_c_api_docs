@@ -73,7 +73,6 @@ if ( ! GetOptions(
 	 'image-settings.c',
 	 'image-filename.c',
 	 'list.c',
-	 'list-scenes.c',
 	 'magick.c',
 	 'magick-wand.c',
 	 'memory.c',

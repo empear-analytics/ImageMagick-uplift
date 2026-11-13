@@ -232,6 +232,94 @@ MagickExport char *GetPageGeometry(const char *page_geometry)
   return(AcquireString(page));
 }
 
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%   G r a v i t y A d j u s t G e o m e t r y                                 %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  GravityAdjustGeometry() adjusts the offset of a region with regard to the
+%  given: width, height and gravity; against which it is positioned.
+%
+%  The region should also have an appropriate width and height to correctly
+%  set the right offset of the top left corner of the region.
+%
+%  The format of the GravityAdjustGeometry method is:
+%
+%      void GravityAdjustGeometry(const size_t width, const size_t height,
+%        const GravityType gravity,RectangleInfo *region);
+%
+%  A description of each parameter follows:
+%
+%    o width, height:  the larger area the region is relative to
+%
+%    o gravity: the edge/corner the current offset is relative to
+%
+%    o region:  The region requiring a offset adjustment relative to gravity
+%
+*/
+MagickExport void GravityAdjustGeometry(const size_t width,
+  const size_t height,const GravityType gravity,RectangleInfo *region)
+{
+  if (region->height == 0)
+    region->height=height;
+  if (region->width == 0)
+    region->width=width;
+  switch (gravity)
+  {
+    case NorthEastGravity:
+    case EastGravity:
+    case SouthEastGravity:
+    {
+      region->x=CastDoubleToSsizeT((double) width-region->width-region->x);
+      break;
+    }
+    case NorthGravity:
+    case SouthGravity:
+    case CenterGravity:
+    {
+      region->x=CastDoubleToSsizeT((double) width/2.0-region->width/2.0+
+        region->x);
+      break;
+    }
+    case ForgetGravity:
+    case NorthWestGravity:
+    case WestGravity:
+    case SouthWestGravity:
+    default:
+      break;
+  }
+  switch (gravity)
+  {
+    case SouthWestGravity:
+    case SouthGravity:
+    case SouthEastGravity:
+    {
+      region->y=CastDoubleToSsizeT((double) height-region->height-region->y);
+      break;
+    }
+    case EastGravity:
+    case WestGravity:
+    case CenterGravity:
+    {
+      region->y=CastDoubleToSsizeT((double) height/2.0-region->height/2.0+
+        region->y);
+      break;
+    }
+    case ForgetGravity:
+    case NorthWestGravity:
+    case NorthGravity:
+    case NorthEastGravity:
+    default:
+      break;
+  }
+  return;
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -270,6 +358,60 @@ MagickExport MagickBooleanType IsGeometry(const char *geometry)
   return(flags != NoValue ? MagickTrue : MagickFalse);
 }
 
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
++     I s S c e n e G e o m e t r y                                           %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  IsSceneGeometry() returns MagickTrue if the geometry is a valid scene
+%  specification (e.g. [1], [1-9], [1,7,4]).
+%
+%  The format of the IsSceneGeometry method is:
+%
+%      MagickBooleanType IsSceneGeometry(const char *geometry,
+%        const MagickBooleanType pedantic)
+%
+%  A description of each parameter follows:
+%
+%    o geometry: This string is the geometry specification.
+%
+%    o pedantic: A value other than 0 invokes a more restrictive set of
+%      conditions for a valid specification (e.g. [1], [1-4], [4-1]).
+%
+*/
+MagickExport MagickBooleanType IsSceneGeometry(const char *geometry,
+  const MagickBooleanType pedantic)
+{
+  char
+    *p;
+
+  double
+    value;
+
+  if (geometry == (const char *) NULL)
+    return(MagickFalse);
+  p=(char *) geometry;
+  value=StringToDouble(geometry,&p);
+  if (IsNaN(value) != 0)
+    return(MagickFalse);
+  if (value > (double) MAGICK_SSIZE_MAX)
+    return(MagickFalse);
+  if (value < (double) MAGICK_SSIZE_MIN)
+    return(MagickFalse);
+  if (p == geometry)
+    return(MagickFalse);
+  if (strspn(geometry,"0123456789-, ") != strlen(geometry))
+    return(MagickFalse);
+  if ((pedantic != MagickFalse) && (strchr(geometry,',') != (char *) NULL))
+    return(MagickFalse);
+  return(MagickTrue);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -357,8 +499,276 @@ MagickExport MagickStatusType ParseAbsoluteGeometry(const char *geometry,
   return(flags);
 }
 
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%   P a r s e A f f i n e G e o m e t r y                                     %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  ParseAffineGeometry() returns an affine matrix as defined by a string of 4
+%  to 6 comma/space separated floating point values.
+%
+%  The affine matrix determinant is checked for validity of the values.
+%
+%  The format of the ParseAffineGeometry method is:
+%
+%      MagickStatusType ParseAffineGeometry(const char *geometry,
+%        AffineMatrix *affine_matrix,ExceptionInfo *exception)
+%
+%  A description of each parameter follows:
+%
+%    o geometry:  The geometry string (e.g. "1.0,0.0,0.0,1.0,3.2,1.2").
+%
+%    o affine_matrix: the affine matrix as defined by the geometry string.
+%
+%    o exception: return any errors or warnings in this structure.
+%
+*/
+MagickExport MagickStatusType ParseAffineGeometry(const char *geometry,
+  AffineMatrix *affine_matrix,ExceptionInfo *exception)
+{
+  char
+    token[MagickPathExtent];
+
+  const char
+    *p;
+
+  double
+    determinant;
+
+  MagickStatusType
+    flags;
+
+  ssize_t
+    i;
+
+  GetAffineMatrix(affine_matrix);
+  flags=NoValue;
+  p=(char *) geometry;
+  for (i=0; (*p != '\0') && (i < 6); i++)
+  {
+    (void) GetNextToken(p,&p,MagickPathExtent,token);
+    if (*token == ',')
+      (void) GetNextToken(p,&p,MagickPathExtent,token);
+    switch (i)
+    {
+      case 0:
+      {
+        affine_matrix->sx=StringToDouble(token,(char **) NULL);
+        break;
+      }
+      case 1:
+      {
+        affine_matrix->rx=StringToDouble(token,(char **) NULL);
+        break;
+      }
+      case 2:
+      {
+        affine_matrix->ry=StringToDouble(token,(char **) NULL);
+        break;
+      }
+      case 3:
+      {
+        affine_matrix->sy=StringToDouble(token,(char **) NULL);
+        break;
+      }
+      case 4:
+      {
+        affine_matrix->tx=StringToDouble(token,(char **) NULL);
+        flags|=XValue;
+        break;
+      }
+      case 5:
+      {
+        affine_matrix->ty=StringToDouble(token,(char **) NULL);
+        flags|=YValue;
+        break;
+      }
+    }
+  }
+  determinant=(affine_matrix->sx*affine_matrix->sy-affine_matrix->rx*
+    affine_matrix->ry);
+  if (fabs(determinant) < MagickEpsilon)
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+      "InvalidArgument","'%s' : 'Indeterminate Matrix'",geometry);
+  return(flags);
+}
 
 
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%   P a r s e G r a v i t y G e o m e t r y                                   %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  ParseGravityGeometry() returns a region as defined by the geometry string
+%  with respect to the given image page (canvas) dimensions and the images
+%  gravity setting.
+%
+%  This is typically used for specifying a area within a given image for
+%  cropping images to a smaller size, chopping out rows and or columns, or
+%  resizing and positioning overlay images.
+%
+%  Percentages are relative to image size and not page size, and are set to
+%  nearest integer (pixel) size.
+%
+%  The format of the ParseGravityGeometry method is:
+%
+%      MagickStatusType ParseGravityGeometry(Image *image,const char *geometry,
+%        RectangleInfo *region_info,ExceptionInfo *exception)
+%
+%  A description of each parameter follows:
+%
+%    o geometry:  The geometry string (e.g. "100x100+10+10").
+%
+%    o region_info: the region as defined by the geometry string with respect
+%      to the image dimensions and its gravity.
+%
+%    o exception: return any errors or warnings in this structure.
+%
+*/
+static MagickStatusType SetPercentRegion(const Image *image,
+  const char *geometry,RectangleInfo *region_info,MagickStatusType flags)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    status;
+
+  PointInfo
+    scale;
+
+  /*
+    Geometry is a percentage of the image size, not canvas size
+  */
+  if (image->gravity != UndefinedGravity)
+    flags|=XValue | YValue;
+  status=ParseGeometry(geometry,&geometry_info);
+  scale.x=geometry_info.rho;
+  if ((status & RhoValue) == 0)
+    scale.x=100.0;
+  scale.y=geometry_info.sigma;
+  if ((status & SigmaValue) == 0)
+    scale.y=scale.x;
+  region_info->width=CastDoubleToSizeT(scale.x*image->columns/100.0+0.5);
+  region_info->height=CastDoubleToSizeT(scale.y*image->rows/100.0+0.5);
+  return(flags);
+}
+
+static MagickStatusType SetAspectRatioRegion(const Image *image,
+  const char *geometry,RectangleInfo *region_info,MagickStatusType flags)
+{
+  double
+    geometry_ratio,
+    image_ratio;
+
+  GeometryInfo
+    geometry_info;
+
+  /*
+    Geometry is a relative to image size and aspect ratio.
+  */
+  if (image->gravity != UndefinedGravity)
+    flags|=XValue | YValue;
+  (void) ParseGeometry(geometry,&geometry_info);
+  geometry_ratio=geometry_info.rho;
+  image_ratio=(double) image->columns/image->rows;
+  region_info->width=image->columns;
+  region_info->height=image->rows;
+  if ((flags & MaximumValue) != 0)
+    {
+      if (geometry_ratio < image_ratio)
+        region_info->height=CastDoubleToSizeT((double) image->rows*
+          image_ratio/geometry_ratio+0.5);
+      else
+        region_info->width=CastDoubleToSizeT((double) image->columns*
+          geometry_ratio/image_ratio+0.5);
+    }
+  else
+    if (geometry_ratio >= image_ratio)
+      region_info->height=CastDoubleToSizeT((double) image->rows*
+        image_ratio/geometry_ratio+0.5);
+    else
+      region_info->width=CastDoubleToSizeT((double) image->columns*
+        geometry_ratio/image_ratio+0.5);
+  return(flags);
+}
+
+static void SetPageGeometryDefaults(const Image *image,
+  RectangleInfo *region_info)
+{
+  SetGeometry(image,region_info);
+  if (image->page.width != 0)
+    region_info->width=image->page.width;
+  if (image->page.height != 0)
+    region_info->height=image->page.height;
+}
+
+MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
+  const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
+{
+  MagickStatusType
+    flags;
+
+  size_t
+    height,
+    width;
+
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",geometry);
+  if ((geometry == (char *) NULL) || (*geometry == '\0'))
+    return(NoValue);
+  SetPageGeometryDefaults(image,region_info);
+  flags=ParseAbsoluteGeometry(geometry,region_info);
+  if (flags == NoValue)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidGeometry","`%s'",geometry);
+      return(flags);
+    }
+  if ((flags & PercentValue) != 0)
+    flags=SetPercentRegion(image,geometry,region_info,flags);
+  if ((flags & AspectRatioValue) != 0)
+    flags=SetAspectRatioRegion(image,geometry,region_info,flags);
+  /*
+    Adjust offset according to gravity setting.
+  */
+  width=region_info->width;
+  height=region_info->height;
+  if (width == 0)
+    region_info->width=image->page.width | image->columns;
+  if (height == 0)
+    region_info->height=image->page.height | image->rows;
+  GravityAdjustGeometry(image->columns,image->rows,image->gravity,region_info);
+  if ((flags & LessValue) != 0)
+    if ((region_info->width < image->columns) &&
+        (region_info->height < image->rows))
+      {
+        SetGeometry(image,region_info);
+        return(NoValue);
+      }
+  if ((flags & GreaterValue) != 0)
+    if ((region_info->width > image->columns) &&
+        (region_info->height > image->rows))
+      {
+        SetGeometry(image,region_info);
+        return(NoValue);
+      }
+  region_info->width=width;
+  region_info->height=height;
+  return(flags);
+}
 
 
 /*

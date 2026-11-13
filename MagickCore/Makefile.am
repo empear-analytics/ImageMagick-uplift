@@ -193,8 +193,6 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/gem.h \
   MagickCore/gem-private.h \
   MagickCore/geometry.c \
-  MagickCore/geometry-affine.c \
-  MagickCore/geometry-gravity.c \
   MagickCore/geometry-meta.c \
   MagickCore/geometry-parse.c \
   MagickCore/geometry.h \
@@ -217,7 +215,6 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/linked-list.c \
   MagickCore/linked-list.h \
   MagickCore/list.c \
-  MagickCore/list-scenes.c \
   MagickCore/list.h \
   MagickCore/locale.c \
   MagickCore/locale-format.c \

@@ -92,8 +92,6 @@ $call Make fourier-complex.c
 $call Make fx.c
 $call Make gem.c
 $call Make geometry.c
-$call Make geometry-affine.c
-$call Make geometry-gravity.c
 $call Make geometry-meta.c
 $call Make geometry-parse.c
 $call Make hashmap.c
@@ -107,7 +105,6 @@ $call Make layer.c
 $call Make layer-composite.c
 $call Make layer-merge.c
 $call Make list.c
-$call Make list-scenes.c
 $call Make locale.c
 $call Make locale-format.c
 $call Make log.c
