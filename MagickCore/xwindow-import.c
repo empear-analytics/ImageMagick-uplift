@@ -1801,6 +1801,22 @@ static GC XCreateInvertContext(Display *display,const Window root_window)
   return(annotate_context);
 }
 
+static MagickBooleanType XGrabTargetCursor(Display *display,
+  const Window root_window,Cursor *target_cursor)
+{
+  Status
+    status;
+
+  (*target_cursor)=XMakeCursor(display,root_window,XDefaultColormap(display,
+    XDefaultScreen(display)),(char * ) "white",(char * ) "black");
+  status=XGrabPointer(display,root_window,MagickFalse,(unsigned int)
+    (ButtonPressMask | ButtonReleaseMask | ButtonMotionMask),GrabModeSync,
+    GrabModeAsync,root_window,(*target_cursor),CurrentTime);
+  if (status != GrabSuccess)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
 {
 #define MinimumCropArea  (unsigned int) 9
@@ -1815,9 +1831,6 @@ static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
     presses,
     x_offset,
     y_offset;
-
-  Status
-    status;
 
   Window
     root_window,
@@ -1840,12 +1853,7 @@ static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
   /*
     Grab the pointer using target cursor.
   */
-  target_cursor=XMakeCursor(display,root_window,XDefaultColormap(display,
-    XDefaultScreen(display)),(char * ) "white",(char * ) "black");
-  status=XGrabPointer(display,root_window,MagickFalse,(unsigned int)
-    (ButtonPressMask | ButtonReleaseMask | ButtonMotionMask),GrabModeSync,
-    GrabModeAsync,root_window,target_cursor,CurrentTime);
-  if (status != GrabSuccess)
+  if (XGrabTargetCursor(display,root_window,&target_cursor) == MagickFalse)
     {
       ThrowXWindowException(XServerError,"UnableToGrabMouse","");
       return((Window) NULL);
