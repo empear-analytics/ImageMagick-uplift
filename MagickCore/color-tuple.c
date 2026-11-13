@@ -235,6 +235,14 @@ static double GetColorComponentScale(const PixelInfo *pixel,
   return(scale);
 }
 
+static void SetAlphaComponent(const PixelInfo *pixel,
+  const ComplianceType compliance,double *color,double *scale)
+{
+  *color=pixel->alpha;
+  if (compliance != NoCompliance)
+    *scale=1.0;
+}
+
 MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   const PixelChannel channel,const ComplianceType compliance,char *tuple)
 {
@@ -273,9 +281,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
     }
     case AlphaPixelChannel:
     {
-      color=pixel->alpha;
-      if (compliance != NoCompliance)
-        scale=1.0;
+      SetAlphaComponent(pixel,compliance,&color,&scale);
       break;
     }
     default:
