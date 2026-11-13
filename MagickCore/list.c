@@ -1223,13 +1223,8 @@ MagickExport Image *RemoveLastImageFromList(Image **images)
   Image
     *image;
 
-  assert(images != (Image **) NULL);
-  if ((*images) == (Image *) NULL)
+  if (IsImageListHead(images) == MagickFalse)
     return((Image *) NULL);
-  assert((*images)->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      (*images)->filename);
   image=(*images);
   while (image->next != (Image *) NULL)
     image=image->next;
