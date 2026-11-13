@@ -1272,6 +1272,347 @@ static MagickBooleanType ParseEXIFTagRequest(const TagInfo *EXIFTag,
   return(MagickTrue);
 }
 
+typedef struct _EXIFWalkInfo
+{
+  const Image
+    *image;
+
+  const char
+    *property;
+
+  const TagInfo
+    *EXIFTag;
+
+  ssize_t
+    all;
+
+  size_t
+    tag;
+
+  EndianType
+    endian;
+
+  const unsigned char
+    *exif;
+
+  size_t
+    length;
+
+  const unsigned char
+    *directory;
+
+  ssize_t
+    tag_offset;
+
+  SplayTreeInfo
+    *exif_resources;
+
+  ExceptionInfo
+    *exception;
+} EXIFWalkInfo;
+
+typedef struct _EXIFWalkTargets
+{
+  ssize_t
+    *level;
+
+  size_t
+    *entry;
+
+  DirectoryInfo
+    *directory_stack;
+} EXIFWalkTargets;
+
+static void GetEXIFDirectory(const EXIFWalkInfo *walk,
+  const EXIFWalkTargets *targets)
+{
+  const Image
+    *const image = walk->image;
+
+  const char
+    *const property = walk->property;
+
+  const TagInfo
+    *const EXIFTag = walk->EXIFTag;
+
+  const ssize_t
+    all = walk->all;
+
+  const size_t
+    tag = walk->tag;
+
+  const EndianType
+    endian = walk->endian;
+
+  const unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  const unsigned char
+    *const directory = walk->directory;
+
+  const ssize_t
+    tag_offset = walk->tag_offset;
+
+  SplayTreeInfo
+    *const exif_resources = walk->exif_resources;
+
+  ExceptionInfo
+    *const exception = walk->exception;
+
+  ssize_t
+    *const level = targets->level;
+
+  size_t
+    *const entry = targets->entry;
+
+  DirectoryInfo
+    *const directory_stack = targets->directory_stack;
+
+  size_t
+    number_entries,
+    tag_value;
+
+  ssize_t
+    i;
+
+  /*
+    Determine how many entries there are in the current IFD.
+  */
+  number_entries=(size_t) ReadPropertyUnsignedShort(endian,directory);
+  for ( ; (*entry) < number_entries; (*entry)++)
+  {
+    size_t
+      format;
+
+    ssize_t
+      components,
+      number_bytes;
+
+    unsigned char
+      *p,
+      *q;
+
+    q=(unsigned char *) (directory+(12*(*entry))+2);
+    if (q > (exif+length-12))
+      break;  /* corrupt EXIF */
+    if (GetValueFromSplayTree(exif_resources,q) == q)
+      break;
+    (void) AddValueToSplayTree(exif_resources,q,q);
+    tag_value=(size_t) (ReadPropertyUnsignedShort(endian,q)+(ssize_t)
+      tag_offset);
+    format=(size_t) ReadPropertyUnsignedShort(endian,q+2);
+    if (format >= (sizeof(tag_bytes)/sizeof(*tag_bytes)))
+      break;
+    if (format == 0)
+      break;  /* corrupt EXIF */
+    components=(ssize_t) ReadPropertySignedLong(endian,q+4);
+    if (components < 0)
+      break;  /* corrupt EXIF */
+    number_bytes=components*(ssize_t) tag_bytes[format];
+    if (number_bytes < components)
+      break;  /* prevent overflow */
+    if (number_bytes <= 4)
+      p=q+8;
+    else
+      {
+        ssize_t
+          dir_offset;
+
+        /*
+          The directory entry contains an offset.
+        */
+        dir_offset=(ssize_t) ReadPropertySignedLong(endian,q+8);
+        if ((dir_offset < 0) || (size_t) dir_offset >= length)
+          continue;
+        if (((size_t) dir_offset+(size_t) number_bytes) < (size_t) dir_offset)
+          continue;  /* prevent overflow */
+        if ((size_t) (dir_offset+(ssize_t) number_bytes) > length)
+          continue;
+        p=(unsigned char *) (exif+dir_offset);
+      }
+    if ((all != 0) || (tag == (size_t) tag_value))
+      {
+        char
+          buffer[6*sizeof(double)+MagickPathExtent],
+          *value;
+
+        if ((p < exif) || (p > (exif+length-tag_bytes[format])))
+          break;
+        value=(char *) NULL;
+        *buffer='\0';
+        switch (format)
+        {
+          case EXIF_FMT_BYTE:
+          {
+            value=AcquireEXIFByteValue(p,number_bytes);
+            break;
+          }
+          case EXIF_FMT_SBYTE:
+          {
+            EXIFMultipleValues("%.17g",(double) (*(signed char *) p));
+            break;
+          }
+          case EXIF_FMT_SSHORT:
+          {
+            EXIFMultipleValues("%hd",ReadPropertySignedShort(endian,p));
+            break;
+          }
+          case EXIF_FMT_USHORT:
+          {
+            EXIFMultipleValues("%hu",ReadPropertyUnsignedShort(endian,p));
+            break;
+          }
+          case EXIF_FMT_ULONG:
+          {
+            EXIFMultipleValues("%.17g",(double)
+              ReadPropertyUnsignedLong(endian,p));
+            break;
+          }
+          case EXIF_FMT_SLONG:
+          {
+            EXIFMultipleValues("%.17g",(double)
+              ReadPropertySignedLong(endian,p));
+            break;
+          }
+          case EXIF_FMT_URATIONAL:
+          {
+            if (IsGPSFractionTag(tag_value) != MagickFalse)
+              {
+                if (number_bytes < 24)
+                  break;  /* reads three rationals */
+                components=1;
+                EXIFGPSFractions("%.17g/%.17g,%.17g/%.17g,%.17g/%.17g",
+                  (double) ReadPropertyUnsignedLong(endian,p),
+                  (double) ReadPropertyUnsignedLong(endian,p+4),
+                  (double) ReadPropertyUnsignedLong(endian,p+8),
+                  (double) ReadPropertyUnsignedLong(endian,p+12),
+                  (double) ReadPropertyUnsignedLong(endian,p+16),
+                  (double) ReadPropertyUnsignedLong(endian,p+20));
+                break;
+              }
+            EXIFMultipleFractions("%.17g/%.17g",(double)
+              ReadPropertyUnsignedLong(endian,p),(double)
+              ReadPropertyUnsignedLong(endian,p+4));
+            break;
+          }
+          case EXIF_FMT_SRATIONAL:
+          {
+            EXIFMultipleFractions("%.17g/%.17g",(double)
+              ReadPropertySignedLong(endian,p),(double)
+              ReadPropertySignedLong(endian,p+4));
+            break;
+          }
+          case EXIF_FMT_SINGLE:
+          {
+            EXIFMultipleValues("%.17g",(double)
+              ReadPropertySignedLong(endian,p));
+            break;
+          }
+          case EXIF_FMT_DOUBLE:
+          {
+            EXIFMultipleValues("%.17g",(double)
+              ReadPropertySignedLong(endian,p));
+            break;
+          }
+          case EXIF_FMT_STRING:
+          case EXIF_FMT_UNDEFINED:
+          default:
+          {
+            if ((p < exif) || (p > (exif+length-number_bytes)))
+              break;
+            value=AcquireEXIFStringValue(p,number_bytes);
+            break;
+          }
+        }
+        if (value != (char *) NULL)
+          {
+            char
+              *key;
+
+            key=AcquireString(property);
+            switch (all)
+            {
+              case 1:
+              {
+                const char
+                  *description;
+
+                description=GetEXIFTagDescription(EXIFTag,tag_value);
+                (void) FormatLocaleString(key,MagickPathExtent,"%s",
+                  description);
+                if ((*level) == 2)
+                  (void) SubstituteString(&key,"exif:","exif:Thumbnail.");
+                break;
+              }
+              case 2:
+              {
+                FormatEXIFTagIdKey(key,tag_value);
+                break;
+              }
+              default:
+              {
+                if ((*level) == 2)
+                  (void) SubstituteString(&key,"exif:","exif:Thumbnail.");
+              }
+            }
+            if ((image->properties == (void *) NULL) ||
+                (GetValueFromSplayTree((SplayTreeInfo *) image->properties,key) == (const void *) NULL))
+              (void) SetImageProperty((Image *) image,key,value,exception);
+            value=DestroyString(value);
+            key=DestroyString(key);
+          }
+      }
+      if (IsSubdirectoryTag(tag_value) != MagickFalse)
+        {
+          ssize_t
+            tag_offset1;
+
+          tag_offset1=(ssize_t) ReadPropertySignedLong(endian,p);
+          if (((size_t) tag_offset1 < length) &&
+              ((*level) < (MaxDirectoryStack-2)))
+            {
+              ssize_t
+                tag_offset2;
+
+              tag_offset2=(ssize_t) ((tag_value == TAG_GPS_OFFSET) ? 0x10000 :
+                0);
+              directory_stack[(*level)].directory=directory;
+              (*entry)++;
+              directory_stack[(*level)].entry=(*entry);
+              directory_stack[(*level)].offset=tag_offset;
+              (*level)++;
+              /*
+                Check for duplicate tag.
+              */
+              for (i=0; i < (*level); i++)
+                if (directory_stack[i].directory == (exif+tag_offset1))
+                  break;
+              if (i < (*level))
+                break;  /* duplicate tag */
+              directory_stack[(*level)].directory=exif+tag_offset1;
+              directory_stack[(*level)].offset=tag_offset2;
+              directory_stack[(*level)].entry=0;
+              (*level)++;
+              if ((directory+2+(12*number_entries)+4) > (exif+length))
+                break;
+              tag_offset1=(ssize_t) ReadPropertySignedLong(endian,directory+
+                2+(12*number_entries));
+              if (IsNextIFDOffset(tag_offset1,length,(*level)) != MagickFalse)
+                {
+                  directory_stack[(*level)].directory=exif+tag_offset1;
+                  directory_stack[(*level)].entry=0;
+                  directory_stack[(*level)].offset=tag_offset2;
+                  (*level)++;
+                }
+            }
+          break;
+        }
+  }
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1590,22 +1931,25 @@ static void GetEXIFProperty(const Image *image,const char *property,
   EndianType
     endian;
 
+  EXIFWalkInfo
+    walk;
+
   size_t
     entry,
     length,
-    number_entries,
-    tag,
-    tag_value;
+    tag;
 
   SplayTreeInfo
     *exif_resources;
 
   ssize_t
     all,
-    i,
     level,
     offset,
     tag_offset;
+
+  const EXIFWalkTargets
+    targets = { &level, &entry, directory_stack };
 
   /*
     If EXIF data exists, then try to parse the request for a tag.
@@ -1658,239 +2002,19 @@ static void GetEXIFProperty(const Image *image,const char *property,
       }
     if ((directory < exif) || (directory > (exif+length-2)))
       break;
-    /*
-      Determine how many entries there are in the current IFD.
-    */
-    number_entries=(size_t) ReadPropertyUnsignedShort(endian,directory);
-    for ( ; entry < number_entries; entry++)
-    {
-      size_t
-        format;
-
-      ssize_t
-        components,
-        number_bytes;
-
-      unsigned char
-        *p,
-        *q;
-
-      q=(unsigned char *) (directory+(12*entry)+2);
-      if (q > (exif+length-12))
-        break;  /* corrupt EXIF */
-      if (GetValueFromSplayTree(exif_resources,q) == q)
-        break;
-      (void) AddValueToSplayTree(exif_resources,q,q);
-      tag_value=(size_t) (ReadPropertyUnsignedShort(endian,q)+(ssize_t)
-        tag_offset);
-      format=(size_t) ReadPropertyUnsignedShort(endian,q+2);
-      if (format >= (sizeof(tag_bytes)/sizeof(*tag_bytes)))
-        break;
-      if (format == 0)
-        break;  /* corrupt EXIF */
-      components=(ssize_t) ReadPropertySignedLong(endian,q+4);
-      if (components < 0)
-        break;  /* corrupt EXIF */
-      number_bytes=components*(ssize_t) tag_bytes[format];
-      if (number_bytes < components)
-        break;  /* prevent overflow */
-      if (number_bytes <= 4)
-        p=q+8;
-      else
-        {
-          ssize_t
-            dir_offset;
-
-          /*
-            The directory entry contains an offset.
-          */
-          dir_offset=(ssize_t) ReadPropertySignedLong(endian,q+8);
-          if ((dir_offset < 0) || (size_t) dir_offset >= length)
-            continue;
-          if (((size_t) dir_offset+(size_t) number_bytes) < (size_t) dir_offset)
-            continue;  /* prevent overflow */
-          if ((size_t) (dir_offset+(ssize_t) number_bytes) > length)
-            continue;
-          p=(unsigned char *) (exif+dir_offset);
-        }
-      if ((all != 0) || (tag == (size_t) tag_value))
-        {
-          char
-            buffer[6*sizeof(double)+MagickPathExtent],
-            *value;
-
-          if ((p < exif) || (p > (exif+length-tag_bytes[format])))
-            break;
-          value=(char *) NULL;
-          *buffer='\0';
-          switch (format)
-          {
-            case EXIF_FMT_BYTE:
-            {
-              value=AcquireEXIFByteValue(p,number_bytes);
-              break;
-            }
-            case EXIF_FMT_SBYTE:
-            {
-              EXIFMultipleValues("%.17g",(double) (*(signed char *) p));
-              break;
-            }
-            case EXIF_FMT_SSHORT:
-            {
-              EXIFMultipleValues("%hd",ReadPropertySignedShort(endian,p));
-              break;
-            }
-            case EXIF_FMT_USHORT:
-            {
-              EXIFMultipleValues("%hu",ReadPropertyUnsignedShort(endian,p));
-              break;
-            }
-            case EXIF_FMT_ULONG:
-            {
-              EXIFMultipleValues("%.17g",(double)
-                ReadPropertyUnsignedLong(endian,p));
-              break;
-            }
-            case EXIF_FMT_SLONG:
-            {
-              EXIFMultipleValues("%.17g",(double)
-                ReadPropertySignedLong(endian,p));
-              break;
-            }
-            case EXIF_FMT_URATIONAL:
-            {
-              if (IsGPSFractionTag(tag_value) != MagickFalse)
-                {
-                  if (number_bytes < 24)
-                    break;  /* reads three rationals */
-                  components=1;
-                  EXIFGPSFractions("%.17g/%.17g,%.17g/%.17g,%.17g/%.17g",
-                    (double) ReadPropertyUnsignedLong(endian,p),
-                    (double) ReadPropertyUnsignedLong(endian,p+4),
-                    (double) ReadPropertyUnsignedLong(endian,p+8),
-                    (double) ReadPropertyUnsignedLong(endian,p+12),
-                    (double) ReadPropertyUnsignedLong(endian,p+16),
-                    (double) ReadPropertyUnsignedLong(endian,p+20));
-                  break;
-                }
-              EXIFMultipleFractions("%.17g/%.17g",(double)
-                ReadPropertyUnsignedLong(endian,p),(double)
-                ReadPropertyUnsignedLong(endian,p+4));
-              break;
-            }
-            case EXIF_FMT_SRATIONAL:
-            {
-              EXIFMultipleFractions("%.17g/%.17g",(double)
-                ReadPropertySignedLong(endian,p),(double)
-                ReadPropertySignedLong(endian,p+4));
-              break;
-            }
-            case EXIF_FMT_SINGLE:
-            {
-              EXIFMultipleValues("%.17g",(double)
-                ReadPropertySignedLong(endian,p));
-              break;
-            }
-            case EXIF_FMT_DOUBLE:
-            {
-              EXIFMultipleValues("%.17g",(double)
-                ReadPropertySignedLong(endian,p));
-              break;
-            }
-            case EXIF_FMT_STRING:
-            case EXIF_FMT_UNDEFINED:
-            default:
-            {
-              if ((p < exif) || (p > (exif+length-number_bytes)))
-                break;
-              value=AcquireEXIFStringValue(p,number_bytes);
-              break;
-            }
-          }
-          if (value != (char *) NULL)
-            {
-              char
-                *key;
-
-              key=AcquireString(property);
-              switch (all)
-              {
-                case 1:
-                {
-                  const char
-                    *description;
-
-                  description=GetEXIFTagDescription(EXIFTag,tag_value);
-                  (void) FormatLocaleString(key,MagickPathExtent,"%s",
-                    description);
-                  if (level == 2)
-                    (void) SubstituteString(&key,"exif:","exif:Thumbnail.");
-                  break;
-                }
-                case 2:
-                {
-                  FormatEXIFTagIdKey(key,tag_value);
-                  break;
-                }
-                default:
-                {
-                  if (level == 2)
-                    (void) SubstituteString(&key,"exif:","exif:Thumbnail.");
-                }
-              }
-              if ((image->properties == (void *) NULL) ||
-                  (GetValueFromSplayTree((SplayTreeInfo *) image->properties,key) == (const void *) NULL))
-                (void) SetImageProperty((Image *) image,key,value,exception);
-              value=DestroyString(value);
-              key=DestroyString(key);
-            }
-        }
-        if (IsSubdirectoryTag(tag_value) != MagickFalse)
-          {
-            ssize_t
-              tag_offset1;
-
-            tag_offset1=(ssize_t) ReadPropertySignedLong(endian,p);
-            if (((size_t) tag_offset1 < length) &&
-                (level < (MaxDirectoryStack-2)))
-              {
-                ssize_t
-                  tag_offset2;
-
-                tag_offset2=(ssize_t) ((tag_value == TAG_GPS_OFFSET) ? 0x10000 :
-                  0);
-                directory_stack[level].directory=directory;
-                entry++;
-                directory_stack[level].entry=entry;
-                directory_stack[level].offset=tag_offset;
-                level++;
-                /*
-                  Check for duplicate tag.
-                */
-                for (i=0; i < level; i++)
-                  if (directory_stack[i].directory == (exif+tag_offset1))
-                    break;
-                if (i < level)
-                  break;  /* duplicate tag */
-                directory_stack[level].directory=exif+tag_offset1;
-                directory_stack[level].offset=tag_offset2;
-                directory_stack[level].entry=0;
-                level++;
-                if ((directory+2+(12*number_entries)+4) > (exif+length))
-                  break;
-                tag_offset1=(ssize_t) ReadPropertySignedLong(endian,directory+
-                  2+(12*number_entries));
-                if (IsNextIFDOffset(tag_offset1,length,level) != MagickFalse)
-                  {
-                    directory_stack[level].directory=exif+tag_offset1;
-                    directory_stack[level].entry=0;
-                    directory_stack[level].offset=tag_offset2;
-                    level++;
-                  }
-              }
-            break;
-          }
-    }
+    walk.image=image;
+    walk.property=property;
+    walk.EXIFTag=EXIFTag;
+    walk.all=all;
+    walk.tag=tag;
+    walk.endian=endian;
+    walk.exif=exif;
+    walk.length=length;
+    walk.directory=directory;
+    walk.tag_offset=tag_offset;
+    walk.exif_resources=exif_resources;
+    walk.exception=exception;
+    GetEXIFDirectory(&walk,&targets);
   } while (level > 0);
   exif_resources=DestroySplayTree(exif_resources);
 }
