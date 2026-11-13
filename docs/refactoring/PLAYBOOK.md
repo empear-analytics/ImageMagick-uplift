@@ -3521,6 +3521,16 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    left in the caller as `{ S return(c); }` is; its expression reads no written
    variable. So does V step 7's side-effect-free `S return(e);`, whose `e` reads no
    written variable.
+   So does V step 7's last form, cleanup statements `S` followed by `return(<expr>);`
+   whose expression makes calls (`ConvertPathToPolygon`'s `(void)
+   ThrowMagickException(...); points=(PointInfo *) RelinquishMagickMemory(points);
+   return(DestroyPolygonInfo(polygon_info));`), the same text at every exit (checked by
+   script), left unchanged in the caller after `if (Helper(...,&targets) ==
+   MagickFalse)` (2026-11-13). As in the macro form, `S` and the expression may read
+   and write the written variables: every write the block made to them has landed
+   through the members before the helper returns, so `S` reads what it read inside the
+   block, and nothing reads them after the caller's `return`. The expression reads no
+   variable the block writes but through a pointer passed by value (`polygon_info`).
    `M` may also be one of MagickCore's own throw macros (`exception-private.h`:
    `ThrowImageException`, `ThrowBinaryException` and the like), whose expansion is
    `(void) ThrowMagickException(exception,GetMagickModule(),...);` and `return(c);` of
@@ -14948,3 +14958,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | KF | Replace an enumerator-keyed `switch` whose groups each call a different function of one signature with the same arguments by a `static const` key/function-pointer table, a lookup function and one call, the `default` statements kept as the else branch; evidence oracle | `stream.c`'s `StreamImagePixels` (cc 16 to 9, 6.15 to 6.31); KD needs a `LocaleCompare` ladder of returns | mandate (2026-10-24) |
 | 2026-11-13 | NEW | SP | Split a predicate whose body returns a disjunction of pure comparisons at a leading run: the run becomes a `static inline` predicate, called as the first operand; evidence oracle | `stream.c`'s `IsCacheMorphologyChanged` (cc 10, 6.31 to 6.44); P names an `if` expression, GD needs an `if ... return` | mandate (2026-10-24) |
 | 2026-11-13 | NEW | UR | Unnest a repeated test of the guard's own condition: `if (C) { S if (C) X }` becomes `if (C) { S }` and `if (C) X` for a side-effect-free `C`, even when `S` writes what `C` reads (the forms can differ only when `C` was false, and then nothing runs between the two tests); evidence oracle | `draw.c`'s `ConvertPathToPolygon` (the new-subpath allocation and its failure test, the last depth-4 site; chain probe 2.62 to 2.68); SG requires `S` not to write `G`'s reads, UX needs a disjunction | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | I | Step 8: V step 7's `S return(<expr>);` with a calling expression may be left in the caller, and `S` and the expression may read and write the written variables, as the macro form may (the writes land through the members before the helper returns) | `draw.c`'s `ConvertPathToPolygon`: the subpath flush writes `number_edges`, `points`, `ghostline` and `edge`, and its exit releases `points` before `return(DestroyPolygonInfo(polygon_info));`; chain probe 2.62 to 2.68 | mandate (2026-10-24) |
