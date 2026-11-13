@@ -2881,6 +2881,47 @@ static void XAnnotatePointerKey(const AnnotateContext *context,
   }
 }
 
+static void XAnnotatePointerEvent(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XAnnotatePointerPress(context,targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XAnnotatePointerKey(context,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(context->display,context->windows,(*x),(*y));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3009,35 +3050,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         XAnnotatePointerCommand(&context,&targets,id);
         continue;
       }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XAnnotatePointerPress(&context,&targets);
-        break;
-      }
-      case ButtonRelease:
-        break;
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        XAnnotatePointerKey(&context,&targets);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        break;
-      }
-      default:
-        break;
-    }
+    XAnnotatePointerEvent(&context,&targets);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
