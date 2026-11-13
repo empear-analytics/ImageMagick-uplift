@@ -14749,6 +14749,14 @@ static void InitializeNoticeDismiss(XWindows *windows,XFontStruct *font_info,
     (windows->widget.height-((*dismiss_info).height << 1));
 }
 
+static void ReleaseNoticeWidget(Display *display,XWindows *windows,
+  const XEvent event,const NoticeTargets targets)
+{
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  ReleaseNoticeDismiss(display,windows,event,&targets);
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -14863,9 +14871,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        ReleaseNoticeDismiss(display,windows,event,&targets);
+        ReleaseNoticeWidget(display,windows,event,targets);
         break;
       }
       case ClientMessage:
