@@ -1444,6 +1444,38 @@ static void XMakeBackgroundColormap(const AnimateBackgroundSetup *setup,
     setup->map_info,pixel,exception);
 }
 
+static void XInitializeBackgroundWindow(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  Display
+    *const display = setup->display;
+
+  XGCValues
+    context_values;
+
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  context_values.background=(*pixel).background_color.pixel;
+  context_values.foreground=(*pixel).foreground_color.pixel;
+  (*pixel).annotate_context=XCreateGC(display,(*window_info).id,(unsigned long)
+    (GCBackground | GCForeground),&context_values);
+  if ((*pixel).annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      setup->images->filename);
+  /*
+    Initialize Image window attributes.
+  */
+  XGetWindowInfo(display,setup->visual_info,setup->map_info,pixel,
+    (XFontStruct *) NULL,resources,window_info);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1482,9 +1514,6 @@ MagickExport void XAnimateBackgroundImage(Display *display,
 
   Window
     root_window;
-
-  XGCValues
-    context_values;
 
   XResourceInfo
     resources;
@@ -1603,18 +1632,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   /*
     Graphic context superclass.
   */
-  context_values.background=pixel.background_color.pixel;
-  context_values.foreground=pixel.foreground_color.pixel;
-  pixel.annotate_context=XCreateGC(display,window_info.id,(unsigned long)
-    (GCBackground | GCForeground),&context_values);
-  if (pixel.annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      images->filename);
-  /*
-    Initialize Image window attributes.
-  */
-  XGetWindowInfo(display,visual_info,map_info,&pixel,(XFontStruct *) NULL,
-    &resources,&window_info);
+  XInitializeBackgroundWindow(&setup,&targets);
   /*
     Create the X image.
   */
