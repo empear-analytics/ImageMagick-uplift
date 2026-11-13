@@ -7035,7 +7035,9 @@ typedef struct _FileBrowserWidgets
     *delay;
 
   XWidgetInfo
-    *expose_info;
+    *expose_info,
+    *text_info,
+    *selection_info;
 } FileBrowserWidgets;
 
 typedef struct _FileBrowserContext
@@ -7072,6 +7074,9 @@ typedef struct _FileBrowserContext
 
   unsigned int
     width;
+
+  char
+    *text;
 } FileBrowserContext;
 
 static void ClientFileBrowserMessage(const FileBrowserContext *context,
@@ -7957,6 +7962,44 @@ static void InitializeFileBrowserList(const FileBrowserContext *context,
     (*state)|=JumpListState;
 }
 
+static void InitializeFileBrowserText(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  const unsigned int
+    height = context->height;
+
+  char
+    *const text = context->text;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const list_info = widgets->list_info,
+    *const text_info = widgets->text_info,
+    *const selection_info = widgets->selection_info;
+
+  /*
+    Initialize text information.
+  */
+  *text='\0';
+  XGetWidgetInfo(text,text_info);
+  (*text_info).center=MagickFalse;
+  (*text_info).width=(*reply_info).width;
+  (*text_info).height=height;
+  (*text_info).x=(*list_info).x-(int) (QuantumMargin >> 1);
+  (*text_info).y=QuantumMargin;
+  /*
+    Initialize selection information.
+  */
+  XGetWidgetInfo((char *) NULL,selection_info);
+  (*selection_info).center=MagickFalse;
+  (*selection_info).width=(*list_info).width;
+  (*selection_info).height=(unsigned int) ((9*height) >> 3);
+  (*selection_info).x=(*list_info).x;
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8032,7 +8075,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     file_widgets = { &reply_info, &state,
       &scroll_info, &slider_info, &visible_files, &files, &up_info, &home_info,
       &special_info, &action_info, &cancel_info, &i, &filelist, &north_info,
-      &south_info, &list_info, &delay, &expose_info };
+      &south_info, &list_info, &delay, &expose_info, &text_info,
+      &selection_info };
 
   FileBrowserContext
     file_context;
@@ -8146,6 +8190,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   file_context.home_directory=home_directory;
   file_context.action=action;
   file_context.width=width;
+  file_context.text=text;
   do
   {
     if (state & UpdateConfigurationState)
@@ -8157,24 +8202,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         */
         InitializeFileBrowserScroll(&file_context,&file_widgets);
         InitializeFileBrowserList(&file_context,&file_widgets);
-        /*
-          Initialize text information.
-        */
-        *text='\0';
-        XGetWidgetInfo(text,&text_info);
-        text_info.center=MagickFalse;
-        text_info.width=reply_info.width;
-        text_info.height=height;
-        text_info.x=list_info.x-(int) (QuantumMargin >> 1);
-        text_info.y=QuantumMargin;
-        /*
-          Initialize selection information.
-        */
-        XGetWidgetInfo((char *) NULL,&selection_info);
-        selection_info.center=MagickFalse;
-        selection_info.width=list_info.width;
-        selection_info.height=(unsigned int) ((9*height) >> 3);
-        selection_info.x=list_info.x;
+        InitializeFileBrowserText(&file_context,&file_widgets);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
     if (state & RedrawWidgetState)
