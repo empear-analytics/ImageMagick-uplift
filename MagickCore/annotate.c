@@ -468,6 +468,17 @@ static size_t GetTextLineHeight(const TypeMetric *metrics,
   return(height);
 }
 
+static PixelInfo GetDecorationColor(const DrawInfo *annotate_info)
+{
+  PixelInfo
+    pixel;
+
+  pixel=annotate_info->fill;
+  if (annotate_info->stroke.alpha != (MagickRealType) TransparentAlpha)
+    pixel=annotate_info->stroke;
+  return(pixel);
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -684,9 +695,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
     annotate_info->affine.tx=offset.x;
     annotate_info->affine.ty=offset.y;
-    pixel=annotate_info->fill;
-    if (annotate_info->stroke.alpha != (MagickRealType) TransparentAlpha)
-      pixel=annotate_info->stroke;
+    pixel=GetDecorationColor(annotate_info);
     (void) QueryColorname(image,&pixel,AllCompliance,color,exception);
     (void) FormatLocaleString(primitive,MagickPathExtent,"stroke %s "
       "stroke-width %g line 0,0 %g,0",color,(double)
