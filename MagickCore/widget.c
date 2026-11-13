@@ -15825,8 +15825,8 @@ static void PressTextViewKey(const TextViewContext *context,const XEvent event,
       /*
         Move slider.
       */
-      (*slider_info)=MoveTextViewSlider((*slider_info),key_symbol,(*visible_lines),
-        lines);
+      (*slider_info)=MoveTextViewSlider((*slider_info),key_symbol,
+        (*visible_lines),lines);
       (*state)|=RedrawListState;
       return;
     }
