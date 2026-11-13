@@ -14992,6 +14992,49 @@ static void SavePreferences(XResourceInfo *resource_info,
   XUserPreferences(resource_info);
 }
 
+typedef struct _PreferencesWidgets
+{
+  XWidgetInfo
+    *cache_info;
+
+  char
+    *cache;
+} PreferencesWidgets;
+
+typedef struct _PreferencesContext
+{
+  XResourceInfo
+    *resource_info;
+
+  XFontStruct
+    *font_info;
+} PreferencesContext;
+
+static void InitializePreferencesCache(const PreferencesContext *context,
+  const PreferencesWidgets *widgets,int y)
+{
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const cache_info = widgets->cache_info;
+
+  char
+    *const cache = widgets->cache;
+
+  (void) FormatLocaleString(cache,MagickPathExtent,CacheButtonText,
+    (unsigned long) resource_info->undo_cache);
+  XGetWidgetInfo(cache,cache_info);
+  (*cache_info).bevel_width--;
+  (*cache_info).width=(unsigned int) QuantumMargin >> 1;
+  (*cache_info).height=(unsigned int) QuantumMargin >> 1;
+  (*cache_info).x=QuantumMargin << 1;
+  (*cache_info).y=y;
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15025,6 +15068,12 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
     cancel_info,
     preferences_info[NumberPreferences];
 
+  const PreferencesWidgets
+    widgets = { &cache_info, &cache[0] };
+
+  PreferencesContext
+    context;
+
   /*
     Determine Preferences widget attributes.
   */
@@ -15053,6 +15102,8 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   */
   state=UpdateConfigurationState;
   XSetCursorState(display,windows,MagickTrue);
+  context.resource_info=resource_info;
+  context.font_info=font_info;
   do
   {
     if (state & UpdateConfigurationState)
@@ -15094,14 +15145,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
           resource_info->quantize_info->dither_method == NoDitherMethod;
         preferences_info[6].raised=resource_info->colormap != SharedColormap;
         preferences_info[7].raised=resource_info->use_pixmap == MagickFalse;
-        (void) FormatLocaleString(cache,MagickPathExtent,CacheButtonText,
-          (unsigned long) resource_info->undo_cache);
-        XGetWidgetInfo(cache,&cache_info);
-        cache_info.bevel_width--;
-        cache_info.width=(unsigned int) QuantumMargin >> 1;
-        cache_info.height=(unsigned int) QuantumMargin >> 1;
-        cache_info.x=QuantumMargin << 1;
-        cache_info.y=y;
+        InitializePreferencesCache(&context,&widgets,y);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
     if (state & RedrawWidgetState)
