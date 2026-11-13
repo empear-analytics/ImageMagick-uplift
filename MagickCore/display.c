@@ -9800,6 +9800,87 @@ static void XTrimUndoCache(const XResourceInfo *resource_info,size_t *bytes,
     }
 }
 
+typedef struct _XImageCacheContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+} XImageCacheContext;
+
+static Image *XSaveUndoImage(const XImageCacheContext *cache_context,
+  Image *undo_image)
+{
+  Display
+    *const display = cache_context->display;
+
+  XResourceInfo
+    *const resource_info = cache_context->resource_info;
+
+  XWindows
+    *const windows = cache_context->windows;
+
+  Image
+    **const image = cache_context->image;
+
+  ExceptionInfo
+    *const exception = cache_context->exception;
+
+  Image
+    *cache_image;
+
+  size_t
+    bytes;
+
+  bytes=(*image)->columns*(*image)->rows*sizeof(PixelInfo);
+  XTrimUndoCache(resource_info,&bytes,&undo_image);
+  if (bytes > (resource_info->undo_cache << 20))
+    return(undo_image);
+  /*
+    Save image before transformations are applied.
+  */
+  cache_image=AcquireImage((ImageInfo *) NULL,exception);
+  if (cache_image == (Image *) NULL)
+    return(undo_image);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  cache_image->list=CloneImage(*image,0,0,MagickTrue,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (cache_image->list == (Image *) NULL)
+    {
+      cache_image=DestroyImage(cache_image);
+      return(undo_image);
+    }
+  cache_image->columns=(size_t) windows->image.ximage->width;
+  cache_image->rows=(size_t) windows->image.ximage->height;
+  cache_image->geometry=windows->image.crop_geometry;
+  if (windows->image.crop_geometry != (char *) NULL)
+    {
+      cache_image->geometry=AcquireString((char *) NULL);
+      (void) CopyMagickString(cache_image->geometry,
+        windows->image.crop_geometry,MagickPathExtent);
+    }
+  if (undo_image == (Image *) NULL)
+    {
+      undo_image=cache_image;
+      return(undo_image);
+    }
+  undo_image->next=cache_image;
+  undo_image->next->previous=undo_image;
+  undo_image=undo_image->next;
+  return(undo_image);
+}
+
 static void XImageCache(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -9810,6 +9891,9 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
   static Image
     *redo_image = (Image *) NULL,
     *undo_image = (Image *) NULL;
+
+  XImageCacheContext
+    cache_context;
 
   switch (command)
   {
@@ -9930,45 +10014,12 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
     case SaveToUndoBufferCommand:
     case RedoCommand:
     {
-      size_t
-        bytes;
-
-      bytes=(*image)->columns*(*image)->rows*sizeof(PixelInfo);
-      XTrimUndoCache(resource_info,&bytes,&undo_image);
-      if (bytes > (resource_info->undo_cache << 20))
-        break;
-      /*
-        Save image before transformations are applied.
-      */
-      cache_image=AcquireImage((ImageInfo *) NULL,exception);
-      if (cache_image == (Image *) NULL)
-        break;
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      cache_image->list=CloneImage(*image,0,0,MagickTrue,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (cache_image->list == (Image *) NULL)
-        {
-          cache_image=DestroyImage(cache_image);
-          break;
-        }
-      cache_image->columns=(size_t) windows->image.ximage->width;
-      cache_image->rows=(size_t) windows->image.ximage->height;
-      cache_image->geometry=windows->image.crop_geometry;
-      if (windows->image.crop_geometry != (char *) NULL)
-        {
-          cache_image->geometry=AcquireString((char *) NULL);
-          (void) CopyMagickString(cache_image->geometry,
-            windows->image.crop_geometry,MagickPathExtent);
-        }
-      if (undo_image == (Image *) NULL)
-        {
-          undo_image=cache_image;
-          break;
-        }
-      undo_image->next=cache_image;
-      undo_image->next->previous=undo_image;
-      undo_image=undo_image->next;
+      cache_context.display=display;
+      cache_context.resource_info=resource_info;
+      cache_context.windows=windows;
+      cache_context.image=image;
+      cache_context.exception=exception;
+      undo_image=XSaveUndoImage(&cache_context,undo_image);
       break;
     }
     default:
