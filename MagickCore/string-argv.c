@@ -73,6 +73,12 @@ static const char *SkipArgvSpaces(const char *p)
   return(p);
 }
 
+static const char *SkipArgvQuoted(const char *p,const int quote)
+{
+  for (p++; (*p != quote) && (*p != '\0'); p++) ;
+  return(p);
+}
+
 static const char *SkipArgvWord(const char *p)
 {
   while ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '\0'))
@@ -92,9 +98,9 @@ static void CountArgvArguments(const char *text,int *argc)
       break;
     (*argc)++;
     if (*p == '"')
-      for (p++; (*p != '"') && (*p != '\0'); p++) ;
+      p=SkipArgvQuoted(p,'"');
     if (*p == '\'')
-      for (p++; (*p != '\'') && (*p != '\0'); p++) ;
+      p=SkipArgvQuoted(p,'\'');
     p=SkipArgvWord(p);
   }
 }
