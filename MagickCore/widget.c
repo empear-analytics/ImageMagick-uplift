@@ -13335,6 +13335,38 @@ static void WithdrawListBrowserWidget(Display *display,XWindows *windows,
   XCheckRefreshWindows(display,windows);
 }
 
+static void RespondToListBrowserEvents(const ListBrowserContext *context,
+  const ListBrowserTargets *targets,const ListBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  do
+  {
+    UpdateListBrowserLayout(context,widgets);
+    RedrawListBrowserWidget(context,widgets);
+    RedrawListBrowserEntries(context,widgets);
+    if (WaitForListBrowserEvent(context,widgets) == MagickFalse)
+      continue;
+    switch ((*event).type)
+    {
+      case ButtonPress:
+      {
+        PressListBrowserSlider(context,(*event),targets,widgets);
+        break;
+      }
+      default:
+      {
+        HandleListBrowserWindowEvent(context,(*event),targets,widgets);
+        break;
+      }
+    }
+  } while (((*state) & ExitState) == 0);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13448,27 +13480,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   list_context.width=width;
   list_context.reply=reply;
   list_context.query=query;
-  do
-  {
-    UpdateListBrowserLayout(&list_context,&list_widgets);
-    RedrawListBrowserWidget(&list_context,&list_widgets);
-    RedrawListBrowserEntries(&list_context,&list_widgets);
-    if (WaitForListBrowserEvent(&list_context,&list_widgets) == MagickFalse)
-      continue;
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        PressListBrowserSlider(&list_context,event,&targets,&list_widgets);
-        break;
-      }
-      default:
-      {
-        HandleListBrowserWindowEvent(&list_context,event,&targets,&list_widgets);
-        break;
-      }
-    }
-  } while ((state & ExitState) == 0);
+  RespondToListBrowserEvents(&list_context,&targets,&list_widgets);
   WithdrawListBrowserWidget(display,windows,window_info);
 }
 
