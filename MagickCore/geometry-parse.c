@@ -251,6 +251,38 @@ static void ParseGeometryYOffset(char **p,MagickStatusType *flags,ssize_t *y)
     }
 }
 
+typedef struct _GeometryMetaFlag
+{
+  int
+    key;
+
+  MagickStatusType
+    flag;
+} GeometryMetaFlag;
+
+static const GeometryMetaFlag
+  GeometryMetaFlags[] =
+  {
+    { '%', PercentValue },
+    { '!', AspectValue },
+    { '<', LessValue },
+    { '>', GreaterValue },
+    { '#', MaximumValue },
+    { '^', MinimumValue },
+    { '@', AreaValue }
+  };
+
+static inline MagickStatusType GetGeometryMetaFlag(const int c)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(GeometryMetaFlags)/sizeof(*GeometryMetaFlags)); i++)
+    if (GeometryMetaFlags[i].key == c)
+      return(GeometryMetaFlags[i].flag);
+  return(NoValue);
+}
+
 static const int
   GeometryAdvanceCharacters[] =
   {
@@ -295,6 +327,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
     c;
 
   MagickStatusType
+    flag,
     flags;
 
   /*
@@ -319,50 +352,15 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
         p++;
         continue;
       }
+    flag=GetGeometryMetaFlag(c);
+    if (flag != NoValue)
+      {
+        flags|=flag;
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        continue;
+      }
     switch (c)
     {
-      case '%':
-      {
-        flags|=PercentValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '!':
-      {
-        flags|=AspectValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '<':
-      {
-        flags|=LessValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '>':
-      {
-        flags|=GreaterValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '#':
-      {
-        flags|=MaximumValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '^':
-      {
-        flags|=MinimumValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '@':
-      {
-        flags|=AreaValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
       case '(':
       case ')':
       {
