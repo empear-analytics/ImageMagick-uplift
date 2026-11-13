@@ -14652,12 +14652,12 @@ static void MoveNoticeDismiss(Display *display,XWindows *windows,XEvent event,
     }
 }
 
-MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
-  const char *reason,const char *description)
-{
 #define DismissButtonText  "Dismiss"
 #define Timeout  8
 
+MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
+  const char *reason,const char *description)
+{
   const char
     *text;
 
