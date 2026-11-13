@@ -775,27 +775,52 @@ static void ConvertResolutionUnits(Image *image,const ResolutionType units)
     }
 }
 
+static void SyncColorOption(const ImageInfo *image_info,const char *key,
+  PixelInfo *value,ExceptionInfo *exception)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    (void) QueryColorCompliance(option,AllCompliance,value,exception);
+}
+
+static void SyncBooleanOption(const ImageInfo *image_info,const char *key,
+  MagickBooleanType *value)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    (*value)=(MagickBooleanType) ParseCommandOption(MagickBooleanOptions,
+      MagickFalse,option);
+}
+
+static void SyncChromaticityOption(const ImageInfo *image_info,
+  const char *key,PrimaryInfo *value)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    ParseChromaticityPrimary(option,value);
+}
+
 static void SyncImageColorAndCodecSettings(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
   const char
     *option;
 
-  option=GetImageOption(image_info,"background");
-  if (option != (const char *) NULL)
-    (void) QueryColorCompliance(option,AllCompliance,&image->background_color,
-      exception);
-  option=GetImageOption(image_info,"black-point-compensation");
-  if (option != (const char *) NULL)
-    image->black_point_compensation=(MagickBooleanType) ParseCommandOption(
-      MagickBooleanOptions,MagickFalse,option);
-  option=GetImageOption(image_info,"blue-primary");
-  if (option != (const char *) NULL)
-    ParseChromaticityPrimary(option,&image->chromaticity.blue_primary);
-  option=GetImageOption(image_info,"bordercolor");
-  if (option != (const char *) NULL)
-    (void) QueryColorCompliance(option,AllCompliance,&image->border_color,
-      exception);
+  SyncColorOption(image_info,"background",&image->background_color,exception);
+  SyncBooleanOption(image_info,"black-point-compensation",
+    &image->black_point_compensation);
+  SyncChromaticityOption(image_info,"blue-primary",
+    &image->chromaticity.blue_primary);
+  SyncColorOption(image_info,"bordercolor",&image->border_color,exception);
   /* FUTURE: do not sync compose to per-image compose setting here */
   option=GetImageOption(image_info,"compose");
   if (option != (const char *) NULL)
@@ -806,10 +831,7 @@ static void SyncImageColorAndCodecSettings(const ImageInfo *image_info,
   if (option != (const char *) NULL)
     image->compression=(CompressionType) ParseCommandOption(
       MagickCompressOptions,MagickFalse,option);
-  option=GetImageOption(image_info,"debug");
-  if (option != (const char *) NULL)
-    image->debug=(MagickBooleanType) ParseCommandOption(MagickBooleanOptions,
-      MagickFalse,option);
+  SyncBooleanOption(image_info,"debug",&image->debug);
 }
 
 static void SyncUnsignedLongOption(const ImageInfo *image_info,
