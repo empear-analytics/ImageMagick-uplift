@@ -1863,6 +1863,92 @@ static Window XSelectCropWindow(const Window root_window,
   return(target_window);
 }
 
+typedef struct _XSelectionInput
+{
+  Display
+    *display;
+
+  Window
+    root_window;
+
+  RectangleInfo
+    *crop_info;
+} XSelectionInput;
+
+typedef struct _XSelectionTargets
+{
+  Window
+    *target_window;
+
+  int
+    *x_offset,
+    *y_offset,
+    *presses;
+
+  XEvent
+    *event;
+} XSelectionTargets;
+
+static void XHandleSelectionEvent(const XSelectionInput *input,
+  const XSelectionTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  Window
+    *const target_window = targets->target_window;
+
+  const Window
+    root_window = input->root_window;
+
+  RectangleInfo
+    *const crop_info = input->crop_info;
+
+  int
+    *const x_offset = targets->x_offset,
+    *const y_offset = targets->y_offset,
+    *const presses = targets->presses;
+
+  XEvent
+    *const event = targets->event;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      (*target_window)=XGetSubwindow(display,(*event).xbutton.subwindow,
+        (*event).xbutton.x,(*event).xbutton.y);
+      if ((*target_window) == (Window) NULL)
+        (*target_window)=root_window;
+      (*x_offset)=(*event).xbutton.x_root;
+      (*y_offset)=(*event).xbutton.y_root;
+      crop_info->x=(ssize_t) (*x_offset);
+      crop_info->y=(ssize_t) (*y_offset);
+      crop_info->width=0;
+      crop_info->height=0;
+      (*presses)++;
+      break;
+    }
+    case ButtonRelease:
+    {
+      (*presses)--;
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Discard pending button motion events.
+      */
+      while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
+      crop_info->x=(ssize_t) (*event).xmotion.x;
+      crop_info->y=(ssize_t) (*event).xmotion.y;
+      XCheckCropBoundary(crop_info,(*x_offset),(*y_offset));
+    }
+    default:
+      break;
+  }
+}
+
 static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
 {
   Cursor
@@ -1882,6 +1968,9 @@ static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
 
   XEvent
     event;
+
+  const XSelectionTargets
+    targets = { &target_window,&x_offset,&y_offset,&presses,&event };
 
   /*
     Initialize graphic context.
@@ -1922,40 +2011,11 @@ static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
     (void) XWindowEvent(display,root_window,ButtonPressMask |
       ButtonReleaseMask | ButtonMotionMask,&event);
     XDrawCropRectangle(display,root_window,annotate_context,crop_info);
-    switch (event.type)
     {
-      case ButtonPress:
-      {
-        target_window=XGetSubwindow(display,event.xbutton.subwindow,
-          event.xbutton.x,event.xbutton.y);
-        if (target_window == (Window) NULL)
-          target_window=root_window;
-        x_offset=event.xbutton.x_root;
-        y_offset=event.xbutton.y_root;
-        crop_info->x=(ssize_t) x_offset;
-        crop_info->y=(ssize_t) y_offset;
-        crop_info->width=0;
-        crop_info->height=0;
-        presses++;
-        break;
-      }
-      case ButtonRelease:
-      {
-        presses--;
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        crop_info->x=(ssize_t) event.xmotion.x;
-        crop_info->y=(ssize_t) event.xmotion.y;
-        XCheckCropBoundary(crop_info,x_offset,y_offset);
-      }
-      default:
-        break;
+      const XSelectionInput
+        input = { display, root_window, crop_info };
+
+      XHandleSelectionEvent(&input,&targets);
     }
   } while ((target_window == (Window) NULL) || (presses > 0));
   (void) XUngrabServer(display);
