@@ -4855,8 +4855,14 @@ typedef struct _XMakeImageSource
   Display
     *display;
 
+  const XResourceInfo
+    *resource_info;
+
   XWindowInfo
     *window;
+
+  ExceptionInfo
+    *exception;
 
   int
     depth,
@@ -4913,6 +4919,50 @@ static MagickBooleanType XCreateWindowXImage(const XMakeImageSource *source,
   return(MagickTrue);
 }
 
+static MagickBooleanType XConvertWindowXImage(const XMakeImageSource *source,
+  XImage *ximage)
+{
+  Display
+    *const display = source->display;
+
+  const XResourceInfo
+    *const resource_info = source->resource_info;
+
+  XWindowInfo
+    *const window = source->window;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    width = source->width,
+    height = source->height;
+
+  XImage
+    *matte_image;
+
+  XReplaceWindowXImage(display,window,ximage);
+  matte_image=XReplaceWindowMatteImage(display,window,width,height);
+  /*
+    Convert pixels to X image data.
+  */
+  if (window->image != (Image *) NULL)
+    {
+      const MakeImageContext
+        make_context = { resource_info, window, exception };
+
+      XMakeXImagePixels(make_context,window,ximage,matte_image);
+    }
+  if (window->matte_image != (XImage *) NULL)
+    XCreateWindowMattePixmap(display,window,width,height);
+  (void) XMakePixmap(display,resource_info,window);
+  /*
+    Restore cursor.
+  */
+  (void) XCheckDefineCursor(display,window->id,window->cursor);
+  return(MagickTrue);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4922,7 +4972,6 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
     format;
 
   XImage
-    *matte_image,
     *ximage;
 
   XMakeImageSource
@@ -4984,33 +5033,16 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
     }
 #endif
   source.display=display;
+  source.resource_info=resource_info;
   source.window=window;
+  source.exception=exception;
   source.depth=depth;
   source.format=format;
   source.width=width;
   source.height=height;
   if (XCreateWindowXImage(&source,&ximage) == MagickFalse)
     return(MagickFalse);
-  XReplaceWindowXImage(display,window,ximage);
-  matte_image=XReplaceWindowMatteImage(display,window,width,height);
-  /*
-    Convert pixels to X image data.
-  */
-  if (window->image != (Image *) NULL)
-    {
-      const MakeImageContext
-        make_context = { resource_info, window, exception };
-
-      XMakeXImagePixels(make_context,window,ximage,matte_image);
-    }
-  if (window->matte_image != (XImage *) NULL)
-    XCreateWindowMattePixmap(display,window,width,height);
-  (void) XMakePixmap(display,resource_info,window);
-  /*
-    Restore cursor.
-  */
-  (void) XCheckDefineCursor(display,window->id,window->cursor);
-  return(MagickTrue);
+  return(XConvertWindowXImage(&source,ximage));
 }
 
 /*
