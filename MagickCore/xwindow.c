@@ -2921,65 +2921,39 @@ static void XGetModulatedColors(const XStandardColormap *map_info,
   pixel->trough_color.flags=(char) (DoRed | DoGreen | DoBlue);
 }
 
-MagickPrivate void XGetPixelInfo(Display *display,
-  const XVisualInfo *visual_info,const XStandardColormap *map_info,
-  const XResourceInfo *resource_info,Image *image,XPixelInfo *pixel)
+typedef struct _XPixelColorContext
 {
-  static const char
-    *PenColors[MaxNumberPens]=
-    {
-      "#000000000000",  /* black */
-      "#00000000ffff",  /* blue */
-      "#0000ffffffff",  /* cyan */
-      "#0000ffff0000",  /* green */
-      "#bdbdbdbdbdbd",  /* gray */
-      "#ffff00000000",  /* red */
-      "#ffff0000ffff",  /* magenta */
-      "#ffffffff0000",  /* yellow */
-      "#ffffffffffff",  /* white */
-      "#bdbdbdbdbdbd",  /* gray */
-      "#bdbdbdbdbdbd"   /* gray */
-    };
+  Display
+    *display;
 
   Colormap
     colormap;
 
-  ssize_t
-    i;
+  const XStandardColormap
+    *map_info;
+
+  const XResourceInfo
+    *resource_info;
+} XPixelColorContext;
+
+static void XGetInterfaceColors(const XPixelColorContext *context,
+  XPixelInfo *pixel)
+{
+  Display
+    *const display = context->display;
+
+  const Colormap
+    colormap = context->colormap;
+
+  const XStandardColormap
+    *const map_info = context->map_info;
+
+  const XResourceInfo
+    *const resource_info = context->resource_info;
 
   Status
     status;
 
-  unsigned int
-    packets;
-
-  /*
-    Initialize pixel info.
-  */
-  assert(display != (Display *) NULL);
-  assert(visual_info != (XVisualInfo *) NULL);
-  assert(map_info != (XStandardColormap *) NULL);
-  assert(resource_info != (XResourceInfo *) NULL);
-  assert(pixel != (XPixelInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  pixel->colors=0;
-  if (image != (Image *) NULL)
-    if (image->storage_class == PseudoClass)
-      pixel->colors=(ssize_t) image->colors;
-  packets=(unsigned int)
-    MagickMax((int) pixel->colors,visual_info->colormap_size)+MaxNumberPens;
-  if (pixel->pixels != (unsigned long *) NULL)
-    pixel->pixels=(unsigned long *) RelinquishMagickMemory(pixel->pixels);
-  pixel->pixels=(unsigned long *) AcquireQuantumMemory(packets,
-    sizeof(*pixel->pixels));
-  if (pixel->pixels == (unsigned long *) NULL)
-    ThrowXWindowFatalException(ResourceLimitFatalError,"UnableToGetPixelInfo",
-      image->filename);
-  /*
-    Set foreground color.
-  */
-  colormap=map_info->colormap;
   (void) XParseColor(display,colormap,(char *) ForegroundColor,
     &pixel->foreground_color);
   status=XParseColor(display,colormap,resource_info->foreground_color,
@@ -3031,6 +3005,75 @@ MagickPrivate void XGetPixelInfo(Display *display,
       pixel->matte_color.pixel=XStandardPixel(map_info,&pixel->matte_color);
       pixel->matte_color.flags=(char) (DoRed | DoGreen | DoBlue);
     }
+}
+
+MagickPrivate void XGetPixelInfo(Display *display,
+  const XVisualInfo *visual_info,const XStandardColormap *map_info,
+  const XResourceInfo *resource_info,Image *image,XPixelInfo *pixel)
+{
+  static const char
+    *PenColors[MaxNumberPens]=
+    {
+      "#000000000000",  /* black */
+      "#00000000ffff",  /* blue */
+      "#0000ffffffff",  /* cyan */
+      "#0000ffff0000",  /* green */
+      "#bdbdbdbdbdbd",  /* gray */
+      "#ffff00000000",  /* red */
+      "#ffff0000ffff",  /* magenta */
+      "#ffffffff0000",  /* yellow */
+      "#ffffffffffff",  /* white */
+      "#bdbdbdbdbdbd",  /* gray */
+      "#bdbdbdbdbdbd"   /* gray */
+    };
+
+  Colormap
+    colormap;
+
+  ssize_t
+    i;
+
+  Status
+    status;
+
+  unsigned int
+    packets;
+
+  XPixelColorContext
+    context;
+
+  /*
+    Initialize pixel info.
+  */
+  assert(display != (Display *) NULL);
+  assert(visual_info != (XVisualInfo *) NULL);
+  assert(map_info != (XStandardColormap *) NULL);
+  assert(resource_info != (XResourceInfo *) NULL);
+  assert(pixel != (XPixelInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  pixel->colors=0;
+  if (image != (Image *) NULL)
+    if (image->storage_class == PseudoClass)
+      pixel->colors=(ssize_t) image->colors;
+  packets=(unsigned int)
+    MagickMax((int) pixel->colors,visual_info->colormap_size)+MaxNumberPens;
+  if (pixel->pixels != (unsigned long *) NULL)
+    pixel->pixels=(unsigned long *) RelinquishMagickMemory(pixel->pixels);
+  pixel->pixels=(unsigned long *) AcquireQuantumMemory(packets,
+    sizeof(*pixel->pixels));
+  if (pixel->pixels == (unsigned long *) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,"UnableToGetPixelInfo",
+      image->filename);
+  /*
+    Set foreground color.
+  */
+  colormap=map_info->colormap;
+  context.display=display;
+  context.colormap=colormap;
+  context.map_info=map_info;
+  context.resource_info=resource_info;
+  XGetInterfaceColors(&context,pixel);
   XGetModulatedColors(map_info,pixel);
   /*
     Set pen color.
