@@ -6963,6 +6963,28 @@ static void XMapCropCommand(Display *display,XWindows *windows,
     windows->im_update_widget,CurrentTime);
 }
 
+static void XSetCropCommandName(XWindows *windows,const ClipboardMode mode)
+{
+  switch (mode)
+  {
+    case CopyMode:
+    {
+      (void) CloneString(&windows->command.name,"Copy");
+      break;
+    }
+    case CropMode:
+    {
+      (void) CloneString(&windows->command.name,"Crop");
+      break;
+    }
+    case CutMode:
+    {
+      (void) CloneString(&windows->command.name,"Cut");
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -7010,24 +7032,7 @@ static MagickBooleanType XCropImage(Display *display,
   /*
     Map Command widget.
   */
-  switch (mode)
-  {
-    case CopyMode:
-    {
-      (void) CloneString(&windows->command.name,"Copy");
-      break;
-    }
-    case CropMode:
-    {
-      (void) CloneString(&windows->command.name,"Crop");
-      break;
-    }
-    case CutMode:
-    {
-      (void) CloneString(&windows->command.name,"Cut");
-      break;
-    }
-  }
+  XSetCropCommandName(windows,mode);
   RectifyModeMenu[0]=windows->command.name;
   XMapCropCommand(display,windows,CropModeMenu);
   /*
