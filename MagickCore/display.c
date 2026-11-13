@@ -9881,6 +9881,77 @@ static Image *XSaveUndoImage(const XImageCacheContext *cache_context,
   return(undo_image);
 }
 
+static MagickBooleanType IsUndoCacheCommand(const DisplayCommand command)
+{
+  switch (command)
+  {
+    case CutCommand:
+    case PasteCommand:
+    case ApplyCommand:
+    case HalfSizeCommand:
+    case OriginalSizeCommand:
+    case DoubleSizeCommand:
+    case ResizeCommand:
+    case TrimCommand:
+    case CropCommand:
+    case ChopCommand:
+    case FlipCommand:
+    case FlopCommand:
+    case RotateRightCommand:
+    case RotateLeftCommand:
+    case RotateCommand:
+    case ShearCommand:
+    case RollCommand:
+    case NegateCommand:
+    case ContrastStretchCommand:
+    case SigmoidalContrastCommand:
+    case NormalizeCommand:
+    case EqualizeCommand:
+    case HueCommand:
+    case SaturationCommand:
+    case BrightnessCommand:
+    case GammaCommand:
+    case SpiffCommand:
+    case DullCommand:
+    case GrayscaleCommand:
+    case MapCommand:
+    case QuantizeCommand:
+    case DespeckleCommand:
+    case EmbossCommand:
+    case ReduceNoiseCommand:
+    case AddNoiseCommand:
+    case SharpenCommand:
+    case BlurCommand:
+    case ThresholdCommand:
+    case EdgeDetectCommand:
+    case SpreadCommand:
+    case ShadeCommand:
+    case RaiseCommand:
+    case SegmentCommand:
+    case SolarizeCommand:
+    case SepiaToneCommand:
+    case SwirlCommand:
+    case ImplodeCommand:
+    case VignetteCommand:
+    case WaveCommand:
+    case OilPaintCommand:
+    case CharcoalDrawCommand:
+    case AnnotateCommand:
+    case AddBorderCommand:
+    case AddFrameCommand:
+    case CompositeCommand:
+    case CommentCommand:
+    case LaunchCommand:
+    case RegionOfInterestCommand:
+    case SaveToUndoBufferCommand:
+    case RedoCommand:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static void XImageCache(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -9953,66 +10024,10 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
       (void) XConfigureImage(display,resource_info,windows,*image,exception);
       return;
     }
-    case CutCommand:
-    case PasteCommand:
-    case ApplyCommand:
-    case HalfSizeCommand:
-    case OriginalSizeCommand:
-    case DoubleSizeCommand:
-    case ResizeCommand:
-    case TrimCommand:
-    case CropCommand:
-    case ChopCommand:
-    case FlipCommand:
-    case FlopCommand:
-    case RotateRightCommand:
-    case RotateLeftCommand:
-    case RotateCommand:
-    case ShearCommand:
-    case RollCommand:
-    case NegateCommand:
-    case ContrastStretchCommand:
-    case SigmoidalContrastCommand:
-    case NormalizeCommand:
-    case EqualizeCommand:
-    case HueCommand:
-    case SaturationCommand:
-    case BrightnessCommand:
-    case GammaCommand:
-    case SpiffCommand:
-    case DullCommand:
-    case GrayscaleCommand:
-    case MapCommand:
-    case QuantizeCommand:
-    case DespeckleCommand:
-    case EmbossCommand:
-    case ReduceNoiseCommand:
-    case AddNoiseCommand:
-    case SharpenCommand:
-    case BlurCommand:
-    case ThresholdCommand:
-    case EdgeDetectCommand:
-    case SpreadCommand:
-    case ShadeCommand:
-    case RaiseCommand:
-    case SegmentCommand:
-    case SolarizeCommand:
-    case SepiaToneCommand:
-    case SwirlCommand:
-    case ImplodeCommand:
-    case VignetteCommand:
-    case WaveCommand:
-    case OilPaintCommand:
-    case CharcoalDrawCommand:
-    case AnnotateCommand:
-    case AddBorderCommand:
-    case AddFrameCommand:
-    case CompositeCommand:
-    case CommentCommand:
-    case LaunchCommand:
-    case RegionOfInterestCommand:
-    case SaveToUndoBufferCommand:
-    case RedoCommand:
+    default:
+      break;
+  }
+  if (IsUndoCacheCommand(command) != MagickFalse)
     {
       cache_context.display=display;
       cache_context.resource_info=resource_info;
@@ -10020,11 +10035,7 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
       cache_context.image=image;
       cache_context.exception=exception;
       undo_image=XSaveUndoImage(&cache_context,undo_image);
-      break;
     }
-    default:
-      break;
-  }
   if (command == RedoCommand)
     {
       /*
