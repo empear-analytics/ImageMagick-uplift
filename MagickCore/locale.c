@@ -1332,6 +1332,21 @@ static MagickBooleanType SkipLocaleElement(const char **q,
   return(MagickFalse);
 }
 
+static LocaleInfo *AcquireLocaleMessage(const char *filename,const char *tag,
+  const char *message)
+{
+  LocaleInfo
+    *locale_info;
+
+  locale_info=(LocaleInfo *) AcquireCriticalMemory(sizeof(*locale_info));
+  (void) memset(locale_info,0,sizeof(*locale_info));
+  locale_info->path=ConstantString(filename);
+  locale_info->tag=ConstantString(tag);
+  locale_info->message=ConstantString(message);
+  locale_info->signature=MagickCoreSignature;
+  return(locale_info);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1424,12 +1439,7 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         */
         q=ReadMessageName(q,extent,token,tag);
         q=ReadMessageText(q,message);
-        locale_info=(LocaleInfo *) AcquireCriticalMemory(sizeof(*locale_info));
-        (void) memset(locale_info,0,sizeof(*locale_info));
-        locale_info->path=ConstantString(filename);
-        locale_info->tag=ConstantString(tag);
-        locale_info->message=ConstantString(message);
-        locale_info->signature=MagickCoreSignature;
+        locale_info=AcquireLocaleMessage(filename,tag,message);
         status=AddValueToSplayTree(cache,locale_info->tag,locale_info);
         if (status == MagickFalse)
           (void) ThrowMagickException(exception,GetMagickModule(),
