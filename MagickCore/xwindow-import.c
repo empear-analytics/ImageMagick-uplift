@@ -1074,6 +1074,35 @@ static MagickBooleanType XImportWindowImage(const WindowImageSource *source)
   return(MagickTrue);
 }
 
+static void XCropToRootWindow(Display *display,RectangleInfo *crop_info)
+{
+  int
+    display_height,
+    display_width;
+
+  /*
+    Crop to root window.
+  */
+  if ((*crop_info).x < 0)
+    {
+      (*crop_info).width=(unsigned int) ((int) (*crop_info).width+
+        (*crop_info).x);
+      (*crop_info).x=0;
+    }
+  if ((*crop_info).y < 0)
+    {
+      (*crop_info).height=(unsigned int) ((int) (*crop_info).height+
+        (*crop_info).y);
+      (*crop_info).y=0;
+    }
+  display_width=XDisplayWidth(display,XDefaultScreen(display));
+  if ((int) ((*crop_info).x+(int) (*crop_info).width) > display_width)
+    (*crop_info).width=(size_t) (display_width-(*crop_info).x);
+  display_height=XDisplayHeight(display,XDefaultScreen(display));
+  if ((int) ((*crop_info).y+(int) (*crop_info).height) > display_height)
+    (*crop_info).height=(size_t) (display_height-(*crop_info).y);
+}
+
 static Image *XGetWindowImage(const WindowImageContext *window_context,
   const Window window,const unsigned int borders,const unsigned int level)
 {
@@ -1084,8 +1113,6 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
     *const exception = window_context->exception;
 
   int
-    display_height,
-    display_width,
     id,
     x_offset,
     y_offset;
@@ -1145,25 +1172,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
       crop_info.width+=(size_t) (window_attributes.border_width << 1);
       crop_info.height+=(size_t) (window_attributes.border_width << 1);
     }
-  /*
-    Crop to root window.
-  */
-  if (crop_info.x < 0)
-    {
-      crop_info.width=(unsigned int) ((int) crop_info.width+crop_info.x);
-      crop_info.x=0;
-    }
-  if (crop_info.y < 0)
-    {
-      crop_info.height=(unsigned int) ((int) crop_info.height+crop_info.y);
-      crop_info.y=0;
-    }
-  display_width=XDisplayWidth(display,XDefaultScreen(display));
-  if ((int) (crop_info.x+(int) crop_info.width) > display_width)
-    crop_info.width=(size_t) (display_width-crop_info.x);
-  display_height=XDisplayHeight(display,XDefaultScreen(display));
-  if ((int) (crop_info.y+(int) crop_info.height) > display_height)
-    crop_info.height=(size_t) (display_height-crop_info.y);
+  XCropToRootWindow(display,&crop_info);
   /*
     Initialize window info attributes.
   */
