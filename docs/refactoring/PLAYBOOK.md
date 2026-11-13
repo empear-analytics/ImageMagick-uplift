@@ -14296,6 +14296,90 @@ enumerator.
 
 ---
 
+## Recipe KF - Replace an Enumerator-Keyed Call Switch by a Table of Function Pointers
+
+**Use when:** CodeScene reports *Complex Method* on a function whose complexity is a
+`switch` over an enumeration whose groups each make one call, `F(args); break;`, to a
+different function of one signature with the same arguments, plus a `default:` group that
+handles an unknown value. `stream.c`'s `StreamImagePixels` (seven `StorageType` labels,
+each calling `Stream<Type>Pixels(stream_info,image,quantum_map,length)`).
+
+**Not covered by:** Recipe KD, whose run is a ladder of `LocaleCompare` tests that each
+`return` the call; Recipe KT, whose groups assign one call's result; Recipes KS, KR and KE,
+whose groups assign or return constants; Recipe SD, which moves groups but keeps every
+label as a branch.
+
+**How:**
+
+1. The `switch` lies outside every OpenMP region. Every group but `default:` is one
+   constant label and one statement `F(a,b,...);` followed by `break;`, the arguments the
+   same text in every group and free of side effects; the labels are distinct; the `F`
+   are `static` functions of one signature. The `default:` group ends in `break;`, falls
+   into nothing and stays as written.
+2. Directly above the function write a `typedef struct` of the key (the enumeration type)
+   and a pointer to a function of that signature, and a `static const` array of it with
+   one element `{ L, F }` per group, in the order of the groups.
+3. Below the table write a lookup function `static const T *Get<Name>(const E key)` that
+   scans the array and returns the first element whose key equals `key`, or `NULL`.
+4. In the function, declare a `const T *` local, and replace the `switch` by
+   `m=Get<Name>(e); if (m != (const T *) NULL) m->fn(a,b,...); else { <default group's
+   statements without the break> }`. Every `ThrowMagickException` stays where it was.
+5. Check by reading that every label of the `switch` has exactly one element and that
+   each element names the function its group called.
+6. Run `tools/ci_warnings.sh <file>`, `tools/cxx_warnings.sh <file>` (both must print
+   `OK`) and the oracle for the function.
+
+**Before:**
+
+```c
+  switch (stream_info->storage_type)
+  {
+    case CharPixel:
+    {
+      StreamCharPixels(stream_info,image,quantum_map,length);
+      break;
+    }
+    ...
+    default:
+    {
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",stream_info->map);
+      break;
+    }
+  }
+```
+
+**After:**
+
+```c
+  storage_method=GetStreamStorageMethod(stream_info->storage_type);
+  if (storage_method != (const StreamStorageMethod *) NULL)
+    storage_method->stream_pixels(stream_info,image,quantum_map,length);
+  else
+    {
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",stream_info->map);
+    }
+```
+
+**Careful:**
+
+- Labels are distinct, so the first match is the group the `switch` would have run, with
+  the same arguments; a value outside the table reaches the `default` statements as before.
+- A group with a second statement, a fall-through, or a `return` is refused (step 1).
+- The lookup adds a function: watch the file's function-count threshold.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-13, from `stream.c`'s `StreamImagePixels` (campaign B, M127): cc
+16 to 9, the file 6.15 to 6.31. Added by Claude Code (Claude Opus 5.5) under the mandate
+of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -14631,3 +14715,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | DT | Step 2 keeps the condition inside a `(MagickBooleanType)` cast, step 4 adds `tools/cxx_warnings.sh`: the bare comparison is `bool` in C++ and broke main's Windows jobs (C2440/C2664 in `policy.c`, `constitute.c`, `stream.c`; the casts fixed them with object code identical) | build fixes on `campaign/M126` | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KF | Replace an enumerator-keyed `switch` whose groups each call a different function of one signature with the same arguments by a `static const` key/function-pointer table, a lookup function and one call, the `default` statements kept as the else branch; evidence oracle | `stream.c`'s `StreamImagePixels` (cc 16 to 9, 6.15 to 6.31); KD needs a `LocaleCompare` ladder of returns | mandate (2026-10-24) |
