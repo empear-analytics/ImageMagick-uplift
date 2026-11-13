@@ -182,6 +182,37 @@ typedef struct _StandardColormapTargets
     *number_maps;
 } StandardColormapTargets;
 
+static void XGetNamedStandardColormap(Display *display,
+  const Window root_window,const char *map_type,
+  const StandardColormapTargets *targets)
+{
+  Atom
+    map_property;
+
+  char
+    map_name[MagickPathExtent];
+
+  Status
+    *const status = targets->status;
+
+  XStandardColormap
+    **const map_list = targets->map_list;
+
+  int
+    *const number_maps = targets->number_maps;
+
+  /*
+    User specified Standard Colormap.
+  */
+  (void) FormatLocaleString((char *) map_name,MagickPathExtent,
+    "RGB_%s_MAP",map_type);
+  LocaleUpper(map_name);
+  map_property=XInternAtom(display,(char *) map_name,MagickTrue);
+  if (map_property != (Atom) NULL)
+    (*status)=XGetRGBColormaps(display,root_window,map_list,number_maps,
+      map_property);
+}
+
 static void XGetListedStandardColormap(Display *display,
   const Window root_window,XResourceInfo *resource_info,
   const StandardColormapTargets *targets)
@@ -355,12 +386,6 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   resource_info->color_recovery=MagickFalse;
   if ((map_info != (XStandardColormap *) NULL) && (map_type != (char *) NULL))
     {
-      Atom
-        map_property;
-
-      char
-        map_name[MagickPathExtent];
-
       int
         j,
         number_maps;
@@ -384,18 +409,7 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
       status=False;
       number_maps=0;
       if (LocaleCompare(map_type,"list") != 0)
-        {
-          /*
-            User specified Standard Colormap.
-          */
-          (void) FormatLocaleString((char *) map_name,MagickPathExtent,
-            "RGB_%s_MAP",map_type);
-          LocaleUpper(map_name);
-          map_property=XInternAtom(display,(char *) map_name,MagickTrue);
-          if (map_property != (Atom) NULL)
-            status=XGetRGBColormaps(display,root_window,&map_list,&number_maps,
-              map_property);
-        }
+        XGetNamedStandardColormap(display,root_window,map_type,&targets);
       else
         XGetListedStandardColormap(display,root_window,resource_info,&targets);
       if (status == False)
