@@ -10765,6 +10765,61 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    **noises;
+
+  Image
+    *noise_image;
+
+  static char
+    noise_type[MagickPathExtent] = "Gaussian";
+
+  /*
+    Add noise to the image.
+  */
+  noises=GetCommandOptions(MagickNoiseOptions);
+  if (noises == (char **) NULL)
+    return;
+  XListBrowserWidget(display,windows,&windows->widget,
+    (const char **) noises,"Add Noise",
+    "Select a type of noise to add to your image:",noise_type);
+  noises=DestroyStringList(noises);
+  if (*noise_type == '\0')
+    return;
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  noise_image=AddNoiseImage(*image,(NoiseType) ParseCommandOption(
+    MagickNoiseOptions,MagickFalse,noise_type),1.0,exception);
+  if (noise_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=noise_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -11671,45 +11726,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case AddNoiseCommand:
-    {
-      char
-        **noises;
-
-      Image
-        *noise_image;
-
-      static char
-        noise_type[MagickPathExtent] = "Gaussian";
-
-      /*
-        Add noise to the image.
-      */
-      noises=GetCommandOptions(MagickNoiseOptions);
-      if (noises == (char **) NULL)
-        break;
-      XListBrowserWidget(display,windows,&windows->widget,
-        (const char **) noises,"Add Noise",
-        "Select a type of noise to add to your image:",noise_type);
-      noises=DestroyStringList(noises);
-      if (*noise_type == '\0')
-        break;
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      noise_image=AddNoiseImage(*image,(NoiseType) ParseCommandOption(
-        MagickNoiseOptions,MagickFalse,noise_type),1.0,exception);
-      if (noise_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=noise_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyAddNoiseCommand(&context);
       break;
-    }
     case SharpenCommand:
     {
       Image
