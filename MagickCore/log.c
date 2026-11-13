@@ -1664,6 +1664,30 @@ static void TranslateLogLocationSpecifier(const LogEventText *event_text,
   }
 }
 
+static void TranslateLogSpecifier(const LogEventText *event_text,
+  const char *domain,const char *p,char **q)
+{
+  char
+    *const text = event_text->text;
+
+  const size_t
+    extent = event_text->extent;
+
+  switch (*p)
+  {
+    case 'd':
+    {
+      (*q)+=(ptrdiff_t) CopyMagickString((*q),domain,extent-((*q)-text));
+      break;
+    }
+    default:
+    {
+      TranslateLogLocationSpecifier(event_text,p,q);
+      break;
+    }
+  }
+}
+
 static void FormatLogEventXML(const LogEventText *event_text,
   const char *domain)
 {
@@ -1832,19 +1856,7 @@ static char *TranslateEvent(const LogEventLocation *location,
     event_text.function=function;
     event_text.module=module;
     event_text.line=line;
-    switch (*p)
-    {
-      case 'd':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,domain,extent-(q-text));
-        break;
-      }
-      default:
-      {
-        TranslateLogLocationSpecifier(&event_text,p,&q);
-        break;
-      }
-    }
+    TranslateLogSpecifier(&event_text,domain,p,&q);
   }
   *q='\0';
   return(text);
