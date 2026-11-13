@@ -635,6 +635,58 @@ static MagickBooleanType FlushSubpathEdge(PolygonInfo *polygon_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType FlushFinalEdge(PolygonInfo *polygon_info,
+  const PolygonEdgeInput *input,const PolygonEdgeTargets *targets)
+{
+  size_t
+    *const number_edges = targets->number_edges;
+
+  PointInfo
+    **const points = targets->points;
+
+  MagickBooleanType
+    *const ghostline = targets->ghostline;
+
+  size_t
+    *const edge = targets->edge;
+
+  const ssize_t
+    n = input->n;
+
+  const long
+    direction = input->direction;
+
+  const SegmentInfo
+    bounds = input->bounds;
+
+  if ((*points) != (PointInfo *) NULL)
+    {
+      if (n < 2)
+        (*points)=(PointInfo *) RelinquishMagickMemory((*points));
+      else
+        {
+          if (GrowPolygonEdges(polygon_info,(*edge),number_edges) == MagickFalse)
+            return(MagickFalse);
+          polygon_info->edges[(*edge)].number_points=(size_t) n;
+          polygon_info->edges[(*edge)].scanline=(-1.0);
+          polygon_info->edges[(*edge)].highwater=0;
+          polygon_info->edges[(*edge)].ghostline=(*ghostline);
+          polygon_info->edges[(*edge)].direction=(ssize_t) (direction > 0);
+          if (direction < 0)
+            ReversePoints((*points),(size_t) n);
+          polygon_info->edges[(*edge)].points=(*points);
+          polygon_info->edges[(*edge)].bounds=bounds;
+          polygon_info->edges[(*edge)].bounds.y1=(*points)[0].y;
+          polygon_info->edges[(*edge)].bounds.y2=(*points)[n-1].y;
+          (*points)=(PointInfo *) NULL;
+          (*ghostline)=MagickFalse;
+          (*edge)++;
+          polygon_info->number_edges=(*edge);
+        }
+    }
+  return(MagickTrue);
+}
+
 static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   ExceptionInfo *exception)
 {
@@ -816,34 +868,14 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
       bounds.x2=point.x;
     n++;
   }
-  if (points != (PointInfo *) NULL)
+  input.n=n;
+  input.direction=direction;
+  input.bounds=bounds;
+  if (FlushFinalEdge(polygon_info,&input,&targets) == MagickFalse)
     {
-      if (n < 2)
-        points=(PointInfo *) RelinquishMagickMemory(points);
-      else
-        {
-          if (GrowPolygonEdges(polygon_info,edge,&number_edges) == MagickFalse)
-            {
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-              return(DestroyPolygonInfo(polygon_info));
-            }
-          polygon_info->edges[edge].number_points=(size_t) n;
-          polygon_info->edges[edge].scanline=(-1.0);
-          polygon_info->edges[edge].highwater=0;
-          polygon_info->edges[edge].ghostline=ghostline;
-          polygon_info->edges[edge].direction=(ssize_t) (direction > 0);
-          if (direction < 0)
-            ReversePoints(points,(size_t) n);
-          polygon_info->edges[edge].points=points;
-          polygon_info->edges[edge].bounds=bounds;
-          polygon_info->edges[edge].bounds.y1=points[0].y;
-          polygon_info->edges[edge].bounds.y2=points[n-1].y;
-          points=(PointInfo *) NULL;
-          ghostline=MagickFalse;
-          edge++;
-          polygon_info->number_edges=edge;
-        }
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+      return(DestroyPolygonInfo(polygon_info));
     }
   polygon_info->number_edges=edge;
   polygon_info->edges=(EdgeInfo *) ResizeQuantumMemory(polygon_info->edges,
