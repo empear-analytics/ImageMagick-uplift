@@ -140,6 +140,7 @@ $call Make quantize-error.c
 $call Make quantize-info.c
 $call Make quantize-posterize.c
 $call Make quantum.c
+$call Make quantum-type.c
 $call Make quantum-export.c
 $call Make quantum-import.c
 $call Make random.c

@@ -289,6 +289,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/quantize-posterize.c \
   MagickCore/quantize.h \
   MagickCore/quantum.c \
+  MagickCore/quantum-type.c \
   MagickCore/quantum.h \
   MagickCore/quantum-export.c \
   MagickCore/quantum-import.c \
