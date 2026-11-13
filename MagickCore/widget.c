@@ -14881,22 +14881,22 @@ static void DoublePreferencesUndoCache(XResourceInfo *resource_info)
     resource_info->undo_cache=1;
 }
 
+static const char
+  *Preferences[] =
+  {
+    "display image centered on a backdrop",
+    "confirm on program exit",
+    "confirm on image edits",
+    "correct image for display gamma",
+    "display warning messages",
+    "apply Floyd/Steinberg error diffusion to image",
+    "use a shared colormap for colormapped X visuals",
+    "display images as an X server pixmap"
+  };
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
-  static const char
-    *Preferences[] =
-    {
-      "display image centered on a backdrop",
-      "confirm on program exit",
-      "confirm on image edits",
-      "correct image for display gamma",
-      "display warning messages",
-      "apply Floyd/Steinberg error diffusion to image",
-      "use a shared colormap for colormapped X visuals",
-      "display images as an X server pixmap"
-    };
-
   char
     cache[MagickPathExtent];
 
