@@ -2097,20 +2097,14 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
   return(status);
 }
 
-static MagickBooleanType SeamlessBlendImage(Image *image,
+static Image *BlendSeamlessMeanImage(const Image *image,
   const Image *source_image,const BlendRequest *request,
   ExceptionInfo *exception)
 {
   Image
     *crop_image,
-    *foreground_image,
     *mean_image,
-    *relax_image,
-    *residual_image,
     *sum_image;
-
-  MagickBooleanType
-    status = MagickTrue;
 
   RectangleInfo
     crop_info = {
@@ -2121,6 +2115,34 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
     };
 
   const BlendSumWeights difference = { 1.0, -1.0 };
+
+  crop_image=CropImage(image,&crop_info,exception);
+  if (crop_image == (Image *) NULL)
+    return((Image *) NULL);
+  DisableCompositeClampUnlessSpecified(crop_image);
+  (void) ResetImagePage(crop_image,"0x0+0+0");
+  sum_image=BlendSumImage(crop_image,source_image,&difference,exception);
+  crop_image=DestroyImage(crop_image);
+  if (sum_image == (Image *) NULL)
+    return((Image *) NULL);
+  mean_image=BlendMeanImage(sum_image,source_image,exception);
+  sum_image=DestroyImage(sum_image);
+  return(mean_image);
+}
+
+static MagickBooleanType SeamlessBlendImage(Image *image,
+  const Image *source_image,const BlendRequest *request,
+  ExceptionInfo *exception)
+{
+  Image
+    *foreground_image,
+    *mean_image,
+    *relax_image,
+    *residual_image;
+
+  MagickBooleanType
+    status = MagickTrue;
+
   const BlendSumWeights sum = { 1.0, 1.0 };
   const CompositePlacement placement = { MagickTrue, request->x_offset, request->y_offset };
 
@@ -2132,17 +2154,7 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
   /*
     Seamless blend composite operator.
   */
-  crop_image=CropImage(image,&crop_info,exception);
-  if (crop_image == (Image *) NULL)
-    return(MagickFalse);
-  DisableCompositeClampUnlessSpecified(crop_image);
-  (void) ResetImagePage(crop_image,"0x0+0+0");
-  sum_image=BlendSumImage(crop_image,source_image,&difference,exception);
-  crop_image=DestroyImage(crop_image);
-  if (sum_image == (Image *) NULL)
-    return(MagickFalse);
-  mean_image=BlendMeanImage(sum_image,source_image,exception);
-  sum_image=DestroyImage(sum_image);
+  mean_image=BlendSeamlessMeanImage(image,source_image,request,exception);
   if (mean_image == (Image *) NULL)
     return(MagickFalse);
   relax_image=CloneImage(mean_image,0,0,MagickTrue,exception);
