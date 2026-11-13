@@ -220,11 +220,9 @@ static void ConformPixelColorspace(const Image *image,PixelInfo *destination)
         ConvertRGBToCMYK(destination);
     }
   else
-    if (destination->colorspace == CMYKColorspace)
-      {
-        if (IssRGBCompatibleColorspace(image->colorspace) != MagickFalse)
-          ConvertCMYKToRGB(destination);
-      }
+    if ((destination->colorspace == CMYKColorspace) &&
+        (IssRGBCompatibleColorspace(image->colorspace) != MagickFalse))
+      ConvertCMYKToRGB(destination);
 }
 
 MagickExport void ConformPixelInfo(Image *image,const PixelInfo *source,
