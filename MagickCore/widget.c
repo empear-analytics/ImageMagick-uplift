@@ -6995,6 +6995,60 @@ static MagickBooleanType ReleaseFileBrowserSpecial(
   return(MagickTrue);
 }
 
+typedef struct _FileBrowserWidgets
+{
+  XWidgetInfo
+    *reply_info;
+
+  size_t
+    *state;
+} FileBrowserWidgets;
+
+typedef struct _FileBrowserContext
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+} FileBrowserContext;
+
+static void ClientFileBrowserMessage(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  /*
+    If client window delete message, exit.
+  */
+  if (event.xclient.message_type != windows->wm_protocols)
+    return;
+  if (*event.xclient.data.l == (int) windows->wm_take_focus)
+    {
+      (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
+        (Time) event.xclient.data.l[1]);
+      return;
+    }
+  if (*event.xclient.data.l != (int) windows->wm_delete_window)
+    return;
+  if (event.xclient.window == windows->widget.id)
+    {
+      *(*reply_info).text='\0';
+      (*state)|=ExitState;
+      return;
+    }
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -7079,6 +7133,12 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 
   const FileBrowserSpecialTargets
     special_targets = { &state, &special_info };
+
+  const FileBrowserWidgets
+    file_widgets = { &reply_info, &state };
+
+  FileBrowserContext
+    file_context;
 
   /*
     Read filelist from current directory.
@@ -7176,6 +7236,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     (LocaleCompare(action,"Open") == 0) || (LocaleCompare(action,"Map") == 0);
   delay=SuspendTime << 2;
   state=UpdateConfigurationState;
+  file_context.display=display;
+  file_context.windows=windows;
   do
   {
     if (state & UpdateConfigurationState)
@@ -7732,25 +7794,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       case ClientMessage:
       {
-        /*
-          If client window delete message, exit.
-        */
-        if (event.xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event.xclient.data.l == (int) windows->wm_take_focus)
-          {
-            (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
-              (Time) event.xclient.data.l[1]);
-            break;
-          }
-        if (*event.xclient.data.l != (int) windows->wm_delete_window)
-          break;
-        if (event.xclient.window == windows->widget.id)
-          {
-            *reply_info.text='\0';
-            state|=ExitState;
-            break;
-          }
+        ClientFileBrowserMessage(&file_context,event,&file_widgets);
         break;
       }
       case ConfigureNotify:
