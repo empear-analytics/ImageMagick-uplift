@@ -14923,6 +14923,21 @@ static void MapPreferencesWidget(Display *display,XWindows *windows)
   windows->widget.mapped=MagickFalse;
 }
 
+static unsigned int GetPreferencesTextWidth(XFontStruct *font_info)
+{
+  int
+    i;
+
+  unsigned int
+    text_width;
+
+  text_width=WidgetTextWidth(font_info,CacheButtonText);
+  for (i=0; i < NumberPreferences; i++)
+    if (WidgetTextWidth(font_info,(char *) Preferences[i]) > text_width)
+      text_width=WidgetTextWidth(font_info,(char *) Preferences[i]);
+  return(text_width);
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -14966,10 +14981,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   assert(windows != (XWindows *) NULL);
   XCheckRefreshWindows(display,windows);
   font_info=windows->widget.font_info;
-  text_width=WidgetTextWidth(font_info,CacheButtonText);
-  for (i=0; i < NumberPreferences; i++)
-    if (WidgetTextWidth(font_info,(char *) Preferences[i]) > text_width)
-      text_width=WidgetTextWidth(font_info,(char *) Preferences[i]);
+  text_width=GetPreferencesTextWidth(font_info);
   width=WidgetTextWidth(font_info,ApplyButtonText);
   if (WidgetTextWidth(font_info,CancelButtonText) > width)
     width=WidgetTextWidth(font_info,CancelButtonText);
