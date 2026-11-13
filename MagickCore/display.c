@@ -3728,6 +3728,53 @@ static void XChopSelectStep(const ChopEventInput *input,
   }
 }
 
+static MagickBooleanType XChopApply(const ChopEventInput *input,Image **image,
+  RectangleInfo chop_info)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  Image
+    *chop_image;
+
+  /*
+    Image chopping is relative to image configuration.
+  */
+  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
+    exception);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  windows->image.window_changes.width=windows->image.ximage->width-
+    (int) chop_info.width;
+  windows->image.window_changes.height=windows->image.ximage->height-
+    (int) chop_info.height;
+  XScaleChopInfo(windows,image,&chop_info);
+  /*
+    Chop image.
+  */
+  chop_image=ChopImage(*image,&chop_info,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (chop_image == (Image *) NULL)
+    return(MagickFalse);
+  *image=DestroyImage(*image);
+  *image=chop_image;
+  /*
+    Update image configuration.
+  */
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3759,9 +3806,6 @@ static MagickBooleanType XChopImage(Display *display,
 
   char
     text[MagickPathExtent];
-
-  Image
-    *chop_image;
 
   int
     x,
@@ -3895,33 +3939,7 @@ static MagickBooleanType XChopImage(Display *display,
   (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
   if (distance <= 9)
     return(MagickTrue);
-  /*
-    Image chopping is relative to image configuration.
-  */
-  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-    exception);
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  windows->image.window_changes.width=windows->image.ximage->width-
-    (int) chop_info.width;
-  windows->image.window_changes.height=windows->image.ximage->height-
-    (int) chop_info.height;
-  XScaleChopInfo(windows,image,&chop_info);
-  /*
-    Chop image.
-  */
-  chop_image=ChopImage(*image,&chop_info,exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (chop_image == (Image *) NULL)
-    return(MagickFalse);
-  *image=DestroyImage(*image);
-  *image=chop_image;
-  /*
-    Update image configuration.
-  */
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
-  return(MagickTrue);
+  return(XChopApply(&input,image,chop_info));
 }
 
 /*
