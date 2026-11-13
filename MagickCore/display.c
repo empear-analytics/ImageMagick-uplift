@@ -12213,6 +12213,12 @@ typedef struct _MatteCommandInput
   char
     *command,
     *matte;
+
+  PaintMethodTargets
+    method_targets;
+
+  BorderColorTargets
+    border_targets;
 } MatteCommandInput;
 
 static void XMatteEditControl(const MatteCommandInput *input,const int id,
@@ -12342,6 +12348,78 @@ static void XMatteEditValues(const MatteCommandInput *input,const int id,
   }
 }
 
+static MagickBooleanType XMatteCommandBlock(const MatteCommandInput *input,
+  XEvent *event,const Cursor cursor,size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  const char
+    *const *const MatteEditMenu = input->MatteEditMenu;
+
+  const ModeType
+    *const MatteEditCommands = input->MatteEditCommands;
+
+  const PaintMethodTargets
+    method_targets = input->method_targets;
+
+  const BorderColorTargets
+    border_targets = input->border_targets;
+
+  int
+    id;
+
+  if ((*event).xany.window == windows->command.id)
+    {
+      EditMenuInput
+        menu_input;
+
+      /*
+        Select a command from the Command widget.
+      */
+      id=XCommandWidget(display,windows,MatteEditMenu,event);
+      if (id < 0)
+        {
+          (void) XCheckDefineCursor(display,windows->image.id,cursor);
+          return(MagickTrue);
+        }
+      switch (MatteEditCommands[id])
+      {
+        case MatteEditMethod:
+        {
+          menu_input.display=display;
+          menu_input.windows=windows;
+          menu_input.MatteEditMenu=MatteEditMenu;
+          menu_input.id=id;
+          menu_input.command=input->command;
+          XSelectPaintMethod(&menu_input,&method_targets);
+          break;
+        }
+        case MatteEditBorderCommand:
+        {
+          menu_input.display=display;
+          menu_input.windows=windows;
+          menu_input.MatteEditMenu=MatteEditMenu;
+          menu_input.id=id;
+          menu_input.command=input->command;
+          XSelectBorderColor(&menu_input,input->resource_info,&border_targets);
+          break;
+        }
+        default:
+        {
+          XMatteEditValues(input,id,state);
+          break;
+        }
+      }
+      (void) XCheckDefineCursor(display,windows->image.id,cursor);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12388,7 +12466,6 @@ static MagickBooleanType XMatteEditImage(Display *display,
     cursor;
 
   int
-    id,
     x,
     x_offset,
     y,
@@ -12412,7 +12489,8 @@ static MagickBooleanType XMatteEditImage(Display *display,
 
   const MatteCommandInput
     command_input = { display, resource_info, windows, MatteEditCommands,
-      image, exception, MatteEditMenu, command, matte };
+      image, exception, MatteEditMenu, command, matte, method_targets,
+      border_targets };
 
   /*
     Map Command widget.
@@ -12451,51 +12529,8 @@ static MagickBooleanType XMatteEditImage(Display *display,
       Wait for next event.
     */
     XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        EditMenuInput
-          menu_input;
-
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,MatteEditMenu,&event);
-        if (id < 0)
-          {
-            (void) XCheckDefineCursor(display,windows->image.id,cursor);
-            continue;
-          }
-        switch (MatteEditCommands[id])
-        {
-          case MatteEditMethod:
-          {
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=MatteEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectPaintMethod(&menu_input,&method_targets);
-            break;
-          }
-          case MatteEditBorderCommand:
-          {
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=MatteEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectBorderColor(&menu_input,resource_info,&border_targets);
-            break;
-          }
-          default:
-          {
-            XMatteEditValues(&command_input,id,&state);
-            break;
-          }
-        }
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        continue;
-      }
+    if (XMatteCommandBlock(&command_input,&event,cursor,&state) != MagickFalse)
+      continue;
     switch (event.type)
     {
       case ButtonPress:
