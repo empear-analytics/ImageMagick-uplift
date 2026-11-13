@@ -3234,9 +3234,11 @@ static void ParseSubimageComponent(ImageInfo *image_info)
     ParseSubimageSpecification(image_info,component);
 }
 
-static void TestMultipleImageSupport(ImageInfo *image_info,char *component,
-  ExceptionInfo *exception)
+static void TestMultipleImageSupport(ImageInfo *image_info,
+  const unsigned int frames,char *component,ExceptionInfo *exception)
 {
+  if ((image_info->adjoin == MagickFalse) || (frames <= 1))
+    return;
   /*
     Test for multiple image support (e.g. image%02d.png).
   */
@@ -3492,8 +3494,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
       sans_exception,exception);
   sans_exception=DestroyExceptionInfo(sans_exception);
   ResetUnsupportedEndian(image_info,magick_info);
-  if ((image_info->adjoin != MagickFalse) && (frames > 1))
-    TestMultipleImageSupport(image_info,component,exception);
+  TestMultipleImageSupport(image_info,frames,component,exception);
   DisableUnsupportedAdjoin(image_info,frames,magic,exception);
   if (image_info->affirm != MagickFalse)
     return(MagickTrue);
