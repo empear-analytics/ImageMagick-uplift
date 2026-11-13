@@ -5453,26 +5453,11 @@ static void ExportAnyDepthRGBQuantum(const Image *image,
   }
 }
 
-static void ExportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span)
+static void ExportOtherDepthRGBQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   switch (quantum_info->depth)
   {
-    case 8:
-    {
-      Export8BitRGBQuantum(image,quantum_info,span);
-      break;
-    }
-    case 10:
-    {
-      Export10BitRGBQuantum(image,quantum_info,span);
-      break;
-    }
-    case 12:
-    {
-      Export12BitRGBQuantum(image,quantum_info,span);
-      break;
-    }
     case 16:
     {
       Export16BitRGBQuantum(image,quantum_info,span);
@@ -5495,6 +5480,34 @@ static void ExportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
     default:
     {
       ExportAnyDepthRGBQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
+static void ExportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 8:
+    {
+      Export8BitRGBQuantum(image,quantum_info,span);
+      break;
+    }
+    case 10:
+    {
+      Export10BitRGBQuantum(image,quantum_info,span);
+      break;
+    }
+    case 12:
+    {
+      Export12BitRGBQuantum(image,quantum_info,span);
+      break;
+    }
+    default:
+    {
+      ExportOtherDepthRGBQuantum(image,quantum_info,span);
       break;
     }
   }
