@@ -1504,23 +1504,30 @@ static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
   return(RotateSplayNode(n,node,parent,grandparent));
 }
 
+static MagickBooleanType IsSplayKeyAtRoot(SplayTreeInfo *splay_tree,
+  const void *key)
+{
+  int
+    compare;
+
+  if (splay_tree->key == (void *) NULL)
+    return(MagickFalse);
+  if (splay_tree->compare != (int (*)(const void *,const void *)) NULL)
+    compare=splay_tree->compare(splay_tree->root->key,key);
+  else
+    compare=(splay_tree->key > key) ? 1 :
+      ((splay_tree->key < key) ? -1 : 0);
+  if (compare == 0)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
 static void SplaySplayTree(SplayTreeInfo *splay_tree,const void *key)
 {
   if (splay_tree->root == (NodeInfo *) NULL)
     return;
-  if (splay_tree->key != (void *) NULL)
-    {
-      int
-        compare;
-
-      if (splay_tree->compare != (int (*)(const void *,const void *)) NULL)
-        compare=splay_tree->compare(splay_tree->root->key,key);
-      else
-        compare=(splay_tree->key > key) ? 1 :
-          ((splay_tree->key < key) ? -1 : 0);
-      if (compare == 0)
-        return;
-    }
+  if (IsSplayKeyAtRoot(splay_tree,key) != MagickFalse)
+    return;
   (void) Splay(splay_tree,0UL,key,&splay_tree->root,(NodeInfo **) NULL,
     (NodeInfo **) NULL);
   if (splay_tree->balance != MagickFalse)
