@@ -13327,6 +13327,14 @@ static void MapListBrowserWidget(Display *display,XWindows *windows,
   window_info->mapped=MagickFalse;
 }
 
+static void WithdrawListBrowserWidget(Display *display,XWindows *windows,
+  XWindowInfo *window_info)
+{
+  XSetCursorState(display,windows,MagickFalse);
+  (void) XWithdrawWindow(display,window_info->id,window_info->screen);
+  XCheckRefreshWindows(display,windows);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13461,9 +13469,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
       }
     }
   } while ((state & ExitState) == 0);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XWithdrawWindow(display,window_info->id,window_info->screen);
-  XCheckRefreshWindows(display,windows);
+  WithdrawListBrowserWidget(display,windows,window_info);
 }
 
 /*
