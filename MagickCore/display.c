@@ -13539,6 +13539,85 @@ static MagickBooleanType XPasteFinish(const PasteFinishInput *input)
   return(MagickTrue);
 }
 
+typedef struct _PasteTargets
+{
+  Image
+    **paste_image;
+
+  size_t
+    *state;
+} PasteTargets;
+
+static void XPasteKeyPress(const PasteCommandInput *input,XEvent *event,
+  const PasteTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const paste_image = targets->paste_image;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  int
+    length;
+
+  if ((*event).xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  length=XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Key press: 0x%lx (%s)",(long) key_symbol,command);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*paste_image)=DestroyImage((*paste_image));
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Composite",ImagePasteHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XPasteImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -13592,6 +13671,9 @@ static MagickBooleanType XPasteImage(Display *display,
 
   XEvent
     event;
+
+  const PasteTargets
+    paste_targets = { &paste_image, &state };
 
   const PasteCommandInput
     command_input = { display, resource_info, windows, PasteMenu,
@@ -13708,56 +13790,7 @@ static MagickBooleanType XPasteImage(Display *display,
         break;
       case KeyPress:
       {
-        char
-          command[MagickPathExtent];
-
-        KeySym
-          key_symbol;
-
-        int
-          length;
-
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Key press: 0x%lx (%s)",(long) key_symbol,command);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            paste_image=DestroyImage(paste_image);
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Composite",ImagePasteHelp);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
+        XPasteKeyPress(&command_input,&event,&paste_targets);
         break;
       }
       case MotionNotify:
