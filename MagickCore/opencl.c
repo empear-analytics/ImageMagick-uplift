@@ -367,6 +367,13 @@ static void SetOpenCLCacheDirectory(char *home,char *path,char *temp)
   cache_directory=temp;
 }
 
+static const char *GetOpenCLCacheDirectoryValue(void)
+{
+  if (*cache_directory == '?')
+    return((const char *) NULL);
+  return(cache_directory);
+}
+
 static const char *GetOpenCLCacheDirectory()
 {
   if (cache_directory == (char *) NULL)
@@ -400,9 +407,7 @@ static const char *GetOpenCLCacheDirectory()
         }
       UnlockSemaphoreInfo(cache_directory_lock);
     }
-  if (*cache_directory == '?')
-    return((const char *) NULL);
-  return(cache_directory);
+  return(GetOpenCLCacheDirectoryValue());
 }
 
 static void EnableSameOpenCLDevices(MagickCLEnv clEnv,MagickCLDevice device,
