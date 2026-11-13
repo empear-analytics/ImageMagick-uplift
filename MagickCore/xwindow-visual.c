@@ -476,9 +476,9 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
         if (XVisualColormapSize(p) > XVisualColormapSize(visual_info))
           visual_info=p;
         else
-          if (XVisualColormapSize(p) == XVisualColormapSize(visual_info))
-            if (rank[p->klass] > rank[visual_info->klass])
-              visual_info=p;
+          if ((XVisualColormapSize(p) == XVisualColormapSize(visual_info)) &&
+              (rank[p->klass] > rank[visual_info->klass]))
+            visual_info=p;
       }
       visual_template.visualid=XVisualIDFromVisual(visual_info->visual);
     }
