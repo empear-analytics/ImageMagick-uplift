@@ -13126,6 +13126,82 @@ static void RedrawListBrowserWidget(const ListBrowserContext *context,
     }
 }
 
+static void RedrawListBrowserEntries(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  const unsigned int
+    entries = context->entries;
+
+  const char
+    *const *const list = context->list;
+
+  const unsigned int
+    height = context->height;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  unsigned int
+    *const visible_entries = widgets->visible_entries;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const expose_info = widgets->expose_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  if ((*state) & RedrawListState)
+    {
+      /*
+        Determine slider id and position.
+      */
+      if ((*slider_info).id >= (int) (entries-(*visible_entries)))
+        (*slider_info).id=(int) (entries-(*visible_entries));
+      if (((*slider_info).id < 0) || (entries <= (*visible_entries)))
+        (*slider_info).id=0;
+      (*slider_info).y=(*slider_info).min_y;
+      if (entries > 0)
+        (*slider_info).y+=(*slider_info).id*((*slider_info).max_y-
+          (*slider_info).min_y+1)/(int) entries;
+      if ((*slider_info).id != (*selection_info).id)
+        {
+          ListBrowserRedraw
+            redraw;
+
+          redraw.display=display;
+          redraw.window_info=window_info;
+          redraw.list=list;
+          redraw.entries=entries;
+          redraw.height=height;
+          redraw.visible_entries=(*visible_entries);
+          redraw.list_info=(list_info);
+          redraw.north_info=(*north_info);
+          redraw.slider_info=(*slider_info);
+          redraw.south_info=(*south_info);
+          RedrawListBrowserList(&redraw,selection_info,expose_info);
+        }
+      (*state)&=(unsigned int) (~RedrawListState);
+    }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13280,38 +13356,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   {
     UpdateListBrowserLayout(&list_context,&list_widgets);
     RedrawListBrowserWidget(&list_context,&list_widgets);
-    if (state & RedrawListState)
-      {
-        /*
-          Determine slider id and position.
-        */
-        if (slider_info.id >= (int) (entries-visible_entries))
-          slider_info.id=(int) (entries-visible_entries);
-        if ((slider_info.id < 0) || (entries <= visible_entries))
-          slider_info.id=0;
-        slider_info.y=slider_info.min_y;
-        if (entries > 0)
-          slider_info.y+=slider_info.id*(slider_info.max_y-
-            slider_info.min_y+1)/(int) entries;
-        if (slider_info.id != selection_info.id)
-          {
-            ListBrowserRedraw
-              redraw;
-
-            redraw.display=display;
-            redraw.window_info=window_info;
-            redraw.list=list;
-            redraw.entries=entries;
-            redraw.height=height;
-            redraw.visible_entries=visible_entries;
-            redraw.list_info=(&list_info);
-            redraw.north_info=north_info;
-            redraw.slider_info=slider_info;
-            redraw.south_info=south_info;
-            RedrawListBrowserList(&redraw,&selection_info,&expose_info);
-          }
-        state&=(unsigned int) (~RedrawListState);
-      }
+    RedrawListBrowserEntries(&list_context,&list_widgets);
     /*
       Wait for next event.
     */
