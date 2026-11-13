@@ -6551,6 +6551,21 @@ static void ExportIndexFamilyQuantum(const Image *image,
   }
 }
 
+static void GetExportPixelQueue(const Image *image,CacheView *image_view,
+  MagickSizeType *number_pixels,const Quantum *magick_restrict *p)
+{
+  if (image_view == (CacheView *) NULL)
+    {
+      *number_pixels=GetImageExtent(image);
+      *p=GetVirtualPixelQueue(image);
+    }
+  else
+    {
+      *number_pixels=GetCacheViewExtent(image_view);
+      *p=GetCacheViewVirtualPixelQueue(image_view);
+    }
+}
+
 MagickExport size_t ExportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,unsigned char *magick_restrict pixels,
@@ -6580,16 +6595,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (pixels == (unsigned char *) NULL)
     pixels=(unsigned char *) GetQuantumPixels(quantum_info);
-  if (image_view == (CacheView *) NULL)
-    {
-      number_pixels=GetImageExtent(image);
-      p=GetVirtualPixelQueue(image);
-    }
-  else
-    {
-      number_pixels=GetCacheViewExtent(image_view);
-      p=GetCacheViewVirtualPixelQueue(image_view);
-    }
+  GetExportPixelQueue(image,image_view,&number_pixels,&p);
   if (p == (Quantum *) NULL)
     return(0);
   if (quantum_info->alpha_type == AssociatedQuantumAlpha)
