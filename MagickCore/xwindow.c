@@ -371,6 +371,31 @@ static void DestroyXPixelInfo(XWindows *windows)
     }
 }
 
+static void DestroyXHints(XWindows *windows)
+{
+  if (windows->font_info != (XFontStruct *) NULL)
+    {
+      XFreeFont(windows->display,windows->font_info);
+      windows->font_info=(XFontStruct *) NULL;
+    }
+  if (windows->class_hints != (XClassHint *) NULL)
+    {
+      if (windows->class_hints->res_name != (char *) NULL)
+        windows->class_hints->res_name=DestroyString(
+          windows->class_hints->res_name);
+      if (windows->class_hints->res_class != (char *) NULL)
+        windows->class_hints->res_class=DestroyString(
+          windows->class_hints->res_class);
+      XFree(windows->class_hints);
+      windows->class_hints=(XClassHint *) NULL;
+    }
+  if (windows->manager_hints != (XWMHints *) NULL)
+    {
+      XFree(windows->manager_hints);
+      windows->manager_hints=(XWMHints *) NULL;
+    }
+}
+
 MagickExport void DestroyXResources(void)
 {
   int
@@ -430,27 +455,7 @@ MagickExport void DestroyXResources(void)
     RelinquishMagickMemory(windows->icon_resources);
   DestroyXIconPixelInfo(windows);
   DestroyXPixelInfo(windows);
-  if (windows->font_info != (XFontStruct *) NULL)
-    {
-      XFreeFont(windows->display,windows->font_info);
-      windows->font_info=(XFontStruct *) NULL;
-    }
-  if (windows->class_hints != (XClassHint *) NULL)
-    {
-      if (windows->class_hints->res_name != (char *) NULL)
-        windows->class_hints->res_name=DestroyString(
-          windows->class_hints->res_name);
-      if (windows->class_hints->res_class != (char *) NULL)
-        windows->class_hints->res_class=DestroyString(
-          windows->class_hints->res_class);
-      XFree(windows->class_hints);
-      windows->class_hints=(XClassHint *) NULL;
-    }
-  if (windows->manager_hints != (XWMHints *) NULL)
-    {
-      XFree(windows->manager_hints);
-      windows->manager_hints=(XWMHints *) NULL;
-    }
+  DestroyXHints(windows);
   if (windows->map_info != (XStandardColormap *) NULL)
     {
       XFree(windows->map_info);
