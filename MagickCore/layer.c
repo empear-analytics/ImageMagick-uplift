@@ -1474,6 +1474,9 @@ typedef struct _DuplicateFrameTargets
 
   MagickBooleanType
     *cleared;
+
+  Image
+    **bgnd_image;
 } DuplicateFrameTargets;
 
 static MagickBooleanType TryDuplicateFrame(const DuplicateFrameTrial *trial,
@@ -1850,6 +1853,84 @@ static void ExpandBackgroundBounds(const Image *curr,Image *bgnd_image,
 #endif
 }
 
+static MagickBooleanType TryBackgroundDisposal(
+  const DuplicateFrameTrial *trial,const RectangleInfo dup_bounds,
+  const DuplicateFrameTargets *targets)
+{
+  const Image
+    *const curr = trial->curr;
+
+  RectangleInfo
+    *const bounds = trial->bounds;
+
+  DisposeType
+    *const disposals = trial->disposals;
+
+  const ssize_t
+    i = trial->i;
+
+  ExceptionInfo
+    *const exception = trial->exception;
+
+  Image
+    **const bgnd_image = targets->bgnd_image,
+    **const dup_image = targets->dup_image;
+
+  MagickBooleanType
+    *const cleared = targets->cleared;
+
+  RectangleInfo
+    bgnd_bounds,
+    try_bounds;
+
+  MagickBooleanType
+    try_cleared;
+
+  const BackgroundBoundsTargets
+    bgnd_targets = { &bgnd_bounds, &try_bounds };
+
+  /*
+    Now compare against a simple background disposal
+  */
+  if (AcquireBackgroundFrame(curr,bgnd_image,exception) == MagickFalse)
+    return(MagickFalse);
+  bgnd_bounds=bounds[i-1]; /* interim bounds of the previous image */
+  ClearBounds((*bgnd_image),&bgnd_bounds,exception);
+  try_bounds=CompareImagesBounds((*bgnd_image),curr,CompareAnyLayer,exception);
+  try_cleared=IsBoundsCleared((*bgnd_image),curr,&try_bounds,exception);
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr, "background: %s\n",
+         try_cleared?"(pixels cleared)":"");
+#endif
+  if ( try_cleared )
+    {
+      ExpandBackgroundBounds(curr,(*bgnd_image),exception,&bgnd_targets);
+    }
+  /*
+    Test if this background dispose is smaller than any of the
+    other methods we tried before this (including duplicated frame)
+  */
+  if ( (*cleared) ||
+        bgnd_bounds.width*bgnd_bounds.height
+          +try_bounds.width*try_bounds.height
+        < bounds[i-1].width*bounds[i-1].height
+            +dup_bounds.width*dup_bounds.height
+            +bounds[i].width*bounds[i].height )
+    {
+      (*cleared)=MagickFalse;
+      bounds[i-1]=bgnd_bounds;
+      bounds[i]=try_bounds;
+      (*dup_image)=DestroyDuplicateImage(disposals,i,(*dup_image));
+      disposals[i-1]=BackgroundDispose;
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr,"expand_bgnd: accepted\n");
+          } else {
+    (void) FormatLocaleFile(stderr,"expand_bgnd: reject\n");
+#endif
+    }
+  return(MagickTrue);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1865,14 +1946,11 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     *bgnd_image;
 
   RectangleInfo
-    try_bounds,
-    bgnd_bounds,
     dup_bounds,
     *bounds;
 
   MagickBooleanType
     add_frames,
-    try_cleared,
     cleared;
 
   ssize_t
@@ -1882,10 +1960,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     choice_targets = { &bgnd_image, &prev_image, &dup_image, &i };
 
   const DuplicateFrameTargets
-    targets = { &dup_image, &dup_bounds, &cleared };
-
-  const BackgroundBoundsTargets
-    bgnd_targets = { &bgnd_bounds, &try_bounds };
+    targets = { &dup_image, &dup_bounds, &cleared, &bgnd_image };
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1993,45 +2068,9 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
         dup_bounds.width=dup_bounds.height=0; /* no dup, no pixel added */
         if (TryDuplicateFrame(&trial,&targets) == MagickFalse)
           return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
-        /*
-          Now compare against a simple background disposal
-        */
-        if (AcquireBackgroundFrame(curr,&bgnd_image,exception) == MagickFalse)
-          return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,dup_image));
-        bgnd_bounds=bounds[i-1]; /* interim bounds of the previous image */
-        ClearBounds(bgnd_image,&bgnd_bounds,exception);
-        try_bounds=CompareImagesBounds(bgnd_image,curr,CompareAnyLayer,exception);
-        try_cleared=IsBoundsCleared(bgnd_image,curr,&try_bounds,exception);
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr, "background: %s\n",
-         try_cleared?"(pixels cleared)":"");
-#endif
-        if ( try_cleared )
-          {
-            ExpandBackgroundBounds(curr,bgnd_image,exception,&bgnd_targets);
-          }
-        /*
-          Test if this background dispose is smaller than any of the
-          other methods we tried before this (including duplicated frame)
-        */
-        if ( cleared ||
-              bgnd_bounds.width*bgnd_bounds.height
-                +try_bounds.width*try_bounds.height
-              < bounds[i-1].width*bounds[i-1].height
-                  +dup_bounds.width*dup_bounds.height
-                  +bounds[i].width*bounds[i].height )
-          {
-            cleared=MagickFalse;
-            bounds[i-1]=bgnd_bounds;
-            bounds[i]=try_bounds;
-            dup_image=DestroyDuplicateImage(disposals,i,dup_image);
-            disposals[i-1]=BackgroundDispose;
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr,"expand_bgnd: accepted\n");
-          } else {
-    (void) FormatLocaleFile(stderr,"expand_bgnd: reject\n");
-#endif
-          }
+        if (TryBackgroundDisposal(&trial,dup_bounds,&targets) == MagickFalse)
+          return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,
+            dup_image));
       }
     /*
        Finalise choice of dispose, set new prev_image,
