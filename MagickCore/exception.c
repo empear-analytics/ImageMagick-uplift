@@ -779,14 +779,19 @@ MagickExport void MagickWarning(const ExceptionType warning,const char *reason,
 %    o handler: the method to handle errors.
 %
 */
+static void LockExceptionSemaphore(void)
+{
+  if (exception_semaphore == (SemaphoreInfo *) NULL)
+    ActivateSemaphoreInfo(&exception_semaphore);
+  LockSemaphoreInfo(exception_semaphore);
+}
+
 MagickExport ErrorHandler SetErrorHandler(ErrorHandler handler)
 {
   ErrorHandler
     previous_handler;
 
-  if (exception_semaphore == (SemaphoreInfo *) NULL)
-    ActivateSemaphoreInfo(&exception_semaphore);
-  LockSemaphoreInfo(exception_semaphore);
+  LockExceptionSemaphore();
   previous_handler=error_handler;
   error_handler=handler;
   UnlockSemaphoreInfo(exception_semaphore);
@@ -815,9 +820,7 @@ MagickExport FatalErrorHandler SetFatalErrorHandler(FatalErrorHandler handler)
   FatalErrorHandler
     previous_handler;
 
-  if (exception_semaphore == (SemaphoreInfo *) NULL)
-    ActivateSemaphoreInfo(&exception_semaphore);
-  LockSemaphoreInfo(exception_semaphore);
+  LockExceptionSemaphore();
   previous_handler=fatal_error_handler;
   fatal_error_handler=handler;
   UnlockSemaphoreInfo(exception_semaphore);
@@ -846,9 +849,7 @@ MagickExport WarningHandler SetWarningHandler(WarningHandler handler)
   WarningHandler
     previous_handler;
 
-  if (exception_semaphore == (SemaphoreInfo *) NULL)
-    ActivateSemaphoreInfo(&exception_semaphore);
-  LockSemaphoreInfo(exception_semaphore);
+  LockExceptionSemaphore();
   previous_handler=warning_handler;
   warning_handler=handler;
   UnlockSemaphoreInfo(exception_semaphore);
