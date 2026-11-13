@@ -2129,6 +2129,27 @@ static MagickBooleanType PrintImageLocations(Image *image,FILE *file,
   return(ferror(file) != 0 ? MagickFalse : MagickTrue);
 }
 
+static MagickBooleanType PrintImageSummary(Image *image,FILE *file,
+  const double elapsed_time,const double user_time)
+{
+  ColorspaceType
+    colorspace;
+
+  colorspace=image->colorspace;
+  /*
+    Display summary info about the image.
+  */
+  PrintImageSummaryHeader(file,image);
+  PrintImageSummaryAttributes(file,image,colorspace);
+  (void) FormatLocaleFile(file,"%0.3fu %lu:%02lu.%03lu",user_time,
+    (unsigned long) (elapsed_time/60.0),(unsigned long) floor(fmod(
+    elapsed_time,60.0)),(unsigned long) (1000.0*(elapsed_time-
+    floor(elapsed_time))));
+  (void) FormatLocaleFile(file,"\n");
+  (void) fflush(file);
+  return(ferror(file) != 0 ? MagickFalse : MagickTrue);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2180,20 +2201,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   user_time=GetUserTime(&image->timer);
   GetTimerInfo(&image->timer);
   if (verbose == MagickFalse)
-    {
-      /*
-        Display summary info about the image.
-      */
-      PrintImageSummaryHeader(file,image);
-      PrintImageSummaryAttributes(file,image,colorspace);
-      (void) FormatLocaleFile(file,"%0.3fu %lu:%02lu.%03lu",user_time,
-        (unsigned long) (elapsed_time/60.0),(unsigned long) floor(fmod(
-        elapsed_time,60.0)),(unsigned long) (1000.0*(elapsed_time-
-        floor(elapsed_time))));
-      (void) FormatLocaleFile(file,"\n");
-      (void) fflush(file);
-      return(ferror(file) != 0 ? MagickFalse : MagickTrue);
-    }
+    return(PrintImageSummary(image,file,elapsed_time,user_time));
   /*
     Display verbose info about the image.
   */
