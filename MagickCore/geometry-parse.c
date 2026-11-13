@@ -251,30 +251,36 @@ static void ParseGeometryYOffset(char **p,MagickStatusType *flags,ssize_t *y)
     }
 }
 
+static const int
+  GeometryAdvanceCharacters[] =
+  {
+    '-',
+    ',',
+    '+',
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    215,
+    'e',
+    'E'
+  };
+
 static inline MagickBooleanType IsGeometryAdvanceCharacter(const int c)
 {
-  switch (c)
-  {
-    case '-':
-    case ',':
-    case '+':
-    case '0':
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-    case '5':
-    case '6':
-    case '7':
-    case '8':
-    case '9':
-    case 215:
-    case 'e':
-    case 'E':
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(GeometryAdvanceCharacters)/
+       sizeof(*GeometryAdvanceCharacters)); i++)
+    if (GeometryAdvanceCharacters[i] == c)
       return(MagickTrue);
-    default:
-      break;
-  }
   return(MagickFalse);
 }
 
