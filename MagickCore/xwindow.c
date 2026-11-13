@@ -2850,6 +2850,25 @@ static void XSetDisplayGamma(const XResourceInfo *resource_info,
     }
 }
 
+static void XInitializePseudoPixels(const XStandardColormap *map_info,
+  const Image *image,XPixelInfo *pixel)
+{
+  ssize_t
+    i;
+
+  if (image->storage_class == PseudoClass)
+    {
+      /*
+        Initialize pixel array for images of type PseudoClass.
+      */
+      for (i=0; i < (ssize_t) image->colors; i++)
+        pixel->pixels[i]=XGammaPacket(map_info,image->colormap+i);
+      for (i=0; i < MaxNumberPens; i++)
+        pixel->pixels[image->colors+(size_t) i]=pixel->pen_colors[i].pixel;
+      pixel->colors+=MaxNumberPens;
+    }
+}
+
 MagickPrivate void XGetPixelInfo(Display *display,
   const XVisualInfo *visual_info,const XStandardColormap *map_info,
   const XResourceInfo *resource_info,Image *image,XPixelInfo *pixel)
@@ -3029,17 +3048,7 @@ MagickPrivate void XGetPixelInfo(Display *display,
   if (image != (Image *) NULL)
     {
       XSetDisplayGamma(resource_info,image);
-      if (image->storage_class == PseudoClass)
-        {
-          /*
-            Initialize pixel array for images of type PseudoClass.
-          */
-          for (i=0; i < (ssize_t) image->colors; i++)
-            pixel->pixels[i]=XGammaPacket(map_info,image->colormap+i);
-          for (i=0; i < MaxNumberPens; i++)
-            pixel->pixels[image->colors+(size_t) i]=pixel->pen_colors[i].pixel;
-          pixel->colors+=MaxNumberPens;
-        }
+      XInitializePseudoPixels(map_info,image,pixel);
     }
 }
 
