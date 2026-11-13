@@ -370,6 +370,73 @@ static double GetLocationTarget(const ChannelLocationsReport *report,
   return(target);
 }
 
+typedef struct _LocationRowScan
+{
+  const ChannelLocationsReport
+    *report;
+
+  FILE
+    *file;
+
+  const Image
+    *image;
+
+  PixelChannel
+    channel;
+
+  double
+    target;
+
+  ssize_t
+    y;
+} LocationRowScan;
+
+static void PrintRowLocations(const LocationRowScan *scan,ssize_t *x,
+  ssize_t *n,const Quantum **p)
+{
+  const ChannelLocationsReport
+    *report = scan->report;
+
+  FILE
+    *file = scan->file;
+
+  const Image
+    *image = scan->image;
+
+  const PixelChannel
+    channel = scan->channel;
+
+  const double
+    target = scan->target;
+
+  const ssize_t
+    y = scan->y;
+
+  ssize_t
+    offset;
+
+  for (*x=0; *x < (ssize_t) image->columns; (*x)++)
+  {
+    MagickBooleanType
+      match;
+
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if (traits == UndefinedPixelTrait)
+      continue;
+    offset=GetPixelChannelOffset(image,channel);
+    match=(MagickBooleanType) (fabs((double) (*p)[offset]-target) < MagickEpsilon);
+    if (match != MagickFalse)
+      {
+        if ((report->locations != 0) &&
+            (*n >= (ssize_t) report->locations))
+          break;
+        (void) FormatLocaleFile(file," %.17g,%.17g",(double) *x,(double) y);
+        (*n)++;
+      }
+    *p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static ssize_t PrintChannelLocations(const ChannelLocationsReport *report,
   const PixelChannel channel,const char *name)
 {
@@ -399,33 +466,22 @@ static ssize_t PrintChannelLocations(const ChannelLocationsReport *report,
     const Quantum
       *p;
 
+    LocationRowScan
+      scan;
+
     ssize_t
-      offset,
       x;
 
     p=GetVirtualPixels(image,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MagickBooleanType
-        match;
-
-      PixelTrait traits = GetPixelChannelTraits(image,channel);
-      if (traits == UndefinedPixelTrait)
-        continue;
-      offset=GetPixelChannelOffset(image,channel);
-      match=(MagickBooleanType) (fabs((double) p[offset]-target) < MagickEpsilon);
-      if (match != MagickFalse)
-        {
-          if ((report->locations != 0) &&
-              (n >= (ssize_t) report->locations))
-            break;
-          (void) FormatLocaleFile(file," %.17g,%.17g",(double) x,(double) y);
-          n++;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    scan.report=report;
+    scan.file=file;
+    scan.image=image;
+    scan.channel=channel;
+    scan.target=target;
+    scan.y=y;
+    PrintRowLocations(&scan,&x,&n,&p);
     if (x < (ssize_t) image->columns)
       break;
   }
