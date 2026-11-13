@@ -1458,6 +1458,23 @@ static void XSetDescendForColormaps(Display *display,const Window target,
     }
 }
 
+static Window XSelectWindowByIDOrName(Display *display,const Window root,
+  const ImageInfo *image_info,Window target)
+{
+  /*
+    Select window by ID or name.
+  */
+  if (isdigit((int) ((unsigned char) *image_info->filename)) != 0)
+    target=XWindowByID(display,root,(Window)
+      strtol(image_info->filename,(char **) NULL,0));
+  if (target == (Window) NULL)
+    target=XWindowByName(display,root,image_info->filename);
+  if (target == (Window) NULL)
+    ThrowXWindowException(XServerError,"NoWindowWithSpecifiedIDExists",
+      image_info->filename);
+  return(target);
+}
+
 static Image *XCropWindowImage(Image *image,const RectangleInfo crop_info,
   ExceptionInfo *exception)
 {
@@ -1559,19 +1576,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
       if (LocaleCompare(image_info->filename,"root") == 0)
         target=root;
       else
-        {
-          /*
-            Select window by ID or name.
-          */
-          if (isdigit((int) ((unsigned char) *image_info->filename)) != 0)
-            target=XWindowByID(display,root,(Window)
-              strtol(image_info->filename,(char **) NULL,0));
-          if (target == (Window) NULL)
-            target=XWindowByName(display,root,image_info->filename);
-          if (target == (Window) NULL)
-            ThrowXWindowException(XServerError,"NoWindowWithSpecifiedIDExists",
-              image_info->filename);
-        }
+        target=XSelectWindowByIDOrName(display,root,image_info,target);
     }
   /*
     If target window is not defined, interactively select one.
