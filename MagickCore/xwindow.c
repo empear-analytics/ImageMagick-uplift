@@ -10037,6 +10037,38 @@ static void XApplyMatteShape(Display *display,const XWindowInfo *window)
     }
 }
 
+typedef struct _XRefreshArea
+{
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+} XRefreshArea;
+
+static void XPutRefreshImage(Display *display,const XWindowInfo *window,
+  const XRefreshArea *area)
+{
+  const int
+    x = area->x,
+    y = area->y;
+
+  const unsigned int
+    height = area->height,
+    width = area->width;
+
+#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
+  if (window->shared_memory)
+    (void) XShmPutImage(display,window->id,window->annotate_context,
+      window->ximage,x+window->x,y+window->y,x,y,width,height,MagickTrue);
+#endif
+  if (window->shared_memory == MagickFalse)
+    (void) XPutImage(display,window->id,window->annotate_context,
+      window->ximage,x+window->x,y+window->y,x,y,width,height);
+}
+
 MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   const XEvent *event)
 {
@@ -10101,14 +10133,14 @@ MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
     }
   else
     {
-#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
-      if (window->shared_memory)
-        (void) XShmPutImage(display,window->id,window->annotate_context,
-          window->ximage,x+window->x,y+window->y,x,y,width,height,MagickTrue);
-#endif
-      if (window->shared_memory == MagickFalse)
-        (void) XPutImage(display,window->id,window->annotate_context,
-          window->ximage,x+window->x,y+window->y,x,y,width,height);
+      XRefreshArea
+        area;
+
+      area.x=x;
+      area.y=y;
+      area.height=height;
+      area.width=width;
+      XPutRefreshImage(display,window,&area);
     }
   if (window->matte_pixmap != (Pixmap) NULL)
     (void) XSetClipMask(display,window->annotate_context,None);
