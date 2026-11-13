@@ -676,7 +676,8 @@ def check(old_text, new_text, caller, helpers):
     return StepCheck(old, new, caller, helpers).run()
 
 
-def main(argv):
+def parse_arguments(argv):
+    """(revision, positional arguments) of the command line."""
     rev = "HEAD"
     args = []
     i = 1
@@ -687,20 +688,35 @@ def main(argv):
         else:
             args.append(argv[i])
             i += 1
+    return rev, args
+
+
+def committed_text(rev, path):
+    """The file as committed at rev."""
+    return subprocess.run(["git", "show", "%s:%s" % (rev, path)], capture_output=True,
+                          text=True, check=True).stdout
+
+
+def report(problems, summary, caller):
+    """Print the verdict and return the exit status."""
+    if not problems:
+        print("OK %s: %s" % (caller, summary))
+        return 0
+    for p in dict.fromkeys(problems):
+        print("FAIL: " + p)
+    return 1
+
+
+def main(argv):
+    rev, args = parse_arguments(argv)
     if len(args) < 3:
         print(__doc__)
         return 2
     path, caller, helpers = args[0], args[1], args[2:]
-    old = subprocess.run(["git", "show", "%s:%s" % (rev, path)], capture_output=True,
-                         text=True, check=True).stdout
+    old = committed_text(rev, path)
     new = open(path).read()
     problems, summary = check(old, new, caller, helpers)
-    if problems:
-        for p in dict.fromkeys(problems):
-            print("FAIL: " + p)
-        return 1
-    print("OK %s: %s" % (caller, summary))
-    return 0
+    return report(problems, summary, caller)
 
 
 if __name__ == "__main__":
