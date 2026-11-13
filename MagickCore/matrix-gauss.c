@@ -394,6 +394,23 @@ static void CopyHPMatrixRow(long double **hp_matrix,double **matrix,
     hp_matrix[i][j]=(long double)matrix[i][j];
 }
 
+static MagickBooleanType AcquireHPMatrixRows(long double **hp_matrix,
+  double **matrix,const size_t rank)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) rank; i++)
+  {
+    hp_matrix[i]=(long double *) AcquireQuantumMemory(rank,
+      sizeof(*hp_matrix[i]));
+    if (hp_matrix[i] == (long double *) NULL)
+      return(MagickFalse);
+    CopyHPMatrixRow(hp_matrix,matrix,rank,i);
+  }
+  return(MagickTrue);
+}
+
 static long double **RelinquishHPMatrix(long double **hp_matrix,
   const size_t rank)
 {
@@ -427,14 +444,8 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   hp_matrix=(long double **) AcquireQuantumMemory(rank,sizeof(*hp_matrix));
   if (hp_matrix == (long double **) NULL)
     return(MagickFalse);
-  for (i=0; i < (ssize_t) rank; i++)
-  {
-    hp_matrix[i]=(long double *) AcquireQuantumMemory(rank,
-      sizeof(*hp_matrix[i]));
-    if (hp_matrix[i] == (long double *) NULL)
-      ThrowGaussJordanException();
-    CopyHPMatrixRow(hp_matrix,matrix,rank,i);
-  }
+  if (AcquireHPMatrixRows(hp_matrix,matrix,rank) == MagickFalse)
+    ThrowGaussJordanException();
   columns=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*columns));
   rows=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*rows));
   pivots=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*pivots));
