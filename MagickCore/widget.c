@@ -12014,6 +12014,12 @@ typedef struct _ListBrowserContext
 
   unsigned int
     height;
+
+  const char
+    *action;
+
+  unsigned int
+    width;
 } ListBrowserContext;
 
 static void ClientListBrowserMessage(const ListBrowserContext *context,
@@ -12767,6 +12773,48 @@ static void HandleListBrowserWindowEvent(const ListBrowserContext *context,
   }
 }
 
+static void InitializeListBrowserButtons(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  const char
+    *const action = context->action;
+
+  const unsigned int
+    width = context->width;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  /*
+    Initialize button information.
+  */
+  XGetWidgetInfo(CancelButtonText,cancel_info);
+  (*cancel_info).width=width;
+  (*cancel_info).height=(unsigned int) ((3*height) >> 1);
+  (*cancel_info).x=(int) window_info->width-(int) (*cancel_info).width-
+    QuantumMargin-2;
+  (*cancel_info).y=(int) window_info->height-(int) (*cancel_info).height-
+    QuantumMargin;
+  XGetWidgetInfo(action,action_info);
+  (*action_info).width=width;
+  (*action_info).height=(unsigned int) ((3*height) >> 1);
+  (*action_info).x=(*cancel_info).x-((int) (*cancel_info).width+
+    (QuantumMargin >> 1)+(int) ((*action_info).bevel_width << 1));
+  (*action_info).y=(*cancel_info).y;
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12912,6 +12960,8 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   list_context.font_info=font_info;
   list_context.list=list;
   list_context.height=height;
+  list_context.action=action;
+  list_context.width=width;
   do
   {
     if (state & UpdateConfigurationState)
@@ -12919,22 +12969,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
         int
           id;
 
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(CancelButtonText,&cancel_info);
-        cancel_info.width=width;
-        cancel_info.height=(unsigned int) ((3*height) >> 1);
-        cancel_info.x=(int) window_info->width-(int) cancel_info.width-
-          QuantumMargin-2;
-        cancel_info.y=(int) window_info->height-(int) cancel_info.height-
-          QuantumMargin;
-        XGetWidgetInfo(action,&action_info);
-        action_info.width=width;
-        action_info.height=(unsigned int) ((3*height) >> 1);
-        action_info.x=cancel_info.x-((int) cancel_info.width+
-          (QuantumMargin >> 1)+(int) (action_info.bevel_width << 1));
-        action_info.y=cancel_info.y;
+        InitializeListBrowserButtons(&list_context,&list_widgets);
         /*
           Initialize reply information.
         */
