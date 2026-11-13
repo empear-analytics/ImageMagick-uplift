@@ -1050,6 +1050,56 @@ static void SetLogInfoAttribute(LogInfo *log_info,const char *keyword,
       (log_info->handler_mask | ParseLogHandlers(token));
 }
 
+typedef struct _LogIncludeInput
+{
+  const LogLoadTarget
+    *target;
+
+  const char
+    *filename;
+
+  char
+    *keyword,
+    *token;
+
+  size_t
+    extent,
+    depth;
+} LogIncludeInput;
+
+static void LoadLogIncludes(const LogIncludeInput *include,const char **q,
+  MagickStatusType *status)
+{
+  const LogLoadTarget
+    *const target = include->target;
+
+  const char
+    *const filename = include->filename;
+
+  char
+    *const keyword = include->keyword,
+    *const token = include->token;
+
+  const size_t
+    extent = include->extent,
+    depth = include->depth;
+
+  ExceptionInfo
+    *exception = target->exception;
+
+  while (IsIncludeElementOpen(token,(*q)) != MagickFalse)
+  {
+    if (IsIncludeFileAttribute(q,extent,keyword,token) == MagickFalse)
+      continue;
+    if (depth >= MagickMaxRecursionDepth)
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+    else
+      (*status)&=(MagickStatusType) LoadLogInclude(target,filename,token,
+        depth);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1144,17 +1194,16 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
         /*
           Include element.
         */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          if (IsIncludeFileAttribute(&q,extent,keyword,token) == MagickFalse)
-            continue;
-          if (depth >= MagickMaxRecursionDepth)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-          else
-            status&=(MagickStatusType) LoadLogInclude(target,filename,token,
-              depth);
-        }
+        LogIncludeInput
+          include;
+
+        include.target=target;
+        include.filename=filename;
+        include.keyword=keyword;
+        include.token=token;
+        include.extent=extent;
+        include.depth=depth;
+        LoadLogIncludes(&include,&q,&status);
         continue;
       }
     if (LocaleCompare(keyword,"<logmap>") == 0)
