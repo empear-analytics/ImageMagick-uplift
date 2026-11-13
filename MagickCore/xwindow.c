@@ -8582,6 +8582,26 @@ static void LogXStandardColormap(const XStandardColormap *map_info)
     }
 }
 
+static void XQuantizeToVisual(const XVisualInfo *visual_info,
+  const XResourceInfo *resource_info,Image *image,ExceptionInfo *exception)
+{
+  if ((visual_info->klass != DirectColor) &&
+      (visual_info->klass != TrueColor))
+    if ((image->storage_class == DirectClass) ||
+        ((int) image->colors > visual_info->colormap_size))
+      {
+        QuantizeInfo
+          quantize_info;
+
+        /*
+          Image has more colors than the visual supports.
+        */
+        quantize_info=(*resource_info->quantize_info);
+        quantize_info.number_colors=(size_t) visual_info->colormap_size;
+        (void) QuantizeImage(&quantize_info,image,exception);
+      }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -8657,21 +8677,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       LogXStandardColormap(map_info);
       return;
     }
-  if ((visual_info->klass != DirectColor) &&
-      (visual_info->klass != TrueColor))
-    if ((image->storage_class == DirectClass) ||
-        ((int) image->colors > visual_info->colormap_size))
-      {
-        QuantizeInfo
-          quantize_info;
-
-        /*
-          Image has more colors than the visual supports.
-        */
-        quantize_info=(*resource_info->quantize_info);
-        quantize_info.number_colors=(size_t) visual_info->colormap_size;
-        (void) QuantizeImage(&quantize_info,image,exception);
-      }
+  XQuantizeToVisual(visual_info,resource_info,image,exception);
   /*
     Free previous and create new colormap.
   */
