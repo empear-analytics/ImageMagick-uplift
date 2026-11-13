@@ -4482,7 +4482,11 @@ Recipe D, whose copies are moved whole and so may not leave the caller.
    and no `continue` or `break` that leaves it.
 2. `R` is a constant, or reads only what the block writes through a pointer the caller
    also holds (`*source`), so the caller evaluating `R` after the call gets the value the
-   block's `return` would have returned.
+   block's `return` would have returned. `R` may also be a plain local of the caller
+   that the block neither writes nor takes the address of (2026-11-13;
+   `splay-tree.c`'s `RemoveNodeFromSplayTree`, `return(value);` with `value` set to
+   `NULL` before the block): it holds the same value after the call as at the block's
+   `return`.
 3. The block writes no plain local of the caller, apart from locals nothing after the
    block reads (Recipe E step 4), which the new function declares, and locals it writes
    only on paths that end in `return(R);`, which go by value. Writes through pointers it
@@ -4547,7 +4551,9 @@ static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
 **Careful:**
 
 - On a failure path the caller returns from the same point as before, with the same
-  value: a constant, or what the block left behind the pointer.
+  value: a constant, what the block left behind the pointer, or a local of the caller
+  that nothing in the block writes (step 2), read after the call as it was read at the
+  block's `return`.
 - Under step 8 the failure path is the same with no value: the caller's `return;` runs
   directly after the helper's `return(MagickFalse);`, where the block's `return;` stood,
   after every statement the block ran before it.
@@ -15349,3 +15355,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | LX | Step 4: written variables whose pointers would take the call past four parameters go in one `const` targets struct (Recipe LB step 8's form), taken after the input struct and before `broke` | `cache.c`'s `GetVirtualPixelRows`: the single-pixel transfer writes `length`, `q` and `s`, continues the column loop and breaks it when the fetch fails; with the input struct and `broke` the pointers would give six parameters | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | TB | Step 1: on a parameter of type `int`, the membership labels may be character constants and integer literals mixed, the table of `int` (*Careful*: integer labels); Lane: b | `geometry-parse.c`'s `IsGeometryAdvanceCharacter` (sixteen labels, `215` among them, cc 18; probe 7.04 to 7.40); the character form needs a `char` parameter | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KP | Peel a run of one-label groups that OR a different enumeration constant into a flags variable out of a loop's character `switch`, through a `static const` table of `{ key, flag }` and a lookup before the `switch`; evidence oracle; Lane: b | `geometry-parse.c`'s `GetGeometry` and `ParseGeometry` (seven meta characters each; probe 7.40 to 7.60); PA needs one shared body, KL a string and a numeric literal | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | W | Step 2: `R` may be a plain local of the caller that the block neither writes nor takes the address of; Lane: b | `splay-tree.c`'s `RemoveNodeFromSplayTree` (`return(value);`, `value` set before the block), the twin of `DeleteNodeFromSplayTree`'s `return(MagickFalse);` block (probe 8.54 to 8.81) | mandate (2026-10-24) |
