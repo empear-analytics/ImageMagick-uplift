@@ -3567,6 +3567,23 @@ static void XChopStartPress(const ChopEventInput *input,const XEvent *event,
   (*state)|=ExitState;
 }
 
+static void XShowChopPointer(Display *display,XWindows *windows,const int x,
+  const int y)
+{
+  char
+    text[MagickPathExtent];
+
+  if (windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
+        x+windows->image.x,y+windows->image.y);
+      XInfoWidget(display,windows,text);
+    }
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3647,15 +3664,7 @@ static MagickBooleanType XChopImage(Display *display,
   (void) memset(&segment_info,0,sizeof(segment_info));
   do
   {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-          x+windows->image.x,y+windows->image.y);
-        XInfoWidget(display,windows,text);
-      }
+    XShowChopPointer(display,windows,x,y);
     /*
       Wait for next event.
     */
