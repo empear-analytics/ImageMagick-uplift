@@ -6754,6 +6754,43 @@ static MagickBooleanType XCropWaitHead(const CropContext *context,
   return(MagickTrue);
 }
 
+static void XCropWaitCorner(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    highlight_info;
+
+  do
+  {
+    if (XCropWaitHead(context,targets,&highlight_info) == MagickFalse)
+      break;
+    XHighlightRectangle(context->display,context->windows->image.id,
+      context->windows->image.highlight_context,&highlight_info);
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((*event).xany.window == context->windows->command.id)
+      {
+        XCropWaitCommand(context,targets,highlight_info);
+        continue;
+      }
+    XHighlightRectangle(context->display,context->windows->image.id,
+      context->windows->image.highlight_context,&highlight_info);
+    XCropWaitEvent(context,targets,highlight_info);
+    if (((*state) & UpdateConfigurationState) != 0)
+      {
+        (void) XPutBackEvent(context->display,event);
+        (void) XCheckDefineCursor(context->display,context->windows->image.id,
+          context->cursor);
+        break;
+      }
+  } while (((*state) & ExitState) == 0);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6793,8 +6830,7 @@ static MagickBooleanType XCropImage(Display *display,
     scale_factor;
 
   RectangleInfo
-    crop_info,
-    highlight_info;
+    crop_info;
 
   Quantum
     *q;
@@ -6892,28 +6928,7 @@ static MagickBooleanType XCropImage(Display *display,
     */
     state=DefaultState;
     (void) XMapWindow(display,windows->info.id);
-    do
-    {
-      if (XCropWaitHead(&context,&targets,&highlight_info) == MagickFalse)
-        break;
-      XHighlightRectangle(display,windows->image.id,
-        windows->image.highlight_context,&highlight_info);
-      XScreenEvent(display,windows,&event,exception);
-      if (event.xany.window == windows->command.id)
-        {
-          XCropWaitCommand(&context,&targets,highlight_info);
-          continue;
-        }
-      XHighlightRectangle(display,windows->image.id,
-        windows->image.highlight_context,&highlight_info);
-      XCropWaitEvent(&context,&targets,highlight_info);
-      if ((state & UpdateConfigurationState) != 0)
-        {
-          (void) XPutBackEvent(display,&event);
-          (void) XCheckDefineCursor(display,windows->image.id,cursor);
-          break;
-        }
-    } while ((state & ExitState) == 0);
+    XCropWaitCorner(&context,&targets);
   } while ((state & ExitState) == 0);
   (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
   XSetCursorState(display,windows,MagickFalse);
