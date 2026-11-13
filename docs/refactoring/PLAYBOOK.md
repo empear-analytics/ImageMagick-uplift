@@ -429,6 +429,19 @@ blocks of nested logic). Each bump is a missing function.
    `e` only as `e.m` (no `&e`, no whole-element assignment, no other access to the
    array), so the one address computed at the call is the element each statement
    named, and each `v->m` reads and writes that member, in the same order.
+   A struct declared `static` in the caller's body (block scope, never file scope; not an
+   array), which the block passes by address (`&v`) only to callees that keep no copy of it,
+   or reads members of (2026-11-13; `xwindow.c`'s `XMakeWindow`: `static XTextProperty
+   icon_name, window_name;`, filled by `XStringListToTextProperty`), goes the way the
+   struct local above does: the parameter is `T *v` (`const T *v` when the block writes no
+   member and passes `&v` only to pointer-to-`const` parameters), each `&v` of the block is
+   written `v`, each `v.m` `(*v).m`, and the call passes `&v`. The caller takes `&v` nowhere
+   but at calls that keep no copy of it (checked by reading each callee) and at this call.
+   The static is one object of static storage duration at one fixed address (C11
+   6.2.4p3), and its name has block scope, so no other function reaches it: the helper's
+   pointer designates the object the block named, each read and write is the access the
+   block made, at the same point, and the object keeps its value between calls of the
+   caller as before. Nothing is copied, and the helper stores the pointer nowhere.
 4. If the block writes to more than one outer variable, **skip it** and move to the next
    bump. Do not invent an out-parameter struct. A variable that nothing after the block
    reads does not count (a block that runs to the end of the function, step 7, advancing
@@ -580,7 +593,13 @@ whose caller store would be left unused: 2026-11-12, from `xwindow.c`'s
 matte row loop writes `q` (the returned value) and the column counter `x`, whose
 caller store `x=0;` nothing else reads once the XYBitmap and matte loops have left
 (added by Claude Code, Claude Sonnet 5.5, under the owner's OK of 2026-11-10 to
-evolve the recipes).
+evolve the recipes). Step 3's block-scope `static` struct passed by address (2026-11-13, W22 round seven lane b, wide
+build, owner's OK of 2026-11-10 to evolve the recipes): `xwindow.c`'s `XMakeWindow`, whose two
+`XStringListToTextProperty` calls fill the function's `static XTextProperty icon_name, window_name` (a
+block of cc 2 and 8 lines that the function's Complex Method needs moved); the structs are
+structs, so Recipe I's static paragraph (arithmetic, enumeration and pointer types) does not take them, and
+the struct-local form refuses them because their addresses are taken elsewhere (`XSetWMProperties`,
+`XFreeTextProperty`). Added by Claude Code (Claude Sonnet 5.5).
 
 ---
 
@@ -15541,3 +15560,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | GS | Group a Cleanup Macro's Locals into Sets Released in Its Order: a function-local macro of guarded `DestroyImage` calls over locals of a few same-shaped sets becomes one struct type and one release function per set, called in the macro's order; each acquisition chain becomes a function filling its set, the final chain a function returning the result. *Careful* gives the argument (every exit releases the same non-`NULL` images in the same order; the result is returned on the same path; an unreleased temporary stays unreleased) | `composite.c`'s `BlendDivergentImage` (cc 20, 114 lines) (campaign A, W22 lane c): after Recipes RD and HN, 3.70 to 3.90 in a probe | owner |
 | 2026-11-13 | NEW | WP | Fold Wrapper Prologues into One Function and a Guard in Each Callee: wrappers that assert, optionally log, test a precondition of one of a few kinds, fetch a resource that may be `NULL` and return their `static` worker's result become one statement `return(Worker(image,getNameEnvironment(image,Kind,__func__,exception),...));`; the prologue function keeps the asserts, the log (under the wrapper's `__func__`, `NULL` for a wrapper that did not log), the test and the fetch in order, and each worker returns the failure value first when the resource is `NULL`. *Careful* gives the argument (same side effects in the same order, the fetch only where it ran, the worker's guard before anything of its own) | `accelerate.c`'s `Accelerate*Image` wrappers (campaign A, W22 lane d): ten wrappers in *Code Duplication*; D, CF, W, E and G leave a test in each wrapper, which stays flagged; four wrappers in this form, 3.27 to 3.71 in a probe | owner |
 | 2026-11-13 | AMEND | F | Step 1 (*Automatic form*): an automatic array of `const` string pointers, or of pointers to such arrays, whose initialiser holds only string literals, a null pointer and the names of other moved arrays, moves as `static` when every use is an element read, an argument to a pointer-to-`const` parameter whose callee keeps no copy past the call, or a member of a local struct the function only reads. *Careful* gives the argument (const-valued data nothing writes, the same address to the same callees, lifetimes distinguishable only by a use after return, which step 1 refuses); the evidence is the oracle plus the data-section comparison, since the caller's code loses the stores that built the array | `animate.c`'s `XAnimateImages` (campaign A, W22 lane d, wide build): `CommandMenu`, `AnimateMenu`, `SpeedMenu`, `DirectionMenu`, `HelpMenu` and `Menus` are 48 lines of the function's 726; Recipe F handled only `static` declarations | owner |
+| 2026-11-13 | AMEND | E | Step 3: a block-scope `static` struct (not an array) that the block passes by address only to callees keeping no copy, or reads members of, goes as a pointer parameter like a struct local (`&v` written `v`, `v.m` written `(*v).m`, the call passing `&v`). *Careful*-style argument in the text: the static is one object at a fixed address with block scope, so the helper's pointer designates the object the block named and each access is the one the block made, at the same point | `xwindow.c`'s `XMakeWindow` (campaign A, W22 round seven lane b, wide build): the `XStringListToTextProperty` pair fills `static XTextProperty icon_name, window_name`; with the size-hints and icon-geometry helpers the function leaves Complex Method and Large Method, 3.76 to 3.88 in a probe | owner |
