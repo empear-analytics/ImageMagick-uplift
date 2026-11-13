@@ -239,12 +239,32 @@ typedef enum
 #define ShadowWidth  8
 #define ShadowHeight  8
 
+typedef struct _AnimateCommandTile
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  MagickStatusType
+    *state;
+
+  ExceptionInfo
+    *exception;
+} AnimateCommandTile;
+
 /*
   Forward declarations.
 */
 static Image
-  *XMagickCommand(Display *,XResourceInfo *,XWindows *,const AnimateCommand,
-    Image **,MagickStatusType *,ExceptionInfo *);
+  *XMagickCommand(const AnimateCommandTile *,const AnimateCommand);
 
 static MagickBooleanType
   XSaveImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *);
@@ -345,26 +365,18 @@ MagickExport MagickBooleanType AnimateImages(const ImageInfo *image_info,
 %
 %  The format of the XMagickCommand method is:
 %
-%      Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
-%        XWindows *windows,const AnimateCommand animate_command,Image **image,
-%        MagickStatusType *state,ExceptionInfo *exception)
+%      Image *XMagickCommand(const AnimateCommandTile *tile,
+%        const AnimateCommand animate_command)
 %
 %  A description of each parameter follows:
 %
-%    o display: Specifies a connection to an X server; returned from
-%      XOpenDisplay.
-%
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
-%
-%    o windows: Specifies a pointer to a XWindows structure.
-%
-%    o image: the image;  XMagickCommand
-%      may transform the image and return a new image pointer.
-%
-%    o state: Specifies a MagickStatusType;  XMagickCommand may return a
-%      modified state.
-%
-%    o exception: return any errors or warnings in this structure.
+%    o tile: holds the display (a connection to an X server; returned from
+%      XOpenDisplay), the resource_info (a pointer to a X11 XResourceInfo
+%      structure), the windows (a pointer to a XWindows structure), the image
+%      (XMagickCommand may transform the image and return a new image
+%      pointer), the state (a MagickStatusType;  XMagickCommand may return a
+%      modified state) and the exception (return any errors or warnings in
+%      this structure).
 %
 %
 */
@@ -404,27 +416,6 @@ static void XRemoteBrowseDocumentation(Display *display,XWindows *windows,
     (int) strlen(command));
   XSetCursorState(display,windows,MagickFalse);
 }
-
-typedef struct _AnimateCommandTile
-{
-  Display
-    *display;
-
-  XResourceInfo
-    *resource_info;
-
-  XWindows
-    *windows;
-
-  Image
-    **image;
-
-  MagickStatusType
-    *state;
-
-  ExceptionInfo
-    *exception;
-} AnimateCommandTile;
 
 static void XVersionQuitCommand(const AnimateCommandTile *tile,
   const AnimateCommand animate_command)
@@ -895,15 +886,11 @@ static MagickBooleanType XOpenAnimateFiles(const AnimateCommandTile *tile,
   return(MagickTrue);
 }
 
-static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
-  XWindows *windows,const AnimateCommand animate_command,Image **image,
-  MagickStatusType *state,ExceptionInfo *exception)
+static Image *XMagickCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
 {
   Image
     *nexus;
-
-  const AnimateCommandTile
-    tile = { display, resource_info, windows, image, state, exception };
 
   /*
     Process user command.
@@ -913,13 +900,13 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   {
     case OpenCommand:
     {
-      if (XOpenAnimateFiles(&tile,&nexus) == MagickFalse)
+      if (XOpenAnimateFiles(tile,&nexus) == MagickFalse)
         return((Image *) NULL);
       break;
     }
     default:
     {
-      XPlayCommand(&tile,animate_command);
+      XPlayCommand(tile,animate_command);
       break;
     }
   }
@@ -2038,13 +2025,15 @@ static void XMapAnimateImageWindow(const AnimateImageWindow *image_window,
   ExceptionInfo
     *const exception = image_window->exception;
 
+  const AnimateCommandTile
+    tile = { display, resource_info, windows, image, state, exception };
+
   if (windows->backdrop.id != (Window) NULL)
     (void) XInstallColormap(display,map_info->colormap);
   if (LocaleCompare(image_list[0]->magick,"LOGO") == 0)
     {
       if (LocaleCompare(display_image->filename,"LOGO") == 0)
-        (*nexus)=XMagickCommand(display,resource_info,windows,
-          OpenCommand,&(*image),&(*state),exception);
+        (*nexus)=XMagickCommand(&tile,OpenCommand);
       else
         (*state)|=ExitState;
     }
@@ -3232,6 +3221,9 @@ static void XRunCommandWidget(const AnimateCommandWidget *command_widget,
   AnimateCommand
     animate_command;
 
+  AnimateCommandTile
+    tile;
+
   AnimateMenuSelection
     menu_selection;
 
@@ -3255,9 +3247,15 @@ static void XRunCommandWidget(const AnimateCommandWidget *command_widget,
       &animate_command) == MagickFalse)
     return;
   if (animate_command != NullCommand)
-    (*nexus)=XMagickCommand(command_widget->display,
-      command_widget->resource_info,command_widget->windows,animate_command,
-      &(*image),&(*state),command_widget->exception);
+    {
+      tile.display=command_widget->display;
+      tile.resource_info=command_widget->resource_info;
+      tile.windows=command_widget->windows;
+      tile.image=image;
+      tile.state=state;
+      tile.exception=command_widget->exception;
+      (*nexus)=XMagickCommand(&tile,animate_command);
+    }
 }
 
 static void XHandleConfigureNotify(Display *display,
@@ -3753,6 +3751,9 @@ static void XHandleKeyPress(const AnimateEventContext *event_context,
   Image
     **const nexus = targets->nexus;
 
+  const AnimateCommandTile
+    tile = { display, resource_info, windows, image, state, exception };
+
   AnimateCommand
     animate_command;
 
@@ -3789,8 +3790,7 @@ static void XHandleKeyPress(const AnimateEventContext *event_context,
     }
   }
   if (animate_command != NullCommand)
-    (*nexus)=XMagickCommand(display,resource_info,windows,
-      animate_command,image,state,exception);
+    (*nexus)=XMagickCommand(&tile,animate_command);
 }
 
 static void XLogButtonRelease(XResourceInfo *resource_info,const XEvent event)
@@ -5464,14 +5464,16 @@ static Image *XRunAnimateLoop(const AnimateEventContext *event_context,
     play_targets = { &scene, &iterations, &state, &image, &first_scene,
       event };
 
+  const AnimateCommandTile
+    tile = { display, resource_info, windows, images, (&state), exception };
+
   nexus=NewImageList();
   scene=0;
   first_scene=0;
   iterations=0;
   image=image_list[0];
   state=(MagickStatusType) (ForwardAnimationState | RepeatAnimationState);
-  (void) XMagickCommand(display,resource_info,windows,PlayCommand,images,
-    &state,exception);
+  (void) XMagickCommand(&tile,PlayCommand);
   do
   {
     if (IsAnimationStep(display,state) != MagickFalse)
