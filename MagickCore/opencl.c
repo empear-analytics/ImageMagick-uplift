@@ -374,14 +374,19 @@ static const char *GetOpenCLCacheDirectoryValue(void)
   return(cache_directory);
 }
 
+static void LockOpenCLCacheDirectory(void)
+{
+  if (cache_directory_lock == (SemaphoreInfo *) NULL)
+    ActivateSemaphoreInfo(&cache_directory_lock);
+  LockSemaphoreInfo(cache_directory_lock);
+}
+
 static const char *GetOpenCLCacheDirectory()
 {
   if (cache_directory != (char *) NULL)
     return(GetOpenCLCacheDirectoryValue());
   {
-      if (cache_directory_lock == (SemaphoreInfo *) NULL)
-        ActivateSemaphoreInfo(&cache_directory_lock);
-      LockSemaphoreInfo(cache_directory_lock);
+      LockOpenCLCacheDirectory();
       if (cache_directory == (char *) NULL)
         {
           char
