@@ -11945,12 +11945,12 @@ static XWidgetInfo TrackListBrowserSlider(XWidgetInfo slider_info,
   return(slider_info);
 }
 
+#define CancelButtonText  "Cancel"
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
 {
-#define CancelButtonText  "Cancel"
-
   char
     primary_selection[MagickPathExtent];
 
