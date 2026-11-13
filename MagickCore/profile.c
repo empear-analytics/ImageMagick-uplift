@@ -3497,9 +3497,11 @@ static void GetXMPContinuedFraction(double value,
       term;
 
     term=floor(remainder);
-    if ((TryAccumulate(term,num,prev_num,&new_num) == MagickFalse) ||
-        (TryAccumulate(term,den,prev_den,&new_den) == MagickFalse) ||
-        (new_den == 0))
+    if (TryAccumulate(term,num,prev_num,&new_num) == MagickFalse)
+      break;
+    if (TryAccumulate(term,den,prev_den,&new_den) == MagickFalse)
+      break;
+    if (new_den == 0)
       break;
     prev_num=num;
     num=new_num;
