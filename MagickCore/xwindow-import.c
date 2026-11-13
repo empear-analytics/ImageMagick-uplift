@@ -128,6 +128,10 @@ typedef struct _WindowImageContext
 /*
   Forward declarations.
 */
+static Image
+  *XGetWindowImage(const WindowImageContext *,const Window,const unsigned int,
+    const unsigned int);
+
 static Window
   XSelectWindow(Display *,RectangleInfo *);
 
@@ -1074,6 +1078,18 @@ static MagickBooleanType XImportWindowImage(const WindowImageSource *source)
   return(MagickTrue);
 }
 
+static void XImportChildWindows(const WindowImageContext child_context,
+  Window *children,const unsigned int number_children,const unsigned int level)
+{
+  int
+    i;
+
+  for (i=0; i < (int) number_children; i++)
+    (void) XGetWindowImage(&child_context,children[i],MagickFalse,
+      level+1);
+  (void) XFree((void *) children);
+}
+
 static void XEliminateOrphanedWindow(WindowInfo *window_info,const int id,
   int *number_windows)
 {
@@ -1171,9 +1187,6 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
   RectangleInfo
     crop_info;
 
-  int
-    i;
-
   static ColormapInfo
     *colormap_info = (ColormapInfo *) NULL;
 
@@ -1254,10 +1267,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
           const WindowImageContext
             child_context = { display, exception };
 
-          for (i=0; i < (int) number_children; i++)
-            (void) XGetWindowImage(&child_context,children[i],MagickFalse,
-              level+1);
-          (void) XFree((void *) children);
+          XImportChildWindows(child_context,children,number_children,level);
         }
     }
   if (level <= 1)
