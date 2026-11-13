@@ -1542,6 +1542,15 @@ typedef struct _AnimateBackgroundEarlyTargets
 
   XWindowInfo
     *window_info;
+
+  XPixelInfo
+    *pixel;
+
+  XStandardColormap
+    **map_info;
+
+  XVisualInfo
+    **visual_info;
 } AnimateBackgroundEarlyTargets;
 
 static void XFindBackgroundWindow(Display *display,
@@ -1569,6 +1578,54 @@ static void XFindBackgroundWindow(Display *display,
       if ((*window_info).id == (Window) NULL)
         (*window_info).id=
           XWindowByName(display,(*root_window),(*resources).window_id);
+    }
+}
+
+static void XCreateBackgroundVisual(Display *display,const char *filename,
+  char *visual_type,const AnimateBackgroundEarlyTargets *targets)
+{
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XStandardColormap
+    **const map_info = targets->map_info;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  if ((*visual_info) == (XVisualInfo *) NULL)
+    {
+      /*
+        Allocate standard colormap.
+      */
+      (*map_info)=XAllocStandardColormap();
+      if ((*map_info) == (XStandardColormap *) NULL)
+        ThrowXWindowFatalException(ResourceLimitFatalError,
+          "MemoryAllocationFailed",filename);
+      (*map_info)->colormap=(Colormap) NULL;
+      (*pixel).pixels=(unsigned long *) NULL;
+      /*
+        Initialize visual info.
+      */
+      (*resources).map_type=(char *) NULL;
+      (*resources).visual_type=visual_type;
+      (*visual_info)=XBestVisualInfo(display,(*map_info),resources);
+      if ((*visual_info) == (XVisualInfo *) NULL)
+        ThrowXWindowFatalException(XServerFatalError,"UnableToGetVisual",
+          filename);
+      /*
+        Initialize window info.
+      */
+      (*window_info).ximage=(XImage *) NULL;
+      (*window_info).matte_image=(XImage *) NULL;
+      (*window_info).pixmap=(Pixmap) NULL;
+      (*window_info).matte_pixmap=(Pixmap) NULL;
     }
 }
 
@@ -1618,7 +1675,8 @@ MagickExport void XAnimateBackgroundImage(Display *display,
       &height, &pixel };
 
   const AnimateBackgroundEarlyTargets
-    early_targets = { &root_window, &resources, &window_info };
+    early_targets = { &root_window, &resources, &window_info, &pixel,
+      &map_info, &visual_info };
 
   /*
     Determine target window.
@@ -1638,34 +1696,8 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     Determine window visual id.
   */
   XGetBackgroundVisualType(display,&targets,visual_type);
-  if (visual_info == (XVisualInfo *) NULL)
-    {
-      /*
-        Allocate standard colormap.
-      */
-      map_info=XAllocStandardColormap();
-      if (map_info == (XStandardColormap *) NULL)
-        ThrowXWindowFatalException(ResourceLimitFatalError,
-          "MemoryAllocationFailed",images->filename);
-      map_info->colormap=(Colormap) NULL;
-      pixel.pixels=(unsigned long *) NULL;
-      /*
-        Initialize visual info.
-      */
-      resources.map_type=(char *) NULL;
-      resources.visual_type=visual_type;
-      visual_info=XBestVisualInfo(display,map_info,&resources);
-      if (visual_info == (XVisualInfo *) NULL)
-        ThrowXWindowFatalException(XServerFatalError,"UnableToGetVisual",
-          images->filename);
-      /*
-        Initialize window info.
-      */
-      window_info.ximage=(XImage *) NULL;
-      window_info.matte_image=(XImage *) NULL;
-      window_info.pixmap=(Pixmap) NULL;
-      window_info.matte_pixmap=(Pixmap) NULL;
-    }
+  XCreateBackgroundVisual(display,images->filename,visual_type,
+    &early_targets);
   /*
     Free previous root colors.
   */
