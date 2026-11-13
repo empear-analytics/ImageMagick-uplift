@@ -546,6 +546,21 @@ static inline MagickBooleanType IsSubpathStart(const PathInfo *path_info,
     (path_info[i].code == GhostlineCode)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType GrowPolygonEdges(PolygonInfo *polygon_info,
+  const size_t edge,size_t *number_edges)
+{
+  if (edge == (*number_edges))
+    {
+      (*number_edges)<<=1;
+      polygon_info->edges=(EdgeInfo *) ResizeQuantumMemory(
+        polygon_info->edges,(size_t) (*number_edges),
+        sizeof(*polygon_info->edges));
+      if (polygon_info->edges == (EdgeInfo *) NULL)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   ExceptionInfo *exception)
 {
@@ -621,19 +636,12 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
         */
         if ((points != (PointInfo *) NULL) && (n >= 2))
           {
-            if (edge == number_edges)
+            if (GrowPolygonEdges(polygon_info,edge,&number_edges) == MagickFalse)
               {
-                number_edges<<=1;
-                polygon_info->edges=(EdgeInfo *) ResizeQuantumMemory(
-                  polygon_info->edges,(size_t) number_edges,
-                  sizeof(*polygon_info->edges));
-                if (polygon_info->edges == (EdgeInfo *) NULL)
-                  {
-                    (void) ThrowMagickException(exception,GetMagickModule(),
-                      ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-                    points=(PointInfo *) RelinquishMagickMemory(points);
-                    return(DestroyPolygonInfo(polygon_info));
-                  }
+                (void) ThrowMagickException(exception,GetMagickModule(),
+                  ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+                points=(PointInfo *) RelinquishMagickMemory(points);
+                return(DestroyPolygonInfo(polygon_info));
               }
             polygon_info->edges[edge].number_points=(size_t) n;
             polygon_info->edges[edge].scanline=(-1.0);
@@ -684,19 +692,12 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
           New edge.
         */
         point=points[n-1];
-        if (edge == number_edges)
+        if (GrowPolygonEdges(polygon_info,edge,&number_edges) == MagickFalse)
           {
-            number_edges<<=1;
-            polygon_info->edges=(EdgeInfo *) ResizeQuantumMemory(
-              polygon_info->edges,(size_t) number_edges,
-              sizeof(*polygon_info->edges));
-            if (polygon_info->edges == (EdgeInfo *) NULL)
-              {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-                points=(PointInfo *) RelinquishMagickMemory(points);
-                return(DestroyPolygonInfo(polygon_info));
-              }
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+            points=(PointInfo *) RelinquishMagickMemory(points);
+            return(DestroyPolygonInfo(polygon_info));
           }
         polygon_info->edges[edge].number_points=(size_t) n;
         polygon_info->edges[edge].scanline=(-1.0);
@@ -756,18 +757,11 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
         points=(PointInfo *) RelinquishMagickMemory(points);
       else
         {
-          if (edge == number_edges)
+          if (GrowPolygonEdges(polygon_info,edge,&number_edges) == MagickFalse)
             {
-              number_edges<<=1;
-              polygon_info->edges=(EdgeInfo *) ResizeQuantumMemory(
-                polygon_info->edges,(size_t) number_edges,
-                sizeof(*polygon_info->edges));
-              if (polygon_info->edges == (EdgeInfo *) NULL)
-                {
-                  (void) ThrowMagickException(exception,GetMagickModule(),
-                    ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-                  return(DestroyPolygonInfo(polygon_info));
-                }
+              (void) ThrowMagickException(exception,GetMagickModule(),
+                ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+              return(DestroyPolygonInfo(polygon_info));
             }
           polygon_info->edges[edge].number_points=(size_t) n;
           polygon_info->edges[edge].scanline=(-1.0);
