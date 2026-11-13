@@ -3355,14 +3355,7 @@ static MagickBooleanType ImportMapQuantumBI(const ImportMapRequest *request,
     }
     default:
     {
-      ImportMapRequest
-        request;
-
-      request.image=image;
-      request.map=map;
-      request.i=i;
-      request.exception=exception;
-      if (ImportMapQuantumAO(&request,quantum_map) == MagickFalse)
+      if (ImportMapQuantumAO(request,quantum_map) == MagickFalse)
         return(MagickFalse);
       break;
     }
@@ -3403,14 +3396,7 @@ static MagickBooleanType ImportMapQuantumCK(const ImportMapRequest *request,
     }
     default:
     {
-      ImportMapRequest
-        request;
-
-      request.image=image;
-      request.map=map;
-      request.i=i;
-      request.exception=exception;
-      if (ImportMapQuantumBI(&request,quantum_map) == MagickFalse)
+      if (ImportMapQuantumBI(request,quantum_map) == MagickFalse)
         return(MagickFalse);
       break;
     }
@@ -3451,14 +3437,7 @@ static MagickBooleanType ImportMapQuantumMY(const ImportMapRequest *request,
     }
     default:
     {
-      ImportMapRequest
-        request;
-
-      request.image=image;
-      request.map=map;
-      request.i=i;
-      request.exception=exception;
-      if (ImportMapQuantumCK(&request,quantum_map) == MagickFalse)
+      if (ImportMapQuantumCK(request,quantum_map) == MagickFalse)
         return(MagickFalse);
       break;
     }
@@ -3583,22 +3562,15 @@ static MagickBooleanType ImportMapQuantums(const ImportMapParse *parse)
 
   for (i=0; i < (ssize_t) length; i++)
   {
-    switch (map[i])
-    {
-      default:
-      {
-        ImportMapRequest
-          request;
+    ImportMapRequest
+      request;
 
-        request.image=image;
-        request.map=map;
-        request.i=i;
-        request.exception=exception;
-        if (ImportMapQuantumMY(&request,quantum_map) == MagickFalse)
-          return(MagickFalse);
-        break;
-      }
-    }
+    request.image=image;
+    request.map=map;
+    request.i=i;
+    request.exception=exception;
+    if (ImportMapQuantumMY(&request,quantum_map) == MagickFalse)
+      return(MagickFalse);
   }
   return(MagickTrue);
 }
