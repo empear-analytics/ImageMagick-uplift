@@ -4774,18 +4774,9 @@ static MagickBooleanType ImportInteger32BitIndexQuantum(const Image *image,
 static MagickBooleanType Import32BitIndexQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
-  MagickBooleanType
-    range_exception = MagickFalse;
-
   if (quantum_info->format == FloatingPointQuantumFormat)
-    {
-      return(ImportFloat32BitIndexQuantum(image,quantum_info,span));
-    }
-  else
-    {
-      return(ImportInteger32BitIndexQuantum(image,quantum_info,span));
-    }
-  return(range_exception);
+    return(ImportFloat32BitIndexQuantum(image,quantum_info,span));
+  return(ImportInteger32BitIndexQuantum(image,quantum_info,span));
 }
 
 static MagickBooleanType Import24BitFloatIndexQuantum(const Image *image,
@@ -5221,18 +5212,9 @@ static MagickBooleanType ImportInteger32BitIndexAlphaQuantum(const Image *image,
 static MagickBooleanType Import32BitIndexAlphaQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
-  MagickBooleanType
-    range_exception = MagickFalse;
-
   if (quantum_info->format == FloatingPointQuantumFormat)
-    {
-      return(ImportFloat32BitIndexAlphaQuantum(image,quantum_info,span));
-    }
-  else
-    {
-      return(ImportInteger32BitIndexAlphaQuantum(image,quantum_info,span));
-    }
-  return(range_exception);
+    return(ImportFloat32BitIndexAlphaQuantum(image,quantum_info,span));
+  return(ImportInteger32BitIndexAlphaQuantum(image,quantum_info,span));
 }
 
 static MagickBooleanType Import24BitFloatIndexAlphaQuantum(const Image *image,
