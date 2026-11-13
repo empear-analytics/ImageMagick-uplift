@@ -159,6 +159,61 @@ static void ParseGeometryXOffset(char **p,MagickStatusType *flags,ssize_t *x)
     }
 }
 
+static MagickStatusType ParseGeometryWidth(char **p,const char *q,
+  MagickStatusType flags,size_t *width)
+{
+  int
+    c;
+
+  if ((**p == '+') || (**p == '-'))
+    return(flags);
+  c=(int) ((unsigned char) *q);
+  if (IsGeometryWidthTerminator(c,q) == MagickFalse)
+    return(flags);
+  /*
+    Parse width.
+  */
+  q=(*p);
+  if (width != (size_t *) NULL)
+    {
+      if (LocaleNCompare(*p,"0x",2) == 0)
+        *width=(size_t) strtol(*p,p,10);
+      else
+        *width=CastDoubleToSizeT(StringToDouble(*p,p)+0.5);
+    }
+  if (*p != q)
+    flags|=WidthValue;
+  return(flags);
+}
+
+static MagickStatusType ParseGeometryHeight(char **p,MagickStatusType flags,
+  size_t *height)
+{
+  char
+    *q;
+
+  int
+    c;
+
+  if ((**p == '+') || (**p == '-'))
+    return(flags);
+  c=(int) ((unsigned char) **p);
+  if (IsGeometryHeightSeparator(c,*p) == MagickFalse)
+    return(flags);
+  (*p)++;
+  if ((**p == '+') || (**p == '-'))
+    return(flags);
+  /*
+    Parse height.
+  */
+  q=(*p);
+  if (height != (size_t *) NULL)
+    *height=CastDoubleToSizeT(StringToDouble(*p,p)+0.5);
+  if (*p != q)
+    flags|=HeightValue;
+  return(flags);
+}
+
 static void ParseGeometryYOffset(char **p,MagickStatusType *flags,ssize_t *y)
 {
   char
@@ -322,45 +377,8 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   (void) value;
   if (LocaleNCompare(p,"0x",2) == 0)
     value=(double) strtol(p,&q,10);
-  if ((*p != '+') && (*p != '-'))
-    {
-      c=(int) ((unsigned char) *q);
-      if (IsGeometryWidthTerminator(c,q) != MagickFalse)
-        {
-          /*
-            Parse width.
-          */
-          q=p;
-          if (width != (size_t *) NULL)
-            {
-              if (LocaleNCompare(p,"0x",2) == 0)
-                *width=(size_t) strtol(p,&p,10);
-              else
-                *width=CastDoubleToSizeT(StringToDouble(p,&p)+0.5);
-            }
-          if (p != q)
-            flags|=WidthValue;
-        }
-    }
-  if ((*p != '+') && (*p != '-'))
-    {
-      c=(int) ((unsigned char) *p);
-      if (IsGeometryHeightSeparator(c,p) != MagickFalse)
-        {
-          p++;
-          if ((*p != '+') && (*p != '-'))
-            {
-              /*
-                Parse height.
-              */
-              q=p;
-              if (height != (size_t *) NULL)
-                *height=CastDoubleToSizeT(StringToDouble(p,&p)+0.5);
-              if (p != q)
-                flags|=HeightValue;
-            }
-        }
-    }
+  flags=ParseGeometryWidth(&p,q,flags,width);
+  flags=ParseGeometryHeight(&p,flags,height);
   if ((*p == '+') || (*p == '-'))
     ParseGeometryXOffset(&p,&flags,x);
   if ((*p == '+') || (*p == '-'))
