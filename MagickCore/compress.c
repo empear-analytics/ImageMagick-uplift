@@ -737,6 +737,14 @@ RestoreMSCWarning \
     }  \
 }
 
+static inline const HuffmanTable *HuffmanMakeupEntry(
+  const HuffmanTable *table,const int runlength)
+{
+  if (runlength < 1792)
+    return(table+((runlength/64)-1));
+  return(EXTable+(MagickMin((size_t) runlength,2560)-1792)/64);
+}
+
 static void OutputHuffmanEndOfLine(const ImageInfo *image_info,Image *image,
   unsigned char *caller_byte,unsigned char *caller_bit)
 {
@@ -863,10 +871,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
       }
       if (runlength >= 64)
         {
-          if (runlength < 1792)
-            entry=MWTable+((runlength/64)-1);
-          else
-            entry=EXTable+(MagickMin((size_t) runlength,2560)-1792)/64;
+          entry=HuffmanMakeupEntry(MWTable,runlength);
           runlength-=(long) entry->count;
           HuffmanOutputCode(entry);
         }
@@ -884,9 +889,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
           }
           if (runlength >= 64)
             {
-              entry=MBTable+((runlength/64)-1);
-              if (runlength >= 1792)
-                entry=EXTable+(MagickMin((size_t) runlength,2560)-1792)/64;
+              entry=HuffmanMakeupEntry(MBTable,runlength);
               runlength-=(long) entry->count;
               HuffmanOutputCode(entry);
             }
