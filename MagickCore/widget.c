@@ -15663,6 +15663,9 @@ typedef struct _TextViewWidgets
 
   XWidgetInfo
     *list_info;
+
+  XWidgetInfo
+    *selection_info;
 } TextViewWidgets;
 
 typedef struct _TextViewContext
@@ -16000,6 +16003,71 @@ static void PressTextViewSlider(const TextViewContext *context,
   PressTextViewScroll(context,event,targets,widgets);
 }
 
+static void HandleTextViewSelectionEvent(const TextViewContext *context,
+  XEvent event,const TextViewWidgets *widgets)
+{
+  char
+    *const primary_selection = context->primary_selection;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  switch (event.type)
+  {
+    case MotionNotify:
+    {
+      MoveTextViewPointer(context,widgets);
+      break;
+    }
+    case SelectionClear:
+    {
+      (*list_info).id=(~0);
+      (*selection_info).id=(~0);
+      (*state)|=RedrawListState;
+      break;
+    }
+    case SelectionRequest:
+    {
+      XSelectionEvent
+        notify;
+
+      XSelectionRequestEvent
+        *request;
+
+      if ((*list_info).id == (~0))
+        break;
+      /*
+        Set primary selection.
+      */
+      request=(&(event.xselectionrequest));
+      (void) XChangeProperty(request->display,request->requestor,
+        request->property,request->target,8,PropModeReplace,
+        (unsigned char *) primary_selection,Extent(primary_selection));
+      notify.type=SelectionNotify;
+      notify.send_event=MagickTrue;
+      notify.display=request->display;
+      notify.requestor=request->requestor;
+      notify.selection=request->selection;
+      notify.target=request->target;
+      notify.time=request->time;
+      if (request->property == None)
+        notify.property=request->target;
+      else
+        notify.property=request->property;
+      (void) XSendEvent(request->display,request->requestor,False,NoEventMask,
+        (XEvent *) &notify);
+    }
+    default:
+      break;
+  }
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16055,7 +16123,8 @@ MagickPrivate void XTextViewWidget(Display *display,
 
   const TextViewWidgets
     view_widgets = { &north_info, &south_info, &delay, &slider_info,
-      &dismiss_info, &state, &scroll_info, &visible_lines, &event, &list_info };
+      &dismiss_info, &state, &scroll_info, &visible_lines, &event, &list_info,
+      &selection_info };
 
   TextViewContext
     view_context;
@@ -16379,51 +16448,11 @@ MagickPrivate void XTextViewWidget(Display *display,
         mask&=(unsigned int) (~CWY);
         break;
       }
-      case MotionNotify:
-      {
-        MoveTextViewPointer(&view_context,&view_widgets);
-        break;
-      }
-      case SelectionClear:
-      {
-        list_info.id=(~0);
-        selection_info.id=(~0);
-        state|=RedrawListState;
-        break;
-      }
-      case SelectionRequest:
-      {
-        XSelectionEvent
-          notify;
-
-        XSelectionRequestEvent
-          *request;
-
-        if (list_info.id == (~0))
-          break;
-        /*
-          Set primary selection.
-        */
-        request=(&(event.xselectionrequest));
-        (void) XChangeProperty(request->display,request->requestor,
-          request->property,request->target,8,PropModeReplace,
-          (unsigned char *) primary_selection,Extent(primary_selection));
-        notify.type=SelectionNotify;
-        notify.send_event=MagickTrue;
-        notify.display=request->display;
-        notify.requestor=request->requestor;
-        notify.selection=request->selection;
-        notify.target=request->target;
-        notify.time=request->time;
-        if (request->property == None)
-          notify.property=request->target;
-        else
-          notify.property=request->property;
-        (void) XSendEvent(request->display,request->requestor,False,NoEventMask,
-          (XEvent *) &notify);
-      }
       default:
+      {
+        HandleTextViewSelectionEvent(&view_context,event,&view_widgets);
         break;
+      }
     }
   } while ((state & ExitState) == 0);
   if (text_info != windows->widget.font_info)
