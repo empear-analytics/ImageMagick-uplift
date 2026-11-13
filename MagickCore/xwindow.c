@@ -9018,14 +9018,21 @@ static void XFreeTextProperty(XTextProperty *text_property)
     }
 }
 
+static void XSetWindowProtocols(Display *display,const XWindowInfo *window_info)
+{
+  Atom
+    atom_list[2];
+
+  atom_list[0]=XInternAtom(display,"WM_DELETE_WINDOW",MagickFalse);
+  atom_list[1]=XInternAtom(display,"WM_TAKE_FOCUS",MagickFalse);
+  (void) XSetWMProtocols(display,window_info->id,atom_list,2);
+}
+
 MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   int argc,XClassHint *class_hint,XWMHints *manager_hints,
   XWindowInfo *window_info)
 {
 #define MinWindowSize  64
-
-  Atom
-    atom_list[2];
 
   int
     gravity;
@@ -9122,9 +9129,7 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
     size_hints,manager_hints,class_hint);
   XFreeTextProperty(&window_name);
   XFreeTextProperty(&icon_name);
-  atom_list[0]=XInternAtom(display,"WM_DELETE_WINDOW",MagickFalse);
-  atom_list[1]=XInternAtom(display,"WM_TAKE_FOCUS",MagickFalse);
-  (void) XSetWMProtocols(display,window_info->id,atom_list,2);
+  XSetWindowProtocols(display,window_info);
   (void) XFree((void *) size_hints);
   if (window_info->shape != MagickFalse)
     {
