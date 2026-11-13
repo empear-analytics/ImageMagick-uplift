@@ -13591,6 +13591,9 @@ typedef struct _ROITargets
 
   size_t
     *state;
+
+  XEvent
+    *event;
 } ROITargets;
 
 static void XROIButtonPress(const CropEventInput *event_input,
@@ -14432,6 +14435,58 @@ static const DisplayCommand
     ROIMiscellanyCommands
   };
 
+typedef struct _ROIContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+} ROIContext;
+
+static void XROIPointerCommand(const ROIContext *context,
+  const ROITargets *targets)
+{
+  int
+    id;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(context->display,context->windows,ROIMenu,event);
+  if (id < 0)
+    return;
+  switch (ROICommands[id])
+  {
+    case ROIHelpCommand:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,"Help Viewer - Region of Interest",ImageROIHelp);
+      break;
+    }
+    case ROIDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -14447,7 +14502,6 @@ static MagickBooleanType XROIImage(Display *display,
     cursor;
 
   int
-    id,
     x,
     y;
 
@@ -14462,8 +14516,11 @@ static MagickBooleanType XROIImage(Display *display,
   XEvent
     event;
 
+  ROIContext
+    context;
+
   const ROITargets
-    targets = { &x, &y, &roi_info, &state };
+    targets = { &x, &y, &roi_info, &state, &event };
 
   const ROIKeyTargets
     key_targets = { &roi_info, &display_command, &state };
@@ -14489,6 +14546,9 @@ static MagickBooleanType XROIImage(Display *display,
   roi_info.height=0;
   cursor=XCreateFontCursor(display,XC_fleur);
   state=DefaultState;
+  context.display=display;
+  context.resource_info=resource_info;
+  context.windows=windows;
   do
   {
     if (windows->info.mapped != MagickFalse)
@@ -14506,32 +14566,7 @@ static MagickBooleanType XROIImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     if (event.xany.window == windows->command.id)
       {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,ROIMenu,&event);
-        if (id < 0)
-          continue;
-        switch (ROICommands[id])
-        {
-          case ROIHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Region of Interest",ImageROIHelp);
-            break;
-          }
-          case ROIDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
+        XROIPointerCommand(&context,&targets);
         continue;
       }
     switch (event.type)
