@@ -1480,6 +1480,14 @@ static NodeInfo **GetSplayChildLink(NodeInfo *n,const int compare)
   return((NodeInfo **) NULL);
 }
 
+static NodeInfo *GetSplayParentNode(NodeInfo **parent)
+{
+  if (parent != (NodeInfo **) NULL)
+    return(*parent);
+  else
+    return((NodeInfo *) NULL);
+}
+
 static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
   const void *key,const SplayPath *path)
 {
@@ -1497,12 +1505,7 @@ static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
 
   n=(*node);
   if (n == (NodeInfo *) NULL)
-    {
-      if (parent != (NodeInfo **) NULL)
-        return(*parent);
-      else
-        return((NodeInfo *) NULL);
-    }
+    return(GetSplayParentNode(parent));
   compare=CompareNodeKey(splay_tree,n,key);
   next=GetSplayChildLink(n,compare);
   if (next != (NodeInfo **) NULL)
