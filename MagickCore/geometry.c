@@ -287,10 +287,6 @@ MagickExport void GravityAdjustGeometry(const size_t width,
         region->x);
       break;
     }
-    case ForgetGravity:
-    case NorthWestGravity:
-    case WestGravity:
-    case SouthWestGravity:
     default:
       break;
   }
@@ -311,10 +307,6 @@ MagickExport void GravityAdjustGeometry(const size_t width,
         region->y);
       break;
     }
-    case ForgetGravity:
-    case NorthWestGravity:
-    case NorthGravity:
-    case NorthEastGravity:
     default:
       break;
   }
