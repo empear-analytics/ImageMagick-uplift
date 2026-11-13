@@ -1235,6 +1235,128 @@ static XImage *XGetListedXImage(Display *display,const WindowInfo *window_info,
   return(ximage);
 }
 
+typedef struct _WindowLoopInput
+{
+  Display
+    *display;
+
+  ExceptionInfo
+    *exception;
+
+  WindowInfo
+    *window_info;
+
+  int
+    id;
+
+  Window
+    window;
+
+  RectangleInfo
+    crop_info;
+} WindowLoopInput;
+
+typedef struct _WindowLoopTargets
+{
+  Image
+    **image;
+
+  ColormapInfo
+    **colormap_info;
+} WindowLoopTargets;
+
+static MagickBooleanType XImportListedWindow(const WindowLoopInput *iteration,
+  const WindowLoopTargets *loop_targets)
+{
+  Display
+    *const display = iteration->display;
+
+  ExceptionInfo
+    *const exception = iteration->exception;
+
+  WindowInfo
+    *const window_info = iteration->window_info;
+
+  const int
+    id = iteration->id;
+
+  Image
+    **const image = loop_targets->image;
+
+  Image
+    *composite_image;
+
+  MagickBooleanType
+    import;
+
+  unsigned int
+    number_colors;
+
+  XColor
+    *colors;
+
+  XImage
+    *ximage;
+
+  const WindowColormapTargets
+    targets = { &number_colors,&colors,loop_targets->colormap_info };
+
+  /*
+    Does target window intersect top level window?
+  */
+  import=IsWindowImported(window_info,id);
+  if (import == MagickFalse)
+    return(MagickTrue);
+  /*
+    Get X image.
+  */
+  ximage=XGetListedXImage(display,window_info,id);
+  if (ximage == (XImage *) NULL)
+    return(MagickTrue);
+  /*
+    Initialize window colormap.
+  */
+  number_colors=0;
+  colors=(XColor *) NULL;
+  {
+    const WindowColormapInput
+      input = { display, window_info, id, ximage };
+
+    if (XGetWindowColormap(&input,&targets) == MagickFalse)
+      return(MagickFalse);
+  }
+  /*
+    Allocate image structure.
+  */
+  composite_image=AcquireImage((ImageInfo *) NULL,exception);
+  if (composite_image == (Image *) NULL)
+    {
+      XDestroyImage(ximage);
+      return(MagickFalse);
+    }
+  {
+    const WindowConvertInput
+      input = { composite_image, exception, ximage, colors,
+        number_colors, window_info, id };
+
+    if (XConvertWindowImage(&input) == MagickFalse)
+      return(MagickFalse);
+  }
+  if ((*image) == (Image *) NULL)
+    {
+      (*image)=composite_image;
+      return(MagickTrue);
+    }
+  {
+    const WindowCompositeInput
+      input = { display, exception, window_info, id, iteration->window,
+        iteration->crop_info, (*image), composite_image };
+
+    XCompositeWindowImage(&input);
+  }
+  return(MagickTrue);
+}
+
 static void XRelinquishColormapInfo(ColormapInfo **colormap_info)
 {
   ColormapInfo
@@ -1448,23 +1570,10 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
   if (level <= 1)
     {
       Image
-        *composite_image,
         *image;
 
-      MagickBooleanType
-        import;
-
-      unsigned int
-        number_colors;
-
-      XColor
-        *colors;
-
-      XImage
-        *ximage;
-
-      const WindowColormapTargets
-        targets = { &number_colors,&colors,&colormap_info };
+      const WindowLoopTargets
+        loop_targets = { &image,&colormap_info };
 
       /*
         Get X image for each window in the list.
@@ -1472,59 +1581,12 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
       image=NewImageList();
       for (id=0; id < number_windows; id++)
       {
-        /*
-          Does target window intersect top level window?
-        */
-        import=IsWindowImported(window_info,id);
-        if (import == MagickFalse)
-          continue;
-        /*
-          Get X image.
-        */
-        ximage=XGetListedXImage(display,window_info,id);
-        if (ximage == (XImage *) NULL)
-          continue;
-        /*
-          Initialize window colormap.
-        */
-        number_colors=0;
-        colors=(XColor *) NULL;
-        {
-          const WindowColormapInput
-            input = { display, window_info, id, ximage };
+        const WindowLoopInput
+          iteration = { display, exception, window_info, id, window,
+            crop_info };
 
-          if (XGetWindowColormap(&input,&targets) == MagickFalse)
-            return((Image *) NULL);
-        }
-        /*
-          Allocate image structure.
-        */
-        composite_image=AcquireImage((ImageInfo *) NULL,exception);
-        if (composite_image == (Image *) NULL)
-          {
-            XDestroyImage(ximage);
-            return((Image *) NULL);
-          }
-        {
-          const WindowConvertInput
-            input = { composite_image, exception, ximage, colors,
-              number_colors, window_info, id };
-
-          if (XConvertWindowImage(&input) == MagickFalse)
-            return((Image *) NULL);
-        }
-        if (image == (Image *) NULL)
-          {
-            image=composite_image;
-            continue;
-          }
-        {
-          const WindowCompositeInput
-            input = { display, exception, window_info, id, window, crop_info,
-              image, composite_image };
-
-          XCompositeWindowImage(&input);
-        }
+        if (XImportListedWindow(&iteration,&loop_targets) == MagickFalse)
+          return((Image *) NULL);
       }
       XRelinquishColormapInfo(&colormap_info);
       /*
