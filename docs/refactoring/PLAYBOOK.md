@@ -13718,7 +13718,11 @@ labels in a `switch` of the new function; Recipe EC, which names an equality cha
    The peeled group `G` has labels `L1 ... Ln` (character constants or integer literals)
    and exactly the body `p++; break;` (the group's braces and comments aside); no label
    of `G` occurs in another group, and no group falls into `G` or out of it. No `#` line
-   stands inside the `switch`.
+   stands inside the `switch`. Widening (2026-11-13): `c` may be a local of
+   any integer type that nothing in the loop body after its assignment writes (the
+   predicate's parameter then has that type, `const ssize_t selector`), and `G`'s body may
+   instead be one call statement `F(...);` and `break;`, whose call writes nothing the
+   `switch` tests (step 3 then copies that call in place of `p++`).
 2. Directly above the first function that uses it write `static inline
    MagickBooleanType Name(const int c)` whose body is `switch (c) { <L1 ... Ln in the
    original order> return(MagickTrue); default: break; } return(MagickFalse);`.
@@ -13785,6 +13789,10 @@ labels in a `switch` of the new function; Recipe EC, which names an equality cha
 **Provenance:** 2026-11-13, from `geometry-parse.c`'s `GetGeometry` and `ParseGeometry`
 (campaign B, M121): 6.80 to 6.99, cc 50 and 52 to 36 and 38. Added by Claude Code (Claude
 Sonnet 5.5) under the mandate of 2026-10-24.
+Step 1's widening (2026-11-13, campaign B, M127 lane c): `profile.c`'s `UpdateClipPath`,
+whose knot group is a call on a `ssize_t` selector. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24.
+Lane: c
 
 ---
 
@@ -14813,3 +14821,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | TC | Drop a loop body's last statement `if (cond) continue;` when `cond` has no side effect; proof `obj_identical.sh` | `locale.c`'s `LoadLocaleCache` (cc 22 to 20, 6.46 to 6.50, object code identical) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | W | Step 3: up to three plain locals the caller reads after the block may be written, each by pointer on Recipe RV step 6(b)'s terms (`(*v)` at every use, `&v` passed on written `v`), counted among step 5's four parameters; `R` reads none of them. *Careful* unchanged: on the success path each pointer has carried the block's writes to the caller's variable, on a failure path the caller returns at once | `profile.c`'s `SyncExifProfile` (lane c, M127): the Exif header block (length test, marker scan, byte-order test, `0x002a` test) returns on failure and writes `exif`, `length` and `endian`, which the IFD walk reads; part of a chain measured 3.58 to 4.03 on a scratch copy | mandate (2026-10-24) |
 | 2026-11-13 | NEW | BC | Extract a Loop-Body Tail Returning Whether It Broke: the tail of a sequential loop's body whose every path ends the iteration by `continue;` or `break;` becomes a `static MagickBooleanType` function returning `MagickTrue` for each `break;` and `MagickFalse` for each `continue;`; the caller writes `if (Helper(...) != MagickFalse) break;` as the body's last statement; evidence oracle | `profile.c`'s `SyncExifDirectory` (lane c, M127): the sub-directory push as `PushExifDirectory`, 3.84 to 3.90; LX needs a fifth parameter for its `broke` flag, LB refuses the `continue`, OC the `break` | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | PA | Step 1: `c` may be a local of any integer type the body does not write after its assignment (the predicate takes that type), and the peeled group's body may be one call statement and `break;` instead of `p++; break;`, the call writing nothing the `switch` tests; step 3 copies the call. *Careful* unchanged: the label sets are disjoint and the `switch` was the body's last statement, so `continue` after the call ends the iteration where the group's `break;` did | `profile.c`'s `UpdateClipPath` (lane c, M127): the knot group `1, 2, 4, 5` (`UpdateClipPathSubpathKnot(resize,&targets);`) of a `switch` on `ssize_t selector`; 4.36 to 4.46 on a scratch copy | mandate (2026-10-24) |
