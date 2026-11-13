@@ -3124,6 +3124,25 @@ static MagickBooleanType XAnnotateTextPaste(const AnnotateContext *context,
   return(MagickTrue);
 }
 
+static void XAnnotateTextPress(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  if ((*event).xbutton.window != context->windows->image.id)
+    return;
+  if ((*event).xbutton.button == Button2)
+    {
+      /*
+        Request primary selection.
+      */
+      (void) XConvertSelection(context->display,XA_PRIMARY,XA_STRING,XA_STRING,
+        context->windows->image.id,CurrentTime);
+      return;
+    }
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3331,17 +3350,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     {
       case ButtonPress:
       {
-        if (event.xbutton.window != windows->image.id)
-          break;
-        if (event.xbutton.button == Button2)
-          {
-            /*
-              Request primary selection.
-            */
-            (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
-              windows->image.id,CurrentTime);
-            break;
-          }
+        XAnnotateTextPress(&context,&targets);
         break;
       }
       case Expose:
