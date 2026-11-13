@@ -1939,6 +1939,19 @@ static void RelinquishDitherMaps(unsigned char *red_map[2][16],
     }
 }
 
+static void SetDitherEntries(const XDitherTables tables)
+{
+  int
+    x;
+
+  for (x=0; x < 256; x++)
+  {
+    SetRedDitherEntry(&tables,x);
+    SetGreenDitherEntry(&tables,x);
+    SetBlueDitherEntry(&tables,x);
+  }
+}
+
 static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
 {
   static const short int
@@ -2008,12 +2021,7 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
       tables.green_map=green_map;
       tables.dither_blue=dither_blue;
       tables.blue_map=blue_map;
-      for (x=0; x < 256; x++)
-      {
-        SetRedDitherEntry(&tables,x);
-        SetGreenDitherEntry(&tables,x);
-        SetBlueDitherEntry(&tables,x);
-      }
+      SetDitherEntries(tables);
     }
   /*
     Dither image.
