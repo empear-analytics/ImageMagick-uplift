@@ -8596,6 +8596,22 @@ static unsigned int GetFileBrowserWidth(XFontStruct *font_info,
   return(width);
 }
 
+static unsigned int WidestFileBrowserName(XFontStruct *font_info,
+  char **filelist,size_t files)
+{
+  ssize_t
+    i;
+
+  unsigned int
+    text_width;
+
+  text_width=0;
+  for (i=0; i < (ssize_t) files; i++)
+    if (WidgetTextWidth(font_info,filelist[i]) > text_width)
+      text_width=WidgetTextWidth(font_info,filelist[i]);
+  return(text_width);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8701,10 +8717,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     Determine File Browser widget attributes.
   */
   font_info=windows->widget.font_info;
-  text_width=0;
-  for (i=0; i < (ssize_t) files; i++)
-    if (WidgetTextWidth(font_info,filelist[i]) > text_width)
-      text_width=WidgetTextWidth(font_info,filelist[i]);
+  text_width=WidestFileBrowserName(font_info,filelist,files);
   width=GetFileBrowserWidth(font_info,action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   /*
