@@ -706,6 +706,18 @@ static MagickBooleanType IsEmptyDelegateText(const char *embed_text,
   return(MagickFalse);
 }
 
+static void OpenInterpretDelegateProperties(const ImageInfo *image_info,
+  const Image *image)
+{
+  assert(image == NULL || image->signature == MagickCoreSignature);
+  assert(image_info == NULL || image_info->signature == MagickCoreSignature);
+  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  else
+   if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
+     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-image");
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
@@ -726,13 +738,7 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
   MagickBooleanType
     number;
 
-  assert(image == NULL || image->signature == MagickCoreSignature);
-  assert(image_info == NULL || image_info->signature == MagickCoreSignature);
-  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  else
-   if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
-     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-image");
+  OpenInterpretDelegateProperties(image_info,image);
   if (IsEmptyDelegateText(embed_text,&p,&returned) != MagickFalse)
     return(returned);
   /*
