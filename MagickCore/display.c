@@ -5105,6 +5105,9 @@ typedef struct _CompositeCommandInput
 
   CompositeTargets
     targets;
+
+  ExceptionInfo
+    *exception;
 } CompositeCommandInput;
 
 static void XCompositeControl(const CompositeCommandInput *input,const int id,
@@ -5223,6 +5226,9 @@ typedef struct _CompositeEventTargets
 
   RectangleInfo
     *composite_info;
+
+  CompositeOperator
+    *compose;
 } CompositeEventTargets;
 
 static void XCompositeKeyPress(const CompositeCommandInput *input,
@@ -5425,6 +5431,61 @@ static void XCompositeEvent(const CompositeCommandInput *input,XEvent *event,
   }
 }
 
+static void XCompositeStep(const CompositeCommandInput *input,
+  const Cursor cursor,const CompositeEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  CompositeOperator
+    *const compose = targets->compose;
+
+  RectangleInfo
+    *const composite_info = targets->composite_info;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    text[MagickPathExtent];
+
+  RectangleInfo
+    highlight_info;
+
+  XEvent
+    event;
+
+  if (windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
+        (long) (*composite_info).x,(long) (*composite_info).y);
+      XInfoWidget(display,windows,text);
+    }
+  highlight_info=(*composite_info);
+  highlight_info.x=(*composite_info).x-windows->image.x;
+  highlight_info.y=(*composite_info).y-windows->image.y;
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(display,windows,&event,exception);
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  if (XCompositeCommandBlock(input,&event,compose,state) != MagickFalse)
+    return;
+  XCompositeEvent(input,&event,cursor,targets);
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5457,9 +5518,6 @@ static MagickBooleanType XCompositeImage(Display *display,
       CompositeDismissCommand
     };
 
-  char
-    text[MagickPathExtent];
-
   Cursor
     cursor;
 
@@ -5475,7 +5533,6 @@ static MagickBooleanType XCompositeImage(Display *display,
     scale_factor;
 
   RectangleInfo
-    highlight_info,
     composite_info;
 
   unsigned int
@@ -5485,18 +5542,16 @@ static MagickBooleanType XCompositeImage(Display *display,
   size_t
     state;
 
-  XEvent
-    event;
-
   const CompositeTargets
     targets = { &blend, &compose };
 
   const CompositeEventTargets
-    event_targets = { &composite_image, &state, &composite_info };
+    event_targets = { &composite_image, &state, &composite_info,
+      &compose };
 
   const CompositeCommandInput
     command_input = { display, resource_info, windows, CompositeCommands,
-      CompositeMenu, displacement_geometry, targets };
+      CompositeMenu, displacement_geometry, targets, exception };
 
   /*
     Request image file name from user.
@@ -5541,29 +5596,7 @@ static MagickBooleanType XCompositeImage(Display *display,
   state=DefaultState;
   do
   {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
-          (long) composite_info.x,(long) composite_info.y);
-        XInfoWidget(display,windows,text);
-      }
-    highlight_info=composite_info;
-    highlight_info.x=composite_info.x-windows->image.x;
-    highlight_info.y=composite_info.y-windows->image.y;
-    XHighlightRectangle(display,windows->image.id,
-      windows->image.highlight_context,&highlight_info);
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    XHighlightRectangle(display,windows->image.id,
-      windows->image.highlight_context,&highlight_info);
-    if (XCompositeCommandBlock(&command_input,&event,&compose,&state) != MagickFalse)
-      continue;
-    XCompositeEvent(&command_input,&event,cursor,&event_targets);
+    XCompositeStep(&command_input,cursor,&event_targets);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
