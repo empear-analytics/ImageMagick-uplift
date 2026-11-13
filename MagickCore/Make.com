@@ -132,6 +132,7 @@ $call Make pixel-gamma.c
 $call Make pixel-import.c
 $call Make pixel-export.c
 $call Make policy.c
+$call Make policy-path.c
 $call Make prepress.c
 $call Make property.c
 $call Make PreRvIcccm.c
