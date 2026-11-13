@@ -693,10 +693,8 @@ static void XWriteColormapInfo(FILE *file,const XResourceInfo *resource_info,
     (void) FormatLocaleFile(file,"  colormap type: Private\n");
 }
 
-static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
-  const XWindows *windows)
+static void XWriteGeometryInfo(FILE *file,const XWindows *windows)
 {
-  XWriteColormapInfo(file,resource_info,windows);
   (void) FormatLocaleFile(file,"  geometry: %dx%d\n",
     windows->image.ximage->width,windows->image.ximage->height);
   if (windows->image.crop_geometry != (char *) NULL)
@@ -714,6 +712,13 @@ static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
     (void) FormatLocaleFile(file,"  shared memory: True\n");
   else
     (void) FormatLocaleFile(file,"  shared memory: False\n");
+}
+
+static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
+  const XWindows *windows)
+{
+  XWriteColormapInfo(file,resource_info,windows);
+  XWriteGeometryInfo(file,windows);
   (void) FormatLocaleFile(file,"\n");
 }
 
