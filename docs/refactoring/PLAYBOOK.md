@@ -13811,6 +13811,515 @@ row pair and Recipe E step 7 on the two tails, a probe measured 8.50, 8.50, 8.72
 
 ---
 
+## Recipe RH - Hoist a Label Run into a Row Flag
+
+**Use when:** CodeScene reports *Complex Method* on a function that runs once per pixel and whose
+complexity is a `switch` on a member of a struct that its caller fills once per row, with one or two
+groups of many labels (a run of eight or more) among the other groups, and the run's group ends
+in `break;` where nothing follows the `switch` (`composite.c`'s `SetCompositeCoverage`, a run of
+thirty-two `compose` labels, and `CompositeAlphaChannel`, runs of eleven and seven). A label-run
+predicate that keeps the `switch` is a *Complex Method* of its own (Recipe LP, flat), and Recipe
+TB's table scan, written where the `switch` stood, runs on every pixel: measured on `composite.c`
+at +46 to +91 instructions per pixel (+4% to +9% of a 400x400 composite).
+
+**Not covered by:** Recipe LP, which leaves the label test in a function that runs on the pixel
+path; Recipe TB, whose step 2 refuses a function called per pixel; Recipes SD, SR and SW, which
+split a run of groups and give the run's body to each copy; Recipe NS, which names one `?:`.
+
+**How:**
+
+1. The selector is `row->compose`, a member of a `const` struct that the function reads through a
+   `const S *row`; `S` is declared once in the file and is filled by plain member assignments (`row.compose=compose;`) at
+   exactly one place, inside the loop body that calls the function (check by `grep` that nothing
+   else fills or writes `compose` of an `S`). The function is `static void`, outside every OpenMP
+   region of its own, and the `switch` is its last statement.
+2. The group `G` is `case L1: ... case Ln:` with body `B` whose last statement is `break;` and
+   which holds no other `break`, no `continue`, `goto` or `case` label and no `#` line (a braced
+   block is kept whole); `G`'s labels are not among the labels of any other group of the `switch`.
+3. Write, directly above the first function that needs it, a `static const` array of the selector's enumeration type
+   named for what the labels have in common, holding `L1 ... Ln` in the `switch`'s order, then
+   `static MagickBooleanType Is<Name>(const <Enum> compose)` whose body is `size_t i;` and
+   `for (i=0; i < (sizeof(T)/sizeof(*T)); i++) if (T[i] == compose) return(MagickTrue);
+   return(MagickFalse);` (Recipe TB's membership form).
+4. Add `MagickBooleanType <name>;` to `S` (a declaration of its own after the last member) and, in
+   the one place that fills `S`, `row.<name>=Is<Name>(compose);` directly after `row.compose=compose;`, with
+   `compose` the value that statement assigned.
+5. Replace `G` and its `case` labels by an `if (row-><name> != MagickFalse)` block ahead of the
+   `switch`, holding `B` without its closing `break;` and ending in `return;`; the `switch` keeps its
+   other groups and its `default:`. When `G` and `default:` are the `switch`'s only groups, the
+   `switch` goes: `if (row-><name> != MagickFalse)` runs `B` and returns, then comes the body of
+   `default:` without its `break;`.
+6. Check by script that the table holds exactly `G`'s labels, each once, in the `switch`'s order, that no
+   other statement of the file changed, and that the new function is reached from the one place that fills `S`.
+7. `refactor_guard.py` `WARN` listing only the `0` of the loop's `i=0` as added; `--calls` `+2` for the predicate and
+   `+1` for the filling call, nothing else; time the step as Recipe CF step 7 says (callgrind
+   instruction counts over operators from and outside the run): the lookup now runs once per row.
+
+8. *If/else form (2026-11-12).* The `switch` may stand anywhere in the function, with statements after it, and
+   may hold up to two runs `G1`, `G2` whose labels together with `default:` number eight or more, when every
+   group of the `switch` (the runs and `default:`) ends in its one closing `break;` and holds no other `break` of
+   it, and no group writes the selector. The `switch` becomes `if (<s>.<f1> != MagickFalse) B1' else if
+   (<s>.<f2> != MagickFalse) B2'`, each `Bi'` the group's body without its closing `break;`, followed by
+   `else D'` when `default:` holds a body (the same without its `break;`) and by nothing when it holds `break;`
+   alone. Each run gets its own table, predicate and flag (steps 3 and 4). The selector's struct may instead be
+   a `const` local of the function that calls it (`const S s = { ..., compose, ... };`, filled by this one
+   initialiser and never by assignment): the flags are further members of `S`, last in its member order, and the
+   initialiser gets `Is<Name>(compose)` for each, in that order, with `compose` the initialiser's own value for
+   that member; that function runs once per row, as the one that fills `S` in step 1.
+
+**Before:**
+
+```c
+  switch (compose)
+  {
+    case DarkenCompositeOp:
+    ...
+    case VividLightCompositeOp:
+    {
+      (*alpha)=RoundToUnity(Sa+Da-Sa*Da);
+      break;
+    }
+    default:
+    {
+      SetCompositeCoverageDissolve(row,Sa,Da,alpha);
+      break;
+    }
+  }
+```
+
+**After:**
+
+```c
+  if (row->union_coverage != MagickFalse)
+    {
+      (*alpha)=RoundToUnity(Sa+Da-Sa*Da);
+      return;
+    }
+  SetCompositeCoverageDissolve(row,Sa,Da,alpha);
+```
+
+with `UnionCoverageOperators[]`, `IsUnionCoverageOperator(compose)`, the member `union_coverage` and
+`row.union_coverage=IsUnionCoverageOperator(compose);` in the row loop.
+
+**Careful:**
+
+- Why the behaviour is the same. `compose` is assigned once when `S` is filled and no code writes it
+  afterwards (step 1), so the flag computed from it at that point holds for every later call
+  through the same `S`. The predicate is true exactly when `compose` equals one of the table's
+  labels (step 6), which are the labels of `G`, so `B` runs on the inputs on which the `switch`
+  chose `G`; the remaining groups are disjoint from `G` (step 2), so testing `G` first selects the
+  same group as the `switch` did, and the function ends where the `switch` ended (step 1), so
+  `return;` ends it as its closing `break;` did.
+- The fill is a store of a `MagickBooleanType` into a member of a struct declared in the loop body, executed once per
+  row where the other members are; no shared variable is read or written, so the OpenMP argument of the
+  other recipes that fill that struct holds.
+- If/else form. A `switch` selects exactly one group by the value of its selector, and every group ends in its one
+  `break;` (step 8), which leaves the `switch` and nothing else, so the selected group's body runs once and
+  control reaches the statement after the `switch`. The chain tests the runs' flags in order; the runs' label
+  sets and `default:`'s are disjoint, each flag is true exactly when the selector equals one of its run's
+  labels, so exactly the body the `switch` chose runs, `else` taking the selector values that no run names, as
+  `default:` did; the statements after it run in every case, as after the `switch`. The selector is `const` or
+  written by no group, so it is the same value in the flags and the original test.
+- Cost: one table scan per row replaces one `switch` per pixel; every pixel now tests one member.
+
+**Evidence level:** oracle (the cases that reach the function), steps 6 and 7 by script, the
+timing quoted in the commit.
+
+**Provenance:** 2026-11-12, from `composite.c`'s `SetCompositeCoverage` and `CompositeAlphaChannel` (campaign A, W19
+lane c): the file's stub ceiling with both clean, the pixel path's last Complex Methods but one, was
+3.69 to 3.84 in a hybrid probe with the five other statics emptied; Recipe TB on the same runs measured +9% on the
+atop and src operators, Recipe LP kept the finding (flat). Added by Claude Code
+(Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe MP - Merge Membership Predicates over a Table Parameter
+
+**Use when:** a file holds two or more `static` membership predicates of Recipe TB's shape, each
+over a `static const` table of its own (Recipe RH writes one per label run), and the file's function
+count stands at the threshold the score pays for (*Number of Functions in a Single Module*: 110), so
+that the next helper of a chain would cost the one-time drop. `composite.c`'s five (`IsUnionCoverageOperator`,
+`IsCanvasAlphaOperator`, `IsSourceAlphaOperator`, `IsPixelInfoInputOperator`, `IsIntensityInputOperator`)
+differ only in the name of the table they scan.
+
+**Not covered by:** Recipe TB and RH, which make one predicate per run; a fold of twin functions identical
+after renaming their parameters (here the differing name is a file-scope table, not a parameter); Recipe CF
+and TI, whose twins differ in a called function or an expression; Recipe D, which merges blocks.
+
+**How:**
+
+1. The predicates. Two or more `static` functions `P1 ... Pn`, defined in the file's order, of the form
+   `static MagickBooleanType P(const E compose) { size_t i; for (i=0; i < (sizeof(T)/sizeof(*T)); i++)
+   if (T[i] == compose) return(MagickTrue); return(MagickFalse); }` with `E` one enumeration type and `T` a
+   `static const E` array of the file, a different one for each predicate. Check by script that each body is
+   the same token sequence once `T` is written as one name. No use of any `Pk` is anything but a call whose
+   argument is an expression without side effects (never its address).
+2. One predicate per commit. The first commit turns `P1` into `static MagickBooleanType IsListed<Name>(const E
+   *list,const size_t count,const E compose)` (`<Name>` the common noun of the type, `IsListedOperator` for
+   `CompositeOperator`), body `size_t i; for (i=0; i < count; i++) if (list[i] == compose) return(MagickTrue);
+   return(MagickFalse);`, and each call `P1(a)` into `IsListedOperator(T1,(sizeof(T1)/sizeof(*T1)),a)`.
+   Each later commit deletes one `Pk` (and the blank line after it) and writes each call `Pk(a)` as
+   `IsListedOperator(Tk,(sizeof(Tk)/sizeof(*Tk)),a)`; the shared function stands above its first use.
+3. Nothing else changes: the tables, their order and the statements around each call stay as they were.
+4. Check by script that the working file is `HEAD`'s with exactly those edits (the definition of `Pk`
+   removed, each call rewritten), that `T` at each call is the table `Pk` scanned, and that no `Pk` is left
+   named anywhere.
+5. `refactor_guard.py`: the literals `OK`, or `WARN` listing only the `0` of a deleted loop's `i=0`
+   removed; `--calls`: the shared function `+1` call per call site, the deleted predicate's callers one
+   fewer each, nothing else. Where a predicate runs once per row (as Recipe RH's do) no timing is needed;
+   a predicate called per pixel or per channel takes Recipe TB step 2's timing.
+
+**Before:**
+
+```c
+static MagickBooleanType IsCanvasAlphaOperator(const CompositeOperator compose)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators)); i++)
+    if (CanvasAlphaOperators[i] == compose)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+...
+    row.canvas_alpha=IsCanvasAlphaOperator(compose);
+```
+
+**After:**
+
+```c
+    row.canvas_alpha=IsListedOperator(CanvasAlphaOperators,
+      sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
+```
+
+with the definition of `IsCanvasAlphaOperator` gone and `IsListedOperator` (the first predicate, made general by
+step 2) above the first call.
+
+**Careful:**
+
+- Same loop, same values. `IsListedOperator` runs the loop each predicate ran over its own table: `list`
+  is the table's first element (an array of `E` decays to a pointer to it, and `list[i]` is `T[i]`), `count` is
+  the value `sizeof(T)/sizeof(*T)` the loop bound was (a constant of type `size_t`, now passed), and `compose`
+  is the argument each caller passed, evaluated once, at the same place. The comparison, the early
+  `return(MagickTrue)` and the final `return(MagickFalse)` are unchanged, so every call returns what the
+  predicate it replaces returned.
+- Nothing outside the file can tell: each predicate and table is `static`, no address of a predicate is taken
+  (step 1), and the shared function is `static` too.
+- A function deleted is a function folded into its twin; the tables stay, so no data is touched.
+
+**Evidence level:** oracle (the cases that reach a caller), steps 1 and 4 by script.
+
+**Provenance:** 2026-11-12, from `composite.c` (campaign A, W21 lane c): Recipe RH made five predicates and the
+SetVirtualCompositeChannels use would be the sixth, taking the file from 110 functions to 111 (3.69 to 3.59 in
+a probe); folding five into one frees four slots (a probe of the whole fold: 3.69 to 3.69). Added by Claude
+Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe RD - Share a Twin Relaxation Loop Through a Driver Releasing by Pointer Lists
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Code Duplication* on two
+`static` functions that each build their own images, then run the same iterative loop over them
+(acquire a residual copy, acquire a kernel, print a verbose title, iterate a step, test a residual
+against a threshold, refresh the residual copy) and give up on a failure before the loop by
+releasing their own images in their own order, as `composite.c`'s `SaliencyBlendImage` and
+`SeamlessBlendImage` do. The loop differs between the twins in one optional stage (Saliency
+subtracts a divergence image, Seamless does not), in the image the step composites back, in the
+title printed and in which images each failure path releases.
+
+**Not covered by:** Recipe TW, whose twin blocks contain no `return`; Recipes ME and MT, whose
+copies sit in one function; Recipe TI, which merges two whole functions; Recipe W and Recipe V,
+which move one block of one function and cannot carry two different release lists; Recipe CF,
+whose twins differ in the function they call, not in which locals they release.
+
+**How:**
+
+1. Twins. Two `static` functions `F1` and `F2` outside every OpenMP region hold one run of
+   statements each, from the residual copy before the loop to the loop's end, that are the same
+   text but for: (a) one stage present in `F1` only, guarded in the driver by a test of a pointer
+   that `F1` passes non-`NULL` (checked by reading that `F1` returned before this point when it
+   was `NULL`) and `F2` passes `NULL`; (b) the image the step reads, a different local; (c) the
+   title, a string literal of each; (d) the statements before each `return(MagickFalse);` of the
+   run, each a list of `v=DestroyImage(v);` of the caller's locals; (e) a `NULL` guard before the
+   in-loop release of the residual that one twin has and the other lacks.
+2. Write a `typedef struct` holding the images of (a) and (b) by value, the caller's mutable
+   image locals (the relaxed and the residual image) by address (`Image **`), and one
+   `Image **const *` per failure stage of (d): a `NULL`-terminated array of addresses of the
+   caller's locals, in the order the caller's statements released them. Each caller declares its
+   arrays as `Image **const name[] = { &a, &b, NULL };` with its own locals, in its own order,
+   and fills the struct by initialiser in a block of its own at the run's place (Recipe FB).
+3. `static void ReleaseBlendImages(Image **const *images)` runs
+   `*images[k]=DestroyImage(*images[k]);` for `k` from 0 to the `NULL`: the same statements as
+   the twin's list, in its order, writing the same `NULL` into the caller's locals.
+4. The driver returns `MagickBooleanType`: each failure stage calls `ReleaseBlendImages` with its
+   list and returns `MagickFalse`; the caller writes
+   `if (Driver(...) == MagickFalse) return(MagickFalse);` where the run stood. After the loop the
+   driver returns `MagickTrue` and the caller goes on with the statements after the run. A
+   `status` the loop assigned and nothing after it reads before assigning it again (check by
+   reading every path to the caller's next read) is not carried out.
+5. Every use of a mutable local `v` in the run becomes `*relaxation->v` in the driver; the
+   loop's step moves into a `static MagickBooleanType` function returning `MagickFalse` where the
+   loop broke and the residual call's result where it fell through; the loop writes
+   `if (Step(...) == MagickFalse) break;`.
+6. (c) becomes a `static void` helper that returns when `verbose` is false and otherwise prints
+   `F1`'s literal when the pointer of (a) is not `NULL` and `F2`'s when it is, each literal
+   unchanged: no new format string. The loop's tick report and the residual refresh of (e) go to
+   helpers of their own (`ReportBlendIteration`, `CloneBlendResidual`), each the run's text, so
+   the driver stays under cc 9; (e)'s guard is kept and so runs for both twins.
+7. `refactor_guard.py`: `WARN`, copies removed, every value still present; `--calls`: the
+   twins' shared callees drop by one copy and each new function appears. Compile with
+   `-DNDEBUG -Wunused-parameter -Wunused-variable`. Both twins' cases through the oracle.
+
+**Before:**
+
+```c
+  residual_image=CloneImage(relax_image,0,0,MagickTrue,exception);
+  if (residual_image == (Image *) NULL)
+    {
+      relax_image=DestroyImage(relax_image);
+      mean_image=DestroyImage(mean_image);
+      return(MagickFalse);
+    }
+  ...
+  for (i=0; i < (ssize_t) request->iterations; i++)
+  {
+    ...
+  }
+  kernel_info=DestroyKernelInfo(kernel_info);
+```
+
+**After:**
+
+```c
+  Image
+    **const residual_failure[] = { &relax_image, &mean_image, NULL },
+    **const kernel_failure[] = { &residual_image, &relax_image, &mean_image,
+      NULL };
+  ...
+  {
+    const BlendRelaxation
+      relaxation = { mean_image, (Image *) NULL, &relax_image,
+        &residual_image, residual_failure, kernel_failure };
+
+    if (RelaxBlendImage(image,&relaxation,request,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+```
+
+**Careful:**
+
+- Releases: each failure stage of each twin releases the same images in the same order as
+  before, because the list is the caller's own statements' locals in their order, and
+  `ReleaseBlendImages` writes the `NULL` that `DestroyImage` returns into the same locals. A
+  twin that released nothing for an image it had acquired (an upstream leak) still releases
+  nothing: the list holds what the twin's text released, not what it should have. Report such
+  leaks; do not fix them.
+- (a): the stage runs exactly where `F1` ran it, because `F1`'s pointer is never `NULL` at the
+  driver (it returned before when it was) and `F2`'s always is.
+- (c): the same bytes reach `stderr` at the same point (after the kernel is acquired, before the
+  loop), and only when `verbose` holds.
+- (e): the residual image is not `NULL` where it is released in the loop (it was tested after the
+  copy before the loop, and the loop breaks when the refresh returns `NULL`), so the guard is
+  always true and the twin without it releases the same image as before.
+- A `status` that the loop assigned is dead at the loop's end in both twins (the next statement
+  that reads it follows an assignment or a `return`); check by reading.
+- Failure paths are allocation failures that no case reaches: checked by reading, list against
+  statements, and `refactor_guard.py --calls`.
+
+**Evidence level:** oracle on both twins' cases, with `refactor_guard.py` (`WARN`, deduplication)
+and `--calls`, steps 1, 4 and 6 checked by reading.
+
+**Provenance:** 2026-11-13, from `composite.c`'s `SaliencyBlendImage` (cc 17, 112 lines) and
+`SeamlessBlendImage` (cc 19, 116 lines) (campaign A, W22 lane c). Earlier lanes found that the
+pair could not be partitioned without a clone pair (3.13 to 3.52 in probes); a driver over the
+whole run, releasing through the callers' own lists, keeps every release and its order. Probed
+on the W21 flat chain: 3.69 to 3.58 alone (*Number of Functions* now reported), 3.70 with Recipe
+HN on Seamless's head, 3.90 with Recipe GS on `BlendDivergentImage`. Added by Claude Code
+(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe HN - Extract a Head That Builds One Image, Returning It or NULL
+
+**Use when:** CodeScene reports *Large Method* or *Complex Method* on a function whose head builds
+one image through a chain of temporaries (crop, sum, mean), leaves through `return(R);` when a
+temporary cannot be made, and ends with `v=Last(...);` followed directly by the caller's own
+`if (v == (Image *) NULL) return(R);`, as `composite.c`'s `SeamlessBlendImage` does for
+`mean_image`.
+
+**Not covered by:** Recipe W, whose block may write no plain local the caller reads afterwards
+(here `v`); Recipe E, whose step 6 covers only the `return` hidden in throw macros; Recipe I,
+which returns success and writes its results through a struct of out-pointers; Recipe V, whose
+block leaves through `goto`.
+
+**How:**
+
+1. The block lies outside every OpenMP region, contains no `#pragma` line, no `goto`, and no
+   `break` or `continue` that leaves it. Every `return` in it is `return(R);` with the caller's
+   one constant `R`, and each comes before the block's last statement.
+2. The block's last statement is `v=Call(...);` (possibly followed by statements that release
+   temporaries and do not read or write `v`), `v` a pointer local of the caller that the block
+   writes nowhere else, and the caller's next statement is `if (v == (T *) NULL) return(R);`
+   with the same `R`.
+3. Every other local the block writes is written before it is read on every path and read by
+   nothing after the block (Recipe E step 4): it moves into the new function with its
+   declaration, initialiser and `const` included (a `RectangleInfo` filled from parameters, a
+   `const` weights struct). A local whose declaration leaves the caller must have no other use
+   there.
+4. Cut the block into a `static T *` function directly above the caller, taking at most four
+   parameters, each something the block reads; a pointer parameter is `const` when the block
+   only reads through it. Each `return(R);` becomes `return((T *) NULL);`; the function declares
+   `v` and ends with `return(v);`.
+5. Where the block stood write `v=Helper(...);`; the caller's `if (v == (T *) NULL) return(R);`
+   stays as it was. Check each argument against its parameter by reading.
+6. `refactor_guard.py`: `PASS` or `WARN` with `NULL`'s cast added only; `--calls`: `+2` for
+   the new function and nothing else.
+
+**Before:**
+
+```c
+  crop_image=CropImage(image,&crop_info,exception);
+  if (crop_image == (Image *) NULL)
+    return(MagickFalse);
+  ...
+  sum_image=BlendSumImage(crop_image,source_image,&difference,exception);
+  crop_image=DestroyImage(crop_image);
+  if (sum_image == (Image *) NULL)
+    return(MagickFalse);
+  mean_image=BlendMeanImage(sum_image,source_image,exception);
+  sum_image=DestroyImage(sum_image);
+  if (mean_image == (Image *) NULL)
+    return(MagickFalse);
+```
+
+**After:**
+
+```c
+  mean_image=BlendSeamlessMeanImage(image,source_image,request,exception);
+  if (mean_image == (Image *) NULL)
+    return(MagickFalse);
+```
+
+**Careful:**
+
+- Each early `return(R);` of the block becomes `return((T *) NULL);`, which the caller's next
+  statement turns into `return(R);` at once, after the same statements ran: the caller leaves
+  with the same value at the same point. On the last path the helper returns the value `v` was
+  given, and the caller tests it as before, after the same releases.
+- Locals that move were never read by the caller after the block (step 3), so nothing the caller
+  reads changes; the images the block releases it still releases, in its order.
+- A `const` struct initialised from parameters now reads them inside the function: the same
+  values, since nothing between the caller's declaration and the block wrote them.
+- The early returns are allocation failures that no case reaches: checked by reading, each
+  `return(R);` against its `return((T *) NULL);`; the last path is checked by the oracle.
+
+**Evidence level:** oracle on the caller's cases, with `refactor_guard.py --calls`, steps 1 to 3
+checked by reading.
+
+**Provenance:** 2026-11-13, from `composite.c`'s `SeamlessBlendImage` (campaign A, W22 lane c):
+after Recipe RD it is a *Large Method* of 73 lines whose head builds `mean_image` from a crop and
+a difference sum; the head as a helper takes it out of the finding, 3.58 to 3.70 in a probe, no
+finding on the helper. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10
+to evolve the recipes.
+
+---
+
+## Recipe GS - Group a Cleanup Macro's Locals into Sets Released in Its Order
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function whose
+complexity is a function-local cleanup macro that releases a run of image locals, each under its
+own `NULL` guard, and that the function calls before every `return` of a chain of acquisitions,
+as `composite.c`'s `BlendDivergentImage` does with `FreeDivergentResources` (eight guarded
+`DestroyImage`, called on ten failure paths and at the end). The locals come in sets of the same
+shape (`dx_`, `dy_`, `magnitude_` for the alpha image, again for the beta image, and the selected
+pair) acquired by the same steps.
+
+**Not covered by:** Recipe MF, which makes a statement macro a function but would pass every
+local by address (eight here); Recipe H, which only hoists the macro; Recipe I, which keeps every
+guard in the caller; Recipe RD, whose release lists belong to two twin callers.
+
+**How:**
+
+1. The macro is defined and used inside one function `F` only, outside every OpenMP region,
+   and is a run of `if (v != (Image *) NULL) v=DestroyImage(v);` over locals `v` that are
+   initialised to `NULL` at their declaration. Partition the run, in its order, into adjacent
+   groups that each name one set's members in one fixed member order (here `dy`, `dx` for the
+   selected pair; `magnitude`, `dy`, `dx` for beta, then for alpha).
+2. Write a `typedef struct` with one `Image *` member per set member, and
+   `static void DestroyBlend<Set>s(S *set)` holding the group's guarded releases, each
+   `v` written `set->m`, in the macro's member order. Members a set never has (the selected
+   pair's magnitude) stay `NULL` and their guard is false.
+3. Each acquisition chain that fills one set and leaves through the macro and
+   `return((Image *) NULL);` becomes a `static MagickBooleanType` function taking the set by
+   pointer: each `v=Acquire(...)` becomes `set->m=Acquire(...)`, each failure exit
+   `return(MagickFalse);`, the end `return(MagickTrue);`. A chain that reads other sets takes
+   them by pointer and keeps its in-line releases of their members (`beta->dx_image=
+   DestroyImage(beta->dx_image);`) in place.
+4. A final chain that builds the result from temporaries of its own (not in the macro) moves to
+   a `static Image *` function returning the result, `NULL` where it left early; its
+   temporaries move with it, released where they were (a temporary the macro never released
+   stays unreleased: report it).
+5. `F` declares each set initialised to all-`NULL` and the result as `NULL`, runs the chains as
+   `status=Chain1(...); if (status != MagickFalse) status=Chain2(...); ...`, assigns the result
+   only when every chain succeeded, then calls the sets' release functions in the macro's group
+   order and returns the result. The macro's `#define` goes with its last use.
+6. Check by script that the release calls, expanded, list the macro's locals in the macro's
+   order; `refactor_guard.py` `PASS` (or `WARN`, copies removed, for the twin chains' literals
+   now written once); `--calls --renamed <Macro>=DestroyBlend<Set>s` (the macro's uses become
+   the release calls) `PASS`, with `DestroyImage` dropping only by the macro's copies.
+
+**Before:**
+
+```c
+  dx_alpha=BlendConvolveImage(alpha_image,"3x1:-0.5,0.0,0.5",exception);
+  if (dx_alpha == (Image *) NULL)
+    {
+      FreeDivergentResources();
+      return((Image *) NULL);
+    }
+```
+
+**After:**
+
+```c
+  status=BlendGradientImages(alpha_image,&alpha,exception);
+  if (status != MagickFalse)
+    status=BlendGradientImages(beta_image,&beta,exception);
+  ...
+  DestroyBlendGradients(&selected);
+  DestroyBlendGradients(&beta);
+  DestroyBlendGradients(&alpha);
+  return(divergent_image);
+```
+
+**Careful:**
+
+- Every exit of `F` ran the macro, which releases each non-`NULL` local once in its order. After
+  the step every exit runs the release calls, which release each non-`NULL` member once in the
+  same order (step 1's partition, step 6's script): a chain's failure leaves the members it set
+  so far, and nothing later runs, so the same images are non-`NULL` at the release as before.
+- A member released in line before the end (`DestroyImage` returns `NULL` into it) is skipped by
+  its guard at the end, as the local was.
+- The result: `F` returned the result only on the path where every acquisition succeeded, and
+  `NULL` on every other; the new `F` assigns it only when every chain returned `MagickTrue`.
+- A temporary that the original released on no failure path (`BlendDivergentImage`'s
+  `dx_divergent` when the `dy_divergent` convolution fails) is still not released: an upstream
+  leak, reported and not fixed.
+- The failure paths are allocation failures that no case reaches: checked by reading and by
+  step 6's script; the success path by the oracle.
+
+**Evidence level:** oracle on `F`'s cases, with `refactor_guard.py --calls`, steps 1, 5 and 6
+checked by reading and by script.
+
+**Provenance:** 2026-11-13, from `composite.c`'s `BlendDivergentImage` (cc 20, 114 lines; the
+macro's eight `if`s count in it) (campaign A, W22 lane c). Earlier lanes saw it "peel cleanly" in
+a probe but no recipe covered the macro. After Recipes RD and HN, 3.70 to 3.90 in a probe, no
+finding on a new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -14860,3 +15369,9 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | ME | Merge Mirrored Twins That Leave Through a Constant Return: copies of one block that leave the function through `return(c);` (Recipe Y steps 1 and 2; `c` may differ between copies), in two mirrored sides (Recipe MT step 1's alignment) whose copies differ in one member-access value, become one `static inline MagickBooleanType` function taking the input struct, a constant selector, the value and the written variable by pointer; each copy becomes `if (Helper(...) == MagickFalse) return(c);` with its own constant. *Careful* gives the argument (the conditional evaluates only the copy's run, in its order; the constants stay in the callers) | `visual-effects-plasma.c`'s `PlasmaImageProxy` (campaign A, W21 round four, lane d): four edge-pixel blocks (left/right along a column, bottom/top along a row) that Recipes MT, Y, SV and W refuse; helpers per side cloned (8.15), precomputed coordinates moved `errno`-writing casts; a probe of the chain this recipe opens: 8.50 to 9.09 | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | SD | *Two levels of evidence*, *Unreached functions: Recipe SD*: Recipe SD may be applied to a function no case reaches, `Verified: guard`, with SD steps 1 to 6 and 8 checked by reading (no group that throws through `GetMagickModule()`), `refactor_guard.py` `OK` with `--calls` moving only `+2` for each new function, `tools/switch_split_check.py` printing `OK` (the added functions are the helpers; the rest of the file is the same token stream; one controlling expression; helper bodies only bindings and their `switch`; links pass each parameter by name; the flattened chain has the original's groups label for label, bodies equal after `(*v)` to `v` and `&p` to `p`, kept groups unchanged, no `return`, `continue` or `goto` in a moved group, original order) and `tools/obj_modulo.sh` printing `IDENTICAL` or `MODULO-IDENTICAL`. The new tool and its tests are a commit of their own. The guard-verified sentence, SD's *Evidence level* and AGENTS.md say so (the AGENTS.md line is the agent's addition for the owner's confirmation) | `widget.c`'s `XNoticeWidget` (campaign A, W22 lane a), reached by no case: its ten-label event `switch` keeps *Complex Method* and *Large Method* after nine guard-level helpers, and no guard-level recipe splits a `switch`; a probe of two chained SD helpers and an E step 7 tail helper takes the file from 7.31 to 7.78 and the function out of both findings. Planted errors (a label dropped, a callee changed, a write dropped, transposed link arguments, a kept group edited, a statement added to the caller, a member bound from another) are each refused | owner |
 | 2026-11-13 | AMEND | V | Step 1: a `goto M;` to a second label may stand in the block when the caller's statement directly after the block is `goto M;`; it becomes `return(MagickTrue);` like falling off the end, and Recipes Y and I admit it too (the path returns success and the caller runs only that `goto M;`) | `morphology.c`'s `MorphologyApply`: the direct-method path's `goto exit_cleanup;` kept the stage block (cc 11, the special, direct, reflected-kernel and loop tests) from Recipe I; with it, the function leaves Complex Method (6.90 to 6.93) | mandate (2026-10-24) |
+| 2026-11-12 | NEW | RH | Hoist a Label Run into a Row Flag: a run of eight or more `case` labels of `row->compose` in a `static void` per-pixel function becomes a `static const` table and a membership predicate (Recipe TB's loop), evaluated once per row where the row struct is filled into a new `MagickBooleanType` member, and the group becomes `if (row->flag != MagickFalse) { B return; }` ahead of the `switch`. *Careful* gives the argument (`compose` is not written after the fill, labels disjoint, the function ends where the `switch` ended) | `composite.c`'s `SetCompositeCoverage` (32 labels) and `CompositeAlphaChannel` (11 and 7) (campaign A, W19 lane c): Recipe TB's loop on the pixel path measured +46 to +91 instructions per pixel (+4% to +9%), Recipe LP keeps the finding; with the flag, +0.5% to +1.5% of a 400x400 composite, no new finding; a hybrid probe with the other five Complex Methods of the pixel path emptied: 3.69 to 3.83 | owner |
+| 2026-11-12 | AMEND | RH | New step 8, the if/else form: the `switch` may stand before other statements and hold up to two runs, each with its own table, predicate and flag; its groups become an `if` / `else if` / `else` chain, and the flags may be filled by the initialiser of a `const` struct local. *Careful* gives the argument (one group selected by value; groups disjoint; the statements after run in every case) | `composite.c`'s `SetVirtualCompositeChannels` (a nine-label run inside the channel loop, `virtual_inputs` initialised once per row) and `CompositeImagePixel` (two runs of six and four labels that set `Si`, `Di` and the pixel infos before the channel loop) (campaign A, W19 lane c): both are Complex Methods held by their label runs, and the stub of the five remaining pixel-path methods measured 3.83 | owner |
+| 2026-11-12 | NEW | MP | Merge Membership Predicates over a Table Parameter: the `static` predicates of Recipe TB's shape, each over its own `static const` table, become one that takes the table and its element count; each call passes `T,sizeof(T)/sizeof(*T)`, one predicate per commit, the others deleted. *Careful* gives the argument (same loop, same table, same count, same argument) | `composite.c`'s five RH predicates (campaign A, W21 lane c): the file stands at 110 functions and the chain needs a sixth for `SetVirtualCompositeChannels` (111: 3.69 to 3.59); folding the five frees four slots, whole fold probe 3.69 to 3.69 | owner |
+| 2026-11-13 | NEW | RD | Share a Twin Relaxation Loop Through a Driver Releasing by Pointer Lists: two `static` twins' runs from the residual copy to the loop's end become one driver taking a struct with the differing images, the callers' mutable images by address and, per failure stage, a `NULL`-terminated array of the caller's own locals' addresses in its own release order; the loop's step, tick report, title and residual refresh become helpers. *Careful* gives the argument (each failure path releases the same images in the same order; the optional stage runs where it ran; the in-loop guard is always true; upstream leaks kept and reported) | `composite.c`'s `SaliencyBlendImage` and `SeamlessBlendImage` (campaign A, W22 lane c): 3.69 to 3.58 alone, 3.70 with Recipe HN, 3.90 with Recipe GS in a probe | owner |
+| 2026-11-13 | NEW | HN | Extract a Head That Builds One Image, Returning It or NULL: a head block that leaves through `return(R);` and ends with `v=Last(...);` directly before the caller's `if (v == NULL) return(R);` becomes a `static T *` function returning `v`, `NULL` for each early return. *Careful* gives the argument (the caller's existing test turns each `NULL` into the same `return(R);` at the same point) | `composite.c`'s `SeamlessBlendImage` after Recipe RD (campaign A, W22 lane c): 73 lines, out of *Large Method*, 3.58 to 3.70 in a probe | owner |
+| 2026-11-13 | NEW | GS | Group a Cleanup Macro's Locals into Sets Released in Its Order: a function-local macro of guarded `DestroyImage` calls over locals of a few same-shaped sets becomes one struct type and one release function per set, called in the macro's order; each acquisition chain becomes a function filling its set, the final chain a function returning the result. *Careful* gives the argument (every exit releases the same non-`NULL` images in the same order; the result is returned on the same path; an unreleased temporary stays unreleased) | `composite.c`'s `BlendDivergentImage` (cc 20, 114 lines) (campaign A, W22 lane c): after Recipes RD and HN, 3.70 to 3.90 in a probe | owner |
