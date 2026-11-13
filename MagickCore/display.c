@@ -3059,6 +3059,48 @@ static void XAnnotateTextCommand(const AnnotateContext *context,
   }
 }
 
+static MagickBooleanType XAnnotateTextKey(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  AnnotateTextInput
+    text_input;
+
+  char
+    command[MagickPathExtent];
+
+  int
+    length;
+
+  KeySym
+    key_symbol;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Respond to a user key press.
+  */
+  length=XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if ((((*event).xkey.state & ControlMask) != 0) ||
+      (((*event).xkey.state & Mod1Mask) != 0))
+    (*state)|=ModifierState;
+  key_symbol=XModifyKeySymbol((*state),key_symbol);
+  text_input.display=context->display;
+  text_input.windows=context->windows;
+  text_input.annotate_context=context->annotate_context;
+  text_input.font_info=context->font_info;
+  text_input.command=command;
+  text_input.state=(*state);
+  if (XAnnotateKeyPress(&text_input,targets,key_symbol) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3295,31 +3337,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       }
       case KeyPress:
       {
-        AnnotateTextInput
-          text_input;
-
-        int
-          length;
-
         if (event.xkey.window != windows->image.id)
           break;
-        /*
-          Respond to a user key press.
-        */
-        length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (((event.xkey.state & ControlMask) != 0) ||
-            ((event.xkey.state & Mod1Mask) != 0))
-          state|=ModifierState;
-        key_symbol=XModifyKeySymbol(state,key_symbol);
-        text_input.display=display;
-        text_input.windows=windows;
-        text_input.annotate_context=annotate_context;
-        text_input.font_info=font_info;
-        text_input.command=command;
-        text_input.state=state;
-        if (XAnnotateKeyPress(&text_input,&targets,key_symbol) == MagickFalse)
+        if (XAnnotateTextKey(&context,&targets) == MagickFalse)
           return(MagickFalse);
         break;
       }
