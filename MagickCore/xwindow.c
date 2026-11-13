@@ -7427,8 +7427,19 @@ static void XPackBitmapImageMSB(const MakeImageContext *make_context,
   }
 }
 
-static void XMakeImageMSBFirst(const MakeImageContext *make_context,
-  Image *image,XImage *ximage,XImage *matte_image)
+typedef struct _XCanvasConversion
+{
+  Image
+    *image,
+    *canvas;
+
+  XImage
+    *ximage,
+    *matte_image;
+} XCanvasConversion;
+
+static void XPackCanvasMSB(const MakeImageContext *make_context,
+  const XCanvasConversion *conversion)
 {
   const XResourceInfo
     *const resource_info = make_context->resource_info;
@@ -7439,11 +7450,20 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   ExceptionInfo
     *const exception = make_context->exception;
 
-  CacheView
-    *canvas_view;
+  Image
+    *const image = conversion->image;
+
+  XImage
+    *const ximage = conversion->ximage;
+
+  XImage
+    *const matte_image = conversion->matte_image;
 
   Image
-    *canvas;
+    *canvas = conversion->canvas;
+
+  CacheView
+    *canvas_view;
 
   int
     x;
@@ -7465,6 +7485,58 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
 
   XImageRowSource
     row_source;
+
+  scanline_pad=(unsigned int) (ximage->bytes_per_line-((ximage->width*
+    ximage->bits_per_pixel) >> 3));
+  map_info=window->map_info;
+  pixels=window->pixel_info->pixels;
+  q=(unsigned char *) ximage->data;
+  x=0;
+  canvas_view=AcquireVirtualCacheView(canvas,exception);
+  row_source.canvas=canvas;
+  row_source.canvas_view=canvas_view;
+  row_source.exception=exception;
+  row_source.resource_info=resource_info;
+  row_source.ximage=ximage;
+  row_source.scanline_pad=scanline_pad;
+  row_source.pixels=pixels;
+  row_source.map_info=map_info;
+  packing.image=image;
+  packing.canvas=canvas;
+  packing.canvas_view=canvas_view;
+  packing.matte_image=matte_image;
+  packing.scanline_pad=scanline_pad;
+  packing.x=x;
+  if (ximage->format == XYBitmap)
+    XPackBitmapImageMSB(make_context,&packing,q);
+  else
+    if (window->pixel_info->colors != 0)
+      XPackColormappedMSB(ximage,row_source,q);
+    else
+      XPackContinuousMSB(ximage,map_info,row_source,q);
+  XPackMatteImageMSB(make_context,&packing);
+  canvas_view=DestroyCacheView(canvas_view);
+  if (canvas != image)
+    canvas=DestroyImage(canvas);
+}
+
+static void XMakeImageMSBFirst(const MakeImageContext *make_context,
+  Image *image,XImage *ximage,XImage *matte_image)
+{
+  const XResourceInfo
+    *const resource_info = make_context->resource_info;
+
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
+  Image
+    *canvas;
+
+  XCanvasConversion
+    conversion;
 
   assert(resource_info != (XResourceInfo *) NULL);
   assert(window != (XWindowInfo *) NULL);
@@ -7503,38 +7575,11 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
           pattern=DestroyImage(pattern);
         }
     }
-  scanline_pad=(unsigned int) (ximage->bytes_per_line-((ximage->width*
-    ximage->bits_per_pixel) >> 3));
-  map_info=window->map_info;
-  pixels=window->pixel_info->pixels;
-  q=(unsigned char *) ximage->data;
-  x=0;
-  canvas_view=AcquireVirtualCacheView(canvas,exception);
-  row_source.canvas=canvas;
-  row_source.canvas_view=canvas_view;
-  row_source.exception=exception;
-  row_source.resource_info=resource_info;
-  row_source.ximage=ximage;
-  row_source.scanline_pad=scanline_pad;
-  row_source.pixels=pixels;
-  row_source.map_info=map_info;
-  packing.image=image;
-  packing.canvas=canvas;
-  packing.canvas_view=canvas_view;
-  packing.matte_image=matte_image;
-  packing.scanline_pad=scanline_pad;
-  packing.x=x;
-  if (ximage->format == XYBitmap)
-    XPackBitmapImageMSB(make_context,&packing,q);
-  else
-    if (window->pixel_info->colors != 0)
-      XPackColormappedMSB(ximage,row_source,q);
-    else
-      XPackContinuousMSB(ximage,map_info,row_source,q);
-  XPackMatteImageMSB(make_context,&packing);
-  canvas_view=DestroyCacheView(canvas_view);
-  if (canvas != image)
-    canvas=DestroyImage(canvas);
+  conversion.image=image;
+  conversion.canvas=canvas;
+  conversion.ximage=ximage;
+  conversion.matte_image=matte_image;
+  XPackCanvasMSB(make_context,&conversion);
 }
 
 /*
