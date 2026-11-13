@@ -442,18 +442,35 @@ MagickPrivate void SetSignatureDigest(SignatureInfo *signature_info,
   SetStringInfo(signature_info->digest,digest);
 }
 
-static unsigned char *AppendPixelBytes(unsigned char *q,const float pixel,
-  const SignatureInfo *signature_info)
+static unsigned char *AppendPixelBytesReversed(unsigned char *q,
+  const float pixel)
 {
   ssize_t
     j;
 
+  for (j=(ssize_t) sizeof(pixel)-1; j >= 0; j--)
+    *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+  return(q);
+}
+
+static unsigned char *AppendPixelBytesInOrder(unsigned char *q,
+  const float pixel)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) sizeof(pixel); j++)
+    *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+  return(q);
+}
+
+static unsigned char *AppendPixelBytes(unsigned char *q,const float pixel,
+  const SignatureInfo *signature_info)
+{
   if (signature_info->lsb_first == MagickFalse)
-    for (j=(ssize_t) sizeof(pixel)-1; j >= 0; j--)
-      *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+    q=AppendPixelBytesReversed(q,pixel);
   else
-    for (j=0; j < (ssize_t) sizeof(pixel); j++)
-      *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+    q=AppendPixelBytesInOrder(q,pixel);
   return(q);
 }
 
