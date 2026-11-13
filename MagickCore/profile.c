@@ -1770,6 +1770,22 @@ static void SpliceProfileInto8Bim(Image *image,const StringInfo *profile,
   extract_profile=DestroyStringInfo(extract_profile);
 }
 
+static MagickBooleanType Get8BimProfileId(const char *name,
+  unsigned short *profile_id)
+{
+  if (LocaleCompare(name,"icc") == 0)
+    (*profile_id)=0x040f;
+  else
+    if (LocaleCompare(name,"iptc") == 0)
+      (*profile_id)=0x0404;
+    else
+      if (LocaleCompare(name,"xmp") == 0)
+        (*profile_id)=0x0424;
+      else
+        return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void WriteTo8BimProfile(Image *image,const char *name,
   const StringInfo *profile)
 {
@@ -1799,16 +1815,8 @@ static void WriteTo8BimProfile(Image *image,const char *name,
     id,
     profile_id;
 
-  if (LocaleCompare(name,"icc") == 0)
-    profile_id=0x040f;
-  else
-    if (LocaleCompare(name,"iptc") == 0)
-      profile_id=0x0404;
-    else
-      if (LocaleCompare(name,"xmp") == 0)
-        profile_id=0x0424;
-      else
-        return;
+  if (Get8BimProfileId(name,&profile_id) == MagickFalse)
+    return;
   profile_8bim=(StringInfo *) GetValueFromSplayTree((SplayTreeInfo *)
     image->profiles,"8bim");
   if (profile_8bim == (StringInfo *) NULL)
