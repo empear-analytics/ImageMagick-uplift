@@ -538,14 +538,74 @@ MagickExport void GetPixelInfo(const Image *image,PixelInfo *pixel)
 %    o pixel: Specifies a pointer to a Quantum structure.
 %
 */
-MagickExport MagickRealType GetPixelInfoIntensity(
-  const Image *magick_restrict image,const PixelInfo *magick_restrict pixel)
+typedef MagickRealType
+  (*PixelGammaHandler)(const MagickRealType);
+
+static MagickRealType GammaWeightedIntensity(const MagickRealType *sample,
+  const PixelGammaHandler gamma,const double red_weight,
+  const double green_weight,const double blue_weight)
 {
   MagickRealType
     blue,
     green,
-    red,
-    intensity;
+    red;
+
+  red=sample[0];
+  green=sample[1];
+  blue=sample[2];
+  if (gamma != (PixelGammaHandler) NULL)
+    {
+      red=gamma(red);
+      green=gamma(green);
+      blue=gamma(blue);
+    }
+  return(red_weight*red+green_weight*green+blue_weight*blue);
+}
+
+static MagickRealType IntensityFromSamples(const PixelIntensityMethod method,
+  const PixelGammaHandler encode,const PixelGammaHandler decode,
+  const MagickRealType *sample)
+{
+  MagickRealType
+    blue,
+    green,
+    red;
+
+  red=sample[0];
+  green=sample[1];
+  blue=sample[2];
+  switch (method)
+  {
+    case AveragePixelIntensityMethod:
+      return((red+green+blue)/3.0);
+    case BrightnessPixelIntensityMethod:
+      return(MagickMax(MagickMax(red,green),blue));
+    case LightnessPixelIntensityMethod:
+      return((MagickMin(MagickMin(red,green),blue)+
+        MagickMax(MagickMax(red,green),blue))/2.0);
+    case MSPixelIntensityMethod:
+      return((MagickRealType) (((double) red*red+green*green+blue*blue)/
+        (3.0*(double) QuantumRange)));
+    case Rec601LumaPixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,encode,0.298839,0.586811,0.114350));
+    case Rec601LuminancePixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,decode,0.298839,0.586811,0.114350));
+    case Rec709LuminancePixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,decode,0.212656,0.715158,0.072186));
+    case RMSPixelIntensityMethod:
+      return((MagickRealType) (sqrt((double) red*red+green*green+blue*blue)/
+        sqrt(3.0)));
+    default:
+      break;
+  }
+  return(GammaWeightedIntensity(sample,encode,0.212656,0.715158,0.072186));
+}
+
+MagickExport MagickRealType GetPixelInfoIntensity(
+  const Image *magick_restrict image,const PixelInfo *magick_restrict pixel)
+{
+  MagickRealType
+    sample[3];
 
   PixelIntensityMethod
     method;
@@ -553,88 +613,14 @@ MagickExport MagickRealType GetPixelInfoIntensity(
   method=Rec709LumaPixelIntensityMethod;
   if (image != (const Image *) NULL)
     method=image->intensity;
-  red=pixel->red;
-  green=pixel->green;
-  blue=pixel->blue;
-  switch (method)
-  {
-    case AveragePixelIntensityMethod:
-    {
-      intensity=(red+green+blue)/3.0;
-      break;
-    }
-    case BrightnessPixelIntensityMethod:
-    {
-      intensity=MagickMax(MagickMax(red,green),blue);
-      break;
-    }
-    case LightnessPixelIntensityMethod:
-    {
-      intensity=(MagickMin(MagickMin(red,green),blue)+
-        MagickMax(MagickMax(red,green),blue))/2.0;
-      break;
-    }
-    case MSPixelIntensityMethod:
-    {
-      intensity=(MagickRealType) (((double) red*red+green*green+blue*blue)/
-        (3.0*(double) QuantumRange));
-      break;
-    }
-    case Rec601LumaPixelIntensityMethod:
-    {
-      if (pixel->colorspace == RGBColorspace)
-        {
-          red=EncodePixelGamma(red);
-          green=EncodePixelGamma(green);
-          blue=EncodePixelGamma(blue);
-        }
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
-    case Rec601LuminancePixelIntensityMethod:
-    {
-      if (pixel->colorspace == sRGBColorspace)
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
-    case Rec709LumaPixelIntensityMethod:
-    default:
-    {
-      if (pixel->colorspace == RGBColorspace)
-        {
-          red=EncodePixelGamma(red);
-          green=EncodePixelGamma(green);
-          blue=EncodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
-      break;
-    }
-    case Rec709LuminancePixelIntensityMethod:
-    {
-      if (pixel->colorspace == sRGBColorspace)
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
-      break;
-    }
-    case RMSPixelIntensityMethod:
-    {
-      intensity=(MagickRealType) (sqrt((double) red*red+green*green+blue*blue)/
-        sqrt(3.0));
-      break;
-    }
-  }
-  return(intensity);
+  sample[0]=pixel->red;
+  sample[1]=pixel->green;
+  sample[2]=pixel->blue;
+  return(IntensityFromSamples(method,
+    pixel->colorspace == RGBColorspace ? EncodePixelGamma : NULL,
+    pixel->colorspace == sRGBColorspace ? DecodePixelGamma : NULL,sample));
 }
-
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -676,100 +662,20 @@ MagickExport MagickRealType GetPixelIntensity(
   const Image *magick_restrict image,const Quantum *magick_restrict pixel)
 {
   MagickRealType
-    blue,
-    green,
-    red,
-    intensity;
+    sample[3];
 
-  red=(MagickRealType) GetPixelRed(image,pixel);
+  sample[0]=(MagickRealType) GetPixelRed(image,pixel);
   if (image->number_channels == 1)
-    return(red);
-  green=(MagickRealType) GetPixelGreen(image,pixel);
-  blue=(MagickRealType) GetPixelBlue(image,pixel);
-  switch (image->intensity)
-  {
-    case AveragePixelIntensityMethod:
-    {
-      intensity=(red+green+blue)/3.0;
-      break;
-    }
-    case BrightnessPixelIntensityMethod:
-    {
-      intensity=MagickMax(MagickMax(red,green),blue);
-      break;
-    }
-    case LightnessPixelIntensityMethod:
-    {
-      intensity=(MagickMin(MagickMin(red,green),blue)+
-        MagickMax(MagickMax(red,green),blue))/2.0;
-      break;
-    }
-    case MSPixelIntensityMethod:
-    {
-      intensity=(MagickRealType) (((double) red*red+green*green+blue*blue)/
-        (3.0*(double) QuantumRange));
-      break;
-    }
-    case Rec601LumaPixelIntensityMethod:
-    {
-      if ((image->colorspace == RGBColorspace) ||
-          (image->colorspace == LinearGRAYColorspace))
-        {
-          red=EncodePixelGamma(red);
-          green=EncodePixelGamma(green);
-          blue=EncodePixelGamma(blue);
-        }
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
-    case Rec601LuminancePixelIntensityMethod:
-    {
-      if ((image->colorspace == sRGBColorspace) ||
-          (image->colorspace == GRAYColorspace))
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
-    case Rec709LumaPixelIntensityMethod:
-    default:
-    {
-      if ((image->colorspace == RGBColorspace) ||
-          (image->colorspace == LinearGRAYColorspace))
-        {
-          red=EncodePixelGamma(red);
-          green=EncodePixelGamma(green);
-          blue=EncodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
-      break;
-    }
-    case Rec709LuminancePixelIntensityMethod:
-    {
-      if ((image->colorspace == sRGBColorspace) ||
-          (image->colorspace == GRAYColorspace))
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
-      break;
-    }
-    case RMSPixelIntensityMethod:
-    {
-      intensity=(MagickRealType) (sqrt((double) red*red+green*green+blue*blue)/
-        sqrt(3.0));
-      break;
-    }
-  }
-  return(intensity);
+    return(sample[0]);
+  sample[1]=(MagickRealType) GetPixelGreen(image,pixel);
+  sample[2]=(MagickRealType) GetPixelBlue(image,pixel);
+  return(IntensityFromSamples(image->intensity,
+    (image->colorspace == RGBColorspace) ||
+    (image->colorspace == LinearGRAYColorspace) ? EncodePixelGamma : NULL,
+    (image->colorspace == sRGBColorspace) ||
+    (image->colorspace == GRAYColorspace) ? DecodePixelGamma : NULL,sample));
 }
-
-
+
 static void LoadInterpolatePixels(const Image *magick_restrict image,
   const PixelChannel channel,const PixelTrait traits,
   const Quantum *magick_restrict p,const ssize_t count,double *alpha,
