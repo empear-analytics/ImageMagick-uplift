@@ -1036,20 +1036,61 @@ static void XSortSceneList(Image **image_list,const size_t number_scenes)
     qsort((void *) image_list,number_scenes,sizeof(Image *),SceneCompare);
 }
 
-MagickExport void XAnimateBackgroundImage(Display *display,
-  XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
+typedef struct _AnimateBackgroundSetup
 {
-  char
-    geometry[MagickPathExtent],
-    visual_type[MagickPathExtent];
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  ExceptionInfo
+    *exception;
 
   Image
-    *coalesce_image,
-    *display_image,
+    *images,
     **image_list;
 
-  int
-    scene;
+  size_t
+    number_scenes;
+
+  XVisualInfo
+    *visual_info;
+
+  XStandardColormap
+    *map_info;
+} AnimateBackgroundSetup;
+
+typedef struct _AnimateBackgroundTargets
+{
+  XWindowInfo
+    *window_info;
+
+  XResourceInfo
+    *resources;
+
+  XWindowAttributes
+    *window_attributes;
+
+  unsigned int
+    *width,
+    *height;
+
+  XPixelInfo
+    *pixel;
+} AnimateBackgroundTargets;
+
+static void XCreateBackgroundXImage(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  char
+    geometry[MagickPathExtent];
+
+  Display
+    *const display = setup->display;
+
+  Image
+    **const image_list = setup->image_list;
 
   MagickStatusType
     status;
@@ -1057,12 +1098,588 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   RectangleInfo
     geometry_info;
 
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowAttributes
+    *const window_attributes = targets->window_attributes;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*window_info).width=(unsigned int) image_list[0]->columns;
+  (*window_info).height=(unsigned int) image_list[0]->rows;
+  if ((image_list[0]->columns != (*window_info).width) ||
+      (image_list[0]->rows != (*window_info).height))
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      image_list[0]->filename);
+  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>",
+    (*window_attributes).width,(*window_attributes).height);
+  geometry_info.width=(*window_info).width;
+  geometry_info.height=(*window_info).height;
+  geometry_info.x=(ssize_t) (*window_info).x;
+  geometry_info.y=(ssize_t) (*window_info).y;
+  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
+    &geometry_info.width,&geometry_info.height);
+  (*window_info).width=(unsigned int) geometry_info.width;
+  (*window_info).height=(unsigned int) geometry_info.height;
+  (*window_info).x=(int) geometry_info.x;
+  (*window_info).y=(int) geometry_info.y;
+  status=XMakeImage(display,resources,window_info,image_list[0],
+    (*window_info).width,(*window_info).height,setup->exception);
+  if (status == MagickFalse)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      setup->images->filename);
+  (*window_info).x=0;
+  (*window_info).y=0;
+  if (setup->resource_info->debug != MagickFalse)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "Image: %s[%.17g] %.17gx%.17g ",image_list[0]->filename,(double)
+        image_list[0]->scene,(double) image_list[0]->columns,(double)
+        image_list[0]->rows);
+      if (image_list[0]->colors != 0)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
+          image_list[0]->colors);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
+        image_list[0]->magick);
+    }
+}
+
+static void XAdjustBackgroundSize(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  unsigned int
+    *const height = targets->height,
+    *const width = targets->width;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowAttributes
+    *const window_attributes = targets->window_attributes;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*width)=(*window_info).width;
+  (*height)=(*window_info).height;
+  if ((*resources).backdrop != MagickFalse)
+    {
+      /*
+        Center image on window.
+      */
+      (*window_info).x=(int) ((*window_attributes).width/2)-
+        ((*window_info).ximage->width/2);
+      (*window_info).y=(int) ((*window_attributes).height/2)-
+        ((*window_info).ximage->height/2);
+      (*width)=(unsigned int) (*window_attributes).width;
+      (*height)=(unsigned int) (*window_attributes).height;
+    }
+  if ((*resources).image_geometry != (char *) NULL)
+    {
+      char
+        default_geometry[MagickPathExtent];
+
+      int
+        flags,
+        gravity;
+
+      XSizeHints
+        *size_hints;
+
+      /*
+        User specified geometry.
+      */
+      size_hints=XAllocSizeHints();
+      if (size_hints == (XSizeHints *) NULL)
+        ThrowXWindowFatalException(ResourceLimitFatalError,
+          "MemoryAllocationFailed",setup->images->filename);
+      size_hints->flags=0L;
+      (void) FormatLocaleString(default_geometry,MagickPathExtent,"%ux%u",
+        (*width),(*height));
+      flags=XWMGeometry(setup->display,setup->visual_info->screen,
+        (*resources).image_geometry,default_geometry,
+        (*window_info).border_width,size_hints,&(*window_info).x,
+        &(*window_info).y,(int *) width,(int *) height,&gravity);
+      if (((flags & (XValue | YValue))) != 0)
+        {
+          (*width)=(unsigned int) (*window_attributes).width;
+          (*height)=(unsigned int) (*window_attributes).height;
+        }
+      (void) XFree((void *) size_hints);
+    }
+}
+
+static void XCreateBackgroundPixmaps(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  Display
+    *const display = setup->display;
+
+  unsigned int
+    *const height = targets->height,
+    *const width = targets->width;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*window_info).pixmap=XCreatePixmap(display,(*window_info).id,
+    (unsigned int) (*width),(unsigned int) (*height),(*window_info).depth);
+  if ((*window_info).pixmap == (Pixmap) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
+      setup->images->filename);
+  /*
+    Display pixmap on the window.
+  */
+  if (((unsigned int) (*width) > (*window_info).width) ||
+      ((unsigned int) (*height) > (*window_info).height))
+    (void) XFillRectangle(display,(*window_info).pixmap,
+      (*window_info).annotate_context,0,0,(unsigned int) (*width),
+      (unsigned int) (*height));
+  (void) XPutImage(display,(*window_info).pixmap,
+    (*window_info).annotate_context,(*window_info).ximage,0,0,
+    (*window_info).x,(*window_info).y,(*window_info).width,
+    (*window_info).height);
+  (void) XSetWindowBackgroundPixmap(display,(*window_info).id,
+    (*window_info).pixmap);
+  (void) XClearWindow(display,(*window_info).id);
+  /*
+    Initialize image pixmaps structure.
+  */
+  (*window_info).pixmaps=(Pixmap *) AcquireQuantumMemory(setup->number_scenes,
+    sizeof(*(*window_info).pixmaps));
+  (*window_info).matte_pixmaps=(Pixmap *) AcquireQuantumMemory(
+    setup->number_scenes,sizeof(*(*window_info).matte_pixmaps));
+  if (((*window_info).pixmaps == (Pixmap *) NULL) ||
+      ((*window_info).matte_pixmaps == (Pixmap *) NULL))
+    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
+      setup->images->filename);
+  (*window_info).pixmaps[0]=(*window_info).pixmap;
+  (*window_info).matte_pixmaps[0]=(*window_info).pixmap;
+}
+
+static void XCreateSceneXImage(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets,const int scene)
+{
+  Image
+    **const image_list = setup->image_list;
+
+  MagickStatusType
+    status;
+
+  unsigned int
+    columns,
+    rows;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XStandardColormap
+    *const map_info = setup->map_info;
+
+  XVisualInfo
+    *const visual_info = setup->visual_info;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*window_info).pixmap=(Pixmap) NULL;
+  (*window_info).matte_pixmap=(Pixmap) NULL;
+  if ((IsTrueColorMap((*resources).map_type,visual_info) != MagickFalse) &&
+      (image_list[scene]->storage_class == PseudoClass))
+    XGetPixelInfo(setup->display,visual_info,map_info,resources,
+      image_list[scene],(*window_info).pixel_info);
+  columns=(unsigned int) image_list[scene]->columns;
+  rows=(unsigned int) image_list[scene]->rows;
+  if ((image_list[scene]->columns != columns) ||
+      (image_list[scene]->rows != rows))
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      image_list[scene]->filename);
+  status=XMakeImage(setup->display,resources,window_info,image_list[scene],
+    columns,rows,setup->exception);
+  if (status == MagickFalse)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      setup->images->filename);
+  if (setup->resource_info->debug != MagickFalse)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "Image: [%.17g] %s %.17gx%.17g ",(double) image_list[scene]->scene,
+        image_list[scene]->filename,(double) columns,(double) rows);
+      if (image_list[scene]->colors != 0)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
+          image_list[scene]->colors);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
+        image_list[scene]->magick);
+    }
+}
+
+static void XCreateScenePixmap(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets,const int scene)
+{
+  Display
+    *const display = setup->display;
+
+  unsigned int
+    *const height = targets->height,
+    *const width = targets->width;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*window_info).pixmap=XCreatePixmap(display,(*window_info).id,(*width),
+    (*height),(*window_info).depth);
+  if ((*window_info).pixmap == (Pixmap) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
+      setup->images->filename);
+  /*
+    Display pixmap on the window.
+  */
+  if (((*width) > (*window_info).width) || ((*height) > (*window_info).height))
+    (void) XFillRectangle(display,(*window_info).pixmap,
+      (*window_info).annotate_context,0,0,(*width),(*height));
+  (void) XPutImage(display,(*window_info).pixmap,
+    (*window_info).annotate_context,(*window_info).ximage,0,0,
+    (*window_info).x,(*window_info).y,(*window_info).width,
+    (*window_info).height);
+  (void) XSetWindowBackgroundPixmap(display,(*window_info).id,
+    (*window_info).pixmap);
+  (void) XClearWindow(display,(*window_info).id);
+  (*window_info).pixmaps[scene]=(*window_info).pixmap;
+  (*window_info).matte_pixmaps[scene]=(*window_info).matte_pixmap;
+  if (setup->image_list[scene]->alpha_trait)
+    (void) XClearWindow(display,(*window_info).id);
+}
+
+static void XRunBackgroundAnimation(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  Display
+    *const display = setup->display;
+
+  Image
+    **const image_list = setup->image_list;
+
+  int
+    scene;
+
   size_t
-    delay,
-    number_scenes;
+    delay;
 
   ssize_t
     iterations;
+
+  XEvent
+    event;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (void) XSelectInput(display,(*window_info).id,SubstructureNotifyMask);
+  event.type=Expose;
+  iterations=0;
+  do
+  {
+    for (scene=0; scene < (int) setup->number_scenes; scene++)
+    {
+      if (XNextBackgroundEvent(display,&event) == MagickFalse)
+        break;
+      (*window_info).pixmap=(*window_info).pixmaps[scene];
+      (*window_info).matte_pixmap=(*window_info).matte_pixmaps[scene];
+      (void) XSetWindowBackgroundPixmap(display,(*window_info).id,
+        (*window_info).pixmap);
+      (void) XClearWindow(display,(*window_info).id);
+      (void) XSync(display,MagickFalse);
+      delay=1000*image_list[scene]->delay/(size_t) MagickMax(
+        image_list[scene]->ticks_per_second,1L);
+      XDelay(display,(*resources).delay*(delay == 0 ? 10 : delay));
+    }
+    iterations++;
+    if (iterations == (ssize_t) image_list[0]->iterations)
+      break;
+  } while (event.type != DestroyNotify);
+}
+
+static void XMakeBackgroundColormap(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  ExceptionInfo
+    *const exception = setup->exception;
+
+  Image
+    *display_image,
+    **const image_list = setup->image_list;
+
+  int
+    scene;
+
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XResourceInfo
+    *const resource_info = setup->resource_info,
+    *const resources = targets->resources;
+
+  XVisualInfo
+    *const visual_info = setup->visual_info;
+
+  (*resources).colormap=SharedColormap;
+  display_image=image_list[0];
+  for (scene=0; scene < (int) setup->number_scenes; scene++)
+  {
+    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
+      (void) SetImageType(image_list[scene],image_list[scene]->alpha_trait ==
+        BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
+    if ((display_image->columns < image_list[scene]->columns) &&
+        (display_image->rows < image_list[scene]->rows))
+      display_image=image_list[scene];
+  }
+  if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
+    (void) SetImageType(display_image,display_image->alpha_trait !=
+      BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
+  XMakeStandardColormap(setup->display,visual_info,resources,display_image,
+    setup->map_info,pixel,exception);
+}
+
+static void XInitializeBackgroundWindow(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  Display
+    *const display = setup->display;
+
+  XGCValues
+    context_values;
+
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  context_values.background=(*pixel).background_color.pixel;
+  context_values.foreground=(*pixel).foreground_color.pixel;
+  (*pixel).annotate_context=XCreateGC(display,(*window_info).id,(unsigned long)
+    (GCBackground | GCForeground),&context_values);
+  if ((*pixel).annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      setup->images->filename);
+  /*
+    Initialize Image window attributes.
+  */
+  XGetWindowInfo(display,setup->visual_info,setup->map_info,pixel,
+    (XFontStruct *) NULL,resources,window_info);
+}
+
+static void XCreateBackgroundScenes(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  Image
+    **const image_list = setup->image_list;
+
+  int
+    scene;
+
+  size_t
+    delay;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  for (scene=1; scene < (int) setup->number_scenes; scene++)
+  {
+    /*
+      Create X image.
+    */
+    XCreateSceneXImage(setup,targets,scene);
+    /*
+      Create the X pixmap.
+    */
+    XCreateScenePixmap(setup,targets,scene);
+    delay=1000*image_list[scene]->delay/(size_t) MagickMax(
+      image_list[scene]->ticks_per_second,1L);
+    XDelay(setup->display,(*resources).delay*(delay == 0 ? 10 : delay));
+  }
+}
+
+static Image **
+XSortAnimateScenes(Image *,const size_t,ExceptionInfo *);
+
+static void XGetBackgroundVisualType(Display *display,
+  const AnimateBackgroundTargets *targets,char *visual_type)
+{
+  MagickStatusType
+    status;
+
+  XWindowAttributes
+    *const window_attributes = targets->window_attributes;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*window_attributes).width=XDisplayWidth(display,XDefaultScreen(display));
+  (*window_attributes).height=XDisplayHeight(display,XDefaultScreen(display));
+  (void) CopyMagickString(visual_type,"default",MagickPathExtent);
+  status=XGetWindowAttributes(display,(*window_info).id,
+    window_attributes) != 0 ? MagickTrue : MagickFalse;
+  if (status != MagickFalse)
+    (void) FormatLocaleString(visual_type,MagickPathExtent,"0x%lx",
+      XVisualIDFromVisual((*window_attributes).visual));
+}
+
+typedef struct _AnimateBackgroundEarlyTargets
+{
+  Window
+    *root_window;
+
+  XResourceInfo
+    *resources;
+
+  XWindowInfo
+    *window_info;
+
+  XPixelInfo
+    *pixel;
+
+  XStandardColormap
+    **map_info;
+
+  XVisualInfo
+    **visual_info;
+} AnimateBackgroundEarlyTargets;
+
+static void XFindBackgroundWindow(Display *display,
+  XResourceInfo *resource_info,const AnimateBackgroundEarlyTargets *targets)
+{
+  Window
+    *const root_window = targets->root_window;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*resources)=(*resource_info);
+  (*window_info).id=(Window) NULL;
+  (*root_window)=XRootWindow(display,XDefaultScreen(display));
+  if (LocaleCompare((*resources).window_id,"root") == 0)
+    (*window_info).id=(*root_window);
+  else
+    {
+      if (isdigit((int) ((unsigned char) *(*resources).window_id)) != 0)
+        (*window_info).id=XWindowByID(display,(*root_window),
+          (Window) strtol((char *) (*resources).window_id,(char **) NULL,0));
+      if ((*window_info).id == (Window) NULL)
+        (*window_info).id=
+          XWindowByName(display,(*root_window),(*resources).window_id);
+    }
+}
+
+static void XCreateBackgroundVisual(Display *display,const char *filename,
+  char *visual_type,const AnimateBackgroundEarlyTargets *targets)
+{
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XStandardColormap
+    **const map_info = targets->map_info;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  if ((*visual_info) == (XVisualInfo *) NULL)
+    {
+      /*
+        Allocate standard colormap.
+      */
+      (*map_info)=XAllocStandardColormap();
+      if ((*map_info) == (XStandardColormap *) NULL)
+        ThrowXWindowFatalException(ResourceLimitFatalError,
+          "MemoryAllocationFailed",filename);
+      (*map_info)->colormap=(Colormap) NULL;
+      (*pixel).pixels=(unsigned long *) NULL;
+      /*
+        Initialize visual info.
+      */
+      (*resources).map_type=(char *) NULL;
+      (*resources).visual_type=visual_type;
+      (*visual_info)=XBestVisualInfo(display,(*map_info),resources);
+      if ((*visual_info) == (XVisualInfo *) NULL)
+        ThrowXWindowFatalException(XServerFatalError,"UnableToGetVisual",
+          filename);
+      /*
+        Initialize window info.
+      */
+      (*window_info).ximage=(XImage *) NULL;
+      (*window_info).matte_image=(XImage *) NULL;
+      (*window_info).pixmap=(Pixmap) NULL;
+      (*window_info).matte_pixmap=(Pixmap) NULL;
+    }
+}
+
+static Image *XPrepareBackgroundImages(Display *display,Image *images,
+  ExceptionInfo *exception,const AnimateBackgroundEarlyTargets *targets)
+{
+  Image
+    *coalesce_image;
+
+  Window
+    *const root_window = targets->root_window;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  if ((*window_info).id == (*root_window))
+    XDestroyWindowColors(display,(*root_window));
+  coalesce_image=CoalesceImages(images,exception);
+  if (coalesce_image == (Image *) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
+      images->filename);
+  images=coalesce_image;
+  if ((*resources).map_type == (char *) NULL)
+    if (((*visual_info)->klass != TrueColor) &&
+        ((*visual_info)->klass != DirectColor))
+      XRemapBackgroundImages(images,(*visual_info),(*resources),exception);
+  return(images);
+}
+
+static void XReleaseBackgroundImages(Display *display,Image *images,
+  Image **image_list)
+{
+  (void) XSync(display,MagickFalse);
+  image_list=(Image **) RelinquishMagickMemory(image_list);
+  images=DestroyImageList(images);
+}
+
+MagickExport void XAnimateBackgroundImage(Display *display,
+  XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
+{
+  char
+    visual_type[MagickPathExtent];
+
+  Image
+    **image_list;
+
+  size_t
+    number_scenes;
 
   static XPixelInfo
     pixel;
@@ -1083,17 +1700,22 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   Window
     root_window;
 
-  XEvent
-    event;
-
-  XGCValues
-    context_values;
-
   XResourceInfo
     resources;
 
   XWindowAttributes
     window_attributes;
+
+  AnimateBackgroundSetup
+    setup;
+
+  const AnimateBackgroundTargets
+    targets = { &window_info, &resources, &window_attributes, &width,
+      &height, &pixel };
+
+  const AnimateBackgroundEarlyTargets
+    early_targets = { &root_window, &resources, &window_info, &pixel,
+      &map_info, &visual_info };
 
   /*
     Determine target window.
@@ -1102,20 +1724,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   assert(images->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
-  resources=(*resource_info);
-  window_info.id=(Window) NULL;
-  root_window=XRootWindow(display,XDefaultScreen(display));
-  if (LocaleCompare(resources.window_id,"root") == 0)
-    window_info.id=root_window;
-  else
-    {
-      if (isdigit((int) ((unsigned char) *resources.window_id)) != 0)
-        window_info.id=XWindowByID(display,root_window,
-          (Window) strtol((char *) resources.window_id,(char **) NULL,0));
-      if (window_info.id == (Window) NULL)
-        window_info.id=
-          XWindowByName(display,root_window,resources.window_id);
-    }
+  XFindBackgroundWindow(display,resource_info,&early_targets);
   if (window_info.id == (Window) NULL)
     {
       ThrowXWindowException(XServerError,"NoWindowWithSpecifiedIDExists",
@@ -1125,317 +1734,53 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   /*
     Determine window visual id.
   */
-  window_attributes.width=XDisplayWidth(display,XDefaultScreen(display));
-  window_attributes.height=XDisplayHeight(display,XDefaultScreen(display));
-  (void) CopyMagickString(visual_type,"default",MagickPathExtent);
-  status=XGetWindowAttributes(display,window_info.id,&window_attributes) != 0 ?
-    MagickTrue : MagickFalse;
-  if (status != MagickFalse)
-    (void) FormatLocaleString(visual_type,MagickPathExtent,"0x%lx",
-      XVisualIDFromVisual(window_attributes.visual));
-  if (visual_info == (XVisualInfo *) NULL)
-    {
-      /*
-        Allocate standard colormap.
-      */
-      map_info=XAllocStandardColormap();
-      if (map_info == (XStandardColormap *) NULL)
-        ThrowXWindowFatalException(ResourceLimitFatalError,
-          "MemoryAllocationFailed",images->filename);
-      map_info->colormap=(Colormap) NULL;
-      pixel.pixels=(unsigned long *) NULL;
-      /*
-        Initialize visual info.
-      */
-      resources.map_type=(char *) NULL;
-      resources.visual_type=visual_type;
-      visual_info=XBestVisualInfo(display,map_info,&resources);
-      if (visual_info == (XVisualInfo *) NULL)
-        ThrowXWindowFatalException(XServerFatalError,"UnableToGetVisual",
-          images->filename);
-      /*
-        Initialize window info.
-      */
-      window_info.ximage=(XImage *) NULL;
-      window_info.matte_image=(XImage *) NULL;
-      window_info.pixmap=(Pixmap) NULL;
-      window_info.matte_pixmap=(Pixmap) NULL;
-    }
+  XGetBackgroundVisualType(display,&targets,visual_type);
+  XCreateBackgroundVisual(display,images->filename,visual_type,
+    &early_targets);
   /*
     Free previous root colors.
   */
-  if (window_info.id == root_window)
-    XDestroyWindowColors(display,root_window);
-  coalesce_image=CoalesceImages(images,exception);
-  if (coalesce_image == (Image *) NULL)
-    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
-      images->filename);
-  images=coalesce_image;
-  if (resources.map_type == (char *) NULL)
-    if ((visual_info->klass != TrueColor) &&
-        (visual_info->klass != DirectColor))
-      XRemapBackgroundImages(images,visual_info,resources,exception);
+  images=XPrepareBackgroundImages(display,images,exception,&early_targets);
   /*
     Sort images by increasing scene number.
   */
   number_scenes=GetImageListLength(images);
-  image_list=ImageListToArray(images,exception);
-  if (image_list == (Image **) NULL)
-    ThrowXWindowFatalException(ResourceLimitFatalError,
-      "MemoryAllocationFailed",images->filename);
-  XSortSceneList(image_list,number_scenes);
+  image_list=XSortAnimateScenes(images,number_scenes,exception);
+  setup.display=display;
+  setup.resource_info=resource_info;
+  setup.exception=exception;
+  setup.images=images;
+  setup.image_list=image_list;
+  setup.number_scenes=number_scenes;
+  setup.visual_info=visual_info;
+  setup.map_info=map_info;
   /*
     Initialize Standard Colormap.
   */
-  resources.colormap=SharedColormap;
-  display_image=image_list[0];
-  for (scene=0; scene < (int) number_scenes; scene++)
-  {
-    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
-      (void) SetImageType(image_list[scene],image_list[scene]->alpha_trait ==
-        BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
-    if ((display_image->columns < image_list[scene]->columns) &&
-        (display_image->rows < image_list[scene]->rows))
-      display_image=image_list[scene];
-  }
-  if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
-    (void) SetImageType(display_image,display_image->alpha_trait !=
-      BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
-  XMakeStandardColormap(display,visual_info,&resources,display_image,map_info,
-    &pixel,exception);
+  XMakeBackgroundColormap(&setup,&targets);
   /*
     Graphic context superclass.
   */
-  context_values.background=pixel.background_color.pixel;
-  context_values.foreground=pixel.foreground_color.pixel;
-  pixel.annotate_context=XCreateGC(display,window_info.id,(unsigned long)
-    (GCBackground | GCForeground),&context_values);
-  if (pixel.annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      images->filename);
-  /*
-    Initialize Image window attributes.
-  */
-  XGetWindowInfo(display,visual_info,map_info,&pixel,(XFontStruct *) NULL,
-    &resources,&window_info);
+  XInitializeBackgroundWindow(&setup,&targets);
   /*
     Create the X image.
   */
-  window_info.width=(unsigned int) image_list[0]->columns;
-  window_info.height=(unsigned int) image_list[0]->rows;
-  if ((image_list[0]->columns != window_info.width) ||
-      (image_list[0]->rows != window_info.height))
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-      image_list[0]->filename);
-  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>",
-    window_attributes.width,window_attributes.height);
-  geometry_info.width=window_info.width;
-  geometry_info.height=window_info.height;
-  geometry_info.x=(ssize_t) window_info.x;
-  geometry_info.y=(ssize_t) window_info.y;
-  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
-    &geometry_info.width,&geometry_info.height);
-  window_info.width=(unsigned int) geometry_info.width;
-  window_info.height=(unsigned int) geometry_info.height;
-  window_info.x=(int) geometry_info.x;
-  window_info.y=(int) geometry_info.y;
-  status=XMakeImage(display,&resources,&window_info,image_list[0],
-    window_info.width,window_info.height,exception);
-  if (status == MagickFalse)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-      images->filename);
-  window_info.x=0;
-  window_info.y=0;
-  if (resource_info->debug != MagickFalse)
-    {
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "Image: %s[%.17g] %.17gx%.17g ",image_list[0]->filename,(double)
-        image_list[0]->scene,(double) image_list[0]->columns,(double)
-        image_list[0]->rows);
-      if (image_list[0]->colors != 0)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
-          image_list[0]->colors);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
-        image_list[0]->magick);
-    }
+  XCreateBackgroundXImage(&setup,&targets);
   /*
     Adjust image dimensions as specified by backdrop or geometry options.
   */
-  width=window_info.width;
-  height=window_info.height;
-  if (resources.backdrop != MagickFalse)
-    {
-      /*
-        Center image on window.
-      */
-      window_info.x=(int) (window_attributes.width/2)-
-        (window_info.ximage->width/2);
-      window_info.y=(int) (window_attributes.height/2)-
-        (window_info.ximage->height/2);
-      width=(unsigned int) window_attributes.width;
-      height=(unsigned int) window_attributes.height;
-    }
-  if (resources.image_geometry != (char *) NULL)
-    {
-      char
-        default_geometry[MagickPathExtent];
-
-      int
-        flags,
-        gravity;
-
-      XSizeHints
-        *size_hints;
-
-      /*
-        User specified geometry.
-      */
-      size_hints=XAllocSizeHints();
-      if (size_hints == (XSizeHints *) NULL)
-        ThrowXWindowFatalException(ResourceLimitFatalError,
-          "MemoryAllocationFailed",images->filename);
-      size_hints->flags=0L;
-      (void) FormatLocaleString(default_geometry,MagickPathExtent,"%ux%u",width,
-        height);
-      flags=XWMGeometry(display,visual_info->screen,resources.image_geometry,
-        default_geometry,window_info.border_width,size_hints,&window_info.x,
-        &window_info.y,(int *) &width,(int *) &height,&gravity);
-      if (((flags & (XValue | YValue))) != 0)
-        {
-          width=(unsigned int) window_attributes.width;
-          height=(unsigned int) window_attributes.height;
-        }
-      (void) XFree((void *) size_hints);
-    }
+  XAdjustBackgroundSize(&setup,&targets);
   /*
     Create the X pixmap.
   */
-  window_info.pixmap=XCreatePixmap(display,window_info.id,(unsigned int) width,
-    (unsigned int) height,window_info.depth);
-  if (window_info.pixmap == (Pixmap) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
-      images->filename);
-  /*
-    Display pixmap on the window.
-  */
-  if (((unsigned int) width > window_info.width) ||
-      ((unsigned int) height > window_info.height))
-    (void) XFillRectangle(display,window_info.pixmap,
-      window_info.annotate_context,0,0,(unsigned int) width,
-      (unsigned int) height);
-  (void) XPutImage(display,window_info.pixmap,window_info.annotate_context,
-    window_info.ximage,0,0,window_info.x,window_info.y,window_info.width,
-    window_info.height);
-  (void) XSetWindowBackgroundPixmap(display,window_info.id,window_info.pixmap);
-  (void) XClearWindow(display,window_info.id);
-  /*
-    Initialize image pixmaps structure.
-  */
-  window_info.pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
-    sizeof(*window_info.pixmaps));
-  window_info.matte_pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
-    sizeof(*window_info.matte_pixmaps));
-  if ((window_info.pixmaps == (Pixmap *) NULL) ||
-      (window_info.matte_pixmaps == (Pixmap *) NULL))
-    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
-      images->filename);
-  window_info.pixmaps[0]=window_info.pixmap;
-  window_info.matte_pixmaps[0]=window_info.pixmap;
-  for (scene=1; scene < (int) number_scenes; scene++)
-  {
-    unsigned int
-      columns,
-      rows;
-
-    /*
-      Create X image.
-    */
-    window_info.pixmap=(Pixmap) NULL;
-    window_info.matte_pixmap=(Pixmap) NULL;
-    if (IsTrueColorMap(resources.map_type,visual_info) != MagickFalse)
-      if (image_list[scene]->storage_class == PseudoClass)
-        XGetPixelInfo(display,visual_info,map_info,&resources,
-          image_list[scene],window_info.pixel_info);
-    columns=(unsigned int) image_list[scene]->columns;
-    rows=(unsigned int) image_list[scene]->rows;
-    if ((image_list[scene]->columns != columns) ||
-        (image_list[scene]->rows != rows))
-      ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-        image_list[scene]->filename);
-    status=XMakeImage(display,&resources,&window_info,image_list[scene],
-      columns,rows,exception);
-    if (status == MagickFalse)
-      ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-        images->filename);
-    if (resource_info->debug != MagickFalse)
-      {
-        (void) LogMagickEvent(X11Event,GetMagickModule(),
-          "Image: [%.17g] %s %.17gx%.17g ",(double) image_list[scene]->scene,
-          image_list[scene]->filename,(double) columns,(double) rows);
-        if (image_list[scene]->colors != 0)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
-            image_list[scene]->colors);
-        (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
-          image_list[scene]->magick);
-      }
-    /*
-      Create the X pixmap.
-    */
-    window_info.pixmap=XCreatePixmap(display,window_info.id,width,height,
-      window_info.depth);
-    if (window_info.pixmap == (Pixmap) NULL)
-      ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
-        images->filename);
-    /*
-      Display pixmap on the window.
-    */
-    if ((width > window_info.width) || (height > window_info.height))
-      (void) XFillRectangle(display,window_info.pixmap,
-        window_info.annotate_context,0,0,width,height);
-    (void) XPutImage(display,window_info.pixmap,window_info.annotate_context,
-      window_info.ximage,0,0,window_info.x,window_info.y,window_info.width,
-      window_info.height);
-    (void) XSetWindowBackgroundPixmap(display,window_info.id,
-      window_info.pixmap);
-    (void) XClearWindow(display,window_info.id);
-    window_info.pixmaps[scene]=window_info.pixmap;
-    window_info.matte_pixmaps[scene]=window_info.matte_pixmap;
-    if (image_list[scene]->alpha_trait)
-      (void) XClearWindow(display,window_info.id);
-    delay=1000*image_list[scene]->delay/(size_t) MagickMax(
-      image_list[scene]->ticks_per_second,1L);
-    XDelay(display,resources.delay*(delay == 0 ? 10 : delay));
-  }
+  XCreateBackgroundPixmaps(&setup,&targets);
+  XCreateBackgroundScenes(&setup,&targets);
   window_info.pixel_info=(&pixel);
   /*
     Display pixmap on the window.
   */
-  (void) XSelectInput(display,window_info.id,SubstructureNotifyMask);
-  event.type=Expose;
-  iterations=0;
-  do
-  {
-    for (scene=0; scene < (int) number_scenes; scene++)
-    {
-      if (XNextBackgroundEvent(display,&event) == MagickFalse)
-        break;
-      window_info.pixmap=window_info.pixmaps[scene];
-      window_info.matte_pixmap=window_info.matte_pixmaps[scene];
-      (void) XSetWindowBackgroundPixmap(display,window_info.id,
-        window_info.pixmap);
-      (void) XClearWindow(display,window_info.id);
-      (void) XSync(display,MagickFalse);
-      delay=1000*image_list[scene]->delay/(size_t) MagickMax(
-        image_list[scene]->ticks_per_second,1L);
-      XDelay(display,resources.delay*(delay == 0 ? 10 : delay));
-    }
-    iterations++;
-    if (iterations == (ssize_t) image_list[0]->iterations)
-      break;
-  } while (event.type != DestroyNotify);
-  (void) XSync(display,MagickFalse);
-  image_list=(Image **) RelinquishMagickMemory(image_list);
-  images=DestroyImageList(images);
+  XRunBackgroundAnimation(&setup,&targets);
+  XReleaseBackgroundImages(display,images,image_list);
 }
 
 /*
@@ -4326,32 +4671,904 @@ static void XWithdrawBackdropWindows(Display *display,
     }
 }
 
-MagickExport Image *XAnimateImages(Display *display,
-  XResourceInfo *resource_info,char **argv,const int argc,Image *images,
+static void XCreateGraphicContexts(const AnimateWindowSetup *setup,
+  const char *filename,XGCValues *context_values,
+  MagickStatusType *context_mask)
+{
+  Display
+    *const display = setup->display;
+
+  XWindows
+    *const windows = setup->windows;
+
+  XPixelInfo
+    *const pixel = setup->pixel;
+
+  XFontStruct
+    *const font_info = setup->font_info;
+
+  /*
+    Initialize graphic context.
+  */
+  (*context_values).background=pixel->background_color.pixel;
+  (*context_values).font=font_info->fid;
+  (*context_values).foreground=pixel->foreground_color.pixel;
+  (*context_values).graphics_exposures=MagickFalse;
+  *context_mask=(MagickStatusType)
+    (GCBackground | GCFont | GCForeground | GCGraphicsExposures);
+  if (pixel->annotate_context != (GC) NULL)
+    (void) XFreeGC(display,pixel->annotate_context);
+  pixel->annotate_context=
+    XCreateGC(display,windows->context.id,*context_mask,context_values);
+  if (pixel->annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      filename);
+  (*context_values).background=pixel->depth_color.pixel;
+  if (pixel->widget_context != (GC) NULL)
+    (void) XFreeGC(display,pixel->widget_context);
+  pixel->widget_context=
+    XCreateGC(display,windows->context.id,*context_mask,context_values);
+  if (pixel->widget_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      filename);
+  (*context_values).background=pixel->foreground_color.pixel;
+  (*context_values).foreground=pixel->background_color.pixel;
+  (*context_values).plane_mask=
+    (*context_values).background ^ (*context_values).foreground;
+  if (pixel->highlight_context != (GC) NULL)
+    (void) XFreeGC(display,pixel->highlight_context);
+  pixel->highlight_context=XCreateGC(display,windows->context.id,
+    (size_t) (*context_mask | GCPlaneMask),context_values);
+  if (pixel->highlight_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      filename);
+  (void) XDestroyWindow(display,windows->context.id);
+}
+
+static void XCreateIconContext(const AnimateWindowSetup *setup,
+  const char *filename,XGCValues *context_values)
+{
+  Display
+    *const display = setup->display;
+
+  XWindows
+    *const windows = setup->windows;
+
+  XPixelInfo
+    *const icon_pixel = setup->icon_pixel;
+
+  if (icon_pixel->annotate_context != (GC) NULL)
+    (void) XFreeGC(display,icon_pixel->annotate_context);
+  (*context_values).background=icon_pixel->background_color.pixel;
+  (*context_values).foreground=icon_pixel->foreground_color.pixel;
+  icon_pixel->annotate_context=XCreateGC(display,windows->icon.id,
+    (size_t) (GCBackground | GCForeground),context_values);
+  if (icon_pixel->annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      filename);
+  windows->icon.annotate_context=icon_pixel->annotate_context;
+}
+
+static void XCreateImageWindowInfo(const AnimateWindowSetup *setup,
   ExceptionInfo *exception)
 {
   char
-    command[MagickPathExtent],
-    geometry[MagickPathExtent],
-    resource_name[MagickPathExtent];
+    geometry[MagickPathExtent];
+
+  Display
+    *const display = setup->display;
+
+  XResourceInfo
+    *const resource_info = setup->resource_info;
+
+  XWindows
+    *const windows = setup->windows;
+
+  XVisualInfo
+    *const visual_info = setup->visual_info;
 
   Image
-    *display_image,
-    *image,
-    **image_list,
-    *nexus;
-
-  MagickStatusType
-    context_mask,
-    state;
+    *const display_image = setup->display_image;
 
   RectangleInfo
     geometry_info;
+
+  XGetWindowInfo(display,visual_info,setup->map_info,setup->pixel,
+    setup->font_info,resource_info,&windows->image);
+  windows->image.shape=MagickTrue;  /* non-rectangular shape hint */
+  if (resource_info->use_shared_memory == MagickFalse)
+    windows->image.shared_memory=MagickFalse;
+  if (resource_info->title != (char *) NULL)
+    {
+      char
+        *title;
+
+      title=InterpretImageProperties(resource_info->image_info,display_image,
+        resource_info->title,exception);
+      (void) CloneString(&windows->image.name,title);
+      (void) CloneString(&windows->image.icon_name,title);
+      title=DestroyString(title);
+    }
+  else
+    {
+      char
+        filename[MagickPathExtent],
+        window_name[MagickPathExtent];
+
+      /*
+        Window name is the base of the filename.
+      */
+      GetPathComponent(display_image->magick_filename,TailPath,filename);
+      (void) FormatLocaleString(window_name,MagickPathExtent,
+        "%s: %s[scene: %.17g frames: %.17g]",MagickPackageName,filename,(double)
+        display_image->scene,(double) setup->number_scenes);
+      (void) CloneString(&windows->image.name,window_name);
+      (void) CloneString(&windows->image.icon_name,filename);
+    }
+  if (resource_info->immutable != MagickFalse)
+    windows->image.immutable=MagickTrue;
+  windows->image.shape=MagickTrue;
+  windows->image.geometry=resource_info->image_geometry;
+  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
+    XDisplayWidth(display,visual_info->screen),
+    XDisplayHeight(display,visual_info->screen));
+  geometry_info.width=display_image->columns;
+  geometry_info.height=display_image->rows;
+  geometry_info.x=0;
+  geometry_info.y=0;
+  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
+    &geometry_info.width,&geometry_info.height);
+  windows->image.width=(unsigned int) geometry_info.width;
+  windows->image.height=(unsigned int) geometry_info.height;
+  windows->image.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
+    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
+    KeyReleaseMask | LeaveWindowMask | OwnerGrabButtonMask |
+    PropertyChangeMask | StructureNotifyMask | SubstructureNotifyMask;
+}
+
+static void XCreateBackdropWindow(const AnimateWindowSetup *setup)
+{
+Display
+    *const display = setup->display;
+
+XResourceInfo
+    *const resource_info = setup->resource_info;
+
+XWindows
+    *const windows = setup->windows;
+
+XVisualInfo
+    *const visual_info = setup->visual_info;
+
+const Window
+    root_window = setup->root_window;
+
+XClassHint
+    *const class_hints = setup->class_hints;
+
+XWMHints
+    *const manager_hints = setup->manager_hints;
+
+char
+    **const argv = setup->argv;
+
+const int
+    argc = setup->argc;
+
+  XGetWindowInfo(display,visual_info,setup->map_info,setup->pixel,
+    setup->font_info,resource_info,&windows->backdrop);
+  if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
+    {
+      /*
+        Initialize backdrop window.
+      */
+      windows->backdrop.x=0;
+      windows->backdrop.y=0;
+      (void) CloneString(&windows->backdrop.name,"ImageMagick Backdrop");
+      windows->backdrop.flags=(size_t) (USSize | USPosition);
+      windows->backdrop.width=(unsigned int)
+        XDisplayWidth(display,visual_info->screen);
+      windows->backdrop.height=(unsigned int)
+        XDisplayHeight(display,visual_info->screen);
+      windows->backdrop.border_width=0;
+      windows->backdrop.immutable=MagickTrue;
+      windows->backdrop.attributes.do_not_propagate_mask=ButtonPressMask |
+        ButtonReleaseMask;
+      windows->backdrop.attributes.event_mask=ButtonPressMask | KeyPressMask |
+        StructureNotifyMask;
+      manager_hints->flags=IconWindowHint | InputHint | StateHint;
+      manager_hints->icon_window=windows->icon.id;
+      manager_hints->input=MagickTrue;
+      manager_hints->initial_state=
+        resource_info->iconic ? IconicState : NormalState;
+      XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+        &windows->backdrop);
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),
+          "Window id: 0x%lx (backdrop)",windows->backdrop.id);
+      XCenterImageOnBackdrop(display,windows,visual_info);
+    }
+}
+
+static void XCreateImageWindow(const AnimateWindowSetup *setup)
+{
+Display
+    *const display = setup->display;
+
+XResourceInfo
+    *const resource_info = setup->resource_info;
+
+XWindows
+    *const windows = setup->windows;
+
+const Window
+    root_window = setup->root_window;
+
+XClassHint
+    *const class_hints = setup->class_hints;
+
+XWMHints
+    *const manager_hints = setup->manager_hints;
+
+char
+    **const argv = setup->argv;
+
+const int
+    argc = setup->argc;
+
+  manager_hints->flags=IconWindowHint | InputHint | StateHint;
+  manager_hints->icon_window=windows->icon.id;
+  manager_hints->input=MagickTrue;
+  manager_hints->initial_state=
+    resource_info->iconic ? IconicState : NormalState;
+  if (windows->group_leader.id != (Window) NULL)
+    {
+      /*
+        Follow the leader.
+      */
+      manager_hints->flags|=(MagickStatusType) WindowGroupHint;
+      manager_hints->window_group=windows->group_leader.id;
+      (void) XSelectInput(display,windows->group_leader.id,StructureNotifyMask);
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),
+          "Window id: 0x%lx (group leader)",windows->group_leader.id);
+    }
+  XMakeWindow(display,
+    (Window) (resource_info->backdrop ? windows->backdrop.id : root_window),
+    argv,argc,class_hints,manager_hints,&windows->image);
+  (void) XChangeProperty(display,windows->image.id,windows->im_protocols,
+    XA_STRING,8,PropModeReplace,(unsigned char *) NULL,0);
+  if (windows->group_leader.id != (Window) NULL)
+    (void) XSetTransientForHint(display,windows->image.id,
+      windows->group_leader.id);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (image)",
+      windows->image.id);
+}
+
+static void XCreatePanelWindows(const AnimateWindowSetup *setup)
+{
+  char
+    resource_name[MagickPathExtent];
+
+Display
+    *const display = setup->display;
+
+XResourceInfo
+    *const resource_info = setup->resource_info;
+
+XWindows
+    *const windows = setup->windows;
+
+const Window
+    root_window = setup->root_window;
+
+XClassHint
+    *const class_hints = setup->class_hints;
+
+XWMHints
+    *const manager_hints = setup->manager_hints;
+
+char
+    **const argv = setup->argv;
+
+const int
+    argc = setup->argc;
+
+  XGetWindowInfo(display,setup->visual_info,setup->map_info,setup->pixel,
+    setup->font_info,resource_info,&windows->widget);
+  (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.widget",
+    resource_info->client_name);
+  windows->widget.geometry=XGetResourceClass(resource_info->resource_database,
+    resource_name,"geometry",(char *) NULL);
+  windows->widget.border_width=0;
+  windows->widget.flags|=PPosition;
+  windows->widget.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
+    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
+    KeyReleaseMask | LeaveWindowMask | OwnerGrabButtonMask |
+    StructureNotifyMask;
+  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
+  manager_hints->input=MagickTrue;
+  manager_hints->initial_state=NormalState;
+  manager_hints->window_group=windows->image.id;
+  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+    &windows->widget);
+  windows->widget.highlight_stipple=XCreateBitmapFromData(display,
+    windows->widget.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
+  windows->widget.shadow_stipple=XCreateBitmapFromData(display,
+    windows->widget.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
+  (void) XSetTransientForHint(display,windows->widget.id,windows->image.id);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Window id: 0x%lx (widget)",windows->widget.id);
+  /*
+    Initialize popup window.
+  */
+  XGetWindowInfo(display,setup->visual_info,setup->map_info,setup->pixel,
+    setup->font_info,resource_info,&windows->popup);
+  windows->popup.border_width=0;
+  windows->popup.flags|=PPosition;
+  windows->popup.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
+    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
+    KeyReleaseMask | LeaveWindowMask | StructureNotifyMask;
+  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
+  manager_hints->input=MagickTrue;
+  manager_hints->initial_state=NormalState;
+  manager_hints->window_group=windows->image.id;
+  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+    &windows->popup);
+  windows->popup.highlight_stipple=XCreateBitmapFromData(display,
+    windows->popup.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
+  windows->popup.shadow_stipple=XCreateBitmapFromData(display,
+    windows->popup.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
+  (void) XSetTransientForHint(display,windows->popup.id,windows->image.id);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Window id: 0x%lx (pop up)",windows->popup.id);
+}
+
+static void XHandleAnimateWindowEvent(
+  const AnimateEventContext *event_context,XEvent event,
+  const AnimateCommandTargets *command_targets)
+{
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  switch (event.type)
+  {
+    case MapNotify:
+    {
+      XHandleMapNotify(event_context,event,command_targets);
+      break;
+    }
+    case MappingNotify:
+    {
+      (void) XRefreshKeyboardMapping(&event.xmapping);
+      break;
+    }
+    case NoExpose:
+      break;
+    case PropertyNotify:
+    {
+      XHandlePropertyNotify(event_context,event,command_targets);
+      break;
+    }
+    case ReparentNotify:
+    {
+      XLogReparentNotify(resource_info,event);
+      break;
+    }
+    case UnmapNotify:
+    {
+      XHandleUnmapNotify(event_context,event);
+      break;
+    }
+    default:
+    {
+      XLogUnknownEvent(resource_info,event);
+      break;
+    }
+  }
+}
+
+static void XHandleAnimateInputEvent(
+  const AnimateEventContext *event_context,XEvent event,const ssize_t scene,
+  const AnimateCommandTargets *command_targets)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XVisualInfo
+    *const visual_info = event_context->visual_info;
+
+  XStandardColormap
+    *const map_info = event_context->map_info;
+
+  switch (event.type)
+  {
+    case Expose:
+    {
+      XHandleExpose(event_context,event,scene);
+      break;
+    }
+    case KeyPress:
+    {
+      XHandleKeyPress(event_context,event,command_targets);
+      break;
+    }
+    case KeyRelease:
+    {
+      XHandleKeyRelease(resource_info,event);
+      break;
+    }
+    case LeaveNotify:
+    {
+      /*
+        Selectively uninstall colormap.
+      */
+      if ((map_info->colormap !=
+           XDefaultColormap(display,visual_info->screen)) &&
+          (event.xcrossing.mode != NotifyUngrab))
+        XUninstallColormap(display,map_info->colormap);
+      break;
+    }
+    default:
+    {
+      XHandleAnimateWindowEvent(event_context,event,command_targets);
+      break;
+    }
+  }
+}
+
+static void XCreateImagePixmaps(const AnimateWindowSetup *setup,
+  const char *filename)
+{
+Display
+    *const display = setup->display;
+
+XWindows
+    *const windows = setup->windows;
+
+const size_t
+    number_scenes = setup->number_scenes;
+
+  XWindowChanges
+    window_changes;
+
+  windows->image.x=0;
+  windows->image.y=0;
+  /*
+    Initialize image pixmaps structure.
+  */
+  window_changes.width=(int) windows->image.width;
+  window_changes.height=(int) windows->image.height;
+  (void) XReconfigureWMWindow(display,windows->image.id,windows->command.screen,
+    (unsigned int) (CWWidth | CWHeight),&window_changes);
+  windows->image.pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
+    sizeof(*windows->image.pixmaps));
+  windows->image.matte_pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
+    sizeof(*windows->image.pixmaps));
+  if ((windows->image.pixmaps == (Pixmap *) NULL) ||
+      (windows->image.matte_pixmaps == (Pixmap *) NULL))
+    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
+      filename);
+  if ((windows->image.mapped == MagickFalse) ||
+      (windows->backdrop.id != (Window) NULL))
+    (void) XMapWindow(display,windows->image.id);
+}
+
+typedef struct _AnimatePlayTargets
+{
+  ssize_t
+    *scene,
+    *iterations;
+
+  MagickStatusType
+    *state;
+
+  Image
+    **image;
+
+  ssize_t
+    *first_scene;
+
+  XEvent
+    *event;
+} AnimatePlayTargets;
+
+static void XPlayNextScene(const AnimateEventContext *event_context,
+  const AnimatePlayTargets *targets)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  Image
+    **const image_list = event_context->image_list;
+
+  const size_t
+    number_scenes = event_context->number_scenes;
+
+  size_t
+    delay;
+
+  ssize_t
+    *const scene = targets->scene,
+    *const iterations = targets->iterations,
+    *const first_scene = targets->first_scene;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  Image
+    **const image = targets->image;
+
+  XEvent
+    *const event = targets->event;
+
+  AnimationTitle
+    animation_title;
+
+  MagickBooleanType
+    pause;
+
+  AnimationSceneStep
+    scene_step;
+
+  AnimateSceneView
+    scene_view;
+
+  const AnimationSceneTargets
+    scene_targets = { scene, iterations, state, &pause };
+
+  pause=MagickFalse;
+  delay=1000*(*image)->delay/(size_t) MagickMax((*image)->ticks_per_second,
+    1L);
+  XDelay(display,resource_info->delay*(delay == 0 ? 10 : delay));
+  scene_step.number_scenes=number_scenes;
+  scene_step.image_list=image_list;
+  scene_step.first_scene=(*first_scene);
+  XAdvanceScene(&scene_step,&scene_targets);
+  (*scene)=MagickMax((*scene),0);
+  (*image)=image_list[(*scene)];
+  (*first_scene)=XLoopStartScene((*image),(*scene),(*first_scene));
+  animation_title.display=display;
+  animation_title.resource_info=resource_info;
+  animation_title.windows=windows;
+  animation_title.image_list=image_list;
+  animation_title.image=(*image);
+  animation_title.exception=event_context->exception;
+  animation_title.scene=(*scene);
+  animation_title.number_scenes=number_scenes;
+  animation_title.state=(*state);
+  XUpdateAnimationTitle(&animation_title);
+  /*
+    Copy X pixmap to Image window.
+  */
+  scene_view.display=display;
+  scene_view.resource_info=resource_info;
+  scene_view.windows=windows;
+  scene_view.visual_info=event_context->visual_info;
+  scene_view.map_info=event_context->map_info;
+  scene_view.image_list=image_list;
+  scene_view.image=(*image);
+  scene_view.scene=(*scene);
+  XShowAnimationScene(&scene_view,(*state),event);
+  (*state)&=(~StepAnimationState);
+  XPauseAnimationScene(&scene_view,pause,event);
+}
+
+static MagickBooleanType IsAnimationStep(Display *display,
+  const MagickStatusType state)
+{
+  return(((XEventsQueued(display,QueuedAfterFlush) == 0) &&
+    (IsAnimationPlaying(state) != MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
+static void XNextAnimateEvent(Display *display,XWindows *windows,
+  XEvent *event)
+{
+  time_t
+    timestamp;
+
+  timestamp=GetMagickTime();
+  (void) XNextEvent(display,event);
+  if (windows->image.stasis == MagickFalse)
+    windows->image.stasis=(GetMagickTime()-timestamp) > 0 ?
+      MagickTrue : MagickFalse;
+}
+
+static void XHandleAnimateWindowChange(
+  const AnimateEventContext *event_context,XEvent event,const ssize_t scene,
+  const AnimateCommandTargets *command_targets)
+{
+  Display
+    *const display = event_context->display;
+
+  MagickStatusType
+    *const state = command_targets->state;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  switch (event.type)
+  {
+    case ConfigureNotify:
+    {
+      XHandleConfigureNotify(display,resource_info,windows,event);
+      break;
+    }
+    case DestroyNotify:
+    {
+      (*state)=XHandleDestroyNotify(resource_info,windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      XHandleEnterNotify(event_context,event);
+      break;
+    }
+    default:
+    {
+      XHandleAnimateInputEvent(event_context,event,scene,command_targets);
+      break;
+    }
+  }
+}
+
+static void XRunCommandWindow(const AnimateEventContext *event_context,
+  char *command,const AnimateCommandTargets *command_targets)
+{
+  AnimateCommandWidget
+    command_widget;
+
+  /*
+    Select a command from the Command widget.
+  */
+  command_widget.display=event_context->display;
+  command_widget.resource_info=event_context->resource_info;
+  command_widget.windows=event_context->windows;
+  command_widget.exception=event_context->exception;
+  command_widget.CommandMenu=CommandMenu;
+  command_widget.CommandMenus=CommandMenus;
+  command_widget.Menus=Menus;
+  command_widget.Commands=Commands;
+  command_widget.command=command;
+  XRunCommandWidget(&command_widget,command_targets);
+}
+
+typedef struct _AnimateEventInput
+{
+  const AnimateCommandTargets
+    *command_targets;
+
+  const AnimateClientTargets
+    *client_targets;
+
+  ssize_t
+    scene;
+} AnimateEventInput;
+
+static void XDispatchAnimateEvent(const AnimateEventContext *event_context,
+  XEvent event,const AnimateEventInput *input)
+{
+  const AnimateClientTargets
+    *const client_targets = input->client_targets;
+
+  const AnimateCommandTargets
+    *const command_targets = input->command_targets;
+
+  const ssize_t
+    scene = input->scene;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+switch (event.type)
+{
+  case ButtonPress:
+  {
+    XHandleButtonPress(event_context,command_targets);
+    break;
+  }
+  case ButtonRelease:
+  {
+    XLogButtonRelease(resource_info,event);
+    break;
+  }
+  case ClientMessage:
+  {
+    XHandleClientMessage(event_context,event,client_targets);
+    break;
+  }
+  default:
+  {
+    XHandleAnimateWindowChange(event_context,event,scene,command_targets);
+    break;
+  }
+}
+}
+
+static Image *XRunAnimateLoop(const AnimateEventContext *event_context,
+  Image **images,XGCValues *context_values,XEvent *event)
+{
+  char
+    command[MagickPathExtent];
+
+  Display
+    *const display = event_context->display;
+
+  ExceptionInfo
+    *const exception = event_context->exception;
+
+  Image
+    *image,
+    **const image_list = event_context->image_list,
+    *nexus;
+
+  AnimateEventInput
+    input;
+
+  MagickStatusType
+    state;
 
   ssize_t
     first_scene,
     iterations,
     scene;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  const AnimateCommandTargets
+    command_targets = { event, &image, &state, &nexus };
+
+  const AnimateClientTargets
+    client_targets = { &state, context_values, &nexus };
+
+  const AnimatePlayTargets
+    play_targets = { &scene, &iterations, &state, &image, &first_scene,
+      event };
+
+  nexus=NewImageList();
+  scene=0;
+  first_scene=0;
+  iterations=0;
+  image=image_list[0];
+  state=(MagickStatusType) (ForwardAnimationState | RepeatAnimationState);
+  (void) XMagickCommand(display,resource_info,windows,PlayCommand,images,
+    &state,exception);
+  do
+  {
+    if (IsAnimationStep(display,state) != MagickFalse)
+      {
+        XPlayNextScene(event_context,&play_targets);
+        continue;
+      }
+    /*
+      Handle a window event.
+    */
+    XNextAnimateEvent(display,windows,event);
+    if ((*event).xany.window == windows->command.id)
+      {
+        XRunCommandWindow(event_context,command,&command_targets);
+        continue;
+      }
+    input.command_targets=&command_targets;
+    input.client_targets=&client_targets;
+    input.scene=scene;
+    XDispatchAnimateEvent(event_context,(*event),&input);
+  }
+  while (!(state & ExitState));
+  return(nexus);
+}
+
+typedef struct _AnimateExitInfo
+{
+  Image
+    *images;
+
+  WarningHandler
+    warning_handler;
+
+  char
+    *working_directory;
+} AnimateExitInfo;
+
+static Image *XFinishAnimation(const AnimateEventContext *event_context,
+  const AnimateWindowSetup *setup,const AnimateExitInfo *exit_info,
+  Image *nexus)
+{
+  Display
+    *const display = event_context->display;
+
+  ExceptionInfo
+    *const exception = event_context->exception;
+
+  Image
+    *images = exit_info->images,
+    **image_list = event_context->image_list;
+
+  const size_t
+    number_scenes = event_context->number_scenes;
+
+  const WarningHandler
+    warning_handler = exit_info->warning_handler;
+
+  char
+    *const working_directory = exit_info->working_directory;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  image_list=(Image **) RelinquishMagickMemory(image_list);
+  images=DestroyImageList(images);
+  XWithdrawColormapWindows(display,windows);
+  XWithdrawBackdropWindows(display,resource_info,windows);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  XFreeScenePixmaps(display,windows,number_scenes);
+  XSetCursorState(display,windows,MagickFalse);
+  windows->image.pixmaps=(Pixmap *)
+    RelinquishMagickMemory(windows->image.pixmaps);
+  windows->image.matte_pixmaps=(Pixmap *)
+    RelinquishMagickMemory(windows->image.matte_pixmaps);
+  XReleaseAnimateWindows(setup,nexus);
+  (void) XSync(display,MagickFalse);
+  /*
+    Restore our progress monitor and warning handlers.
+  */
+  (void) SetErrorHandler(warning_handler);
+  (void) SetWarningHandler(warning_handler);
+  /*
+    Change to home directory.
+  */
+  XChangeToHomeDirectory(resource_info,working_directory,exception);
+  return(nexus);
+}
+
+static void XInitializeMagickWindows(XWindows *windows,
+  XWindowInfo **magick_windows,size_t *number_windows)
+{
+  (*number_windows)=0;
+  magick_windows[(*number_windows)++]=(&windows->icon);
+  magick_windows[(*number_windows)++]=(&windows->backdrop);
+  magick_windows[(*number_windows)++]=(&windows->image);
+  magick_windows[(*number_windows)++]=(&windows->info);
+  magick_windows[(*number_windows)++]=(&windows->command);
+  magick_windows[(*number_windows)++]=(&windows->widget);
+  magick_windows[(*number_windows)++]=(&windows->popup);
+  XClearMagickWindowIds(magick_windows,(*number_windows));
+}
+
+MagickExport Image *XAnimateImages(Display *display,
+  XResourceInfo *resource_info,char **argv,const int argc,Image *images,
+  ExceptionInfo *exception)
+{
+  Image
+    *display_image,
+    **image_list,
+    *nexus;
+
+  MagickStatusType
+    context_mask;
 
   static char
     working_directory[MagickPathExtent];
@@ -4362,11 +5579,7 @@ MagickExport Image *XAnimateImages(Display *display,
   static XWindowInfo
     *magick_windows[MaXWindows];
 
-  time_t
-    timestamp;
-
   size_t
-    delay,
     number_scenes;
 
   WarningHandler
@@ -4402,9 +5615,6 @@ MagickExport Image *XAnimateImages(Display *display,
     *icon_visual,
     *visual_info;
 
-  XWindowChanges
-    window_changes;
-
   XWindows
     *windows;
 
@@ -4420,11 +5630,8 @@ MagickExport Image *XAnimateImages(Display *display,
   AnimateWindowSetup
     setup;
 
-  const AnimateCommandTargets
-    command_targets = { &event, &image, &state, &nexus };
-
-  const AnimateClientTargets
-    client_targets = { &state, &context_values, &nexus };
+  AnimateExitInfo
+    exit_info;
 
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
@@ -4443,15 +5650,7 @@ MagickExport Image *XAnimateImages(Display *display,
       /*
         Initialize window id's.
       */
-      number_windows=0;
-      magick_windows[number_windows++]=(&windows->icon);
-      magick_windows[number_windows++]=(&windows->backdrop);
-      magick_windows[number_windows++]=(&windows->image);
-      magick_windows[number_windows++]=(&windows->info);
-      magick_windows[number_windows++]=(&windows->command);
-      magick_windows[number_windows++]=(&windows->widget);
-      magick_windows[number_windows++]=(&windows->popup);
-      XClearMagickWindowIds(magick_windows,number_windows);
+      XInitializeMagickWindows(windows,magick_windows,&number_windows);
     }
   XLoadAnimateFont(display,resource_info,windows);
   /*
@@ -4507,223 +5706,25 @@ MagickExport Image *XAnimateImages(Display *display,
   setup.display_image=display_image;
   setup.number_scenes=number_scenes;
   XCreateContextWindow(&setup);
-  context_values.background=pixel->background_color.pixel;
-  context_values.font=font_info->fid;
-  context_values.foreground=pixel->foreground_color.pixel;
-  context_values.graphics_exposures=MagickFalse;
-  context_mask=(MagickStatusType)
-    (GCBackground | GCFont | GCForeground | GCGraphicsExposures);
-  if (pixel->annotate_context != (GC) NULL)
-    (void) XFreeGC(display,pixel->annotate_context);
-  pixel->annotate_context=
-    XCreateGC(display,windows->context.id,context_mask,&context_values);
-  if (pixel->annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      images->filename);
-  context_values.background=pixel->depth_color.pixel;
-  if (pixel->widget_context != (GC) NULL)
-    (void) XFreeGC(display,pixel->widget_context);
-  pixel->widget_context=
-    XCreateGC(display,windows->context.id,context_mask,&context_values);
-  if (pixel->widget_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      images->filename);
-  context_values.background=pixel->foreground_color.pixel;
-  context_values.foreground=pixel->background_color.pixel;
-  context_values.plane_mask=
-    context_values.background ^ context_values.foreground;
-  if (pixel->highlight_context != (GC) NULL)
-    (void) XFreeGC(display,pixel->highlight_context);
-  pixel->highlight_context=XCreateGC(display,windows->context.id,
-    (size_t) (context_mask | GCPlaneMask),&context_values);
-  if (pixel->highlight_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      images->filename);
-  (void) XDestroyWindow(display,windows->context.id);
+  XCreateGraphicContexts(&setup,images->filename,&context_values,
+    &context_mask);
   XCreateIconWindow(&setup);
   /*
     Initialize graphic context for icon window.
   */
-  if (icon_pixel->annotate_context != (GC) NULL)
-    (void) XFreeGC(display,icon_pixel->annotate_context);
-  context_values.background=icon_pixel->background_color.pixel;
-  context_values.foreground=icon_pixel->foreground_color.pixel;
-  icon_pixel->annotate_context=XCreateGC(display,windows->icon.id,
-    (size_t) (GCBackground | GCForeground),&context_values);
-  if (icon_pixel->annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      images->filename);
-  windows->icon.annotate_context=icon_pixel->annotate_context;
+  XCreateIconContext(&setup,images->filename,&context_values);
   /*
     Initialize Image window.
   */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->image);
-  windows->image.shape=MagickTrue;  /* non-rectangular shape hint */
-  if (resource_info->use_shared_memory == MagickFalse)
-    windows->image.shared_memory=MagickFalse;
-  if (resource_info->title != (char *) NULL)
-    {
-      char
-        *title;
-
-      title=InterpretImageProperties(resource_info->image_info,display_image,
-        resource_info->title,exception);
-      (void) CloneString(&windows->image.name,title);
-      (void) CloneString(&windows->image.icon_name,title);
-      title=DestroyString(title);
-    }
-  else
-    {
-      char
-        filename[MagickPathExtent],
-        window_name[MagickPathExtent];
-
-      /*
-        Window name is the base of the filename.
-      */
-      GetPathComponent(display_image->magick_filename,TailPath,filename);
-      (void) FormatLocaleString(window_name,MagickPathExtent,
-        "%s: %s[scene: %.17g frames: %.17g]",MagickPackageName,filename,(double)
-        display_image->scene,(double) number_scenes);
-      (void) CloneString(&windows->image.name,window_name);
-      (void) CloneString(&windows->image.icon_name,filename);
-    }
-  if (resource_info->immutable != MagickFalse)
-    windows->image.immutable=MagickTrue;
-  windows->image.shape=MagickTrue;
-  windows->image.geometry=resource_info->image_geometry;
-  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
-    XDisplayWidth(display,visual_info->screen),
-    XDisplayHeight(display,visual_info->screen));
-  geometry_info.width=display_image->columns;
-  geometry_info.height=display_image->rows;
-  geometry_info.x=0;
-  geometry_info.y=0;
-  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
-    &geometry_info.width,&geometry_info.height);
-  windows->image.width=(unsigned int) geometry_info.width;
-  windows->image.height=(unsigned int) geometry_info.height;
-  windows->image.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
-    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
-    KeyReleaseMask | LeaveWindowMask | OwnerGrabButtonMask |
-    PropertyChangeMask | StructureNotifyMask | SubstructureNotifyMask;
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->backdrop);
-  if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
-    {
-      /*
-        Initialize backdrop window.
-      */
-      windows->backdrop.x=0;
-      windows->backdrop.y=0;
-      (void) CloneString(&windows->backdrop.name,"ImageMagick Backdrop");
-      windows->backdrop.flags=(size_t) (USSize | USPosition);
-      windows->backdrop.width=(unsigned int)
-        XDisplayWidth(display,visual_info->screen);
-      windows->backdrop.height=(unsigned int)
-        XDisplayHeight(display,visual_info->screen);
-      windows->backdrop.border_width=0;
-      windows->backdrop.immutable=MagickTrue;
-      windows->backdrop.attributes.do_not_propagate_mask=ButtonPressMask |
-        ButtonReleaseMask;
-      windows->backdrop.attributes.event_mask=ButtonPressMask | KeyPressMask |
-        StructureNotifyMask;
-      manager_hints->flags=IconWindowHint | InputHint | StateHint;
-      manager_hints->icon_window=windows->icon.id;
-      manager_hints->input=MagickTrue;
-      manager_hints->initial_state=
-        resource_info->iconic ? IconicState : NormalState;
-      XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-        &windows->backdrop);
-      if (resource_info->debug != MagickFalse)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),
-          "Window id: 0x%lx (backdrop)",windows->backdrop.id);
-      XCenterImageOnBackdrop(display,windows,visual_info);
-    }
-  manager_hints->flags=IconWindowHint | InputHint | StateHint;
-  manager_hints->icon_window=windows->icon.id;
-  manager_hints->input=MagickTrue;
-  manager_hints->initial_state=
-    resource_info->iconic ? IconicState : NormalState;
-  if (windows->group_leader.id != (Window) NULL)
-    {
-      /*
-        Follow the leader.
-      */
-      manager_hints->flags|=(MagickStatusType) WindowGroupHint;
-      manager_hints->window_group=windows->group_leader.id;
-      (void) XSelectInput(display,windows->group_leader.id,StructureNotifyMask);
-      if (resource_info->debug != MagickFalse)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),
-          "Window id: 0x%lx (group leader)",windows->group_leader.id);
-    }
-  XMakeWindow(display,
-    (Window) (resource_info->backdrop ? windows->backdrop.id : root_window),
-    argv,argc,class_hints,manager_hints,&windows->image);
-  (void) XChangeProperty(display,windows->image.id,windows->im_protocols,
-    XA_STRING,8,PropModeReplace,(unsigned char *) NULL,0);
-  if (windows->group_leader.id != (Window) NULL)
-    (void) XSetTransientForHint(display,windows->image.id,
-      windows->group_leader.id);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (image)",
-      windows->image.id);
+  XCreateImageWindowInfo(&setup,exception);
+  XCreateBackdropWindow(&setup);
+  XCreateImageWindow(&setup);
   XCreateInfoWindow(&setup);
   XCreateCommandWindow(&setup);
   /*
     Initialize Widget window.
   */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->widget);
-  (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.widget",
-    resource_info->client_name);
-  windows->widget.geometry=XGetResourceClass(resource_info->resource_database,
-    resource_name,"geometry",(char *) NULL);
-  windows->widget.border_width=0;
-  windows->widget.flags|=PPosition;
-  windows->widget.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
-    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
-    KeyReleaseMask | LeaveWindowMask | OwnerGrabButtonMask |
-    StructureNotifyMask;
-  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
-  manager_hints->input=MagickTrue;
-  manager_hints->initial_state=NormalState;
-  manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->widget);
-  windows->widget.highlight_stipple=XCreateBitmapFromData(display,
-    windows->widget.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
-  windows->widget.shadow_stipple=XCreateBitmapFromData(display,
-    windows->widget.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
-  (void) XSetTransientForHint(display,windows->widget.id,windows->image.id);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),
-      "Window id: 0x%lx (widget)",windows->widget.id);
-  /*
-    Initialize popup window.
-  */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->popup);
-  windows->popup.border_width=0;
-  windows->popup.flags|=PPosition;
-  windows->popup.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
-    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
-    KeyReleaseMask | LeaveWindowMask | StructureNotifyMask;
-  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
-  manager_hints->input=MagickTrue;
-  manager_hints->initial_state=NormalState;
-  manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->popup);
-  windows->popup.highlight_stipple=XCreateBitmapFromData(display,
-    windows->popup.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
-  windows->popup.shadow_stipple=XCreateBitmapFromData(display,
-    windows->popup.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
-  (void) XSetTransientForHint(display,windows->popup.id,windows->image.id);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),
-      "Window id: 0x%lx (pop up)",windows->popup.id);
+  XCreatePanelWindows(&setup);
   /*
     Set out progress and warning handlers.
   */
@@ -4731,26 +5732,7 @@ MagickExport Image *XAnimateImages(Display *display,
   /*
     Initialize X image structure.
   */
-  windows->image.x=0;
-  windows->image.y=0;
-  /*
-    Initialize image pixmaps structure.
-  */
-  window_changes.width=(int) windows->image.width;
-  window_changes.height=(int) windows->image.height;
-  (void) XReconfigureWMWindow(display,windows->image.id,windows->command.screen,
-    (unsigned int) (CWWidth | CWHeight),&window_changes);
-  windows->image.pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
-    sizeof(*windows->image.pixmaps));
-  windows->image.matte_pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
-    sizeof(*windows->image.pixmaps));
-  if ((windows->image.pixmaps == (Pixmap *) NULL) ||
-      (windows->image.matte_pixmaps == (Pixmap *) NULL))
-    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
-      images->filename);
-  if ((windows->image.mapped == MagickFalse) ||
-      (windows->backdrop.id != (Window) NULL))
-    (void) XMapWindow(display,windows->image.id);
+  XCreateImagePixmaps(&setup,images->filename);
   XSetCursorState(display,windows,MagickTrue);
   event_context.display=display;
   event_context.resource_info=resource_info;
@@ -4778,216 +5760,11 @@ MagickExport Image *XAnimateImages(Display *display,
   /*
     Respond to events.
   */
-  nexus=NewImageList();
-  scene=0;
-  first_scene=0;
-  iterations=0;
-  image=image_list[0];
-  state=(MagickStatusType) (ForwardAnimationState | RepeatAnimationState);
-  (void) XMagickCommand(display,resource_info,windows,PlayCommand,&images,
-    &state,exception);
-  do
-  {
-    if ((XEventsQueued(display,QueuedAfterFlush) == 0) &&
-        (IsAnimationPlaying(state) != MagickFalse))
-      {
-        AnimationTitle
-          animation_title;
-
-        MagickBooleanType
-          pause;
-
-        AnimationSceneStep
-          scene_step;
-
-        AnimateSceneView
-          scene_view;
-
-        const AnimationSceneTargets
-          scene_targets = { &scene, &iterations, &state, &pause };
-
-        pause=MagickFalse;
-        delay=1000*image->delay/(size_t) MagickMax(image->ticks_per_second,
-          1L);
-        XDelay(display,resource_info->delay*(delay == 0 ? 10 : delay));
-        scene_step.number_scenes=number_scenes;
-        scene_step.image_list=image_list;
-        scene_step.first_scene=first_scene;
-        XAdvanceScene(&scene_step,&scene_targets);
-        scene=MagickMax(scene,0);
-        image=image_list[scene];
-        first_scene=XLoopStartScene(image,scene,first_scene);
-        animation_title.display=display;
-        animation_title.resource_info=resource_info;
-        animation_title.windows=windows;
-        animation_title.image_list=image_list;
-        animation_title.image=image;
-        animation_title.exception=exception;
-        animation_title.scene=scene;
-        animation_title.number_scenes=number_scenes;
-        animation_title.state=state;
-        XUpdateAnimationTitle(&animation_title);
-        /*
-          Copy X pixmap to Image window.
-        */
-        scene_view.display=display;
-        scene_view.resource_info=resource_info;
-        scene_view.windows=windows;
-        scene_view.visual_info=visual_info;
-        scene_view.map_info=map_info;
-        scene_view.image_list=image_list;
-        scene_view.image=image;
-        scene_view.scene=scene;
-        XShowAnimationScene(&scene_view,state,&event);
-        state&=(~StepAnimationState);
-        XPauseAnimationScene(&scene_view,pause,&event);
-        continue;
-      }
-    /*
-      Handle a window event.
-    */
-    timestamp=GetMagickTime();
-    (void) XNextEvent(display,&event);
-    if (windows->image.stasis == MagickFalse)
-      windows->image.stasis=(GetMagickTime()-timestamp) > 0 ?
-        MagickTrue : MagickFalse;
-    if (event.xany.window == windows->command.id)
-      {
-        AnimateCommandWidget
-          command_widget;
-
-        /*
-          Select a command from the Command widget.
-        */
-        command_widget.display=display;
-        command_widget.resource_info=resource_info;
-        command_widget.windows=windows;
-        command_widget.exception=exception;
-        command_widget.CommandMenu=CommandMenu;
-        command_widget.CommandMenus=CommandMenus;
-        command_widget.Menus=Menus;
-        command_widget.Commands=Commands;
-        command_widget.command=command;
-        XRunCommandWidget(&command_widget,&command_targets);
-        continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XHandleButtonPress(&event_context,&command_targets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        XLogButtonRelease(resource_info,event);
-        break;
-      }
-      case ClientMessage:
-      {
-        XHandleClientMessage(&event_context,event,&client_targets);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        XHandleConfigureNotify(display,resource_info,windows,event);
-        break;
-      }
-      case DestroyNotify:
-      {
-        state=XHandleDestroyNotify(resource_info,windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        XHandleEnterNotify(&event_context,event);
-        break;
-      }
-      case Expose:
-      {
-        XHandleExpose(&event_context,event,scene);
-        break;
-      }
-      case KeyPress:
-      {
-        XHandleKeyPress(&event_context,event,&command_targets);
-        break;
-      }
-      case KeyRelease:
-      {
-        XHandleKeyRelease(resource_info,event);
-        break;
-      }
-      case LeaveNotify:
-      {
-        /*
-          Selectively uninstall colormap.
-        */
-        if ((map_info->colormap !=
-             XDefaultColormap(display,visual_info->screen)) &&
-            (event.xcrossing.mode != NotifyUngrab))
-          XUninstallColormap(display,map_info->colormap);
-        break;
-      }
-      case MapNotify:
-      {
-        XHandleMapNotify(&event_context,event,&command_targets);
-        break;
-      }
-      case MappingNotify:
-      {
-        (void) XRefreshKeyboardMapping(&event.xmapping);
-        break;
-      }
-      case NoExpose:
-        break;
-      case PropertyNotify:
-      {
-        XHandlePropertyNotify(&event_context,event,&command_targets);
-        break;
-      }
-      case ReparentNotify:
-      {
-        XLogReparentNotify(resource_info,event);
-        break;
-      }
-      case UnmapNotify:
-      {
-        XHandleUnmapNotify(&event_context,event);
-        break;
-      }
-      default:
-      {
-        XLogUnknownEvent(resource_info,event);
-        break;
-      }
-    }
-  }
-  while (!(state & ExitState));
-  image_list=(Image **) RelinquishMagickMemory(image_list);
-  images=DestroyImageList(images);
-  XWithdrawColormapWindows(display,windows);
-  XWithdrawBackdropWindows(display,resource_info,windows);
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  XFreeScenePixmaps(display,windows,number_scenes);
-  XSetCursorState(display,windows,MagickFalse);
-  windows->image.pixmaps=(Pixmap *)
-    RelinquishMagickMemory(windows->image.pixmaps);
-  windows->image.matte_pixmaps=(Pixmap *)
-    RelinquishMagickMemory(windows->image.matte_pixmaps);
-  XReleaseAnimateWindows(&setup,nexus);
-  (void) XSync(display,MagickFalse);
-  /*
-    Restore our progress monitor and warning handlers.
-  */
-  (void) SetErrorHandler(warning_handler);
-  (void) SetWarningHandler(warning_handler);
-  /*
-    Change to home directory.
-  */
-  XChangeToHomeDirectory(resource_info,working_directory,exception);
-  return(nexus);
+  nexus=XRunAnimateLoop(&event_context,&images,&context_values,&event);
+  exit_info.images=images;
+  exit_info.warning_handler=warning_handler;
+  exit_info.working_directory=working_directory;
+  return(XFinishAnimation(&event_context,&setup,&exit_info,nexus));
 }
 
 /*
