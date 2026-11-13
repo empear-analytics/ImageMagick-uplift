@@ -1078,6 +1078,78 @@ static MagickBooleanType XImportWindowImage(const WindowImageSource *source)
   return(MagickTrue);
 }
 
+typedef struct _WindowCompositeInput
+{
+  Display
+    *display;
+
+  ExceptionInfo
+    *exception;
+
+  WindowInfo
+    *window_info;
+
+  int
+    id;
+
+  Window
+    window;
+
+  RectangleInfo
+    crop_info;
+
+  Image
+    *image,
+    *composite_image;
+} WindowCompositeInput;
+
+static void XCompositeWindowImage(const WindowCompositeInput *input)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  WindowInfo
+    *const window_info = input->window_info;
+
+  const int
+    id = input->id;
+
+  const Window
+    window = input->window;
+
+  const RectangleInfo
+    crop_info = input->crop_info;
+
+  Image
+    *const image = input->image,
+    *composite_image = input->composite_image;
+
+  int
+    x_offset,
+    y_offset;
+
+  Window
+    child;
+
+  /*
+    Composite any children in back-to-front order.
+  */
+  (void) XTranslateCoordinates(display,window_info[id].window,window,0,0,
+    &x_offset,&y_offset,&child);
+  x_offset-=(int) crop_info.x;
+  if (x_offset < 0)
+    x_offset=0;
+  y_offset-=(int) crop_info.y;
+  if (y_offset < 0)
+    y_offset=0;
+  (void) CompositeImage(image,composite_image,CopyCompositeOp,MagickTrue,
+    (ssize_t) x_offset,(ssize_t) y_offset,exception);
+  composite_image=DestroyImage(composite_image);
+}
+
 static void XRelinquishColormapInfo(ColormapInfo **colormap_info)
 {
   ColormapInfo
@@ -1378,20 +1450,13 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
             image=composite_image;
             continue;
           }
-        /*
-          Composite any children in back-to-front order.
-        */
-        (void) XTranslateCoordinates(display,window_info[id].window,window,0,0,
-          &x_offset,&y_offset,&child);
-        x_offset-=(int) crop_info.x;
-        if (x_offset < 0)
-          x_offset=0;
-        y_offset-=(int) crop_info.y;
-        if (y_offset < 0)
-          y_offset=0;
-        (void) CompositeImage(image,composite_image,CopyCompositeOp,MagickTrue,
-          (ssize_t) x_offset,(ssize_t) y_offset,exception);
-        composite_image=DestroyImage(composite_image);
+        {
+          const WindowCompositeInput
+            input = { display, exception, window_info, id, window, crop_info,
+              image, composite_image };
+
+          XCompositeWindowImage(&input);
+        }
       }
       XRelinquishColormapInfo(&colormap_info);
       /*
