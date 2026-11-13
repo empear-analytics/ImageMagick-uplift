@@ -14457,6 +14457,147 @@ enumerator.
 
 ---
 
+## Recipe WP - Fold Wrapper Prologues into One Function and a Guard in Each Callee
+
+**Use when:** CodeScene reports *Code Duplication* among several wrapper functions of one
+file that each run the same prologue and then hand a fetched resource to a worker of their
+own: asserts on the parameters, an optional trace log, a precondition test of one of a few
+kinds, the fetch of a resource that may come back `NULL`, and the call of a `static` worker
+that takes it. `accelerate.c`'s `Accelerate*Image` wrappers do this: they assert `image` and
+`exception`, most log, they test `checkAccelerateCondition`, `checkAccelerateConditionRGBA`,
+or `checkAccelerateConditionRGBA` and `checkHistogramCondition`, fetch the OpenCL environment
+with `getOpenCLEnvironment` and return the result of their `Compute*Image` worker. A wrapper
+that keeps any `if (...) return(...);` beside its call stays a clone of the others.
+
+**Not covered by:** Recipe D, whose copies differ in one value and move whole, while these
+copies differ in the worker called, its arguments and the failure value; Recipe CF, whose
+called functions share one type, while each worker here has its own parameter list; Recipe W,
+which leaves `if (Helper(...) == MagickFalse) return(R);` and the worker's call in each wrapper
+(two statements, still flagged); Recipe E, which moves a block and leaves the wrapper's early
+returns; Recipe G, which keeps every test in the wrapper.
+
+**How:**
+
+1. Wrappers. Each wrapper's body is, in this order and nothing else: the declarations of a
+   result and of the resource `r`; the same asserts on parameters, in the same order, in every
+   wrapper of the set; optionally `if (IsEventLogging() != MagickFalse) (void)
+   LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);`; one precondition test
+   that returns the wrapper's failure value `F` (`(Image *) NULL` or `MagickFalse`); `r=Fetch(
+   exception);` and `if (r == (T) NULL) return(F);`; then `result=Worker(image,r,...);
+   return(result);`. A wrapper with another assert, another test or a second worker is left
+   out. The arguments of the worker's call other than `r` are parameters, read without side
+   effect.
+2. Workers. Each worker is `static`, is called only by its wrapper (checked by `grep`), and
+   returns `F`'s type. Every initialiser in its declarations is a constant or a call of a
+   function with no side effect on a member of a parameter that the precondition test has
+   already read (`get32BitChannelValue(image->channel_mask)`). Insert `if (r == (T) NULL)
+   return(F);` and a blank line as its first statement, before its own asserts, logging and
+   acquisitions.
+3. The check selector. Directly below `Fetch`, write `typedef enum { ... } NameCheck;`, one
+   constant per kind of precondition test, and a `static MagickBooleanType` function taking the
+   image and the selector that returns each kind's result: a test of one call returns that
+   call; a test `(A == MagickFalse) || (B == MagickFalse)` becomes `if (A == MagickFalse)
+   return(MagickFalse);` and then `return(B);`, so `B` is called exactly when it was.
+4. The prologue. Below it, a `static T getNameEnvironment(const Image *image,const NameCheck
+   check,const char *trace_function,ExceptionInfo *exception)` holding the asserts verbatim and
+   in order; `if ((trace_function != (const char *) NULL) && (IsEventLogging() !=
+   MagickFalse)) (void) LogMagickEvent(TraceEvent,__FILE__,trace_function,(const size_t)
+   __LINE__,"%s",image->filename);`; `if (Check(image,check) == MagickFalse) return((T)
+   NULL);`; and `return(Fetch(exception));`.
+5. Each wrapper's body becomes the one statement `return(Worker(image,getNameEnvironment(image,
+   Kind,__func__,exception),...));`, the worker's other arguments as before, with `(const char
+   *) NULL` in place of `__func__` for a wrapper that did not log. Its signature does not
+   change.
+6. One wrapper per commit; the first also adds steps 3 and 4. Stop at the commit after which
+   the file has no *Code Duplication* finding: converting a wrapper that no longer carries the
+   finding is a flat step that removes nothing (rule 2).
+7. Check: `clang -DNDEBUG -Wunused-parameter -Wunused-variable` on the file (every parameter of
+   step 4 stays used without asserts), `ci_warnings.sh` and `ci_linux_warnings.sh`,
+   `refactor_guard.py --calls`, and the oracle on the wrapper and on its worker (the wide build
+   for a wide file), with line coverage showing a case on the failed fetch and a case in the
+   worker.
+
+**Before:**
+
+```c
+MagickPrivate Image* AccelerateBlurImage(const Image *image,
+  const double radius,const double sigma,ExceptionInfo *exception)
+{
+  ...
+  assert(image != NULL);
+  assert(exception != (ExceptionInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+
+  if (checkAccelerateCondition(image) == MagickFalse)
+    return((Image *) NULL);
+
+  clEnv=getOpenCLEnvironment(exception);
+  if (clEnv == (MagickCLEnv) NULL)
+    return((Image *) NULL);
+
+  filteredImage=ComputeBlurImage(image,clEnv,radius,sigma,exception);
+  return(filteredImage);
+}
+```
+
+**After:**
+
+```c
+static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
+  const double radius,const double sigma,ExceptionInfo *exception)
+{
+  ...
+  if (clEnv == (MagickCLEnv) NULL)
+    return((Image *) NULL);
+
+  queue=NULL;
+  ...
+}
+
+MagickPrivate Image* AccelerateBlurImage(const Image *image,
+  const double radius,const double sigma,ExceptionInfo *exception)
+{
+  return(ComputeBlurImage(image,getAccelerateEnvironment(image,
+    BasicAccelerateCheck,__func__,exception),radius,sigma,exception));
+}
+```
+
+**Careful:**
+
+- Order of side effects. The worker's arguments are evaluated before the worker runs; every
+  argument but the prologue's call is a parameter read without side effect, so C's unspecified
+  order among arguments changes nothing. The prologue runs the asserts, the log, the test and
+  the fetch in the wrapper's order, and when the test fails it returns `NULL` without fetching,
+  as the wrapper returned without fetching (the OpenCL environment is fetched, and
+  `InitializeOpenCL` called, in exactly the calls that fetched it before).
+- The failure paths. When the test or the fetch fails, the worker gets `NULL` and its first
+  statement returns `F` before its own asserts, logging, allocation or OpenCL call: the caller
+  sees `F` and nothing else ran, as when the wrapper returned `F`. When the fetch succeeds the
+  worker gets the same environment and runs unchanged.
+- The worker's initialisers now also run on the failure paths. Step 2 admits only constants
+  and side-effect-free reads of a member the test has already read through the same pointer,
+  so they can neither fault nor change anything.
+- The trace log. `GetMagickModule()` expands to `__FILE__,__func__,(const size_t) __LINE__`;
+  the prologue logs `__FILE__` (the same file) and the wrapper's own `__func__`, so the event
+  names the same module and function; only the line number differs, as after any edit above a
+  log call. A wrapper that did not log passes `NULL` and logs nothing.
+- The test of step 3 calls the same functions on the same image in the same order with the
+  same short-circuit. Selectors and trace names are constants at each call.
+- Not a hot path: the prologue runs once per image operation.
+
+**Evidence level:** oracle (wide build for a wide file), with step 7's checks, and steps 1 and
+2 by reading.
+
+**Provenance:** 2026-11-13, from `accelerate.c`'s `Accelerate*Image` wrappers (campaign A, W22,
+lane d). Ten wrappers carried *Code Duplication*: a shared helper with an `if`-return in each
+wrapper, the original prologue with a single return, and two statements with a `?:` all stayed
+flagged (3.27 to 3.35); bodies of one statement clear the finding (a probe of four wrappers,
+3.27 to 3.71). Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to
+evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -14792,3 +14933,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
 | 2026-11-13 | NEW | ME | Merge Mirrored Twins That Leave Through a Constant Return: copies of one block that leave the function through `return(c);` (Recipe Y steps 1 and 2; `c` may differ between copies), in two mirrored sides (Recipe MT step 1's alignment) whose copies differ in one member-access value, become one `static inline MagickBooleanType` function taking the input struct, a constant selector, the value and the written variable by pointer; each copy becomes `if (Helper(...) == MagickFalse) return(c);` with its own constant. *Careful* gives the argument (the conditional evaluates only the copy's run, in its order; the constants stay in the callers) | `visual-effects-plasma.c`'s `PlasmaImageProxy` (campaign A, W21 round four, lane d): four edge-pixel blocks (left/right along a column, bottom/top along a row) that Recipes MT, Y, SV and W refuse; helpers per side cloned (8.15), precomputed coordinates moved `errno`-writing casts; a probe of the chain this recipe opens: 8.50 to 9.09 | mandate (2026-10-24) |
+| 2026-11-13 | NEW | WP | Fold Wrapper Prologues into One Function and a Guard in Each Callee: wrappers that assert, optionally log, test a precondition of one of a few kinds, fetch a resource that may be `NULL` and return their `static` worker's result become one statement `return(Worker(image,getNameEnvironment(image,Kind,__func__,exception),...));`; the prologue function keeps the asserts, the log (under the wrapper's `__func__`, `NULL` for a wrapper that did not log), the test and the fetch in order, and each worker returns the failure value first when the resource is `NULL`. *Careful* gives the argument (same side effects in the same order, the fetch only where it ran, the worker's guard before anything of its own) | `accelerate.c`'s `Accelerate*Image` wrappers (campaign A, W22 lane d): ten wrappers in *Code Duplication*; D, CF, W, E and G leave a test in each wrapper, which stays flagged; four wrappers in this form, 3.27 to 3.71 in a probe | owner |
