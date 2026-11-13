@@ -6372,6 +6372,38 @@ static void AssociateQuantumAlpha(const Image *image,CacheView *image_view)
   }
 }
 
+static void ExportRGBFamilyQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumType quantum_type,QuantumPixelSpan span)
+{
+  switch (quantum_type)
+  {
+    case BGRQuantum:
+    {
+      ExportBGRQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RGBQuantum:
+    case CbYCrQuantum:
+    {
+      ExportRGBQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RGBAQuantum:
+    case CbYCrAQuantum:
+    {
+      ExportRGBAQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RGBOQuantum:
+    {
+      ExportRGBOQuantum(image,quantum_info,&span);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport size_t ExportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,unsigned char *magick_restrict pixels,
@@ -6429,11 +6461,6 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     case AlphaQuantum:
     {
       ExportAlphaQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case BGRQuantum:
-    {
-      ExportBGRQuantum(image,quantum_info,&span);
       break;
     }
     case BGRAQuantum:
@@ -6520,25 +6547,11 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       ExportOpacityQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case RGBQuantum:
-    case CbYCrQuantum:
-    {
-      ExportRGBQuantum(image,quantum_info,&span);
-      break;
-    }
-    case RGBAQuantum:
-    case CbYCrAQuantum:
-    {
-      ExportRGBAQuantum(image,quantum_info,&span);
-      break;
-    }
-    case RGBOQuantum:
-    {
-      ExportRGBOQuantum(image,quantum_info,&span);
-      break;
-    }
     default:
+    {
+      ExportRGBFamilyQuantum(image,quantum_info,quantum_type,span);
       break;
+    }
   }
   if ((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum))
     SwapRedGreenQuantum(image,image_view,number_pixels);
