@@ -4601,13 +4601,93 @@ const int
       windows->image.id);
 }
 
+static void XCreatePanelWindows(const AnimateWindowSetup *setup)
+{
+  char
+    resource_name[MagickPathExtent];
+
+Display
+    *const display = setup->display;
+
+XResourceInfo
+    *const resource_info = setup->resource_info;
+
+XWindows
+    *const windows = setup->windows;
+
+const Window
+    root_window = setup->root_window;
+
+XClassHint
+    *const class_hints = setup->class_hints;
+
+XWMHints
+    *const manager_hints = setup->manager_hints;
+
+char
+    **const argv = setup->argv;
+
+const int
+    argc = setup->argc;
+
+  XGetWindowInfo(display,setup->visual_info,setup->map_info,setup->pixel,
+    setup->font_info,resource_info,&windows->widget);
+  (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.widget",
+    resource_info->client_name);
+  windows->widget.geometry=XGetResourceClass(resource_info->resource_database,
+    resource_name,"geometry",(char *) NULL);
+  windows->widget.border_width=0;
+  windows->widget.flags|=PPosition;
+  windows->widget.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
+    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
+    KeyReleaseMask | LeaveWindowMask | OwnerGrabButtonMask |
+    StructureNotifyMask;
+  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
+  manager_hints->input=MagickTrue;
+  manager_hints->initial_state=NormalState;
+  manager_hints->window_group=windows->image.id;
+  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+    &windows->widget);
+  windows->widget.highlight_stipple=XCreateBitmapFromData(display,
+    windows->widget.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
+  windows->widget.shadow_stipple=XCreateBitmapFromData(display,
+    windows->widget.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
+  (void) XSetTransientForHint(display,windows->widget.id,windows->image.id);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Window id: 0x%lx (widget)",windows->widget.id);
+  /*
+    Initialize popup window.
+  */
+  XGetWindowInfo(display,setup->visual_info,setup->map_info,setup->pixel,
+    setup->font_info,resource_info,&windows->popup);
+  windows->popup.border_width=0;
+  windows->popup.flags|=PPosition;
+  windows->popup.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
+    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
+    KeyReleaseMask | LeaveWindowMask | StructureNotifyMask;
+  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
+  manager_hints->input=MagickTrue;
+  manager_hints->initial_state=NormalState;
+  manager_hints->window_group=windows->image.id;
+  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+    &windows->popup);
+  windows->popup.highlight_stipple=XCreateBitmapFromData(display,
+    windows->popup.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
+  windows->popup.shadow_stipple=XCreateBitmapFromData(display,
+    windows->popup.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
+  (void) XSetTransientForHint(display,windows->popup.id,windows->image.id);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Window id: 0x%lx (pop up)",windows->popup.id);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
 {
   char
-    command[MagickPathExtent],
-    resource_name[MagickPathExtent];
+    command[MagickPathExtent];
 
   Image
     *display_image,
@@ -4796,56 +4876,7 @@ MagickExport Image *XAnimateImages(Display *display,
   /*
     Initialize Widget window.
   */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->widget);
-  (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.widget",
-    resource_info->client_name);
-  windows->widget.geometry=XGetResourceClass(resource_info->resource_database,
-    resource_name,"geometry",(char *) NULL);
-  windows->widget.border_width=0;
-  windows->widget.flags|=PPosition;
-  windows->widget.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
-    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
-    KeyReleaseMask | LeaveWindowMask | OwnerGrabButtonMask |
-    StructureNotifyMask;
-  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
-  manager_hints->input=MagickTrue;
-  manager_hints->initial_state=NormalState;
-  manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->widget);
-  windows->widget.highlight_stipple=XCreateBitmapFromData(display,
-    windows->widget.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
-  windows->widget.shadow_stipple=XCreateBitmapFromData(display,
-    windows->widget.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
-  (void) XSetTransientForHint(display,windows->widget.id,windows->image.id);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),
-      "Window id: 0x%lx (widget)",windows->widget.id);
-  /*
-    Initialize popup window.
-  */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->popup);
-  windows->popup.border_width=0;
-  windows->popup.flags|=PPosition;
-  windows->popup.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
-    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
-    KeyReleaseMask | LeaveWindowMask | StructureNotifyMask;
-  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
-  manager_hints->input=MagickTrue;
-  manager_hints->initial_state=NormalState;
-  manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->popup);
-  windows->popup.highlight_stipple=XCreateBitmapFromData(display,
-    windows->popup.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
-  windows->popup.shadow_stipple=XCreateBitmapFromData(display,
-    windows->popup.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
-  (void) XSetTransientForHint(display,windows->popup.id,windows->image.id);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),
-      "Window id: 0x%lx (pop up)",windows->popup.id);
+  XCreatePanelWindows(&setup);
   /*
     Set out progress and warning handlers.
   */
