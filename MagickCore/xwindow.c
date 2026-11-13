@@ -4047,6 +4047,29 @@ static void XCropWindowImage(XWindowInfo *window,Image *image,
     }
 }
 
+static void XLogXImage(const XImage *ximage)
+{
+  (void) LogMagickEvent(X11Event,GetMagickModule(),"XImage:");
+  (void) LogMagickEvent(X11Event,GetMagickModule(),"  width, height: %dx%d",
+    ximage->width,ximage->height);
+  (void) LogMagickEvent(X11Event,GetMagickModule(),"  format: %d",
+    ximage->format);
+  (void) LogMagickEvent(X11Event,GetMagickModule(),"  byte order: %d",
+    ximage->byte_order);
+  (void) LogMagickEvent(X11Event,GetMagickModule(),
+    "  bitmap unit, bit order, pad: %d %d %d",ximage->bitmap_unit,
+    ximage->bitmap_bit_order,ximage->bitmap_pad);
+  (void) LogMagickEvent(X11Event,GetMagickModule(),"  depth: %d",
+    ximage->depth);
+  (void) LogMagickEvent(X11Event,GetMagickModule(),"  bytes per line: %d",
+    ximage->bytes_per_line);
+  (void) LogMagickEvent(X11Event,GetMagickModule(),"  bits per pixel: %d",
+    ximage->bits_per_pixel);
+  (void) LogMagickEvent(X11Event,GetMagickModule(),
+    "  red, green, blue masks: 0x%lx 0x%lx 0x%lx",ximage->red_mask,
+    ximage->green_mask,ximage->blue_mask);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4225,27 +4248,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       return(MagickFalse);
     }
   if ((GetLogEventMask() & X11Event) != 0)
-    {
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"XImage:");
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  width, height: %dx%d",
-        ximage->width,ximage->height);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  format: %d",
-        ximage->format);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  byte order: %d",
-        ximage->byte_order);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "  bitmap unit, bit order, pad: %d %d %d",ximage->bitmap_unit,
-        ximage->bitmap_bit_order,ximage->bitmap_pad);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  depth: %d",
-        ximage->depth);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  bytes per line: %d",
-        ximage->bytes_per_line);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  bits per pixel: %d",
-        ximage->bits_per_pixel);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "  red, green, blue masks: 0x%lx 0x%lx 0x%lx",ximage->red_mask,
-        ximage->green_mask,ximage->blue_mask);
-    }
+    XLogXImage(ximage);
   if (window->shared_memory == MagickFalse)
     {
       if (ximage->format == XYBitmap)
