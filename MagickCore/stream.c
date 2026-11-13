@@ -3178,11 +3178,15 @@ static void StreamCharPixels(const StreamInfo *stream_info,const Image *image,
 }
 
 static void StreamDoublePixels(const StreamInfo *stream_info,const Image *image,
-  QuantumInfo *quantum_info,QuantumType *quantum_map,size_t length)
+  QuantumType *quantum_map,size_t length)
 {
+  QuantumInfo
+    *quantum_info;
+
   double
     *q;
 
+  quantum_info=stream_info->quantum_info;
   q=(double *) stream_info->pixels;
   if (LocaleCompare(stream_info->map,"BGR") == 0)
     {
@@ -3223,11 +3227,15 @@ static void StreamDoublePixels(const StreamInfo *stream_info,const Image *image,
 }
 
 static void StreamFloatPixels(const StreamInfo *stream_info,const Image *image,
-  QuantumInfo *quantum_info,QuantumType *quantum_map,size_t length)
+  QuantumType *quantum_map,size_t length)
 {
+  QuantumInfo
+    *quantum_info;
+
   float
     *q;
 
+  quantum_info=stream_info->quantum_info;
   q=(float *) stream_info->pixels;
   if (LocaleCompare(stream_info->map,"BGR") == 0)
     {
@@ -3503,9 +3511,6 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
   const StreamMapInfo
     *map_info;
 
-  QuantumInfo
-    *quantum_info;
-
   QuantumType
     *quantum_map;
 
@@ -3549,7 +3554,6 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
       "ColorSeparatedImageRequired","`%s'",stream_info->map);
     return(MagickFalse);
   }
-  quantum_info=stream_info->quantum_info;
   switch (stream_info->storage_type)
   {
     case CharPixel:
@@ -3559,12 +3563,12 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
     }
     case DoublePixel:
     {
-      StreamDoublePixels(stream_info,image,quantum_info,quantum_map,length);
+      StreamDoublePixels(stream_info,image,quantum_map,length);
       break;
     }
     case FloatPixel:
     {
-      StreamFloatPixels(stream_info,image,quantum_info,quantum_map,length);
+      StreamFloatPixels(stream_info,image,quantum_map,length);
       break;
     }
     case LongPixel:
