@@ -13297,6 +13297,36 @@ static void PositionListBrowserWidget(XWindowInfo *window_info,
     window_info->height=window_info->min_height;
 }
 
+static void MapListBrowserWidget(Display *display,XWindows *windows,
+  XWindowInfo *window_info,MagickStatusType mask)
+{
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  (void) CopyMagickString(window_info->name,"Browse",MagickPathExtent);
+  status=XStringListToTextProperty(&window_info->name,1,&window_name);
+  if (status != False)
+    {
+      XSetWMName(display,window_info->id,&window_name);
+      XSetWMIconName(display,windows->widget.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  window_changes.width=(int) window_info->width;
+  window_changes.height=(int) window_info->height;
+  window_changes.x=window_info->x;
+  window_changes.y=window_info->y;
+  (void) XReconfigureWMWindow(display,window_info->id,window_info->screen,mask,
+    &window_changes);
+  (void) XMapRaised(display,window_info->id);
+  window_info->mapped=MagickFalse;
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13306,9 +13336,6 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
 
   static MagickStatusType
     mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
-
-  Status
-    status;
 
   unsigned int
     entries,
@@ -13327,9 +13354,6 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XFontStruct
     *font_info;
 
-  XTextProperty
-    window_name;
-
   XWidgetInfo
     action_info,
     cancel_info,
@@ -13342,9 +13366,6 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
     slider_info,
     south_info,
     text_info;
-
-  XWindowChanges
-    window_changes;
 
   const ListBrowserTargets
     targets = { &reply_info, &selection_info, &action_info, &state,
@@ -13395,22 +13416,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   /*
     Map List Browser widget.
   */
-  (void) CopyMagickString(window_info->name,"Browse",MagickPathExtent);
-  status=XStringListToTextProperty(&window_info->name,1,&window_name);
-  if (status != False)
-    {
-      XSetWMName(display,window_info->id,&window_name);
-      XSetWMIconName(display,windows->widget.id,&window_name);
-      (void) XFree((void *) window_name.value);
-    }
-  window_changes.width=(int) window_info->width;
-  window_changes.height=(int) window_info->height;
-  window_changes.x=window_info->x;
-  window_changes.y=window_info->y;
-  (void) XReconfigureWMWindow(display,window_info->id,window_info->screen,mask,
-    &window_changes);
-  (void) XMapRaised(display,window_info->id);
-  window_info->mapped=MagickFalse;
+  MapListBrowserWidget(display,windows,window_info,mask);
   /*
     Respond to X events.
   */
