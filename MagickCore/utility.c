@@ -2034,6 +2034,16 @@ static void ApplyTemporaryPathPolicy(char **directory)
     }
 }
 
+static void FormatPathTemplate(char *path,const char *directory)
+{
+  if (directory[strlen(directory)-1] == *DirectorySeparator)
+    (void) FormatLocaleString(path,MagickPathExtent,"%smagick-"
+      MagickPathTemplate,directory);
+  else
+    (void) FormatLocaleString(path,MagickPathExtent,
+      "%s%smagick-" MagickPathTemplate,directory,DirectorySeparator);
+}
+
 MagickExport MagickBooleanType GetPathTemplate(char *path)
 {
   char
@@ -2061,12 +2071,7 @@ MagickExport MagickBooleanType GetPathTemplate(char *path)
   ApplyTemporaryPathPolicy(&directory);
   if (ValidateTemporaryDirectory(directory) == MagickFalse)
     return(MagickFalse);
-  if (directory[strlen(directory)-1] == *DirectorySeparator)
-    (void) FormatLocaleString(path,MagickPathExtent,"%smagick-"
-      MagickPathTemplate,directory);
-  else
-    (void) FormatLocaleString(path,MagickPathExtent,
-      "%s%smagick-" MagickPathTemplate,directory,DirectorySeparator);
+  FormatPathTemplate(path,directory);
   directory=DestroyString(directory);
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   {
