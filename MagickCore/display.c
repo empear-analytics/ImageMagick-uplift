@@ -11712,6 +11712,33 @@ static void XSelectMagnifyDigit(XWindows *windows,const KeySym key_symbol)
   }
 }
 
+static void XMoveMagnifyRightDown(XWindows *windows,const unsigned int quantum,
+  const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Right:
+    case XK_KP_Right:
+    {
+      if (windows->magnify.x < (int) (windows->image.ximage->width-1))
+        windows->magnify.x+=(int) quantum;
+      break;
+    }
+    case XK_Down:
+    case XK_KP_Down:
+    {
+      if (windows->magnify.y < (int) (windows->image.ximage->height-1))
+        windows->magnify.y+=(int) quantum;
+      break;
+    }
+    default:
+    {
+      XSelectMagnifyDigit(windows,key_symbol);
+      break;
+    }
+  }
+}
+
 static void XMoveMagnifyPosition(XWindows *windows,const unsigned int quantum,
   const KeySym key_symbol)
 {
@@ -11731,23 +11758,9 @@ static void XMoveMagnifyPosition(XWindows *windows,const unsigned int quantum,
         windows->magnify.y-=(int) quantum;
       break;
     }
-    case XK_Right:
-    case XK_KP_Right:
-    {
-      if (windows->magnify.x < (int) (windows->image.ximage->width-1))
-        windows->magnify.x+=(int) quantum;
-      break;
-    }
-    case XK_Down:
-    case XK_KP_Down:
-    {
-      if (windows->magnify.y < (int) (windows->image.ximage->height-1))
-        windows->magnify.y+=(int) quantum;
-      break;
-    }
     default:
     {
-      XSelectMagnifyDigit(windows,key_symbol);
+      XMoveMagnifyRightDown(windows,quantum,key_symbol);
       break;
     }
   }
