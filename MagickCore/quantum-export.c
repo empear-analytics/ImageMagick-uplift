@@ -4166,6 +4166,13 @@ static void ExportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static inline unsigned char Get1BitTransparentSample(const Image *image,
+  const Quantum *magick_restrict p)
+{
+  return((unsigned char) (GetPixelAlpha(image,p) == (Quantum)
+    TransparentAlpha ? 1 : 0));
+}
+
 static void Export1BitIndexAlphaQuantum(const Image *image,
   const QuantumPixelSpan *span)
 {
@@ -4191,26 +4198,22 @@ static void Export1BitIndexAlphaQuantum(const Image *image,
   {
     pixel=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
     *q=((pixel & 0x01) << 7);
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == (Quantum)
-      TransparentAlpha ? 1 : 0);
+    pixel=Get1BitTransparentSample(image,p);
     *q|=((pixel & 0x01) << 6);
     p+=(ptrdiff_t) GetPixelChannels(image);
     pixel=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
     *q|=((pixel & 0x01) << 5);
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == (Quantum)
-      TransparentAlpha ? 1 : 0);
+    pixel=Get1BitTransparentSample(image,p);
     *q|=((pixel & 0x01) << 4);
     p+=(ptrdiff_t) GetPixelChannels(image);
     pixel=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
     *q|=((pixel & 0x01) << 3);
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == (Quantum)
-      TransparentAlpha ? 1 : 0);
+    pixel=Get1BitTransparentSample(image,p);
     *q|=((pixel & 0x01) << 2);
     p+=(ptrdiff_t) GetPixelChannels(image);
     pixel=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
     *q|=((pixel & 0x01) << 1);
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == (Quantum)
-      TransparentAlpha ? 1 : 0);
+    pixel=Get1BitTransparentSample(image,p);
     *q|=((pixel & 0x01) << 0);
     p+=(ptrdiff_t) GetPixelChannels(image);
     q++;
@@ -4222,8 +4225,7 @@ static void Export1BitIndexAlphaQuantum(const Image *image,
       {
         pixel=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
         *q|=((pixel & 0x01) << (unsigned char) (bit+4));
-        pixel=(unsigned char) (GetPixelAlpha(image,p) == (Quantum)
-          TransparentAlpha ? 1 : 0);
+        pixel=Get1BitTransparentSample(image,p);
         *q|=((pixel & 0x01) << (unsigned char) (bit+4-1));
         p+=(ptrdiff_t) GetPixelChannels(image);
       }
