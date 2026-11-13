@@ -6666,6 +6666,63 @@ static void XCropWaitCommand(const CropContext *context,
   XCropRectifyCommand(&command_input,event,state);
 }
 
+static void XCropWaitEvent(const CropContext *context,
+  const CropTargets *targets,const RectangleInfo highlight_info)
+{
+  CropEventInput
+    event_input;
+
+  XEvent
+    *const event = targets->event;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  event_input.display=context->display;
+  event_input.windows=context->windows;
+  event_input.event=(event);
+  event_input.highlight_info=highlight_info;
+  event_input.text=context->text;
+  event_input.resource_info=context->resource_info;
+  event_input.mode=context->mode;
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XCropButtonPress(&event_input,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XCropButtonRelease(&event_input,(*crop_info));
+      break;
+    }
+    case Expose:
+    {
+      XCropExpose(&event_input,event);
+      break;
+    }
+    case KeyPress:
+    {
+      XCropKeyPress(&event_input,event,targets);
+      break;
+    }
+    case KeyRelease:
+      break;
+    case MotionNotify:
+    {
+      XCropMotion(&event_input,targets);
+      break;
+    }
+    case SelectionRequest:
+    {
+      XCropSelectionRequest(event,(*crop_info),context->text);
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6806,9 +6863,6 @@ static MagickBooleanType XCropImage(Display *display,
     (void) XMapWindow(display,windows->info.id);
     do
     {
-      CropEventInput
-        event_input;
-
       if (windows->info.mapped != MagickFalse)
         {
           /*
@@ -6838,49 +6892,7 @@ static MagickBooleanType XCropImage(Display *display,
         }
       XHighlightRectangle(display,windows->image.id,
         windows->image.highlight_context,&highlight_info);
-      event_input.display=display;
-      event_input.windows=windows;
-      event_input.event=(&event);
-      event_input.highlight_info=highlight_info;
-      event_input.text=text;
-      event_input.resource_info=resource_info;
-      event_input.mode=mode;
-      switch (event.type)
-      {
-        case ButtonPress:
-        {
-          XCropButtonPress(&event_input,&targets);
-          break;
-        }
-        case ButtonRelease:
-        {
-          XCropButtonRelease(&event_input,crop_info);
-          break;
-        }
-        case Expose:
-        {
-          XCropExpose(&event_input,&event);
-          break;
-        }
-        case KeyPress:
-        {
-          XCropKeyPress(&event_input,&event,&targets);
-          break;
-        }
-        case KeyRelease:
-          break;
-        case MotionNotify:
-        {
-          XCropMotion(&event_input,&targets);
-          break;
-        }
-        case SelectionRequest:
-        {
-          XCropSelectionRequest(&event,crop_info,text);
-        }
-        default:
-          break;
-      }
+      XCropWaitEvent(&context,&targets,highlight_info);
       if ((state & UpdateConfigurationState) != 0)
         {
           (void) XPutBackEvent(display,&event);
