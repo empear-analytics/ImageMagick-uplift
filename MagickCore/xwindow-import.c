@@ -1009,6 +1009,22 @@ static void XImportDirectClass(const WindowImageSource *source)
     XImportTrueColorRows(&direct_source);
 }
 
+static void XSetColormapColors(Image *composite_image,const XColor *colors)
+{
+  int
+    i;
+
+  for (i=0; i < (int) composite_image->colors; i++)
+  {
+    composite_image->colormap[colors[i].pixel].red=(double)
+      ScaleShortToQuantum(colors[i].red);
+    composite_image->colormap[colors[i].pixel].green=(double)
+      ScaleShortToQuantum(colors[i].green);
+    composite_image->colormap[colors[i].pixel].blue=(double)
+      ScaleShortToQuantum(colors[i].blue);
+  }
+}
+
 static MagickBooleanType XImportWindowImage(const WindowImageSource *source)
 {
   Image
@@ -1028,9 +1044,6 @@ static MagickBooleanType XImportWindowImage(const WindowImageSource *source)
 
   const unsigned int
     number_colors = source->number_colors;
-
-  int
-    i;
 
   Status
     status;
@@ -1058,15 +1071,7 @@ static MagickBooleanType XImportWindowImage(const WindowImageSource *source)
         }
       if (colors == (XColor *) NULL)
         break;
-      for (i=0; i < (int) composite_image->colors; i++)
-      {
-        composite_image->colormap[colors[i].pixel].red=(double)
-          ScaleShortToQuantum(colors[i].red);
-        composite_image->colormap[colors[i].pixel].green=(double)
-          ScaleShortToQuantum(colors[i].green);
-        composite_image->colormap[colors[i].pixel].blue=(double)
-          ScaleShortToQuantum(colors[i].blue);
-      }
+      XSetColormapColors(composite_image,colors);
       /*
         Convert X image to PseudoClass packets.
       */
