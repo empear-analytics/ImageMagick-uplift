@@ -5266,6 +5266,13 @@ static void XPlayNextScene(const AnimateEventContext *event_context,
   XPauseAnimationScene(&scene_view,pause,event);
 }
 
+static MagickBooleanType IsAnimationStep(Display *display,
+  const MagickStatusType state)
+{
+  return(((XEventsQueued(display,QueuedAfterFlush) == 0) &&
+    (IsAnimationPlaying(state) != MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -5506,8 +5513,7 @@ MagickExport Image *XAnimateImages(Display *display,
     &state,exception);
   do
   {
-    if ((XEventsQueued(display,QueuedAfterFlush) == 0) &&
-        (IsAnimationPlaying(state) != MagickFalse))
+    if (IsAnimationStep(display,state) != MagickFalse)
       {
         XPlayNextScene(&event_context,&play_targets);
         continue;
