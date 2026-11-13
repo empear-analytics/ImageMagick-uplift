@@ -219,37 +219,23 @@ static double GetFuzzyAlphaScale(const PixelInfo *p)
   return(1.0);
 }
 
-MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
-  const PixelInfo *q)
+typedef struct _FuzzyColorDistance
 {
   double
     distance,
     fuzz,
-    pixel,
     scale;
+} FuzzyColorDistance;
 
-  fuzz=p->fuzz*p->fuzz+q->fuzz*q->fuzz;
-  scale=1.0;
-  distance=0.0;
-  if ((p->alpha_trait != UndefinedPixelTrait) ||
-      (q->alpha_trait != UndefinedPixelTrait))
-    {
-      /*
-        Transparencies are involved - set alpha distance.
-      */
-      pixel=GetFuzzyAlpha(p)-GetFuzzyAlpha(q);
-      distance=pixel*pixel;
-      if (MagickSafeSignificantError(distance,fuzz) != MagickFalse)
-        return(MagickFalse);
-      /*
-        Generate a alpha scaling factor to generate a 4D cone on colorspace.
-        If one color is transparent, distance has no color component.
-      */
-      scale=GetFuzzyAlphaScale(p);
-      scale*=GetFuzzyAlphaScale(q);
-      if (scale <= MagickEpsilon)
-        return(MagickTrue);
-    }
+static MagickBooleanType IsFuzzyEquivalenceColor(const PixelInfo *p,
+  const PixelInfo *q,const FuzzyColorDistance *color_distance)
+{
+  double
+    distance = color_distance->distance,
+    fuzz = color_distance->fuzz,
+    pixel,
+    scale = color_distance->scale;
+
   /*
     CMYK create a CMY cube with a multi-dimensional cone toward black.
   */
@@ -281,4 +267,44 @@ MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
   if (MagickSafeSignificantError(distance,fuzz) != MagickFalse)
     return(MagickFalse);
   return(MagickTrue);
+}
+
+MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
+  const PixelInfo *q)
+{
+  double
+    distance,
+    fuzz,
+    pixel,
+    scale;
+
+  FuzzyColorDistance
+    color_distance;
+
+  fuzz=p->fuzz*p->fuzz+q->fuzz*q->fuzz;
+  scale=1.0;
+  distance=0.0;
+  if ((p->alpha_trait != UndefinedPixelTrait) ||
+      (q->alpha_trait != UndefinedPixelTrait))
+    {
+      /*
+        Transparencies are involved - set alpha distance.
+      */
+      pixel=GetFuzzyAlpha(p)-GetFuzzyAlpha(q);
+      distance=pixel*pixel;
+      if (MagickSafeSignificantError(distance,fuzz) != MagickFalse)
+        return(MagickFalse);
+      /*
+        Generate a alpha scaling factor to generate a 4D cone on colorspace.
+        If one color is transparent, distance has no color component.
+      */
+      scale=GetFuzzyAlphaScale(p);
+      scale*=GetFuzzyAlphaScale(q);
+      if (scale <= MagickEpsilon)
+        return(MagickTrue);
+    }
+  color_distance.distance=distance;
+  color_distance.fuzz=fuzz;
+  color_distance.scale=scale;
+  return(IsFuzzyEquivalenceColor(p,q,&color_distance));
 }

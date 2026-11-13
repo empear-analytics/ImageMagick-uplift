@@ -271,8 +271,8 @@ MagickExport void *ResizeQuantumMemory(void *memory,const size_t count,
 %    o length:  Specifies the length of the memory buffer.
 %
 */
-MagickPrivate MagickBooleanType ShredMagickMemory(void *memory,
-  const size_t length)
+static MagickBooleanType OverwriteMagickMemory(void *memory,
+  const size_t length,const ssize_t passes)
 {
   RandomInfo
     *random_info;
@@ -283,18 +283,9 @@ MagickPrivate MagickBooleanType ShredMagickMemory(void *memory,
   ssize_t
     i;
 
-  static ssize_t
-    passes = -1;
-
   StringInfo
     *key;
 
-  if ((memory == NULL) || (length == 0))
-    return(MagickFalse);
-  if (passes == -1)
-    passes=GetShredPasses();
-  if (passes == 0)
-    return(MagickTrue);
   /*
     Overwrite the memory buffer with random data.
   */
@@ -323,4 +314,19 @@ MagickPrivate MagickBooleanType ShredMagickMemory(void *memory,
   key=DestroyStringInfo(key);
   random_info=DestroyRandomInfo(random_info);
   return(i < passes ? MagickFalse : MagickTrue);
+}
+
+MagickPrivate MagickBooleanType ShredMagickMemory(void *memory,
+  const size_t length)
+{
+  static ssize_t
+    passes = -1;
+
+  if ((memory == NULL) || (length == 0))
+    return(MagickFalse);
+  if (passes == -1)
+    passes=GetShredPasses();
+  if (passes == 0)
+    return(MagickTrue);
+  return(OverwriteMagickMemory(memory,length,passes));
 }

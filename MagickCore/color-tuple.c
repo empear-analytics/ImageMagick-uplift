@@ -235,6 +235,31 @@ static double GetColorComponentScale(const PixelInfo *pixel,
   return(scale);
 }
 
+static void AdjustGreenComponent(const PixelInfo *pixel,
+  const ComplianceType compliance,double *color,double *scale)
+{
+  if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
+    *scale=100.0;
+  if ((compliance != NoCompliance) &&
+      (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
+    (*color)-=QuantumRange/2.0;
+}
+
+static void SetAlphaComponent(const PixelInfo *pixel,
+  const ComplianceType compliance,double *color,double *scale)
+{
+  *color=pixel->alpha;
+  if (compliance != NoCompliance)
+    *scale=1.0;
+}
+
+static inline MagickBooleanType IsOklchHueChannel(const PixelInfo *pixel,
+  const PixelChannel channel)
+{
+  return((MagickBooleanType) ((pixel->colorspace == OklchColorspace) &&
+    (channel == BluePixelChannel)));
+}
+
 MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   const PixelChannel channel,const ComplianceType compliance,char *tuple)
 {
@@ -260,11 +285,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
     case GreenPixelChannel:
     {
       color=pixel->green;
-      if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
-        scale=100.0;
-      if ((compliance != NoCompliance) &&
-          (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
-        color-=QuantumRange/2.0;
+      AdjustGreenComponent(pixel,compliance,&color,&scale);
       if (pixel->colorspace == XYZColorspace)
         color/=2.55;
       if (pixel->colorspace == OklchColorspace)
@@ -273,9 +294,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
     }
     case AlphaPixelChannel:
     {
-      color=pixel->alpha;
-      if (compliance != NoCompliance)
-        scale=1.0;
+      SetAlphaComponent(pixel,compliance,&color,&scale);
       break;
     }
     default:
@@ -284,7 +303,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
       break;
     }
   }
-  if ((pixel->colorspace == OklchColorspace) && (channel == BluePixelChannel))
+  if (IsOklchHueChannel(pixel,channel) != MagickFalse)
     (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
       GetMagickPrecision(),RadiansToDegrees(scale*QuantumScale*color));
   else

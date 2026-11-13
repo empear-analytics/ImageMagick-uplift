@@ -164,6 +164,16 @@ MagickExport size_t ConcatenateMagickString(char *magick_restrict destination,
 %    o length: the length of the destination string.
 %
 */
+static size_t CopyMagickStringTail(char *magick_restrict q,
+  const char *magick_restrict p,const char *magick_restrict source,size_t n)
+{
+  while (--n != 0)
+    if (((*q++)=(*p++)) == '\0')
+      return((size_t) (p-source-1));
+  *q='\0';
+  return((size_t) (p-source));
+}
+
 MagickExport size_t CopyMagickString(char *magick_restrict destination,
   const char *magick_restrict source,const size_t length)
 {
@@ -190,11 +200,6 @@ MagickExport size_t CopyMagickString(char *magick_restrict destination,
       return((size_t) (p-source-1));
   }
   if (length != 0)
-    {
-      while (--n != 0)
-        if (((*q++)=(*p++)) == '\0')
-          return((size_t) (p-source-1));
-      *q='\0';
-    }
+    return(CopyMagickStringTail(q,p,source,n));
   return((size_t) (p-source));
 }

@@ -163,6 +163,18 @@ static void AddLZWString(TableType *table,const size_t last_code,
     } \
 }
 
+static void CheckLZWEncodeArguments(const Image *image,
+  const unsigned char *magick_restrict pixels,const ExceptionInfo *exception)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(pixels != (unsigned char *) NULL);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
   unsigned char *magick_restrict pixels,ExceptionInfo *exception)
 {
@@ -185,13 +197,7 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
   /*
     Allocate string table.
   */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(pixels != (unsigned char *) NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckLZWEncodeArguments(image,pixels,exception);
   table=(TableType *) AcquireQuantumMemory(1UL << 12,sizeof(*table));
   if (table == (TableType *) NULL)
     ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed",
@@ -214,34 +220,33 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
       Find string.
     */
     index=FindLZWString(table,&last_code,pixels[i]);
-    if (last_code != (size_t) index)
+    if (last_code == (size_t) index)
+      continue;
+    /*
+      Add string.
+    */
+    OutputCode(last_code);
+    AddLZWString(table,last_code,pixels[i],next_index);
+    next_index++;
+    /*
+      Did we just move up to next bit width?
+    */
+    if ((next_index >> code_width) != 0)
       {
-        /*
-          Add string.
-        */
-        OutputCode(last_code);
-        AddLZWString(table,last_code,pixels[i],next_index);
-        next_index++;
-        /*
-          Did we just move up to next bit width?
-        */
-        if ((next_index >> code_width) != 0)
+        code_width++;
+        if (code_width > 12)
           {
-            code_width++;
-            if (code_width > 12)
-              {
-                /*
-                  Did we overflow the max bit width?
-                */
-                code_width--;
-                OutputCode(LZWClr);
-                ResetLZWTable(table);
-                next_index=LZWEod+1;
-                code_width=9;
-              }
-            }
-          last_code=(size_t) pixels[i];
-      }
+            /*
+              Did we overflow the max bit width?
+            */
+            code_width--;
+            OutputCode(LZWClr);
+            ResetLZWTable(table);
+            next_index=LZWEod+1;
+            code_width=9;
+          }
+        }
+      last_code=(size_t) pixels[i];
   }
   /*
     Flush tables.

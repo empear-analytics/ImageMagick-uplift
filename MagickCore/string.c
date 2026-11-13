@@ -1466,6 +1466,25 @@ static void ReplaceMatch(char *p,const char *replace,
 %    o replace: replace any matches with this string.
 %
 */
+static char *MakeRoomForReplacement(char **string,char *p,
+  const size_t search_extent,const size_t replace_extent)
+{
+  size_t
+    extent;
+
+  ssize_t
+    offset;
+
+  offset=(ssize_t) (p-(*string));
+  extent=strlen(*string)+replace_extent-search_extent+1;
+  *string=(char *) ResizeQuantumMemory(*string,
+    OverAllocateMemory(extent+MagickPathExtent),sizeof(*p));
+  if (*string == (char *) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"UnableToAcquireString");
+  p=(*string)+offset;
+  return(p);
+}
+
 MagickExport MagickBooleanType SubstituteString(char **string,
   const char *search,const char *replace)
 {
@@ -1476,12 +1495,8 @@ MagickExport MagickBooleanType SubstituteString(char **string,
     *p;
 
   size_t
-    extent,
     replace_extent,
     search_extent;
-
-  ssize_t
-    offset;
 
   status=MagickFalse;
   search_extent=0,
@@ -1503,13 +1518,7 @@ MagickExport MagickBooleanType SubstituteString(char **string,
         /*
           Make room for the replacement string.
         */
-        offset=(ssize_t) (p-(*string));
-        extent=strlen(*string)+replace_extent-search_extent+1;
-        *string=(char *) ResizeQuantumMemory(*string,
-          OverAllocateMemory(extent+MagickPathExtent),sizeof(*p));
-        if (*string == (char *) NULL)
-          ThrowFatalException(ResourceLimitFatalError,"UnableToAcquireString");
-        p=(*string)+offset;
+        p=MakeRoomForReplacement(string,p,search_extent,replace_extent);
       }
     /*
       Replace string.

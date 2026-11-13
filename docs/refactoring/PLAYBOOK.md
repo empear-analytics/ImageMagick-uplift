@@ -15372,6 +15372,454 @@ Lane: c
 
 ---
 
+## Recipe AT - Extract a Selection Arm with a Copy of the Return Tail
+
+**Use when:** CodeScene reports *Complex Method* or *Bumpy Road Ahead* on a
+value-returning function that ends in `if (c) { <arm> } return(R);`, where the arm leaves
+through `return(...)` on some paths and falls through to the final `return(R);` on
+others, as `string-copy.c`'s `CopyMagickString` ends: its tail `if (length != 0)` copies
+the last bytes, returning early on a NUL, and otherwise terminates the buffer and falls
+through to `return((size_t) (p-source));`.
+
+**Not covered by:** Recipe E step 7, which moves the whole `if` and the tail into one
+function: the new function then needs the condition's operand as one more parameter
+(five in `CopyMagickString`, an *Excess Number of Function Arguments*); Recipe ST, which
+splits a `switch` at its `default:`, not the arm of an `if`; Recipe W, which returns
+success and leaves the caller to repeat the early return; Recipe RV, whose block holds no
+`return`.
+
+**How:**
+
+1. The function returns a value and its last two statements, in its outermost block, are
+   `if (c) <arm>` (no `else`) and `return(R);`. The arm lies outside every OpenMP region
+   and holds no `#pragma` line, `goto`, or `break`/`continue` that leaves it; every
+   `return` in it has the form `return(<expr>);`.
+2. The plain locals of the caller that the arm writes are read after the arm by nothing
+   but `R`; they go by value, like everything the arm and `R` read, keeping their
+   declared types and qualifiers (`magick_restrict` included), at most four parameters.
+   Writes through pointers the arm already uses stay as they are.
+3. Cut the arm's statements into a new `static` function of the caller's return type
+   directly above the caller, followed by a copy of `return(R);`. Nothing else in the
+   text changes; the arm's own braces go.
+4. The `if` becomes `if (c)` followed by `return(Helper(...));`, in the caller's
+   indentation. The caller's `return(R);` stays as it was. Check by reading that every
+   argument fills the parameter it names.
+5. Run `tools/ci_warnings.sh <file>` and `tools/cxx_warnings.sh <file>` (both `OK`) and
+   the oracle for the function.
+6. *An `else` arm* (2026-11-13, lane b). The `if` may have an `else` whose arm also
+   leaves through `return(...)` on some paths and falls through to `return(R);` on
+   others (`color.c`'s `QueryHexColor`). The `else` arm alone moves by steps 2 and 3,
+   and the `else` becomes `else` followed by `return(Helper(...));`; the `if` arm stays.
+   A local that only the moved arm and `R` read, declared with an initialiser that no
+   statement between its declaration and the `if` changes (`PixelPacket pixel = { 0,
+   0, 0, 0, 0 };`, filled by the arm through `&pixel`), is declared in the new function
+   with the same declaration (Recipe E step 4), not passed. Only one arm moves: with
+   both moved, the caller's `return(R);` could not be reached.
+
+**Before:**
+
+```c
+  for (n=length; n > 4; n-=4)
+  {
+    ...
+  }
+  if (length != 0)
+    {
+      while (--n != 0)
+        if (((*q++)=(*p++)) == '\0')
+          return((size_t) (p-source-1));
+      *q='\0';
+    }
+  return((size_t) (p-source));
+}
+```
+
+**After:**
+
+```c
+static size_t CopyMagickStringTail(char *magick_restrict q,
+  const char *magick_restrict p,const char *magick_restrict source,size_t n)
+{
+  while (--n != 0)
+    if (((*q++)=(*p++)) == '\0')
+      return((size_t) (p-source-1));
+  *q='\0';
+  return((size_t) (p-source));
+}
+...
+  if (length != 0)
+    return(CopyMagickStringTail(q,p,source,n));
+  return((size_t) (p-source));
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. When `c` is false, the caller runs `return(R);` as
+  before. When it is true, the helper runs the arm's statements on copies holding the
+  values the caller's locals held at the `if`; a path that returned inside the arm
+  returns the same expression, read from copies that went through the same writes; a path
+  that fell through reaches the copy of `return(R);`, whose locals hold what the caller's
+  would have held, since only the arm wrote them (step 2). Writes through pointers land in
+  the same objects, in the same order. The caller returns what the helper returned.
+- A local that the arm writes and something other than `R` reads after the `if` refuses
+  the step: nothing after the call can see the copy's value.
+- `R` is evaluated in one of two places, never both, so a call or side effect in it still
+  happens once.
+
+**Evidence level:** oracle (the cases that reach the function), with
+`tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `string-copy.c`'s `CopyMagickString` (campaign B, M127
+lane b round 5): cc 9 and two bumps; Recipe E step 7 on the `if` and the tail gave a
+five-argument helper (9.61 to 9.68); this recipe gave 9.61 to 10.0. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+Step 6 (2026-11-13, same lane): `color.c`'s `QueryHexColor`, whose RGBA arm moved
+(Bumpy Road gone, 8.15 to 8.21). Added by Claude Code (Claude Opus 5.5).
+Lane: b
+
+---
+
+## Recipe BF - Drop the Blank Frame Rows of Doc-Comment Banners
+
+**Use when:** CodeScene reports *Code Duplication* between functions of one file whose
+code is not alike, because it counts the `%` banner comment above a function as part of
+the function (the span starts at the banner) and finds the banners' framing near
+identical, as in `locale.c`, where `AcquireCLocale`/`DestroyCLocale` and six other
+functions pair up in *Code Duplication* though their bodies share nothing.
+
+**Not covered by:** Recipe D, which deduplicates code, not comments; every other recipe,
+which changes tokens of the program. The owner allowed banners to be shortened by a
+guard-level recipe (owner, 2026-11-13), on condition that no code token changes, the
+object file stays identical, and what each banner says about the API is kept.
+
+**How:**
+
+1. A banner is a comment that opens `/*`, then a row of 79 `%`, then three rows that are
+   `%`, 77 spaces and `%`, then the name row (`%   N a m e ...  %` or `+   N a m e ...  %`),
+   then three more blank framed rows, then a row of 79 `%`, followed by the description.
+2. Delete the six blank framed rows (`%` + 77 spaces + `%`), nothing else: the `/*`, both
+   rows of `%`, the name row, the description, the format and parameter text and the
+   closing `*/` stay byte for byte. Do it for every banner of the file in one commit (a
+   script with the exact pattern above; a banner that differs in any row is left alone).
+3. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL` (it pins `__LINE__`;
+   the lines removed are inside comments). Run `tools/ci_warnings.sh <file>` and
+   `tools/cxx_warnings.sh <file>`: both `OK`. Check with `git diff` that every removed
+   line matches `^% {77}%$` and that no line was added.
+
+**Before:**
+
+```c
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
++   A c q u i r e C L o c a l e                                               %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  AcquireCLocale() allocates the C locale object, or (locale_t) 0 with
+```
+
+**After:**
+
+```c
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
++   A c q u i r e C L o c a l e                                               %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  AcquireCLocale() allocates the C locale object, or (locale_t) 0 with
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Only comment lines go; the preprocessor replaces a
+  comment by one space, so the token sequence is unchanged, and `obj_identical.sh`
+  confirms the object file. Line numbers of the code below each banner move up; the
+  campaign's extractions move them as well, and the oracle compares runs on that basis.
+- The banner's content (the function's name, its `+` or `%` marker for private or
+  public, the description, format and parameters) is unchanged: only blank framing goes.
+- Do not reword or reflow the description: a reworded banner is another recipe.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` and
+`tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `locale.c` (campaign B, M127 lane b round 5): eight
+functions in *Code Duplication* through their banners; the probe 7.09 to 8.01 with every
+duplication finding gone. Allowed by the owner's ruling (owner, 2026-11-13) that the `%`
+banners may be shortened by a guard-level recipe. Added by Claude Code (Claude Opus 5.5).
+Lane: b
+
+---
+
+## Recipe TM - Merge Twin Function Tails Differing in the Member They Read
+
+**Use when:** CodeScene reports *Code Duplication* between two functions of one file whose
+tails (everything after the opening asserts) are the same text except for the member
+designator of one lvalue they read, as `timer.c`'s `GetElapsedTime` and `GetUserTime`:
+both return `0.0` for an undefined timer, stop a running one, and return
+`time_info->elapsed.total` or `time_info->user.total`.
+
+**Not covered by:** Recipe MA, whose copies are blocks of one function and whose new
+function is `void`, updating the member; Recipe D, whose copies differ in variables or one
+value, never a member designator; Recipe TI and MT, which merge whole `static` functions
+through a selector (here the twins are public and stay); Recipe CF, whose copies differ
+in the function called.
+
+**How:**
+
+1. Two functions of one file (either may be public; both stay, with their signatures)
+   end in tails that align by script, whitespace ignored, and differ only in the member
+   `m1`/`m2` of one member access `e.m1.f`/`e.m2.f` (or `e.m1`/`e.m2`), where `e` is a
+   pointer parameter of both, with the same name and type, that neither tail assigns; the
+   two members have one declared type `T`. Every path of the tail ends in `return(...)`
+   (Recipe E step 7), it lies outside every OpenMP region, and it reads the member only,
+   never takes its address or assigns it.
+2. Write one `static` function of the twins' return type directly above the first twin:
+   its parameters are the variables the tail reads (`e` among them) and `const T *value`,
+   at most four; its body is the tail's text with `e->m1` written `(*value)`, nothing else
+   changed.
+3. Replace each twin's tail with `return(Helper(..., &e->mi));`, its own member. The
+   opening block of each twin (its asserts and trace log) stays where it is, so the
+   address is taken only after `e` was checked.
+4. Check by script that substituting `e->mi` for `(*value)` in the new function gives each
+   twin's tail, token for token. Run `tools/ci_warnings.sh` and `tools/cxx_warnings.sh`
+   (`OK`), and the oracle for both twins.
+
+**Before:**
+
+```c
+MagickExport double GetElapsedTime(TimerInfo *time_info)
+{
+  assert(time_info != (TimerInfo *) NULL);
+  assert(time_info->signature == MagickCoreSignature);
+  if (time_info->state == UndefinedTimerState)
+    return(0.0);
+  if (time_info->state == RunningTimerState)
+    StopTimer(time_info);
+  return(time_info->elapsed.total);
+}
+```
+
+**After:**
+
+```c
+static double GetStoppedTimerTotal(TimerInfo *time_info,const Timer *value)
+{
+  if (time_info->state == UndefinedTimerState)
+    return(0.0);
+  if (time_info->state == RunningTimerState)
+    StopTimer(time_info);
+  return((*value).total);
+}
+
+MagickExport double GetElapsedTime(TimerInfo *time_info)
+{
+  assert(time_info != (TimerInfo *) NULL);
+  assert(time_info->signature == MagickCoreSignature);
+  return(GetStoppedTimerTotal(time_info,&time_info->elapsed));
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `value` holds the address of the member of the object
+  `e` points to, computed at the call; `e` is not assigned in the tail (step 1), so the
+  address names the same storage throughout. Each read `(*value)` happens where the tail
+  read `e->mi`, after the same calls: a call that writes the member through `e`
+  (`StopTimer` updating the totals) is seen by the read, because the pointer is to
+  `const` only for this function, not a promise the object does not change, and the
+  compiler reloads it after an opaque call.
+- Taking the address before the tail runs reads no memory; only `(*value)` does.
+- A tail that assigns the member is Recipe MA's shape, not this one.
+
+**Evidence level:** oracle (the cases that reach either twin), with `tools/ci_warnings.sh`
+and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `timer.c`'s `GetElapsedTime` and `GetUserTime` (campaign
+B, M127 lane b round 5): the last *Code Duplication* pair once Recipe BF had removed the
+banners' share; 9.38 to 10.0. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: b
+
+---
+
+## Recipe IC - Inline Cast-Only Locals into Their One Use
+
+**Use when:** CodeScene reports *Code Duplication* between short functions whose bodies
+only convert their parameters through locals and pass them on, as `splay-tree.c`'s
+comparison callbacks `CompareSplayTreeString` and `CompareSplayTreeStringInfo` do:
+each declares `p` and `q`, sets them to casts of `target` and `source`, and returns a
+comparison of `p` and `q`. The declarations and assignments are the duplicated text.
+
+**Not covered by:** Recipe IX, which inlines a local set from an integer constant
+expression, not from a cast of a parameter; Recipe D, which moves a shared block into a
+helper (here the copies differ in their types and called function, and a helper would
+be one more copy); Recipe TM and MA, whose copies differ in a member designator.
+
+**How:**
+
+1. In each function, every local `v` to inline is declared without an initialiser and
+   assigned exactly once, by `v=(T) a;`, where `T` is `v`'s exact declared type and `a`
+   is a parameter that nothing in the function assigns. After that assignment `v` is
+   read exactly once, as a whole argument of a call or operand of the `return`, and its
+   address is never taken.
+2. Replace that one read of `v` by `(T) a`, the cast copied character for character.
+   Delete the assignment and the declaration of `v`. Keep the order of the arguments;
+   wrap at 80 columns as ImageMagick does.
+3. All copies that CodeScene groups together go in one commit (one finding, as Recipe D
+   does for its copies).
+4. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL`; otherwise revert.
+   Run `tools/ci_warnings.sh <file>` and `tools/cxx_warnings.sh <file>`: both `OK`.
+
+**Before:**
+
+```c
+MagickExport int CompareSplayTreeString(const void *target,const void *source)
+{
+  const char
+    *p,
+    *q;
+
+  p=(const char *) target;
+  q=(const char *) source;
+  return(LocaleCompare(p,q));
+}
+```
+
+**After:**
+
+```c
+MagickExport int CompareSplayTreeString(const void *target,const void *source)
+{
+  return(LocaleCompare((const char *) target,(const char *) source));
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `v` held the value of `(T) a` from its assignment to its
+  one read, since neither `v` nor `a` is assigned in between (step 1), and a cast has no
+  side effect; the call receives the same value of the same type. The order in which a
+  call's arguments are evaluated is unspecified in both forms, and evaluating a cast of
+  a parameter reads nothing else.
+- A local read twice, or whose address is taken, refuses the step: it is a name for a
+  value used more than once, not a conversion.
+- The object code is the compiler's to judge; step 4 is the proof.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD` and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `splay-tree.c`'s `CompareSplayTreeString` and
+`CompareSplayTreeStringInfo` (campaign B, M127 lane b round 5): after Recipe BF the
+file kept two *Code Duplication* pairs; this step on the comparison pair cleared both,
+9.38 to 10.0 in the probe. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: b
+
+---
+
+## Recipe OS - Share an Option-Sync Block Through a Helper Keyed by the Option Name
+
+**Use when:** CodeScene reports *Overall Code Complexity* (the mean cyclomatic
+complexity of the file's functions) on a file whose functions copy one small block per
+option: look the option up by name, and when it is set, store what one call makes of it
+into one member, as `image-settings.c`'s `SyncImage...Settings` functions do
+(`option=GetImageOption(image_info,"quality"); if (option != (const char *) NULL)
+image->quality=StringToUnsignedLong(option);`, the same for `scene`, `depth` and `loop`,
+in three functions). Each copy is an `if` of its own, and the copies raise the mean.
+
+**Not covered by:** Recipe MA, whose copies are blocks of one function and whose finding
+is a function-level one; Recipe D, which needs a reported *Code Duplication* (these
+copies are three lines and not reported) and copies that differ in one value (here a
+string literal and a member); Recipe SV and SC, which pass only constants; Recipe E,
+which would keep the literal and the member in the helper, one helper per copy.
+
+**How:**
+
+1. Copies. Blocks of the form `option=GetImageOption(image_info,"K");` followed by
+   `if (option != (const char *) NULL)` and one statement `S` that reads `option` and
+   writes one lvalue `e.m` (`e.m=F(option);`, `F(option,&e.m);` or `(void) F(option,
+   &e.m,...);`), outside every OpenMP region, where `option` is a local `const char *`
+   that the caller writes again before any later read (Recipe E step 4's temporary).
+   Copies that share a helper have the same text once the literal `"K"` and the member
+   designator `m` are set aside, and their lvalues `e.m` have one declared type `T`.
+2. The first commit for a helper takes the copies in one function and writes, directly
+   above the first function of the file that will call it, `static void
+   Name(const ImageInfo *image_info,const char *key,T *value[, other inputs])` with at
+   most four parameters: a local `const char *option;`, then the copy's text with `"K"`
+   replaced by `key` and `e.m` by `(*value)` (`&e.m` by `value`), nothing else changed.
+3. Each copy becomes `Name(image_info,"K",&e.m[, the same other inputs]);` where it stood.
+   The caller's `option` local stays while other code uses it.
+4. Later commits replace the copies of one other function each with calls of the same
+   helper, under the same conditions; a copy whose text differs in anything but the
+   literal and the member is left alone.
+5. Check by script that substituting each call's arguments into the helper's text gives
+   the copy it replaced, token for token. Run `tools/ci_warnings.sh` and
+   `tools/cxx_warnings.sh` (`OK`) and the oracle for each changed function.
+
+**Before:**
+
+```c
+  option=GetImageOption(image_info,"quality");
+  if (option != (const char *) NULL)
+    image->quality=StringToUnsignedLong(option);
+  ...
+  option=GetImageOption(image_info,"scene");
+  if (option != (const char *) NULL)
+    image->scene=StringToUnsignedLong(option);
+```
+
+**After:**
+
+```c
+static void SyncUnsignedLongOption(const ImageInfo *image_info,
+  const char *key,size_t *value)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    (*value)=StringToUnsignedLong(option);
+}
+...
+  SyncUnsignedLongOption(image_info,"quality",&image->quality);
+  ...
+  SyncUnsignedLongOption(image_info,"scene",&image->scene);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The helper looks up the same name (the literal is
+  passed unchanged), calls the same function on the same string, and stores the result
+  through a pointer to the member the copy named, so the same member receives the same
+  value, converted to its type `T` as the assignment converted it. When the option is
+  unset neither form writes anything. The caller's `option` held a value that the copy
+  overwrote and that nothing read afterwards, so its loss changes nothing.
+- The members of one helper must share one declared type (`size_t` for `quality`,
+  `scene`, `depth`, `iterations`): a member of another type, an enumeration cast through
+  `ParseCommandOption` say, needs its own helper or stays.
+- `e` is a pointer parameter the copies do not assign, so `&e.m` names the member the
+  copy wrote.
+
+**Evidence level:** oracle (the cases that reach each changed function), with
+`tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `image-settings.c` (campaign B, M127 lane b round 5):
+*Overall Code Complexity* held the file at 9.09 with one other finding; a probe of the
+size_t, geometry and colour option copies left the mean just above the threshold, and a
+probe with two more functions of complexity one cleared it (9.68). Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -16771,3 +17219,9 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | B | Existing input struct: when every caller binds the group's arguments as `const` locals from one Recipe N input struct, the group may become that struct's pointer instead of a new struct (members the group lacks are allowed); the callers' bindings left unused are deleted | `token-next.c`'s `AppendTokenChar(token,extent,p,i)`, called only from the `Scan*Token` helpers that bind `token` and `extent` from `NextTokenInput`: *String Heavy Function Arguments* leaves the file, 9.09 to 9.38 in a probe | mandate (2026-10-24) |
 | 2026-11-13 | NEW | TR | Extract a `while` loop whose body reports an error through `ThrowMagickException` and goes on looping: the throw becomes `return(MagickFalse);` in the helper and the caller writes `while (Helper(...) == MagickFalse) T;`, so the throw stays in its function; evidence oracle; Lane: a | `type.c`'s `LoadTypeCache` (include loop; probe 6.90 to 7.39, out of *Deep, Nested Complexity*) and `policy.c`'s `LoadPolicyCache` (the same loop) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | CK | Extract the Cases of a Loop's Switch Through Copies of the Caller's Locals: each group (its block, a macro naming the caller's `status` and `return(c);` exits inside) moves to a helper taking one `const` struct of the state's addresses, copying the locals in and out (Recipe MB's form) and returning a constant other than `c`; the caller writes `if (Helper(&name) == c) return(c); break;`; evidence oracle; Lane: c | `draw.c`'s `TracePath` (ten path-command groups with `ThrowPointExpectedException` and `return(-1);`; probe 2.68 to 2.79) | mandate (2026-10-24) |
+| 2026-11-13 | NEW | AT | Extract a Selection Arm with a Copy of the Return Tail: in a value-returning function ending `if (c) <arm> return(R);`, the arm (returning on some paths, falling through on others) moves to a `static` function of the caller's return type followed by a copy of `return(R);`; the `if` becomes `if (c) return(Helper(...));`; locals the arm writes are read after it only by `R` and go by value; evidence oracle; Lane: b | `string-copy.c`'s `CopyMagickString` (cc 9, two bumps; E step 7 on the whole tail left a five-argument helper, 9.68; this recipe 9.61 to 10.0) | mandate (2026-10-24) |
+| 2026-11-13 | NEW | BF | Drop the Blank Frame Rows of Doc-Comment Banners: the six rows of `%`, 77 spaces and `%` around a banner's name row are deleted in every banner of a file, nothing else; evidence guard (`obj_identical.sh` IDENTICAL); Lane: b | `locale.c`: eight functions in *Code Duplication* through their banners (CodeScene counts the banner into the function's span); probe 7.09 to 8.01, every duplication finding gone | owner |
+| 2026-11-13 | NEW | TM | Merge Twin Function Tails Differing in the Member They Read: two functions of a file whose returning tails differ only in the member of one read `e->m.f` share a `static` function taking `const T *value`; each twin keeps its opening block and returns the call with `&e->m`; evidence oracle; Lane: b | `timer.c`'s `GetElapsedTime` and `GetUserTime` (*Code Duplication*; 9.38 to 10.0) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | AT | Step 6: the `if` may have an `else` arm of the same kind; that arm alone moves (`else return(Helper(...));`), a local only it and `R` read is declared in the helper with its initialiser; Lane: b | `color.c`'s `QueryHexColor` (two bumps, one per arm) | mandate (2026-10-24) |
+| 2026-11-13 | NEW | IC | Inline Cast-Only Locals into Their One Use: a local assigned once from a cast of an unassigned parameter to its own type, and read once, is replaced at that read by the cast; declaration and assignment go; the grouped copies in one commit; evidence guard (`obj_identical.sh`); Lane: b | `splay-tree.c`'s `CompareSplayTreeString` and `CompareSplayTreeStringInfo` (*Code Duplication*; probe 9.38 to 10.0) | mandate (2026-10-24) |
+| 2026-11-13 | NEW | OS | Share an Option-Sync Block Through a Helper Keyed by the Option Name: copies of `option=GetImageOption(image_info,"K"); if (option != NULL) S;` whose `S` stores into one member become calls of a `static void` helper taking the key and a pointer to the member; one function per commit; targets *Overall Code Complexity*; evidence oracle; Lane: b | `image-settings.c`'s `SyncImage...Settings` (`quality`, `scene`, `depth`, `loop`, `page`, `tile-offset`, colours) | mandate (2026-10-24) |
