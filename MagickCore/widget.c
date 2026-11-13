@@ -14950,6 +14950,16 @@ static unsigned int GetPreferencesButtonWidth(XFontStruct *font_info)
   return(width);
 }
 
+static void PositionPreferencesWidth(XWindows *windows,XFontStruct *font_info,
+  unsigned int width,unsigned int text_width)
+{
+  windows->widget.width=(unsigned int) (MagickMax((int) (width << 1),
+    (int) text_width)+6*QuantumMargin);
+  windows->widget.min_width=(width << 1)+(unsigned int) QuantumMargin;
+  if (windows->widget.width < windows->widget.min_width)
+    windows->widget.width=windows->widget.min_width;
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -14999,11 +15009,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   /*
     Position Preferences widget.
   */
-  windows->widget.width=(unsigned int) (MagickMax((int) (width << 1),
-    (int) text_width)+6*QuantumMargin);
-  windows->widget.min_width=(width << 1)+(unsigned int) QuantumMargin;
-  if (windows->widget.width < windows->widget.min_width)
-    windows->widget.width=windows->widget.min_width;
+  PositionPreferencesWidth(windows,font_info,width,text_width);
   windows->widget.height=(unsigned int) (7*(int) height+NumberPreferences*
     ((int) height+(QuantumMargin >> 1)));
   windows->widget.min_height=(unsigned int) (7*(int) height+NumberPreferences*
