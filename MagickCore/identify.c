@@ -2195,6 +2195,21 @@ static void PrintImageClassToEndianness(FILE *file,Image *image,
     MagickEndianOptions,(ssize_t) image->endian));
 }
 
+static void PrintImageDetails(FILE *file,Image *image,
+  ExceptionInfo *exception)
+{
+  PrintImageColormapEntries(file,image,exception);
+  PrintImageErrorAndRendering(file,image);
+  PrintImageColors(file,image,exception);
+  PrintImageLayout(file,image);
+  PrintImageAnimation(file,image);
+  PrintImageStorageDetails(file,image,exception);
+  PrintImageProfiles(file,image);
+  PrintImageProperties(file,image,exception);
+  PrintImageArtifacts(file,image);
+  PrintImageRegistry(file,exception);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2298,16 +2313,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     {
       PrintImagePixelSummary(file,image,colorspace,exception);
     }
-  PrintImageColormapEntries(file,image,exception);
-  PrintImageErrorAndRendering(file,image);
-  PrintImageColors(file,image,exception);
-  PrintImageLayout(file,image);
-  PrintImageAnimation(file,image);
-  PrintImageStorageDetails(file,image,exception);
-  PrintImageProfiles(file,image);
-  PrintImageProperties(file,image,exception);
-  PrintImageArtifacts(file,image);
-  PrintImageRegistry(file,exception);
+  PrintImageDetails(file,image,exception);
   PrintImageSizes(file,image);
   PrintImageTimes(file,image,elapsed_time,user_time);
   (void) fflush(file);
