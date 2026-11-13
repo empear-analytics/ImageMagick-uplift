@@ -180,72 +180,6 @@ MagickExport char *CloneString(char **destination,const char *source)
 }
 
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   C o n c a t e n a t e M a g i c k S t r i n g                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  ConcatenateMagickString() concatenates the source string to the destination
-%  string.  The destination buffer is always null-terminated even if the
-%  string must be truncated.
-%
-%  The format of the ConcatenateMagickString method is:
-%
-%      size_t ConcatenateMagickString(char *magick_restrict destination,
-%        const char *magick_restrict source,const size_t length)
-%
-%  A description of each parameter follows:
-%
-%    o destination: the destination string.
-%
-%    o source: the source string.
-%
-%    o length: the length of the destination string.
-%
-*/
-MagickExport size_t ConcatenateMagickString(char *magick_restrict destination,
-  const char *magick_restrict source,const size_t length)
-{
-  char
-    *magick_restrict q;
-
-  const char
-    *magick_restrict p;
-
-  size_t
-    count,
-    i;
-
-  assert(destination != (char *) NULL);
-  assert(source != (const char *) NULL);
-  assert(length >= 1);
-  p=source;
-  q=destination;
-  i=length;
-  while ((i-- != 0) && (*q != '\0'))
-    q++;
-  count=(size_t) (q-destination);
-  i=length-count;
-  if (i == 0)
-    return(count+strlen(p));
-  while (*p != '\0')
-  {
-    if (i != 1)
-      {
-        *q++=(*p);
-        i--;
-      }
-    p++;
-  }
-  *q='\0';
-  return(count+(size_t) (p-source));
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -356,71 +290,6 @@ MagickExport char *ConstantString(const char *source)
   return(destination);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   C o p y M a g i c k S t r i n g                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  CopyMagickString() copies the source string to the destination string, with
-%  out exceeding the given pre-declared length.
-%
-%  The destination buffer is always null-terminated even if the string must be
-%  truncated.  The return value is the length of the string.
-%
-%  The format of the CopyMagickString method is:
-%
-%      size_t CopyMagickString(const char *magick_restrict destination,
-%        char *magick_restrict source,const size_t length)
-%
-%  A description of each parameter follows:
-%
-%    o destination: the destination string.
-%
-%    o source: the source string.
-%
-%    o length: the length of the destination string.
-%
-*/
-MagickExport size_t CopyMagickString(char *magick_restrict destination,
-  const char *magick_restrict source,const size_t length)
-{
-  char
-    *magick_restrict q;
-
-  const char
-    *magick_restrict p;
-
-  size_t
-    n;
-
-  p=source;
-  q=destination;
-  for (n=length; n > 4; n-=4)
-  {
-    if (((*q++)=(*p++)) == '\0')
-      return((size_t) (p-source-1));
-    if (((*q++)=(*p++)) == '\0')
-      return((size_t) (p-source-1));
-    if (((*q++)=(*p++)) == '\0')
-      return((size_t) (p-source-1));
-    if (((*q++)=(*p++)) == '\0')
-      return((size_t) (p-source-1));
-  }
-  if (length != 0)
-    {
-      while (--n != 0)
-        if (((*q++)=(*p++)) == '\0')
-          return((size_t) (p-source-1));
-      *q='\0';
-    }
-  return((size_t) (p-source));
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
