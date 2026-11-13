@@ -13951,6 +13951,129 @@ Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipe
 
 ---
 
+## Recipe RD - Share a Twin Relaxation Loop Through a Driver Releasing by Pointer Lists
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Code Duplication* on two
+`static` functions that each build their own images, then run the same iterative loop over them
+(acquire a residual copy, acquire a kernel, print a verbose title, iterate a step, test a residual
+against a threshold, refresh the residual copy) and give up on a failure before the loop by
+releasing their own images in their own order, as `composite.c`'s `SaliencyBlendImage` and
+`SeamlessBlendImage` do. The loop differs between the twins in one optional stage (Saliency
+subtracts a divergence image, Seamless does not), in the image the step composites back, in the
+title printed and in which images each failure path releases.
+
+**Not covered by:** Recipe TW, whose twin blocks contain no `return`; Recipes ME and MT, whose
+copies sit in one function; Recipe TI, which merges two whole functions; Recipe W and Recipe V,
+which move one block of one function and cannot carry two different release lists; Recipe CF,
+whose twins differ in the function they call, not in which locals they release.
+
+**How:**
+
+1. Twins. Two `static` functions `F1` and `F2` outside every OpenMP region hold one run of
+   statements each, from the residual copy before the loop to the loop's end, that are the same
+   text but for: (a) one stage present in `F1` only, guarded in the driver by a test of a pointer
+   that `F1` passes non-`NULL` (checked by reading that `F1` returned before this point when it
+   was `NULL`) and `F2` passes `NULL`; (b) the image the step reads, a different local; (c) the
+   title, a string literal of each; (d) the statements before each `return(MagickFalse);` of the
+   run, each a list of `v=DestroyImage(v);` of the caller's locals; (e) a `NULL` guard before the
+   in-loop release of the residual that one twin has and the other lacks.
+2. Write a `typedef struct` holding the images of (a) and (b) by value, the caller's mutable
+   image locals (the relaxed and the residual image) by address (`Image **`), and one
+   `Image **const *` per failure stage of (d): a `NULL`-terminated array of addresses of the
+   caller's locals, in the order the caller's statements released them. Each caller declares its
+   arrays as `Image **const name[] = { &a, &b, NULL };` with its own locals, in its own order,
+   and fills the struct by initialiser in a block of its own at the run's place (Recipe FB).
+3. `static void ReleaseBlendImages(Image **const *images)` runs
+   `*images[k]=DestroyImage(*images[k]);` for `k` from 0 to the `NULL`: the same statements as
+   the twin's list, in its order, writing the same `NULL` into the caller's locals.
+4. The driver returns `MagickBooleanType`: each failure stage calls `ReleaseBlendImages` with its
+   list and returns `MagickFalse`; the caller writes
+   `if (Driver(...) == MagickFalse) return(MagickFalse);` where the run stood. After the loop the
+   driver returns `MagickTrue` and the caller goes on with the statements after the run. A
+   `status` the loop assigned and nothing after it reads before assigning it again (check by
+   reading every path to the caller's next read) is not carried out.
+5. Every use of a mutable local `v` in the run becomes `*relaxation->v` in the driver; the
+   loop's step moves into a `static MagickBooleanType` function returning `MagickFalse` where the
+   loop broke and the residual call's result where it fell through; the loop writes
+   `if (Step(...) == MagickFalse) break;`.
+6. (c) becomes a `static void` helper that returns when `verbose` is false and otherwise prints
+   `F1`'s literal when the pointer of (a) is not `NULL` and `F2`'s when it is, each literal
+   unchanged: no new format string. The loop's tick report and the residual refresh of (e) go to
+   helpers of their own (`ReportBlendIteration`, `CloneBlendResidual`), each the run's text, so
+   the driver stays under cc 9; (e)'s guard is kept and so runs for both twins.
+7. `refactor_guard.py`: `WARN`, copies removed, every value still present; `--calls`: the
+   twins' shared callees drop by one copy and each new function appears. Compile with
+   `-DNDEBUG -Wunused-parameter -Wunused-variable`. Both twins' cases through the oracle.
+
+**Before:**
+
+```c
+  residual_image=CloneImage(relax_image,0,0,MagickTrue,exception);
+  if (residual_image == (Image *) NULL)
+    {
+      relax_image=DestroyImage(relax_image);
+      mean_image=DestroyImage(mean_image);
+      return(MagickFalse);
+    }
+  ...
+  for (i=0; i < (ssize_t) request->iterations; i++)
+  {
+    ...
+  }
+  kernel_info=DestroyKernelInfo(kernel_info);
+```
+
+**After:**
+
+```c
+  Image
+    **const residual_failure[] = { &relax_image, &mean_image, NULL },
+    **const kernel_failure[] = { &residual_image, &relax_image, &mean_image,
+      NULL };
+  ...
+  {
+    const BlendRelaxation
+      relaxation = { mean_image, (Image *) NULL, &relax_image,
+        &residual_image, residual_failure, kernel_failure };
+
+    if (RelaxBlendImage(image,&relaxation,request,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+```
+
+**Careful:**
+
+- Releases: each failure stage of each twin releases the same images in the same order as
+  before, because the list is the caller's own statements' locals in their order, and
+  `ReleaseBlendImages` writes the `NULL` that `DestroyImage` returns into the same locals. A
+  twin that released nothing for an image it had acquired (an upstream leak) still releases
+  nothing: the list holds what the twin's text released, not what it should have. Report such
+  leaks; do not fix them.
+- (a): the stage runs exactly where `F1` ran it, because `F1`'s pointer is never `NULL` at the
+  driver (it returned before when it was) and `F2`'s always is.
+- (c): the same bytes reach `stderr` at the same point (after the kernel is acquired, before the
+  loop), and only when `verbose` holds.
+- (e): the residual image is not `NULL` where it is released in the loop (it was tested after the
+  copy before the loop, and the loop breaks when the refresh returns `NULL`), so the guard is
+  always true and the twin without it releases the same image as before.
+- A `status` that the loop assigned is dead at the loop's end in both twins (the next statement
+  that reads it follows an assignment or a `return`); check by reading.
+- Failure paths are allocation failures that no case reaches: checked by reading, list against
+  statements, and `refactor_guard.py --calls`.
+
+**Evidence level:** oracle on both twins' cases, with `refactor_guard.py` (`WARN`, deduplication)
+and `--calls`, steps 1, 4 and 6 checked by reading.
+
+**Provenance:** 2026-11-13, from `composite.c`'s `SaliencyBlendImage` (cc 17, 112 lines) and
+`SeamlessBlendImage` (cc 19, 116 lines) (campaign A, W22 lane c). Earlier lanes found that the
+pair could not be partitioned without a clone pair (3.13 to 3.52 in probes); a driver over the
+whole run, releasing through the callers' own lists, keeps every release and its order. Probed
+on the W21 flat chain: 3.69 to 3.58 alone (*Number of Functions* now reported), 3.70 with Recipe
+HN on Seamless's head, 3.90 with Recipe GS on `BlendDivergentImage`. Added by Claude Code
+(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -15001,3 +15124,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | RH | Hoist a Label Run into a Row Flag: a run of eight or more `case` labels of `row->compose` in a `static void` per-pixel function becomes a `static const` table and a membership predicate (Recipe TB's loop), evaluated once per row where the row struct is filled into a new `MagickBooleanType` member, and the group becomes `if (row->flag != MagickFalse) { B return; }` ahead of the `switch`. *Careful* gives the argument (`compose` is not written after the fill, labels disjoint, the function ends where the `switch` ended) | `composite.c`'s `SetCompositeCoverage` (32 labels) and `CompositeAlphaChannel` (11 and 7) (campaign A, W19 lane c): Recipe TB's loop on the pixel path measured +46 to +91 instructions per pixel (+4% to +9%), Recipe LP keeps the finding; with the flag, +0.5% to +1.5% of a 400x400 composite, no new finding; a hybrid probe with the other five Complex Methods of the pixel path emptied: 3.69 to 3.83 | owner |
 | 2026-11-12 | AMEND | RH | New step 8, the if/else form: the `switch` may stand before other statements and hold up to two runs, each with its own table, predicate and flag; its groups become an `if` / `else if` / `else` chain, and the flags may be filled by the initialiser of a `const` struct local. *Careful* gives the argument (one group selected by value; groups disjoint; the statements after run in every case) | `composite.c`'s `SetVirtualCompositeChannels` (a nine-label run inside the channel loop, `virtual_inputs` initialised once per row) and `CompositeImagePixel` (two runs of six and four labels that set `Si`, `Di` and the pixel infos before the channel loop) (campaign A, W19 lane c): both are Complex Methods held by their label runs, and the stub of the five remaining pixel-path methods measured 3.83 | owner |
 | 2026-11-12 | NEW | MP | Merge Membership Predicates over a Table Parameter: the `static` predicates of Recipe TB's shape, each over its own `static const` table, become one that takes the table and its element count; each call passes `T,sizeof(T)/sizeof(*T)`, one predicate per commit, the others deleted. *Careful* gives the argument (same loop, same table, same count, same argument) | `composite.c`'s five RH predicates (campaign A, W21 lane c): the file stands at 110 functions and the chain needs a sixth for `SetVirtualCompositeChannels` (111: 3.69 to 3.59); folding the five frees four slots, whole fold probe 3.69 to 3.69 | owner |
+| 2026-11-13 | NEW | RD | Share a Twin Relaxation Loop Through a Driver Releasing by Pointer Lists: two `static` twins' runs from the residual copy to the loop's end become one driver taking a struct with the differing images, the callers' mutable images by address and, per failure stage, a `NULL`-terminated array of the caller's own locals' addresses in its own release order; the loop's step, tick report, title and residual refresh become helpers. *Careful* gives the argument (each failure path releases the same images in the same order; the optional stage runs where it ran; the in-loop guard is always true; upstream leaks kept and reported) | `composite.c`'s `SaliencyBlendImage` and `SeamlessBlendImage` (campaign A, W22 lane c): 3.69 to 3.58 alone, 3.70 with Recipe HN, 3.90 with Recipe GS in a probe | owner |
