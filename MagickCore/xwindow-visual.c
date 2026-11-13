@@ -164,15 +164,15 @@ static const char
 %    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
 */
-MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
-  XStandardColormap *map_info,XResourceInfo *resource_info)
-{
 #define MaxStandardColormaps  7
 #define XVisualColormapSize(visual_info) MagickMin((unsigned long int) (\
   (visual_info->klass == TrueColor) || (visual_info->klass == DirectColor) ? \
    visual_info->red_mask | visual_info->green_mask | visual_info->blue_mask : \
    (unsigned long) visual_info->colormap_size),1UL << visual_info->depth)
 
+MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
+  XStandardColormap *map_info,XResourceInfo *resource_info)
+{
   char
     *map_type,
     *visual_type;
