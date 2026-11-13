@@ -7057,6 +7057,9 @@ typedef struct _FileBrowserContext
 
   unsigned int
     anomaly;
+
+  char
+    *home_directory;
 } FileBrowserContext;
 
 static void ClientFileBrowserMessage(const FileBrowserContext *context,
@@ -7630,6 +7633,55 @@ static void ReleaseFileBrowserActions(const FileBrowserContext *context,
     }
 }
 
+static void ReleaseFileBrowserButtons(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const working_path = context->working_path,
+    *const home_directory = context->home_directory;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const up_info = widgets->up_info,
+    *const home_info = widgets->home_info;
+
+  if ((*up_info).raised == MagickFalse)
+    {
+      FileBrowserPathRelease
+        up;
+
+      up.windows=windows;
+      up.event=event;
+      up.working_path=working_path;
+      (*state)=ReleaseFileBrowserUp(&up,(*up_info),(*state));
+      (*up_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,up_info);
+    }
+  if ((*home_info).raised == MagickFalse)
+    {
+      FontBrowserBack
+        back;
+
+      back.windows=windows;
+      back.event=event;
+      back.back_info=(*home_info);
+      back.glob_pattern=working_path;
+      back.back_pattern=home_directory;
+      (*state)=ReleaseFontBrowserBack(&back,(*state));
+      (*home_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,home_info);
+    }
+  ReleaseFileBrowserActions(context,event,widgets);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -7824,6 +7876,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   file_context.height=height;
   file_context.format=format;
   file_context.anomaly=anomaly;
+  file_context.home_directory=home_directory;
   do
   {
     if (state & UpdateConfigurationState)
@@ -8189,33 +8242,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
             slider_info.active=MagickFalse;
             break;
           }
-        if (up_info.raised == MagickFalse)
-          {
-            FileBrowserPathRelease
-              up;
-
-            up.windows=windows;
-            up.event=event;
-            up.working_path=working_path;
-            state=ReleaseFileBrowserUp(&up,up_info,state);
-            up_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&up_info);
-          }
-        if (home_info.raised == MagickFalse)
-          {
-            FontBrowserBack
-              back;
-
-            back.windows=windows;
-            back.event=event;
-            back.back_info=home_info;
-            back.glob_pattern=working_path;
-            back.back_pattern=home_directory;
-            state=ReleaseFontBrowserBack(&back,state);
-            home_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&home_info);
-          }
-        ReleaseFileBrowserActions(&file_context,event,&file_widgets);
+        ReleaseFileBrowserButtons(&file_context,event,&file_widgets);
         break;
       }
       case ClientMessage:
