@@ -733,11 +733,8 @@ MagickExport Image *GetImageFromList(const Image *images,const ssize_t index)
   ssize_t
     i;
 
-  if (images == (Image *) NULL)
+  if (IsImageListEntry(images) == MagickFalse)
     return((Image *) NULL);
-  assert(images->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   if (index < 0)
     {
       p=GetLastImageInList(images);
