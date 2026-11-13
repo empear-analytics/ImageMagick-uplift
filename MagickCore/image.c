@@ -1028,6 +1028,17 @@ static MagickBooleanType CopyImageRow(const CopyRow *row,const ssize_t y,
 
 #define CopyImageTag  "Copy/Image"
 
+static void SetCopyImageProgress(Image *image,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,CopyImageTag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType CopyImagePixels(Image *image,
   const Image *source_image,const RectangleInfo *geometry,
   const OffsetInfo *offset,ExceptionInfo *exception)
@@ -1076,16 +1087,11 @@ MagickExport MagickBooleanType CopyImagePixels(Image *image,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,CopyImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetCopyImageProgress(image,progress,&status);
       }
   }
   source_view=DestroyCacheView(source_view);
