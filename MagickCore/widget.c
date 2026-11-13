@@ -13367,22 +13367,11 @@ static void RespondToListBrowserEvents(const ListBrowserContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
-MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
-  XWindowInfo *window_info,const char *const *list,const char *action,
-  const char *query,char *reply)
+static void RunListBrowser(const ListBrowserContext *context,
+  MagickStatusType *mask)
 {
-  char
-    primary_selection[MagickPathExtent];
-
-  static MagickStatusType
-    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
-
   unsigned int
-    entries,
-    height,
-    text_width,
-    visible_entries,
-    width;
+    visible_entries;
 
   size_t
     delay,
@@ -13390,9 +13379,6 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
 
   XEvent
     event;
-
-  XFontStruct
-    *font_info;
 
   XWidgetInfo
     action_info,
@@ -13414,8 +13400,38 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   const ListBrowserWidgets
     list_widgets = { &reply_info, &state, &slider_info, &action_info,
       &cancel_info, &north_info, &south_info, &delay, &scroll_info,
-      &visible_entries, &event, &list_info, &mask, &expose_info, &text_info,
+      &visible_entries, &event, &list_info, mask, &expose_info, &text_info,
       &selection_info };
+
+  XGetWidgetInfo((char *) NULL,&slider_info);
+  XGetWidgetInfo((char *) NULL,&north_info);
+  XGetWidgetInfo((char *) NULL,&south_info);
+  XGetWidgetInfo((char *) NULL,&expose_info);
+  XGetWidgetInfo((char *) NULL,&selection_info);
+  visible_entries=0;
+  delay=SuspendTime << 2;
+  state=UpdateConfigurationState;
+  RespondToListBrowserEvents(context,&targets,&list_widgets);
+}
+
+MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
+  XWindowInfo *window_info,const char *const *list,const char *action,
+  const char *query,char *reply)
+{
+  char
+    primary_selection[MagickPathExtent];
+
+  static MagickStatusType
+    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
+
+  unsigned int
+    entries,
+    height,
+    text_width,
+    width;
+
+  XFontStruct
+    *font_info;
 
   ListBrowserContext
     list_context;
@@ -13460,14 +13476,6 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   /*
     Respond to X events.
   */
-  XGetWidgetInfo((char *) NULL,&slider_info);
-  XGetWidgetInfo((char *) NULL,&north_info);
-  XGetWidgetInfo((char *) NULL,&south_info);
-  XGetWidgetInfo((char *) NULL,&expose_info);
-  XGetWidgetInfo((char *) NULL,&selection_info);
-  visible_entries=0;
-  delay=SuspendTime << 2;
-  state=UpdateConfigurationState;
   list_context.display=display;
   list_context.windows=windows;
   list_context.window_info=window_info;
@@ -13480,7 +13488,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   list_context.width=width;
   list_context.reply=reply;
   list_context.query=query;
-  RespondToListBrowserEvents(&list_context,&targets,&list_widgets);
+  RunListBrowser(&list_context,&mask);
   WithdrawListBrowserWidget(display,windows,window_info);
 }
 
