@@ -158,6 +158,27 @@ static double GetSiPrefixExponent(const char *q)
 %      after the last character used in the conversion.
 %
 */
+static void ApplySiPrefix(double *value,char **q)
+{
+  double
+    e;
+
+  e=GetSiPrefixExponent(*q);
+  if (e >= MagickEpsilon)
+    {
+      if ((*q)[1] == 'i')
+        {
+          *value*=pow(2.0,e/0.3);
+          *q+=(ptrdiff_t) 2;
+        }
+      else
+        {
+          *value*=pow(10.0,e);
+          (*q)++;
+        }
+    }
+}
+
 MagickExport double InterpretSiPrefixValue(const char *magick_restrict string,
   char **magick_restrict sentinel)
 {
@@ -171,25 +192,7 @@ MagickExport double InterpretSiPrefixValue(const char *magick_restrict string,
   if (q != string)
     {
       if ((*q >= 'E') && (*q <= 'z'))
-        {
-          double
-            e;
-
-          e=GetSiPrefixExponent(q);
-          if (e >= MagickEpsilon)
-            {
-              if (q[1] == 'i')
-                {
-                  value*=pow(2.0,e/0.3);
-                  q+=(ptrdiff_t) 2;
-                }
-              else
-                {
-                  value*=pow(10.0,e);
-                  q++;
-                }
-            }
-        }
+        ApplySiPrefix(&value,&q);
       if ((*q == 'B') || (*q == 'P'))
         q++;
     }
