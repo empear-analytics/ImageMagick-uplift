@@ -15223,6 +15223,151 @@ Lane: b
 
 ---
 
+## Recipe CK - Extract the Cases of a Loop's Switch Through Copies of the Caller's Locals
+
+**Use when:** CodeScene reports *Deep, Nested Complexity* or *Bumpy Road Ahead* on a
+function whose loop body is a `switch`, each of whose groups reads and writes the same
+handful of the loop's state variables, uses a function-local macro whose text names one
+of them, and leaves the function on failure through `return(c);` of one constant, as
+`draw.c`'s `TracePath` does: each path command (`'a'`, `'c'`, `'H'`, ... `'z'`) parses
+its coordinates in a `do ... while` loop, every token read is followed by
+`ThrowPointExpectedException`, which sets `status=MagickFalse` and `break`s out of that
+`do` loop, and every allocation failure is `return(-1);`. The `do` loop's `if`s inside
+the `switch` inside the `for` hold the depth (5) and the bumps (11), and only a whole
+group can leave, with the macro and its `break` inside it.
+
+**Not covered by:** Recipe CT, whose block contains no `return`, writes two to six
+variables and rewrites each as `(*v)`, which would edit the macro's text; Recipe MB,
+which copies struct locals in and out but takes them one pointer parameter each (at
+most four) and refuses a `return`; Recipe MF, whose macro is a statement macro made a
+function, one use per helper; Recipe RC, whose group returns the caller's value or
+breaks to a constant `return`, and reads no state the caller reads afterwards; Recipe E
+step 7, which takes one written variable; Recipe EX, whose exits are dispatched through
+a result code the caller switches on.
+
+**How:**
+
+1. The `switch (e)` is the body's last statement of a loop outside every OpenMP region,
+   with no `#` line in the groups to move. Each moved group is its labels, one
+   compound block and a closing `break;`, falls into no other group, and holds no
+   `goto`, no `continue` or `break` that leaves it but that closing `break;`, and no
+   `return` but `return(c);` of the one constant `c` (a literal), the same text at
+   every exit. A `break` or `continue` of a loop nested inside the group, the hidden
+   `break` of a macro included, stays as it is.
+2. List the caller's variables the groups name, and the variables named by the text of
+   the macros they use. Each is a plain local of the caller, a parameter, or an array
+   local; the caller takes no address of them but in the struct of step 3. Temporaries
+   (Recipe E step 4: written before read on every path through the group, read by
+   nothing after it, in no other group before being written again) are declared in each
+   helper that uses them, and leave the caller when nothing else there names them.
+3. Directly above the first new function declare `typedef struct _Name { ... } Name;`
+   with one member per remaining variable: a pointer `T *v` to each local of type `T`
+   (`const char **p` for `const char *p`), the pointer value itself for a parameter that
+   is a pointer the groups only read (`MVGInfo *mvg_info`) and for an array (`char
+   *token`, `PointInfo *points`, its element type). The caller declares it once as its
+   last declaration, `const Name name = { ... };`, with the addresses, parameters and
+   array names in member order.
+4. Cut each group's block, its closing `break;` left out, into a `static` function of
+   the caller's return type directly above the caller, `static T Helper(const Name
+   *name)`. Its body: the block's own declarations, then one local per member the
+   block or its macros name, of the variable's exact type and name: `T v =
+   (*name->v);` for a local (the copy in; it may be `const` when the group only
+   reads it), `T *v =
+   name->v;` for a parameter or array; then the temporaries; then the block's
+   statements, unchanged; then, for each local it copied in and did not make `const`,
+   `(*name->v)=v;` (the copy out); then `return(r);` of a constant `r` different from
+   `c` (`0` when `c` is `-1`). Every `return(c);` of the block stays as it is.
+5. The group becomes its labels and `{ if (Helper(&name) == c) return(c); break; }`.
+6. Check by reading: (a) every path through the block that falls out of it reaches the
+   copy out, so the caller's variables receive the final values the block left, and
+   variables it did not write receive the values they held; (b) on a path that ends
+   in `return(c);` the copy out does not run, and the caller returns `c` at once,
+   reading nothing; (c) the macro expansions name the helper's locals, of the same
+   names and types, which start with the caller's values (the copy in); (d) an array
+   is never copied: its element writes land in the caller's array through the same
+   address; (e) each member is the address of a distinct variable.
+7. Run `tools/refactor_guard.py --calls` (each helper `+2`, nothing else moved), the
+   CI and C++ warning checks, and the oracle on the caller's cases. All groups of one
+   `switch` may move in one commit when moving fewer leaves the file below its score
+   (each helper is a new function; the nesting and bumps leave only with the last
+   group).
+
+**Before:**
+
+```c
+      case 'H':
+      case 'h':
+      {
+        do
+        {
+          (void) GetNextToken(p,&p,MagickPathExtent,token);
+          if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+            ThrowPointExpectedException(token,exception);
+          ...
+          point.x=(double) (attribute == (int) 'H' ? x: point.x+x);
+          if (CheckPrimitiveExtent(mvg_info,PrimitiveExtentPad) == MagickFalse)
+            return(-1);
+          ...
+        } while (IsValidPoint(p) != MagickFalse);
+        break;
+      }
+```
+
+**After:**
+
+```c
+static ssize_t TracePathHorizontalLine(const PathTrace *trace)
+{
+  ...
+  MagickBooleanType
+    status = (*trace->status);
+
+  PointInfo
+    point = (*trace->point);
+  ...
+  do
+  {
+    ... (unchanged)
+  } while (IsValidPoint(p) != MagickFalse);
+  (*trace->p)=p;
+  (*trace->q)=q;
+  (*trace->point)=point;
+  (*trace->status)=status;
+  return(0);
+}
+  ...
+      case 'H':
+      case 'h':
+      {
+        if (TracePathHorizontalLine(&trace) == -1)
+          return(-1);
+        break;
+      }
+```
+
+**Careful:**
+
+- The copy in and copy out are Recipe MB's pass-by-value-result: correct because no
+  other access reaches the caller's variables while the helper runs (step 6 (e)).
+- A variable written by one group and read by a later iteration's group (`points`,
+  `end`, `start` in `TracePath`) is state, not a temporary: it goes by the struct.
+- A value `r` equal to `c` would make the caller return on success: step 4 forbids it.
+- An error the macro throws with `GetMagickModule()` now names the helper (owner,
+  2026-11-12), its text unchanged.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, `ci_warnings.sh`,
+`cxx_warnings.sh`, and step 6 checked by reading.
+
+**Provenance:** 2026-11-13, from `draw.c`'s `TracePath` (campaign B, lane c round 5):
+ten path-command groups, each holding `ThrowPointExpectedException` (which names
+`status`) and `return(-1);`; earlier passes stopped at the macro. Probe 2.68 to 2.79
+with all ten moved (TracePath leaves *Deep, Nested Complexity* and *Bumpy Road* drops to
+3; the one-time *Number of Functions in a Single Module* is paid inside the step).
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -15577,3 +15722,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | KC | Step 1: a label may be a character constant (type `int`; `key` of type `int`); Lane: b | `string-si.c`'s `GetSiPrefixExponent` (twenty-four letter labels each assigning a `double` exponent, cc 26; probe 8.50 to 9.09) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | RS | Extract a Loop Body of Status-Call Exits, Returning the Calls' Status: a sequential loop's whole body whose exits are `continue;` and `return(c);` after status calls moves as in Recipe CR (b), and in the new function each `if (H(...) == MagickFalse) return(MagickFalse); return(MagickTrue);` pair becomes `return(H(...));` when `H` returns only `MagickTrue` or `MagickFalse`; evidence oracle | `token.c`'s `Tokenizer` (cc 15, three bumps after Recipe Y); CR alone keeps the bumps in the new function | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | B | Existing input struct: when every caller binds the group's arguments as `const` locals from one Recipe N input struct, the group may become that struct's pointer instead of a new struct (members the group lacks are allowed); the callers' bindings left unused are deleted | `token-next.c`'s `AppendTokenChar(token,extent,p,i)`, called only from the `Scan*Token` helpers that bind `token` and `extent` from `NextTokenInput`: *String Heavy Function Arguments* leaves the file, 9.09 to 9.38 in a probe | mandate (2026-10-24) |
+| 2026-11-13 | NEW | CK | Extract the Cases of a Loop's Switch Through Copies of the Caller's Locals: each group (its block, a macro naming the caller's `status` and `return(c);` exits inside) moves to a helper taking one `const` struct of the state's addresses, copying the locals in and out (Recipe MB's form) and returning a constant other than `c`; the caller writes `if (Helper(&name) == c) return(c); break;`; evidence oracle; Lane: c | `draw.c`'s `TracePath` (ten path-command groups with `ThrowPointExpectedException` and `return(-1);`; probe 2.68 to 2.79) | mandate (2026-10-24) |
