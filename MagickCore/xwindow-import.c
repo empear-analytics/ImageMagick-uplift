@@ -1078,6 +1078,24 @@ static MagickBooleanType XImportWindowImage(const WindowImageSource *source)
   return(MagickTrue);
 }
 
+static void XRelinquishColormapInfo(ColormapInfo **colormap_info)
+{
+  ColormapInfo
+    *next;
+
+  /*
+    Relinquish resources.
+  */
+  while ((*colormap_info) != (ColormapInfo *) NULL)
+  {
+    next=(*colormap_info)->next;
+    (*colormap_info)->colors=(XColor *) RelinquishMagickMemory(
+      (*colormap_info)->colors);
+    (*colormap_info)=(ColormapInfo *) RelinquishMagickMemory((*colormap_info));
+    (*colormap_info)=next;
+  }
+}
+
 static void XImportChildWindows(const WindowImageContext child_context,
   Window *children,const unsigned int number_children,const unsigned int level)
 {
@@ -1275,9 +1293,6 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
       CacheView
         *composite_view;
 
-      ColormapInfo
-        *next;
-
       Image
         *composite_image,
         *image;
@@ -1378,17 +1393,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
           (ssize_t) x_offset,(ssize_t) y_offset,exception);
         composite_image=DestroyImage(composite_image);
       }
-      /*
-        Relinquish resources.
-      */
-      while (colormap_info != (ColormapInfo *) NULL)
-      {
-        next=colormap_info->next;
-        colormap_info->colors=(XColor *) RelinquishMagickMemory(
-          colormap_info->colors);
-        colormap_info=(ColormapInfo *) RelinquishMagickMemory(colormap_info);
-        colormap_info=next;
-      }
+      XRelinquishColormapInfo(&colormap_info);
       /*
         Relinquish resources and restore initial state.
       */
