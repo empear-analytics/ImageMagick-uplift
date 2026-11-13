@@ -300,6 +300,18 @@ static MagickBooleanType IsMagicCacheInstantiated(void)
   return(magic_cache != (LinkedListInfo *) NULL ? MagickTrue : MagickFalse);
 }
 
+static void FindMagicElement(const unsigned char *magic,const size_t length,
+  ElementInfo **p,const MagicInfo **magic_info)
+{
+  while ((*p) != (ElementInfo *) NULL)
+  {
+    (*magic_info)=(const MagicInfo *) (*p)->value;
+    if (CompareMagic(magic,length,(*magic_info)) != MagickFalse)
+      break;
+    (*p)=(*p)->next;
+  }
+}
+
 MagickExport const MagicInfo *GetMagicInfo(const unsigned char *magic,
   const size_t length,ExceptionInfo *exception)
 {
@@ -322,13 +334,7 @@ MagickExport const MagicInfo *GetMagicInfo(const unsigned char *magic,
     {
       LockSemaphoreInfo(magic_cache_semaphore);
       p=GetHeadElementInLinkedList(magic_cache);
-      while (p != (ElementInfo *) NULL)
-      {
-        magic_info=(const MagicInfo *) p->value;
-        if (CompareMagic(magic,length,magic_info) != MagickFalse)
-          break;
-        p=p->next;
-      }
+      FindMagicElement(magic,length,&p,&magic_info);
       UnlockSemaphoreInfo(magic_cache_semaphore);
       if (p != (ElementInfo *) NULL)
         return(magic_info);
@@ -345,13 +351,7 @@ MagickExport const MagicInfo *GetMagicInfo(const unsigned char *magic,
         magic_info=(const MagicInfo *) p->value;
       return(magic_info);
     }
-  while (p != (ElementInfo *) NULL)
-  {
-    magic_info=(const MagicInfo *) p->value;
-    if (CompareMagic(magic,length,magic_info) != MagickFalse)
-      break;
-    p=p->next;
-  }
+  FindMagicElement(magic,length,&p,&magic_info);
   UnlockSemaphoreInfo(magic_list_semaphore);
   if (p == (ElementInfo *) NULL)
     magic_info=(const MagicInfo *) NULL;
