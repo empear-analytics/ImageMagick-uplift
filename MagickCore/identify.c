@@ -724,6 +724,30 @@ static void PrintImageProperties(FILE *file,Image *image,
     }
 }
 
+static void PrintRGBChannelMoments(const Image *image,
+  const ChannelMomentsReport *report)
+{
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,RedPixelChannel,"Red");
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,GreenPixelChannel,"Green");
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,BluePixelChannel,"Blue");
+}
+
+static void PrintCMYKChannelMoments(const Image *image,
+  const ChannelMomentsReport *report)
+{
+  if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,CyanPixelChannel,"Cyan");
+  if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,MagentaPixelChannel,"Magenta");
+  if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,YellowPixelChannel,"Yellow");
+  if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,BlackPixelChannel,"Black");
+}
+
 static void PrintChannelMomentsTable(FILE *file,const Image *image,
   const ColorspaceType colorspace,ChannelMoments *channel_moments)
 {
@@ -746,24 +770,12 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
     case RGBColorspace:
     case sRGBColorspace:
     {
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,RedPixelChannel,"Red");
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,GreenPixelChannel,"Green");
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,BluePixelChannel,"Blue");
+      PrintRGBChannelMoments(image,&report);
       break;
     }
     case CMYKColorspace:
     {
-      if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,CyanPixelChannel,"Cyan");
-      if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,MagentaPixelChannel,"Magenta");
-      if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,YellowPixelChannel,"Yellow");
-      if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,BlackPixelChannel,"Black");
+      PrintCMYKChannelMoments(image,&report);
       break;
     }
     case GRAYColorspace:
