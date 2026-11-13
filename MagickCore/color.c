@@ -2663,6 +2663,17 @@ static void StripColorspaceAlphaSuffix(char *colorspace,const ssize_t i,
     }
 }
 
+static void SetQueriedColorspace(PixelInfo *color,const ssize_t type,
+  const MagickBooleanType icc_color)
+{
+  color->colorspace=(ColorspaceType) type;
+  if ((icc_color == MagickFalse) && (color->colorspace == RGBColorspace))
+    {
+      color->colorspace=sRGBColorspace;  /* as required by SVG standard */
+      color->depth=8;
+    }
+}
+
 static MagickBooleanType QueryColorFunction(const char *name,
   const char *q,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2707,12 +2718,7 @@ static MagickBooleanType QueryColorFunction(const char *name,
         OptionWarning,"UnrecognizedColor","`%s'",name);
       return(MagickFalse);
     }
-  color->colorspace=(ColorspaceType) type;
-  if ((icc_color == MagickFalse) && (color->colorspace == RGBColorspace))
-    {
-      color->colorspace=sRGBColorspace;  /* as required by SVG standard */
-      color->depth=8;
-    }
+  SetQueriedColorspace(color,type,icc_color);
   if (i >= (ssize_t) strlen(name))
     flags=ParseCSSColor(name,&geometry_info);
   else
