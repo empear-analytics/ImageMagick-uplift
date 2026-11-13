@@ -1025,14 +1025,25 @@ static inline MagickBooleanType IsColorNameCompliant(const ColorInfo *color,
     (LocaleCompare(colorname,color->name) == 0)) ? MagickTrue : MagickFalse);
 }
 
+static void StripColorNameWhitespace(char *colorname)
+{
+  char
+    *q;
+
+  for (q=colorname; *q != '\0'; q++)
+  {
+    if (isspace((int) ((unsigned char) *q)) == 0)
+      continue;
+    (void) CopyMagickString(q,q+1,MagickPathExtent);
+    q--;
+  }
+}
+
 MagickExport const ColorInfo *GetColorCompliance(const char *name,
   const ComplianceType compliance,ExceptionInfo *exception)
 {
   char
     colorname[MagickPathExtent];
-
-  char
-    *q;
 
   const ColorInfo
     *color;
@@ -1049,13 +1060,7 @@ MagickExport const ColorInfo *GetColorCompliance(const char *name,
   *colorname='\0';
   if (name != (const char *) NULL)
     (void) CopyMagickString(colorname,name,MagickPathExtent);
-  for (q=colorname; *q != '\0'; q++)
-  {
-    if (isspace((int) ((unsigned char) *q)) == 0)
-      continue;
-    (void) CopyMagickString(q,q+1,MagickPathExtent);
-    q--;
-  }
+  StripColorNameWhitespace(colorname);
   /*
     Search for color tag.
   */
