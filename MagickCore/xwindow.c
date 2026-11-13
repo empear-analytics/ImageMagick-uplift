@@ -7537,6 +7537,24 @@ static void XShowMagnifyPixelColor(Display *display,XWindows *windows,
     windows->magnify.annotate_context,x,y,tuple,(int) strlen(tuple));
 }
 
+static int XGetMagnifyPixmapX(const XWindows *windows,const XImage *ximage,
+  const unsigned int width,const unsigned int magnify)
+{
+  int
+    x;
+
+  x=windows->magnify.x-(int) ((width/magnify) >> 1);
+  if (x < 0)
+    x=((int) (width >> 1)-windows->magnify.x*(int) magnify);
+  else
+    if (x > (ximage->width-(int) (width/magnify)))
+      x=(int) ((ximage->width-windows->magnify.x)*(int) magnify-(int)
+        (width >> 1));
+    else
+      x=0;
+  return(x);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7735,15 +7753,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   /*
     Copy X image to magnify pixmap.
   */
-  x=windows->magnify.x-(int) ((width/magnify) >> 1);
-  if (x < 0)
-    x=((int) (width >> 1)-windows->magnify.x*(int) magnify);
-  else
-    if (x > (ximage->width-(int) (width/magnify)))
-      x=(int) ((ximage->width-windows->magnify.x)*(int) magnify-(int)
-        (width >> 1));
-    else
-      x=0;
+  x=XGetMagnifyPixmapX(windows,ximage,width,magnify);
   y=windows->magnify.y-(int) ((height/magnify) >> 1);
   if (y < 0)
     y=((int) (height >> 1)-windows->magnify.y*(int) magnify);
