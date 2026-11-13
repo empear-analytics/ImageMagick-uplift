@@ -2567,6 +2567,20 @@ static double GetFuzzyHueDistance(const PixelInfo *p,double pixel)
   return(pixel);
 }
 
+static double GetFuzzyAlpha(const PixelInfo *p)
+{
+  if (p->alpha_trait != UndefinedPixelTrait)
+    return(p->alpha);
+  return((double) OpaqueAlpha);
+}
+
+static double GetFuzzyAlphaScale(const PixelInfo *p)
+{
+  if (p->alpha_trait != UndefinedPixelTrait)
+    return(QuantumScale*p->alpha);
+  return(1.0);
+}
+
 MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
   const PixelInfo *q)
 {
@@ -2585,9 +2599,7 @@ MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
       /*
         Transparencies are involved - set alpha distance.
       */
-      pixel=(p->alpha_trait != UndefinedPixelTrait ? p->alpha :
-        (double) OpaqueAlpha)-(q->alpha_trait != UndefinedPixelTrait ?
-        q->alpha : (double) OpaqueAlpha);
+      pixel=GetFuzzyAlpha(p)-GetFuzzyAlpha(q);
       distance=pixel*pixel;
       if (MagickSafeSignificantError(distance,fuzz) != MagickFalse)
         return(MagickFalse);
@@ -2595,10 +2607,8 @@ MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
         Generate a alpha scaling factor to generate a 4D cone on colorspace.
         If one color is transparent, distance has no color component.
       */
-      if (p->alpha_trait != UndefinedPixelTrait)
-        scale=(QuantumScale*p->alpha);
-      if (q->alpha_trait != UndefinedPixelTrait)
-        scale*=(QuantumScale*q->alpha);
+      scale=GetFuzzyAlphaScale(p);
+      scale*=GetFuzzyAlphaScale(q);
       if (scale <= MagickEpsilon)
         return(MagickTrue);
     }
