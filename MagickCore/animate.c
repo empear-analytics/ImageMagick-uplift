@@ -1348,6 +1348,58 @@ static void XCreateScenePixmap(const AnimateBackgroundSetup *setup,
     (void) XClearWindow(display,(*window_info).id);
 }
 
+static void XRunBackgroundAnimation(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  Display
+    *const display = setup->display;
+
+  Image
+    **const image_list = setup->image_list;
+
+  int
+    scene;
+
+  size_t
+    delay;
+
+  ssize_t
+    iterations;
+
+  XEvent
+    event;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (void) XSelectInput(display,(*window_info).id,SubstructureNotifyMask);
+  event.type=Expose;
+  iterations=0;
+  do
+  {
+    for (scene=0; scene < (int) setup->number_scenes; scene++)
+    {
+      if (XNextBackgroundEvent(display,&event) == MagickFalse)
+        break;
+      (*window_info).pixmap=(*window_info).pixmaps[scene];
+      (*window_info).matte_pixmap=(*window_info).matte_pixmaps[scene];
+      (void) XSetWindowBackgroundPixmap(display,(*window_info).id,
+        (*window_info).pixmap);
+      (void) XClearWindow(display,(*window_info).id);
+      (void) XSync(display,MagickFalse);
+      delay=1000*image_list[scene]->delay/(size_t) MagickMax(
+        image_list[scene]->ticks_per_second,1L);
+      XDelay(display,(*resources).delay*(delay == 0 ? 10 : delay));
+    }
+    iterations++;
+    if (iterations == (ssize_t) image_list[0]->iterations)
+      break;
+  } while (event.type != DestroyNotify);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1369,9 +1421,6 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     delay,
     number_scenes;
 
-  ssize_t
-    iterations;
-
   static XPixelInfo
     pixel;
 
@@ -1390,9 +1439,6 @@ MagickExport void XAnimateBackgroundImage(Display *display,
 
   Window
     root_window;
-
-  XEvent
-    event;
 
   XGCValues
     context_values;
@@ -1571,29 +1617,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   /*
     Display pixmap on the window.
   */
-  (void) XSelectInput(display,window_info.id,SubstructureNotifyMask);
-  event.type=Expose;
-  iterations=0;
-  do
-  {
-    for (scene=0; scene < (int) number_scenes; scene++)
-    {
-      if (XNextBackgroundEvent(display,&event) == MagickFalse)
-        break;
-      window_info.pixmap=window_info.pixmaps[scene];
-      window_info.matte_pixmap=window_info.matte_pixmaps[scene];
-      (void) XSetWindowBackgroundPixmap(display,window_info.id,
-        window_info.pixmap);
-      (void) XClearWindow(display,window_info.id);
-      (void) XSync(display,MagickFalse);
-      delay=1000*image_list[scene]->delay/(size_t) MagickMax(
-        image_list[scene]->ticks_per_second,1L);
-      XDelay(display,resources.delay*(delay == 0 ? 10 : delay));
-    }
-    iterations++;
-    if (iterations == (ssize_t) image_list[0]->iterations)
-      break;
-  } while (event.type != DestroyNotify);
+  XRunBackgroundAnimation(&setup,&targets);
   (void) XSync(display,MagickFalse);
   image_list=(Image **) RelinquishMagickMemory(image_list);
   images=DestroyImageList(images);
