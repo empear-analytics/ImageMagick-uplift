@@ -4634,6 +4634,55 @@ static void XColorEditRelease(const ColorEditContext *context,
   (*state)&=(size_t) (~UpdateConfigurationState);
 }
 
+static void XColorEditKey(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  char
+    command[MagickPathExtent];
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  KeySym
+    key_symbol;
+
+  XDiscardMagnifyKeys(context->display,context->windows,event);
+  if ((*event).xkey.window != context->windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,"Help Viewer - Image Annotation",ImageColorEditHelp);
+      break;
+    }
+    default:
+    {
+      (void) XBell(context->display,0);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -4759,41 +4808,7 @@ static MagickBooleanType XColorEditImage(Display *display,
         break;
       case KeyPress:
       {
-        KeySym
-          key_symbol;
-
-        XDiscardMagnifyKeys(display,windows,&event);
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Annotation",ImageColorEditHelp);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
+        XColorEditKey(&context,&targets);
         break;
       }
       case MotionNotify:
