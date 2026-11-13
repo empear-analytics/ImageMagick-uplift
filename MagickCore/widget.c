@@ -15001,6 +15001,17 @@ typedef struct _PreferencesWidgets
     *cache;
   XWidgetInfo
     *preferences_info;
+  XWidgetInfo
+    *cancel_info;
+
+  XWidgetInfo
+    *apply_info;
+
+  unsigned int
+    *width;
+
+  size_t
+    *state;
 } PreferencesWidgets;
 
 typedef struct _PreferencesContext
@@ -15010,6 +15021,11 @@ typedef struct _PreferencesContext
 
   XFontStruct
     *font_info;
+  XWindows
+    *windows;
+
+  unsigned int
+    height;
 } PreferencesContext;
 
 static void InitializePreferencesCache(const PreferencesContext *context,
@@ -15059,6 +15075,71 @@ static void SetPreferencesRaised(const PreferencesContext *context,
   preferences_info[7].raised=resource_info->use_pixmap == MagickFalse;
 }
 
+static void UpdatePreferencesButtons(const PreferencesContext *context,
+  const PreferencesWidgets *widgets)
+{
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  XWidgetInfo
+    *const preferences_info = widgets->preferences_info;
+
+  unsigned int
+    *const width = widgets->width;
+
+  size_t
+    *const state = widgets->state;
+
+  int
+    i,
+    y;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      /*
+        Initialize button information.
+      */
+      XGetWidgetInfo(CancelButtonText,cancel_info);
+      (*cancel_info).width=(*width);
+      (*cancel_info).height=(unsigned int) (3*height) >> 1;
+      (*cancel_info).x=(int) windows->widget.width-(int) (*cancel_info).width-
+        (QuantumMargin << 1);
+      (*cancel_info).y=(int) windows->widget.height-(int) (*cancel_info).height-
+        QuantumMargin;
+      XGetWidgetInfo(ApplyButtonText,apply_info);
+      (*apply_info).width=(*width);
+      (*apply_info).height=(unsigned int) (3*height) >> 1;
+      (*apply_info).x=QuantumMargin << 1;
+      (*apply_info).y=(*cancel_info).y;
+      y=(int) (height << 1);
+      for (i=0; i < NumberPreferences; i++)
+      {
+        XGetWidgetInfo(Preferences[i],&preferences_info[i]);
+        preferences_info[i].bevel_width--;
+        preferences_info[i].width=(unsigned int) QuantumMargin >> 1;
+        preferences_info[i].height=(unsigned int) QuantumMargin >> 1;
+        preferences_info[i].x=QuantumMargin << 1;
+        preferences_info[i].y=y;
+        y+=(int) height+(QuantumMargin >> 1);
+      }
+      SetPreferencesRaised(context,widgets);
+      InitializePreferencesCache(context,widgets,y);
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15093,7 +15174,8 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
     preferences_info[NumberPreferences];
 
   const PreferencesWidgets
-    widgets = { &cache_info, &cache[0], &preferences_info[0] };
+    widgets = { &cache_info, &cache[0], &preferences_info[0], &cancel_info,
+      &apply_info, &width, &state };
 
   PreferencesContext
     context;
@@ -15128,40 +15210,11 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XSetCursorState(display,windows,MagickTrue);
   context.resource_info=resource_info;
   context.font_info=font_info;
+  context.windows=windows;
+  context.height=height;
   do
   {
-    if (state & UpdateConfigurationState)
-      {
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(CancelButtonText,&cancel_info);
-        cancel_info.width=width;
-        cancel_info.height=(unsigned int) (3*height) >> 1;
-        cancel_info.x=(int) windows->widget.width-(int) cancel_info.width-
-          (QuantumMargin << 1);
-        cancel_info.y=(int) windows->widget.height-(int) cancel_info.height-
-          QuantumMargin;
-        XGetWidgetInfo(ApplyButtonText,&apply_info);
-        apply_info.width=width;
-        apply_info.height=(unsigned int) (3*height) >> 1;
-        apply_info.x=QuantumMargin << 1;
-        apply_info.y=cancel_info.y;
-        y=(int) (height << 1);
-        for (i=0; i < NumberPreferences; i++)
-        {
-          XGetWidgetInfo(Preferences[i],&preferences_info[i]);
-          preferences_info[i].bevel_width--;
-          preferences_info[i].width=(unsigned int) QuantumMargin >> 1;
-          preferences_info[i].height=(unsigned int) QuantumMargin >> 1;
-          preferences_info[i].x=QuantumMargin << 1;
-          preferences_info[i].y=y;
-          y+=(int) height+(QuantumMargin >> 1);
-        }
-        SetPreferencesRaised(&context,&widgets);
-        InitializePreferencesCache(&context,&widgets,y);
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
+    UpdatePreferencesButtons(&context,&widgets);
     if (state & RedrawWidgetState)
       {
         /*
