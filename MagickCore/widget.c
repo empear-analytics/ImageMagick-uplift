@@ -8687,6 +8687,16 @@ static void RespondToFileBrowserEvents(const FileBrowserContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
+static unsigned int GetFileBrowserAnomaly(const char *action)
+{
+  unsigned int
+    anomaly;
+
+  anomaly=(LocaleCompare(action,"Composite") == 0) ||
+    (LocaleCompare(action,"Open") == 0) || (LocaleCompare(action,"Map") == 0);
+  return(anomaly);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8810,8 +8820,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   XGetWidgetInfo((char *) NULL,&south_info);
   XGetWidgetInfo((char *) NULL,&expose_info);
   visible_files=0;
-  anomaly=(LocaleCompare(action,"Composite") == 0) ||
-    (LocaleCompare(action,"Open") == 0) || (LocaleCompare(action,"Map") == 0);
+  anomaly=GetFileBrowserAnomaly(action);
   delay=SuspendTime << 2;
   state=UpdateConfigurationState;
   file_context.display=display;
