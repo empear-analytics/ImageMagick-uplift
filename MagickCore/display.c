@@ -6923,6 +6923,17 @@ static MagickBooleanType XCropCopyImage(const CropContext *context,Image *image,
   return(MagickTrue);
 }
 
+static void XCropSelectArea(const CropContext *context,
+  const CropTargets *targets)
+{
+  (void) XSetFunction(context->display,
+    context->windows->image.highlight_context,GXinvert);
+  XCropSelectRegion(context,targets);
+  (void) XSetFunction(context->display,
+    context->windows->image.highlight_context,GXcopy);
+  XSetCursorState(context->display,context->windows,MagickFalse);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -7027,10 +7038,7 @@ static MagickBooleanType XCropImage(Display *display,
       (void) XFreeCursor(display,cursor);
       return(MagickTrue);
     }
-  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-  XCropSelectRegion(&context,&targets);
-  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-  XSetCursorState(display,windows,MagickFalse);
+  XCropSelectArea(&context,&targets);
   if ((state & EscapeState) != 0)
     return(MagickTrue);
   if (mode == CropMode)
