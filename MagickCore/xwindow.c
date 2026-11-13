@@ -1923,6 +1923,22 @@ static void AcquireDitherMaps(unsigned char *red_map[2][16],
     }
 }
 
+static void RelinquishDitherMaps(unsigned char *red_map[2][16],
+  unsigned char *green_map[2][16],unsigned char *blue_map[2][16])
+{
+  int
+    i,
+    j;
+
+  for (i=0; i < 2; i++)
+    for (j=0; j < 16; j++)
+    {
+      green_map[i][j]=(unsigned char *) RelinquishMagickMemory(green_map[i][j]);
+      blue_map[i][j]=(unsigned char *) RelinquishMagickMemory(blue_map[i][j]);
+      red_map[i][j]=(unsigned char *) RelinquishMagickMemory(red_map[i][j]);
+    }
+}
+
 static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
 {
   static const short int
@@ -2040,13 +2056,7 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   /*
     Free allocated memory.
   */
-  for (i=0; i < 2; i++)
-    for (j=0; j < 16; j++)
-    {
-      green_map[i][j]=(unsigned char *) RelinquishMagickMemory(green_map[i][j]);
-      blue_map[i][j]=(unsigned char *) RelinquishMagickMemory(blue_map[i][j]);
-      red_map[i][j]=(unsigned char *) RelinquishMagickMemory(red_map[i][j]);
-    }
+  RelinquishDitherMaps(red_map,green_map,blue_map);
 }
 
 /*
