@@ -561,6 +561,80 @@ static MagickBooleanType GrowPolygonEdges(PolygonInfo *polygon_info,
   return(MagickTrue);
 }
 
+typedef struct _PolygonEdgeInput
+{
+  ssize_t
+    n;
+
+  long
+    direction;
+
+  SegmentInfo
+    bounds;
+} PolygonEdgeInput;
+
+typedef struct _PolygonEdgeTargets
+{
+  size_t
+    *number_edges;
+
+  PointInfo
+    **points;
+
+  MagickBooleanType
+    *ghostline;
+
+  size_t
+    *edge;
+} PolygonEdgeTargets;
+
+static MagickBooleanType FlushSubpathEdge(PolygonInfo *polygon_info,
+  const PolygonEdgeInput *input,const PolygonEdgeTargets *targets)
+{
+  size_t
+    *const number_edges = targets->number_edges;
+
+  PointInfo
+    **const points = targets->points;
+
+  MagickBooleanType
+    *const ghostline = targets->ghostline;
+
+  size_t
+    *const edge = targets->edge;
+
+  const ssize_t
+    n = input->n;
+
+  const long
+    direction = input->direction;
+
+  const SegmentInfo
+    bounds = input->bounds;
+
+  if (((*points) != (PointInfo *) NULL) && (n >= 2))
+    {
+      if (GrowPolygonEdges(polygon_info,(*edge),number_edges) == MagickFalse)
+        return(MagickFalse);
+      polygon_info->edges[(*edge)].number_points=(size_t) n;
+      polygon_info->edges[(*edge)].scanline=(-1.0);
+      polygon_info->edges[(*edge)].highwater=0;
+      polygon_info->edges[(*edge)].ghostline=(*ghostline);
+      polygon_info->edges[(*edge)].direction=(ssize_t) (direction > 0);
+      if (direction < 0)
+        ReversePoints((*points),(size_t) n);
+      polygon_info->edges[(*edge)].points=(*points);
+      polygon_info->edges[(*edge)].bounds=bounds;
+      polygon_info->edges[(*edge)].bounds.y1=(*points)[0].y;
+      polygon_info->edges[(*edge)].bounds.y2=(*points)[n-1].y;
+      (*points)=(PointInfo *) NULL;
+      (*ghostline)=MagickFalse;
+      (*edge)++;
+      polygon_info->number_edges=(*edge);
+    }
+  return(MagickTrue);
+}
+
 static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   ExceptionInfo *exception)
 {
@@ -589,6 +663,12 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
     edge,
     number_edges,
     number_points;
+
+  PolygonEdgeInput
+    input;
+
+  const PolygonEdgeTargets
+    targets = { &number_edges, &points, &ghostline, &edge };
 
   /*
     Convert a path to the more efficient sorted rendering form.
@@ -634,30 +714,15 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
         /*
           Move to.
         */
-        if ((points != (PointInfo *) NULL) && (n >= 2))
+        input.n=n;
+        input.direction=direction;
+        input.bounds=bounds;
+        if (FlushSubpathEdge(polygon_info,&input,&targets) == MagickFalse)
           {
-            if (GrowPolygonEdges(polygon_info,edge,&number_edges) == MagickFalse)
-              {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-                points=(PointInfo *) RelinquishMagickMemory(points);
-                return(DestroyPolygonInfo(polygon_info));
-              }
-            polygon_info->edges[edge].number_points=(size_t) n;
-            polygon_info->edges[edge].scanline=(-1.0);
-            polygon_info->edges[edge].highwater=0;
-            polygon_info->edges[edge].ghostline=ghostline;
-            polygon_info->edges[edge].direction=(ssize_t) (direction > 0);
-            if (direction < 0)
-              ReversePoints(points,(size_t) n);
-            polygon_info->edges[edge].points=points;
-            polygon_info->edges[edge].bounds=bounds;
-            polygon_info->edges[edge].bounds.y1=points[0].y;
-            polygon_info->edges[edge].bounds.y2=points[n-1].y;
-            points=(PointInfo *) NULL;
-            ghostline=MagickFalse;
-            edge++;
-            polygon_info->number_edges=edge;
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+            points=(PointInfo *) RelinquishMagickMemory(points);
+            return(DestroyPolygonInfo(polygon_info));
           }
         if (points == (PointInfo *) NULL)
           {
