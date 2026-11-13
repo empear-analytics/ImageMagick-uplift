@@ -375,6 +375,51 @@ static void XRestrictVisualByScreen(Display *display,
       (*visual_mask)|=VisualDepthMask;
 }
 
+typedef struct _StandardColormapSearch
+{
+  XVisualInfo
+    *visual_list;
+
+  XStandardColormap
+    *map_list;
+
+  char
+    *map_type;
+
+  int
+    number_maps,
+    number_visuals;
+} StandardColormapSearch;
+
+static MagickBooleanType XMatchStandardColormap(
+  const StandardColormapSearch *search,XVisualInfo *visual_template,
+  XStandardColormap *map_info)
+{
+  int
+    i,
+    j;
+
+  (*visual_template).visualid=XVisualIDFromVisual(
+    search->visual_list[0].visual);
+  for (i=0; i < search->number_maps; i++)
+    for (j=0; j < search->number_visuals; j++)
+      if (search->map_list[i].visualid ==
+          XVisualIDFromVisual(search->visual_list[j].visual))
+        {
+          *map_info=search->map_list[i];
+          (*visual_template).visualid=XVisualIDFromVisual(
+            search->visual_list[j].visual);
+          break;
+        }
+  if (map_info->visualid != (*visual_template).visualid)
+    {
+      ThrowXWindowException(XServerError,
+        "UnableToMatchVisualToStandardColormap",search->map_type);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   XStandardColormap *map_info,XResourceInfo *resource_info)
 {
@@ -384,9 +429,6 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
 
   int
     visual_mask;
-
-  int
-    i;
 
   static int
     number_visuals;
@@ -437,7 +479,6 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   if ((map_info != (XStandardColormap *) NULL) && (map_type != (char *) NULL))
     {
       int
-        j,
         number_maps;
 
       Status
@@ -473,23 +514,15 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
       */
       *map_info=map_list[0];
 #if !defined(PRE_R4_ICCCM)
-      visual_template.visualid=XVisualIDFromVisual(visual_list[0].visual);
-      for (i=0; i < number_maps; i++)
-        for (j=0; j < number_visuals; j++)
-          if (map_list[i].visualid ==
-              XVisualIDFromVisual(visual_list[j].visual))
-            {
-              *map_info=map_list[i];
-              visual_template.visualid=XVisualIDFromVisual(
-                visual_list[j].visual);
-              break;
-            }
-      if (map_info->visualid != visual_template.visualid)
-        {
-          ThrowXWindowException(XServerError,
-            "UnableToMatchVisualToStandardColormap",map_type);
+      {
+        const StandardColormapSearch
+          search = { visual_list,map_list,map_type,number_maps,
+            number_visuals };
+
+        if (XMatchStandardColormap(&search,&visual_template,map_info) ==
+            MagickFalse)
           return((XVisualInfo *) NULL);
-        }
+      }
 #endif
       if (map_info->colormap == (Colormap) NULL)
         {
