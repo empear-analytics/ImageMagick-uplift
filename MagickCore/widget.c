@@ -11972,6 +11972,12 @@ typedef struct _ListBrowserWidgets
 
   size_t
     *delay;
+
+  XWidgetInfo
+    *scroll_info;
+
+  unsigned int
+    *visible_entries;
 } ListBrowserWidgets;
 
 typedef struct _ListBrowserContext
@@ -11984,6 +11990,9 @@ typedef struct _ListBrowserContext
 
   XWindowInfo
     *window_info;
+
+  unsigned int
+    entries;
 } ListBrowserContext;
 
 static void ClientListBrowserMessage(const ListBrowserContext *context,
@@ -12101,6 +12110,76 @@ static void ReleaseListBrowserScroll(const ListBrowserContext *context,
     return;
 }
 
+static void PressListBrowserKey(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserTargets *targets,
+  const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  const unsigned int
+    entries = context->entries;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_entries = widgets->visible_entries;
+
+  static char
+    command[MagickPathExtent];
+
+  static int
+    length;
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != window_info->id)
+    return;
+  length=XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if (AreaIsActive((*scroll_info),event.xkey))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=MoveListBrowserSlider((*slider_info),key_symbol,
+        (*visible_entries),entries);
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      ReadListBrowserEntry(display,window_info,(*reply_info),targets);
+      return;
+    }
+  if (key_symbol == XK_Control_L)
+    {
+      (*state)|=ControlState;
+      return;
+    }
+  (*reply_info)=ApplyListBrowserControlKey((*reply_info),key_symbol,(*state));
+  XEditText(display,reply_info,key_symbol,command,(*state));
+  XDrawMatteText(display,window_info,reply_info);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12162,7 +12241,8 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
 
   const ListBrowserWidgets
     list_widgets = { &reply_info, &state, &slider_info, &action_info,
-      &cancel_info, &north_info, &south_info, &delay };
+      &cancel_info, &north_info, &south_info, &delay, &scroll_info,
+      &visible_entries };
 
   ListBrowserContext
     list_context;
@@ -12246,6 +12326,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   list_context.display=display;
   list_context.windows=windows;
   list_context.window_info=window_info;
+  list_context.entries=entries;
   do
   {
     if (state & UpdateConfigurationState)
@@ -12601,46 +12682,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
       }
       case KeyPress:
       {
-        static char
-          command[MagickPathExtent];
-
-        static int
-          length;
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != window_info->id)
-          break;
-        length=XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (AreaIsActive(scroll_info,event.xkey))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=MoveListBrowserSlider(slider_info,key_symbol,
-              visible_entries,entries);
-            state|=RedrawListState;
-            break;
-          }
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            ReadListBrowserEntry(display,window_info,reply_info,&targets);
-            break;
-          }
-        if (key_symbol == XK_Control_L)
-          {
-            state|=ControlState;
-            break;
-          }
-        reply_info=ApplyListBrowserControlKey(reply_info,key_symbol,state);
-        XEditText(display,&reply_info,key_symbol,command,state);
-        XDrawMatteText(display,window_info,&reply_info);
+        PressListBrowserKey(&list_context,event,&targets,&list_widgets);
         break;
       }
       case KeyRelease:
