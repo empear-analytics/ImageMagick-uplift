@@ -9800,6 +9800,274 @@ static void XTrimUndoCache(const XResourceInfo *resource_info,size_t *bytes,
     }
 }
 
+typedef struct _XImageCacheContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+} XImageCacheContext;
+
+static Image *XSaveUndoImage(const XImageCacheContext *cache_context,
+  Image *undo_image)
+{
+  Display
+    *const display = cache_context->display;
+
+  XResourceInfo
+    *const resource_info = cache_context->resource_info;
+
+  XWindows
+    *const windows = cache_context->windows;
+
+  Image
+    **const image = cache_context->image;
+
+  ExceptionInfo
+    *const exception = cache_context->exception;
+
+  Image
+    *cache_image;
+
+  size_t
+    bytes;
+
+  bytes=(*image)->columns*(*image)->rows*sizeof(PixelInfo);
+  XTrimUndoCache(resource_info,&bytes,&undo_image);
+  if (bytes > (resource_info->undo_cache << 20))
+    return(undo_image);
+  /*
+    Save image before transformations are applied.
+  */
+  cache_image=AcquireImage((ImageInfo *) NULL,exception);
+  if (cache_image == (Image *) NULL)
+    return(undo_image);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  cache_image->list=CloneImage(*image,0,0,MagickTrue,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (cache_image->list == (Image *) NULL)
+    {
+      cache_image=DestroyImage(cache_image);
+      return(undo_image);
+    }
+  cache_image->columns=(size_t) windows->image.ximage->width;
+  cache_image->rows=(size_t) windows->image.ximage->height;
+  cache_image->geometry=windows->image.crop_geometry;
+  if (windows->image.crop_geometry != (char *) NULL)
+    {
+      cache_image->geometry=AcquireString((char *) NULL);
+      (void) CopyMagickString(cache_image->geometry,
+        windows->image.crop_geometry,MagickPathExtent);
+    }
+  if (undo_image == (Image *) NULL)
+    {
+      undo_image=cache_image;
+      return(undo_image);
+    }
+  undo_image->next=cache_image;
+  undo_image->next->previous=undo_image;
+  undo_image=undo_image->next;
+  return(undo_image);
+}
+
+static const DisplayCommand
+  UndoCacheCommands[] =
+  {
+    CutCommand,
+    PasteCommand,
+    ApplyCommand,
+    HalfSizeCommand,
+    OriginalSizeCommand,
+    DoubleSizeCommand,
+    ResizeCommand,
+    TrimCommand,
+    CropCommand,
+    ChopCommand,
+    FlipCommand,
+    FlopCommand,
+    RotateRightCommand,
+    RotateLeftCommand,
+    RotateCommand,
+    ShearCommand,
+    RollCommand,
+    NegateCommand,
+    ContrastStretchCommand,
+    SigmoidalContrastCommand,
+    NormalizeCommand,
+    EqualizeCommand,
+    HueCommand,
+    SaturationCommand,
+    BrightnessCommand,
+    GammaCommand,
+    SpiffCommand,
+    DullCommand,
+    GrayscaleCommand,
+    MapCommand,
+    QuantizeCommand,
+    DespeckleCommand,
+    EmbossCommand,
+    ReduceNoiseCommand,
+    AddNoiseCommand,
+    SharpenCommand,
+    BlurCommand,
+    ThresholdCommand,
+    EdgeDetectCommand,
+    SpreadCommand,
+    ShadeCommand,
+    RaiseCommand,
+    SegmentCommand,
+    SolarizeCommand,
+    SepiaToneCommand,
+    SwirlCommand,
+    ImplodeCommand,
+    VignetteCommand,
+    WaveCommand,
+    OilPaintCommand,
+    CharcoalDrawCommand,
+    AnnotateCommand,
+    AddBorderCommand,
+    AddFrameCommand,
+    CompositeCommand,
+    CommentCommand,
+    LaunchCommand,
+    RegionOfInterestCommand,
+    SaveToUndoBufferCommand,
+    RedoCommand
+  };
+
+static MagickBooleanType IsUndoCacheCommand(const DisplayCommand command)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(UndoCacheCommands)/sizeof(*UndoCacheCommands)); i++)
+    if (UndoCacheCommands[i] == command)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
+static void XUndoImageCache(const XImageCacheContext *cache_context,
+  Image **undo_image,Image **redo_image)
+{
+  Display
+    *const display = cache_context->display;
+
+  XResourceInfo
+    *const resource_info = cache_context->resource_info;
+
+  XWindows
+    *const windows = cache_context->windows;
+
+  Image
+    **const image = cache_context->image;
+
+  ExceptionInfo
+    *const exception = cache_context->exception;
+
+  char
+    image_geometry[MagickPathExtent];
+
+  Image
+    *cache_image;
+
+  /*
+    Undo the last image transformation.
+  */
+  if ((*undo_image) == (Image *) NULL)
+    {
+      (void) XBell(display,0);
+      ThrowXWindowException(ImageError,"NoImagesWereFound",
+        (*image)->filename);
+      return;
+    }
+  cache_image=(*undo_image);
+  (*undo_image)=GetPreviousImageInList((*undo_image));
+  windows->image.window_changes.width=(int) cache_image->columns;
+  windows->image.window_changes.height=(int) cache_image->rows;
+  (void) FormatLocaleString(image_geometry,MagickPathExtent,"%dx%d!",
+    windows->image.ximage->width,windows->image.ximage->height);
+  (void) TransformImage(image,windows->image.crop_geometry,image_geometry,
+    exception);
+  if (windows->image.crop_geometry != (char *) NULL)
+    windows->image.crop_geometry=(char *) RelinquishMagickMemory(
+      windows->image.crop_geometry);
+  windows->image.crop_geometry=cache_image->geometry;
+  if ((*redo_image) != (Image *) NULL)
+    (*redo_image)=DestroyImage((*redo_image));
+  (*redo_image)=(*image);
+  *image=cache_image->list;
+  cache_image=DestroyImage(cache_image);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
+  const DisplayCommand command,Image **redo_image,Image *undo_image)
+{
+  Display
+    *const display = cache_context->display;
+
+  XResourceInfo
+    *const resource_info = cache_context->resource_info;
+
+  XWindows
+    *const windows = cache_context->windows;
+
+  Image
+    **const image = cache_context->image;
+
+  ExceptionInfo
+    *const exception = cache_context->exception;
+
+  if (command == RedoCommand)
+    {
+      /*
+        Redo the last image transformation.
+      */
+      if ((*redo_image) == (Image *) NULL)
+        {
+          (void) XBell(display,0);
+          return;
+        }
+      windows->image.window_changes.width=(int) (*redo_image)->columns;
+      windows->image.window_changes.height=(int) (*redo_image)->rows;
+      if (windows->image.crop_geometry != (char *) NULL)
+        windows->image.crop_geometry=(char *)
+          RelinquishMagickMemory(windows->image.crop_geometry);
+      windows->image.crop_geometry=(*redo_image)->geometry;
+      *image=DestroyImage(*image);
+      *image=(*redo_image);
+      (*redo_image)=NewImageList();
+      if (windows->image.orphan != MagickFalse)
+        return;
+      XConfigureImageColormap(display,resource_info,windows,*image,exception);
+      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      return;
+    }
+  if (command != InfoCommand)
+    return;
+  /*
+    Display image info.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  XDisplayImageInfo(display,resource_info,windows,undo_image,*image,exception);
+  XSetCursorState(display,windows,MagickFalse);
+}
+
 static void XImageCache(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -9811,6 +10079,14 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
     *redo_image = (Image *) NULL,
     *undo_image = (Image *) NULL;
 
+  XImageCacheContext
+    cache_context;
+
+  cache_context.display=display;
+  cache_context.resource_info=resource_info;
+  cache_context.windows=windows;
+  cache_context.image=image;
+  cache_context.exception=exception;
   switch (command)
   {
     case FreeBuffersCommand:
@@ -9833,181 +10109,15 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
     }
     case UndoCommand:
     {
-      char
-        image_geometry[MagickPathExtent];
-
-      /*
-        Undo the last image transformation.
-      */
-      if (undo_image == (Image *) NULL)
-        {
-          (void) XBell(display,0);
-          ThrowXWindowException(ImageError,"NoImagesWereFound",
-            (*image)->filename);
-          return;
-        }
-      cache_image=undo_image;
-      undo_image=GetPreviousImageInList(undo_image);
-      windows->image.window_changes.width=(int) cache_image->columns;
-      windows->image.window_changes.height=(int) cache_image->rows;
-      (void) FormatLocaleString(image_geometry,MagickPathExtent,"%dx%d!",
-        windows->image.ximage->width,windows->image.ximage->height);
-      (void) TransformImage(image,windows->image.crop_geometry,image_geometry,
-        exception);
-      if (windows->image.crop_geometry != (char *) NULL)
-        windows->image.crop_geometry=(char *) RelinquishMagickMemory(
-          windows->image.crop_geometry);
-      windows->image.crop_geometry=cache_image->geometry;
-      if (redo_image != (Image *) NULL)
-        redo_image=DestroyImage(redo_image);
-      redo_image=(*image);
-      *image=cache_image->list;
-      cache_image=DestroyImage(cache_image);
-      if (windows->image.orphan != MagickFalse)
-        return;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XUndoImageCache(&cache_context,&undo_image,&redo_image);
       return;
-    }
-    case CutCommand:
-    case PasteCommand:
-    case ApplyCommand:
-    case HalfSizeCommand:
-    case OriginalSizeCommand:
-    case DoubleSizeCommand:
-    case ResizeCommand:
-    case TrimCommand:
-    case CropCommand:
-    case ChopCommand:
-    case FlipCommand:
-    case FlopCommand:
-    case RotateRightCommand:
-    case RotateLeftCommand:
-    case RotateCommand:
-    case ShearCommand:
-    case RollCommand:
-    case NegateCommand:
-    case ContrastStretchCommand:
-    case SigmoidalContrastCommand:
-    case NormalizeCommand:
-    case EqualizeCommand:
-    case HueCommand:
-    case SaturationCommand:
-    case BrightnessCommand:
-    case GammaCommand:
-    case SpiffCommand:
-    case DullCommand:
-    case GrayscaleCommand:
-    case MapCommand:
-    case QuantizeCommand:
-    case DespeckleCommand:
-    case EmbossCommand:
-    case ReduceNoiseCommand:
-    case AddNoiseCommand:
-    case SharpenCommand:
-    case BlurCommand:
-    case ThresholdCommand:
-    case EdgeDetectCommand:
-    case SpreadCommand:
-    case ShadeCommand:
-    case RaiseCommand:
-    case SegmentCommand:
-    case SolarizeCommand:
-    case SepiaToneCommand:
-    case SwirlCommand:
-    case ImplodeCommand:
-    case VignetteCommand:
-    case WaveCommand:
-    case OilPaintCommand:
-    case CharcoalDrawCommand:
-    case AnnotateCommand:
-    case AddBorderCommand:
-    case AddFrameCommand:
-    case CompositeCommand:
-    case CommentCommand:
-    case LaunchCommand:
-    case RegionOfInterestCommand:
-    case SaveToUndoBufferCommand:
-    case RedoCommand:
-    {
-      size_t
-        bytes;
-
-      bytes=(*image)->columns*(*image)->rows*sizeof(PixelInfo);
-      XTrimUndoCache(resource_info,&bytes,&undo_image);
-      if (bytes > (resource_info->undo_cache << 20))
-        break;
-      /*
-        Save image before transformations are applied.
-      */
-      cache_image=AcquireImage((ImageInfo *) NULL,exception);
-      if (cache_image == (Image *) NULL)
-        break;
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      cache_image->list=CloneImage(*image,0,0,MagickTrue,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (cache_image->list == (Image *) NULL)
-        {
-          cache_image=DestroyImage(cache_image);
-          break;
-        }
-      cache_image->columns=(size_t) windows->image.ximage->width;
-      cache_image->rows=(size_t) windows->image.ximage->height;
-      cache_image->geometry=windows->image.crop_geometry;
-      if (windows->image.crop_geometry != (char *) NULL)
-        {
-          cache_image->geometry=AcquireString((char *) NULL);
-          (void) CopyMagickString(cache_image->geometry,
-            windows->image.crop_geometry,MagickPathExtent);
-        }
-      if (undo_image == (Image *) NULL)
-        {
-          undo_image=cache_image;
-          break;
-        }
-      undo_image->next=cache_image;
-      undo_image->next->previous=undo_image;
-      undo_image=undo_image->next;
-      break;
     }
     default:
       break;
   }
-  if (command == RedoCommand)
-    {
-      /*
-        Redo the last image transformation.
-      */
-      if (redo_image == (Image *) NULL)
-        {
-          (void) XBell(display,0);
-          return;
-        }
-      windows->image.window_changes.width=(int) redo_image->columns;
-      windows->image.window_changes.height=(int) redo_image->rows;
-      if (windows->image.crop_geometry != (char *) NULL)
-        windows->image.crop_geometry=(char *)
-          RelinquishMagickMemory(windows->image.crop_geometry);
-      windows->image.crop_geometry=redo_image->geometry;
-      *image=DestroyImage(*image);
-      *image=redo_image;
-      redo_image=NewImageList();
-      if (windows->image.orphan != MagickFalse)
-        return;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
-      return;
-    }
-  if (command != InfoCommand)
-    return;
-  /*
-    Display image info.
-  */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  XDisplayImageInfo(display,resource_info,windows,undo_image,*image,exception);
-  XSetCursorState(display,windows,MagickFalse);
+  if (IsUndoCacheCommand(command) != MagickFalse)
+    undo_image=XSaveUndoImage(&cache_context,undo_image);
+  XRedoOrShowImageCache(&cache_context,command,&redo_image,undo_image);
 }
 
 /*

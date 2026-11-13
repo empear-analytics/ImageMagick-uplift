@@ -8446,6 +8446,16 @@ whole `switch` with the tail of the function.
    its own commit.
 5. Check by script that each site's labels and the function's are the same set, each
    label once, and that each `B` equals the original body but for indentation.
+6. *Fall-out form* (2026-11-13). Besides `G` and `default: break;` the `switch` may hold
+   other groups, each of which ends every path with a `return` (no group falls into or
+   out of another, and no label of `G` stands in one of them); and `B` may instead end
+   with `break;` as its last statement and hold no other `break` of this `switch` (nothing
+   else of step 1 changes: no `continue`, `goto`, `case` label, `#pragma` or preprocessor
+   line). `e` is, besides step 1, a parameter or local that no statement of the `switch`
+   writes. Delete `G` from the `switch`, its labels, `B` and that `break;`, and directly
+   after the `switch`'s closing brace write `if (<Name>(e) != MagickFalse)` followed by
+   `B` without its last `break;`, braced when it holds more than one statement. The other
+   groups and `default: break;` stay as they were; steps 2 and 5 apply unchanged.
 
 **Before:**
 
@@ -8512,6 +8522,21 @@ static MagickBooleanType IsGenericColorspace(const ColorspaceType colorspace)
   `if` runs once it has run, as nothing after the `switch` did.
 - `B` holds no `break` of the `switch` (step 1), which inside an `if` would bind to an
   enclosing loop or not compile.
+- Why the fall-out form (step 6) behaves the same. The `switch` evaluates `e` once and
+  selects by its value, and the groups' label sets are disjoint. A value of `G` ran `B`,
+  whose last `break;` left the `switch` for the statement after it. Now no group matches
+  it, so `default: break;` leaves the `switch` at the same point, having done nothing, and
+  the `if` evaluates `e` again: it has no side effect (step 1) and nothing in the `switch`
+  wrote it (step 6), so the predicate sees the value the `switch` selected on and returns
+  `MagickTrue` (step 5), and `B` runs on the same state as before, its statements in the
+  same order; afterwards control goes on after the `if`, where it went after the
+  `switch`. A value of another group runs that group as before, and it returns on every
+  path, so the new `if` is never reached, as the statements after the `switch` were not.
+  Any other value reaches `default: break;` as before; the predicate returns
+  `MagickFalse` for it, so `B` is skipped and control goes on where it went. The only
+  difference is the second evaluation of `e` and the predicate's call, neither of which
+  writes anything. `B` holds no other `break` of the `switch` (step 6), which inside the
+  `if` would bind to an enclosing loop or not compile.
 - The new function's `switch` keeps `default: break;`, so `-Wswitch` stays quiet; the
   caller has no `switch` left to warn about. The new function is a label run: with more
   than seven labels it is a *Complex Method* of its own, allowed for label-run helpers by
@@ -8528,6 +8553,11 @@ mean complexity. W15 lane b measured the label run as an SW helper of `sRGBTrans
 (7.46, five parameters by SW step 3). A probe of this recipe on both sites: 7.44 to 8.10
 (the first site alone 7.46), the one new function the only *Complex Method* left (cc 30, a
 label run). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Step 6 (fall-out form): 2026-11-13, from `display.c`'s `XImageCache` (campaign A, W23 round
+nine lane b, wide build): sixty labels save the image to the undo cache and break to the
+redo and info tests after the `switch`, beside the free-buffers and undo groups, which
+return; the label run is cc 60 of the function's 75 once the save body is a helper. Added
+by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -12628,6 +12658,18 @@ Recipe SD, whose groups do not return.
 5. Why the behaviour is the same: where the group returned `R`, the helper returns `R`
    and the caller returns it; where it broke, the caller would have returned `F` and the
    helper returns `F`.
+6. *Void form* (2026-11-13). In a `void` function, a group whose every path ends with
+   `return;` (its last statement is `return;`; it holds no `break;` of the `switch`, and
+   nothing else step 1 refuses) moves wherever the `switch` stands, step 1's `return(F);`
+   aside. The new function is `static void`; its body is the block without its last
+   `return;`, every other `return;` unchanged; the group's place holds
+   `Helper(<arguments>);` and `return;`. A `static` of the caller's body that the block
+   writes goes by pointer on Recipe O step 2's terms (`*v` at every use, the call passing
+   `&v`); inputs past four go in one input struct of Recipe N (steps 2 to 6, step 8 for
+   sibling blocks sharing it). Why the behaviour is the same: each `return;` ends the
+   helper after the statements that ran before it in the caller, and the caller's
+   `return;` follows the call at once, so the caller ends at the same point; nothing
+   after the `switch` ran on any path of the group, before or after.
 
 **Before:**
 
@@ -12668,6 +12710,10 @@ M120): three domain groups to `SetCachePolicyValue`, `SetResourcePolicyValue` an
 `SetSystemPolicyValue`, the function leaving Large Method and Bumpy Road to 3 bumps, the
 file 5.29 to 5.45. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
 2026-10-24.
+Step 6 (void form): 2026-11-13, from `display.c`'s `XImageCache` (campaign A, W23 round
+nine lane b, wide build), whose undo group (`return;` on its three paths, the undo and redo
+lists `static`) is the last block holding the function's *Complex Method*. Added by Claude
+Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -16230,3 +16276,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | I | Step 2: a block-scope `static` of structure type may be a written variable on Recipe CT step 2's terms (member a pointer to the structure, `v.m` written `(*v).m`, `&v` written `v`), and when every written variable of the targets struct is such a `static` the limit of six rises to ten. The text gives the argument (one object at a fixed address, block scope, distinct objects, nothing to alias) | `xwindow.c`'s `XRenderImage` (campaign A, W22 round seven lane b, wide build): the `if (display == NULL)` init block writes eight statics, three of them structures, and leaves through `return(MagickFalse);` four times; Recipe I stopped at six variables and refused structure statics | owner |
 | 2026-11-13 | NEW | KM | Replace a Key Switch Selecting by Modifier Masks with a Table of Rules: the groups of a key `switch` that return a constant command after at most two non-Control mask tests and the Control test become rows `{ key, mask, command, mask, command, plain, control }` of a `static const` table (a missing pair filled with `ControlMask` and the control command) read by one lookup function that the caller returns from after `default: break;`. *Careful* gives the argument (same value, same tests in the same order, the filler pair returns what the next test would, `break` meant the closing return) | `display.c`'s `XImageWindowCommand` (campaign A, W23 round eight lane a, wide build): cc 132 to 41, 342 to 129 lines, the lookup finding-free; KR, KT, KC and KE refuse groups that test masks | owner |
 | 2026-11-13 | AMEND | F | Step 2: a `static` array that the function stores into a member of a local struct it only fills may move as written, when every reader of the member only reads through it by subscript (checked by reading each reader). The declaration is already `static`, so its storage, bytes and section do not change (data sections compare identical); only the scope of its name widens, which steps 4 and 5 check | `display.c`'s `XDisplayImage` (campaign A, W23 round eight lane b, wide build): the thirteen `static DisplayCommand` tables and `Commands` are stored into `event_context.VirtualCommands`, `.ShortCutsCommands` and `.Commands` and read by subscript in `XSelectCommandMenuEntry`, `XSelectVirtualCommand` and `XPressImageButton3`; Recipe F's text covered element reads and `const` pointer arguments only | owner |
+| 2026-11-13 | AMEND | LP | Step 6 (*fall-out form*): besides the label group `G` and `default: break;` the `switch` may hold other groups that end every path with a `return`, and `G`'s body `B` may end with its only `break;` of the `switch`; `e` is a parameter or local nothing in the `switch` writes. `G` leaves the `switch` and `B`, without the `break;`, stands under `if (<Name>(e) != MagickFalse)` directly after the `switch`. *Careful* gives the argument (disjoint labels; `default: break;` reaches the same point doing nothing; `e` side-effect free and unwritten, so the predicate sees the selected value; the returning groups never reach the `if`) | `display.c`'s `XImageCache` (campaign A, W23 round nine lane b, wide build): the sixty-label save-to-undo group breaks to the redo and info tests beside the free-buffers and undo groups, which return, so step 1's two-group form refused it; a probe of the chain (N on the save body, this step, TB, RC on the undo group, N on the tail) leaves `XImageCache` only its six arguments | owner |
+| 2026-11-13 | AMEND | RC | Step 6 (*void form*): in a `void` function a group whose every path ends with `return;` moves wherever the `switch` stands into a `static void` function, its last `return;` dropped and every other kept; the group holds `Helper(...); return;`. Written block-scope statics go by pointer on Recipe O step 2's terms, inputs past four in a Recipe N input struct. The step gives the argument (each `return;` ends the helper where it ended the caller, whose `return;` follows the call at once) | `display.c`'s `XImageCache` (campaign A, W23 round nine lane b, wide build): the undo group returns on its three paths and writes the static undo and redo lists; RC's value form (`return(F);` after the `switch`) refused it | owner |
