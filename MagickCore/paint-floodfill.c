@@ -517,11 +517,6 @@ static MagickBooleanType TileFloodplaneImage(const FloodfillPlane *plane)
   return(status);
 }
 
-MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
-  const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
-  const ssize_t y_offset,const MagickBooleanType invert,
-  ExceptionInfo *exception)
-{
 #define MaxStacksize  524288UL
 #define PushSegmentStack(up,left,right,delta) \
 { \
@@ -546,6 +541,11 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     } \
 }
 
+MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
+  const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
+  const ssize_t y_offset,const MagickBooleanType invert,
+  ExceptionInfo *exception)
+{
   CacheView
     *floodplane_view,
     *image_view;
