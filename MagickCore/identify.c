@@ -192,7 +192,6 @@ static void AccumulateLocationExtrema(const Image *image,
       continue;
     switch (type)
     {
-      case MaximumStatistic:
       default:
       {
         if ((double) p[i] > channel_statistics[channel].maxima)
