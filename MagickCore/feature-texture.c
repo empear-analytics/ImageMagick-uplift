@@ -1836,12 +1836,43 @@ static void ComputeDifferenceAndContrastFeatures(
   }
 }
 
-MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
-  const size_t distance,ExceptionInfo *exception)
+static MagickBooleanType FillFeatureGrays(const Image *image,
+  PixelPacket *grays,ExceptionInfo *exception)
 {
   CacheView
     *image_view;
 
+  MagickBooleanType
+    status;
+
+  ssize_t
+    r;
+
+  status=MagickTrue;
+  image_view=AcquireVirtualCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (r=0; r < (ssize_t) image->rows; r++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    const FeatureGrayRow
+      row = { image, image_view, exception };
+
+    if (FetchFeatureGrayRow(&row,r,&p,&status) == MagickFalse)
+      continue;
+    RecordFeatureGrays(image,p,grays);
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
+  const size_t distance,ExceptionInfo *exception)
+{
   ChannelFeatures
     *channel_features;
 
@@ -1876,8 +1907,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     status;
 
   ssize_t
-    i,
-    r;
+    i;
 
   size_t
     length;
@@ -1918,25 +1948,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
       return(channel_features);
     }
   InitializeFeatureGrays(grays);
-  status=MagickTrue;
-  image_view=AcquireVirtualCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (r=0; r < (ssize_t) image->rows; r++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    const FeatureGrayRow
-      row = { image, image_view, exception };
-
-    if (FetchFeatureGrayRow(&row,r,&p,&status) == MagickFalse)
-      continue;
-    RecordFeatureGrays(image,p,grays);
-  }
-  image_view=DestroyCacheView(image_view);
+  status=FillFeatureGrays(image,grays,exception);
   if (status == MagickFalse)
     {
       channel_features=RelinquishFeatureGrays(grays,channel_features);
