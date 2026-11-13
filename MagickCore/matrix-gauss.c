@@ -384,6 +384,16 @@ static void UnscrambleColumns(long double **hp_matrix,const size_t rank,
         GaussJordanSwapLD(hp_matrix[i][columns[j]],hp_matrix[i][rows[j]]);
 }
 
+static void CopyHPMatrixRow(long double **hp_matrix,double **matrix,
+  const size_t rank,const ssize_t i)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) rank; j++)
+    hp_matrix[i][j]=(long double)matrix[i][j];
+}
+
 MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   double **vectors,const size_t rank,const size_t number_vectors)
 {
@@ -395,7 +405,6 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
     column,
     *columns = (ssize_t *) NULL,
     i,
-    j,
     *pivots = (ssize_t *) NULL,
     row,
     *rows = (ssize_t *) NULL;
@@ -412,8 +421,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
       sizeof(*hp_matrix[i]));
     if (hp_matrix[i] == (long double *) NULL)
       ThrowGaussJordanException();
-    for (j=0; j < (ssize_t) rank; j++)
-      hp_matrix[i][j]=(long double)matrix[i][j];
+    CopyHPMatrixRow(hp_matrix,matrix,rank,i);
   }
   columns=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*columns));
   rows=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*rows));
