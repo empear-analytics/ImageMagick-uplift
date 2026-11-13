@@ -813,11 +813,8 @@ MagickExport size_t GetImageListLength(const Image *images)
   size_t
     i;
 
-  if (images == (Image *) NULL)
+  if (IsImageListEntry(images) == MagickFalse)
     return(0);
-  assert(images->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   images=GetLastImageInList(images);
   for (i=0; images != (Image *) NULL; images=images->previous)
   {
