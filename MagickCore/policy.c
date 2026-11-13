@@ -1204,6 +1204,20 @@ static PolicyInfo *AcquirePolicyElement(const char *filename)
   return(policy_info);
 }
 
+static MagickStatusType AppendPolicyElement(LinkedListInfo *cache,
+  PolicyInfo *policy_info,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AppendValueToLinkedList(cache,policy_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",
+      policy_info->name);
+  return(status);
+}
+
 typedef struct _PolicyIncludeScan
 {
   const PolicyLoadTarget
@@ -1314,11 +1328,7 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
       continue;
     if (IsPolicyEnd(keyword) != MagickFalse)
       {
-        status=AppendValueToLinkedList(cache,policy_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",
-            policy_info->name);
+        status=AppendPolicyElement(cache,policy_info,exception);
         policy_info=(PolicyInfo *) NULL;
         continue;
       }
