@@ -1242,8 +1242,8 @@ static void PrintImageDirectory(FILE *file,const Image *image,
   image_info=DestroyImageInfo(image_info);
 }
 
-static void PrintConvexHullAndBoundingBox(FILE *file,Image *image,
-  ExceptionInfo *exception)
+static char *FormatPointList(const PointInfo *point_list,
+  const size_t number_points)
 {
   char
     buffer[MagickPathExtent];
@@ -1251,12 +1251,28 @@ static void PrintConvexHullAndBoundingBox(FILE *file,Image *image,
   char
     *points;
 
+  ssize_t
+    n;
+
+  points=AcquireString("");
+  for (n=0; n < (ssize_t) number_points; n++)
+  {
+    (void) FormatLocaleString(buffer,MagickPathExtent,"%g,%g ",
+      point_list[n].x,point_list[n].y);
+    (void) ConcatenateString(&points,buffer);
+  }
+  return(points);
+}
+
+static void PrintConvexHullAndBoundingBox(FILE *file,Image *image,
+  ExceptionInfo *exception)
+{
+  char
+    *points;
+
   PointInfo
     *bounding_box,
     *convex_hull;
-
-  ssize_t
-    n;
 
   size_t
     number_points;
@@ -1267,13 +1283,7 @@ static void PrintConvexHullAndBoundingBox(FILE *file,Image *image,
   convex_hull=GetImageConvexHull(image,&number_points,exception);
   if (convex_hull != (PointInfo *) NULL)
     {
-      points=AcquireString("");
-      for (n=0; n < (ssize_t) number_points; n++)
-      {
-        (void) FormatLocaleString(buffer,MagickPathExtent,"%g,%g ",
-          convex_hull[n].x,convex_hull[n].y);
-        (void) ConcatenateString(&points,buffer);
-      }
+      points=FormatPointList(convex_hull,number_points);
       convex_hull=(PointInfo *) RelinquishMagickMemory(convex_hull);
       (void) FormatLocaleFile(file,"  Convex hull: ");
       (void) FormatLocaleFile(file,"%s\n",points);
@@ -1282,13 +1292,7 @@ static void PrintConvexHullAndBoundingBox(FILE *file,Image *image,
   bounding_box=GetImageMinimumBoundingBox(image,&number_points,exception);
   if (bounding_box != (PointInfo *) NULL)
     {
-      points=AcquireString("");
-      for (n=0; n < (ssize_t) number_points; n++)
-      {
-        (void) FormatLocaleString(buffer,MagickPathExtent,"%g,%g ",
-          bounding_box[n].x,bounding_box[n].y);
-        (void) ConcatenateString(&points,buffer);
-      }
+      points=FormatPointList(bounding_box,number_points);
       bounding_box=(PointInfo *) RelinquishMagickMemory(bounding_box);
       (void) FormatLocaleFile(file,"  Minimum bounding box: ");
       (void) FormatLocaleFile(file,"%s\n",points);
