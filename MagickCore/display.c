@@ -8550,6 +8550,184 @@ static void XClampTrimRightQuantum(XResourceInfo *resource_info,
     resource_info->quantum=(int) (crop_info.width-(ssize_t) crop_info.x-1);
 }
 
+typedef struct _XKeyCommandInfo
+{
+  int
+    key;
+
+  MagickStatusType
+    first_mask;
+
+  DisplayCommand
+    first_command;
+
+  MagickStatusType
+    second_mask;
+
+  DisplayCommand
+    second_command,
+    plain_command,
+    control_command;
+} XKeyCommandInfo;
+
+static const XKeyCommandInfo
+  ImageWindowKeyCommands[] =
+  {
+    { XK_o, ControlMask, OpenCommand, ControlMask, OpenCommand, NullCommand,
+      OpenCommand },
+    { XK_space, ControlMask, NextCommand, ControlMask, NextCommand,
+      NextCommand, NextCommand },
+    { XK_BackSpace, ControlMask, FormerCommand, ControlMask, FormerCommand,
+      FormerCommand, FormerCommand },
+    { XK_s, Mod1Mask, SwirlCommand, ControlMask, SaveCommand, ShearCommand,
+      SaveCommand },
+    { XK_p, Mod1Mask, OilPaintCommand, Mod4Mask, ColorCommand, NullCommand,
+      PrintCommand },
+    { XK_Print, Mod1Mask, OilPaintCommand, Mod4Mask, ColorCommand,
+      NullCommand, PrintCommand },
+    { XK_d, Mod4Mask, DrawCommand, ControlMask, DeleteCommand, NullCommand,
+      DeleteCommand },
+    { XK_Select, ControlMask, SelectCommand, ControlMask, SelectCommand,
+      NullCommand, SelectCommand },
+    { XK_n, ControlMask, NewCommand, ControlMask, NewCommand, NullCommand,
+      NewCommand },
+    { XK_q, ControlMask, QuitCommand, ControlMask, QuitCommand, QuitCommand,
+      QuitCommand },
+    { XK_Escape, ControlMask, QuitCommand, ControlMask, QuitCommand,
+      QuitCommand, QuitCommand },
+    { XK_z, ControlMask, UndoCommand, ControlMask, UndoCommand, NullCommand,
+      UndoCommand },
+    { XK_Undo, ControlMask, UndoCommand, ControlMask, UndoCommand,
+      NullCommand, UndoCommand },
+    { XK_r, ControlMask, RedoCommand, ControlMask, RedoCommand, RollCommand,
+      RedoCommand },
+    { XK_Redo, ControlMask, RedoCommand, ControlMask, RedoCommand,
+      RollCommand, RedoCommand },
+    { XK_x, ControlMask, CutCommand, ControlMask, CutCommand, NullCommand,
+      CutCommand },
+    { XK_c, Mod1Mask, CharcoalDrawCommand, ControlMask, CopyCommand,
+      CropCommand, CopyCommand },
+    { XK_v, Mod4Mask, CompositeCommand, ControlMask, PasteCommand,
+      FlipCommand, PasteCommand },
+    { XK_Insert, Mod4Mask, CompositeCommand, ControlMask, PasteCommand,
+      FlipCommand, PasteCommand },
+    { XK_less, ControlMask, HalfSizeCommand, ControlMask, HalfSizeCommand,
+      HalfSizeCommand, HalfSizeCommand },
+    { XK_minus, ControlMask, OriginalSizeCommand, ControlMask,
+      OriginalSizeCommand, OriginalSizeCommand, OriginalSizeCommand },
+    { XK_greater, ControlMask, DoubleSizeCommand, ControlMask,
+      DoubleSizeCommand, DoubleSizeCommand, DoubleSizeCommand },
+    { XK_percent, ControlMask, ResizeCommand, ControlMask, ResizeCommand,
+      ResizeCommand, ResizeCommand },
+    { XK_at, ControlMask, RefreshCommand, ControlMask, RefreshCommand,
+      RefreshCommand, RefreshCommand },
+    { XK_bracketleft, ControlMask, ChopCommand, ControlMask, ChopCommand,
+      ChopCommand, ChopCommand },
+    { XK_h, ControlMask, FlopCommand, ControlMask, FlopCommand, FlopCommand,
+      FlopCommand },
+    { XK_slash, ControlMask, RotateRightCommand, ControlMask,
+      RotateRightCommand, RotateRightCommand, RotateRightCommand },
+    { XK_backslash, ControlMask, RotateLeftCommand, ControlMask,
+      RotateLeftCommand, RotateLeftCommand, RotateLeftCommand },
+    { XK_asterisk, ControlMask, RotateCommand, ControlMask, RotateCommand,
+      RotateCommand, RotateCommand },
+    { XK_t, ControlMask, TrimCommand, ControlMask, TrimCommand, TrimCommand,
+      TrimCommand },
+    { XK_H, ControlMask, HueCommand, ControlMask, HueCommand, HueCommand,
+      HueCommand },
+    { XK_S, ControlMask, SaturationCommand, ControlMask, SaturationCommand,
+      SaturationCommand, SaturationCommand },
+    { XK_L, ControlMask, BrightnessCommand, ControlMask, BrightnessCommand,
+      BrightnessCommand, BrightnessCommand },
+    { XK_G, ControlMask, GammaCommand, ControlMask, GammaCommand,
+      GammaCommand, GammaCommand },
+    { XK_C, ControlMask, SpiffCommand, ControlMask, SpiffCommand,
+      SpiffCommand, SpiffCommand },
+    { XK_Z, ControlMask, DullCommand, ControlMask, DullCommand, DullCommand,
+      DullCommand },
+    { XK_N, ControlMask, NormalizeCommand, ControlMask, NormalizeCommand,
+      NormalizeCommand, NormalizeCommand },
+    { XK_equal, ControlMask, EqualizeCommand, ControlMask, EqualizeCommand,
+      EqualizeCommand, EqualizeCommand },
+    { XK_asciitilde, ControlMask, NegateCommand, ControlMask, NegateCommand,
+      NegateCommand, NegateCommand },
+    { XK_period, ControlMask, GrayscaleCommand, ControlMask, GrayscaleCommand,
+      GrayscaleCommand, GrayscaleCommand },
+    { XK_numbersign, ControlMask, QuantizeCommand, ControlMask,
+      QuantizeCommand, QuantizeCommand, QuantizeCommand },
+    { XK_F2, ControlMask, DespeckleCommand, ControlMask, DespeckleCommand,
+      DespeckleCommand, DespeckleCommand },
+    { XK_F3, ControlMask, EmbossCommand, ControlMask, EmbossCommand,
+      EmbossCommand, EmbossCommand },
+    { XK_F4, ControlMask, ReduceNoiseCommand, ControlMask, ReduceNoiseCommand,
+      ReduceNoiseCommand, ReduceNoiseCommand },
+    { XK_F5, ControlMask, AddNoiseCommand, ControlMask, AddNoiseCommand,
+      AddNoiseCommand, AddNoiseCommand },
+    { XK_F6, ControlMask, SharpenCommand, ControlMask, SharpenCommand,
+      SharpenCommand, SharpenCommand },
+    { XK_F7, ControlMask, BlurCommand, ControlMask, BlurCommand, BlurCommand,
+      BlurCommand },
+    { XK_F8, ControlMask, ThresholdCommand, ControlMask, ThresholdCommand,
+      ThresholdCommand, ThresholdCommand },
+    { XK_F9, ControlMask, EdgeDetectCommand, ControlMask, EdgeDetectCommand,
+      EdgeDetectCommand, EdgeDetectCommand },
+    { XK_F10, ControlMask, SpreadCommand, ControlMask, SpreadCommand,
+      SpreadCommand, SpreadCommand },
+    { XK_F11, ControlMask, ShadeCommand, ControlMask, ShadeCommand,
+      ShadeCommand, ShadeCommand },
+    { XK_F12, ControlMask, RaiseCommand, ControlMask, RaiseCommand,
+      RaiseCommand, RaiseCommand },
+    { XK_F13, ControlMask, SegmentCommand, ControlMask, SegmentCommand,
+      SegmentCommand, SegmentCommand },
+    { XK_i, Mod1Mask, ImplodeCommand, ControlMask, NullCommand, NullCommand,
+      NullCommand },
+    { XK_w, Mod1Mask, WaveCommand, ControlMask, NullCommand, NullCommand,
+      NullCommand },
+    { XK_m, Mod4Mask, MatteCommand, ControlMask, NullCommand, NullCommand,
+      NullCommand },
+    { XK_b, Mod4Mask, AddBorderCommand, ControlMask, NullCommand, NullCommand,
+      NullCommand },
+    { XK_f, Mod4Mask, AddFrameCommand, ControlMask, NullCommand, NullCommand,
+      NullCommand },
+    { XK_exclam, Mod4Mask, CommentCommand, ControlMask, NullCommand,
+      NullCommand, NullCommand },
+    { XK_a, Mod1Mask, ApplyCommand, Mod4Mask, AnnotateCommand, NullCommand,
+      RegionOfInterestCommand },
+    { XK_question, ControlMask, InfoCommand, ControlMask, InfoCommand,
+      InfoCommand, InfoCommand },
+    { XK_plus, ControlMask, ZoomCommand, ControlMask, ZoomCommand,
+      ZoomCommand, ZoomCommand },
+    { XK_Execute, ControlMask, LaunchCommand, ControlMask, LaunchCommand,
+      LaunchCommand, LaunchCommand },
+    { XK_F1, ControlMask, HelpCommand, ControlMask, HelpCommand, HelpCommand,
+      HelpCommand },
+    { XK_Find, ControlMask, BrowseDocumentationCommand, ControlMask,
+      BrowseDocumentationCommand, BrowseDocumentationCommand,
+      BrowseDocumentationCommand }
+  };
+
+static DisplayCommand XLookupKeyCommand(const int key,
+  const MagickStatusType state)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(ImageWindowKeyCommands)/
+       sizeof(*ImageWindowKeyCommands)); i++)
+  {
+    if (ImageWindowKeyCommands[i].key != key)
+      continue;
+    if ((state & ImageWindowKeyCommands[i].first_mask) != 0)
+      return(ImageWindowKeyCommands[i].first_command);
+    if ((state & ImageWindowKeyCommands[i].second_mask) != 0)
+      return(ImageWindowKeyCommands[i].second_command);
+    if ((state & ControlMask) == 0)
+      return(ImageWindowKeyCommands[i].plain_command);
+    return(ImageWindowKeyCommands[i].control_command);
+  }
+  return(NullCommand);
+}
+
 static DisplayCommand XImageWindowCommand(Display *display,
   XResourceInfo *resource_info,XWindows *windows,const MagickStatusType state,
   KeySym key_symbol,Image **image,ExceptionInfo *exception)
@@ -8608,225 +8786,12 @@ static DisplayCommand XImageWindowCommand(Display *display,
     }
   switch ((int) key_symbol)
   {
-    case XK_o:
-    {
-      if ((state & ControlMask) == 0)
-        break;
-      return(OpenCommand);
-    }
-    case XK_space:
-      return(NextCommand);
-    case XK_BackSpace:
-      return(FormerCommand);
-    case XK_s:
-    {
-      if ((state & Mod1Mask) != 0)
-        return(SwirlCommand);
-      if ((state & ControlMask) == 0)
-        return(ShearCommand);
-      return(SaveCommand);
-    }
-    case XK_p:
-    case XK_Print:
-    {
-      if ((state & Mod1Mask) != 0)
-        return(OilPaintCommand);
-      if ((state & Mod4Mask) != 0)
-        return(ColorCommand);
-      if ((state & ControlMask) == 0)
-        return(NullCommand);
-      return(PrintCommand);
-    }
-    case XK_d:
-    {
-      if ((state & Mod4Mask) != 0)
-        return(DrawCommand);
-      if ((state & ControlMask) == 0)
-        return(NullCommand);
-      return(DeleteCommand);
-    }
-    case XK_Select:
-    {
-      if ((state & ControlMask) == 0)
-        return(NullCommand);
-      return(SelectCommand);
-    }
-    case XK_n:
-    {
-      if ((state & ControlMask) == 0)
-        return(NullCommand);
-      return(NewCommand);
-    }
-    case XK_q:
-    case XK_Escape:
-      return(QuitCommand);
-    case XK_z:
-    case XK_Undo:
-    {
-      if ((state & ControlMask) == 0)
-        return(NullCommand);
-      return(UndoCommand);
-    }
-    case XK_r:
-    case XK_Redo:
-    {
-      if ((state & ControlMask) == 0)
-        return(RollCommand);
-      return(RedoCommand);
-    }
-    case XK_x:
-    {
-      if ((state & ControlMask) == 0)
-        return(NullCommand);
-      return(CutCommand);
-    }
-    case XK_c:
-    {
-      if ((state & Mod1Mask) != 0)
-        return(CharcoalDrawCommand);
-      if ((state & ControlMask) == 0)
-        return(CropCommand);
-      return(CopyCommand);
-    }
-    case XK_v:
-    case XK_Insert:
-    {
-      if ((state & Mod4Mask) != 0)
-        return(CompositeCommand);
-      if ((state & ControlMask) == 0)
-        return(FlipCommand);
-      return(PasteCommand);
-    }
-    case XK_less:
-      return(HalfSizeCommand);
-    case XK_minus:
-      return(OriginalSizeCommand);
-    case XK_greater:
-      return(DoubleSizeCommand);
-    case XK_percent:
-      return(ResizeCommand);
-    case XK_at:
-      return(RefreshCommand);
-    case XK_bracketleft:
-      return(ChopCommand);
-    case XK_h:
-      return(FlopCommand);
-    case XK_slash:
-      return(RotateRightCommand);
-    case XK_backslash:
-      return(RotateLeftCommand);
-    case XK_asterisk:
-      return(RotateCommand);
-    case XK_t:
-      return(TrimCommand);
-    case XK_H:
-      return(HueCommand);
-    case XK_S:
-      return(SaturationCommand);
-    case XK_L:
-      return(BrightnessCommand);
-    case XK_G:
-      return(GammaCommand);
-    case XK_C:
-      return(SpiffCommand);
-    case XK_Z:
-      return(DullCommand);
-    case XK_N:
-      return(NormalizeCommand);
-    case XK_equal:
-      return(EqualizeCommand);
-    case XK_asciitilde:
-      return(NegateCommand);
-    case XK_period:
-      return(GrayscaleCommand);
-    case XK_numbersign:
-      return(QuantizeCommand);
-    case XK_F2:
-      return(DespeckleCommand);
-    case XK_F3:
-      return(EmbossCommand);
-    case XK_F4:
-      return(ReduceNoiseCommand);
-    case XK_F5:
-      return(AddNoiseCommand);
-    case XK_F6:
-      return(SharpenCommand);
-    case XK_F7:
-      return(BlurCommand);
-    case XK_F8:
-      return(ThresholdCommand);
-    case XK_F9:
-      return(EdgeDetectCommand);
-    case XK_F10:
-      return(SpreadCommand);
-    case XK_F11:
-      return(ShadeCommand);
-    case XK_F12:
-      return(RaiseCommand);
-    case XK_F13:
-      return(SegmentCommand);
-    case XK_i:
-    {
-      if ((state & Mod1Mask) == 0)
-        return(NullCommand);
-      return(ImplodeCommand);
-    }
-    case XK_w:
-    {
-      if ((state & Mod1Mask) == 0)
-        return(NullCommand);
-      return(WaveCommand);
-    }
-    case XK_m:
-    {
-      if ((state & Mod4Mask) == 0)
-        return(NullCommand);
-      return(MatteCommand);
-    }
-    case XK_b:
-    {
-      if ((state & Mod4Mask) == 0)
-        return(NullCommand);
-      return(AddBorderCommand);
-    }
-    case XK_f:
-    {
-      if ((state & Mod4Mask) == 0)
-        return(NullCommand);
-      return(AddFrameCommand);
-    }
-    case XK_exclam:
-    {
-      if ((state & Mod4Mask) == 0)
-        return(NullCommand);
-      return(CommentCommand);
-    }
-    case XK_a:
-    {
-      if ((state & Mod1Mask) != 0)
-        return(ApplyCommand);
-      if ((state & Mod4Mask) != 0)
-        return(AnnotateCommand);
-      if ((state & ControlMask) == 0)
-        return(NullCommand);
-      return(RegionOfInterestCommand);
-    }
-    case XK_question:
-      return(InfoCommand);
-    case XK_plus:
-      return(ZoomCommand);
     case XK_P:
     {
       if ((state & ShiftMask) == 0)
         return(NullCommand);
       return(ShowPreviewCommand);
     }
-    case XK_Execute:
-      return(LaunchCommand);
-    case XK_F1:
-      return(HelpCommand);
-    case XK_Find:
-      return(BrowseDocumentationCommand);
     case XK_Menu:
     {
       (void) XMapRaised(display,windows->command.id);
@@ -8899,9 +8864,9 @@ static DisplayCommand XImageWindowCommand(Display *display,
       return(NullCommand);
     }
     default:
-      return(NullCommand);
+      break;
   }
-  return(NullCommand);
+  return(XLookupKeyCommand((int) key_symbol,state));
 }
 
 /*
