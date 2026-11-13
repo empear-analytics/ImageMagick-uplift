@@ -175,7 +175,8 @@ start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 **Guard-verified.** No case executes the function. It may still
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
 recipes whose guard fingerprint is exact: **E, G and P** (and B, N and I with the
-checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below). The proof is the build
+checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below, and SD with
+*Unreached functions: Recipe SD*). The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
 For E and P, which add a function, `OK` means the exact fingerprint the guard names as
 expected: the literal check `OK`, and `--calls` moving nothing but `+2` for each new
@@ -290,6 +291,54 @@ another member, a flipped comparison and a missing `*` in the moved block, a dup
 moved statement, an extra exit, a statement added to another function
 (`targets_fill_check.py`), and a literal changed in a function the shortened caller now
 inlines (`obj_modulo.sh`).
+
+**Unreached functions: Recipe SD** (owner's OK of 2026-11-10 to evolve the recipes; added by
+Claude Sonnet 5.5, campaign A W22 lane a; awaits the owner's confirmation). Recipe SD may also be
+applied to a function no case reaches (`casemap.py` 0 for it, and no executed line in a line-coverage
+profile of the function's text, or `FNDA:0` for it when the profile predates the text), `Verified:
+guard`, on the terms of the sections above. A split at this level is a label partition: no case runs a
+group before or after it, so the proof is that every label of the original `switch` is in exactly one
+group of exactly one `switch` and every group's text is the original's. Each of these is run before
+the commit and quoted in its message:
+
+1. The step is SD's own step, every condition of its *How* met and checked by reading (steps 1 to 6
+   and 8: the controlling expression, the exits of every group, each group's written variables under
+   Recipe O step 2 or Recipe Z step 7's `const` targets struct, the OpenMP rules). A group that throws
+   through `GetMagickModule()` does not move at this level: the function name the message reports
+   would change, and no case shows it.
+2. `refactor_guard.py` prints `OK`, and `--calls` moves nothing but `+2` for each new function (its
+   definition and its call), as for E at this level.
+3. `python3 tools/switch_split_check.py <file> <Caller> <Helper> [<Helper> ...]` prints `OK`, the
+   helpers named in the order the calls chain. It requires: the added functions are the helpers and
+   nothing else of the file changed (the file is the same token stream once the helpers and the
+   caller's `switch` statements are cut out); every `switch` of the chain controls on the same
+   expression; a helper's body is its `switch` and bindings `T *const v = p->v;` of a member under its
+   own name, the targets initialiser filling the members by address in order; a `default:` that is
+   not the innermost one holds only the call of the next helper, each argument the parameter of its
+   position (no transposed argument); flattening the chain gives exactly the original's groups, label
+   for label (none lost, added, doubled or split), each body the original's token for token once `(*v)`
+   is read as `v` and `&p` as `p`; a kept group is unchanged as written; no moved group holds `return`,
+   `continue` or `goto`; every `switch` keeps its groups in the original order. A step that the tool
+   refuses is not this form.
+4. `sh tools/obj_modulo.sh <file> <Caller> <Helper>` prints `IDENTICAL` or `MODULO-IDENTICAL`, as item
+   4 of *Unreached functions: B and N* (`WIDE=1` for a wide-build file; a chain of several helpers
+   names the last one added, and the helpers the compiler inlined into the caller leave no function
+   of their own).
+
+Why this proves the step: `obj_modulo.sh` shows that nothing outside the caller and the helpers
+changed; `switch_split_check.py` shows that the three `switch` statements together select, for every
+label, the group the original `switch` selected, and that the group's statements are the original's
+with the one rewrite SD and Recipe O already make (`(*v)` for the caller's `v`, a pointer parameter
+for `&p`). A value that matches a kept label selects its group in the caller; any other reaches the
+caller's `default:`, whose call runs the next `switch`, as SD's first *Careful* point argues; the
+check closes the ways that argument can fail on a function the oracle never runs (a label lost or
+doubled, a group edited, a write to the targets dropped, a transposed argument, a stray statement in
+the caller). What it leaves to reading is what the text check cannot see: that the controlling
+expression is not written by any group, that the members bind variables the groups write, and the
+type of every argument. Planted errors on `widget.c`'s `XNoticeWidget` and on a synthetic fixture
+(`tools/test_switch_split_check.py`) were each caught: a label dropped, a callee changed, a write to
+`state` dropped, a transposed argument, a kept group edited, a statement added after the loop, a
+member bound from another member.
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -4231,7 +4280,8 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), a case for each moved label where one exists, and steps 1 and 5
-checked by reading.
+checked by reading. At the guard level (no case reaches the function): the checks of *Two
+levels of evidence*, *Unreached functions: Recipe SD*.
 
 **Provenance:** 2026-10-30, from `fourier.c`'s `ComplexImages`, whose operator `switch`
 (seven operators and `default`) sits at depth 4 inside the parallel row loop. Recipe Z on
@@ -4262,6 +4312,11 @@ Roll, Grayscale and Quantize groups with `default` write `preview_image`, `degre
 `gamma`, `colors` and `quantize_info`, one more than four parameters hold; a probe: 8.42
 to 8.58, no finding on the helper. Added by Claude Code (Claude Opus 5.5) under the
 mandate of 2026-10-24.
+The unreached form (2026-11-13, task W22 lane a): `widget.c`'s `XNoticeWidget`, whose ten-label
+event `switch` (cc 18, 115 lines after nine helpers) no case executes; it splits into two chained
+helpers by adjacent runs of groups with the `Targets` form of step 8 (`const NoticeTargets *`), the
+label partition checked by `tools/switch_split_check.py` and the whole object file by
+`obj_modulo.sh`. Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10.
 
 ---
 
@@ -14792,3 +14847,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
 | 2026-11-13 | NEW | ME | Merge Mirrored Twins That Leave Through a Constant Return: copies of one block that leave the function through `return(c);` (Recipe Y steps 1 and 2; `c` may differ between copies), in two mirrored sides (Recipe MT step 1's alignment) whose copies differ in one member-access value, become one `static inline MagickBooleanType` function taking the input struct, a constant selector, the value and the written variable by pointer; each copy becomes `if (Helper(...) == MagickFalse) return(c);` with its own constant. *Careful* gives the argument (the conditional evaluates only the copy's run, in its order; the constants stay in the callers) | `visual-effects-plasma.c`'s `PlasmaImageProxy` (campaign A, W21 round four, lane d): four edge-pixel blocks (left/right along a column, bottom/top along a row) that Recipes MT, Y, SV and W refuse; helpers per side cloned (8.15), precomputed coordinates moved `errno`-writing casts; a probe of the chain this recipe opens: 8.50 to 9.09 | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | SD | *Two levels of evidence*, *Unreached functions: Recipe SD*: Recipe SD may be applied to a function no case reaches, `Verified: guard`, with SD steps 1 to 6 and 8 checked by reading (no group that throws through `GetMagickModule()`), `refactor_guard.py` `OK` with `--calls` moving only `+2` for each new function, `tools/switch_split_check.py` printing `OK` (the added functions are the helpers; the rest of the file is the same token stream; one controlling expression; helper bodies only bindings and their `switch`; links pass each parameter by name; the flattened chain has the original's groups label for label, bodies equal after `(*v)` to `v` and `&p` to `p`, kept groups unchanged, no `return`, `continue` or `goto` in a moved group, original order) and `tools/obj_modulo.sh` printing `IDENTICAL` or `MODULO-IDENTICAL`. The new tool and its tests are a commit of their own. The guard-verified sentence, SD's *Evidence level* and AGENTS.md say so (the AGENTS.md line is the agent's addition for the owner's confirmation) | `widget.c`'s `XNoticeWidget` (campaign A, W22 lane a), reached by no case: its ten-label event `switch` keeps *Complex Method* and *Large Method* after nine guard-level helpers, and no guard-level recipe splits a `switch`; a probe of two chained SD helpers and an E step 7 tail helper takes the file from 7.31 to 7.78 and the function out of both findings. Planted errors (a label dropped, a callee changed, a write dropped, transposed link arguments, a kept group edited, a statement added to the caller, a member bound from another) are each refused | owner |
