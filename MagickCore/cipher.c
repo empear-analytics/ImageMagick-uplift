@@ -564,6 +564,26 @@ MagickExport MagickBooleanType DecipherImage(Image *image,
   return(status);
 }
 
+static SignatureInfo *AcquireNonceSignature(const Image *image,
+  StringInfo *nonce)
+{
+  MagickSizeType
+    extent;
+
+  SignatureInfo
+    *signature_info;
+
+  signature_info=AcquireSignatureInfo();
+  UpdateSignature(signature_info,nonce);
+  extent=(MagickSizeType) image->columns*image->rows;
+  SetStringInfoLength(nonce,sizeof(extent));
+  SetStringInfoDatum(nonce,(const unsigned char *) &extent);
+  UpdateSignature(signature_info,nonce);
+  nonce=DestroyStringInfo(nonce);
+  FinalizeSignature(signature_info);
+  return(signature_info);
+}
+
 typedef struct _CipherRow
 {
   Image
@@ -656,9 +676,6 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
   MagickBooleanType
     proceed;
 
-  MagickSizeType
-    extent;
-
   QuantumInfo
     *quantum_info;
 
@@ -709,14 +726,7 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
     }
   SetAESKey(aes_info,key);
   key=DestroyStringInfo(key);
-  signature_info=AcquireSignatureInfo();
-  UpdateSignature(signature_info,nonce);
-  extent=(MagickSizeType) image->columns*image->rows;
-  SetStringInfoLength(nonce,sizeof(extent));
-  SetStringInfoDatum(nonce,(const unsigned char *) &extent);
-  UpdateSignature(signature_info,nonce);
-  nonce=DestroyStringInfo(nonce);
-  FinalizeSignature(signature_info);
+  signature_info=AcquireNonceSignature(image,nonce);
   (void) memset(input_block,0,sizeof(input_block));
   digest=GetStringInfoDatum(GetSignatureDigest(signature_info));
   (void) memcpy(input_block,digest,MagickMin(AESBlocksize,
@@ -846,9 +856,6 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
   MagickBooleanType
     proceed;
 
-  MagickSizeType
-    extent;
-
   QuantumInfo
     *quantum_info;
 
@@ -901,14 +908,7 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
     }
   SetAESKey(aes_info,key);
   key=DestroyStringInfo(key);
-  signature_info=AcquireSignatureInfo();
-  UpdateSignature(signature_info,nonce);
-  extent=(MagickSizeType) image->columns*image->rows;
-  SetStringInfoLength(nonce,sizeof(extent));
-  SetStringInfoDatum(nonce,(const unsigned char *) &extent);
-  UpdateSignature(signature_info,nonce);
-  nonce=DestroyStringInfo(nonce);
-  FinalizeSignature(signature_info);
+  signature_info=AcquireNonceSignature(image,nonce);
   signature=StringInfoToHexString(GetSignatureDigest(signature_info));
   (void) SetImageProperty(image,"cipher:type","AES",exception);
   (void) SetImageProperty(image,"cipher:mode","CTR",exception);
