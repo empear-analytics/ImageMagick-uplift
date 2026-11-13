@@ -299,6 +299,26 @@ static XVisualInfo *XPickRichestVisual(XVisualInfo *visual_list,
   return(visual_info);
 }
 
+static void XRestrictVisualByID(Display *display,const char *visual_type,
+  int *visual_mask,XVisualInfo *visual_template)
+{
+  if (LocaleCompare("default",visual_type) == 0)
+    {
+      (*visual_mask)|=VisualIDMask;
+      (*visual_template).visualid=XVisualIDFromVisual(
+        XDefaultVisual(display,XDefaultScreen(display)));
+    }
+  else if (isdigit((int) ((unsigned char) *visual_type)) != 0)
+    {
+      (*visual_mask)|=VisualIDMask;
+      (*visual_template).visualid=(size_t)
+        strtol(visual_type,(char **) NULL,0);
+    }
+  else
+    ThrowXWindowException(XServerError,
+      "UnrecognizedVisualSpecifier",visual_type);
+}
+
 MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   XStandardColormap *map_info,XResourceInfo *resource_info)
 {
@@ -377,21 +397,8 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
           visual_mask|=VisualClassMask;
           visual_template.klass=DirectColor;
         }
-      else if (LocaleCompare("default",visual_type) == 0)
-        {
-          visual_mask|=VisualIDMask;
-          visual_template.visualid=XVisualIDFromVisual(
-            XDefaultVisual(display,XDefaultScreen(display)));
-        }
-      else if (isdigit((int) ((unsigned char) *visual_type)) != 0)
-        {
-          visual_mask|=VisualIDMask;
-          visual_template.visualid=(size_t)
-            strtol(visual_type,(char **) NULL,0);
-        }
       else
-        ThrowXWindowException(XServerError,
-          "UnrecognizedVisualSpecifier",visual_type);
+        XRestrictVisualByID(display,visual_type,&visual_mask,&visual_template);
     }
   /*
     Get all visuals that meet our criteria so far.
