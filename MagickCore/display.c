@@ -8094,6 +8094,94 @@ static void XStartDrawElement(const DrawPointerTargets *pointer_targets,
   (*coordinate_info)->y=(*y);
 }
 
+static void XTrackDrawElement(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets,unsigned int *distance)
+{
+  Display
+    *const display = context->display;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    *const x = pointer_targets->x;
+
+  int
+    *const y = pointer_targets->y;
+
+  size_t
+    *const state = pointer_targets->state;
+
+  XEvent
+    *const event = pointer_targets->event;
+
+  ElementType
+    *const element = pointer_targets->element;
+
+  XSegment
+    *const line_info = shape_targets->line_info;
+
+  RectangleInfo
+    *const rectangle_info = shape_targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = shape_targets->coordinate_info;
+
+  int
+    *const number_coordinates = shape_targets->number_coordinates;
+
+  double
+    degrees;
+
+  DrawPreviewInput
+    preview_input;
+
+  DrawShapeInput
+    shape_input;
+
+  degrees=0.0;
+  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
+  (*state)=DefaultState;
+  do
+  {
+    preview_input.element=(*element);
+    preview_input.number_coordinates=(*number_coordinates);
+    preview_input.coordinate_info=(*coordinate_info);
+    preview_input.distance=(*distance);
+    preview_input.line_info=(*line_info);
+    preview_input.rectangle_info=(*rectangle_info);
+    XPreviewElement(context,&preview_input,(*element),&degrees);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(display,windows,event,exception);
+    XErasePreviewElement(context,&preview_input,(*element));
+    shape_input.element=(*element);
+    shape_input.distance=(*distance);
+    XDrawShapeEvent(context,&shape_input,(*event),shape_targets);
+    /*
+      Check boundary conditions.
+    */
+    XClampLineEnd(windows,line_info);
+    (*distance)=(unsigned int)
+      ((((*line_info).x2-(*line_info).x1+1)*
+        ((*line_info).x2-(*line_info).x1+1))+
+       (((*line_info).y2-(*line_info).y1+1)*
+        ((*line_info).y2-(*line_info).y1+1)));
+    if (IsSelectionMovedOrDone((*rectangle_info),(*x),(*y),(*state)) !=
+        MagickFalse)
+      {
+        (*rectangle_info)=XFitSelectionRectangle(windows,(*x),(*y),
+          (*rectangle_info));
+      }
+  } while (((*state) & ExitState) == 0);
+  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8144,9 +8232,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
     x,
     y;
 
-  double
-    degrees;
-
   MagickStatusType
     status;
 
@@ -8178,15 +8263,9 @@ static MagickBooleanType XDrawEditImage(Display *display,
   DrawEditContext
     draw_context;
 
-  DrawPreviewInput
-    preview_input;
-
   const DrawShapeTargets
     shape_targets = { &line_info, &rectangle_info, &coordinate_info, &state,
       &number_coordinates, &max_coordinates };
-
-  DrawShapeInput
-    shape_input;
 
   const DrawPointerTargets
     pointer_targets = { &x, &y, &state, &event, &element };
@@ -8241,40 +8320,8 @@ static MagickBooleanType XDrawEditImage(Display *display,
       Draw element as pointer moves until the button is released.
     */
     distance=0;
-    degrees=0.0;
     XStartDrawElement(&pointer_targets,&shape_targets);
-    (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-    state=DefaultState;
-    do
-    {
-      preview_input.element=element;
-      preview_input.number_coordinates=number_coordinates;
-      preview_input.coordinate_info=coordinate_info;
-      preview_input.distance=distance;
-      preview_input.line_info=line_info;
-      preview_input.rectangle_info=rectangle_info;
-      XPreviewElement(&draw_context,&preview_input,element,&degrees);
-      /*
-        Wait for next event.
-      */
-      XScreenEvent(display,windows,&event,exception);
-      XErasePreviewElement(&draw_context,&preview_input,element);
-      shape_input.element=element;
-      shape_input.distance=distance;
-      XDrawShapeEvent(&draw_context,&shape_input,event,&shape_targets);
-      /*
-        Check boundary conditions.
-      */
-      XClampLineEnd(windows,&line_info);
-      distance=(unsigned int)
-        (((line_info.x2-line_info.x1+1)*(line_info.x2-line_info.x1+1))+
-         ((line_info.y2-line_info.y1+1)*(line_info.y2-line_info.y1+1)));
-      if (IsSelectionMovedOrDone(rectangle_info,x,y,state) != MagickFalse)
-        {
-          rectangle_info=XFitSelectionRectangle(windows,x,y,rectangle_info);
-        }
-    } while ((state & ExitState) == 0);
-    (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+    XTrackDrawElement(&draw_context,&pointer_targets,&shape_targets,&distance);
     if (IsPolygonElement(element) != MagickFalse)
       {
         rectangle_info=XDrawPolygonBounds(coordinate_info,number_coordinates,
