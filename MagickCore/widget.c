@@ -12933,6 +12933,63 @@ static void InitializeListBrowserScroll(const ListBrowserContext *context,
   (*expose_info).y=(*slider_info).y;
 }
 
+static void InitializeListBrowserList(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  const unsigned int
+    entries = context->entries;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const char
+    *const *const list = context->list;
+
+  char
+    *const reply = context->reply;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_entries = widgets->visible_entries;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  /*
+    Initialize list information.
+  */
+  XGetWidgetInfo((char *) NULL,list_info);
+  (*list_info).raised=MagickFalse;
+  (*list_info).bevel_width--;
+  (*list_info).width=(unsigned int)
+    ((*scroll_info).x-(*reply_info).x-(int) (QuantumMargin >> 1));
+  (*list_info).height=(*scroll_info).height;
+  (*list_info).x=(*reply_info).x;
+  (*list_info).y=(*scroll_info).y;
+  if (window_info->mapped == MagickFalse)
+    {
+      ListBrowserReplyMatch
+        match;
+
+      match.list=list;
+      match.reply=reply;
+      match.entries=entries;
+      match.visible_entries=(*visible_entries);
+      MatchListBrowserReply(&match,list_info,slider_info);
+    }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13088,28 +13145,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
         InitializeListBrowserButtons(&list_context,&list_widgets);
         InitializeListBrowserReply(&list_context,&list_widgets);
         InitializeListBrowserScroll(&list_context,&list_widgets);
-        /*
-          Initialize list information.
-        */
-        XGetWidgetInfo((char *) NULL,&list_info);
-        list_info.raised=MagickFalse;
-        list_info.bevel_width--;
-        list_info.width=(unsigned int)
-          (scroll_info.x-reply_info.x-(int) (QuantumMargin >> 1));
-        list_info.height=scroll_info.height;
-        list_info.x=reply_info.x;
-        list_info.y=scroll_info.y;
-        if (window_info->mapped == MagickFalse)
-          {
-            ListBrowserReplyMatch
-              match;
-
-            match.list=list;
-            match.reply=reply;
-            match.entries=entries;
-            match.visible_entries=visible_entries;
-            MatchListBrowserReply(&match,&list_info,&slider_info);
-          }
+        InitializeListBrowserList(&list_context,&list_widgets);
         /*
           Initialize text information.
         */
