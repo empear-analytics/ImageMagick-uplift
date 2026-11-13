@@ -1889,6 +1889,139 @@ static void ReportBlendResidual(const MagickBooleanType verbose,
       residual);
 }
 
+typedef struct _BlendRelaxation
+{
+  Image
+    *anchor_image,
+    *divergent_image,
+    **relax_image,
+    **residual_image;
+
+  Image
+    **const *residual_failure,
+    **const *kernel_failure;
+} BlendRelaxation;
+
+static void ReleaseBlendImages(Image **const *images)
+{
+  ssize_t
+    k;
+
+  for (k=0; images[k] != (Image **) NULL; k++)
+    *images[k]=DestroyImage(*images[k]);
+}
+
+static void ReportBlendIteration(const MagickBooleanType verbose,
+  const ssize_t i,const size_t tick,const double residual)
+{
+  if ((verbose != MagickFalse) && ((i % MagickMax(tick,1)) == 0))
+    (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double) residual);
+}
+
+static void ReportBlendTitle(const BlendRelaxation *relaxation,
+  const MagickBooleanType verbose)
+{
+  if (verbose == MagickFalse)
+    return;
+  if (relaxation->divergent_image != (Image *) NULL)
+    (void) FormatLocaleFile(stderr,"saliency blending:\n");
+  else
+    (void) FormatLocaleFile(stderr,"seamless blending:\n");
+}
+
+static Image *CloneBlendResidual(Image *residual_image,
+  const Image *relax_image,ExceptionInfo *exception)
+{
+  if (residual_image != (Image *) NULL)
+    residual_image=DestroyImage(residual_image);
+  return(CloneImage(relax_image,0,0,MagickTrue,exception));
+}
+
+static MagickBooleanType RelaxBlendStep(const BlendRelaxation *relaxation,
+  const KernelInfo *kernel_info,double *residual,ExceptionInfo *exception)
+{
+  Image
+    *convolve_image,
+    *sum_image;
+
+  const BlendSumWeights difference = { 1.0, -1.0 };
+  const CompositePlacement origin = { MagickTrue, 0, 0 };
+
+  convolve_image=ConvolveImage(*relaxation->relax_image,kernel_info,exception);
+  if (convolve_image == (Image *) NULL)
+    return(MagickFalse);
+  *relaxation->relax_image=DestroyImage(*relaxation->relax_image);
+  *relaxation->relax_image=convolve_image;
+  if (relaxation->divergent_image != (Image *) NULL)
+    {
+      sum_image=BlendSumImage(*relaxation->relax_image,
+        relaxation->divergent_image,&difference,exception);
+      if (sum_image == (Image *) NULL)
+        return(MagickFalse);
+      *relaxation->relax_image=DestroyImage(*relaxation->relax_image);
+      *relaxation->relax_image=sum_image;
+    }
+  if (CompositeOverImage(*relaxation->relax_image,relaxation->anchor_image,
+      &origin,exception) == MagickFalse)
+    return(MagickFalse);
+  return(BlendRMSEResidual(*relaxation->relax_image,
+    *relaxation->residual_image,residual,exception));
+}
+
+static MagickBooleanType RelaxBlendImage(Image *image,
+  const BlendRelaxation *relaxation,const BlendRequest *request,
+  ExceptionInfo *exception)
+{
+  KernelInfo
+    *kernel_info;
+
+  MagickBooleanType
+    verbose;
+
+  ssize_t
+    i;
+
+  *relaxation->residual_image=CloneImage(*relaxation->relax_image,0,0,
+    MagickTrue,exception);
+  if (*relaxation->residual_image == (Image *) NULL)
+    {
+      ReleaseBlendImages(relaxation->residual_failure);
+      return(MagickFalse);
+    }
+  /*
+    Convolve relaxed image and blur area of interest.
+  */
+  kernel_info=AcquireKernelInfo("3x3:0,0.25,0,0.25,0,0.25,0,0.25,0",exception);
+  if (kernel_info == (KernelInfo *) NULL)
+    {
+      ReleaseBlendImages(relaxation->kernel_failure);
+      return(MagickFalse);
+    }
+  verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
+  ReportBlendTitle(relaxation,verbose);
+  for (i=0; i < (ssize_t) request->iterations; i++)
+  {
+    double
+      residual = 1.0;
+
+    if (RelaxBlendStep(relaxation,kernel_info,&residual,
+        exception) == MagickFalse)
+      break;
+    ReportBlendIteration(verbose,i,request->tick,residual);
+    if (residual < request->residual_threshold)
+      {
+        ReportBlendResidual(verbose,i,residual);
+        break;
+      }
+    *relaxation->residual_image=CloneBlendResidual(
+      *relaxation->residual_image,*relaxation->relax_image,exception);
+    if (*relaxation->residual_image == (Image *) NULL)
+      break;
+  }
+  kernel_info=DestroyKernelInfo(kernel_info);
+  return(MagickTrue);
+}
+
 static MagickBooleanType SaliencyBlendImage(Image *image,
   const Image *source_image,const BlendRequest *request,
   ExceptionInfo *exception)
@@ -1899,12 +2032,8 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
     *relax_image,
     *residual_image = (Image *) NULL;
 
-  KernelInfo
-    *kernel_info;
-
   MagickBooleanType
-    status = MagickTrue,
-    verbose = MagickFalse;
+    status = MagickTrue;
 
   RectangleInfo
     crop_info = {
@@ -1914,10 +2043,12 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
       request->y_offset
     };
 
-  ssize_t
-    i;
-
   const CompositePlacement placement = { MagickTrue, request->x_offset, request->y_offset };
+
+  Image
+    **const residual_failure[] = { &crop_image, &relax_image, NULL },
+    **const kernel_failure[] = { &crop_image, &residual_image, &relax_image,
+      NULL };
 
   /*
     Saliency blend composite operator.
@@ -1947,68 +2078,14 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
       divergent_image=DestroyImage(divergent_image);
       return(MagickFalse);
     }
-  residual_image=CloneImage(relax_image,0,0,MagickTrue,exception);
-  if (residual_image == (Image *) NULL)
-    {
-      crop_image=DestroyImage(crop_image);
-      relax_image=DestroyImage(relax_image);
-      return(MagickFalse);
-    }
-  /*
-    Convolve relaxed image and blur area of interest.
-  */
-  kernel_info=AcquireKernelInfo("3x3:0,0.25,0,0.25,0,0.25,0,0.25,0",exception);
-  if (kernel_info == (KernelInfo *) NULL)
-    {
-      crop_image=DestroyImage(crop_image);
-      residual_image=DestroyImage(residual_image);
-      relax_image=DestroyImage(relax_image);
-      return(MagickFalse);
-    }
-  verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
-  if (verbose != MagickFalse)
-    (void) FormatLocaleFile(stderr,"saliency blending:\n");
-  for (i=0; i < (ssize_t) request->iterations; i++)
   {
-    double
-      residual = 1.0;
+    const BlendRelaxation
+      relaxation = { crop_image, divergent_image, &relax_image,
+        &residual_image, residual_failure, kernel_failure };
 
-    Image
-      *convolve_image,
-      *sum_image;
-
-    const BlendSumWeights difference = { 1.0, -1.0 };
-    const CompositePlacement origin = { MagickTrue, 0, 0 };
-
-    convolve_image=ConvolveImage(relax_image,kernel_info,exception);
-    if (convolve_image == (Image *) NULL)
-      break;
-    relax_image=DestroyImage(relax_image);
-    relax_image=convolve_image;
-    sum_image=BlendSumImage(relax_image,divergent_image,&difference,exception);
-    if (sum_image == (Image *) NULL)
-      break;
-    relax_image=DestroyImage(relax_image);
-    relax_image=sum_image;
-    status=CompositeOverImage(relax_image,crop_image,&origin,exception);
-    if (status == MagickFalse)
-      break;
-    status=BlendRMSEResidual(relax_image,residual_image,&residual,exception);
-    if (status == MagickFalse)
-      break;
-    if ((verbose != MagickFalse) && ((i % MagickMax(request->tick,1)) == 0))
-      (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double) residual);
-    if (residual < request->residual_threshold)
-      {
-        ReportBlendResidual(verbose,i,residual);
-        break;
-      }
-    residual_image=DestroyImage(residual_image);
-    residual_image=CloneImage(relax_image,0,0,MagickTrue,exception);
-    if (residual_image == (Image *) NULL)
-      break;
+    if (RelaxBlendImage(image,&relaxation,request,exception) == MagickFalse)
+      return(MagickFalse);
   }
-  kernel_info=DestroyKernelInfo(kernel_info);
   crop_image=DestroyImage(crop_image);
   divergent_image=DestroyImage(divergent_image);
   residual_image=DestroyImage(residual_image);
@@ -2032,12 +2109,8 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
     *residual_image,
     *sum_image;
 
-  KernelInfo
-    *kernel_info;
-
   MagickBooleanType
-    status = MagickTrue,
-    verbose = MagickFalse;
+    status = MagickTrue;
 
   RectangleInfo
     crop_info = {
@@ -2047,12 +2120,14 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
       request->y_offset
     };
 
-  ssize_t
-    i;
-
   const BlendSumWeights difference = { 1.0, -1.0 };
   const BlendSumWeights sum = { 1.0, 1.0 };
   const CompositePlacement placement = { MagickTrue, request->x_offset, request->y_offset };
+
+  Image
+    **const residual_failure[] = { &relax_image, &mean_image, NULL },
+    **const kernel_failure[] = { &residual_image, &relax_image, &mean_image,
+      NULL };
 
   /*
     Seamless blend composite operator.
@@ -2083,62 +2158,14 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
       mean_image=DestroyImage(mean_image);
       return(MagickFalse);
     }
-  residual_image=CloneImage(relax_image,0,0,MagickTrue,exception);
-  if (residual_image == (Image *) NULL)
-    {
-      relax_image=DestroyImage(relax_image);
-      mean_image=DestroyImage(mean_image);
-      return(MagickFalse);
-    }
-  /*
-    Convolve relaxed image and blur area of interest.
-  */
-  kernel_info=AcquireKernelInfo("3x3:0,0.25,0,0.25,0,0.25,0,0.25,0",exception);
-  if (kernel_info == (KernelInfo *) NULL)
-    {
-      residual_image=DestroyImage(residual_image);
-      relax_image=DestroyImage(relax_image);
-      mean_image=DestroyImage(mean_image);
-      return(MagickFalse);
-    }
-  verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
-  if (verbose != MagickFalse)
-    (void) FormatLocaleFile(stderr,"seamless blending:\n");
-  for (i=0; i < (ssize_t) request->iterations; i++)
   {
-    double
-      residual = 1.0;
+    const BlendRelaxation
+      relaxation = { mean_image, (Image *) NULL, &relax_image,
+        &residual_image, residual_failure, kernel_failure };
 
-    Image
-      *convolve_image;
-
-    const CompositePlacement origin = { MagickTrue, 0, 0 };
-
-    convolve_image=ConvolveImage(relax_image,kernel_info,exception);
-    if (convolve_image == (Image *) NULL)
-      break;
-    relax_image=DestroyImage(relax_image);
-    relax_image=convolve_image;
-    status=CompositeOverImage(relax_image,mean_image,&origin,exception);
-    if (status == MagickFalse)
-      break;
-    status=BlendRMSEResidual(relax_image,residual_image,&residual,exception);
-    if (status == MagickFalse)
-      break;
-    if ((verbose != MagickFalse) && ((i % MagickMax(request->tick,1)) == 0))
-      (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double) residual);
-    if (residual < request->residual_threshold)
-      {
-        ReportBlendResidual(verbose,i,residual);
-        break;
-      }
-    if (residual_image != (Image *) NULL)
-      residual_image=DestroyImage(residual_image);
-    residual_image=CloneImage(relax_image,0,0,MagickTrue,exception);
-    if (residual_image == (Image *) NULL)
-      break;
+    if (RelaxBlendImage(image,&relaxation,request,exception) == MagickFalse)
+      return(MagickFalse);
   }
-  kernel_info=DestroyKernelInfo(kernel_info);
   mean_image=DestroyImage(mean_image);
   residual_image=DestroyImage(residual_image);
   /*
