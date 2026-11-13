@@ -14364,6 +14364,34 @@ static int CloseMenuWidget(const MenuEventContext *context,
   return((*selection_info).id);
 }
 
+static void RespondToMenuEvents(const MenuEventContext *context,
+  const MenuTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  XEvent
+    event;
+
+  do
+  {
+    UpdateMenuLayout(context,targets);
+    RedrawMenuWidget(context,targets);
+    DrawMenuLine(context,targets);
+    /*
+      Wait for next event.
+    */
+    (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
+    HandleMenuEvent(context,event,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -14384,9 +14412,6 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
 
   size_t
     state;
-
-  XEvent
-    event;
 
   XFontStruct
     *font_info;
@@ -14471,17 +14496,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   event_context.height=height;
   event_context.title=title;
   event_context.title_height=title_height;
-  do
-  {
-    UpdateMenuLayout(&event_context,&targets);
-    RedrawMenuWidget(&event_context,&targets);
-    DrawMenuLine(&event_context,&targets);
-    /*
-      Wait for next event.
-    */
-    (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    HandleMenuEvent(&event_context,event,&targets);
-  } while ((state & ExitState) == 0);
+  RespondToMenuEvents(&event_context,&targets);
   return(CloseMenuWidget(&event_context,&targets,cursor));
 }
 
