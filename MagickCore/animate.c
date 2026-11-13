@@ -4481,6 +4481,70 @@ static void XCreateImageWindowInfo(const AnimateWindowSetup *setup,
     PropertyChangeMask | StructureNotifyMask | SubstructureNotifyMask;
 }
 
+static void XCreateBackdropWindow(const AnimateWindowSetup *setup)
+{
+Display
+    *const display = setup->display;
+
+XResourceInfo
+    *const resource_info = setup->resource_info;
+
+XWindows
+    *const windows = setup->windows;
+
+XVisualInfo
+    *const visual_info = setup->visual_info;
+
+const Window
+    root_window = setup->root_window;
+
+XClassHint
+    *const class_hints = setup->class_hints;
+
+XWMHints
+    *const manager_hints = setup->manager_hints;
+
+char
+    **const argv = setup->argv;
+
+const int
+    argc = setup->argc;
+
+  XGetWindowInfo(display,visual_info,setup->map_info,setup->pixel,
+    setup->font_info,resource_info,&windows->backdrop);
+  if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
+    {
+      /*
+        Initialize backdrop window.
+      */
+      windows->backdrop.x=0;
+      windows->backdrop.y=0;
+      (void) CloneString(&windows->backdrop.name,"ImageMagick Backdrop");
+      windows->backdrop.flags=(size_t) (USSize | USPosition);
+      windows->backdrop.width=(unsigned int)
+        XDisplayWidth(display,visual_info->screen);
+      windows->backdrop.height=(unsigned int)
+        XDisplayHeight(display,visual_info->screen);
+      windows->backdrop.border_width=0;
+      windows->backdrop.immutable=MagickTrue;
+      windows->backdrop.attributes.do_not_propagate_mask=ButtonPressMask |
+        ButtonReleaseMask;
+      windows->backdrop.attributes.event_mask=ButtonPressMask | KeyPressMask |
+        StructureNotifyMask;
+      manager_hints->flags=IconWindowHint | InputHint | StateHint;
+      manager_hints->icon_window=windows->icon.id;
+      manager_hints->input=MagickTrue;
+      manager_hints->initial_state=
+        resource_info->iconic ? IconicState : NormalState;
+      XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+        &windows->backdrop);
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),
+          "Window id: 0x%lx (backdrop)",windows->backdrop.id);
+      XCenterImageOnBackdrop(display,windows,visual_info);
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4669,39 +4733,7 @@ MagickExport Image *XAnimateImages(Display *display,
     Initialize Image window.
   */
   XCreateImageWindowInfo(&setup,exception);
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->backdrop);
-  if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
-    {
-      /*
-        Initialize backdrop window.
-      */
-      windows->backdrop.x=0;
-      windows->backdrop.y=0;
-      (void) CloneString(&windows->backdrop.name,"ImageMagick Backdrop");
-      windows->backdrop.flags=(size_t) (USSize | USPosition);
-      windows->backdrop.width=(unsigned int)
-        XDisplayWidth(display,visual_info->screen);
-      windows->backdrop.height=(unsigned int)
-        XDisplayHeight(display,visual_info->screen);
-      windows->backdrop.border_width=0;
-      windows->backdrop.immutable=MagickTrue;
-      windows->backdrop.attributes.do_not_propagate_mask=ButtonPressMask |
-        ButtonReleaseMask;
-      windows->backdrop.attributes.event_mask=ButtonPressMask | KeyPressMask |
-        StructureNotifyMask;
-      manager_hints->flags=IconWindowHint | InputHint | StateHint;
-      manager_hints->icon_window=windows->icon.id;
-      manager_hints->input=MagickTrue;
-      manager_hints->initial_state=
-        resource_info->iconic ? IconicState : NormalState;
-      XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-        &windows->backdrop);
-      if (resource_info->debug != MagickFalse)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),
-          "Window id: 0x%lx (backdrop)",windows->backdrop.id);
-      XCenterImageOnBackdrop(display,windows,visual_info);
-    }
+  XCreateBackdropWindow(&setup);
   manager_hints->flags=IconWindowHint | InputHint | StateHint;
   manager_hints->icon_window=windows->icon.id;
   manager_hints->input=MagickTrue;
