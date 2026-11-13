@@ -2377,6 +2377,18 @@ static MagickBooleanType OpenFileListDirectory(const char *directory,
   return(MagickTrue);
 }
 
+static char **SortFileList(char **filelist,const size_t *number_entries)
+{
+  if (filelist == (char **) NULL)
+    return((char **) NULL);
+  /*
+    Sort filelist in ascending order.
+  */
+  qsort((void *) filelist,(size_t) *number_entries,sizeof(*filelist),
+    FileCompare);
+  return(filelist);
+}
+
 MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   size_t *number_entries)
 {
@@ -2449,14 +2461,7 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   }
   buffer=(struct dirent *) RelinquishMagickMemory(buffer);
   (void) closedir(current_directory);
-  if (filelist == (char **) NULL)
-    return((char **) NULL);
-  /*
-    Sort filelist in ascending order.
-  */
-  qsort((void *) filelist,(size_t) *number_entries,sizeof(*filelist),
-    FileCompare);
-  return(filelist);
+  return(SortFileList(filelist,number_entries));
 }
 
 /*
