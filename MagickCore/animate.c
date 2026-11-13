@@ -5327,6 +5327,27 @@ static void XHandleAnimateWindowChange(
   }
 }
 
+static void XRunCommandWindow(const AnimateEventContext *event_context,
+  char *command,const AnimateCommandTargets *command_targets)
+{
+  AnimateCommandWidget
+    command_widget;
+
+  /*
+    Select a command from the Command widget.
+  */
+  command_widget.display=event_context->display;
+  command_widget.resource_info=event_context->resource_info;
+  command_widget.windows=event_context->windows;
+  command_widget.exception=event_context->exception;
+  command_widget.CommandMenu=CommandMenu;
+  command_widget.CommandMenus=CommandMenus;
+  command_widget.Menus=Menus;
+  command_widget.Commands=Commands;
+  command_widget.command=command;
+  XRunCommandWidget(&command_widget,command_targets);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -5575,22 +5596,7 @@ MagickExport Image *XAnimateImages(Display *display,
     XNextAnimateEvent(display,windows,&event);
     if (event.xany.window == windows->command.id)
       {
-        AnimateCommandWidget
-          command_widget;
-
-        /*
-          Select a command from the Command widget.
-        */
-        command_widget.display=display;
-        command_widget.resource_info=resource_info;
-        command_widget.windows=windows;
-        command_widget.exception=exception;
-        command_widget.CommandMenu=CommandMenu;
-        command_widget.CommandMenus=CommandMenus;
-        command_widget.Menus=Menus;
-        command_widget.Commands=Commands;
-        command_widget.command=command;
-        XRunCommandWidget(&command_widget,&command_targets);
+        XRunCommandWindow(&event_context,command,&command_targets);
         continue;
       }
     switch (event.type)
