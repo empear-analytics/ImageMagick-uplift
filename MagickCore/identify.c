@@ -2087,6 +2087,19 @@ static void GetRequestedMoments(const Image *image,
     }
 }
 
+static void PrintImagePermissions(FILE *file,const struct stat *properties)
+{
+  if (properties->st_mode != 0)
+    {
+      static const char *rwx[] =
+        { "---", "--x", "-w-", "-wx", "r--", "r-x", "rw-", "rwx"};
+      (void) FormatLocaleFile(file,"  Permissions: %s%s%s\n",
+        rwx[(properties->st_mode >> 6) & 0x07],
+        rwx[(properties->st_mode >> 3) & 0x07],
+        rwx[(properties->st_mode >> 0) & 0x07]);
+    }
+}
+
 static MagickBooleanType PrintImageLocations(Image *image,FILE *file,
   const char *locate,ExceptionInfo *exception)
 {
@@ -2223,15 +2236,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   (void) FormatLocaleFile(file,"Image:\n  Filename: %s\n",image->filename);
   PrintImageBaseFilename(file,image);
   properties=(*GetBlobProperties(image));
-  if (properties.st_mode != 0)
-    {
-      static const char *rwx[] =
-        { "---", "--x", "-w-", "-wx", "r--", "r-x", "rw-", "rwx"};
-      (void) FormatLocaleFile(file,"  Permissions: %s%s%s\n",
-        rwx[(properties.st_mode >> 6) & 0x07],
-        rwx[(properties.st_mode >> 3) & 0x07],
-        rwx[(properties.st_mode >> 0) & 0x07]);
-    }
+  PrintImagePermissions(file,&properties);
   PrintImageFormat(file,image,exception);
   (void) FormatLocaleFile(file,"  Class: %s\n",CommandOptionToMnemonic(
     MagickClassOptions,(ssize_t) image->storage_class));
