@@ -246,6 +246,46 @@ static void EliminateColumn(long double **hp_matrix,double **vectors,
       }
 }
 
+typedef struct _GaussJordanSystem
+{
+  long double
+    **hp_matrix;
+
+  double
+    **vectors;
+
+  size_t
+    rank,
+    number_vectors;
+} GaussJordanSystem;
+
+static void NormalizePivotRow(const GaussJordanSystem *system,
+  const ssize_t column)
+{
+  long double
+    **const hp_matrix = system->hp_matrix;
+
+  double
+    **const vectors = system->vectors;
+
+  const size_t
+    rank = system->rank,
+    number_vectors = system->number_vectors;
+
+  long double
+    scale;
+
+  ssize_t
+    j;
+
+  scale=1.0L/hp_matrix[column][column];
+  hp_matrix[column][column]=1.0;
+  for (j=0; j < (ssize_t) rank; j++)
+    hp_matrix[column][j]*=scale;
+  for (j=0; j < (ssize_t) number_vectors; j++)
+    vectors[j][column]*=(double) scale;
+}
+
 static void UnscrambleColumns(long double **hp_matrix,const size_t rank,
   const ssize_t *columns,const ssize_t *rows)
 {
@@ -264,8 +304,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
 {
 
   long double
-    **hp_matrix = (long double **) NULL,
-    scale;
+    **hp_matrix = (long double **) NULL;
 
   ssize_t
     column,
@@ -301,6 +340,9 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   (void) memset(pivots,0,rank*sizeof(*pivots));
   for (i=0; i < (ssize_t) rank; i++)
   {
+    const GaussJordanSystem
+      system = { hp_matrix, vectors, rank, number_vectors };
+
     long double
       max = 0.0;
 
@@ -321,12 +363,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
     columns[i]=column;
     if (fabsl(hp_matrix[column][column]) < LDBL_MIN)
       ThrowGaussJordanException();  /* Singular matrix */
-    scale=1.0L/hp_matrix[column][column];
-    hp_matrix[column][column]=1.0;
-    for (j=0; j < (ssize_t) rank; j++)
-      hp_matrix[column][j]*=scale;
-    for (j=0; j < (ssize_t) number_vectors; j++)
-      vectors[j][column]*=(double) scale;
+    NormalizePivotRow(&system,column);
     EliminateColumn(hp_matrix,vectors,rank,number_vectors,column);
   }
   UnscrambleColumns(hp_matrix,rank,columns,rows);
