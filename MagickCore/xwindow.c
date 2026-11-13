@@ -2098,6 +2098,55 @@ static void XDrawArcElement(Display *display,const Pixmap draw_pixmap,
   }
 }
 
+static void XDrawElementToPixmap(Display *display,const Pixmap draw_pixmap,
+  const GC draw_context,const XDrawInfo *draw_info)
+{
+  /*
+    Clear pixmap.
+  */
+  (void) XFillRectangle(display,draw_pixmap,draw_context,0,0,draw_info->width,
+    draw_info->height);
+  /*
+    Draw line to pixmap.
+  */
+  (void) XSetBackground(display,draw_context,0);
+  (void) XSetForeground(display,draw_context,(size_t) (~0));
+  if (draw_info->stipple !=  (Pixmap) NULL)
+    {
+      (void) XSetFillStyle(display,draw_context,FillOpaqueStippled);
+      (void) XSetStipple(display,draw_context,draw_info->stipple);
+    }
+  switch (draw_info->element)
+  {
+    default:
+    {
+      XDrawArcElement(display,draw_pixmap,draw_context,draw_info);
+      break;
+    }
+    case PolygonElement:
+    {
+      XPoint
+        *coordinate_info;
+
+      coordinate_info=draw_info->coordinate_info;
+      (void) XDrawLines(display,draw_pixmap,draw_context,coordinate_info,
+        (int) draw_info->number_coordinates,CoordModeOrigin);
+      (void) XDrawLine(display,draw_pixmap,draw_context,
+        coordinate_info[draw_info->number_coordinates-1].x,
+        coordinate_info[draw_info->number_coordinates-1].y,
+        coordinate_info[0].x,coordinate_info[0].y);
+      break;
+    }
+    case FillPolygonElement:
+    {
+      (void) XFillPolygon(display,draw_pixmap,draw_context,
+        draw_info->coordinate_info,(int) draw_info->number_coordinates,Complex,
+        CoordModeOrigin);
+      break;
+    }
+  }
+}
+
 MagickPrivate MagickBooleanType XDrawImage(Display *display,
   const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
   ExceptionInfo *exception)
@@ -2163,50 +2212,7 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
     (GCBackground | GCForeground | GCLineWidth),&context_values);
   if (draw_context == (GC) NULL)
     return(MagickFalse);
-  /*
-    Clear pixmap.
-  */
-  (void) XFillRectangle(display,draw_pixmap,draw_context,0,0,draw_info->width,
-    draw_info->height);
-  /*
-    Draw line to pixmap.
-  */
-  (void) XSetBackground(display,draw_context,0);
-  (void) XSetForeground(display,draw_context,(size_t) (~0));
-  if (draw_info->stipple !=  (Pixmap) NULL)
-    {
-      (void) XSetFillStyle(display,draw_context,FillOpaqueStippled);
-      (void) XSetStipple(display,draw_context,draw_info->stipple);
-    }
-  switch (draw_info->element)
-  {
-    default:
-    {
-      XDrawArcElement(display,draw_pixmap,draw_context,draw_info);
-      break;
-    }
-    case PolygonElement:
-    {
-      XPoint
-        *coordinate_info;
-
-      coordinate_info=draw_info->coordinate_info;
-      (void) XDrawLines(display,draw_pixmap,draw_context,coordinate_info,
-        (int) draw_info->number_coordinates,CoordModeOrigin);
-      (void) XDrawLine(display,draw_pixmap,draw_context,
-        coordinate_info[draw_info->number_coordinates-1].x,
-        coordinate_info[draw_info->number_coordinates-1].y,
-        coordinate_info[0].x,coordinate_info[0].y);
-      break;
-    }
-    case FillPolygonElement:
-    {
-      (void) XFillPolygon(display,draw_pixmap,draw_context,
-        draw_info->coordinate_info,(int) draw_info->number_coordinates,Complex,
-        CoordModeOrigin);
-      break;
-    }
-  }
+  XDrawElementToPixmap(display,draw_pixmap,draw_context,draw_info);
   (void) XFreeGC(display,draw_context);
   /*
     Initialize X image.
