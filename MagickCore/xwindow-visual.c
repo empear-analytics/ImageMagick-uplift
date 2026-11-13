@@ -452,6 +452,88 @@ static MagickBooleanType XMatchStandardColormap(
   return(MagickTrue);
 }
 
+typedef struct _VisualSelection
+{
+  Display
+    *display;
+
+  char
+    *map_type;
+
+  XVisualInfo
+    *visual_list;
+
+  int
+    number_visuals;
+} VisualSelection;
+
+static MagickBooleanType XSelectVisualID(const VisualSelection *selection,
+  XVisualInfo *visual_template,XStandardColormap *map_info,
+  XResourceInfo *resource_info)
+{
+  Display
+    *const display = selection->display;
+
+  char
+    *const map_type = selection->map_type;
+
+  XVisualInfo
+    *const visual_list = selection->visual_list;
+
+  const int
+    number_visuals = selection->number_visuals;
+
+  XVisualInfo
+    *visual_info;
+
+  if ((map_info != (XStandardColormap *) NULL) && (map_type != (char *) NULL))
+    {
+      int
+        number_maps;
+
+      Status
+        status;
+
+      XStandardColormap
+        *map_list;
+
+      const StandardColormapTargets
+        targets = { &status,&map_list,&number_maps };
+
+      if (XGetStandardColormapList(display,map_type,resource_info,&targets) ==
+          MagickFalse)
+        return(MagickFalse);
+      /*
+        Search all Standard Colormaps and visuals for ids that match.
+      */
+      *map_info=map_list[0];
+#if !defined(PRE_R4_ICCCM)
+      {
+        const StandardColormapSearch
+          search = { visual_list,map_list,map_type,number_maps,
+            number_visuals };
+
+        if (XMatchStandardColormap(&search,visual_template,map_info) ==
+            MagickFalse)
+          return(MagickFalse);
+      }
+#endif
+      if (map_info->colormap == (Colormap) NULL)
+        {
+          ThrowXWindowException(XServerError,"StandardColormapIsNotInitialized",
+            map_type);
+          return(MagickFalse);
+        }
+      (void) XFree((void *) map_list);
+    }
+  else
+    {
+      visual_info=XPickRichestVisual(visual_list,number_visuals);
+      (*visual_template).visualid=XVisualIDFromVisual(visual_info->visual);
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   XStandardColormap *map_info,XResourceInfo *resource_info)
 {
@@ -508,51 +590,14 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
         XVisualClassName(visual_list->klass));
     }
   resource_info->color_recovery=MagickFalse;
-  if ((map_info != (XStandardColormap *) NULL) && (map_type != (char *) NULL))
-    {
-      int
-        number_maps;
+  {
+    const VisualSelection
+      selection = { display,map_type,visual_list,number_visuals };
 
-      Status
-        status;
-
-      XStandardColormap
-        *map_list;
-
-      const StandardColormapTargets
-        targets = { &status,&map_list,&number_maps };
-
-      if (XGetStandardColormapList(display,map_type,resource_info,&targets) ==
-          MagickFalse)
-        return((XVisualInfo *) NULL);
-      /*
-        Search all Standard Colormaps and visuals for ids that match.
-      */
-      *map_info=map_list[0];
-#if !defined(PRE_R4_ICCCM)
-      {
-        const StandardColormapSearch
-          search = { visual_list,map_list,map_type,number_maps,
-            number_visuals };
-
-        if (XMatchStandardColormap(&search,&visual_template,map_info) ==
-            MagickFalse)
-          return((XVisualInfo *) NULL);
-      }
-#endif
-      if (map_info->colormap == (Colormap) NULL)
-        {
-          ThrowXWindowException(XServerError,"StandardColormapIsNotInitialized",
-            map_type);
-          return((XVisualInfo *) NULL);
-        }
-      (void) XFree((void *) map_list);
-    }
-  else
-    {
-      visual_info=XPickRichestVisual(visual_list,number_visuals);
-      visual_template.visualid=XVisualIDFromVisual(visual_info->visual);
-    }
+    if (XSelectVisualID(&selection,&visual_template,map_info,resource_info) ==
+        MagickFalse)
+      return((XVisualInfo *) NULL);
+  }
   (void) XFree((void *) visual_list);
   /*
     Retrieve only one visual by its screen & id number.
