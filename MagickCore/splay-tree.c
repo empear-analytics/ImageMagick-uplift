@@ -80,6 +80,14 @@ typedef struct _NodeInfo
     *right;
 } NodeInfo;
 
+typedef struct _SplayPath
+{
+  NodeInfo
+    **node,
+    **parent,
+    **grandparent;
+} SplayPath;
+
 struct _SplayTreeInfo
 {
   NodeInfo
@@ -1473,10 +1481,15 @@ static NodeInfo **GetSplayChildLink(NodeInfo *n,const int compare)
 }
 
 static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
-  const void *key,NodeInfo **node,NodeInfo **parent,NodeInfo **grandparent)
+  const void *key,const SplayPath *path)
 {
   int
     compare;
+
+  NodeInfo
+    **const node = path->node,
+    **const parent = path->parent,
+    **const grandparent = path->grandparent;
 
   NodeInfo
     *n,
@@ -1494,12 +1507,18 @@ static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
   next=GetSplayChildLink(n,compare);
   if (next != (NodeInfo **) NULL)
     {
+      SplayPath
+        next_path;
+
       if (depth >= MaxSplayTreeDepth)
         {
           splay_tree->balance=MagickTrue;
           return(n);
         }
-      n=Splay(splay_tree,depth+1,key,next,node,parent);
+      next_path.node=next;
+      next_path.parent=node;
+      next_path.grandparent=parent;
+      n=Splay(splay_tree,depth+1,key,&next_path);
       if ((n != *node) || (splay_tree->balance != MagickFalse))
         return(n);
     }
@@ -1528,17 +1547,24 @@ static MagickBooleanType IsSplayKeyAtRoot(SplayTreeInfo *splay_tree,
 
 static void SplaySplayTree(SplayTreeInfo *splay_tree,const void *key)
 {
+  SplayPath
+    root_path;
+
   if (splay_tree->root == (NodeInfo *) NULL)
     return;
   if (IsSplayKeyAtRoot(splay_tree,key) != MagickFalse)
     return;
-  (void) Splay(splay_tree,0UL,key,&splay_tree->root,(NodeInfo **) NULL,
-    (NodeInfo **) NULL);
+  root_path.node=(&splay_tree->root);
+  root_path.parent=(NodeInfo **) NULL;
+  root_path.grandparent=(NodeInfo **) NULL;
+  (void) Splay(splay_tree,0UL,key,&root_path);
   if (splay_tree->balance != MagickFalse)
     {
       BalanceSplayTree(splay_tree);
-      (void) Splay(splay_tree,0UL,key,&splay_tree->root,(NodeInfo **) NULL,
-        (NodeInfo **) NULL);
+      root_path.node=(&splay_tree->root);
+      root_path.parent=(NodeInfo **) NULL;
+      root_path.grandparent=(NodeInfo **) NULL;
+      (void) Splay(splay_tree,0UL,key,&root_path);
       if (splay_tree->balance != MagickFalse)
         ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
     }
