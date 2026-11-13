@@ -551,6 +551,20 @@ static char *PrepareDelegateCommand(const MagickBooleanType asynchronous,
   return(sanitize_command);
 }
 
+static void ReportDelegateFailure(const char *sanitize_command,
+  const char *message,const int status,ExceptionInfo *exception)
+{
+  if (status < 0)
+    {
+      if ((message != (char *) NULL) && (*message != '\0'))
+        (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
+          "FailedToExecuteCommand","`%s' (%s)",sanitize_command,message);
+      else
+        (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
+          "FailedToExecuteCommand","`%s' (%d)",sanitize_command,status);
+    }
+}
+
 MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   const MagickBooleanType verbose,const char *command,char *message,
   ExceptionInfo *exception)
@@ -617,15 +631,7 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
 #else
 #  error No suitable system() method.
 #endif
-  if (status < 0)
-    {
-      if ((message != (char *) NULL) && (*message != '\0'))
-        (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
-          "FailedToExecuteCommand","`%s' (%s)",sanitize_command,message);
-      else
-        (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
-          "FailedToExecuteCommand","`%s' (%d)",sanitize_command,status);
-    }
+  ReportDelegateFailure(sanitize_command,message,status,exception);
   sanitize_command=DestroyString(sanitize_command);
   DestroyDelegateArguments(arguments,number_arguments);
   return(status);
