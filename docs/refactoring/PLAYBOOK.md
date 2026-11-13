@@ -15384,6 +15384,81 @@ Lane: b
 
 ---
 
+## Recipe IC - Inline Cast-Only Locals into Their One Use
+
+**Use when:** CodeScene reports *Code Duplication* between short functions whose bodies
+only convert their parameters through locals and pass them on, as `splay-tree.c`'s
+comparison callbacks `CompareSplayTreeString` and `CompareSplayTreeStringInfo` do:
+each declares `p` and `q`, sets them to casts of `target` and `source`, and returns a
+comparison of `p` and `q`. The declarations and assignments are the duplicated text.
+
+**Not covered by:** Recipe IX, which inlines a local set from an integer constant
+expression, not from a cast of a parameter; Recipe D, which moves a shared block into a
+helper (here the copies differ in their types and called function, and a helper would
+be one more copy); Recipe TM and MA, whose copies differ in a member designator.
+
+**How:**
+
+1. In each function, every local `v` to inline is declared without an initialiser and
+   assigned exactly once, by `v=(T) a;`, where `T` is `v`'s exact declared type and `a`
+   is a parameter that nothing in the function assigns. After that assignment `v` is
+   read exactly once, as a whole argument of a call or operand of the `return`, and its
+   address is never taken.
+2. Replace that one read of `v` by `(T) a`, the cast copied character for character.
+   Delete the assignment and the declaration of `v`. Keep the order of the arguments;
+   wrap at 80 columns as ImageMagick does.
+3. All copies that CodeScene groups together go in one commit (one finding, as Recipe D
+   does for its copies).
+4. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL`; otherwise revert.
+   Run `tools/ci_warnings.sh <file>` and `tools/cxx_warnings.sh <file>`: both `OK`.
+
+**Before:**
+
+```c
+MagickExport int CompareSplayTreeString(const void *target,const void *source)
+{
+  const char
+    *p,
+    *q;
+
+  p=(const char *) target;
+  q=(const char *) source;
+  return(LocaleCompare(p,q));
+}
+```
+
+**After:**
+
+```c
+MagickExport int CompareSplayTreeString(const void *target,const void *source)
+{
+  return(LocaleCompare((const char *) target,(const char *) source));
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `v` held the value of `(T) a` from its assignment to its
+  one read, since neither `v` nor `a` is assigned in between (step 1), and a cast has no
+  side effect; the call receives the same value of the same type. The order in which a
+  call's arguments are evaluated is unspecified in both forms, and evaluating a cast of
+  a parameter reads nothing else.
+- A local read twice, or whose address is taken, refuses the step: it is a name for a
+  value used more than once, not a conversion.
+- The object code is the compiler's to judge; step 4 is the proof.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD` and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `splay-tree.c`'s `CompareSplayTreeString` and
+`CompareSplayTreeStringInfo` (campaign B, M127 lane b round 5): after Recipe BF the
+file kept two *Code Duplication* pairs; this step on the comparison pair cleared both,
+9.38 to 10.0 in the probe. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -15740,3 +15815,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | BF | Drop the Blank Frame Rows of Doc-Comment Banners: the six rows of `%`, 77 spaces and `%` around a banner's name row are deleted in every banner of a file, nothing else; evidence guard (`obj_identical.sh` IDENTICAL); Lane: b | `locale.c`: eight functions in *Code Duplication* through their banners (CodeScene counts the banner into the function's span); probe 7.09 to 8.01, every duplication finding gone | owner |
 | 2026-11-13 | NEW | TM | Merge Twin Function Tails Differing in the Member They Read: two functions of a file whose returning tails differ only in the member of one read `e->m.f` share a `static` function taking `const T *value`; each twin keeps its opening block and returns the call with `&e->m`; evidence oracle; Lane: b | `timer.c`'s `GetElapsedTime` and `GetUserTime` (*Code Duplication*; 9.38 to 10.0) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | AT | Step 6: the `if` may have an `else` arm of the same kind; that arm alone moves (`else return(Helper(...));`), a local only it and `R` read is declared in the helper with its initialiser; Lane: b | `color.c`'s `QueryHexColor` (two bumps, one per arm) | mandate (2026-10-24) |
+| 2026-11-13 | NEW | IC | Inline Cast-Only Locals into Their One Use: a local assigned once from a cast of an unassigned parameter to its own type, and read once, is replaced at that read by the cast; declaration and assignment go; the grouped copies in one commit; evidence guard (`obj_identical.sh`); Lane: b | `splay-tree.c`'s `CompareSplayTreeString` and `CompareSplayTreeStringInfo` (*Code Duplication*; probe 9.38 to 10.0) | mandate (2026-10-24) |
