@@ -1003,6 +1003,47 @@ static const char *SkipOpenCLBenchmarkDoctype(const char *q)
   return(q);
 }
 
+typedef struct _OpenCLBenchmarkTokens
+{
+  MagickCLEnv
+    clEnv;
+
+  char
+    *keyword,
+    *token;
+
+  size_t
+    extent;
+} OpenCLBenchmarkTokens;
+
+static void ReadOpenCLBenchmarkAttribute(const OpenCLBenchmarkTokens *tokens,
+  MagickCLDeviceBenchmark **device_benchmark,const char **q)
+{
+  const MagickCLEnv
+    clEnv = tokens->clEnv;
+
+  char
+    *const keyword = tokens->keyword,
+    *const token = tokens->token;
+
+  const size_t
+    extent = tokens->extent;
+
+  if ((*device_benchmark) == (MagickCLDeviceBenchmark *) NULL)
+    return;
+  if (LocaleCompare(keyword,"/>") == 0)
+    {
+      (*device_benchmark)=EndOpenCLDeviceBenchmark(clEnv,(*device_benchmark));
+      return;
+    }
+  (void) GetNextToken((*q),(const char **) NULL,extent,token);
+  if (*token != '=')
+    return;
+  (void) GetNextToken((*q),q,extent,token);
+  (void) GetNextToken((*q),q,extent,token);
+  SetOpenCLBenchmarkAttribute((*device_benchmark),keyword,token);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -1025,6 +1066,9 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
   extent=strlen(token)+MagickPathExtent;
   for (q=(char *) xml; *q != '\0'; )
   {
+    OpenCLBenchmarkTokens
+      tokens;
+
     /*
       Interpret XML.
     */
@@ -1058,19 +1102,11 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
         device_benchmark->score=MAGICKCORE_OPENCL_UNDEFINED_SCORE;
         continue;
       }
-    if (device_benchmark == (MagickCLDeviceBenchmark *) NULL)
-      continue;
-    if (LocaleCompare(keyword,"/>") == 0)
-      {
-        device_benchmark=EndOpenCLDeviceBenchmark(clEnv,device_benchmark);
-        continue;
-      }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    SetOpenCLBenchmarkAttribute(device_benchmark,keyword,token);
+    tokens.clEnv=clEnv;
+    tokens.keyword=keyword;
+    tokens.token=token;
+    tokens.extent=extent;
+    ReadOpenCLBenchmarkAttribute(&tokens,&device_benchmark,&q);
   }
   token=(char *) RelinquishMagickMemory(token);
   device_benchmark=RelinquishDeviceBenchmark(device_benchmark);
