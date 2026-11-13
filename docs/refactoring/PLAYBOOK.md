@@ -13321,6 +13321,74 @@ Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe KE - Replace a Letter-Keyed Parser Switch by a Table of Records
+
+**Use when:** CodeScene reports *Complex Method* on a function whose loop body is a
+`switch` over one character, each group `case 'X': case 'x': { v[i]=EnumX; <test>
+break; }` assigning an enumerator and, for some groups, running the same exit test, with a
+`default:` that exits. `stream.c`'s `StreamImagePixels` (eleven letters in both cases,
+four with the CMYK test, cc 39).
+
+**Not covered by:** Recipe KS, whose groups assign a string literal and whose function
+returns it; Recipe SR, which splits the switch into functions that keep its labels.
+
+**How:**
+
+1. The loop is outside every OpenMP region. Every group assigns one enumerator to the same
+   element and either breaks or first runs one identical test (a condition, then the same
+   exit statements). The `default:` group holds the exit statements of the unknown letter.
+2. Write above the function a `typedef struct` of the key (`char`), the enumerator and one
+   flag (`MagickBooleanType`) that says whether the group runs the test, and a `static`
+   function returning a pointer to the matching element of a `static const` array, or
+   `NULL`. Each group's labels become elements (one per label, keys distinct).
+3. In the loop: `info=Helper(c);` an `if (info == NULL)` holding the `default:` statements
+   unchanged; the assignment `v[i]=info->quantum;`; then the test, written as
+   `if ((info->flag == MagickFalse) || (<test passes>)) continue;` followed by the
+   exit statements unchanged. Every `ThrowMagickException` stays in the original function.
+4. Run `tools/ci_warnings.sh <file>` (must print `OK`) and the oracle for the function.
+
+**Before:**
+
+```c
+      case 'C':
+      case 'c':
+      {
+        quantum_map[i]=CyanQuantum;
+        if (image->colorspace == CMYKColorspace)
+          break;
+        ...exit...
+      }
+```
+
+**After:**
+
+```c
+    map_info=GetStreamMapInfo(stream_info->map[i]);
+    if (map_info == (const StreamMapInfo *) NULL) { ...default exit... }
+    quantum_map[i]=map_info->quantum;
+    if ((map_info->separation == MagickFalse) ||
+        (image->colorspace == CMYKColorspace))
+      continue;
+    ...exit...
+```
+
+**Careful:**
+
+- Keys are distinct, so the first match is the only one, holding what the group assigned.
+  Letters outside the table take the `default:` exit as before; the test runs for exactly
+  the groups that ran it (the flag), and for them the exit follows the same condition.
+- The assignment happens before the test, as in the groups (it precedes the exit).
+- The table is `static const` and never written; the lookup scans at most twenty-two
+  elements per map letter, once per stream write.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-13, from `stream.c`'s `StreamImagePixels` (campaign B, M123):
+5.98 to 6.12 with the three exits kept in place. Added by Claude Code (Claude Sonnet 5.5)
+under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -13641,3 +13709,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | KS | Replace a keyed `switch` whose groups assign string literals to one local by a `static const` key/name table and a lookup loop; evidence oracle | `identify.c` `GetIPTCTagName` (cc 55); KT needs a call per group, TB needs `0..k` labels | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KR | Replace a keyed `switch` whose groups return string literals by a `static const` key/name table and a lookup loop; evidence oracle | `exception.c` `ExceptionSeverityToTag` (cc 65); KS assigns to a local, TB needs `0..k` labels | mandate (2026-10-24) |
 | 2026-11-13 | NEW | DD | Drop a `case` whose statements repeat the `default:` group; proof `obj_identical.sh` | `stream.c`'s `GetStreamPacketSize` (cc 9 to 8, 5.84 to 5.98, object code identical); DL refuses a label with its own statements | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KE | Replace a letter-keyed `switch` that assigns an enumerator (and for some letters tests then exits) by a `static const` table of records and a lookup helper; evidence oracle | `stream.c`'s `StreamImagePixels` map parser (cc 39 to 16, 5.98 to 6.12); KS assigns strings and returns, SR keeps the labels | mandate (2026-10-24) |
