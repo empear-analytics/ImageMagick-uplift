@@ -737,6 +737,23 @@ static void PrintMagicBytes(FILE *file,const MagicInfo **magic_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void PrintMagicInfoLine(FILE *file,const MagicInfo **magic_info,
+  const ssize_t i)
+{
+  ssize_t
+    j;
+
+  (void) FormatLocaleFile(file,"%s",magic_info[i]->name);
+  for (j=(ssize_t) strlen(magic_info[i]->name); j <= 9; j++)
+    (void) FormatLocaleFile(file," ");
+  (void) FormatLocaleFile(file,"%6ld ",(long) magic_info[i]->offset);
+  if (magic_info[i]->magic != (unsigned char *) NULL)
+    {
+      PrintMagicBytes(file,magic_info,i);
+    }
+  (void) FormatLocaleFile(file,"\n");
+}
+
 MagickExport MagickBooleanType ListMagicInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -749,9 +766,6 @@ MagickExport MagickBooleanType ListMagicInfo(FILE *file,
   size_t
     number_aliases;
 
-  ssize_t
-    j;
-
   if (file == (const FILE *) NULL)
     file=stdout;
   magic_info=GetMagicInfoList("*",&number_aliases,exception);
@@ -762,17 +776,7 @@ MagickExport MagickBooleanType ListMagicInfo(FILE *file,
     "-------------------------------------------------"
     "------------------------------\n");
   for (i=0; i < (ssize_t) number_aliases; i++)
-  {
-    (void) FormatLocaleFile(file,"%s",magic_info[i]->name);
-    for (j=(ssize_t) strlen(magic_info[i]->name); j <= 9; j++)
-      (void) FormatLocaleFile(file," ");
-    (void) FormatLocaleFile(file,"%6ld ",(long) magic_info[i]->offset);
-    if (magic_info[i]->magic != (unsigned char *) NULL)
-      {
-        PrintMagicBytes(file,magic_info,i);
-      }
-    (void) FormatLocaleFile(file,"\n");
-  }
+    PrintMagicInfoLine(file,magic_info,i);
   (void) fflush(file);
   magic_info=(const MagicInfo **) RelinquishMagickMemory((void *) magic_info);
   return(MagickTrue);
