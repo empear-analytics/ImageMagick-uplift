@@ -1270,6 +1270,14 @@ static inline MagickBooleanType IsMissingDataSubtype(const char *slash,
     MagickFalse);
 }
 
+static inline MagickBooleanType IsImplicitDataFormat(
+  const MagickInfo *magick_info)
+{
+  return(((magick_info == (const MagickInfo *) NULL) ||
+    (magick_info->format_type == ImplicitFormatType)) ? MagickTrue :
+    MagickFalse);
+}
+
 static void NormalizeDataImageType(char *magick)
 {
   char
@@ -1316,8 +1324,7 @@ static MagickBooleanType GetImplicitDataImageType(const char *data_url,
   magick[offset]='\0';
   NormalizeDataImageType(magick);
   magick_info=GetMagickInfo(magick,exception);
-  if ((magick_info == (const MagickInfo *) NULL) ||
-      (magick_info->format_type == ImplicitFormatType))
+  if (IsImplicitDataFormat(magick_info) != MagickFalse)
     return(MagickFalse);
   return(MagickTrue);
 }
