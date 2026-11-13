@@ -223,6 +223,13 @@ static void ResetMultilineMetrics(DrawInfo *annotate_info,TypeMetric *metrics)
   (void) memset(metrics,0,sizeof(*metrics));
 }
 
+static double GetMultilineHeight(const DrawInfo *draw_info,
+  const TypeMetric *metrics,const size_t count)
+{
+  return(count*(size_t) (metrics->ascent-metrics->descent+
+    0.5)+(count-1)*draw_info->interline_spacing);
+}
+
 MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
   const DrawInfo *draw_info,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -282,8 +289,7 @@ MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
   annotate_info->text=textlist[0];
   status=GetTypeMetrics(image,annotate_info,&extent,exception);
   *metrics=extent;
-  height=(count*(size_t) (metrics->ascent-metrics->descent+
-    0.5)+(count-1)*draw_info->interline_spacing);
+  height=GetMultilineHeight(draw_info,metrics,count);
   size=(MagickSizeType) fabs(height);
   if (AcquireMagickResource(HeightResource,size) == MagickFalse)
     {
