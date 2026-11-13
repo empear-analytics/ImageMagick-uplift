@@ -1311,6 +1311,43 @@ static void XCreateSceneXImage(const AnimateBackgroundSetup *setup,
     }
 }
 
+static void XCreateScenePixmap(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets,const int scene)
+{
+  Display
+    *const display = setup->display;
+
+  unsigned int
+    *const height = targets->height,
+    *const width = targets->width;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*window_info).pixmap=XCreatePixmap(display,(*window_info).id,(*width),
+    (*height),(*window_info).depth);
+  if ((*window_info).pixmap == (Pixmap) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
+      setup->images->filename);
+  /*
+    Display pixmap on the window.
+  */
+  if (((*width) > (*window_info).width) || ((*height) > (*window_info).height))
+    (void) XFillRectangle(display,(*window_info).pixmap,
+      (*window_info).annotate_context,0,0,(*width),(*height));
+  (void) XPutImage(display,(*window_info).pixmap,
+    (*window_info).annotate_context,(*window_info).ximage,0,0,
+    (*window_info).x,(*window_info).y,(*window_info).width,
+    (*window_info).height);
+  (void) XSetWindowBackgroundPixmap(display,(*window_info).id,
+    (*window_info).pixmap);
+  (void) XClearWindow(display,(*window_info).id);
+  (*window_info).pixmaps[scene]=(*window_info).pixmap;
+  (*window_info).matte_pixmaps[scene]=(*window_info).matte_pixmap;
+  if (setup->image_list[scene]->alpha_trait)
+    (void) XClearWindow(display,(*window_info).id);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1525,27 +1562,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     /*
       Create the X pixmap.
     */
-    window_info.pixmap=XCreatePixmap(display,window_info.id,width,height,
-      window_info.depth);
-    if (window_info.pixmap == (Pixmap) NULL)
-      ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
-        images->filename);
-    /*
-      Display pixmap on the window.
-    */
-    if ((width > window_info.width) || (height > window_info.height))
-      (void) XFillRectangle(display,window_info.pixmap,
-        window_info.annotate_context,0,0,width,height);
-    (void) XPutImage(display,window_info.pixmap,window_info.annotate_context,
-      window_info.ximage,0,0,window_info.x,window_info.y,window_info.width,
-      window_info.height);
-    (void) XSetWindowBackgroundPixmap(display,window_info.id,
-      window_info.pixmap);
-    (void) XClearWindow(display,window_info.id);
-    window_info.pixmaps[scene]=window_info.pixmap;
-    window_info.matte_pixmaps[scene]=window_info.matte_pixmap;
-    if (image_list[scene]->alpha_trait)
-      (void) XClearWindow(display,window_info.id);
+    XCreateScenePixmap(&setup,&targets,scene);
     delay=1000*image_list[scene]->delay/(size_t) MagickMax(
       image_list[scene]->ticks_per_second,1L);
     XDelay(display,resources.delay*(delay == 0 ? 10 : delay));
