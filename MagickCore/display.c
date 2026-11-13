@@ -14948,6 +14948,47 @@ static void XROIWaitCorner(const ROIContext *context,const ROITargets *targets)
   } while (((*state) & ExitState) == 0);
 }
 
+static void XROISelectRegion(const ROIContext *context,const ROITargets *targets)
+{
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  DisplayCommand
+    *const display_command = targets->display_command;
+
+  do
+  {
+    /*
+      Size rectangle as pointer moves until the mouse button is released.
+    */
+    (*x)=(int) (*roi_info).x;
+    (*y)=(int) (*roi_info).y;
+    (*roi_info).width=0;
+    (*roi_info).height=0;
+    (*state)=DefaultState;
+    XROISizeRegion(context,targets);
+    /*
+      Wait for user to grab a corner of the rectangle or press return.
+    */
+    (*state)=DefaultState;
+    (*display_command)=NullCommand;
+    (*crop_info).x=0;
+    (*crop_info).y=0;
+    (void) XMapWindow(context->display,context->windows->info.id);
+    XROIWaitCorner(context,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -15027,27 +15068,7 @@ static MagickBooleanType XROIImage(Display *display,
       return(MagickTrue);
     }
   (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-  do
-  {
-    /*
-      Size rectangle as pointer moves until the mouse button is released.
-    */
-    x=(int) roi_info.x;
-    y=(int) roi_info.y;
-    roi_info.width=0;
-    roi_info.height=0;
-    state=DefaultState;
-    XROISizeRegion(&context,&targets);
-    /*
-      Wait for user to grab a corner of the rectangle or press return.
-    */
-    state=DefaultState;
-    display_command=NullCommand;
-    crop_info.x=0;
-    crop_info.y=0;
-    (void) XMapWindow(display,windows->info.id);
-    XROIWaitCorner(&context,&targets);
-  } while ((state & ExitState) == 0);
+  XROISelectRegion(&context,&targets);
   (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
   XSetCursorState(display,windows,MagickFalse);
   if ((state & EscapeState) != 0)
