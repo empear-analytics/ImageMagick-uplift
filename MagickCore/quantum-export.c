@@ -3400,6 +3400,13 @@ static void ExportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static inline int Get1BitAboveSample(const Image *image,
+  const Quantum *magick_restrict p,const double threshold,
+  const unsigned char black,const unsigned char white)
+{
+  return(GetPixelLuma(image,p) > threshold ? black : white);
+}
+
 static inline int Get1BitOpaqueSample(const Image *image,
   const Quantum *magick_restrict p)
 {
@@ -3447,16 +3454,16 @@ static void Export1BitGrayAlphaQuantum(const Image *image,
   for (x=((ssize_t) number_pixels-3); x > 0; x-=4)
   {
     *q='\0';
-    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 7;
+    *q|=Get1BitAboveSample(image,p,threshold,black,white) << 7;
     *q|=Get1BitOpaqueSample(image,p) << 6;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 5;
+    *q|=Get1BitAboveSample(image,p,threshold,black,white) << 5;
     *q|=Get1BitOpaqueSample(image,p) << 4;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 3;
+    *q|=Get1BitAboveSample(image,p,threshold,black,white) << 3;
     *q|=Get1BitOpaqueSample(image,p) << 2;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 1;
+    *q|=Get1BitAboveSample(image,p,threshold,black,white) << 1;
     *q|=Get1BitOpaqueSample(image,p) << 0;
     p+=(ptrdiff_t) GetPixelChannels(image);
     q++;
@@ -3466,7 +3473,7 @@ static void Export1BitGrayAlphaQuantum(const Image *image,
       *q='\0';
       for (bit=0; bit <= (ssize_t) (number_pixels % 4); bit+=2)
       {
-        *q|=(GetPixelLuma(image,p) > threshold ? black : white) <<
+        *q|=Get1BitAboveSample(image,p,threshold,black,white) <<
           (7-bit);
         *q|=Get1BitOpaqueSample(image,p) << (unsigned char)
           (7-bit-1);
