@@ -2713,6 +2713,18 @@ typedef struct _AnnotateContext
 
   char
     *command;
+
+  const AnnotateFontTargets
+    *font_targets;
+
+  const AnnotateFontColorTargets
+    *font_color_targets;
+
+  const AnnotateBoxColorTargets
+    *box_color_targets;
+
+  const AnnotateRotateTargets
+    *rotate_targets;
 } AnnotateContext;
 
 static void XSetAnnotateMenuInput(const AnnotateContext *context,const int id,
@@ -2724,6 +2736,71 @@ static void XSetAnnotateMenuInput(const AnnotateContext *context,const int id,
   (*annotate_input).AnnotateMenu=AnnotateMenu;
   (*annotate_input).id=id;
   (*annotate_input).command=context->command;
+}
+
+static void XAnnotatePointerCommand(const AnnotateContext *context,
+  const AnnotateTargets *targets,const int id)
+{
+  size_t
+    *const state = targets->state;
+
+  switch (AnnotateCommands[id])
+  {
+    case AnnotateNameCommand:
+    {
+      AnnotateMenuInput
+        annotate_input;
+
+      XSetAnnotateMenuInput(context,id,&annotate_input);
+      XSelectAnnotateFont(&annotate_input,context->font_targets);
+      break;
+    }
+    case AnnotateFontColorCommand:
+    {
+      AnnotateMenuInput
+        annotate_input;
+
+      XSetAnnotateMenuInput(context,id,&annotate_input);
+      XSelectAnnotateFontColor(&annotate_input,context->font_color_targets);
+      break;
+    }
+    case AnnotateBackgroundColorCommand:
+    {
+      AnnotateMenuInput
+        annotate_input;
+
+      XSetAnnotateMenuInput(context,id,&annotate_input);
+      XSelectAnnotateBoxColor(&annotate_input,context->box_color_targets);
+      break;
+    }
+    case AnnotateRotateCommand:
+    {
+      AnnotateMenuInput
+        annotate_input;
+
+      XSetAnnotateMenuInput(context,id,&annotate_input);
+      XSelectAnnotateRotation(&annotate_input,context->rotate_targets);
+      break;
+    }
+    case AnnotateHelpCommand:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,
+        "Help Viewer - Image Annotation",ImageAnnotateHelp);
+      break;
+    }
+    case AnnotateDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
 }
 
 static MagickBooleanType XAnnotateEditImage(Display *display,
@@ -2823,6 +2900,10 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   context.resource_info=resource_info;
   context.windows=windows;
   context.command=command;
+  context.font_targets=&font_targets;
+  context.font_color_targets=&font_color_targets;
+  context.box_color_targets=&box_color_targets;
+  context.rotate_targets=&rotate_targets;
   do
   {
     if (windows->info.mapped != MagickFalse)
@@ -2847,62 +2928,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         (void) XCheckDefineCursor(display,windows->image.id,cursor);
         if (id < 0)
           continue;
-        switch (AnnotateCommands[id])
-        {
-          case AnnotateNameCommand:
-          {
-            AnnotateMenuInput
-              annotate_input;
-
-            XSetAnnotateMenuInput(&context,id,&annotate_input);
-            XSelectAnnotateFont(&annotate_input,&font_targets);
-            break;
-          }
-          case AnnotateFontColorCommand:
-          {
-            AnnotateMenuInput
-              annotate_input;
-
-            XSetAnnotateMenuInput(&context,id,&annotate_input);
-            XSelectAnnotateFontColor(&annotate_input,&font_color_targets);
-            break;
-          }
-          case AnnotateBackgroundColorCommand:
-          {
-            AnnotateMenuInput
-              annotate_input;
-
-            XSetAnnotateMenuInput(&context,id,&annotate_input);
-            XSelectAnnotateBoxColor(&annotate_input,&box_color_targets);
-            break;
-          }
-          case AnnotateRotateCommand:
-          {
-            AnnotateMenuInput
-              annotate_input;
-
-            XSetAnnotateMenuInput(&context,id,&annotate_input);
-            XSelectAnnotateRotation(&annotate_input,&rotate_targets);
-            break;
-          }
-          case AnnotateHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Annotation",ImageAnnotateHelp);
-            break;
-          }
-          case AnnotateDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
+        XAnnotatePointerCommand(&context,&targets,id);
         continue;
       }
     switch (event.type)
