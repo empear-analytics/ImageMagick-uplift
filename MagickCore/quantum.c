@@ -486,18 +486,24 @@ MagickExport void SetQuantumAlphaType(QuantumInfo *quantum_info,
 %    o depth: the quantum depth.
 %
 */
-MagickExport MagickBooleanType SetQuantumDepth(const Image *image,
-  QuantumInfo *quantum_info,const size_t depth)
+static void TraceQuantumSetter(const Image *image,
+  const QuantumInfo *quantum_info)
 {
-  /*
-    Allocate the quantum pixel buffer.
-  */
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(quantum_info != (QuantumInfo *) NULL);
   assert(quantum_info->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
+MagickExport MagickBooleanType SetQuantumDepth(const Image *image,
+  QuantumInfo *quantum_info,const size_t depth)
+{
+  /*
+    Allocate the quantum pixel buffer.
+  */
+  TraceQuantumSetter(image,quantum_info);
   quantum_info->depth=MagickMin(depth,64);
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
@@ -539,12 +545,7 @@ MagickExport MagickBooleanType SetQuantumDepth(const Image *image,
 MagickExport MagickBooleanType SetQuantumEndian(const Image *image,
   QuantumInfo *quantum_info,const EndianType endian)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(quantum_info != (QuantumInfo *) NULL);
-  assert(quantum_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceQuantumSetter(image,quantum_info);
   quantum_info->endian=endian;
   return(SetQuantumExtent(image,quantum_info));
 }
@@ -621,12 +622,7 @@ MagickExport MagickBooleanType SetQuantumExtent(const Image *image,
 MagickExport MagickBooleanType SetQuantumFormat(const Image *image,
   QuantumInfo *quantum_info,const QuantumFormatType format)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(quantum_info != (QuantumInfo *) NULL);
-  assert(quantum_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceQuantumSetter(image,quantum_info);
   quantum_info->format=format;
   return(SetQuantumExtent(image,quantum_info));
 }
@@ -718,12 +714,7 @@ MagickExport void SetQuantumPack(QuantumInfo *quantum_info,
 MagickExport MagickBooleanType SetQuantumPad(const Image *image,
   QuantumInfo *quantum_info,const size_t pad)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(quantum_info != (QuantumInfo *) NULL);
-  assert(quantum_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceQuantumSetter(image,quantum_info);
   if (pad >= (MAGICK_SSIZE_MAX/GetImageChannels(image)))
     return(MagickFalse);
   quantum_info->pad=pad;
