@@ -13017,6 +13017,15 @@ copies of blocks and leave a block's `if` where it is.
    candidate on images that take every branch (several interleaved runs, median CPU time),
    and count instructions under `valgrind --tool=callgrind`. A step more than 3% slower is
    not taken.
+7. A site may instead be one call `F(x1,...,(T) (C ? a : k),...)` of the helper's callee, in
+   which one argument is a parenthesised selection between `a` and the literal `k` that
+   the helper's else branch passes at that position, with `C` of step 1's kind or a plain
+   identifier tested as `C ? ...`; `(T)` is the cast to the parameter's own type. It
+   becomes the helper's call with `C` for `selected` (`C != 0` when `C` is not an `int`,
+   so that no wider value is narrowed), `a`, and the call's other arguments, which step 2
+   restricts as before. The helper is the one step 3 gave a function of the file's
+   if/else sites, or the same helper written for these sites alone; the script check of
+   step 4 distributes the selection over the two calls.
 
 **Before:**
 
@@ -13057,6 +13066,10 @@ static inline void CopyPixelsIf(const MagnifyPixels *magnify,
   state.
 - The sites' shared literal (`4`) stays one literal in the helper, and each call keeps the
   value it passed; no constant changes.
+- Step 7's form is the same argument read the other way: `F(m,(C ? a : k),d)` evaluates
+  `C` once, then calls `F` with `a` or `k`, which is what the helper's `if` does with the
+  call written twice; `C != 0` of an `ssize_t` that holds a comparison's `0` or `1` is the
+  same test, passed as an `int`.
 - Not a licence to merge sites that differ in the callee: `F` and `G` stay as written.
 - Compiler output differs (`tools/obj_identical.sh` prints `DIFFERENT`), which is why the
   evidence is the oracle and the timing, and the step the owner admitted for `magnify.c`
@@ -13068,8 +13081,10 @@ calls removed, each by its count) and step 6's timing quoted in the commit.
 
 **Provenance:** 2026-11-13, from `magnify.c`'s `Scale3X` (campaign A, W21 lane d): eight
 selections of `CopyPixels` over a call condition, cc 12; the file 8.84 to 9.09, beside
-Recipe NS on one site of `Xbr2X`. Added by Claude Code (Claude Sonnet 5.5) under the owner's
-leave to evolve the recipes (2026-11-10).
+Recipe NS on one site of `Xbr2X`. Step 7 (2026-11-13): `Eagle3X` and `Eagle3XB`, whose
+`(ssize_t) (corner_tl ? 0 : 4)` arguments are the same selection written in the call.
+Added by Claude Code (Claude Sonnet 5.5) under the owner's leave to evolve the recipes
+(2026-11-10).
 
 ---
 
@@ -13495,3 +13510,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | KD | Replace a Constant-Assigning Label Run with a Table Lookup: the groups of a `switch` that are `v=c;` `break;` (several labels to a group) become a `static const` table of `{label, literal}` read through a lookup function, `if (entry != NULL) v=entry->value; else` the `default:` group's text; *Careful* gives the argument (`e` evaluated once, the lookup finds an element exactly when a deleted group carried the label, the literal converted to `v`'s type as before) | `morphology.c`'s `MorphologyApply` (campaign A, W19 lane d): the stage-count `switch` (`SmoothMorphology` 4, seven labels 2, `default:` calling `SetIteratedMorphologyLimits`); probe cc 22 to 14, 6.63 to 6.70 | owner |
 | 2026-11-12 | AMEND | S | Step 2: a quoted `#include` of a header that defines objects (a file-scope initialised variable in column 0) is left out of the new file's include block, when no line of the family names an object or macro of that header; the split is refused when one does. *Careful* gives the argument | `opencl.c`'s device-property family (campaign A, W19 lane a, wide build): the copied include block included `accelerate-kernels-private.h`, which defines `accelerateKernels` and `accelerateKernels2`, and the pair failed to link (multiple definition); the family names neither, and the moved functions' object code compares unchanged | owner |
 | 2026-11-13 | NEW | CQ | Name a Selection of Calls Over Its Condition: sites `if (C) F(...); else G(...);` (one call per branch, `C` an `int` condition that may call read-only functions, the other arguments free of side effects and traps) become calls of one `static inline void` helper taking `C`'s value as `const int selected` and the sites' differing arguments; *Careful* gives the argument (`C` evaluated once before either branch, the other arguments evaluated in the branch not taken too with no effect); proof: the oracle, `--calls`, `nm` for inlining, and a timing (at most 3% slower) | `magnify.c`'s `Scale3X` (campaign A, W21 lane d): eight `if (C) CopyPixels(&magnify,a,d); else CopyPixels(&magnify,4,d);` over `PixelsEqual` and `IsScale3X*Edge` conditions, cc 12; Recipe NS refuses a call in the condition and the owner's `?:` fold for magnify (2026-11-12) leaves the decisions in place. A probe: 8.84 to 9.09 | owner |
+| 2026-11-13 | AMEND | CQ | Step 7: a site that is one call whose argument is a parenthesised `(C ? a : k)`, `k` the literal the helper's else branch passes, becomes the helper's call (`C != 0` for a `C` that is not an `int`); *Careful* gives the argument (the same selection with the call written once; `C` evaluated once) | `magnify.c`'s `Eagle3X` (three sites) and `Eagle3XB` (four): `CopyPixels(&magnify,(ssize_t) (corner_tr ? 1 : 4),2);` with `corner_tr` a `ssize_t` holding a comparison, beside `Scale3X`'s if/else sites; a probe: the file 9.38 to 10.0 together with `Scale2X` and Recipe P on `IsEpbx2XBlendable` | owner |
