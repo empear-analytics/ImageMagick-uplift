@@ -6707,8 +6707,6 @@ static void XCropWaitEvent(const CropContext *context,
       XCropKeyPress(&event_input,event,targets);
       break;
     }
-    case KeyRelease:
-      break;
     case MotionNotify:
     {
       XCropMotion(&event_input,targets);
