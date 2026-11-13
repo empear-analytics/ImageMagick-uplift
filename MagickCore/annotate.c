@@ -2919,6 +2919,26 @@ static PointInfo GetPostscriptExtent(const DrawInfo *draw_info)
   return(extent);
 }
 
+static void SetPostscriptMetrics(const DrawInfo *draw_info,
+  const Image *annotate_image,const PointInfo resolution,TypeMetric *metrics)
+{
+  metrics->pixels_per_em.x=(resolution.y/DefaultResolution)*
+    ExpandAffine(&draw_info->affine)*draw_info->pointsize;
+  metrics->pixels_per_em.y=metrics->pixels_per_em.x;
+  metrics->ascent=metrics->pixels_per_em.y;
+  metrics->descent=metrics->pixels_per_em.y/-5.0;
+  metrics->width=(double) annotate_image->columns/
+    ExpandAffine(&draw_info->affine);
+  metrics->height=floor(metrics->ascent-metrics->descent+0.5);
+  metrics->max_advance=metrics->pixels_per_em.x;
+  metrics->bounds.x1=0.0;
+  metrics->bounds.y1=metrics->descent;
+  metrics->bounds.x2=metrics->ascent+metrics->descent;
+  metrics->bounds.y2=metrics->ascent+metrics->descent;
+  metrics->underline_position=(-2.0);
+  metrics->underline_thickness=1.0;
+}
+
 static MagickBooleanType RenderPostscript(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -3055,21 +3075,7 @@ static MagickBooleanType RenderPostscript(Image *image,
         crop_info.height,(double) crop_info.x,(double) crop_info.y);
       (void) TransformImage(&annotate_image,geometry,(char *) NULL,exception);
     }
-  metrics->pixels_per_em.x=(resolution.y/DefaultResolution)*
-    ExpandAffine(&draw_info->affine)*draw_info->pointsize;
-  metrics->pixels_per_em.y=metrics->pixels_per_em.x;
-  metrics->ascent=metrics->pixels_per_em.y;
-  metrics->descent=metrics->pixels_per_em.y/-5.0;
-  metrics->width=(double) annotate_image->columns/
-    ExpandAffine(&draw_info->affine);
-  metrics->height=floor(metrics->ascent-metrics->descent+0.5);
-  metrics->max_advance=metrics->pixels_per_em.x;
-  metrics->bounds.x1=0.0;
-  metrics->bounds.y1=metrics->descent;
-  metrics->bounds.x2=metrics->ascent+metrics->descent;
-  metrics->bounds.y2=metrics->ascent+metrics->descent;
-  metrics->underline_position=(-2.0);
-  metrics->underline_thickness=1.0;
+  SetPostscriptMetrics(draw_info,annotate_image,resolution,metrics);
   if (draw_info->render == MagickFalse)
     {
       annotate_image=DestroyImage(annotate_image);
