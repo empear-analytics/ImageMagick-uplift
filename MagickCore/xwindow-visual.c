@@ -352,53 +352,46 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
           visual_mask|=VisualClassMask;
           visual_template.klass=StaticGray;
         }
+      else if (LocaleCompare("grayscale",visual_type) == 0)
+        {
+          visual_mask|=VisualClassMask;
+          visual_template.klass=GrayScale;
+        }
+      else if (LocaleCompare("staticcolor",visual_type) == 0)
+        {
+          visual_mask|=VisualClassMask;
+          visual_template.klass=StaticColor;
+        }
+      else if (LocaleCompare("pseudocolor",visual_type) == 0)
+        {
+          visual_mask|=VisualClassMask;
+          visual_template.klass=PseudoColor;
+        }
+      else if (LocaleCompare("truecolor",visual_type) == 0)
+        {
+          visual_mask|=VisualClassMask;
+          visual_template.klass=TrueColor;
+        }
+      else if (LocaleCompare("directcolor",visual_type) == 0)
+        {
+          visual_mask|=VisualClassMask;
+          visual_template.klass=DirectColor;
+        }
+      else if (LocaleCompare("default",visual_type) == 0)
+        {
+          visual_mask|=VisualIDMask;
+          visual_template.visualid=XVisualIDFromVisual(
+            XDefaultVisual(display,XDefaultScreen(display)));
+        }
+      else if (isdigit((int) ((unsigned char) *visual_type)) != 0)
+        {
+          visual_mask|=VisualIDMask;
+          visual_template.visualid=(size_t)
+            strtol(visual_type,(char **) NULL,0);
+        }
       else
-        if (LocaleCompare("grayscale",visual_type) == 0)
-          {
-            visual_mask|=VisualClassMask;
-            visual_template.klass=GrayScale;
-          }
-        else
-          if (LocaleCompare("staticcolor",visual_type) == 0)
-            {
-              visual_mask|=VisualClassMask;
-              visual_template.klass=StaticColor;
-            }
-          else
-            if (LocaleCompare("pseudocolor",visual_type) == 0)
-              {
-                visual_mask|=VisualClassMask;
-                visual_template.klass=PseudoColor;
-              }
-            else
-              if (LocaleCompare("truecolor",visual_type) == 0)
-                {
-                  visual_mask|=VisualClassMask;
-                  visual_template.klass=TrueColor;
-                }
-              else
-                if (LocaleCompare("directcolor",visual_type) == 0)
-                  {
-                    visual_mask|=VisualClassMask;
-                    visual_template.klass=DirectColor;
-                  }
-                else
-                  if (LocaleCompare("default",visual_type) == 0)
-                    {
-                      visual_mask|=VisualIDMask;
-                      visual_template.visualid=XVisualIDFromVisual(
-                        XDefaultVisual(display,XDefaultScreen(display)));
-                    }
-                  else
-                    if (isdigit((int) ((unsigned char) *visual_type)) != 0)
-                      {
-                        visual_mask|=VisualIDMask;
-                        visual_template.visualid=(size_t)
-                          strtol(visual_type,(char **) NULL,0);
-                      }
-                    else
-                      ThrowXWindowException(XServerError,
-                        "UnrecognizedVisualSpecifier",visual_type);
+        ThrowXWindowException(XServerError,
+          "UnrecognizedVisualSpecifier",visual_type);
     }
   /*
     Get all visuals that meet our criteria so far.
