@@ -10831,6 +10831,23 @@ the caller (a *Bumpy Road Ahead* in `AcquireRidgesKernel`, 3.08 in a probe).
    copies' callees and `R`'s callee down by the copies less one, and the helper up by
    two.
 
+8. Records and a `void` caller (2026-11-13). The copies may differ in two constants, a
+   numeric literal (the same value at each of its positions in one copy, as Recipe D's
+   *One value at several positions*) and a string literal, and each copy may write its
+   own local, the copies being the same once those locals are renamed to one name
+   (Recipe D's renaming) and the constants replaced: `years=ttl/31536000;
+   seconds=ttl % 31536000; if (seconds == 0) { (void) FormatLocaleString(timeString,
+   MagickPathExtent,"%lld years",years); return; }`, then `months` with `2628000`, and
+   so on (`resource.c`'s `FormatTimeToLive`). The table is then of a `typedef struct`
+   with one member per constant, the numeric one of the type of the other operand of
+   the arithmetic it takes part in (`MagickSizeType` for `ttl/31536000`, which the
+   usual arithmetic conversions bring to that type), the string one `const char *`, one
+   element `{ n, "s" }` per copy; the renamed local is declared once in the helper, of
+   the type every copy's local had. In a `void` caller each exit is `return;`: it
+   becomes `return(MagickFalse);` and step 6 writes `if (Helper(...) == MagickFalse)
+   return;`, as Recipe W step 8 does. A string used as a format reaches the callee as
+   a pointer to the same characters (*Careful*).
+
 **Before:**
 
 ```c
@@ -15356,3 +15373,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | TB | Step 1: on a parameter of type `int`, the membership labels may be character constants and integer literals mixed, the table of `int` (*Careful*: integer labels); Lane: b | `geometry-parse.c`'s `IsGeometryAdvanceCharacter` (sixteen labels, `215` among them, cc 18; probe 7.04 to 7.40); the character form needs a `char` parameter | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KP | Peel a run of one-label groups that OR a different enumeration constant into a flags variable out of a loop's character `switch`, through a `static const` table of `{ key, flag }` and a lookup before the `switch`; evidence oracle; Lane: b | `geometry-parse.c`'s `GetGeometry` and `ParseGeometry` (seven meta characters each; probe 7.40 to 7.60); PA needs one shared body, KL a string and a numeric literal | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | W | Step 2: `R` may be a plain local of the caller that the block neither writes nor takes the address of; Lane: b | `splay-tree.c`'s `RemoveNodeFromSplayTree` (`return(value);`, `value` set before the block), the twin of `DeleteNodeFromSplayTree`'s `return(MagickFalse);` block (probe 8.54 to 8.81) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | RT | Step 8: copies differing in a numeric and a string literal (a table of two-member records), each writing its own renamed local, in a `void` caller whose exits are `return;`; Lane: b | `resource.c`'s `FormatTimeToLive` (six unit copies); with it the file's line budget admits the helpers of `AcquireMagickResource` (probe 8.46 to 8.97 over three steps) | mandate (2026-10-24) |
