@@ -11954,6 +11954,24 @@ typedef struct _ListBrowserWidgets
 
   size_t
     *state;
+
+  XWidgetInfo
+    *slider_info;
+
+  XWidgetInfo
+    *action_info;
+
+  XWidgetInfo
+    *cancel_info;
+
+  XWidgetInfo
+    *north_info;
+
+  XWidgetInfo
+    *south_info;
+
+  size_t
+    *delay;
 } ListBrowserWidgets;
 
 typedef struct _ListBrowserContext
@@ -12005,6 +12023,82 @@ static void ClientListBrowserMessage(const ListBrowserContext *context,
       (*state)|=ExitState;
       return;
     }
+}
+
+static void ReleaseListBrowserScroll(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  ListBrowserRelease
+    release;
+
+  if (window_info->mapped == MagickFalse)
+    return;
+  if ((*north_info).raised == MagickFalse)
+    {
+      /*
+        User released up button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*north_info).raised=MagickTrue;
+      XDrawTriangleNorth(display,window_info,north_info);
+    }
+  if ((*south_info).raised == MagickFalse)
+    {
+      /*
+        User released down button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*south_info).raised=MagickTrue;
+      XDrawTriangleSouth(display,window_info,south_info);
+    }
+  if ((*slider_info).active)
+    {
+      /*
+        Stop tracking slider.
+      */
+      (*slider_info).active=MagickFalse;
+      return;
+    }
+  release.display=display;
+  release.window_info=window_info;
+  release.event=event;
+  ReleaseListBrowserAction(&release,(*reply_info),action_info,state);
+  release.display=display;
+  release.window_info=window_info;
+  release.event=event;
+  ReleaseListBrowserCancel(&release,(*reply_info),cancel_info,state);
+  if (MatteIsActive((*reply_info),event.xbutton) == MagickFalse)
+    return;
 }
 
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
@@ -12067,7 +12161,8 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
       &list_info };
 
   const ListBrowserWidgets
-    list_widgets = { &reply_info, &state };
+    list_widgets = { &reply_info, &state, &slider_info, &action_info,
+      &cancel_info, &north_info, &south_info, &delay };
 
   ListBrowserContext
     list_context;
@@ -12463,47 +12558,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        ListBrowserRelease
-          release;
-
-        if (window_info->mapped == MagickFalse)
-          break;
-        if (north_info.raised == MagickFalse)
-          {
-            /*
-              User released up button.
-            */
-            delay=SuspendTime << 2;
-            north_info.raised=MagickTrue;
-            XDrawTriangleNorth(display,window_info,&north_info);
-          }
-        if (south_info.raised == MagickFalse)
-          {
-            /*
-              User released down button.
-            */
-            delay=SuspendTime << 2;
-            south_info.raised=MagickTrue;
-            XDrawTriangleSouth(display,window_info,&south_info);
-          }
-        if (slider_info.active)
-          {
-            /*
-              Stop tracking slider.
-            */
-            slider_info.active=MagickFalse;
-            break;
-          }
-        release.display=display;
-        release.window_info=window_info;
-        release.event=event;
-        ReleaseListBrowserAction(&release,reply_info,&action_info,&state);
-        release.display=display;
-        release.window_info=window_info;
-        release.event=event;
-        ReleaseListBrowserCancel(&release,reply_info,&cancel_info,&state);
-        if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
-          break;
+        ReleaseListBrowserScroll(&list_context,event,&list_widgets);
         break;
       }
       case ClientMessage:
