@@ -896,13 +896,8 @@ static void SyncImageRenderingSettings(const ImageInfo *image_info,
   if (option != (const char *) NULL)
     image->interpolate=(PixelInterpolateMethod) ParseCommandOption(
       MagickInterpolateOptions,MagickFalse,option);
-  option=GetImageOption(image_info,"loop");
-  if (option != (const char *) NULL)
-    image->iterations=StringToUnsignedLong(option);
-  option=GetImageOption(image_info,"mattecolor");
-  if (option != (const char *) NULL)
-    (void) QueryColorCompliance(option,AllCompliance,&image->matte_color,
-      exception);
+  SyncUnsignedLongOption(image_info,"loop",&image->iterations);
+  SyncColorOption(image_info,"mattecolor",&image->matte_color,exception);
   option=GetImageOption(image_info,"orient");
   if (option != (const char *) NULL)
     image->orientation=(OrientationType) ParseCommandOption(
