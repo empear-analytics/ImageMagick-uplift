@@ -1252,12 +1252,8 @@ static SignalHandler *SetMagickSignalHandler(int signal_number,
 #endif
 }
 
-static void MagickSignalHandler(int signal_number)
+static void AbortOnFatalSignal(int signal_number)
 {
-  if (magickcore_signal_in_progress != MagickFalse)
-    (void) SetMagickSignalHandler(signal_number,signal_handlers[signal_number]);
-  magickcore_signal_in_progress=MagickTrue;
-  AsynchronousResourceComponentTerminus();
 #if defined(SIGQUIT)
   if (signal_number == SIGQUIT)
     abort();
@@ -1278,6 +1274,15 @@ static void MagickSignalHandler(int signal_number)
   if (signal_number == SIGSEGV)
     abort();
 #endif
+}
+
+static void MagickSignalHandler(int signal_number)
+{
+  if (magickcore_signal_in_progress != MagickFalse)
+    (void) SetMagickSignalHandler(signal_number,signal_handlers[signal_number]);
+  magickcore_signal_in_progress=MagickTrue;
+  AsynchronousResourceComponentTerminus();
+  AbortOnFatalSignal(signal_number);
 #if !defined(MAGICKCORE_HAVE__EXIT)
   exit(signal_number);
 #else
