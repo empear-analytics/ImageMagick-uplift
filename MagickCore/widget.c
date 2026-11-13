@@ -14845,6 +14845,42 @@ static void RespondToNoticePointerEvents(Display *display,XWindows *windows,
   }
 }
 
+static void RespondToNoticeWindowEvents(Display *display,XWindows *windows,
+  const XEvent event,const NoticeTargets *targets)
+{
+  size_t
+    *const state = targets->state;
+
+  switch (event.type)
+  {
+    case ClientMessage:
+    {
+      (*state)=ClientWidgetMessage(display,windows,event,(*state));
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      RespondToNoticePointerEvents(display,windows,event,targets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -14949,29 +14985,9 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
         ReleaseNoticeWidget(display,windows,event,targets);
         break;
       }
-      case ClientMessage:
-      {
-        state=ClientWidgetMessage(display,windows,event,state);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
       default:
       {
-        RespondToNoticePointerEvents(display,windows,event,&targets);
+        RespondToNoticeWindowEvents(display,windows,event,&targets);
         break;
       }
     }
