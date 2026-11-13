@@ -15690,7 +15690,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
     preferences_info[NumberPreferences];
 
   const PreferencesWidgets
-    widgets = { &cache_info, &cache[0], &preferences_info[0], &cancel_info,
+    widgets = { &cache_info, cache, preferences_info, &cancel_info,
       &apply_info, &width, &state, &event };
 
   PreferencesContext
