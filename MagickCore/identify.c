@@ -1673,6 +1673,13 @@ static void PrintChannelsFeatures(FILE *file,const Image *image,
   }
 }
 
+static void PrintGrayChannelStatistics(const Image *image,
+  const ChannelStatisticsReport *report)
+{
+  if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelStatistics(report,GrayPixelChannel,"Gray");
+}
+
 static void PrintGrayOrChannelStatistics(const Image *image,
   const ColorspaceType colorspace,ChannelStatisticsReport report)
 {
@@ -1684,8 +1691,7 @@ static void PrintGrayOrChannelStatistics(const Image *image,
     case LinearGRAYColorspace:
     case GRAYColorspace:
     {
-      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelStatistics(&report,GrayPixelChannel,"Gray");
+      PrintGrayChannelStatistics(image,&report);
       break;
     }
     default:
