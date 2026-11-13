@@ -15977,7 +15977,8 @@ static void PressTextViewScroll(const TextViewContext *context,
       /*
         Move slider.
       */
-      (*slider_info)=PageListBrowserSlider((*slider_info),event,(*visible_lines));
+      (*slider_info)=PageListBrowserSlider((*slider_info),event,
+        (*visible_lines));
       (*state)|=RedrawListState;
       return;
     }
