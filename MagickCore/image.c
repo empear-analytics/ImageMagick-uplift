@@ -3370,13 +3370,30 @@ static void DisableUnsupportedAdjoin(ImageInfo *image_info,const char *magic,
       image_info->adjoin=MagickFalse;
 }
 
+static void GetImageInfoExtension(const ImageInfo *image_info,char *component)
+{
+  char
+    path[MagickPathExtent];
+
+  *component='\0';
+  if (*image_info->magick == '\0')
+    GetPathComponent(image_info->filename,ExtensionPath,component);
+  if (*component != '\0')
+    {
+      /*
+        Base path sans any compression extension.
+      */
+      GetPathComponent(image_info->filename,BasePathSansCompressExtension,path);
+      GetPathComponent(path,ExtensionPath,component);
+    }
+}
+
 MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   const unsigned int frames,ExceptionInfo *exception)
 {
   char
     component[MagickPathExtent],
-    magic[MagickPathExtent],
-    path[MagickPathExtent];
+    magic[MagickPathExtent];
 
   const MagickInfo
     *magick_info;
@@ -3393,17 +3410,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       image_info->filename);
   ParseSubimageComponent(image_info);
-  *component='\0';
-  if (*image_info->magick == '\0')
-    GetPathComponent(image_info->filename,ExtensionPath,component);
-  if (*component != '\0')
-    {
-      /*
-        Base path sans any compression extension.
-      */
-      GetPathComponent(image_info->filename,BasePathSansCompressExtension,path);
-      GetPathComponent(path,ExtensionPath,component);
-    }
+  GetImageInfoExtension(image_info,component);
   image_info->affirm=MagickFalse;
   sans_exception=AcquireExceptionInfo();
   if ((*component != '\0') && (IsGlob(component) == MagickFalse))
