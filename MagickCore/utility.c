@@ -1269,6 +1269,22 @@ static void GetProcExecutionPath(char *path,const size_t extent)
 }
 #endif
 
+#if defined(MAGICKCORE_HAVE_GETEXECNAME)
+static void GetExecNamePath(char *path,const size_t extent)
+{
+  const char
+    *execution_path;
+
+  execution_path=(const char *) getexecname();
+  if (execution_path != (const char *) NULL)
+    {
+      if (*execution_path != *DirectorySeparator)
+        (void) ConcatenateMagickString(path,DirectorySeparator,extent);
+      (void) ConcatenateMagickString(path,execution_path,extent);
+    }
+}
+#endif
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1309,18 +1325,7 @@ MagickPrivate MagickBooleanType GetExecutionPath(char *path,const size_t extent)
   GetNSExecutablePath(path,extent);
 #endif
 #if defined(MAGICKCORE_HAVE_GETEXECNAME)
-  {
-    const char
-      *execution_path;
-
-    execution_path=(const char *) getexecname();
-    if (execution_path != (const char *) NULL)
-      {
-        if (*execution_path != *DirectorySeparator)
-          (void) ConcatenateMagickString(path,DirectorySeparator,extent);
-        (void) ConcatenateMagickString(path,execution_path,extent);
-      }
-  }
+  GetExecNamePath(path,extent);
 #endif
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   NTGetExecutionPath(path,extent);
