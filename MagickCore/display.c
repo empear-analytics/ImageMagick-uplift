@@ -17217,6 +17217,28 @@ static Image *XVisualDirectoryImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType XFindBackgroundWindow(Display *display,
+  char *window_id,const Window root_window,XWindowInfo *window_info)
+{
+  if (LocaleCompare(window_id,"root") == 0)
+    (*window_info).id=root_window;
+  else
+    {
+      if (isdigit((int) ((unsigned char) *window_id)) != 0)
+        (*window_info).id=XWindowByID(display,root_window,
+          (Window) strtol((char *) window_id,(char **) NULL,0));
+      if ((*window_info).id == (Window) NULL)
+        (*window_info).id=XWindowByName(display,root_window,window_id);
+    }
+  if ((*window_info).id == (Window) NULL)
+    {
+      ThrowXWindowException(XServerError,"NoWindowWithSpecifiedIDExists",
+        window_id);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *image,ExceptionInfo *exception)
 {
@@ -17269,22 +17291,9 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   resources=(*resource_info);
   window_info.id=(Window) NULL;
   root_window=XRootWindow(display,XDefaultScreen(display));
-  if (LocaleCompare(resources.window_id,"root") == 0)
-    window_info.id=root_window;
-  else
-    {
-      if (isdigit((int) ((unsigned char) *resources.window_id)) != 0)
-        window_info.id=XWindowByID(display,root_window,
-          (Window) strtol((char *) resources.window_id,(char **) NULL,0));
-      if (window_info.id == (Window) NULL)
-        window_info.id=XWindowByName(display,root_window,resources.window_id);
-    }
-  if (window_info.id == (Window) NULL)
-    {
-      ThrowXWindowException(XServerError,"NoWindowWithSpecifiedIDExists",
-        resources.window_id);
-      return(MagickFalse);
-    }
+  if (XFindBackgroundWindow(display,resources.window_id,root_window,
+      &window_info) == MagickFalse)
+    return(MagickFalse);
   /*
     Determine window visual id.
   */
