@@ -78,30 +78,63 @@
 #include "MagickCore/thread-private.h"
 #include "MagickCore/utility.h"
 
+typedef struct _QuantumChannels
+{
+  QuantumType
+    key;
+
+  size_t
+    value;
+} QuantumChannels;
+
+static const QuantumChannels
+  QuantumChannelCounts[] =
+  {
+    { GrayAlphaQuantum, 2 },
+    { IndexAlphaQuantum, 2 },
+    { RGBQuantum, 3 },
+    { BGRQuantum, 3 },
+    { RGBAQuantum, 4 },
+    { RGBOQuantum, 4 },
+    { BGRAQuantum, 4 },
+    { CMYKQuantum, 4 },
+    { CMYKAQuantum, 5 },
+    { CbYCrAQuantum, 4 },
+    { CbYCrQuantum, 3 },
+    { CbYCrYQuantum, 4 }
+  };
+
+static const QuantumChannels *FindQuantumChannels(const QuantumType key)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(QuantumChannelCounts)/sizeof(*QuantumChannelCounts));
+       i++)
+    if (QuantumChannelCounts[i].key == key)
+      return(QuantumChannelCounts+i);
+  return((const QuantumChannels *) NULL);
+}
+
 static size_t GetQuantumChannels(const Image *image,
   const QuantumType quantum_type)
 {
+  const QuantumChannels
+    *entry;
+
   size_t
     channels;
 
   channels=1;
-  switch (quantum_type)
-  {
-    case GrayAlphaQuantum: channels=2; break;
-    case IndexAlphaQuantum: channels=2; break;
-    case RGBQuantum: channels=3; break;
-    case BGRQuantum: channels=3; break;
-    case RGBAQuantum: channels=4; break;
-    case RGBOQuantum: channels=4; break;
-    case BGRAQuantum: channels=4; break;
-    case CMYKQuantum: channels=4; break;
-    case CMYKAQuantum: channels=5; break;
-    case MultispectralQuantum: channels=GetImageChannels(image); break;
-    case CbYCrAQuantum: channels=4; break;
-    case CbYCrQuantum: channels=3; break;
-    case CbYCrYQuantum: channels=4; break;
-    default: break;
-  }
+  entry=FindQuantumChannels(quantum_type);
+  if (entry != (const QuantumChannels *) NULL)
+    channels=entry->value;
+  else
+    switch (quantum_type)
+    {
+      case MultispectralQuantum: channels=GetImageChannels(image); break;
+      default: break;
+    }
   return(channels);
 }
 
@@ -173,8 +206,34 @@ MagickExport size_t GetQuantumExtent(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _AlphaQuantumTypes
+{
+  QuantumType
+    opaque_type,
+    alpha_type;
+} AlphaQuantumTypes;
+
+static QuantumType SelectAlphaQuantumType(const Image *image,
+  const AlphaQuantumTypes *types)
+{
+  const QuantumType
+    alpha_type = types->alpha_type,
+    opaque_type = types->opaque_type;
+
+  QuantumType
+    quantum_type;
+
+  quantum_type=opaque_type;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    quantum_type=alpha_type;
+  return(quantum_type);
+}
+
 MagickExport QuantumType GetQuantumType(Image *image,ExceptionInfo *exception)
 {
+  const AlphaQuantumTypes
+    rgb_types = { RGBQuantum, RGBAQuantum };
+
   QuantumType
     quantum_type;
 
@@ -183,26 +242,27 @@ MagickExport QuantumType GetQuantumType(Image *image,ExceptionInfo *exception)
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   (void) exception;
-  quantum_type=RGBQuantum;
-  if (image->alpha_trait != UndefinedPixelTrait)
-    quantum_type=RGBAQuantum;
+  quantum_type=SelectAlphaQuantumType(image,&rgb_types);
   if (image->colorspace == CMYKColorspace)
     {
-      quantum_type=CMYKQuantum;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        quantum_type=CMYKAQuantum;
+      const AlphaQuantumTypes
+        cmyk_types = { CMYKQuantum, CMYKAQuantum };
+
+      quantum_type=SelectAlphaQuantumType(image,&cmyk_types);
     }
   if (IsGrayColorspace(image->colorspace) != MagickFalse)
     {
-      quantum_type=GrayQuantum;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        quantum_type=GrayAlphaQuantum;
+      const AlphaQuantumTypes
+        gray_types = { GrayQuantum, GrayAlphaQuantum };
+
+      quantum_type=SelectAlphaQuantumType(image,&gray_types);
     }
   if (image->storage_class == PseudoClass)
     {
-      quantum_type=IndexQuantum;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        quantum_type=IndexAlphaQuantum;
+      const AlphaQuantumTypes
+        index_types = { IndexQuantum, IndexAlphaQuantum };
+
+      quantum_type=SelectAlphaQuantumType(image,&index_types);
     }
   if (image->number_meta_channels != 0)
     quantum_type=MultispectralQuantum;

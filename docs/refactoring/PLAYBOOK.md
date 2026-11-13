@@ -6648,7 +6648,12 @@ functions between files. No other recipe changes where a preprocessor line sits.
    (`output_scaling` in `DistortImage`'s `ScaleFilter`) are resolved where it is used.
    Use it only to unblock an extraction that follows, as step 5 says.
 2. Move the run, unchanged, to directly above the function's signature: below its
-   comment banner and below any helper already placed there.
+   comment banner and below any helper already placed there. When the helpers above
+   the function stand inside a conditional block (`#if !defined(...)` ... `#endif`)
+   and the helper the run unblocks must join them, because it uses what only that
+   block's configurations have, the run goes directly above that block's `#if`
+   instead (`random.c`'s `MaxEntropyExtent` above `ReadRandom`'s
+   `#if !defined(MAGICKCORE_WINDOWS_SUPPORT)`); step 4's proof is the same.
 3. Leave every `#undef` and any `#define` further down the body where it is, except the
    single `#define` of step 1's last form.
 4. Run `sh tools/pp_identical.sh <file>`. It must print `IDENTICAL`: the preprocessed
@@ -6715,6 +6720,10 @@ Added by Claude Code (Claude Opus 5.5) during task M84, under the mandate of 202
 Step 1's last form (2026-11-01, task W11): `distort.c`'s `ScaleFilter`, defined in the middle
 of `DistortImage`'s body and used by nine pixel cases that Recipes Z, N and O move to helpers
 above the function, where the macro is not yet defined.
+Step 2's conditional-block form (2026-11-13, campaign B, M127 lane b round 6): `random.c`'s
+`GenerateEntropicChaos`, whose device-entropy block (the `#else` side of
+`MAGICKCORE_WINDOWS_SUPPORT`) moves to helpers that must sit beside `ReadRandom` in its
+`#if !defined(MAGICKCORE_WINDOWS_SUPPORT)` block. Lane: b
 
 ---
 
@@ -8431,6 +8440,12 @@ whole `switch` with the tail of the function.
    its own commit.
 5. Check by script that each site's labels and the function's are the same set, each
    label once, and that each `B` equals the original body but for indentation.
+6. *Widening (2026-11-13).* `e` may be `*p`, the character a pointer local points to
+   (a read with no side effect; the parameter is `const char`), and `B` may instead be
+   statements that do not leave the function, followed by the group's one `break;`,
+   which then is the last statement of `B` and is dropped in step 3 (the end of the `if`
+   goes where the `break` went: to the statement after the `switch`). `B` holds no other
+   `break`, `continue` or label.
 
 **Before:**
 
@@ -10782,6 +10797,12 @@ and all.
    changed.
 5. The predicate is a label run (allowed as a *Complex Method* by the owner's ruling of
    2026-11-07); Recipe TB's membership form may make it a table, in a commit of its own.
+6. *Tail form (2026-11-13).* When the `switch` is the last statement of a `void`
+   function, a group whose body is statements that stay in the function followed by
+   its one `break;` (no other `break`, no `continue`, `goto` or `return`) leaves the
+   function as well: its `break;` goes to the end of the body. It may be peeled as `S`
+   = `{ <its statements>; return; }`: step 3 writes `if (Name(e) != MagickFalse)`
+   followed by that block, the statements unchanged, `break;` replaced by `return;`.
 
 **Before:**
 
@@ -13106,6 +13127,11 @@ keep every label.
    `WARN` for a count that dropped with every value present is the expected one);
    `--calls` shows the lookup added once. The function is not on a per-pixel path (check
    its callers by reading); otherwise time the step.
+7. *Kept groups (2026-11-13).* Groups of the form `v=x; break;` whose `x` is not a
+   numeric literal (a call such as `GetImageChannels(image)`) need not move: they stay,
+   labels and text unchanged, in a `switch (e)` that keeps them and the `default:` group,
+   and that `switch` is step 4's `else` branch. Only the literal groups go into the
+   table; step 5's script checks that the kept `switch` is the original without them.
 
 **Before:**
 
@@ -16852,6 +16878,176 @@ evolve the recipes.
 
 ---
 
+## Recipe BW - Reword a Banner's Repeated Parameter Text
+
+**Use when:** CodeScene still reports *Code Duplication* between two functions of a file
+after Recipe BF, because their `%` banners (which CodeScene counts into each function's
+span) repeat the same parameter descriptions word for word, as `memory.c`'s
+`GetMagickMemoryMethods` and `SetMagickMemoryMethods` (three `o name: method to ...
+memory (e.g. ...)` items each).
+
+**Not covered by:** Recipe BF, which only drops blank frame rows and forbids rewording;
+Recipe D and the other deduplication recipes, which change code, not comments.
+
+**How:**
+
+1. Apply Recipe BF to the file first (its own commit).
+2. Pick one banner of the pair, the one whose function comes second in the file.
+3. Replace its `A description of each parameter follows:` block (the heading, the
+   `o name: text` items and the blank `%` rows between them) by one or two `%` rows that
+   say the same in prose: every parameter's role and every example the items gave, in
+   the items' order. Add no claim the items did not make, drop none they did; the
+   description above it, the format block and the closing `*/` stay byte for byte.
+4. Run `sh tools/obj_identical.sh <file>`: `IDENTICAL`. Run `tools/ci_warnings.sh` and
+   `tools/cxx_warnings.sh`: both `OK`. Check with `git diff` that every changed line
+   starts with `%` and lies inside the one banner.
+
+**Before:**
+
+```c
+%  A description of each parameter follows:
+%
+%    o acquire_memory_handler: method to acquire memory (e.g. malloc).
+%
+%    o resize_memory_handler: method to resize memory (e.g. realloc).
+%
+%    o destroy_memory_handler: method to destroy memory (e.g. free).
+%
+*/
+MagickExport void SetMagickMemoryMethods(
+```
+
+**After:**
+
+```c
+%  Its parameters are the methods to acquire (e.g. malloc), resize (e.g.
+%  realloc) and destroy (e.g. free) memory.
+%
+*/
+MagickExport void SetMagickMemoryMethods(
+```
+
+**Careful:**
+
+- Why the behaviour is the same: only comment text changes, which the preprocessor turns
+  into one space; `obj_identical.sh` confirms the object file (it pins `__LINE__`).
+- The banner is documentation of a public API. Keep its meaning: the parameter names
+  stay visible in the format block above, and the prose names each role and example.
+  Do not shorten the function's description or format block with this recipe.
+- Reword one banner of a pair, never both; the other keeps the reference form.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` and
+`tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `memory.c` (campaign B, M127 lane b round 6):
+`GetMagickMemoryMethods` and `SetMagickMemoryMethods` in *Code Duplication* through their
+identical parameter items after BF; probe 7.67 to 8.42, every duplication finding gone.
+Allowed by the owner's ruling (owner, 2026-11-13) that `%` banners may be reworded by a
+guard-level recipe, keeping what each says about the API. Added by Claude Code (Claude
+Opus 5.5).
+Lane: b
+
+---
+
+## Recipe TP - Extract a Nested Test Path as a Predicate Writing One Local
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*) on a
+loop body whose bump is a selection `if (A) { S; if (B) { T; U } }` (no `else` on either
+`if`) where `S` and `T` only update one local `v` of the caller (`code_width++;`,
+`code_width--;`) and `U`, the rest of the inner body, uses a function-local macro or
+several other locals and cannot move, as in `LZWEncodeImage`'s "next bit width" block,
+whose `U` calls the `OutputCode` macro.
+
+**Not covered by:** Recipe P, whose predicate has no side effect; Recipe E and Recipe O,
+which move the whole block, `U` included; Recipe CN, which cannot join `A` and `B` across
+`S`; Recipe RV, whose block leaves the function.
+
+**How:**
+
+1. The selection lies outside every OpenMP region. `A`, `S`, `B` and `T` read only
+   parameters of the caller and locals the block does not write, and write only `v`
+   (a plain local whose address is not taken elsewhere), with no call that has a side
+   effect. `T` is the leading statements of the inner body, before `U`.
+2. Write a `static MagickBooleanType` function directly above the caller taking the
+   values `A`, `S`, `B` and `T` read (by value) and `T *v` last. Its body is the outer
+   `if (A) { S; if (B) { T; return(MagickTrue); } }` copied verbatim with each `v`
+   written `(*v)`, followed by `return(MagickFalse);`. Comments inside move with it.
+3. The caller becomes `if (Helper(..., &v) != MagickFalse) { U }`, `U` unchanged. `S`
+   runs exactly when `A` holds, `T` and `U` exactly when `A` and then `B` hold, in the
+   same order as before.
+4. Check every argument against its parameter by reading; run `refactor_guard.py
+   --calls` (one new name, `+2`), `tools/ci_warnings.sh` and `tools/cxx_warnings.sh`,
+   and the oracle for the caller.
+
+**Before:**
+
+```c
+    if ((next_index >> code_width) != 0)
+      {
+        code_width++;
+        if (code_width > 12)
+          {
+            /*
+              Did we overflow the max bit width?
+            */
+            code_width--;
+            OutputCode(LZWClr);
+            ResetLZWTable(table);
+            next_index=LZWEod+1;
+            code_width=9;
+          }
+        }
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsLZWCodeWidthOverflow(const size_t next_index,
+  size_t *code_width)
+{
+  if ((next_index >> (*code_width)) != 0)
+    {
+      (*code_width)++;
+      if ((*code_width) > 12)
+        {
+          /*
+            Did we overflow the max bit width?
+          */
+          (*code_width)--;
+          return(MagickTrue);
+        }
+    }
+  return(MagickFalse);
+}
+...
+    if (IsLZWCodeWidthOverflow(next_index,&code_width) != MagickFalse)
+      {
+        OutputCode(LZWClr);
+        ResetLZWTable(table);
+        next_index=LZWEod+1;
+        code_width=9;
+      }
+```
+
+**Careful:**
+
+- The operators of `A` and `B` stay as written; only `v` gains `(*...)`. A comparison is
+  not inverted to make an early return.
+- `U` must not need `v`'s value from before `T`: it runs after the helper has written
+  `v` through the pointer, exactly where it ran before.
+- A selection with an `else`, or an `S` or `T` that writes a second local, is not this
+  recipe.
+
+**Evidence level:** oracle (the cases that reach the caller).
+
+**Provenance:** 2026-11-13, from `compress-lzw.c`'s `LZWEncodeImage` (campaign B, M127
+lane b round 6): the code-width block was the second bump of the loop body and its tail
+calls `OutputCode`; probe 9.92 to 10.0. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17225,3 +17421,9 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | AT | Step 6: the `if` may have an `else` arm of the same kind; that arm alone moves (`else return(Helper(...));`), a local only it and `R` read is declared in the helper with its initialiser; Lane: b | `color.c`'s `QueryHexColor` (two bumps, one per arm) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | IC | Inline Cast-Only Locals into Their One Use: a local assigned once from a cast of an unassigned parameter to its own type, and read once, is replaced at that read by the cast; declaration and assignment go; the grouped copies in one commit; evidence guard (`obj_identical.sh`); Lane: b | `splay-tree.c`'s `CompareSplayTreeString` and `CompareSplayTreeStringInfo` (*Code Duplication*; probe 9.38 to 10.0) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | OS | Share an Option-Sync Block Through a Helper Keyed by the Option Name: copies of `option=GetImageOption(image_info,"K"); if (option != NULL) S;` whose `S` stores into one member become calls of a `static void` helper taking the key and a pointer to the member; one function per commit; targets *Overall Code Complexity*; evidence oracle; Lane: b | `image-settings.c`'s `SyncImage...Settings` (`quality`, `scene`, `depth`, `loop`, `page`, `tile-offset`, colours) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | H | Step 2: when the helpers above the function stand in a conditional block that the unblocked helper must join, the run goes directly above that block's `#if`; proof unchanged (`pp_identical.sh`); Lane: b | `random.c`'s `GenerateEntropicChaos`: `MaxEntropyExtent`, used by the device-entropy block that joins `ReadRandom` under `#if !defined(MAGICKCORE_WINDOWS_SUPPORT)` | mandate (2026-10-24) |
+| 2026-11-13 | NEW | BW | Reword a Banner's Repeated Parameter Text: after BF, one banner of a pair replaces its `o name: text` parameter items by prose that keeps every role and example; evidence guard (`obj_identical.sh` IDENTICAL); Lane: b | `memory.c`'s `GetMagickMemoryMethods` and `SetMagickMemoryMethods` (*Code Duplication* through identical items; probe 7.67 to 8.42) | owner |
+| 2026-11-13 | NEW | TP | Extract a Nested Test Path as a Predicate Writing One Local: `if (A) { S; if (B) { T; U } }` whose `S` and `T` only update one local becomes `if (Helper(...,&v) != MagickFalse) { U }`, the helper holding both tests and the updates through a pointer; evidence oracle; Lane: b | `compress-lzw.c`'s `LZWEncodeImage` (code-width block, whose tail calls the `OutputCode` macro; probe 9.92 to 10.0) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | LP | Step 6: `e` may be `*p` (a character read, the predicate takes `const char`), and `B` may be statements that stay in the function ending in the group's one `break;`, which the `if` form drops; Lane: b | `token-isglob.c`'s `IsGlob` (six glob characters setting `status=MagickTrue; break;`, cc 11) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | PL | Step 6, tail form: in a `void` function whose last statement is the `switch`, a group of statements ending in its one `break;` counts as leaving and is peeled as `{ <statements> return; }`; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (seven colour-separation labels setting `image->type`) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | KC | Step 7: groups `v=x; break;` with a non-literal `x` stay, with `default:`, in a kept `switch` that is step 4's `else` branch; Lane: b | `quantum-type.c`'s `GetQuantumChannels` (twelve literal channel counts and `MultispectralQuantum`'s `GetImageChannels(image)`) | mandate (2026-10-24) |

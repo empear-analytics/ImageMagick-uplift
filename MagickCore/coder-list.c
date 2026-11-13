@@ -101,6 +101,20 @@ static void PrintCoderPathHeader(FILE *file,const CoderInfo **coder_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void PrintCoderInfoLine(FILE *file,const CoderInfo **coder_info,
+  const ssize_t i)
+{
+  ssize_t
+    j;
+
+  (void) FormatLocaleFile(file,"%s",coder_info[i]->magick);
+  for (j=(ssize_t) strlen(coder_info[i]->magick); j <= 15; j++)
+    (void) FormatLocaleFile(file," ");
+  if (coder_info[i]->name != (char *) NULL)
+    (void) FormatLocaleFile(file,"%s",coder_info[i]->name);
+  (void) FormatLocaleFile(file,"\n");
+}
+
 MagickExport MagickBooleanType ListCoderInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -116,9 +130,6 @@ MagickExport MagickBooleanType ListCoderInfo(FILE *file,
   size_t
     number_coders;
 
-  ssize_t
-    j;
-
   if (file == (const FILE *) NULL)
     file=stdout;
   coder_info=GetCoderInfoList("*",&number_coders,exception);
@@ -133,12 +144,7 @@ MagickExport MagickBooleanType ListCoderInfo(FILE *file,
         (LocaleCompare(path,coder_info[i]->path) != 0))
       PrintCoderPathHeader(file,coder_info,i);
     path=coder_info[i]->path;
-    (void) FormatLocaleFile(file,"%s",coder_info[i]->magick);
-    for (j=(ssize_t) strlen(coder_info[i]->magick); j <= 15; j++)
-      (void) FormatLocaleFile(file," ");
-    if (coder_info[i]->name != (char *) NULL)
-      (void) FormatLocaleFile(file,"%s",coder_info[i]->name);
-    (void) FormatLocaleFile(file,"\n");
+    PrintCoderInfoLine(file,coder_info,i);
   }
   coder_info=(const CoderInfo **) RelinquishMagickMemory((void *) coder_info);
   (void) fflush(file);

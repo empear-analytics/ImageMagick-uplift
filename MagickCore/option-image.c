@@ -231,14 +231,19 @@ MagickExport MagickBooleanType DefineImageOption(ImageInfo *image_info,
 %    o option: the image option.
 %
 */
-MagickExport MagickBooleanType DeleteImageOption(ImageInfo *image_info,
-  const char *option)
+static void TraceImageOptions(const ImageInfo *image_info)
 {
   assert(image_info != (ImageInfo *) NULL);
   assert(image_info->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       image_info->filename);
+}
+
+MagickExport MagickBooleanType DeleteImageOption(ImageInfo *image_info,
+  const char *option)
+{
+  TraceImageOptions(image_info);
   if (image_info->options == (void *) NULL)
     return(MagickFalse);
   return(DeleteNodeFromSplayTree((SplayTreeInfo *) image_info->options,option));
@@ -269,11 +274,7 @@ MagickExport MagickBooleanType DeleteImageOption(ImageInfo *image_info,
 */
 MagickExport void DestroyImageOptions(ImageInfo *image_info)
 {
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
+  TraceImageOptions(image_info);
   if (image_info->options != (void *) NULL)
     image_info->options=DestroySplayTree((SplayTreeInfo *) image_info->options);
 }
@@ -309,11 +310,7 @@ MagickExport void DestroyImageOptions(ImageInfo *image_info)
 MagickExport const char *GetImageOption(const ImageInfo *image_info,
   const char *option)
 {
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
+  TraceImageOptions(image_info);
   if (image_info->options == (void *) NULL)
     return((const char *) NULL);
   return((const char *) GetValueFromSplayTree((SplayTreeInfo *)
@@ -344,11 +341,7 @@ MagickExport const char *GetImageOption(const ImageInfo *image_info,
 */
 MagickExport char *GetNextImageOption(const ImageInfo *image_info)
 {
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
+  TraceImageOptions(image_info);
   if (image_info->options == (void *) NULL)
     return((char *) NULL);
   return((char *) GetNextKeyInSplayTree((SplayTreeInfo *) image_info->options));
@@ -386,11 +379,7 @@ MagickExport char *RemoveImageOption(ImageInfo *image_info,const char *option)
   char
     *value;
 
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
+  TraceImageOptions(image_info);
   if (image_info->options == (void *) NULL)
     return((char *) NULL);
   value=(char *) RemoveNodeFromSplayTree((SplayTreeInfo *)
@@ -423,11 +412,7 @@ MagickExport char *RemoveImageOption(ImageInfo *image_info,const char *option)
 */
 MagickExport void ResetImageOptions(const ImageInfo *image_info)
 {
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
+  TraceImageOptions(image_info);
   if (image_info->options == (void *) NULL)
     return;
   ResetSplayTree((SplayTreeInfo *) image_info->options);
@@ -459,11 +444,7 @@ MagickExport void ResetImageOptions(const ImageInfo *image_info)
 */
 MagickExport void ResetImageOptionIterator(const ImageInfo *image_info)
 {
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
+  TraceImageOptions(image_info);
   if (image_info->options == (void *) NULL)
     return;
   ResetSplayTreeIterator((SplayTreeInfo *) image_info->options);
@@ -499,11 +480,7 @@ MagickExport void ResetImageOptionIterator(const ImageInfo *image_info)
 MagickExport MagickBooleanType SetImageOption(ImageInfo *image_info,
   const char *option,const char *value)
 {
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
+  TraceImageOptions(image_info);
   /*
     Specific global option settings.
   */
