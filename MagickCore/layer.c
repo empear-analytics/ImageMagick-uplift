@@ -1477,6 +1477,9 @@ typedef struct _DuplicateFrameTargets
 
   Image
     **bgnd_image;
+
+  ssize_t
+    *i;
 } DuplicateFrameTargets;
 
 static MagickBooleanType TryDuplicateFrame(const DuplicateFrameTrial *trial,
@@ -2040,6 +2043,66 @@ static MagickBooleanType AssumeNoneDisposal(
   return(cleared);
 }
 
+typedef enum
+{
+  FrameDisposalChosen,
+  FrameDisposalSkipped,
+  FrameDisposalPreviousFailed,
+  FrameDisposalImagesFailed
+} FrameDisposalExit;
+
+static FrameDisposalExit SelectFrameDisposal(const DuplicateFrameTrial *trial,
+  const DuplicateFrameTargets *targets)
+{
+  const MagickBooleanType
+    add_frames = trial->add_frames;
+
+  RectangleInfo
+    *const bounds = trial->bounds;
+
+  DisposeType
+    *const disposals = trial->disposals;
+
+  MagickBooleanType
+    *const cleared = targets->cleared;
+
+  RectangleInfo
+    *const dup_bounds = targets->dup_bounds;
+
+  ssize_t
+    *const i = targets->i;
+
+  if ( bounds[(*i)].x < 0 ) {
+    /*
+      Image frame is exactly the same as the previous frame!
+      If not adding frames leave it to be cropped down to a null image.
+      Otherwise mark previous image for deleted, transfering its crop bounds
+      to the current image.
+    */
+    if (MarkDeletedFrame(add_frames,(*i),disposals,bounds) == MagickFalse)
+      {
+        (*i)++;
+        return(FrameDisposalSkipped);
+      }
+  }
+  else
+    {
+      (*cleared)=TryPreviousDisposal(trial,(*cleared));
+
+      /*
+        If we are allowed lets try a complex frame duplication.
+        It is useless if the previous image already clears pixels correctly.
+        This method will always clear all the pixels that need to be cleared.
+      */
+      (*dup_bounds).width=(*dup_bounds).height=0; /* no dup, no pixel added */
+      if (TryDuplicateFrame(trial,targets) == MagickFalse)
+        return(FrameDisposalPreviousFailed);
+      if (TryBackgroundDisposal(trial,(*dup_bounds),targets) == MagickFalse)
+        return(FrameDisposalImagesFailed);
+    }
+  return(FrameDisposalChosen);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -2069,7 +2132,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     choice_targets = { &bgnd_image, &prev_image, &dup_image, &i };
 
   const DuplicateFrameTargets
-    targets = { &dup_image, &dup_bounds, &cleared, &bgnd_image };
+    targets = { &dup_image, &dup_bounds, &cleared, &bgnd_image, &i };
 
   const FrameListTargets
     lists = { &curr, &bounds, &disposals };
@@ -2129,35 +2192,18 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
         prev_image };
 
     cleared=AssumeNoneDisposal(&trial);
-    if ( bounds[i].x < 0 ) {
-      /*
-        Image frame is exactly the same as the previous frame!
-        If not adding frames leave it to be cropped down to a null image.
-        Otherwise mark previous image for deleted, transfering its crop bounds
-        to the current image.
-      */
-      if (MarkDeletedFrame(add_frames,i,disposals,bounds) == MagickFalse)
-        {
-          i++;
-          continue;
-        }
+    switch (SelectFrameDisposal(&trial,&targets))
+    {
+      case FrameDisposalSkipped:
+        continue;
+      case FrameDisposalPreviousFailed:
+        return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
+      case FrameDisposalImagesFailed:
+        return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,
+          dup_image));
+      default:
+        break;
     }
-    else
-      {
-        cleared=TryPreviousDisposal(&trial,cleared);
-
-        /*
-          If we are allowed lets try a complex frame duplication.
-          It is useless if the previous image already clears pixels correctly.
-          This method will always clear all the pixels that need to be cleared.
-        */
-        dup_bounds.width=dup_bounds.height=0; /* no dup, no pixel added */
-        if (TryDuplicateFrame(&trial,&targets) == MagickFalse)
-          return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
-        if (TryBackgroundDisposal(&trial,dup_bounds,&targets) == MagickFalse)
-          return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,
-            dup_image));
-      }
     /*
        Finalise choice of dispose, set new prev_image,
        and junk any extra images as appropriate,
