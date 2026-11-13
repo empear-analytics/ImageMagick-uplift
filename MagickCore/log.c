@@ -1505,6 +1505,14 @@ typedef struct _LogEventText
 
   time_t
     seconds;
+
+  const char
+    *event,
+    *function,
+    *module;
+
+  size_t
+    line;
 } LogEventText;
 
 static void TranslateLogTimeSpecifier(const LogEventText *event_text,
@@ -1547,6 +1555,61 @@ static void TranslateLogTimeSpecifier(const LogEventText *event_text,
     default:
     {
       (*q)+=FormatLogSpecifier((*q),extent-((*q)-text),*p);
+      break;
+    }
+  }
+}
+
+static void TranslateLogLocationSpecifier(const LogEventText *event_text,
+  const char *p,char **q)
+{
+  char
+    *const text = event_text->text;
+
+  const size_t
+    extent = event_text->extent;
+
+  const char
+    *const event = event_text->event,
+    *const function = event_text->function,
+    *const module = event_text->module;
+
+  const size_t
+    line = event_text->line;
+
+  switch (*p)
+  {
+    case 'e':
+    {
+      (*q)+=(ptrdiff_t) CopyMagickString((*q),event,extent-((*q)-text));
+      break;
+    }
+    case 'f':
+    {
+      (*q)+=(ptrdiff_t) CopyMagickString((*q),function,extent-((*q)-text));
+      break;
+    }
+    case 'i':
+    {
+      (*q)+=(ptrdiff_t) FormatLocaleString((*q),extent-((*q)-text),"%.17g",
+        (double) GetMagickThreadSignature());
+      break;
+    }
+    case 'l':
+    {
+      (*q)+=(ptrdiff_t) FormatLocaleString((*q),extent-((*q)-text),"%.17g",
+        (double) line);
+      break;
+    }
+    case 'm':
+    {
+      (*q)+=(ptrdiff_t) CopyMagickString((*q),GetModuleBasename(module),
+        extent-((*q)-text));
+      break;
+    }
+    default:
+    {
+      TranslateLogTimeSpecifier(event_text,p,q);
       break;
     }
   }
@@ -1680,6 +1743,10 @@ static char *TranslateEvent(const LogEventLocation *location,
     event_text.elapsed_time=elapsed_time;
     event_text.user_time=user_time;
     event_text.seconds=seconds;
+    event_text.event=event;
+    event_text.function=function;
+    event_text.module=module;
+    event_text.line=line;
     switch (*p)
     {
       case 'd':
@@ -1687,37 +1754,9 @@ static char *TranslateEvent(const LogEventLocation *location,
         q+=(ptrdiff_t) CopyMagickString(q,domain,extent-(q-text));
         break;
       }
-      case 'e':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,event,extent-(q-text));
-        break;
-      }
-      case 'f':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,function,extent-(q-text));
-        break;
-      }
-      case 'i':
-      {
-        q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%.17g",(double)
-          GetMagickThreadSignature());
-        break;
-      }
-      case 'l':
-      {
-        q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%.17g",(double)
-          line);
-        break;
-      }
-      case 'm':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,GetModuleBasename(module),
-          extent-(q-text));
-        break;
-      }
       default:
       {
-        TranslateLogTimeSpecifier(&event_text,p,&q);
+        TranslateLogLocationSpecifier(&event_text,p,&q);
         break;
       }
     }
