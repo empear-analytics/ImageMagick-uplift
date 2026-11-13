@@ -377,14 +377,15 @@ MagickPrivate void DelegateComponentTerminus(void)
 
 static inline MagickBooleanType IsWindowsDrivePath(const char *token)
 {
-  return(((isalpha((int) *token) != 0) && (token[1] == ':') &&
-    ((token[2] == '\\') || (token[2] == '/'))) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((isalpha((int) *token) != 0) &&
+    (token[1] == ':') &&
+    ((token[2] == '\\') || (token[2] == '/'))));
 }
 
 static inline MagickBooleanType IsDotRelativePath(const char *token)
 {
-  return(((*token == '.') && ((token[1] == '\\') || (token[1] == '/'))) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((*token == '.') && ((token[1] == '\\') ||
+    (token[1] == '/'))));
 }
 
 static inline MagickBooleanType HasExecutableLead(const char *token)
@@ -717,13 +718,13 @@ static MagickBooleanType IsDelegateMatch(const DelegateInfo *delegate_info,
   const char *decode,const char *encode)
 {
   if (delegate_info->mode > 0)
-    return(LocaleCompare(delegate_info->decode,decode) == 0 ? MagickTrue :
-      MagickFalse);
+    return((MagickBooleanType) (LocaleCompare(delegate_info->decode,decode)
+      == 0));
   if (delegate_info->mode < 0)
-    return(LocaleCompare(delegate_info->encode,encode) == 0 ? MagickTrue :
-      MagickFalse);
-  return(IsBidirectionalMismatch(delegate_info,decode,encode) == MagickFalse ?
-    MagickTrue : MagickFalse);
+    return((MagickBooleanType) (LocaleCompare(delegate_info->encode,encode)
+      == 0));
+  return((MagickBooleanType) (IsBidirectionalMismatch(delegate_info,decode,
+    encode) == MagickFalse));
 }
 
 static void FindDelegateElement(const char *decode,const char *encode,
@@ -837,10 +838,9 @@ static int DelegateInfoCompare(const void *x,const void *y)
 static inline MagickBooleanType IsListedDelegate(
   const DelegateInfo *delegate_info,const char *pattern)
 {
-  return(((delegate_info->stealth == MagickFalse) &&
+  return((MagickBooleanType) ((delegate_info->stealth == MagickFalse) &&
     (GlobExpression(delegate_info->decode,pattern,MagickFalse) != MagickFalse ||
-     GlobExpression(delegate_info->encode,pattern,MagickFalse) != MagickFalse)) ?
-    MagickTrue : MagickFalse);
+     GlobExpression(delegate_info->encode,pattern,MagickFalse) != MagickFalse)));
 }
 
 MagickExport const DelegateInfo **GetDelegateInfoList(const char *pattern,
@@ -942,9 +942,8 @@ static int DelegateCompare(const void *x,const void *y)
 static inline MagickBooleanType IsListedDelegateMatch(
   const DelegateInfo *delegate_info,const char *command,const char *pattern)
 {
-  return(((delegate_info->stealth == MagickFalse) &&
-    (GlobExpression(command,pattern,MagickFalse) != MagickFalse)) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((delegate_info->stealth == MagickFalse) &&
+    (GlobExpression(command,pattern,MagickFalse) != MagickFalse)));
 }
 
 MagickExport char **GetDelegateList(const char *pattern,
@@ -1097,7 +1096,7 @@ static MagickBooleanType IsDelegateCacheInstantiated(ExceptionInfo *exception)
         delegate_cache=AcquireDelegateCache(DelegateFilename,exception);
       UnlockSemaphoreInfo(delegate_semaphore);
     }
-  return(delegate_cache != (LinkedListInfo *) NULL ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (delegate_cache != (LinkedListInfo *) NULL));
 }
 
 
@@ -1241,8 +1240,8 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
 static inline MagickBooleanType IsIncludeElementOpen(const char *token,
   const char *q)
 {
-  return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) (((*token != '/') && (*(token+1) != '>')) &&
+    (*q != '\0')));
 }
 
 static void GetIncludePath(const char *filename,const char *token,
@@ -1457,8 +1456,8 @@ static MagickBooleanType SkipDelegateElement(const char **q,
 
 static inline MagickBooleanType IsDelegateEnd(const char *keyword)
 {
-  return(((LocaleCompare(keyword,"/>") == 0) ||
-    (LocaleCompare(keyword,"</policy>") == 0)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((LocaleCompare(keyword,"/>") == 0) ||
+    (LocaleCompare(keyword,"</policy>") == 0)));
 }
 
 static MagickBooleanType IsIncludeFileAttribute(const char **q,
@@ -1469,7 +1468,7 @@ static MagickBooleanType IsIncludeFileAttribute(const char **q,
   if (*token != '=')
     return(MagickFalse);
   (void) GetNextToken(*q,q,extent,token);
-  return(LocaleCompare(keyword,"file") == 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (LocaleCompare(keyword,"file") == 0));
 }
 
 static void LoadDelegateIncludeElement(const DelegateInclude *include,
@@ -1644,5 +1643,5 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
     ParseDelegateElement(&element,&delegate_info,&status,&q);
   }
   token=(char *) RelinquishMagickMemory(token);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
