@@ -15184,15 +15184,90 @@ static void RedrawPreferencesWidget(const PreferencesContext *context,
     }
 }
 
+static void PressPreferencesButton(const PreferencesContext *context,
+  const XEvent event,const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const preferences_info = widgets->preferences_info;
+
+  XWidgetInfo
+    *const cache_info = widgets->cache_info;
+
+  unsigned int
+    *const width = widgets->width;
+
+  char
+    *const cache = widgets->cache;
+
+  int
+    x,
+    y;
+
+  if (MatteIsActive((*apply_info),event.xbutton))
+    {
+      /*
+        User pressed Apply button.
+      */
+      (*apply_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,apply_info);
+      return;
+    }
+  if (MatteIsActive((*cancel_info),event.xbutton))
+    {
+      /*
+        User pressed Cancel button.
+      */
+      (*cancel_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+  TogglePreferencesButton(display,windows,event,preferences_info);
+  if (MatteIsActive((*cache_info),event.xbutton))
+    {
+      /*
+        User pressed Cache button.
+      */
+      x=(*cache_info).x+(int) (*cache_info).width+
+        (int) (*cache_info).bevel_width+(QuantumMargin >> 1);
+      y=(*cache_info).y+(int) (((*cache_info).height-height) >> 1);
+      (*width)=WidgetTextWidth(font_info,cache);
+      (void) XClearArea(display,windows->widget.id,x,y,(*width),height,
+        False);
+      DoublePreferencesUndoCache(resource_info);
+      (void) FormatLocaleString(cache,MagickPathExtent,CacheButtonText,
+        (unsigned long) resource_info->undo_cache);
+      (*cache_info).raised=MagickFalse;
+      XDrawTriangleEast(display,&windows->widget,cache_info);
+      return;
+    }
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
   char
     cache[MagickPathExtent];
-
-  int
-    x,
-    y;
 
   unsigned int
     height,
@@ -15266,43 +15341,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
     {
       case ButtonPress:
       {
-        if (MatteIsActive(apply_info,event.xbutton))
-          {
-            /*
-              User pressed Apply button.
-            */
-            apply_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&apply_info);
-            break;
-          }
-        if (MatteIsActive(cancel_info,event.xbutton))
-          {
-            /*
-              User pressed Cancel button.
-            */
-            cancel_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        TogglePreferencesButton(display,windows,event,preferences_info);
-        if (MatteIsActive(cache_info,event.xbutton))
-          {
-            /*
-              User pressed Cache button.
-            */
-            x=cache_info.x+(int) cache_info.width+(int) cache_info.bevel_width+
-              (QuantumMargin >> 1);
-            y=cache_info.y+(int) ((cache_info.height-height) >> 1);
-            width=WidgetTextWidth(font_info,cache);
-            (void) XClearArea(display,windows->widget.id,x,y,width,height,
-              False);
-            DoublePreferencesUndoCache(resource_info);
-            (void) FormatLocaleString(cache,MagickPathExtent,CacheButtonText,
-              (unsigned long) resource_info->undo_cache);
-            cache_info.raised=MagickFalse;
-            XDrawTriangleEast(display,&windows->widget,&cache_info);
-            break;
-          }
+        PressPreferencesButton(&context,event,&widgets);
         break;
       }
       case ButtonRelease:
