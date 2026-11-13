@@ -10069,6 +10069,26 @@ static void XPutRefreshImage(Display *display,const XWindowInfo *window,
       window->ximage,x+window->x,y+window->y,x,y,width,height);
 }
 
+static void XCopyRefreshPixmap(Display *display,const XWindowInfo *window,
+  const XRefreshArea *area)
+{
+  const int
+    x = area->x,
+    y = area->y;
+
+  const unsigned int
+    height = area->height,
+    width = area->width;
+
+  if (window->depth > 1)
+    (void) XCopyArea(display,window->pixmap,window->id,
+      window->annotate_context,x+window->x,y+window->y,width,height,x,y);
+  else
+    (void) XCopyPlane(display,window->pixmap,window->id,
+      window->highlight_context,x+window->x,y+window->y,width,height,x,y,
+      1L);
+}
+
 MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   const XEvent *event)
 {
@@ -10079,6 +10099,9 @@ MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   unsigned int
     height,
     width;
+
+  XRefreshArea
+    area;
 
   assert(display != (Display *) NULL);
   assert(window != (XWindowInfo *) NULL);
@@ -10121,27 +10144,14 @@ MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   */
   if (window->matte_pixmap != (Pixmap) NULL)
     (void) XSetClipMask(display,window->annotate_context,window->matte_pixmap);
+  area.x=x;
+  area.y=y;
+  area.height=height;
+  area.width=width;
   if (window->pixmap != (Pixmap) NULL)
-    {
-      if (window->depth > 1)
-        (void) XCopyArea(display,window->pixmap,window->id,
-          window->annotate_context,x+window->x,y+window->y,width,height,x,y);
-      else
-        (void) XCopyPlane(display,window->pixmap,window->id,
-          window->highlight_context,x+window->x,y+window->y,width,height,x,y,
-          1L);
-    }
+    XCopyRefreshPixmap(display,window,&area);
   else
-    {
-      XRefreshArea
-        area;
-
-      area.x=x;
-      area.y=y;
-      area.height=height;
-      area.width=width;
-      XPutRefreshImage(display,window,&area);
-    }
+    XPutRefreshImage(display,window,&area);
   if (window->matte_pixmap != (Pixmap) NULL)
     (void) XSetClipMask(display,window->annotate_context,None);
   (void) XFlush(display);
