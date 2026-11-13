@@ -882,11 +882,8 @@ MagickExport Image *GetLastImageInList(const Image *images)
 */
 MagickExport Image *GetNextImageInList(const Image *images)
 {
-  if (images == (Image *) NULL)
+  if (IsImageListEntry(images) == MagickFalse)
     return((Image *) NULL);
-  assert(images->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   return(images->next);
 }
 
