@@ -1211,7 +1211,8 @@ static void XEditText(Display *display,XWidgetInfo *text_info,
           text_info->highlight=MagickFalse;
           break;
         }
-      magick_fallthrough;
+      XEditTextCursorLeft(text_info);
+      break;
     }
     case XK_Left:
     case XK_KP_Left:
