@@ -8182,6 +8182,39 @@ static void XTrackDrawElement(const DrawEditContext *context,
   (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
 }
 
+static MagickStatusType XDrawElementImage(const DrawEditContext *context,
+  XDrawInfo *draw_info)
+{
+  Display
+    *const display = context->display;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const image = context->image;
+
+  MagickStatusType
+    status;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  status=XDrawImage(display,windows->pixel_info,draw_info,*image,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  /*
+    Update image colormap and return to image drawing.
+  */
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  return(status);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8363,15 +8396,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
     /*
       Draw element on image.
     */
-    XSetCursorState(display,windows,MagickTrue);
-    XCheckRefreshWindows(display,windows);
-    status=XDrawImage(display,windows->pixel_info,&draw_info,*image,exception);
-    XSetCursorState(display,windows,MagickFalse);
-    /*
-      Update image colormap and return to image drawing.
-    */
-    XConfigureImageColormap(display,resource_info,windows,*image,exception);
-    (void) XConfigureImage(display,resource_info,windows,*image,exception);
+    status=XDrawElementImage(&draw_context,&draw_info);
   }
   XSetCursorState(display,windows,MagickFalse);
   coordinate_info=(XPoint *) RelinquishMagickMemory(coordinate_info);
