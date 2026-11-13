@@ -7844,6 +7844,53 @@ static void XSetDrawLineInfo(XDrawInfo *draw_info,const XSegment *line_info,
     }
 }
 
+static void XDrawStartEvent(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    *const x = pointer_targets->x;
+
+  int
+    *const y = pointer_targets->y;
+
+  XEvent
+    *const event = pointer_targets->event;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XDrawButtonPress(context,(*event),pointer_targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XDrawKeyPress(context,pointer_targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(display,windows,(*x),(*y));
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8010,33 +8057,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
           XDrawCommand(&draw_context,&pointer_targets,&style_targets);
           continue;
         }
-      switch (event.type)
-      {
-        case ButtonPress:
-        {
-          XDrawButtonPress(&draw_context,event,&pointer_targets);
-          break;
-        }
-        case ButtonRelease:
-          break;
-        case Expose:
-          break;
-        case KeyPress:
-        {
-          XDrawKeyPress(&draw_context,&pointer_targets);
-          break;
-        }
-        case MotionNotify:
-        {
-          /*
-            Map and unmap Info widget as text cursor crosses its boundaries.
-          */
-          x=event.xmotion.x;
-          y=event.xmotion.y;
-          XTrackInfoWidget(display,windows,x,y);
-          break;
-        }
-      }
+      XDrawStartEvent(&draw_context,&pointer_targets);
     } while ((state & ExitState) == 0);
     (void) XSelectInput(display,windows->image.id,
       windows->image.attributes.event_mask);
