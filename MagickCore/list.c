@@ -959,11 +959,8 @@ MagickExport Image **ImageListToArray(const Image *images,
   ssize_t
     i;
 
-  if (images == (Image *) NULL)
+  if (IsImageListEntry(images) == MagickFalse)
     return((Image **) NULL);
-  assert(images->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   group=(Image **) AcquireQuantumMemory((size_t) GetImageListLength(images)+1UL,
     sizeof(*group));
   if (group == (Image **) NULL)
