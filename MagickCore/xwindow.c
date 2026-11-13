@@ -7451,6 +7451,35 @@ static unsigned int XGetMagnifyFactor(const XWindows *windows,
   return(magnify);
 }
 
+static void XSetMagnifyWindowName(Display *display,XWindows *windows,
+  const unsigned int magnify)
+{
+  ssize_t
+    i;
+
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  /*
+    New magnify factor:  update magnify window name.
+  */
+  i=0;
+  while ((1 << i) <= (int) magnify)
+    i++;
+  (void) FormatLocaleString(windows->magnify.name,MagickPathExtent,
+    "Magnify %.17gX",(double) i);
+  status=XStringListToTextProperty(&windows->magnify.name,1,&window_name);
+  if (status != False)
+    {
+      XSetWMName(display,windows->magnify.id,&window_name);
+      XSetWMIconName(display,windows->magnify.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7465,9 +7494,6 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
 
   int
     x;
-
-  ssize_t
-    i;
 
   unsigned char
     *q;
@@ -7497,27 +7523,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   magnify=XGetMagnifyFactor(windows,previous_magnify);
   if (magnify != previous_magnify)
     {
-      Status
-        status;
-
-      XTextProperty
-        window_name;
-
-      /*
-        New magnify factor:  update magnify window name.
-      */
-      i=0;
-      while ((1 << i) <= (int) magnify)
-        i++;
-      (void) FormatLocaleString(windows->magnify.name,MagickPathExtent,
-        "Magnify %.17gX",(double) i);
-      status=XStringListToTextProperty(&windows->magnify.name,1,&window_name);
-      if (status != False)
-        {
-          XSetWMName(display,windows->magnify.id,&window_name);
-          XSetWMIconName(display,windows->magnify.id,&window_name);
-          (void) XFree((void *) window_name.value);
-        }
+      XSetMagnifyWindowName(display,windows,magnify);
     }
   previous_magnify=magnify;
   ximage=windows->image.ximage;
