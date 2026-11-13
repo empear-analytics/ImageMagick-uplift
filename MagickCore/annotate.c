@@ -604,6 +604,45 @@ static void GetCenterGravityTextOffset(const GravityTextInfo *gravity,
   }
 }
 
+static void GetAnnotateTextOffset(const GravityTextInfo *gravity,
+  PointInfo *offset)
+{
+  DrawInfo
+    *const annotate = gravity->annotate,
+    *const annotate_info = gravity->annotate_info;
+
+  const RectangleInfo
+    geometry = gravity->geometry;
+
+  const size_t
+    height = gravity->height;
+
+  const ssize_t
+    i = gravity->i;
+
+  const TypeMetric
+    metrics = gravity->metrics;
+
+  switch (annotate->gravity)
+  {
+    default:
+    {
+      GetCenterGravityTextOffset(gravity,offset);
+      break;
+    }
+    case (GravityType) NorthWestGravity:
+    {
+      (*offset).x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
+        annotate_info->affine.ry*height+annotate_info->affine.ry*
+        (metrics.ascent+metrics.descent);
+      (*offset).y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
+        (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
+        annotate_info->affine.sy*metrics.ascent;
+      break;
+    }
+  }
+}
+
 typedef struct _TextDecorationInfo
 {
   Image
@@ -854,31 +893,14 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     if ((metrics.width == 0) || (annotate->gravity != NorthWestGravity))
       (void) GetTypeMetrics(image,annotate,&metrics,exception);
     height=GetTextLineHeight(&metrics,draw_info);
-    switch (annotate->gravity)
-    {
-      default:
-      {
-        gravity.annotate=annotate;
-        gravity.annotate_info=annotate_info;
-        gravity.geometry=geometry;
-        gravity.height=height;
-        gravity.i=i;
-        gravity.metrics=metrics;
-        gravity.number_lines=number_lines;
-        GetCenterGravityTextOffset(&gravity,&offset);
-        break;
-      }
-      case (GravityType) NorthWestGravity:
-      {
-        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
-          annotate_info->affine.ry*height+annotate_info->affine.ry*
-          (metrics.ascent+metrics.descent);
-        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
-          (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
-          annotate_info->affine.sy*metrics.ascent;
-        break;
-      }
-    }
+    gravity.annotate=annotate;
+    gravity.annotate_info=annotate_info;
+    gravity.geometry=geometry;
+    gravity.height=height;
+    gravity.i=i;
+    gravity.metrics=metrics;
+    gravity.number_lines=number_lines;
+    GetAnnotateTextOffset(&gravity,&offset);
     text_align.annotate=annotate;
     text_align.annotate_info=annotate_info;
     text_align.height=height;
