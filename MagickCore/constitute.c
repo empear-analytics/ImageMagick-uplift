@@ -1795,6 +1795,13 @@ static void SyncWriteBlobStream(ImageInfo *write_info,Image *p,
     SyncBlobStream(write_info,p,images);
 }
 
+static void RestoreWriteProgressMonitor(Image *p,
+  const MagickSizeType number_images,MagickProgressMonitor progress_monitor)
+{
+  if (number_images != 1)
+    (void) SetImageProgressMonitor(p,progress_monitor,p->client_data);
+}
+
 MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
   Image *images,const char *filename,ExceptionInfo *exception)
 {
@@ -1848,8 +1855,7 @@ MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
         p->client_data);
     status&=(MagickStatusType) WriteImage(write_info,p,exception);
     SyncWriteBlobStream(write_info,p,images);
-    if (number_images != 1)
-      (void) SetImageProgressMonitor(p,progress_monitor,p->client_data);
+    RestoreWriteProgressMonitor(p,number_images,progress_monitor);
     if (write_info->adjoin != MagickFalse)
       break;
     if (number_images != 1)
