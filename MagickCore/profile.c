@@ -2971,6 +2971,82 @@ static MagickBooleanType ReadExifEntry(const ExifWalkInfo *walk,
   return(MagickTrue);
 }
 
+static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
+  const ExifTagInfo *exif_tag,const size_t number_entries,
+  const ExifWalkTargets *targets)
+{
+  const EndianType
+    endian = walk->endian;
+
+  unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  unsigned char
+    *const directory = walk->directory,
+    *const ifd0 = walk->ifd0;
+
+  const unsigned short
+    tag_value = exif_tag->tag_value;
+
+  const ssize_t
+    format = exif_tag->format;
+
+  const int
+    components = exif_tag->components;
+
+  const size_t
+    number_bytes = exif_tag->number_bytes;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  ssize_t
+    *const level = targets->level;
+
+  size_t
+    *const entry = targets->entry;
+
+  unsigned char
+    **const exif_directory = targets->exif_directory;
+
+  DirectoryInfo
+    *const directory_stack = targets->directory_stack;
+
+  ssize_t
+    offset;
+
+  if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
+      MagickFalse)
+    return(MagickFalse);
+  offset=(ssize_t) ReadProfileLong(endian,p);
+  if (((size_t) offset >= (length-1)) ||
+      ((*level) >= (MaxDirectoryStack-2)))
+    return(MagickFalse);
+  if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
+    (*exif_directory)=exif+offset;
+  directory_stack[(*level)].directory=directory;
+  (*entry)++;
+  directory_stack[(*level)].entry=(*entry);
+  (*level)++;
+  directory_stack[(*level)].directory=exif+offset;
+  directory_stack[(*level)].entry=0;
+  (*level)++;
+  if ((directory+2+(12*number_entries)) > (exif+length))
+    return(MagickTrue);
+  offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
+    number_entries));
+  if (IsNextDirectoryOffset(offset,length,(*level)) != MagickFalse)
+    {
+      directory_stack[(*level)].directory=exif+offset;
+      directory_stack[(*level)].entry=0;
+      (*level)++;
+    }
+  return(MagickTrue);
+}
+
 static void SyncExifDirectory(const ExifWalkInfo *walk,
   const ExifWalkTargets *targets)
 {
@@ -2990,24 +3066,15 @@ static void SyncExifDirectory(const ExifWalkInfo *walk,
     *const directory = walk->directory,
     *const ifd0 = walk->ifd0;
 
-  ssize_t
-    *const level = targets->level;
-
   size_t
     *const entry = targets->entry;
 
   unsigned char
     **const exif_directory = targets->exif_directory;
 
-  DirectoryInfo
-    *const directory_stack = targets->directory_stack;
-
   size_t
     directory_length,
     number_entries;
-
-  ssize_t
-    offset;
 
   /*
     Determine how many entries there are in the current IFD.
@@ -3066,33 +3133,9 @@ static void SyncExifDirectory(const ExifWalkInfo *walk,
     exif_tag.q=q;
     exif_tag.p=p;
     SyncExifTag(&exif_tag,(*exif_directory));
-    if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
+    if (PushExifDirectory(walk,&exif_tag,number_entries,targets) !=
         MagickFalse)
-      continue;
-    offset=(ssize_t) ReadProfileLong(endian,p);
-    if (((size_t) offset >= (length-1)) ||
-        ((*level) >= (MaxDirectoryStack-2)))
-      continue;
-    if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
-      (*exif_directory)=exif+offset;
-    directory_stack[(*level)].directory=directory;
-    (*entry)++;
-    directory_stack[(*level)].entry=(*entry);
-    (*level)++;
-    directory_stack[(*level)].directory=exif+offset;
-    directory_stack[(*level)].entry=0;
-    (*level)++;
-    if ((directory+2+(12*number_entries)) > (exif+length))
       break;
-    offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
-      number_entries));
-    if (IsNextDirectoryOffset(offset,length,(*level)) != MagickFalse)
-      {
-        directory_stack[(*level)].directory=exif+offset;
-        directory_stack[(*level)].entry=0;
-        (*level)++;
-      }
-    break;
   }
 }
 
