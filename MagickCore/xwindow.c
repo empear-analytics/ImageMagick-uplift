@@ -8914,6 +8914,21 @@ MagickPrivate void XMakeStandardColormap(Display *display,
 %    o window_info: Specifies a pointer to a X11 XWindowInfo structure.
 %
 */
+static void XStripGeometrySpaces(char *geometry)
+{
+  char
+    *p;
+
+  p=geometry;
+  while (strlen(p) != 0)
+  {
+    if ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '%'))
+      p++;
+    else
+      (void) memmove(p,p+1,(size_t) (MagickPathExtent-(p-geometry)));
+  }
+}
+
 static void XCreateOrConfigureWindow(Display *display,const Window parent,
   XWindowInfo *window_info,const XSizeHints *size_hints)
 {
@@ -9028,23 +9043,13 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
       int
         flags;
 
-      char
-        *p;
-
       /*
         User specified geometry.
       */
       (void) FormatLocaleString(default_geometry,MagickPathExtent,"%dx%d",
         size_hints->width,size_hints->height);
       (void) CopyMagickString(geometry,window_info->geometry,MagickPathExtent);
-      p=geometry;
-      while (strlen(p) != 0)
-      {
-        if ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '%'))
-          p++;
-        else
-          (void) memmove(p,p+1,(size_t) (MagickPathExtent-(p-geometry)));
-      }
+      XStripGeometrySpaces(geometry);
       flags=XWMGeometry(display,window_info->screen,geometry,default_geometry,
         window_info->border_width,size_hints,&size_hints->x,&size_hints->y,
         &size_hints->width,&size_hints->height,&gravity);
