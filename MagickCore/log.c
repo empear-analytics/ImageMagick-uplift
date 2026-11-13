@@ -1811,6 +1811,26 @@ static void FormatLogEventXML(const LogEventText *event_text,
     (double) line,domain,event);
 }
 
+static MagickBooleanType CopyLogFormatLiteral(const char **p,char **q)
+{
+  char
+    escape;
+
+  escape=GetLogEscape((*p));
+  if (escape != '\0')
+    {
+      *(*q)++=escape;
+      (*p)++;
+      return(MagickTrue);
+    }
+  if (*(*p) != '%')
+    {
+      *(*q)++=(*(*p));
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static char *TranslateEvent(const LogEventLocation *location,
   const char *domain,const char *event)
 {
@@ -1835,7 +1855,6 @@ static char *TranslateEvent(const LogEventLocation *location,
     *log_info;
 
   char
-    escape,
     *q;
 
   const char
@@ -1905,18 +1924,8 @@ static char *TranslateEvent(const LogEventLocation *location,
         \n   newline
         \r   carriage return
     */
-    escape=GetLogEscape(p);
-    if (escape != '\0')
-      {
-        *q++=escape;
-        p++;
-        continue;
-      }
-    if (*p != '%')
-      {
-        *q++=(*p);
-        continue;
-      }
+    if (CopyLogFormatLiteral(&p,&q) != MagickFalse)
+      continue;
     p++;
     if (*p == '\0')
       break;
