@@ -5821,21 +5821,46 @@ static Image *XStartAnimateSession(const AnimateStartInputs *start)
   }
 }
 
-MagickExport Image *XAnimateImages(Display *display,
-  XResourceInfo *resource_info,char **argv,const int argc,Image *images,
-  ExceptionInfo *exception)
+typedef struct _AnimateWindowInputs
 {
-  static char
-    working_directory[MagickPathExtent];
+  Display
+    *display;
 
-  static size_t
-    number_windows;
+  XResourceInfo
+    *resource_info;
 
-  static XWindowInfo
-    *magick_windows[MaXWindows];
+  char
+    **argv;
+
+  int
+    argc;
+
+  XWindows
+    *windows;
+
+  Image
+    *images;
+
+  ExceptionInfo
+    *exception;
 
   WarningHandler
     warning_handler;
+
+  char
+    *working_directory;
+
+  XWindowInfo
+    **magick_windows;
+
+  size_t
+    number_windows;
+} AnimateWindowInputs;
+
+static Image *XBindAnimateWindows(const AnimateWindowInputs *window_inputs)
+{
+  Display
+    *const display = window_inputs->display;
 
   Window
     root_window;
@@ -5862,10 +5887,60 @@ MagickExport Image *XAnimateImages(Display *display,
     *visual_info;
 
   XWindows
-    *windows;
+    *const windows = window_inputs->windows;
 
   XWMHints
     *manager_hints;
+
+  /*
+    Initialize Standard Colormap.
+  */
+  map_info=windows->map_info;
+  icon_map=windows->icon_map;
+  visual_info=windows->visual_info;
+  icon_visual=windows->icon_visual;
+  pixel=windows->pixel_info;
+  icon_pixel=windows->icon_pixel;
+  font_info=windows->font_info;
+  icon_resources=windows->icon_resources;
+  class_hints=windows->class_hints;
+  manager_hints=windows->manager_hints;
+  root_window=XRootWindow(display,visual_info->screen);
+  {
+    const AnimateStartInputs
+      start = { display, window_inputs->resource_info, window_inputs->argv,
+        window_inputs->argc, windows, window_inputs->images,
+        window_inputs->exception, window_inputs->warning_handler,
+        window_inputs->working_directory, window_inputs->magick_windows,
+        window_inputs->number_windows, visual_info, map_info, pixel, font_info,
+        root_window, class_hints, manager_hints, icon_resources, icon_visual,
+        icon_map, icon_pixel };
+
+    return(XStartAnimateSession(&start));
+  }
+}
+
+MagickExport Image *XAnimateImages(Display *display,
+  XResourceInfo *resource_info,char **argv,const int argc,Image *images,
+  ExceptionInfo *exception)
+{
+  static char
+    working_directory[MagickPathExtent];
+
+  static size_t
+    number_windows;
+
+  static XWindowInfo
+    *magick_windows[MaXWindows];
+
+  WarningHandler
+    warning_handler;
+
+  XWindows
+    *windows;
+
+  AnimateWindowInputs
+    window_inputs;
 
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
@@ -5887,29 +5962,18 @@ MagickExport Image *XAnimateImages(Display *display,
       XInitializeMagickWindows(windows,magick_windows,&number_windows);
     }
   XLoadAnimateFont(display,resource_info,windows);
-  /*
-    Initialize Standard Colormap.
-  */
-  map_info=windows->map_info;
-  icon_map=windows->icon_map;
-  visual_info=windows->visual_info;
-  icon_visual=windows->icon_visual;
-  pixel=windows->pixel_info;
-  icon_pixel=windows->icon_pixel;
-  font_info=windows->font_info;
-  icon_resources=windows->icon_resources;
-  class_hints=windows->class_hints;
-  manager_hints=windows->manager_hints;
-  root_window=XRootWindow(display,visual_info->screen);
-  {
-    const AnimateStartInputs
-      start = { display, resource_info, argv, argc, windows, images, exception,
-        warning_handler, working_directory, magick_windows, number_windows,
-        visual_info, map_info, pixel, font_info, root_window, class_hints,
-        manager_hints, icon_resources, icon_visual, icon_map, icon_pixel };
-
-    return(XStartAnimateSession(&start));
-  }
+  window_inputs.display=display;
+  window_inputs.resource_info=resource_info;
+  window_inputs.argv=argv;
+  window_inputs.argc=argc;
+  window_inputs.windows=windows;
+  window_inputs.images=images;
+  window_inputs.exception=exception;
+  window_inputs.warning_handler=warning_handler;
+  window_inputs.working_directory=working_directory;
+  window_inputs.magick_windows=magick_windows;
+  window_inputs.number_windows=number_windows;
+  return(XBindAnimateWindows(&window_inputs));
 }
 
 /*
