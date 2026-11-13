@@ -1925,6 +1925,14 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    (`x_offset = grid->x_offset`), and leave the block's text unchanged; the other
    members keep step 4's form. Its writes land in that local, as they would in a
    by-value parameter.
+   A variable the block writes before it reads it, whose only other use is a write the
+   caller made before the block (`FloodfillPaintImage`'s `start=0;`, which the block's loop
+   overwrites before any read), is carried in the same way (2026-11-13): leaving it
+   to the new function would make the caller's write a variable set and never used, which
+   clang's `-Wunused-but-set-variable` turns into an error in the CI jobs (Recipe I
+   step 2 gives the same reason for a written variable). The new function's local starts
+   with the value the caller wrote, which the block never reads, so no value anyone sees
+   changes.
    An array of the caller's (a local, a `static` or an array parameter) that the
    block names only as an argument of calls, where it converts to a pointer to its
    first element, and whose contents the block writes, if at all, only through calls
@@ -13235,6 +13243,141 @@ Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe MF - Make a Hoisted Statement Macro a Function
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Complex
+Method* or *Large Method* on a function whose blocks all use one function-like macro that
+expands to a compound statement with its own branches, and Recipe H has hoisted the macro
+so that a helper can use it: every block that would move holds a use, and a helper that
+holds a use carries the macro's branches itself (a probe of `paint-floodfill.c`:
+`FloodfillPaintImage` with `PushSegmentStack` hoisted and nothing else changed, 8.35 to
+7.03, because each helper holding a use still holds the whole `if`/`else`/`if`). The
+typical case is a push on a stack that overflows through `ThrowBinaryException`, used at
+five sites: `PushSegmentStack`.
+
+**Not covered by:** Recipe H, which moves the macro and keeps its uses; Recipe E, whose
+step 7 moves a macro only together with a block that is its sole user; Recipes W, Y and I,
+which move a block and leave its text unchanged, while here the block is the macro's body
+with its parameters bound to the argument values, and their steps 3 and 4 give a variable
+the block advances (`s++`) no way through a struct when the macro's text names it plainly;
+Recipe D, whose copies are blocks of the function's own text.
+
+**How:**
+
+1. The macro `M` is defined at file scope, hoisted under Recipe H, directly above the
+   caller; its body is one compound statement without `#`, `##`, `goto`, `break` or
+   `continue`, whose only exit is `ThrowBinaryException(...)` (or another of
+   `exception-private.h`'s throw macros), that is `return(c);` of one constant `c`. Every
+   use of `M` in the file is a statement `M(a1,...,ak);` in the one caller, outside every
+   OpenMP region, with no `#pragma` line in the macro. Every argument is a side-effect-free
+   expression of locals, parameters and literals (identifiers, literals, unary `-`, `+`
+   and `-`), has the type `ssize_t` or is an integer literal, and reads no variable the
+   macro writes.
+2. List the caller's variables that `M`'s body names besides its parameters. Those it only
+   reads are the group of Recipe N step 2 (here `image`, `exception`, `segment_stack`).
+   Those it writes only on the paths that end in its `return(c);` (here the cleanup
+   `segment_info=RelinquishVirtualMemory(segment_info);` and the three that follow) the
+   helper keeps as non-`const` locals of its own (Recipe W step 3: by value); the caller
+   returns `c` at once and reads none of them. At most one variable `p` is written on the
+   path that falls through: a plain pointer local of the caller (`s`, advanced by `s++` and
+   stored through) whose address the caller takes only to fill the struct of step 3.
+3. Declare `typedef struct _Stack { ... } Stack;` with one member per variable of step 2
+   (the exact type and name, a top-level `const` left off) and last a member `T **top` for
+   `p` (`T *p`); and `typedef struct _Segment { ... } Segment;` with one member per
+   parameter of `M` (`ssize_t up, left, right, delta`), in the macro's order.
+4. Directly above the caller, below the hoisted macro, write `static MagickBooleanType
+   Helper(const Stack *stack,const Segment *segment)`. Its body declares a local of every
+   name step 2 lists, initialised from `stack` (non-`const` for the names `M` writes,
+   `T *p = *stack->top;`), a `const` local per parameter of `M` initialised from `segment`
+   and named as the parameter, then `M(<the parameters>);`, then `*stack->top=p;` and
+   `return(MagickTrue);`. The macro's `return(c);` is the helper's failure exit.
+5. In the caller declare a `Stack` local with the other locals and fill it by assignments
+   before the first use, in member order, `stack.top=&p;` last, at a point every use
+   follows, with nothing from it to a use writing a member's variable. Where `M(a1,...,ak);`
+   stood write a compound statement `{ const Segment segment = { a1,...,ak };` blank line
+   `if (Helper(&stack,&segment) == MagickFalse) return(c); }`, with the caller's own `c`.
+6. Check by reading each of the five: (a) every argument is evaluated once at the call
+   where the macro evaluated it up to three times, to the same value, since it reads no
+   variable the macro writes and no memory behind `p`; (b) the cleanup and the throw run
+   on the helper's copies of the objects the caller held, before the caller returns `c`, so
+   the same objects are released and the same value returned; (c) on the fall-through path
+   `*stack->top=p;` stores the value the macro left in `p`, and the caller reads `p` only
+   after the helper returned; (d) the exception the throw makes names the helper in
+   `GetMagickModule()` (owner, 2026-11-12), its text unchanged.
+7. Run `tools/refactor_guard.py --calls`: the macro's name drops by its use count and the
+   helper appears; run the oracle on the caller's cases.
+
+**Before:**
+
+```c
+#define PushSegmentStack(up,left,right,delta) \
+{ \
+  if (s >= (segment_stack+MaxStacksize)) \
+    { \
+      ...cleanup... \
+      ThrowBinaryException(DrawError,"SegmentStackOverflow",image->filename) \
+    } \
+  else \
+    { \
+      if ((((up)+(delta)) >= 0) && (((up)+(delta)) < (ssize_t) image->rows)) \
+        { s->x1=(double) (left); ... s++; } \
+    } \
+}
+  ...
+          PushSegmentStack(y,start,x1-1,-offset);
+```
+
+**After:**
+
+```c
+static MagickBooleanType PushFloodfillSegment(const FloodfillStack *stack,
+  const FloodfillSegment *segment)
+{
+  ...
+  SegmentInfo
+    *s = *stack->top;
+  ...
+  PushSegmentStack(up,left,right,delta);
+  *stack->top=s;
+  return(MagickTrue);
+}
+  ...
+          {
+            const FloodfillSegment
+              segment = { y, start, x1-1, -offset };
+
+            if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
+              return(MagickFalse);
+          }
+```
+
+**Careful:**
+
+- The macro's text is not edited: the hoisted `#define` stays as it stands and the helper
+  names the same identifiers, which is why step 4 binds each name as a local of the same
+  name. `pp_identical.sh` proves the hoist (Recipe H); this recipe's proof is the oracle.
+- The overflow branch (`s >= segment_stack+MaxStacksize`) is reached by no case: it is
+  checked by reading step 6 (b) and the `--calls` guard, and the helper's text of it is
+  the macro's, unchanged.
+- The helper is a call per use where the macro was inline code; a use inside a per-pixel
+  loop must be timed against the baseline binary (several runs, median) and the step taken
+  only if the slowdown is at most 3%. `PushSegmentStack` runs once per row segment.
+- Several uses of one macro in one helper are not this recipe's result: each expansion is a
+  bump, so one helper holds one use.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` and steps 1, 2 and 6 checked by
+reading; the throw branch by reading only.
+
+**Provenance:** 2026-11-13, from `paint-floodfill.c`'s `FloodfillPaintImage` (campaign A,
+W21 lane b): the five `PushSegmentStack` uses held every bump of the function and Recipe H
+alone probed 7.03; the helper of this recipe with the loop split into helpers under
+Recipes Y and I, the seed pushes in a helper of their own and Recipe FB on the last
+struct, probed 9.09. The copy-in and copy-out of `s` is Recipe MB's form (a local of the
+macro-bound name, initialised from a pointer and stored back). Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to
+evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -13661,3 +13804,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | CQ | Name a Selection of Calls Over Its Condition: sites `if (C) F(...); else G(...);` (one call per branch, `C` an `int` condition that may call read-only functions, the other arguments free of side effects and traps) become calls of one `static inline void` helper taking `C`'s value as `const int selected` and the sites' differing arguments; *Careful* gives the argument (`C` evaluated once before either branch, the other arguments evaluated in the branch not taken too with no effect); proof: the oracle, `--calls`, `nm` for inlining, and a timing (at most 3% slower) | `magnify.c`'s `Scale3X` (campaign A, W21 lane d): eight `if (C) CopyPixels(&magnify,a,d); else CopyPixels(&magnify,4,d);` over `PixelsEqual` and `IsScale3X*Edge` conditions, cc 12; Recipe NS refuses a call in the condition and the owner's `?:` fold for magnify (2026-11-12) leaves the decisions in place. A probe: 8.84 to 9.09 | owner |
 | 2026-11-13 | AMEND | CQ | Step 7: a site that is one call whose argument is a parenthesised `(C ? a : k)`, `k` the literal the helper's else branch passes, becomes the helper's call (`C != 0` for a `C` that is not an `int`); *Careful* gives the argument (the same selection with the call written once; `C` evaluated once) | `magnify.c`'s `Eagle3X` (three sites) and `Eagle3XB` (four): `CopyPixels(&magnify,(ssize_t) (corner_tr ? 1 : 4),2);` with `corner_tr` a `ssize_t` holding a comparison, beside `Scale3X`'s if/else sites; a probe: the file 9.38 to 10.0 together with `Scale2X` and Recipe P on `IsEpbx2XBlendable` | owner |
 | 2026-11-13 | NEW | EX | Dispatch the Exits of an Extracted Block Through a Result Code: a block in a sequential loop body that leaves by `continue;` and by `return(R);` with different `R` (or by several `return`s) becomes a function returning an enumerator per exit, and the caller's `switch` runs each exit's original statement. *Careful* gives the argument (same statements up to the exit, nothing between the helper's return and the caller's exit, `R` read from caller variables written through pointers) | `layer.c`'s `OptimizeLayerFrames` (campaign A, W21 lane b): the `bounds[i].x < 0` choice with its two cleanup returns and its `i++; continue;`; BR, CR, I and LC refuse it; 8.82 to 8.85 with the choice as one helper, 8.92 with step 7's pass-through on its `else` body | owner |
+| 2026-11-13 | NEW | MF | Make a Hoisted Statement Macro a Function: the uses of a hoisted function-like statement macro (`M(a1,...,ak);`, side-effect-free arguments, one `ThrowBinaryException` exit, at most one pointer local advanced on the fall-through path) become calls of one `static MagickBooleanType` helper that holds the one remaining use, taking a struct of the macro's free variables with `T **top` for the advanced pointer and a struct of the arguments; *Careful* gives the argument (arguments evaluated once to the same value, cleanup on copies of objects the caller releases before returning, the pointer stored back on the success path); proof: the oracle, `--calls`, reading | `paint-floodfill.c`'s `PushSegmentStack` (campaign A, W21 lane b): five uses in `FloodfillPaintImage`, the file 8.35; with the helper and the loop split under Recipes Y and I, probed 9.09 | owner |
+| 2026-11-13 | AMEND | N | Step 2: a variable the block writes before it reads it, whose only other use is the caller's earlier write of it, may be carried in by value like a read-then-written one (a non-`const` local of the member's name initialised from the member), since declaring it in the new function would leave the caller's write set but never used (`-Wunused-but-set-variable`, an error in the CI jobs) | `paint-floodfill.c`'s `FloodfillPaintImage` (campaign A, W21 lane b): `start=0;` before the stack loop, which the loop overwrites before reading; the loop as a helper under Recipe Y with `start` declared in it leaves `start` set and unused in the caller | owner |
