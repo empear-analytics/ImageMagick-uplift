@@ -333,6 +333,61 @@ static void AcquireMagickResourceTail(const ResourceType type,
   }
 }
 
+static void AcquireMagickResourceMiddle(const ResourceType type,
+  const MagickSizeType size,const MagickOffsetType request,
+  const AcquireTargets *targets)
+{
+  MagickBooleanType
+    *const bi = targets->bi,
+    *const status = targets->status;
+
+  MagickOffsetType
+    *const current = targets->current;
+
+  MagickSizeType
+    *const limit = targets->limit;
+
+  switch (type)
+  {
+    case HeightResource:
+    {
+      (*bi)=MagickTrue;
+      resource_info.height=request;
+      (*limit)=resource_info.height_limit;
+      (*status)=IsSizeWithinLimit(size,(*limit));
+      break;
+    }
+    case ListLengthResource:
+    {
+      resource_info.list_length=request;
+      (*limit)=resource_info.list_length_limit;
+      (*status)=IsSizeWithinLimit(size,(*limit));
+      break;
+    }
+    case MapResource:
+    {
+      (*bi)=MagickTrue;
+      (*limit)=resource_info.map_limit;
+      (*status)=AcquireResourceCounter(&resource_info.map,request,(*limit));
+      (*current)=resource_info.map;
+      break;
+    }
+    case MemoryResource:
+    {
+      (*bi)=MagickTrue;
+      (*limit)=resource_info.memory_limit;
+      (*status)=AcquireResourceCounter(&resource_info.memory,request,(*limit));
+      (*current)=resource_info.memory;
+      break;
+    }
+    default:
+    {
+      AcquireMagickResourceTail(type,size,request,targets);
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
   const MagickSizeType size)
 {
@@ -381,40 +436,9 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
       AcquireFileResourceCounter(request,&limit,&status,&current);
       break;
     }
-    case HeightResource:
-    {
-      bi=MagickTrue;
-      resource_info.height=request;
-      limit=resource_info.height_limit;
-      status=IsSizeWithinLimit(size,limit);
-      break;
-    }
-    case ListLengthResource:
-    {
-      resource_info.list_length=request;
-      limit=resource_info.list_length_limit;
-      status=IsSizeWithinLimit(size,limit);
-      break;
-    }
-    case MapResource:
-    {
-      bi=MagickTrue;
-      limit=resource_info.map_limit;
-      status=AcquireResourceCounter(&resource_info.map,request,limit);
-      current=resource_info.map;
-      break;
-    }
-    case MemoryResource:
-    {
-      bi=MagickTrue;
-      limit=resource_info.memory_limit;
-      status=AcquireResourceCounter(&resource_info.memory,request,limit);
-      current=resource_info.memory;
-      break;
-    }
     default:
     {
-      AcquireMagickResourceTail(type,size,request,&targets);
+      AcquireMagickResourceMiddle(type,size,request,&targets);
       break;
     }
   }
