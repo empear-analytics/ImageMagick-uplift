@@ -84,6 +84,23 @@
 %    o path: the path.
 %
 */
+static MagickBooleanType IsGlobCharacter(const char c)
+{
+  switch (c)
+  {
+    case '*':
+    case '?':
+    case '{':
+    case '}':
+    case '[':
+    case ']':
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 MagickPrivate MagickBooleanType IsGlob(const char *path)
 {
   MagickBooleanType
@@ -96,21 +113,8 @@ MagickPrivate MagickBooleanType IsGlob(const char *path)
     return(MagickFalse);
   for (p=path; *p != '\0'; p++)
   {
-    switch (*p)
-    {
-      case '*':
-      case '?':
-      case '{':
-      case '}':
-      case '[':
-      case ']':
-      {
-        status=MagickTrue;
-        break;
-      }
-      default:
-        break;
-    }
+    if (IsGlobCharacter(*p) != MagickFalse)
+      status=MagickTrue;
   }
   return(status);
 }
