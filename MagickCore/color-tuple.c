@@ -253,6 +253,13 @@ static void SetAlphaComponent(const PixelInfo *pixel,
     *scale=1.0;
 }
 
+static inline MagickBooleanType IsOklchHueChannel(const PixelInfo *pixel,
+  const PixelChannel channel)
+{
+  return((MagickBooleanType) ((pixel->colorspace == OklchColorspace) &&
+    (channel == BluePixelChannel)));
+}
+
 MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   const PixelChannel channel,const ComplianceType compliance,char *tuple)
 {
@@ -296,7 +303,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
       break;
     }
   }
-  if ((pixel->colorspace == OklchColorspace) && (channel == BluePixelChannel))
+  if (IsOklchHueChannel(pixel,channel) != MagickFalse)
     (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
       GetMagickPrecision(),RadiansToDegrees(scale*QuantumScale*color));
   else
