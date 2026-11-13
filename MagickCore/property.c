@@ -291,13 +291,18 @@ MagickExport MagickBooleanType DefineImageProperty(Image *image,
 %    o property: the image property.
 %
 */
-MagickExport MagickBooleanType DeleteImageProperty(Image *image,
-  const char *property)
+static void CheckPropertyImage(const Image *image)
 {
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
+MagickExport MagickBooleanType DeleteImageProperty(Image *image,
+  const char *property)
+{
+  CheckPropertyImage(image);
   if (image->properties == (void *) NULL)
     return(MagickFalse);
   return(DeleteNodeFromSplayTree((SplayTreeInfo *) image->properties,property));
@@ -328,10 +333,7 @@ MagickExport MagickBooleanType DeleteImageProperty(Image *image,
 */
 MagickExport void DestroyImageProperties(Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckPropertyImage(image);
   if (image->properties != (void *) NULL)
     image->properties=(void *) DestroySplayTree((SplayTreeInfo *)
       image->properties);
@@ -4223,11 +4225,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
 */
 MagickExport const char *GetNextImageProperty(const Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image->filename);
+  CheckPropertyImage(image);
   if (image->properties == (void *) NULL)
     return((const char *) NULL);
   return((const char *) GetNextKeyInSplayTree((SplayTreeInfo *) image->properties));
@@ -4970,10 +4968,7 @@ MagickExport char *RemoveImageProperty(Image *image,const char *property)
 */
 MagickExport void ResetImagePropertyIterator(const Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckPropertyImage(image);
   if (image->properties == (void *) NULL)
     return;
   ResetSplayTreeIterator((SplayTreeInfo *) image->properties);
