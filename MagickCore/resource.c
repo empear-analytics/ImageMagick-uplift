@@ -904,61 +904,54 @@ MagickExport MagickSizeType GetMagickResourceLimit(const ResourceType type)
 %
 */
 
-static void FormatTimeToLive(const MagickSizeType ttl,char *timeString)
+typedef struct _TimeToLiveUnit
 {
   MagickSizeType
-    days,
-    hours,
-    minutes,
-    months,
-    seconds,
-    weeks,
-    years;
+    seconds;
 
-  years=ttl/31536000;
-  seconds=ttl % 31536000;
-  if (seconds == 0)
-    {
-      (void) FormatLocaleString(timeString,MagickPathExtent,"%lld years",years);
-      return;
-    }
-  months=ttl/2628000;
-  seconds=ttl % 2628000;
-  if (seconds == 0)
-    {
-      (void) FormatLocaleString(timeString,MagickPathExtent,"%lld months",
-        months);
-      return;
-    }
-  weeks=ttl/604800;
-  seconds=ttl % 604800;
-  if (seconds == 0)
-    {
-      (void) FormatLocaleString(timeString,MagickPathExtent,"%lld weeks",weeks);
-      return;
-    }
-  days=ttl/86400;
-  seconds=ttl % 86400;
-  if (seconds == 0)
-    {
-      (void) FormatLocaleString(timeString,MagickPathExtent,"%lld days",days);
-      return;
-    }
-  hours=ttl/3600;
-  seconds=ttl % 3600;
-  if (seconds == 0)
-    {
-      (void) FormatLocaleString(timeString,MagickPathExtent,"%lld hours",hours);
-      return;
-    }
-  minutes=ttl/60;
-  seconds=ttl % 60;
-  if (seconds == 0)
-    {
-      (void) FormatLocaleString(timeString,MagickPathExtent,"%lld minutes",
-        minutes);
-      return;
-    }
+  const char
+    *format;
+} TimeToLiveUnit;
+
+static const TimeToLiveUnit
+  TimeToLiveUnits[] =
+  {
+    { 31536000, "%lld years" },
+    { 2628000, "%lld months" },
+    { 604800, "%lld weeks" },
+    { 86400, "%lld days" },
+    { 3600, "%lld hours" },
+    { 60, "%lld minutes" }
+  };
+
+static MagickBooleanType FormatTimeToLiveUnit(const MagickSizeType ttl,
+  char *timeString)
+{
+  MagickSizeType
+    seconds,
+    value;
+
+  size_t
+    j;
+
+  for (j=0; j < (sizeof(TimeToLiveUnits)/sizeof(*TimeToLiveUnits)); j++)
+  {
+    value=ttl/TimeToLiveUnits[j].seconds;
+    seconds=ttl % TimeToLiveUnits[j].seconds;
+    if (seconds == 0)
+      {
+        (void) FormatLocaleString(timeString,MagickPathExtent,
+          TimeToLiveUnits[j].format,value);
+        return(MagickFalse);
+      }
+  }
+  return(MagickTrue);
+}
+
+static void FormatTimeToLive(const MagickSizeType ttl,char *timeString)
+{
+  if (FormatTimeToLiveUnit(ttl,timeString) == MagickFalse)
+    return;
   (void) FormatLocaleString(timeString,MagickPathExtent,"%lld seconds",ttl);
 }
 
