@@ -1229,12 +1229,24 @@ static void PrintAlphaColor(FILE *file,const Image *image,
   (void) FormatLocaleFile(file,"  %s\n",tuple);
 }
 
-static void PrintColorspaceLocations(const Image *image,
-  const ColorspaceType colorspace,ChannelLocationsReport report)
+static void PrintAllChannelLocations(const Image *image,
+  const ChannelLocationsReport *report)
 {
   ssize_t
     i;
 
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) != 0)
+      (void) PrintChannelLocations(report,channel,"Channel");
+  }
+}
+
+static void PrintColorspaceLocations(const Image *image,
+  const ColorspaceType colorspace,ChannelLocationsReport report)
+{
   switch (colorspace)
   {
     case RGBColorspace:
@@ -1269,13 +1281,7 @@ static void PrintColorspaceLocations(const Image *image,
     }
     default:
     {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) != 0)
-          (void) PrintChannelLocations(&report,channel,"Channel");
-      }
+      PrintAllChannelLocations(image,&report);
       break;
     }
   }
