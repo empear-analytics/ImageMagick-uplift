@@ -12720,14 +12720,20 @@ tests. Neither removes one.
 1. Find `? MagickTrue : MagickFalse` (or `? MagickFalse : MagickTrue`, with the test's
    sense kept as written) whose condition is a comparison (`==`, `!=`, `<`, ...), a `!`
    test, or `&&` / `||` of those, all of which yield `0` or `1` in C.
-2. Delete the ternary and keep the condition: `return(a == b);`, `status = (a != b) &&
-   (c == d);`. A condition that is a bare value (`return(p ? MagickTrue : MagickFalse);`,
-   `x & mask`) is refused: its value is not `0` or `1`.
+2. Delete the ternary and keep the condition inside a cast to the destination's type:
+   `return((MagickBooleanType) (a == b));`, `status=(MagickBooleanType) ((a != b) &&
+   (c == d));`, and the same for an argument passed to a `MagickBooleanType` parameter.
+   The cast is required: the Windows jobs compile MagickCore as C++, where a comparison
+   is `bool` and does not convert to an enum (MSVC C2440, C2664); the bare form passed
+   every check on the Mac and broke main's Windows jobs (2026-11-13). A condition that is
+   a bare value (`return(p ? MagickTrue : MagickFalse);`, `x & mask`) is refused: its
+   value is not `0` or `1`.
 3. `MagickFalse` is `0` and `MagickTrue` is `1` (`MagickCore/magick-type.h`); check it
    once by reading. A `MagickBooleanType` function returning, or a variable of that type
    assigned, an `int` of `0` or `1` is the same value.
 4. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL`; otherwise revert the
-   step. Run `tools/ci_warnings.sh <file>` and keep the step only if it prints `OK`.
+   step. Run `tools/ci_warnings.sh <file>` and `tools/cxx_warnings.sh <file>` and keep the
+   step only if both print `OK`.
 
 **Before:**
 
@@ -12739,8 +12745,8 @@ tests. Neither removes one.
 **After:**
 
 ```c
-  return((policy_info[i]->domain == CachePolicyDomain) ||
-    (policy_info[i]->domain == ResourcePolicyDomain));
+  return((MagickBooleanType) ((policy_info[i]->domain == CachePolicyDomain) ||
+    (policy_info[i]->domain == ResourcePolicyDomain)));
 ```
 
 **Careful:**
@@ -12751,7 +12757,7 @@ tests. Neither removes one.
   the ternary: step 2.
 
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
-`HEAD` and `tools/ci_warnings.sh` printing `OK`.
+`HEAD` and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
 
 **Provenance:** 2026-11-12, from `policy.c` (campaign B, M120): seven ternaries, the
 file 6.21 to 6.38, object code identical. Added by Claude Code (Claude Sonnet 5.5) under
@@ -14624,3 +14630,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | KE | Replace a letter-keyed `switch` that assigns an enumerator (and for some letters tests then exits) by a `static const` table of records and a lookup helper; evidence oracle | `stream.c`'s `StreamImagePixels` map parser (cc 39 to 16, 5.98 to 6.12); KS assigns strings and returns, SR keeps the labels | mandate (2026-10-24) |
 | 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | DT | Step 2 keeps the condition inside a `(MagickBooleanType)` cast, step 4 adds `tools/cxx_warnings.sh`: the bare comparison is `bool` in C++ and broke main's Windows jobs (C2440/C2664 in `policy.c`, `constitute.c`, `stream.c`; the casts fixed them with object code identical) | build fixes on `campaign/M126` | mandate (2026-10-24) |
