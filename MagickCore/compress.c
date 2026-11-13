@@ -421,6 +421,80 @@ static void InitializeHuffmanHashes(HuffmanTable **mb_hash,
   InitializeHashTable(mb_hash,EXTable,MBHashA,MBHashB);
 }
 
+static void SetHuffmanScanlinePixels(Image *image,
+  const unsigned char *scanline,Quantum *q)
+{
+  const unsigned char
+    *p;
+
+  Quantum
+    index;
+
+  ssize_t
+    x;
+
+  p=scanline;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    index=(Quantum) (*p++);
+    SetPixelIndex(image,index,q);
+    SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void FillHuffmanBlackRun(unsigned char *scanline,const size_t columns,
+  ssize_t *x,ssize_t *count)
+{
+  for ( ; *count > 0; (*count)--)
+    if ((*x >= 0) && (*x < (ssize_t) columns))
+      scanline[(*x)++]=(unsigned char) 1;
+}
+
+static const HuffmanTable *LookupHuffmanEntry(HuffmanTable **hash,
+  const unsigned int color,const size_t length,const size_t code)
+{
+  const HuffmanTable
+    *entry;
+
+  if (color != MagickFalse)
+    {
+      if (length < 4)
+        return((const HuffmanTable *) NULL);
+      entry=hash[((length+MWHashA)*(code+MWHashB)) % HashSize];
+    }
+  else
+    {
+      if (length < 2)
+        return((const HuffmanTable *) NULL);
+      entry=hash[((length+MBHashA)*(code+MBHashB)) % HashSize];
+    }
+  if (entry == (const HuffmanTable *) NULL)
+    return((const HuffmanTable *) NULL);
+  if ((entry->length != length) || (entry->code != code))
+    return((const HuffmanTable *) NULL);
+  return(entry);
+}
+
+static void SkipHuffmanToEndOfLine(Image *image,int *caller_byte,
+  int *caller_mask,size_t *caller_runlength)
+{
+  int
+    byte = (*caller_byte),
+    mask = (*caller_mask);
+
+  size_t
+    bit,
+    runlength = (*caller_runlength);
+
+  while (runlength < 11)
+    InputBit(bit);
+  do { InputBit(bit); } while ((int) bit == 0);
+  (*caller_byte)=byte;
+  (*caller_mask)=mask;
+  (*caller_runlength)=runlength;
+}
+
 MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -441,9 +515,6 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   MagickBooleanType
     proceed;
 
-  Quantum
-    index;
-
   size_t
     bit,
     code,
@@ -456,7 +527,6 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     y;
 
   unsigned char
-    *p,
     *scanline;
 
   unsigned int
@@ -478,12 +548,9 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     sizeof(*scanline));
   if (IsHuffmanBufferMissing(mb_hash,mw_hash,scanline) != MagickFalse)
     {
-      if (mb_hash != (HuffmanTable **) NULL)
-        mb_hash=(HuffmanTable **) RelinquishMagickMemory(mb_hash);
-      if (mw_hash != (HuffmanTable **) NULL)
-        mw_hash=(HuffmanTable **) RelinquishMagickMemory(mw_hash);
-      if (scanline != (unsigned char *) NULL)
-        scanline=(unsigned char *) RelinquishMagickMemory(scanline);
+      mb_hash=(HuffmanTable **) RelinquishMagickMemory(mb_hash);
+      mw_hash=(HuffmanTable **) RelinquishMagickMemory(mw_hash);
+      scanline=(unsigned char *) RelinquishMagickMemory(scanline);
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
@@ -498,9 +565,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   mask=0;
   null_lines=0;
   runlength=0;
-  while (runlength < 11)
-   InputBit(bit);
-  do { InputBit(bit); } while ((int) bit == 0);
+  SkipHuffmanToEndOfLine(image,&byte,&mask,&runlength);
   image->resolution.x=204.0;
   image->resolution.y=196.0;
   image->units=PixelsPerInchResolution;
@@ -532,9 +597,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
         break;
       if (x >= (ssize_t) image->columns)
         {
-          while (runlength < 11)
-            InputBit(bit);
-          do { InputBit(bit); } while ((int) bit == 0);
+          SkipHuffmanToEndOfLine(image,&byte,&mask,&runlength);
           break;
         }
       bail=MagickFalse;
@@ -561,26 +624,12 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
         break;
       if (length > 13)
         {
-          while (runlength < 11)
-            InputBit(bit);
-          do { InputBit(bit); } while ((int) bit == 0);
+          SkipHuffmanToEndOfLine(image,&byte,&mask,&runlength);
           break;
         }
-      if (color != MagickFalse)
-        {
-          if (length < 4)
-            continue;
-          entry=mw_hash[((length+MWHashA)*(code+MWHashB)) % HashSize];
-        }
-      else
-        {
-          if (length < 2)
-            continue;
-          entry=mb_hash[((length+MBHashA)*(code+MBHashB)) % HashSize];
-        }
+      entry=LookupHuffmanEntry((color != MagickFalse) ? mw_hash : mb_hash,color,
+        length,code);
       if (entry == (const HuffmanTable *) NULL)
-        continue;
-      if ((entry->length != length) || (entry->code != code))
         continue;
       switch (entry->id)
       {
@@ -598,12 +647,9 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
                   count=0;
                 }
               else
-                for ( ; count > 0; count--)
-                  if ((x >= 0) && (x < (ssize_t) image->columns))
-                    scanline[x++]=(unsigned char) 1;
+                FillHuffmanBlackRun(scanline,image->columns,&x,&count);
             }
-          color=(unsigned int)
-            ((color == MagickFalse) ? MagickTrue : MagickFalse);
+          color=(unsigned int) (color == MagickFalse);
           break;
         }
         case MWId:
@@ -622,17 +668,10 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     /*
       Transfer scanline to image pixels.
     */
-    p=scanline;
     q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
     if (q == (Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      index=(Quantum) (*p++);
-      SetPixelIndex(image,index,q);
-      SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    SetHuffmanScanlinePixels(image,scanline,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       break;
     proceed=SetImageProgress(image,LoadImageTag,(MagickOffsetType) y,
@@ -682,9 +721,6 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
-  Image *image,Image *inject_image,ExceptionInfo *exception)
-{
 #define HuffmanOutputCode(entry)  \
 {  \
   mask=one << (entry->length-1);  \
@@ -713,11 +749,66 @@ RestoreMSCWarning \
     }  \
 }
 
+static void ThresholdHuffmanRow(const Image *huffman_image,const Quantum *p,
+  unsigned char *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) huffman_image->columns; x++)
+  {
+    *q++=(unsigned char) (GetPixelIntensity(huffman_image,p) >=
+      ((double) QuantumRange/2.0) ? 0 : 1);
+    p+=(ptrdiff_t) GetPixelChannels(huffman_image);
+  }
+}
+
+static int CountHuffmanRun(unsigned char **q,ssize_t *n,
+  const MagickBooleanType black)
+{
+  int
+    runlength;
+
+  for (runlength=0; ((*n > 0) && ((**q != 0) == (black != MagickFalse))); (*n)--)
+  {
+    (*q)++;
+    runlength++;
+  }
+  return(runlength);
+}
+
+static inline const HuffmanTable *HuffmanMakeupEntry(
+  const HuffmanTable *table,const int runlength)
+{
+  if (runlength < 1792)
+    return(table+((runlength/64)-1));
+  return(EXTable+(MagickMin((size_t) runlength,2560)-1792)/64);
+}
+
+static void OutputHuffmanEndOfLine(const ImageInfo *image_info,Image *image,
+  unsigned char *caller_byte,unsigned char *caller_bit)
+{
+  int
+    k;
+
+  unsigned char
+    bit = (*caller_bit),
+    byte = (*caller_byte);
+
+  for (k=0; k < 11; k++)
+    OutputBit(0);
+  OutputBit(1);
+  (*caller_byte)=byte;
+  (*caller_bit)=bit;
+}
+
+MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
+  Image *image,Image *inject_image,ExceptionInfo *exception)
+{
   const HuffmanTable
     *entry;
 
   int
-    k,
     runlength;
 
   Image
@@ -727,8 +818,7 @@ RestoreMSCWarning \
     proceed;
 
   ssize_t
-    i,
-    x;
+    i;
 
   const Quantum
     *p;
@@ -787,9 +877,7 @@ RestoreMSCWarning \
       /*
         End of line.
       */
-      for (k=0; k < 11; k++)
-        OutputBit(0);
-      OutputBit(1);
+      OutputHuffmanEndOfLine(image_info,image,&byte,&bit);
     }
   /*
     Compress to 1D Huffman pixels.
@@ -800,12 +888,7 @@ RestoreMSCWarning \
     p=GetVirtualPixels(huffman_image,0,y,huffman_image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) huffman_image->columns; x++)
-    {
-      *q++=(unsigned char) (GetPixelIntensity(huffman_image,p) >=
-        ((double) QuantumRange/2.0) ? 0 : 1);
-      p+=(ptrdiff_t) GetPixelChannels(huffman_image);
-    }
+    ThresholdHuffmanRow(huffman_image,p,q);
     /*
       Huffman encode scanline.
     */
@@ -815,17 +898,10 @@ RestoreMSCWarning \
       /*
         Output white run.
       */
-      for (runlength=0; ((n > 0) && (*q == 0)); n--)
-      {
-        q++;
-        runlength++;
-      }
+      runlength=CountHuffmanRun(&q,&n,MagickFalse);
       if (runlength >= 64)
         {
-          if (runlength < 1792)
-            entry=MWTable+((runlength/64)-1);
-          else
-            entry=EXTable+(MagickMin((size_t) runlength,2560)-1792)/64;
+          entry=HuffmanMakeupEntry(MWTable,runlength);
           runlength-=(long) entry->count;
           HuffmanOutputCode(entry);
         }
@@ -836,16 +912,10 @@ RestoreMSCWarning \
           /*
             Output black run.
           */
-          for (runlength=0; ((*q != 0) && (n > 0)); n--)
-          {
-            q++;
-            runlength++;
-          }
+          runlength=CountHuffmanRun(&q,&n,MagickTrue);
           if (runlength >= 64)
             {
-              entry=MBTable+((runlength/64)-1);
-              if (runlength >= 1792)
-                entry=EXTable+(MagickMin((size_t) runlength,2560)-1792)/64;
+              entry=HuffmanMakeupEntry(MBTable,runlength);
               runlength-=(long) entry->count;
               HuffmanOutputCode(entry);
             }
@@ -856,9 +926,7 @@ RestoreMSCWarning \
     /*
       End of line.
     */
-    for (k=0; k < 11; k++)
-      OutputBit(0);
-    OutputBit(1);
+    OutputHuffmanEndOfLine(image_info,image,&byte,&bit);
     q=scanline;
     if (GetPreviousImageInList(huffman_image) == (Image *) NULL)
       {
@@ -873,9 +941,7 @@ RestoreMSCWarning \
   */
   for (i=0; i < 6; i++)
   {
-    for (k=0; k < 11; k++)
-      OutputBit(0);
-    OutputBit(1);
+    OutputHuffmanEndOfLine(image_info,image,&byte,&bit);
   }
   /*
     Flush bits.
@@ -946,9 +1012,34 @@ static void ResetLZWTable(TableType *table)
   }
 }
 
-MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
-  unsigned char *magick_restrict pixels,ExceptionInfo *exception)
+static ssize_t FindLZWString(const TableType *table,size_t *last_code,
+  const unsigned char pixel)
 {
+  ssize_t
+    index;
+
+  index=(ssize_t) (*last_code);
+  while (index != -1)
+    if ((table[index].prefix != (ssize_t) (*last_code)) ||
+        (table[index].suffix != (ssize_t) pixel))
+      index=table[index].next;
+    else
+      {
+        (*last_code)=(size_t) index;
+        break;
+      }
+  return(index);
+}
+
+static void AddLZWString(TableType *table,const size_t last_code,
+  const unsigned char pixel,const size_t next_index)
+{
+  table[next_index].prefix=(ssize_t) last_code;
+  table[next_index].suffix=(ssize_t) pixel;
+  table[next_index].next=table[last_code].next;
+  table[last_code].next=(ssize_t) next_index;
+}
+
 #define LZWClr  256UL  /* Clear Table Marker */
 #define LZWEod  257UL  /* End of Data marker */
 #define OutputCode(code) \
@@ -963,6 +1054,9 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
     } \
 }
 
+MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
+  unsigned char *magick_restrict pixels,ExceptionInfo *exception)
+{
   ssize_t
     i;
 
@@ -1001,12 +1095,7 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
   number_bits=0;
   last_code=0;
   OutputCode(LZWClr);
-  for (index=0; index < 256; index++)
-  {
-    table[index].prefix=(-1);
-    table[index].suffix=(ssize_t) index;
-    table[index].next=(-1);
-  }
+  ResetLZWTable(table);
   next_index=LZWEod+1;
   code_width=9;
   last_code=(size_t) pixels[0];
@@ -1015,26 +1104,14 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
     /*
       Find string.
     */
-    index=(ssize_t) last_code;
-    while (index != -1)
-      if ((table[index].prefix != (ssize_t) last_code) ||
-          (table[index].suffix != (ssize_t) pixels[i]))
-        index=table[index].next;
-      else
-        {
-          last_code=(size_t) index;
-          break;
-        }
+    index=FindLZWString(table,&last_code,pixels[i]);
     if (last_code != (size_t) index)
       {
         /*
           Add string.
         */
         OutputCode(last_code);
-        table[next_index].prefix=(ssize_t) last_code;
-        table[next_index].suffix=(ssize_t) pixels[i];
-        table[next_index].next=table[last_code].next;
-        table[last_code].next=(ssize_t) next_index;
+        AddLZWString(table,last_code,pixels[i],next_index);
         next_index++;
         /*
           Did we just move up to next bit width?
@@ -1132,6 +1209,36 @@ static int GetLiteralRunLength(const unsigned char *magick_restrict pixels,
 %      pixels to compress.
 %
 */
+static int WritePackbitsRun(Image *image,
+  const unsigned char *magick_restrict pixels,unsigned char *packbits,
+  const ssize_t i)
+{
+  int
+    count;
+
+  ssize_t
+    j;
+
+  if ((*pixels == *(pixels+1)) && (*(pixels+1) == *(pixels+2)))
+    {
+      /*
+        Packed run.
+      */
+      count=GetPackedRunLength(pixels,i);
+      (void) WriteBlobByte(image,(unsigned char) ((256-count)+1));
+      (void) WriteBlobByte(image,*pixels);
+      return(count);
+    }
+  /*
+    Literal run.
+  */
+  count=GetLiteralRunLength(pixels,packbits,i);
+  *packbits=(unsigned char) (count-1);
+  for (j=0; j <= (ssize_t) count; j++)
+    (void) WriteBlobByte(image,packbits[j]);
+  return(count);
+}
+
 MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
   const size_t length,unsigned char *magick_restrict pixels,
   ExceptionInfo *exception)
@@ -1140,8 +1247,7 @@ MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
     count;
 
   ssize_t
-    i,
-    j;
+    i;
 
   unsigned char
     *packbits;
@@ -1194,26 +1300,8 @@ MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
       }
       default:
       {
-        if ((*pixels == *(pixels+1)) && (*(pixels+1) == *(pixels+2)))
-          {
-            /*
-              Packed run.
-            */
-            count=GetPackedRunLength(pixels,i);
-            i-=count;
-            (void) WriteBlobByte(image,(unsigned char) ((256-count)+1));
-            (void) WriteBlobByte(image,*pixels);
-            pixels+=count;
-            break;
-          }
-        /*
-          Literal run.
-        */
-        count=GetLiteralRunLength(pixels,packbits,i);
+        count=WritePackbitsRun(image,pixels,packbits,i);
         i-=count;
-        *packbits=(unsigned char) (count-1);
-        for (j=0; j <= (ssize_t) count; j++)
-          (void) WriteBlobByte(image,packbits[j]);
         pixels+=count;
         break;
       }

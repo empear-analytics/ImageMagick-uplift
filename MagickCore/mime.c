@@ -254,19 +254,90 @@ static ssize_t ReadMimeLongValue(const MimeInfo *q,const unsigned char *r)
   return(value);
 }
 
-static ElementInfo *MatchMimeValue(const MimeInfo *q,const ssize_t value,
-  ElementInfo *p,ElementInfo *element_info)
+static MagickBooleanType MatchMimeValue(const MimeInfo *q,const ssize_t value)
 {
   if (q->mask == 0)
-    {
-      if (q->value == value)
-        element_info=p;
-    }
-  else
-    {
-      if ((q->value & q->mask) == value)
-        element_info=p;
-    }
+    return(q->value == value ? MagickTrue : MagickFalse);
+  return((q->value & q->mask) == value ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType MatchMimeString(const MimeInfo *q,
+  const unsigned char *magic,const size_t length)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= (ssize_t) q->extent; i++)
+  {
+    if ((size_t) (q->offset+i+(ssize_t) q->length) > length)
+      break;
+    if (memcmp(magic+q->offset+i,q->magic,q->length) == 0)
+      return(MagickTrue);
+  }
+  return(MagickFalse);
+}
+
+static MagickBooleanType IsMimeNumeric(const MimeInfo *q)
+{
+  return((q->data_type == ByteData) || (q->data_type == ShortData) ||
+    (q->data_type == LongData) ? MagickTrue : MagickFalse);
+}
+
+static ssize_t ReadMimeValue(const MimeInfo *q,const unsigned char *r)
+{
+  if (q->data_type == ShortData)
+    return(ReadMimeShortValue(q,r));
+  if (q->data_type == LongData)
+    return(ReadMimeLongValue(q,r));
+  return((ssize_t) (*r));
+}
+
+static MagickBooleanType MatchMimeData(const MimeInfo *q,
+  const unsigned char *magic,const size_t length)
+{
+  if (IsMimeNumeric(q) == MagickFalse)
+    return(MatchMimeString(q,magic,length));
+  if ((size_t) (q->offset+4) > length)
+    return(MagickFalse);
+  return(MatchMimeValue(q,ReadMimeValue(q,magic+q->offset)));
+}
+
+static MagickBooleanType IsMimeOutranked(const MimeInfo *q,
+  const ElementInfo *element_info)
+{
+  if (element_info == (const ElementInfo *) NULL)
+    return(MagickFalse);
+  return(q->priority > ((const MimeInfo *) element_info->value)->priority ?
+    MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType MatchMimeElement(const MimeInfo *q,
+  const char *filename,const unsigned char *magic,const size_t length)
+{
+  if ((q->pattern != (char *) NULL) && (filename != (char *) NULL))
+    return(GlobExpression(filename,q->pattern,MagickFalse));
+  return(MatchMimeData(q,magic,length));
+}
+
+static ElementInfo *FindMimeElement(ElementInfo *p,const char *filename,
+  const unsigned char *magic,const size_t length)
+{
+  ElementInfo
+    *element_info;
+
+  element_info=(ElementInfo *) NULL;
+  while (p != (ElementInfo *) NULL)
+  {
+    const MimeInfo
+      *q;
+
+    q=(const MimeInfo *) p->value;
+    assert(q->offset >= 0);
+    if ((IsMimeOutranked(q,element_info) == MagickFalse) &&
+        (MatchMimeElement(q,filename,magic,length) != MagickFalse))
+      element_info=p;
+    p=p->next;
+  }
   return(element_info);
 }
 
@@ -310,15 +381,6 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
     *element_info,
     *p;
 
-  const unsigned char
-    *r;
-
-  ssize_t
-    i;
-
-  ssize_t
-    value;
-
   assert(exception != (ExceptionInfo *) NULL);
   if (IsMimeCacheInstantiated(exception) == MagickFalse)
     return((const MimeInfo *) NULL);
@@ -334,74 +396,7 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
         return((const MimeInfo *) p->value);
       return((const MimeInfo *) NULL);
     }
-  element_info=(ElementInfo *) NULL;
-  while (p != (ElementInfo *) NULL)
-  {
-    const MimeInfo
-      *q;
-
-    q=(const MimeInfo *) p->value;
-    assert(q->offset >= 0);
-    if (element_info != (const ElementInfo *) NULL)
-      if (q->priority > ((const MimeInfo *) element_info->value)->priority)
-        {
-          p=p->next;
-          continue;
-        }
-    if ((q->pattern != (char *) NULL) && (filename != (char *) NULL))
-      {
-        if (GlobExpression(filename,q->pattern,MagickFalse) != MagickFalse)
-          element_info=p;
-        p=p->next;
-        continue;
-      }
-    switch (q->data_type)
-    {
-      case ByteData:
-      {
-        if ((size_t) (q->offset+4) > length)
-          break;
-        r=magic+q->offset;
-        value=(ssize_t) (*r++);
-        element_info=MatchMimeValue(q,value,p,element_info);
-        break;
-      }
-      case ShortData:
-      {
-        if ((size_t) (q->offset+4) > length)
-          break;
-        r=magic+q->offset;
-        value=ReadMimeShortValue(q,r);
-        element_info=MatchMimeValue(q,value,p,element_info);
-        break;
-      }
-      case LongData:
-      {
-        if ((size_t) (q->offset+4) > length)
-          break;
-        r=magic+q->offset;
-        value=ReadMimeLongValue(q,r);
-        element_info=MatchMimeValue(q,value,p,element_info);
-        break;
-      }
-      case StringData:
-      default:
-      {
-        for (i=0; i <= (ssize_t) q->extent; i++)
-        {
-          if ((size_t) (q->offset+i+(ssize_t) q->length) > length)
-            break;
-          if (memcmp(magic+q->offset+i,q->magic,q->length) == 0)
-            {
-              element_info=p;
-              break;
-            }
-        }
-        break;
-      }
-    }
-    p=p->next;
-  }
+  element_info=FindMimeElement(p,filename,magic,length);
   if (element_info != (ElementInfo *) NULL)
     SetHeadElementInLinkedList(mime_cache,element_info);
   UnlockSemaphoreInfo(mime_semaphore);
@@ -742,6 +737,16 @@ static void PadMimeType(FILE *file,const MimeInfo **mime_info,
     }
 }
 
+static void PrintMimeEntry(FILE *file,const MimeInfo **mime_info,
+  const ssize_t i)
+{
+  (void) FormatLocaleFile(file,"%s",mime_info[i]->type);
+  PadMimeType(file,mime_info,i);
+  if (mime_info[i]->description != (char *) NULL)
+    (void) FormatLocaleFile(file,"%s",mime_info[i]->description);
+  (void) FormatLocaleFile(file,"\n");
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -794,11 +799,7 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
         (strcasecmp(path,mime_info[i]->path) != 0))
       PrintMimePathHeader(file,mime_info,i);
     path=mime_info[i]->path;
-    (void) FormatLocaleFile(file,"%s",mime_info[i]->type);
-    PadMimeType(file,mime_info,i);
-    if (mime_info[i]->description != (char *) NULL)
-      (void) FormatLocaleFile(file,"%s",mime_info[i]->description);
-    (void) FormatLocaleFile(file,"\n");
+    PrintMimeEntry(file,mime_info,i);
   }
   (void) fflush(file);
   mime_info=(const MimeInfo **) RelinquishMagickMemory((void *) mime_info);
@@ -806,6 +807,21 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
 }
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
+static unsigned char GetMimeEscape(const char c)
+{
+  static const char
+    escapes[] = "\b\f\n\r\t\va\?",
+    letters[] = "bfnrtva?";
+
+  const char
+    *p;
+
+  p=(c != '\0') ? strchr(letters,c) : (const char *) NULL;
+  if (p != (const char *) NULL)
+    return((unsigned char) escapes[p-letters]);
+  return((unsigned char) c);
+}
+
 static void ParseMimeMagic(MimeInfo *mime_info,const char *attribute)
 {
   char
@@ -840,18 +856,7 @@ static void ParseMimeMagic(MimeInfo *mime_info,const char *attribute)
             mime_info->length++;
             continue;
           }
-        switch (*p)
-        {
-          case 'b': *q='\b'; break;
-          case 'f': *q='\f'; break;
-          case 'n': *q='\n'; break;
-          case 'r': *q='\r'; break;
-          case 't': *q='\t'; break;
-          case 'v': *q='\v'; break;
-          case 'a': *q='a'; break;
-          case '?': *q='\?'; break;
-          default: *q=(unsigned char) (*p); break;
-        }
+        *q=GetMimeEscape(*p);
         p++;
         q++;
         mime_info->length++;
@@ -877,6 +882,97 @@ static void GetIncludePath(const char *filename,const char *attribute,
     (void) CopyMagickString(path,attribute,MagickPathExtent);
   else
     (void) ConcatenateMagickString(path,attribute,MagickPathExtent);
+}
+
+static MagickBooleanType LoadMimeInclude(const MimeLoadTarget *target,
+  const char *filename,const char *attribute,const size_t depth)
+{
+  const MimeLoadTarget include_target = { target->cache, target->exception };
+
+  char
+    path[MagickPathExtent],
+    *file_xml;
+
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  GetIncludePath(filename,attribute,path);
+  file_xml=FileToXML(path,~0UL);
+  if (file_xml != (char *) NULL)
+    {
+      status=LoadMimeCache(&include_target,file_xml,path,depth+1);
+      file_xml=DestroyString(file_xml);
+    }
+  return(status);
+}
+
+static void SetMimeTypeAttributes(MimeInfo *mime_info,XMLTreeInfo *mime)
+{
+  const char
+    *attribute;
+
+  attribute=GetXMLTreeAttribute(mime,"data-type");
+  if (attribute != (const char *) NULL)
+    mime_info->data_type=(DataType) ParseCommandOption(MagickDataTypeOptions,
+      MagickTrue,attribute);
+  attribute=GetXMLTreeAttribute(mime,"description");
+  if (attribute != (const char *) NULL)
+    mime_info->description=ConstantString(attribute);
+  attribute=GetXMLTreeAttribute(mime,"endian");
+  if (attribute != (const char *) NULL)
+    mime_info->endian=(EndianType) ParseCommandOption(MagickEndianOptions,
+      MagickTrue,attribute);
+  attribute=GetXMLTreeAttribute(mime,"magic");
+  if (attribute != (const char *) NULL)
+    ParseMimeMagic(mime_info,attribute);
+}
+
+static void SetMimeMatchAttributes(MimeInfo *mime_info,XMLTreeInfo *mime)
+{
+  const char
+    *attribute;
+
+  attribute=GetXMLTreeAttribute(mime,"mask");
+  if (attribute != (const char *) NULL)
+    mime_info->mask=(ssize_t) strtoul(attribute,(char **) NULL,0);
+  attribute=GetXMLTreeAttribute(mime,"offset");
+  if (attribute != (const char *) NULL)
+    {
+      char
+        *c;
+
+      mime_info->offset=(MagickOffsetType) strtol(attribute,&c,0);
+      if (*c == ':')
+        mime_info->extent=(size_t) strtol(c+1,(char **) NULL,0);
+    }
+  attribute=GetXMLTreeAttribute(mime,"pattern");
+  if (attribute != (const char *) NULL)
+    mime_info->pattern=ConstantString(attribute);
+  attribute=GetXMLTreeAttribute(mime,"priority");
+  if (attribute != (const char *) NULL)
+    mime_info->priority=(ssize_t) strtol(attribute,(char **) NULL,0);
+  attribute=GetXMLTreeAttribute(mime,"stealth");
+  if (attribute != (const char *) NULL)
+    mime_info->stealth=IsStringTrue(attribute);
+  attribute=GetXMLTreeAttribute(mime,"type");
+  if (attribute != (const char *) NULL)
+    mime_info->type=ConstantString(attribute);
+}
+
+static MimeInfo *AcquireMimeElement(XMLTreeInfo *mime,
+  const char *filename)
+{
+  MimeInfo
+    *mime_info;
+
+  mime_info=(MimeInfo *) AcquireCriticalMemory(sizeof(*mime_info));
+  (void) memset(mime_info,0,sizeof(*mime_info));
+  mime_info->path=ConstantString(filename);
+  mime_info->signature=MagickCoreSignature;
+  SetMimeTypeAttributes(mime_info,mime);
+  SetMimeMatchAttributes(mime_info,mime);
+  return(mime_info);
 }
 
 /*
@@ -957,22 +1053,8 @@ static MagickBooleanType LoadMimeCache(const MimeLoadTarget *target,
           (void) ThrowMagickException(exception,GetMagickModule(),
             ConfigureError,"IncludeElementNestedTooDeeply","`%s'",filename);
         else
-          {
-            const MimeLoadTarget include_target = { cache, exception };
-
-            char
-              path[MagickPathExtent],
-              *file_xml;
-
-            GetIncludePath(filename,attribute,path);
-            file_xml=FileToXML(path,~0UL);
-            if (file_xml != (char *) NULL)
-              {
-                status&=(MagickStatusType) LoadMimeCache(&include_target,
-                  file_xml,path,depth+1);
-                file_xml=DestroyString(file_xml);
-              }
-          }
+          status&=(MagickStatusType) LoadMimeInclude(target,filename,
+            attribute,depth);
       }
     include=GetNextXMLTreeTag(include);
   }
@@ -982,49 +1064,7 @@ static MagickBooleanType LoadMimeCache(const MimeLoadTarget *target,
     /*
       Process mime element.
     */
-    mime_info=(MimeInfo *) AcquireCriticalMemory(sizeof(*mime_info));
-    (void) memset(mime_info,0,sizeof(*mime_info));
-    mime_info->path=ConstantString(filename);
-    mime_info->signature=MagickCoreSignature;
-    attribute=GetXMLTreeAttribute(mime,"data-type");
-    if (attribute != (const char *) NULL)
-      mime_info->data_type=(DataType) ParseCommandOption(MagickDataTypeOptions,
-        MagickTrue,attribute);
-    attribute=GetXMLTreeAttribute(mime,"description");
-    if (attribute != (const char *) NULL)
-      mime_info->description=ConstantString(attribute);
-    attribute=GetXMLTreeAttribute(mime,"endian");
-    if (attribute != (const char *) NULL)
-      mime_info->endian=(EndianType) ParseCommandOption(MagickEndianOptions,
-        MagickTrue,attribute);
-    attribute=GetXMLTreeAttribute(mime,"magic");
-    if (attribute != (const char *) NULL)
-      ParseMimeMagic(mime_info,attribute);
-    attribute=GetXMLTreeAttribute(mime,"mask");
-    if (attribute != (const char *) NULL)
-      mime_info->mask=(ssize_t) strtoul(attribute,(char **) NULL,0);
-    attribute=GetXMLTreeAttribute(mime,"offset");
-    if (attribute != (const char *) NULL)
-      {
-        char
-          *c;
-
-        mime_info->offset=(MagickOffsetType) strtol(attribute,&c,0);
-        if (*c == ':')
-          mime_info->extent=(size_t) strtol(c+1,(char **) NULL,0);
-      }
-    attribute=GetXMLTreeAttribute(mime,"pattern");
-    if (attribute != (const char *) NULL)
-      mime_info->pattern=ConstantString(attribute);
-    attribute=GetXMLTreeAttribute(mime,"priority");
-    if (attribute != (const char *) NULL)
-      mime_info->priority=(ssize_t) strtol(attribute,(char **) NULL,0);
-    attribute=GetXMLTreeAttribute(mime,"stealth");
-    if (attribute != (const char *) NULL)
-      mime_info->stealth=IsStringTrue(attribute);
-    attribute=GetXMLTreeAttribute(mime,"type");
-    if (attribute != (const char *) NULL)
-      mime_info->type=ConstantString(attribute);
+    mime_info=AcquireMimeElement(mime,filename);
     status=AppendValueToLinkedList(cache,mime_info);
     if (status == MagickFalse)
       (void) ThrowMagickException(exception,GetMagickModule(),

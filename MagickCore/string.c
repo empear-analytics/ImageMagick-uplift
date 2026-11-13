@@ -544,6 +544,36 @@ MagickExport void ConcatenateStringInfo(StringInfo *string_info,
   string_info->length=length;
 }
 
+static MagickBooleanType ReadFileIntoBuffer(const int file,char *string,
+  const size_t length)
+{
+  size_t
+    i;
+
+  ssize_t
+    count;
+
+  void
+    *map;
+
+  map=MapBlob(file,ReadMode,0,length);
+  if (map != (void *) NULL)
+    {
+      (void) memcpy(string,map,length);
+      (void) UnmapBlob(map,length);
+      return(MagickTrue);
+    }
+  (void) lseek(file,0,SEEK_SET);
+  for (i=0; i < length; i+=(size_t) count)
+  {
+    count=MagickRead(file,string+i,(size_t) MagickMin(length-i,(size_t)
+      MagickMaxBufferExtent));
+    if (count <= 0)
+      break;
+  }
+  return(i < length ? MagickFalse : MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -585,9 +615,6 @@ MagickExport StringInfo *ConfigureFileToStringInfo(const char *filename)
   StringInfo
     *string_info;
 
-  void
-    *map;
-
   assert(filename != (const char *) NULL);
   file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
   if (file == -1)
@@ -608,34 +635,11 @@ MagickExport StringInfo *ConfigureFileToStringInfo(const char *filename)
       file=close_utf8(file)-1;
       return((StringInfo *) NULL);
     }
-  map=MapBlob(file,ReadMode,0,length);
-  if (map != (void *) NULL)
+  if (ReadFileIntoBuffer(file,string,length) == MagickFalse)
     {
-      (void) memcpy(string,map,length);
-      (void) UnmapBlob(map,length);
-    }
-  else
-    {
-      size_t
-        i;
-
-      ssize_t
-        count;
-
-      (void) lseek(file,0,SEEK_SET);
-      for (i=0; i < length; i+=(size_t) count)
-      {
-        count=MagickRead(file,string+i,(size_t) MagickMin(length-i,(size_t)
-          MagickMaxBufferExtent));
-        if (count <= 0)
-          break;
-      }
-      if (i < length)
-        {
-          file=close_utf8(file)-1;
-          string=DestroyString(string);
-          return((StringInfo *) NULL);
-        }
+      file=close_utf8(file)-1;
+      string=DestroyString(string);
+      return((StringInfo *) NULL);
     }
   string[length]='\0';
   file=close_utf8(file)-1;
@@ -888,6 +892,11 @@ MagickExport char **DestroyStringList(char **list)
 %    o escape: the quoted string termination character to escape (e.g. '"').
 %
 */
+static inline MagickBooleanType NeedsEscape(const char c,const char escape)
+{
+  return((c == '\\') || (c == escape) ? MagickTrue : MagickFalse);
+}
+
 MagickExport char *EscapeString(const char *source,const char escape)
 {
   char
@@ -906,7 +915,7 @@ MagickExport char *EscapeString(const char *source,const char escape)
   length=0;
   for (p=source; *p != '\0'; p++)
   {
-    if ((*p == '\\') || (*p == escape))
+    if (NeedsEscape(*p,escape) != MagickFalse)
       {
         if (~length < 1)
           ThrowFatalException(ResourceLimitFatalError,"UnableToEscapeString");
@@ -924,7 +933,7 @@ MagickExport char *EscapeString(const char *source,const char escape)
   q=destination;
   for (p=source; *p != '\0'; p++)
   {
-    if ((*p == '\\') || (*p == escape))
+    if (NeedsEscape(*p,escape) != MagickFalse)
       *q++='\\';
     *q++=(*p);
   }
@@ -1939,6 +1948,31 @@ static const char *SkipValueSeparator(const char *p)
   return(p);
 }
 
+static ssize_t CountDoubleValues(const char *string)
+{
+  char
+    *q;
+
+  const char
+    *p;
+
+  ssize_t
+    count;
+
+  count=0;
+  p=string;
+  while (*p != '\0')
+  {
+    (void) StringToDouble(p,&q);  /* get value - ignores leading space */
+    if (p == q)
+      return(-1);  /* no value found */
+    p=q;
+    count++;  /* increment value count */
+    p=SkipValueSeparator(p);
+  }
+  return(count);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1997,17 +2031,9 @@ MagickExport double *StringToArrayOfDoubles(const char *string,ssize_t *count,
   *count=0;
   if (string == (char *) NULL)
     return((double *) NULL);  /* no value found */
-  i=0;
-  p=string;
-  while (*p != '\0')
-  {
-    (void) StringToDouble(p,&q);  /* get value - ignores leading space */
-    if (p == q)
-      return((double *) NULL);  /* no value found */
-    p=q;
-    i++;  /* increment value count */
-    p=SkipValueSeparator(p);
-  }
+  i=CountDoubleValues(string);
+  if (i < 0)
+    return((double *) NULL);  /* no value found */
   /*
     Allocate floating point argument list.
   */
@@ -2068,6 +2094,24 @@ MagickExport double *StringToArrayOfDoubles(const char *string,ssize_t *count,
 %      NULL.
 %
 */
+static MagickBooleanType IsDelimiter(const int c,const char *delimiters)
+{
+  const char
+    *r;
+
+  int
+    d;
+
+  r=delimiters;
+  do
+  {
+    d=(*r++);
+    if (c == d)
+      return(MagickTrue);
+  } while (d != '\0');
+  return(MagickFalse);
+}
+
 MagickExport char *StringToken(const char *delimiters,char **string)
 {
   char
@@ -2076,12 +2120,8 @@ MagickExport char *StringToken(const char *delimiters,char **string)
   char
     *p;
 
-  const char
-    *r;
-
   int
-    c,
-    d;
+    c;
 
   p=(*string);
   if (p == (char *) NULL)
@@ -2090,20 +2130,15 @@ MagickExport char *StringToken(const char *delimiters,char **string)
   for ( ; ; )
   {
     c=(*p++);
-    r=delimiters;
-    do
-    {
-      d=(*r++);
-      if (c == d)
-        {
-          if (c == '\0')
-            p=(char *) NULL;
-          else
-            p[-1]='\0';
-          *string=p;
-          return(q);
-        }
-    } while (d != '\0');
+    if (IsDelimiter(c,delimiters) != MagickFalse)
+      {
+        if (c == '\0')
+          p=(char *) NULL;
+        else
+          p[-1]='\0';
+        *string=p;
+        return(q);
+      }
   }
 }
 
@@ -2151,6 +2186,156 @@ static size_t CountTextLines(const char *text)
   return(lines);
 }
 
+static char **DestroyTextList(char **textlist,const ssize_t count)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < count; i++)
+    textlist[i]=DestroyString(textlist[i]);
+  textlist=(char **) RelinquishMagickMemory(textlist);
+  return((char **) NULL);
+}
+
+static char **AsciiTextList(const char *text,size_t *lines)
+{
+  char
+    **textlist;
+
+  const char
+    *p,
+    *q;
+
+  ssize_t
+    i;
+
+  /*
+    Convert string to an ASCII list.
+  */
+  *lines=CountTextLines(text);
+  textlist=(char **) AcquireQuantumMemory((size_t) *lines+1UL,
+    sizeof(*textlist));
+  if (textlist == (char **) NULL)
+    return((char **) NULL);
+  p=text;
+  for (i=0; i < (ssize_t) *lines; i++)
+  {
+    for (q=p; *q != '\0'; q++)
+      if ((*q == '\r') || (*q == '\n'))
+        break;
+    textlist[i]=(char *) AcquireQuantumMemory((size_t) (q-p)+1,
+      sizeof(**textlist));
+    if (textlist[i] == (char *) NULL)
+      return(DestroyTextList(textlist,i));
+    (void) memcpy(textlist[i],p,(size_t) (q-p));
+    textlist[i][q-p]='\0';
+    if (*q == '\r')
+      q++;
+    p=q+1;
+  }
+  return(textlist);
+}
+
+static char *FormatHexTextLine(char *q,const char **text)
+{
+  char
+    hex_string[MagickPathExtent];
+
+  const char
+    *p;
+
+  size_t
+    length;
+
+  ssize_t
+    j;
+
+  p=(*text);
+  length=strlen(p);
+  for (j=1; j <= (ssize_t) MagickMin(length,CharsPerLine); j++)
+  {
+    (void) FormatLocaleString(hex_string,MagickPathExtent,"%02x",*(p+j));
+    (void) CopyMagickString(q,hex_string,MagickPathExtent);
+    q+=(ptrdiff_t) 2;
+    if ((j % 0x04) == 0)
+      *q++=' ';
+  }
+  for ( ; j <= CharsPerLine; j++)
+  {
+    *q++=' ';
+    *q++=' ';
+    if ((j % 0x04) == 0)
+      *q++=' ';
+  }
+  *q++=' ';
+  for (j=1; j <= (ssize_t) MagickMin(length,CharsPerLine); j++)
+  {
+    if (isprint((int) ((unsigned char) *p)) != 0)
+      *q++=(*p);
+    else
+      *q++='-';
+    p++;
+  }
+  *q='\0';
+  *text=p;
+  return(q);
+}
+
+static char **HexTextList(const char *text,size_t *lines)
+{
+  char
+    **textlist,
+    *q,
+    *resized;
+
+  const char
+    *p;
+
+  ssize_t
+    i;
+
+  /*
+    Convert string to a HEX list.
+  */
+  *lines=(size_t) (strlen(text)/CharsPerLine)+1;
+  textlist=(char **) AcquireQuantumMemory((size_t) *lines+1UL,
+    sizeof(*textlist));
+  if (textlist == (char **) NULL)
+    return((char **) NULL);
+  p=text;
+  for (i=0; i < (ssize_t) *lines; i++)
+  {
+    textlist[i]=(char *) AcquireQuantumMemory(2UL*MagickPathExtent,
+      sizeof(**textlist));
+    if (textlist[i] == (char *) NULL)
+      return(DestroyTextList(textlist,i));
+    (void) FormatLocaleString(textlist[i],MagickPathExtent,"0x%08lx: ",
+      (long) (CharsPerLine*i));
+    q=FormatHexTextLine(textlist[i]+strlen(textlist[i]),&p);
+    resized=(char *) ResizeQuantumMemory(textlist[i],(size_t) (q-textlist[i]+
+      1),sizeof(**textlist));
+    if (resized == (char *) NULL)
+      {
+        textlist[i]=(char *) NULL;
+        return(DestroyTextList(textlist,i));
+      }
+    textlist[i]=resized;
+  }
+  return(textlist);
+}
+
+static MagickBooleanType IsPlainText(const char *text)
+{
+  const char
+    *p;
+
+  for (p=text; *p != '\0'; p++)
+    if (((int) ((unsigned char) *p) < 32) &&
+        (isspace((int) ((unsigned char) *p)) == 0))
+      break;
+  return(*p == '\0' ? MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2182,12 +2367,6 @@ MagickExport char **StringToStrings(const char *text,size_t *count)
   char
     **textlist;
 
-  const char
-    *p;
-
-  ssize_t
-    i;
-
   size_t
     lines;
 
@@ -2197,132 +2376,15 @@ MagickExport char **StringToStrings(const char *text,size_t *count)
         *count=0;
       return((char **) NULL);
     }
-  for (p=text; *p != '\0'; p++)
-    if (((int) ((unsigned char) *p) < 32) &&
-        (isspace((int) ((unsigned char) *p)) == 0))
-      break;
-  if (*p == '\0')
-    {
-      const char
-        *q;
-
-      /*
-        Convert string to an ASCII list.
-      */
-      lines=CountTextLines(text);
-      textlist=(char **) AcquireQuantumMemory((size_t) lines+1UL,
-        sizeof(*textlist));
-      if (textlist == (char **) NULL)
-        return((char **) NULL);
-      p=text;
-      for (i=0; i < (ssize_t) lines; i++)
-      {
-        for (q=p; *q != '\0'; q++)
-          if ((*q == '\r') || (*q == '\n'))
-            break;
-        textlist[i]=(char *) AcquireQuantumMemory((size_t) (q-p)+1,
-          sizeof(**textlist));
-        if (textlist[i] == (char *) NULL)
-          {
-            ssize_t
-              j;
-
-            for (j=0; j < i; j++)
-              textlist[j]=DestroyString(textlist[j]);
-            textlist=(char **) RelinquishMagickMemory(textlist);
-            return((char **) NULL);
-          }
-        (void) memcpy(textlist[i],p,(size_t) (q-p));
-        textlist[i][q-p]='\0';
-        if (*q == '\r')
-          q++;
-        p=q+1;
-      }
-    }
+  if (IsPlainText(text) != MagickFalse)
+    textlist=AsciiTextList(text,&lines);
   else
-    {
-      char
-        hex_string[MagickPathExtent];
-
-      char
-        *q;
-
-      ssize_t
-        j;
-
-      /*
-        Convert string to a HEX list.
-      */
-      lines=(size_t) (strlen(text)/CharsPerLine)+1;
-      textlist=(char **) AcquireQuantumMemory((size_t) lines+1UL,
-        sizeof(*textlist));
-      if (textlist == (char **) NULL)
-        return((char **) NULL);
-      p=text;
-      for (i=0; i < (ssize_t) lines; i++)
-      {
-        size_t
-          length;
-
-        textlist[i]=(char *) AcquireQuantumMemory(2UL*MagickPathExtent,
-          sizeof(**textlist));
-        if (textlist[i] == (char *) NULL)
-          {
-            for (j=0; j < i; j++)
-              textlist[j]=DestroyString(textlist[j]);
-            textlist=(char **) RelinquishMagickMemory(textlist);
-            return((char **) NULL);
-          }
-        (void) FormatLocaleString(textlist[i],MagickPathExtent,"0x%08lx: ",
-          (long) (CharsPerLine*i));
-        q=textlist[i]+strlen(textlist[i]);
-        length=strlen(p);
-        for (j=1; j <= (ssize_t) MagickMin(length,CharsPerLine); j++)
-        {
-          (void) FormatLocaleString(hex_string,MagickPathExtent,"%02x",*(p+j));
-          (void) CopyMagickString(q,hex_string,MagickPathExtent);
-          q+=(ptrdiff_t) 2;
-          if ((j % 0x04) == 0)
-            *q++=' ';
-        }
-        for ( ; j <= CharsPerLine; j++)
-        {
-          *q++=' ';
-          *q++=' ';
-          if ((j % 0x04) == 0)
-            *q++=' ';
-        }
-        *q++=' ';
-        for (j=1; j <= (ssize_t) MagickMin(length,CharsPerLine); j++)
-        {
-          if (isprint((int) ((unsigned char) *p)) != 0)
-            *q++=(*p);
-          else
-            *q++='-';
-          p++;
-        }
-        *q='\0';
-        {
-          char
-            *resized;
-
-          resized=(char *) ResizeQuantumMemory(textlist[i],(size_t) (q-
-            textlist[i]+1),sizeof(**textlist));
-          if (resized == (char *) NULL)
-            {
-              textlist[i]=(char *) NULL;
-              for (j=0; j < i; j++)
-                textlist[j]=DestroyString(textlist[j]);
-              textlist=(char **) RelinquishMagickMemory(textlist);
-              return((char **) NULL);
-            }
-          textlist[i]=resized;
-        }
-      }
-    }
+    textlist=HexTextList(text,&lines);
+  if (textlist == (char **) NULL)
+    return((char **) NULL);
   if (count != (size_t *) NULL)
     *count=lines;
-  textlist[i]=(char *) NULL;
+  textlist[lines]=(char *) NULL;
   return(textlist);
 }
 
@@ -2388,32 +2450,46 @@ MagickExport void StripString(char *message)
   (void) StripMagickString(message);
 }
 
+static char *SkipLeadingSpaceAndQuote(char *message)
+{
+  char
+    *p;
+
+  p=message;
+  while (isspace((int) ((unsigned char) *p)) != 0)
+    p++;
+  if ((*p == '\'') || (*p == '"'))
+    p++;
+  return(p);
+}
+
+static char *TrimTrailingSpaceAndQuote(char *message,const char *p)
+{
+  char
+    *q;
+
+  q=message+strlen(message)-1;
+  while ((isspace((int) ((unsigned char) *q)) != 0) && (q > p))
+    q--;
+  if (q > p)
+    if ((*q == '\'') || (*q == '"'))
+      q--;
+  return(q);
+}
+
 MagickExport size_t StripMagickString(char *message)
 {
   char
     *p,
     *q;
 
-  size_t
-    length;
-
   assert(message != (char *) NULL);
   if (*message == '\0')
     return(0);
-  length=strlen(message);
-  if (length == 1)
+  if (strlen(message) == 1)
     return(1);
-  p=message;
-  while (isspace((int) ((unsigned char) *p)) != 0)
-    p++;
-  if ((*p == '\'') || (*p == '"'))
-    p++;
-  q=message+length-1;
-  while ((isspace((int) ((unsigned char) *q)) != 0) && (q > p))
-    q--;
-  if (q > p)
-    if ((*q == '\'') || (*q == '"'))
-      q--;
+  p=SkipLeadingSpaceAndQuote(message);
+  q=TrimTrailingSpaceAndQuote(message,p);
   (void) memmove(message,p,(size_t) (q-p+1));
   message[q-p+1]='\0';
   for (p=message; *p != '\0'; p++)
@@ -2422,6 +2498,15 @@ MagickExport size_t StripMagickString(char *message)
   return((size_t) (q-p+1));
 }
 
+static void ReplaceMatch(char *p,const char *replace,
+  const size_t search_extent,const size_t replace_extent)
+{
+  if (search_extent != replace_extent)
+    (void) memmove(p+replace_extent,p+search_extent,
+      strlen(p+search_extent)+1);
+  (void) memcpy(p,replace,replace_extent);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2501,10 +2586,7 @@ MagickExport MagickBooleanType SubstituteString(char **string,
     /*
       Replace string.
     */
-    if (search_extent != replace_extent)
-      (void) memmove(p+replace_extent,p+search_extent,
-        strlen(p+search_extent)+1);
-    (void) memcpy(p,replace,replace_extent);
+    ReplaceMatch(p,replace,search_extent,replace_extent);
     p+=(ptrdiff_t) replace_extent-1;
   }
   return(status);

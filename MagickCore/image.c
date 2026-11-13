@@ -105,58 +105,111 @@
 #include "MagickCore/version.h"
 #include "MagickCore/xwindow-private.h"
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   A c q u i r e I m a g e                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  AcquireImage() returns a pointer to an image structure initialized to
-%  default values.
-%
-%  The format of the AcquireImage method is:
-%
-%      Image *AcquireImage(const ImageInfo *image_info,ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image_info: Many of the image default values are set from this
-%      structure.  For example, filename, compression, depth, background color,
-%      and others.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-MagickExport Image *AcquireImage(const ImageInfo *image_info,
-  ExceptionInfo *exception)
+static void LimitImageDelay(Image *image,const double rho)
 {
-  const char
-    *option;
+  if ((double) image->delay > floor(rho+0.5))
+    image->delay=(size_t) CastDoubleToSsizeT(floor(rho+0.5));
+}
 
-  Image
-    *image;
+static void SetImageSize(Image *image,const char *size)
+{
+  if (size != (char *) NULL)
+    {
+      (void) ParseAbsoluteGeometry(size,&image->extract_info);
+      image->columns=image->extract_info.width;
+      image->rows=image->extract_info.height;
+      image->offset=image->extract_info.x;
+      image->extract_info.x=0;
+      image->extract_info.y=0;
+    }
+}
 
-  MagickSizeType
-    time_limit;
+static void SetImageExtract(Image *image,const char *extract)
+{
+  MagickStatusType
+    flags;
+
+  if (extract != (char *) NULL)
+    {
+      RectangleInfo
+        geometry;
+
+      (void) memset(&geometry,0,sizeof(geometry));
+      flags=ParseAbsoluteGeometry(extract,&geometry);
+      if (((flags & XValue) != 0) || ((flags & YValue) != 0))
+        {
+          image->extract_info=geometry;
+          Swap(image->columns,image->extract_info.width);
+          Swap(image->rows,image->extract_info.height);
+        }
+    }
+}
+
+static void SetImageDensity(Image *image,const char *density)
+{
+  MagickStatusType
+    flags;
+
+  if (density != (char *) NULL)
+    {
+      GeometryInfo
+        geometry_info;
+
+      flags=ParseGeometry(density,&geometry_info);
+      if ((flags & RhoValue) != 0)
+        image->resolution.x=geometry_info.rho;
+      image->resolution.y=image->resolution.x;
+      if ((flags & SigmaValue) != 0)
+        image->resolution.y=geometry_info.sigma;
+    }
+}
+
+static void SetImagePage(Image *image,const char *page)
+{
+  if (page != (char *) NULL)
+    {
+      char
+        *geometry;
+
+      image->page=image->extract_info;
+      geometry=GetPageGeometry(page);
+      (void) ParseAbsoluteGeometry(geometry,&image->page);
+      geometry=DestroyString(geometry);
+    }
+}
+
+static void LimitImageTicks(Image *image,const GeometryInfo *geometry_info)
+{
+  if ((double) image->delay < floor(geometry_info->rho+0.5))
+    image->ticks_per_second=CastDoubleToSsizeT(floor(geometry_info->sigma+0.5));
+}
+
+static void SetImageDelay(Image *image,const char *delay)
+{
+  GeometryInfo
+    geometry_info;
 
   MagickStatusType
     flags;
 
-  /*
-    Allocate image structure.
-  */
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  image=(Image *) AcquireCriticalMemory(sizeof(*image));
-  (void) memset(image,0,sizeof(*image));
-  /*
-    Initialize Image structure.
-  */
+  if (delay == (const char *) NULL)
+    return;
+  flags=ParseGeometry(delay,&geometry_info);
+  if ((flags & GreaterValue) != 0)
+    LimitImageDelay(image,geometry_info.rho);
+  else if ((flags & LessValue) != 0)
+    LimitImageTicks(image,&geometry_info);
+  else
+    image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+0.5));
+  if ((flags & SigmaValue) != 0)
+    image->ticks_per_second=CastDoubleToSsizeT(floor(geometry_info.sigma+0.5));
+}
+
+static void SetImageDefaults(Image *image)
+{
+  MagickSizeType
+    time_limit;
+
   (void) CopyMagickString(image->magick,"MIFF",MagickPathExtent);
   image->storage_class=DirectClass;
   image->depth=MAGICKCORE_QUANTUM_DEPTH;
@@ -200,6 +253,55 @@ MagickExport Image *AcquireImage(const ImageInfo *image_info,
   image->reference_count=1;
   image->semaphore=AcquireSemaphoreInfo();
   image->signature=MagickCoreSignature;
+}
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%   A c q u i r e I m a g e                                                   %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  AcquireImage() returns a pointer to an image structure initialized to
+%  default values.
+%
+%  The format of the AcquireImage method is:
+%
+%      Image *AcquireImage(const ImageInfo *image_info,ExceptionInfo *exception)
+%
+%  A description of each parameter follows:
+%
+%    o image_info: Many of the image default values are set from this
+%      structure.  For example, filename, compression, depth, background color,
+%      and others.
+%
+%    o exception: return any errors or warnings in this structure.
+%
+*/
+MagickExport Image *AcquireImage(const ImageInfo *image_info,
+  ExceptionInfo *exception)
+{
+  const char
+    *option;
+
+  Image
+    *image;
+
+  /*
+    Allocate image structure.
+  */
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  image=(Image *) AcquireCriticalMemory(sizeof(*image));
+  (void) memset(image,0,sizeof(*image));
+  /*
+    Initialize Image structure.
+  */
+  SetImageDefaults(image);
   if (image_info == (ImageInfo *) NULL)
     return(image);
   /*
@@ -212,56 +314,15 @@ MagickExport Image *AcquireImage(const ImageInfo *image_info,
   (void) CopyMagickString(image->magick_filename,image_info->filename,
     MagickPathExtent);
   (void) CopyMagickString(image->magick,image_info->magick,MagickPathExtent);
-  if (image_info->size != (char *) NULL)
-    {
-      (void) ParseAbsoluteGeometry(image_info->size,&image->extract_info);
-      image->columns=image->extract_info.width;
-      image->rows=image->extract_info.height;
-      image->offset=image->extract_info.x;
-      image->extract_info.x=0;
-      image->extract_info.y=0;
-    }
-  if (image_info->extract != (char *) NULL)
-    {
-      RectangleInfo
-        geometry;
-
-      (void) memset(&geometry,0,sizeof(geometry));
-      flags=ParseAbsoluteGeometry(image_info->extract,&geometry);
-      if (((flags & XValue) != 0) || ((flags & YValue) != 0))
-        {
-          image->extract_info=geometry;
-          Swap(image->columns,image->extract_info.width);
-          Swap(image->rows,image->extract_info.height);
-        }
-    }
+  SetImageSize(image,image_info->size);
+  SetImageExtract(image,image_info->extract);
   image->compression=image_info->compression;
   image->quality=image_info->quality;
   image->endian=image_info->endian;
   image->interlace=image_info->interlace;
   image->units=image_info->units;
-  if (image_info->density != (char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      flags=ParseGeometry(image_info->density,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->resolution.x=geometry_info.rho;
-      image->resolution.y=image->resolution.x;
-      if ((flags & SigmaValue) != 0)
-        image->resolution.y=geometry_info.sigma;
-    }
-  if (image_info->page != (char *) NULL)
-    {
-      char
-        *geometry;
-
-      image->page=image->extract_info;
-      geometry=GetPageGeometry(image_info->page);
-      (void) ParseAbsoluteGeometry(geometry,&image->page);
-      geometry=DestroyString(geometry);
-    }
+  SetImageDensity(image,image_info->density);
+  SetImagePage(image,image_info->page);
   if (image_info->depth != 0)
     image->depth=image_info->depth;
   image->dither=image_info->dither;
@@ -281,33 +342,7 @@ MagickExport Image *AcquireImage(const ImageInfo *image_info,
   /*
     Global options that are only set for new images.
   */
-  option=GetImageOption(image_info,"delay");
-  if (option != (const char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & GreaterValue) != 0)
-        {
-          if ((double) image->delay > floor(geometry_info.rho+0.5))
-            image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+
-              0.5));
-        }
-      else
-        if ((flags & LessValue) != 0)
-          {
-            if ((double) image->delay < floor(geometry_info.rho+0.5))
-              image->ticks_per_second=CastDoubleToSsizeT(floor(
-                geometry_info.sigma+0.5));
-          }
-        else
-          image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+
-            0.5));
-      if ((flags & SigmaValue) != 0)
-        image->ticks_per_second=CastDoubleToSsizeT(floor(geometry_info.sigma+
-          0.5));
-    }
+  SetImageDelay(image,GetImageOption(image_info,"delay"));
   option=GetImageOption(image_info,"dispose");
   if (option != (const char *) NULL)
     image->dispose=(DisposeType) ParseCommandOption(MagickDisposeOptions,
@@ -903,33 +938,9 @@ static MagickBooleanType CloneImageColormap(Image *clone_image,
   return(MagickTrue);
 }
 
-MagickExport Image *CloneImage(const Image *image,const size_t columns,
-  const size_t rows,const MagickBooleanType detach,ExceptionInfo *exception)
+static void CopyImageAttributes(Image *clone_image,const Image *image,
+  const MagickBooleanType detach)
 {
-  double
-    scale_x,
-    scale_y;
-
-  Image
-    *clone_image;
-
-  /*
-    Clone the image.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((image->columns == 0) || (image->rows == 0))
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),CorruptImageError,
-        "NegativeOrZeroImageSize","`%s'",image->filename);
-      return((Image *) NULL);
-    }
-  clone_image=(Image *) AcquireCriticalMemory(sizeof(*clone_image));
-  (void) memset(clone_image,0,sizeof(*clone_image));
   clone_image->signature=MagickCoreSignature;
   clone_image->storage_class=image->storage_class;
   clone_image->number_channels=image->number_channels;
@@ -979,17 +990,15 @@ MagickExport Image *CloneImage(const Image *image,const size_t columns,
   clone_image->ttl=image->ttl;
   clone_image->debug=image->debug;
   clone_image->semaphore=AcquireSemaphoreInfo();
-  if (CloneImageColormap(clone_image,image) == MagickFalse)
-    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  if ((columns == 0) || (rows == 0))
-    {
-      if (image->montage != (char *) NULL)
-        (void) CloneString(&clone_image->montage,image->montage);
-      if (image->directory != (char *) NULL)
-        (void) CloneString(&clone_image->directory,image->directory);
-      clone_image->cache=ReferencePixelCache(image->cache);
-      return(clone_image);
-    }
+}
+
+static void ScaleClonePage(Image *clone_image,const Image *image,
+  const size_t columns,const size_t rows)
+{
+  double
+    scale_x,
+    scale_y;
+
   scale_x=1.0;
   scale_y=1.0;
   if (image->columns != 0)
@@ -1010,6 +1019,49 @@ MagickExport Image *CloneImage(const Image *image,const size_t columns,
     (double) image->page.y-0.5));
   clone_image->tile_offset.y=CastDoubleToSsizeT(ceil((double) scale_y*
     (double) image->tile_offset.y-0.5));
+}
+
+static void CloneMontageStrings(Image *clone_image,const Image *image)
+{
+  if (image->montage != (char *) NULL)
+    (void) CloneString(&clone_image->montage,image->montage);
+  if (image->directory != (char *) NULL)
+    (void) CloneString(&clone_image->directory,image->directory);
+}
+
+MagickExport Image *CloneImage(const Image *image,const size_t columns,
+  const size_t rows,const MagickBooleanType detach,ExceptionInfo *exception)
+{
+  Image
+    *clone_image;
+
+  /*
+    Clone the image.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if ((image->columns == 0) || (image->rows == 0))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),CorruptImageError,
+        "NegativeOrZeroImageSize","`%s'",image->filename);
+      return((Image *) NULL);
+    }
+  clone_image=(Image *) AcquireCriticalMemory(sizeof(*clone_image));
+  (void) memset(clone_image,0,sizeof(*clone_image));
+  CopyImageAttributes(clone_image,image,detach);
+  if (CloneImageColormap(clone_image,image) == MagickFalse)
+    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+  if ((columns == 0) || (rows == 0))
+    {
+      CloneMontageStrings(clone_image,image);
+      clone_image->cache=ReferencePixelCache(image->cache);
+      return(clone_image);
+    }
+  ScaleClonePage(clone_image,image,columns,rows);
   clone_image->cache=ClonePixelCache(image->cache);
   if (SetImageExtent(clone_image,columns,rows,exception) == MagickFalse)
     clone_image=DestroyImage(clone_image);
@@ -1933,6 +1985,23 @@ static MagickBooleanType IsIntegralQuantumPixel(const Image *image,
 }
 #endif
 
+#if defined(MAGICKCORE_HDRI_SUPPORT)
+static MagickBooleanType HasNonIntegralPixel(const Image *image,
+  const Quantum *p)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (IsIntegralQuantumPixel(image,p) == MagickFalse)
+      return(MagickTrue);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(MagickFalse);
+}
+#endif
+
 MagickExport MagickBooleanType IsHighDynamicRangeImage(const Image *image,
   ExceptionInfo *exception)
 {
@@ -1964,22 +2033,13 @@ MagickExport MagickBooleanType IsHighDynamicRangeImage(const Image *image,
     const Quantum
       *p;
 
-    ssize_t
-      x;
-
     if (hdri != MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       continue;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (IsIntegralQuantumPixel(image,p) == MagickFalse)
-        hdri=MagickTrue;
-      if (hdri != MagickFalse)
-        break;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    if (HasNonIntegralPixel(image,p) != MagickFalse)
+      hdri=MagickTrue;
   }
   image_view=DestroyCacheView(image_view);
   return(hdri);
@@ -2285,21 +2345,27 @@ static void AddRelativePageOffset(Image *image,const MagickStatusType flags,
     image->page.y+=geometry.y;
 }
 
+static void SetAbsolutePageX(Image *image,const ssize_t x)
+{
+  image->page.x=x;
+  if ((image->page.width == 0) && (x > 0))
+    image->page.width=(size_t) ((ssize_t) image->columns+x);
+}
+
+static void SetAbsolutePageY(Image *image,const ssize_t y)
+{
+  image->page.y=y;
+  if ((image->page.height == 0) && (y > 0))
+    image->page.height=(size_t) ((ssize_t) image->rows+y);
+}
+
 static void SetAbsolutePageOffset(Image *image,const MagickStatusType flags,
   const RectangleInfo geometry)
 {
   if ((flags & XValue) != 0)
-    {
-      image->page.x=geometry.x;
-      if ((image->page.width == 0) && (geometry.x > 0))
-        image->page.width=(size_t) ((ssize_t) image->columns+geometry.x);
-    }
+    SetAbsolutePageX(image,geometry.x);
   if ((flags & YValue) != 0)
-    {
-      image->page.y=geometry.y;
-      if ((image->page.height == 0) && (geometry.y > 0))
-        image->page.height=(size_t) ((ssize_t) image->rows+geometry.y);
-    }
+    SetAbsolutePageY(image,geometry.y);
 }
 
 MagickExport MagickBooleanType ResetImagePage(Image *image,const char *page)
@@ -3168,9 +3234,11 @@ static void ParseSubimageComponent(ImageInfo *image_info)
     ParseSubimageSpecification(image_info,component);
 }
 
-static void TestMultipleImageSupport(ImageInfo *image_info,char *component,
-  ExceptionInfo *exception)
+static void TestMultipleImageSupport(ImageInfo *image_info,
+  const unsigned int frames,char *component,ExceptionInfo *exception)
 {
+  if ((image_info->adjoin == MagickFalse) || (frames <= 1))
+    return;
   /*
     Test for multiple image support (e.g. image%02d.png).
   */
@@ -3219,6 +3287,14 @@ static MagickBooleanType CopyImageToSeekableFile(ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static void ResetUnsupportedEndian(ImageInfo *image_info,
+  const MagickInfo *magick_info)
+{
+  if ((magick_info == (const MagickInfo *) NULL) ||
+      (GetMagickEndianSupport(magick_info) == MagickFalse))
+    image_info->endian=UndefinedEndian;
+}
+
 static MagickBooleanType SetImageMagickFromMagic(ImageInfo *image_info,
   const MagickInfo *magick_info,const MagicInfo *magic_info,
   ExceptionInfo *sans_exception)
@@ -3238,28 +3314,18 @@ static MagickBooleanType SetImageMagickFromMagic(ImageInfo *image_info,
             magic_info),MagickPathExtent);
           magick_info=GetMagickInfo(image_info->magick,sans_exception);
         }
-      if ((magick_info == (const MagickInfo *) NULL) ||
-          (GetMagickEndianSupport(magick_info) == MagickFalse))
-        image_info->endian=UndefinedEndian;
+      ResetUnsupportedEndian(image_info,magick_info);
       sans_exception=DestroyExceptionInfo(sans_exception);
       return(MagickFalse);
     }
   return(MagickTrue);
 }
 
-MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
-  const unsigned int frames,ExceptionInfo *exception)
+static MagickBooleanType SetImageMagickFromContent(ImageInfo *image_info,
+  const MagickInfo *magick_info,char *component,ExceptionInfo *exception)
 {
-  char
-    component[MagickPathExtent],
-    magic[MagickPathExtent],
-    path[MagickPathExtent];
-
   const MagicInfo
     *magic_info;
-
-  const MagickInfo
-    *magick_info;
 
   ExceptionInfo
     *sans_exception;
@@ -3273,15 +3339,81 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   ssize_t
     count;
 
+  unsigned char
+    *magick;
+
+  size_t
+    magick_size;
+
   /*
-    Look for 'image.format' in filename.
+    Determine the image format from the first few bytes of the file.
   */
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
-  ParseSubimageComponent(image_info);
+  magick_size=GetMagicPatternExtent(exception);
+  if (magick_size == 0)
+    return(MagickFalse);
+  image=AcquireImage(image_info,exception);
+  (void) CopyMagickString(image->filename,image_info->filename,
+    MagickPathExtent);
+  sans_exception=AcquireExceptionInfo();
+  status=OpenBlob(image_info,image,ReadBinaryBlobMode,sans_exception);
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  if (status == MagickFalse)
+    {
+      image=DestroyImage(image);
+      return(MagickFalse);
+    }
+  if (CopyImageToSeekableFile(image_info,image,component,exception) ==
+      MagickFalse)
+    return(MagickFalse);
+  magick=(unsigned char *) AcquireQuantumMemory(1,magick_size);
+  if (magick == (unsigned char *) NULL)
+    {
+      (void) CloseBlob(image);
+      image=DestroyImage(image);
+      return(MagickFalse);
+    }
+  (void) memset(magick,0,magick_size);
+  count=ReadBlob(image,magick_size,magick);
+  (void) SeekBlob(image,-((MagickOffsetType) count),SEEK_CUR);
+  (void) CloseBlob(image);
+  image=DestroyImage(image);
+  /*
+    Check magic cache.
+  */
+  sans_exception=AcquireExceptionInfo();
+  magic_info=GetMagicInfo(magick,(size_t) count,sans_exception);
+  magick=(unsigned char *) RelinquishMagickMemory(magick);
+  if (SetImageMagickFromMagic(image_info,magick_info,magic_info,
+      sans_exception) == MagickFalse)
+    return(MagickTrue);
+  magick_info=GetMagickInfo(image_info->magick,sans_exception);
+  ResetUnsupportedEndian(image_info,magick_info);
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  return(MagickTrue);
+}
+
+static void DisableUnsupportedAdjoin(ImageInfo *image_info,
+  const unsigned int frames,const char *magic,ExceptionInfo *exception)
+{
+  const MagickInfo
+    *magick_info;
+
+  if ((image_info->adjoin == MagickFalse) || (frames == 0))
+    return;
+  /*
+    Some image formats do not support multiple frames per file.
+  */
+  magick_info=GetMagickInfo(magic,exception);
+  if (magick_info != (const MagickInfo *) NULL)
+    if (GetMagickAdjoin(magick_info) == MagickFalse)
+      image_info->adjoin=MagickFalse;
+}
+
+static void GetImageInfoExtension(const ImageInfo *image_info,char *component)
+{
+  char
+    path[MagickPathExtent];
+
   *component='\0';
   if (*image_info->magick == '\0')
     GetPathComponent(image_info->filename,ExtensionPath,component);
@@ -3293,6 +3425,55 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
       GetPathComponent(image_info->filename,BasePathSansCompressExtension,path);
       GetPathComponent(path,ExtensionPath,component);
     }
+}
+
+static const MagickInfo *GetImplicitFormat(ImageInfo *image_info,char *magic,
+  ExceptionInfo *sans_exception)
+{
+  const MagickInfo
+    *magick_info;
+
+  (void) CopyMagickString(magic,image_info->magick,MagickPathExtent);
+  magick_info=GetMagickInfo(magic,sans_exception);
+  if ((magick_info != (const MagickInfo *) NULL) &&
+      (magick_info->format_type == ExplicitFormatType))
+    image_info->affirm=MagickTrue;
+  return(magick_info);
+}
+
+static void SetImageInfoFilename(ImageInfo *image_info,
+  const unsigned int frames,char *component)
+{
+  if (frames == 0)
+    GetPathComponent(image_info->filename,CanonicalPath,component);
+  else
+    GetPathComponent(image_info->filename,SubcanonicalPath,component);
+  (void) CopyMagickString(image_info->filename,component,MagickPathExtent);
+}
+
+MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
+  const unsigned int frames,ExceptionInfo *exception)
+{
+  char
+    component[MagickPathExtent],
+    magic[MagickPathExtent];
+
+  const MagickInfo
+    *magick_info;
+
+  ExceptionInfo
+    *sans_exception;
+
+  /*
+    Look for 'image.format' in filename.
+  */
+  assert(image_info != (ImageInfo *) NULL);
+  assert(image_info->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
+      image_info->filename);
+  ParseSubimageComponent(image_info);
+  GetImageInfoExtension(image_info,component);
   image_info->affirm=MagickFalse;
   sans_exception=AcquireExceptionInfo();
   if ((*component != '\0') && (IsGlob(component) == MagickFalse))
@@ -3305,93 +3486,21 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   GetPathComponent(image_info->filename,MagickPath,magic);
   if (*magic == '\0')
     {
-      (void) CopyMagickString(magic,image_info->magick,MagickPathExtent);
-      magick_info=GetMagickInfo(magic,sans_exception);
-      if ((magick_info != (const MagickInfo *) NULL) &&
-          (magick_info->format_type == ExplicitFormatType))
-        image_info->affirm=MagickTrue;
-      if (frames == 0)
-        GetPathComponent(image_info->filename,CanonicalPath,component);
-      else
-        GetPathComponent(image_info->filename,SubcanonicalPath,component);
-      (void) CopyMagickString(image_info->filename,component,MagickPathExtent);
+      magick_info=GetImplicitFormat(image_info,magic,sans_exception);
+      SetImageInfoFilename(image_info,frames,component);
     }
   else
     magick_info=SetUserSpecifiedFormat(image_info,magic,component,
       sans_exception,exception);
   sans_exception=DestroyExceptionInfo(sans_exception);
-  if ((magick_info == (const MagickInfo *) NULL) ||
-      (GetMagickEndianSupport(magick_info) == MagickFalse))
-    image_info->endian=UndefinedEndian;
-  if ((image_info->adjoin != MagickFalse) && (frames > 1))
-    TestMultipleImageSupport(image_info,component,exception);
-  if ((image_info->adjoin != MagickFalse) && (frames > 0))
-    {
-      /*
-        Some image formats do not support multiple frames per file.
-      */
-      magick_info=GetMagickInfo(magic,exception);
-      if (magick_info != (const MagickInfo *) NULL)
-        if (GetMagickAdjoin(magick_info) == MagickFalse)
-          image_info->adjoin=MagickFalse;
-    }
+  ResetUnsupportedEndian(image_info,magick_info);
+  TestMultipleImageSupport(image_info,frames,component,exception);
+  DisableUnsupportedAdjoin(image_info,frames,magic,exception);
   if (image_info->affirm != MagickFalse)
     return(MagickTrue);
   if (frames == 0)
-    {
-      unsigned char
-        *magick;
-
-      size_t
-        magick_size;
-
-      /*
-        Determine the image format from the first few bytes of the file.
-      */
-      magick_size=GetMagicPatternExtent(exception);
-      if (magick_size == 0)
-        return(MagickFalse);
-      image=AcquireImage(image_info,exception);
-      (void) CopyMagickString(image->filename,image_info->filename,
-        MagickPathExtent);
-      sans_exception=AcquireExceptionInfo();
-      status=OpenBlob(image_info,image,ReadBinaryBlobMode,sans_exception);
-      sans_exception=DestroyExceptionInfo(sans_exception);
-      if (status == MagickFalse)
-        {
-          image=DestroyImage(image);
-          return(MagickFalse);
-        }
-      if (CopyImageToSeekableFile(image_info,image,component,exception) ==
-          MagickFalse)
-        return(MagickFalse);
-      magick=(unsigned char *) AcquireQuantumMemory(1,magick_size);
-      if (magick == (unsigned char *) NULL)
-        {
-          (void) CloseBlob(image);
-          image=DestroyImage(image);
-          return(MagickFalse);
-        }
-      (void) memset(magick,0,magick_size);
-      count=ReadBlob(image,magick_size,magick);
-      (void) SeekBlob(image,-((MagickOffsetType) count),SEEK_CUR);
-      (void) CloseBlob(image);
-      image=DestroyImage(image);
-      /*
-        Check magic cache.
-      */
-      sans_exception=AcquireExceptionInfo();
-      magic_info=GetMagicInfo(magick,(size_t) count,sans_exception);
-      magick=(unsigned char *) RelinquishMagickMemory(magick);
-      if (SetImageMagickFromMagic(image_info,magick_info,magic_info,
-          sans_exception) == MagickFalse)
-        return(MagickTrue);
-      magick_info=GetMagickInfo(image_info->magick,sans_exception);
-      if ((magick_info == (const MagickInfo *) NULL) ||
-          (GetMagickEndianSupport(magick_info) == MagickFalse))
-        image_info->endian=UndefinedEndian;
-      sans_exception=DestroyExceptionInfo(sans_exception);
-    }
+    return(SetImageMagickFromContent(image_info,magick_info,component,
+      exception));
   return(MagickTrue);
 }
 
@@ -4007,44 +4116,53 @@ typedef struct _SmushXRows
     *exception;
 } SmushXRows;
 
-static size_t SmushXRow(const SmushXRows *rows,const ssize_t y,size_t gap)
+static ssize_t FindLeftGapEdge(const SmushXRows *rows,const ssize_t y,
+  const size_t gap)
 {
-  const Image
-    *left_image = rows->left_image,
-    *right_image = rows->right_image;
-
-  CacheView
-    *left_view = rows->left_view,
-    *right_view = rows->right_view;
-
-  const RectangleInfo
-    left_geometry = rows->left_geometry,
-    right_geometry = rows->right_geometry;
-
-  ExceptionInfo
-    *exception = rows->exception;
-
   const Quantum
     *p;
 
   ssize_t
+    x;
+
+  for (x=(ssize_t) rows->left_image->columns-1; x > 0; x--)
+  {
+    p=GetCacheViewVirtualPixels(rows->left_view,x,rows->left_geometry.y+y,1,1,
+      rows->exception);
+    if (IsLeftGapEdge(rows->left_image,p,x,gap) != MagickFalse)
+      break;
+  }
+  return(x);
+}
+
+static ssize_t FindRightGapEdge(const SmushXRows *rows,const ssize_t y,
+  const ssize_t i,const size_t gap)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) rows->right_image->columns; x++)
+  {
+    p=GetCacheViewVirtualPixels(rows->right_view,x,rows->right_geometry.y+y,1,1,
+      rows->exception);
+    if (IsRightGapEdge(rows->right_image,p,x,i,gap) != MagickFalse)
+      break;
+  }
+  return(x);
+}
+
+static size_t SmushXRow(const SmushXRows *rows,const ssize_t y,size_t gap)
+{
+  ssize_t
     i,
     x;
 
-  for (x=(ssize_t) left_image->columns-1; x > 0; x--)
-  {
-    p=GetCacheViewVirtualPixels(left_view,x,left_geometry.y+y,1,1,exception);
-    if (IsLeftGapEdge(left_image,p,x,gap) != MagickFalse)
-      break;
-  }
-  i=(ssize_t) left_image->columns-x-1;
-  for (x=0; x < (ssize_t) right_image->columns; x++)
-  {
-    p=GetCacheViewVirtualPixels(right_view,x,right_geometry.y+y,1,1,
-      exception);
-    if (IsRightGapEdge(right_image,p,x,i,gap) != MagickFalse)
-      break;
-  }
+  x=FindLeftGapEdge(rows,y,gap);
+  i=(ssize_t) rows->left_image->columns-x-1;
+  x=FindRightGapEdge(rows,y,i,gap);
   if ((x+i) < (ssize_t) gap)
     gap=(size_t) (x+i);
   return(gap);
@@ -4140,44 +4258,53 @@ typedef struct _SmushYRows
     *exception;
 } SmushYRows;
 
-static size_t SmushYRow(const SmushYRows *rows,const ssize_t x,size_t gap)
+static ssize_t FindTopGapEdge(const SmushYRows *rows,const ssize_t x,
+  const size_t gap)
 {
-  const Image
-    *bottom_image = rows->bottom_image,
-    *top_image = rows->top_image;
-
-  CacheView
-    *bottom_view = rows->bottom_view,
-    *top_view = rows->top_view;
-
-  const RectangleInfo
-    bottom_geometry = rows->bottom_geometry,
-    top_geometry = rows->top_geometry;
-
-  ExceptionInfo
-    *exception = rows->exception;
-
   const Quantum
     *p;
 
   ssize_t
+    y;
+
+  for (y=(ssize_t) rows->top_image->rows-1; y > 0; y--)
+  {
+    p=GetCacheViewVirtualPixels(rows->top_view,rows->top_geometry.x+x,y,1,1,
+      rows->exception);
+    if (IsTopGapEdge(rows->top_image,p,y,gap) != MagickFalse)
+      break;
+  }
+  return(y);
+}
+
+static ssize_t FindBottomGapEdge(const SmushYRows *rows,const ssize_t x,
+  const ssize_t i,const size_t gap)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) rows->bottom_image->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(rows->bottom_view,rows->bottom_geometry.x+x,y,1,
+      1,rows->exception);
+    if (IsBottomGapEdge(rows->bottom_image,p,y,i,gap) != MagickFalse)
+      break;
+  }
+  return(y);
+}
+
+static size_t SmushYRow(const SmushYRows *rows,const ssize_t x,size_t gap)
+{
+  ssize_t
     i,
     y;
 
-  for (y=(ssize_t) top_image->rows-1; y > 0; y--)
-  {
-    p=GetCacheViewVirtualPixels(top_view,top_geometry.x+x,y,1,1,exception);
-    if (IsTopGapEdge(top_image,p,y,gap) != MagickFalse)
-      break;
-  }
-  i=(ssize_t) top_image->rows-y-1;
-  for (y=0; y < (ssize_t) bottom_image->rows; y++)
-  {
-    p=GetCacheViewVirtualPixels(bottom_view,bottom_geometry.x+x,y,1,1,
-      exception);
-    if (IsBottomGapEdge(bottom_image,p,y,i,gap) != MagickFalse)
-      break;
-  }
+  y=FindTopGapEdge(rows,x,gap);
+  i=(ssize_t) rows->top_image->rows-y-1;
+  y=FindBottomGapEdge(rows,x,i,gap);
   if ((y+i) < (ssize_t) gap)
     gap=(size_t) (y+i);
   return(gap);
@@ -4256,6 +4383,15 @@ static void AddSmushRowExtent(const Image *next,const ssize_t offset,
     (*width)=(size_t) MagickMax((ssize_t) (*width)+offset,0U);
   if (next->rows > (*height))
     (*height)=next->rows;
+}
+
+static void SetSmushExtent(Image *smush_image,const MagickBooleanType stack,
+  const ssize_t x_offset,const ssize_t y_offset)
+{
+  if (stack == MagickFalse)
+    smush_image->columns=(size_t) x_offset;
+  else
+    smush_image->rows=(size_t) y_offset;
 }
 
 MagickExport Image *SmushImages(const Image *images,
@@ -4359,10 +4495,7 @@ MagickExport Image *SmushImages(const Image *images,
     AdvanceAppendOffset(image,stack,&x_offset,&y_offset);
     image=GetNextImageInList(image);
   }
-  if (stack == MagickFalse)
-    smush_image->columns=(size_t) x_offset;
-  else
-    smush_image->rows=(size_t) y_offset;
+  SetSmushExtent(smush_image,stack,x_offset,y_offset);
   if (status == MagickFalse)
     smush_image=DestroyImage(smush_image);
   return(smush_image);

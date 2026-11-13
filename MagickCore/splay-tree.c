@@ -465,6 +465,23 @@ static NodeInfo *GetSuccessorNode(const SplayTreeInfo *splay_tree)
   return(next);
 }
 
+static void JoinSplayTreeSubtrees(SplayTreeInfo *splay_tree,NodeInfo *left,
+  NodeInfo *right)
+{
+  if (left == (NodeInfo *) NULL)
+    {
+      splay_tree->root=right;
+      return;
+    }
+  splay_tree->root=left;
+  if (right != (NodeInfo *) NULL)
+    {
+      while (left->right != (NodeInfo *) NULL)
+        left=left->right;
+      left->right=right;
+    }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -541,19 +558,7 @@ MagickExport MagickBooleanType DeleteNodeByValueFromSplayTree(
         RelinquishNodeContents(splay_tree,splay_tree->root);
         splay_tree->root=(NodeInfo *) RelinquishMagickMemory(splay_tree->root);
         splay_tree->nodes--;
-        if (left == (NodeInfo *) NULL)
-          {
-            splay_tree->root=right;
-            UnlockSemaphoreInfo(splay_tree->semaphore);
-            return(MagickTrue);
-          }
-        splay_tree->root=left;
-        if (right != (NodeInfo *) NULL)
-          {
-            while (left->right != (NodeInfo *) NULL)
-              left=left->right;
-            left->right=right;
-          }
+        JoinSplayTreeSubtrees(splay_tree,left,right);
         UnlockSemaphoreInfo(splay_tree->semaphore);
         return(MagickTrue);
       }
@@ -1204,19 +1209,7 @@ MagickExport void *RemoveNodeByValueFromSplayTree(SplayTreeInfo *splay_tree,
             splay_tree->root->value);
         splay_tree->root=(NodeInfo *) RelinquishMagickMemory(splay_tree->root);
         splay_tree->nodes--;
-        if (left == (NodeInfo *) NULL)
-          {
-            splay_tree->root=right;
-            UnlockSemaphoreInfo(splay_tree->semaphore);
-            return(key);
-          }
-        splay_tree->root=left;
-        if (right != (NodeInfo *) NULL)
-          {
-            while (left->right != (NodeInfo *) NULL)
-              left=left->right;
-            left->right=right;
-          }
+        JoinSplayTreeSubtrees(splay_tree,left,right);
         UnlockSemaphoreInfo(splay_tree->semaphore);
         return(key);
       }
@@ -1287,19 +1280,7 @@ MagickExport void *RemoveNodeFromSplayTree(SplayTreeInfo *splay_tree,
     splay_tree->root->key=splay_tree->relinquish_key(splay_tree->root->key);
   splay_tree->root=(NodeInfo *) RelinquishMagickMemory(splay_tree->root);
   splay_tree->nodes--;
-  if (left == (NodeInfo *) NULL)
-    {
-      splay_tree->root=right;
-      UnlockSemaphoreInfo(splay_tree->semaphore);
-      return(value);
-    }
-  splay_tree->root=left;
-  if (right != (NodeInfo *) NULL)
-    {
-      while (left->right != (NodeInfo *) NULL)
-        left=left->right;
-      left->right=right;
-    }
+  JoinSplayTreeSubtrees(splay_tree,left,right);
   UnlockSemaphoreInfo(splay_tree->semaphore);
   return(value);
 }
@@ -1424,45 +1405,12 @@ static int CompareNodeKey(const SplayTreeInfo *splay_tree,const NodeInfo *n,
 %
 */
 
-static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
-  const void *key,NodeInfo **node,NodeInfo **parent,NodeInfo **grandparent)
+static NodeInfo *RotateSplayNode(NodeInfo *n,NodeInfo **node,NodeInfo **parent,
+  NodeInfo **grandparent)
 {
-  int
-    compare;
-
   NodeInfo
-    *n,
-    **next,
     *p;
 
-  n=(*node);
-  if (n == (NodeInfo *) NULL)
-    {
-      if (parent != (NodeInfo **) NULL)
-        return(*parent);
-      else
-        return((NodeInfo *) NULL);
-    }
-  compare=CompareNodeKey(splay_tree,n,key);
-  next=(NodeInfo **) NULL;
-  if (compare > 0)
-    next=(&n->left);
-  else
-    if (compare < 0)
-      next=(&n->right);
-  if (next != (NodeInfo **) NULL)
-    {
-      if (depth >= MaxSplayTreeDepth)
-        {
-          splay_tree->balance=MagickTrue;
-          return(n);
-        }
-      n=Splay(splay_tree,depth+1,key,next,node,parent);
-      if ((n != *node) || (splay_tree->balance != MagickFalse))
-        return(n);
-    }
-  if (parent == (NodeInfo **) NULL)
-    return(n);
   if (grandparent == (NodeInfo **) NULL)
     {
       if (n == (*parent)->left)
@@ -1515,23 +1463,75 @@ static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
   return(n);
 }
 
+static NodeInfo **GetSplayChildLink(NodeInfo *n,const int compare)
+{
+  if (compare > 0)
+    return(&n->left);
+  if (compare < 0)
+    return(&n->right);
+  return((NodeInfo **) NULL);
+}
+
+static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
+  const void *key,NodeInfo **node,NodeInfo **parent,NodeInfo **grandparent)
+{
+  int
+    compare;
+
+  NodeInfo
+    *n,
+    **next;
+
+  n=(*node);
+  if (n == (NodeInfo *) NULL)
+    {
+      if (parent != (NodeInfo **) NULL)
+        return(*parent);
+      else
+        return((NodeInfo *) NULL);
+    }
+  compare=CompareNodeKey(splay_tree,n,key);
+  next=GetSplayChildLink(n,compare);
+  if (next != (NodeInfo **) NULL)
+    {
+      if (depth >= MaxSplayTreeDepth)
+        {
+          splay_tree->balance=MagickTrue;
+          return(n);
+        }
+      n=Splay(splay_tree,depth+1,key,next,node,parent);
+      if ((n != *node) || (splay_tree->balance != MagickFalse))
+        return(n);
+    }
+  if (parent == (NodeInfo **) NULL)
+    return(n);
+  return(RotateSplayNode(n,node,parent,grandparent));
+}
+
+static MagickBooleanType IsSplayKeyAtRoot(SplayTreeInfo *splay_tree,
+  const void *key)
+{
+  int
+    compare;
+
+  if (splay_tree->key == (void *) NULL)
+    return(MagickFalse);
+  if (splay_tree->compare != (int (*)(const void *,const void *)) NULL)
+    compare=splay_tree->compare(splay_tree->root->key,key);
+  else
+    compare=(splay_tree->key > key) ? 1 :
+      ((splay_tree->key < key) ? -1 : 0);
+  if (compare == 0)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
 static void SplaySplayTree(SplayTreeInfo *splay_tree,const void *key)
 {
   if (splay_tree->root == (NodeInfo *) NULL)
     return;
-  if (splay_tree->key != (void *) NULL)
-    {
-      int
-        compare;
-
-      if (splay_tree->compare != (int (*)(const void *,const void *)) NULL)
-        compare=splay_tree->compare(splay_tree->root->key,key);
-      else
-        compare=(splay_tree->key > key) ? 1 :
-          ((splay_tree->key < key) ? -1 : 0);
-      if (compare == 0)
-        return;
-    }
+  if (IsSplayKeyAtRoot(splay_tree,key) != MagickFalse)
+    return;
   (void) Splay(splay_tree,0UL,key,&splay_tree->root,(NodeInfo **) NULL,
     (NodeInfo **) NULL);
   if (splay_tree->balance != MagickFalse)
