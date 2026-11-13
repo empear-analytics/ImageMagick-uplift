@@ -4070,6 +4070,39 @@ static void XLogXImage(const XImage *ximage)
     ximage->green_mask,ximage->blue_mask);
 }
 
+static void XDestroyWindowXImage(Display *display,XWindowInfo *window)
+{
+  /*
+    Destroy previous X image.
+  */
+#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
+  if (window->segment_info != (XShmSegmentInfo *) NULL)
+    {
+      XShmSegmentInfo
+        *segment_info;
+
+      segment_info=(XShmSegmentInfo *) window->segment_info;
+      if (segment_info[0].shmid >= 0)
+        {
+          (void) XSync(display,MagickFalse);
+          (void) XShmDetach(display,&segment_info[0]);
+          (void) XSync(display,MagickFalse);
+          if (segment_info[0].shmaddr != (char *) NULL)
+            (void) shmdt(segment_info[0].shmaddr);
+          (void) shmctl(segment_info[0].shmid,IPC_RMID,0);
+          segment_info[0].shmid=(-1);
+          segment_info[0].shmaddr=(char *) NULL;
+          window->ximage->data=(char *) NULL;
+      }
+    }
+#endif
+  if (window->ximage->data != (char *) NULL)
+    free(window->ximage->data);
+  window->ximage->data=(char *) NULL;
+  XDestroyImage(window->ximage);
+  window->ximage=(XImage *) NULL;
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4279,37 +4312,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       return(MagickFalse);
     }
   if (window->ximage != (XImage *) NULL)
-    {
-      /*
-        Destroy previous X image.
-      */
-#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
-      if (window->segment_info != (XShmSegmentInfo *) NULL)
-        {
-          XShmSegmentInfo
-            *segment_info;
-
-          segment_info=(XShmSegmentInfo *) window->segment_info;
-          if (segment_info[0].shmid >= 0)
-            {
-              (void) XSync(display,MagickFalse);
-              (void) XShmDetach(display,&segment_info[0]);
-              (void) XSync(display,MagickFalse);
-              if (segment_info[0].shmaddr != (char *) NULL)
-                (void) shmdt(segment_info[0].shmaddr);
-              (void) shmctl(segment_info[0].shmid,IPC_RMID,0);
-              segment_info[0].shmid=(-1);
-              segment_info[0].shmaddr=(char *) NULL;
-              window->ximage->data=(char *) NULL;
-          }
-        }
-#endif
-      if (window->ximage->data != (char *) NULL)
-        free(window->ximage->data);
-      window->ximage->data=(char *) NULL;
-      XDestroyImage(window->ximage);
-      window->ximage=(XImage *) NULL;
-    }
+    XDestroyWindowXImage(display,window);
 #if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
   if (window->segment_info != (XShmSegmentInfo *) NULL)
     {
