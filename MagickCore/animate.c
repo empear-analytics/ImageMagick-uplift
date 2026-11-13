@@ -1208,6 +1208,54 @@ static void XAdjustBackgroundSize(const AnimateBackgroundSetup *setup,
     }
 }
 
+static void XCreateBackgroundPixmaps(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  Display
+    *const display = setup->display;
+
+  unsigned int
+    *const height = targets->height,
+    *const width = targets->width;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*window_info).pixmap=XCreatePixmap(display,(*window_info).id,
+    (unsigned int) (*width),(unsigned int) (*height),(*window_info).depth);
+  if ((*window_info).pixmap == (Pixmap) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
+      setup->images->filename);
+  /*
+    Display pixmap on the window.
+  */
+  if (((unsigned int) (*width) > (*window_info).width) ||
+      ((unsigned int) (*height) > (*window_info).height))
+    (void) XFillRectangle(display,(*window_info).pixmap,
+      (*window_info).annotate_context,0,0,(unsigned int) (*width),
+      (unsigned int) (*height));
+  (void) XPutImage(display,(*window_info).pixmap,
+    (*window_info).annotate_context,(*window_info).ximage,0,0,
+    (*window_info).x,(*window_info).y,(*window_info).width,
+    (*window_info).height);
+  (void) XSetWindowBackgroundPixmap(display,(*window_info).id,
+    (*window_info).pixmap);
+  (void) XClearWindow(display,(*window_info).id);
+  /*
+    Initialize image pixmaps structure.
+  */
+  (*window_info).pixmaps=(Pixmap *) AcquireQuantumMemory(setup->number_scenes,
+    sizeof(*(*window_info).pixmaps));
+  (*window_info).matte_pixmaps=(Pixmap *) AcquireQuantumMemory(
+    setup->number_scenes,sizeof(*(*window_info).matte_pixmaps));
+  if (((*window_info).pixmaps == (Pixmap *) NULL) ||
+      ((*window_info).matte_pixmaps == (Pixmap *) NULL))
+    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
+      setup->images->filename);
+  (*window_info).pixmaps[0]=(*window_info).pixmap;
+  (*window_info).matte_pixmaps[0]=(*window_info).pixmap;
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1412,37 +1460,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   /*
     Create the X pixmap.
   */
-  window_info.pixmap=XCreatePixmap(display,window_info.id,(unsigned int) width,
-    (unsigned int) height,window_info.depth);
-  if (window_info.pixmap == (Pixmap) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
-      images->filename);
-  /*
-    Display pixmap on the window.
-  */
-  if (((unsigned int) width > window_info.width) ||
-      ((unsigned int) height > window_info.height))
-    (void) XFillRectangle(display,window_info.pixmap,
-      window_info.annotate_context,0,0,(unsigned int) width,
-      (unsigned int) height);
-  (void) XPutImage(display,window_info.pixmap,window_info.annotate_context,
-    window_info.ximage,0,0,window_info.x,window_info.y,window_info.width,
-    window_info.height);
-  (void) XSetWindowBackgroundPixmap(display,window_info.id,window_info.pixmap);
-  (void) XClearWindow(display,window_info.id);
-  /*
-    Initialize image pixmaps structure.
-  */
-  window_info.pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
-    sizeof(*window_info.pixmaps));
-  window_info.matte_pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
-    sizeof(*window_info.matte_pixmaps));
-  if ((window_info.pixmaps == (Pixmap *) NULL) ||
-      (window_info.matte_pixmaps == (Pixmap *) NULL))
-    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
-      images->filename);
-  window_info.pixmaps[0]=window_info.pixmap;
-  window_info.matte_pixmaps[0]=window_info.pixmap;
+  XCreateBackgroundPixmaps(&setup,&targets);
   for (scene=1; scene < (int) number_scenes; scene++)
   {
     unsigned int
