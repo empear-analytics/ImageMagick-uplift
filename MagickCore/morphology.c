@@ -2573,6 +2573,18 @@ static KernelInfo *AcquireEdgeDetectionKernel(KernelInfo *kernel,
   }
 }
 
+static void AddRankedBlurGaussian(KernelInfo *kernel,const ssize_t v,
+  const double alpha,const double beta)
+{
+  ssize_t
+    u;
+
+  for ( u=-v; u <= v; u++) {
+    kernel->values[(u+v)/KernelRank] +=
+                    exp(-((double)(u*u))*alpha)*beta;
+  }
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2583,7 +2595,6 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     *kernel;
 
   ssize_t
-    u,
     v;
 
   double
@@ -2702,10 +2713,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
           { sigma *= KernelRank;               /* simplify loop expressions */
             alpha = 1.0/(2.0*sigma*sigma);
             beta= (double) (1.0/(MagickSQ2PI*sigma ));
-            for ( u=-v; u <= v; u++) {
-              kernel->values[(u+v)/KernelRank] +=
-                              exp(-((double)(u*u))*alpha)*beta;
-            }
+            AddRankedBlurGaussian(kernel,v,alpha,beta);
           }
         else /* special case - generate a unity kernel */
           kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
