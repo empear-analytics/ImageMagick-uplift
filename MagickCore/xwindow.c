@@ -2067,6 +2067,37 @@ static void XDrawLineOrRectangle(Display *display,const Pixmap draw_pixmap,
   }
 }
 
+static void XDrawArcElement(Display *display,const Pixmap draw_pixmap,
+  const GC draw_context,const XDrawInfo *draw_info)
+{
+  switch (draw_info->element)
+  {
+    default:
+    {
+      XDrawLineOrRectangle(display,draw_pixmap,draw_context,draw_info);
+      break;
+    }
+    case CircleElement:
+    case EllipseElement:
+    {
+      (void) XDrawArc(display,draw_pixmap,draw_context,
+        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
+        (unsigned int) draw_info->rectangle_info.width,
+        (unsigned int) draw_info->rectangle_info.height,0,360*64);
+      break;
+    }
+    case FillCircleElement:
+    case FillEllipseElement:
+    {
+      (void) XFillArc(display,draw_pixmap,draw_context,
+        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
+        (unsigned int) draw_info->rectangle_info.width,
+        (unsigned int) draw_info->rectangle_info.height,0,360*64);
+      break;
+    }
+  }
+}
+
 MagickPrivate MagickBooleanType XDrawImage(Display *display,
   const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
   ExceptionInfo *exception)
@@ -2151,25 +2182,7 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
   {
     default:
     {
-      XDrawLineOrRectangle(display,draw_pixmap,draw_context,draw_info);
-      break;
-    }
-    case CircleElement:
-    case EllipseElement:
-    {
-      (void) XDrawArc(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height,0,360*64);
-      break;
-    }
-    case FillCircleElement:
-    case FillEllipseElement:
-    {
-      (void) XFillArc(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height,0,360*64);
+      XDrawArcElement(display,draw_pixmap,draw_context,draw_info);
       break;
     }
     case PolygonElement:
