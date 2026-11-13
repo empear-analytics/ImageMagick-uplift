@@ -1728,6 +1728,52 @@ static MagickBooleanType LocateEXIFEntryValue(const EXIFWalkInfo *walk,
   return(MagickTrue);
 }
 
+static MagickBooleanType GetEXIFEntry(const EXIFWalkInfo *walk,
+  const size_t number_entries,const EXIFWalkTargets *targets)
+{
+  ssize_t
+    *const level = targets->level;
+
+  size_t
+    *const entry = targets->entry;
+
+  size_t
+    tag_value;
+
+  EXIFTagInfo
+    exif_tag;
+
+  size_t
+    format;
+
+  ssize_t
+    components,
+    number_bytes;
+
+  unsigned char
+    *p,
+    *q;
+
+  const EXIFEntryTargets
+    entry_targets = { &q, &tag_value, &format, &components, &number_bytes };
+
+  if (ReadEXIFEntry(walk,(*entry),&entry_targets) == MagickFalse)
+    return(MagickTrue);
+  if (LocateEXIFEntryValue(walk,q,number_bytes,&p) == MagickFalse)
+    return(MagickFalse);
+  exif_tag.tag_value=tag_value;
+  exif_tag.format=format;
+  exif_tag.components=components;
+  exif_tag.number_bytes=number_bytes;
+  exif_tag.p=p;
+  if (GetEXIFTagProperty(walk,&exif_tag,(*level)) == MagickFalse)
+    return(MagickTrue);
+  if (PushEXIFDirectory(walk,&exif_tag,number_entries,targets) !=
+      MagickFalse)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
 static void GetEXIFDirectory(const EXIFWalkInfo *walk,
   const EXIFWalkTargets *targets)
 {
@@ -1737,15 +1783,11 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
   const unsigned char
     *const directory = walk->directory;
 
-  ssize_t
-    *const level = targets->level;
-
   size_t
     *const entry = targets->entry;
 
   size_t
-    number_entries,
-    tag_value;
+    number_entries;
 
   /*
     Determine how many entries there are in the current IFD.
@@ -1753,36 +1795,7 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
   number_entries=(size_t) ReadPropertyUnsignedShort(endian,directory);
   for ( ; (*entry) < number_entries; (*entry)++)
   {
-    EXIFTagInfo
-      exif_tag;
-
-    size_t
-      format;
-
-    ssize_t
-      components,
-      number_bytes;
-
-    unsigned char
-      *p,
-      *q;
-
-    const EXIFEntryTargets
-      entry_targets = { &q, &tag_value, &format, &components, &number_bytes };
-
-    if (ReadEXIFEntry(walk,(*entry),&entry_targets) == MagickFalse)
-      break;
-    if (LocateEXIFEntryValue(walk,q,number_bytes,&p) == MagickFalse)
-      continue;
-    exif_tag.tag_value=tag_value;
-    exif_tag.format=format;
-    exif_tag.components=components;
-    exif_tag.number_bytes=number_bytes;
-    exif_tag.p=p;
-    if (GetEXIFTagProperty(walk,&exif_tag,(*level)) == MagickFalse)
-      break;
-    if (PushEXIFDirectory(walk,&exif_tag,number_entries,targets) !=
-        MagickFalse)
+    if (GetEXIFEntry(walk,number_entries,targets) != MagickFalse)
       break;
   }
 }
