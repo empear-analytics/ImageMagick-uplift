@@ -649,8 +649,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
               else
                 FillHuffmanBlackRun(scanline,image->columns,&x,&count);
             }
-          color=(unsigned int)
-            ((color == MagickFalse) ? MagickTrue : MagickFalse);
+          color=(unsigned int) (color == MagickFalse);
           break;
         }
         case MWId:
