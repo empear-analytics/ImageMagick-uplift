@@ -716,6 +716,38 @@ static void DrawTextUndercolor(const TextDecorationInfo *decoration,
     }
 }
 
+static void DrawTextLineThrough(const TextDecorationInfo *decoration,
+  DrawInfo *annotate_info)
+{
+  Image
+    *const image = decoration->image;
+
+  const DrawInfo
+    *const draw_info = decoration->draw_info;
+
+  DrawInfo
+    *const annotate = decoration->annotate;
+
+  const TypeMetric
+    metrics = decoration->metrics;
+
+  const char
+    *const primitive = decoration->primitive;
+
+  const size_t
+    height = decoration->height;
+
+  ExceptionInfo
+    *const exception = decoration->exception;
+
+  if (annotate->decorate == LineThroughDecoration) {
+      annotate_info->affine.ty-=(draw_info->affine.sy*(height+
+        metrics.underline_position+metrics.descent*2)/2.0);
+      (void) CloneString(&annotate_info->primitive,primitive);
+      (void) DrawImage(image,annotate_info,exception);
+  }
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -876,12 +908,8 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     if (status == MagickFalse)
       break;
 
-    if (annotate->decorate == LineThroughDecoration) {
-        annotate_info->affine.ty-=(draw_info->affine.sy*(height+
-          metrics.underline_position+metrics.descent*2)/2.0);
-        (void) CloneString(&annotate_info->primitive,primitive);
-        (void) DrawImage(image,annotate_info,exception);
-    }
+    decoration.metrics=metrics;
+    DrawTextLineThrough(&decoration,annotate_info);
   }
   /*
     Relinquish resources.
