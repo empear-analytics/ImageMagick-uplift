@@ -316,6 +316,15 @@ static inline MagickBooleanType IsGeometryAdvanceCharacter(const int c)
   return(MagickFalse);
 }
 
+static void ParseGeometryXYOffsets(char **p,MagickStatusType *flags,
+  ssize_t *x,ssize_t *y)
+{
+  if ((**p == '+') || (**p == '-'))
+    ParseGeometryXOffset(p,flags,x);
+  if ((**p == '+') || (**p == '-'))
+    ParseGeometryYOffset(p,flags,y);
+}
+
 MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -398,10 +407,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
     return(flags);
   flags=ParseGeometryWidth(&p,flags,width);
   flags=ParseGeometryHeight(&p,flags,height);
-  if ((*p == '+') || (*p == '-'))
-    ParseGeometryXOffset(&p,&flags,x);
-  if ((*p == '+') || (*p == '-'))
-    ParseGeometryYOffset(&p,&flags,y);
+  ParseGeometryXYOffsets(&p,&flags,x,y);
   if ((flags & PercentValue) != 0)
     flags=SetPercentGeometrySize(flags,width,height);
 #if 0
