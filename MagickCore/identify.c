@@ -355,7 +355,6 @@ static ssize_t PrintChannelLocations(const ChannelLocationsReport *report,
 
   switch (report->type)
   {
-    case MaximumStatistic:
     default:
     {
       target=report->channel_statistics[channel].maxima;
