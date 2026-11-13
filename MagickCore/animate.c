@@ -5544,6 +5544,20 @@ static Image *XFinishAnimation(const AnimateEventContext *event_context,
   return(nexus);
 }
 
+static void XInitializeMagickWindows(XWindows *windows,
+  XWindowInfo **magick_windows,size_t *number_windows)
+{
+  (*number_windows)=0;
+  magick_windows[(*number_windows)++]=(&windows->icon);
+  magick_windows[(*number_windows)++]=(&windows->backdrop);
+  magick_windows[(*number_windows)++]=(&windows->image);
+  magick_windows[(*number_windows)++]=(&windows->info);
+  magick_windows[(*number_windows)++]=(&windows->command);
+  magick_windows[(*number_windows)++]=(&windows->widget);
+  magick_windows[(*number_windows)++]=(&windows->popup);
+  XClearMagickWindowIds(magick_windows,(*number_windows));
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -5636,15 +5650,7 @@ MagickExport Image *XAnimateImages(Display *display,
       /*
         Initialize window id's.
       */
-      number_windows=0;
-      magick_windows[number_windows++]=(&windows->icon);
-      magick_windows[number_windows++]=(&windows->backdrop);
-      magick_windows[number_windows++]=(&windows->image);
-      magick_windows[number_windows++]=(&windows->info);
-      magick_windows[number_windows++]=(&windows->command);
-      magick_windows[number_windows++]=(&windows->widget);
-      magick_windows[number_windows++]=(&windows->popup);
-      XClearMagickWindowIds(magick_windows,number_windows);
+      XInitializeMagickWindows(windows,magick_windows,&number_windows);
     }
   XLoadAnimateFont(display,resource_info,windows);
   /*
