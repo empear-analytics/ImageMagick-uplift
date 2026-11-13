@@ -1697,6 +1697,69 @@ static void GetBasePathSansCompressExtension(const char *path,
     GetPathComponent(path,BasePath,component);
 }
 
+static void SelectPathHeadComponent(char *component,PathType type,char *p)
+{
+  switch (type)
+  {
+    case RootPath:
+    {
+      if (*component != '\0')
+        {
+          RemoveRootExtension(component);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case HeadPath:
+    {
+      *p='\0';
+      break;
+    }
+    case TailPath:
+    {
+      if (IsBasenameSeparator(*p) != MagickFalse)
+        (void) CopyMagickString(component,p+1,MagickPathExtent);
+      break;
+    }
+    case SubcanonicalPath:
+    case CanonicalPath:
+    case UndefinedPath:
+      break;
+    default:
+      break;
+  }
+}
+
+static void SelectPathTailComponent(const char *path,PathType type,
+  char *component,char *p)
+{
+  switch (type)
+  {
+    case BasePath:
+    {
+      if (IsBasenameSeparator(*p) != MagickFalse)
+        (void) CopyMagickString(component,p+1,MagickPathExtent);
+      RemoveBaseExtension(component);
+      break;
+    }
+    case BasePathSansCompressExtension:
+    {
+      GetBasePathSansCompressExtension(path,component);
+      break;
+    }
+    case ExtensionPath:
+    {
+      GetExtensionComponent(component,p);
+      break;
+    }
+    default:
+    {
+      SelectPathHeadComponent(component,type,p);
+      break;
+    }
+  }
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1739,41 +1802,9 @@ MagickExport void GetPathComponent(const char *path,PathType type,
         *component='\0';
       break;
     }
-    case RootPath:
+    default:
     {
-      if (*component != '\0')
-        {
-          RemoveRootExtension(component);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case HeadPath:
-    {
-      *p='\0';
-      break;
-    }
-    case TailPath:
-    {
-      if (IsBasenameSeparator(*p) != MagickFalse)
-        (void) CopyMagickString(component,p+1,MagickPathExtent);
-      break;
-    }
-    case BasePath:
-    {
-      if (IsBasenameSeparator(*p) != MagickFalse)
-        (void) CopyMagickString(component,p+1,MagickPathExtent);
-      RemoveBaseExtension(component);
-      break;
-    }
-    case BasePathSansCompressExtension:
-    {
-      GetBasePathSansCompressExtension(path,component);
-      break;
-    }
-    case ExtensionPath:
-    {
-      GetExtensionComponent(component,p);
+      SelectPathTailComponent(path,type,component,p);
       break;
     }
     case SubimagePath:
@@ -1783,10 +1814,6 @@ MagickExport void GetPathComponent(const char *path,PathType type,
         (void) CopyMagickString(component,path+subimage_offset,subimage_length);
       break;
     }
-    case SubcanonicalPath:
-    case CanonicalPath:
-    case UndefinedPath:
-      break;
   }
 }
 
