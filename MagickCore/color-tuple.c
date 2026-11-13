@@ -193,6 +193,22 @@ static void SelectIndexComponent(const PixelInfo *pixel,
   }
 }
 
+static void SetBlueComponent(const PixelInfo *pixel,double *color,
+  double *scale)
+{
+  *color=pixel->blue;
+  if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
+    *scale=100.0f;
+  if (pixel->colorspace == LabColorspace)
+    (*color)-=QuantumRange/2.0;
+  if (IsLCHColorspace(pixel->colorspace) != MagickFalse)
+    (*color)*=360.0/255.0;
+  if (pixel->colorspace == XYZColorspace)
+    (*color)/=2.55;
+  if (pixel->colorspace == OklchColorspace)
+    *scale=1.0;
+}
+
 static void SelectBlueComponent(const PixelInfo *pixel,
   const PixelChannel channel,double *color,double *scale)
 {
@@ -200,17 +216,7 @@ static void SelectBlueComponent(const PixelInfo *pixel,
   {
     case BluePixelChannel:
     {
-      *color=pixel->blue;
-      if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
-        *scale=100.0f;
-      if (pixel->colorspace == LabColorspace)
-        (*color)-=QuantumRange/2.0;
-      if (IsLCHColorspace(pixel->colorspace) != MagickFalse)
-        (*color)*=360.0/255.0;
-      if (pixel->colorspace == XYZColorspace)
-        (*color)/=2.55;
-      if (pixel->colorspace == OklchColorspace)
-        *scale=1.0;
+      SetBlueComponent(pixel,color,scale);
       break;
     }
     default:
