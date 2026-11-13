@@ -559,13 +559,20 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
 %    o image: the image sequence.
 %
 */
-MagickExport Image *DestroyImageList(Image *images)
+static MagickBooleanType IsImageListEntry(const Image *images)
 {
   if (images == (Image *) NULL)
-    return((Image *) NULL);
+    return(MagickFalse);
   assert(images->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
+  return(MagickTrue);
+}
+
+MagickExport Image *DestroyImageList(Image *images)
+{
+  if (IsImageListEntry(images) == MagickFalse)
+    return((Image *) NULL);
   while (images != (Image *) NULL)
     DeleteImageFromList(&images);
   return((Image *) NULL);
