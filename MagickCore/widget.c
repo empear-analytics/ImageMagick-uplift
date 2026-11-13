@@ -13045,6 +13045,22 @@ static void InitializeListBrowserText(const ListBrowserContext *context,
   (*state)&=(unsigned int) (~UpdateConfigurationState);
 }
 
+static void UpdateListBrowserLayout(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      InitializeListBrowserButtons(context,widgets);
+      InitializeListBrowserReply(context,widgets);
+      InitializeListBrowserScroll(context,widgets);
+      InitializeListBrowserList(context,widgets);
+      InitializeListBrowserText(context,widgets);
+    }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13197,14 +13213,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   list_context.query=query;
   do
   {
-    if (state & UpdateConfigurationState)
-      {
-        InitializeListBrowserButtons(&list_context,&list_widgets);
-        InitializeListBrowserReply(&list_context,&list_widgets);
-        InitializeListBrowserScroll(&list_context,&list_widgets);
-        InitializeListBrowserList(&list_context,&list_widgets);
-        InitializeListBrowserText(&list_context,&list_widgets);
-      }
+    UpdateListBrowserLayout(&list_context,&list_widgets);
     if (state & RedrawWidgetState)
       {
         /*
