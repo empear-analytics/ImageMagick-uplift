@@ -820,15 +820,87 @@ static void XDestroyFailedFileList(const MagickStatusType status,
     }
 }
 
+static MagickBooleanType XOpenAnimateFiles(const AnimateCommandTile *tile,
+  Image **nexus)
+{
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  MagickStatusType
+    *const state = tile->state;
+
+  char
+    **filelist;
+
+  Image
+    *images;
+
+  int
+    number_files;
+
+  MagickStatusType
+    status;
+
+  static char
+    filenames[MagickPathExtent] = "*";
+
+  if (resource_info->immutable != MagickFalse)
+    return(MagickTrue);
+  /*
+    Request file name from user.
+  */
+  XFileBrowserWidget(display,windows,"Animate",filenames);
+  if (*filenames == '\0')
+    return(MagickFalse);
+  /*
+    Expand the filenames.
+  */
+  filelist=(char **) AcquireMagickMemory(sizeof(char *));
+  if (filelist == (char **) NULL)
+    {
+      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+        filenames);
+      return(MagickFalse);
+    }
+  number_files=1;
+  filelist[0]=filenames;
+  status=ExpandFilenames(&number_files,&filelist);
+  XDestroyFailedFileList(status,filelist,number_files);
+  if (number_files == 0)
+    {
+      ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
+      return(MagickFalse);
+    }
+  if (status == MagickFalse)
+    {
+      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+        filenames);
+      return(MagickFalse);
+    }
+  images=XReadImageFileList(tile,filelist,number_files);
+  if (images == (Image *) NULL)
+    {
+      XSetCursorState(display,windows,MagickFalse);
+      ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
+      return(MagickFalse);
+    }
+  (*nexus)=GetFirstImageInList(images);
+  *state|=ExitState;
+  return(MagickTrue);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const AnimateCommand animate_command,Image **image,
   MagickStatusType *state,ExceptionInfo *exception)
 {
   Image
     *nexus;
-
-  MagickStatusType
-    status;
 
   const AnimateCommandTile
     tile = { display, resource_info, windows, image, state, exception };
@@ -841,60 +913,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   {
     case OpenCommand:
     {
-      char
-        **filelist;
-
-      Image
-        *images;
-
-      int
-        number_files;
-
-      static char
-        filenames[MagickPathExtent] = "*";
-
-      if (resource_info->immutable != MagickFalse)
-        break;
-      /*
-        Request file name from user.
-      */
-      XFileBrowserWidget(display,windows,"Animate",filenames);
-      if (*filenames == '\0')
+      if (XOpenAnimateFiles(&tile,&nexus) == MagickFalse)
         return((Image *) NULL);
-      /*
-        Expand the filenames.
-      */
-      filelist=(char **) AcquireMagickMemory(sizeof(char *));
-      if (filelist == (char **) NULL)
-        {
-          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-            filenames);
-          return((Image *) NULL);
-        }
-      number_files=1;
-      filelist[0]=filenames;
-      status=ExpandFilenames(&number_files,&filelist);
-      XDestroyFailedFileList(status,filelist,number_files);
-      if (number_files == 0)
-        {
-          ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
-          return((Image *) NULL);
-        }
-      if (status == MagickFalse)
-        {
-          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-            filenames);
-          return((Image *) NULL);
-        }
-      images=XReadImageFileList(&tile,filelist,number_files);
-      if (images == (Image *) NULL)
-        {
-          XSetCursorState(display,windows,MagickFalse);
-          ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
-          return((Image *) NULL);
-        }
-      nexus=GetFirstImageInList(images);
-      *state|=ExitState;
       break;
     }
     default:
