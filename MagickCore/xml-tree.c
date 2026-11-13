@@ -1102,15 +1102,21 @@ static void AppendUTF8Character(char *utf8,const int c,ssize_t *j)
   *j=WriteUTF8Bytes(utf8,*j,c);
 }
 
+static int ReadUTF16Unit(const char *content,const ssize_t i,
+  const int encoding)
+{
+  return((encoding != 0) ? ((content[i] & 0xff) << 8) |
+    (content[i+1] & 0xff) : ((content[i+1] & 0xff) << 8) |
+    (content[i] & 0xff));
+}
+
 static int CombineUTF16Surrogates(const char *content,const ssize_t i,
   const int encoding,int c)
 {
   int
     byte;
 
-  byte=(encoding != 0) ? ((content[i] & 0xff) << 8) |
-    (content[i+1] & 0xff) : ((content[i+1] & 0xff) << 8) |
-    (content[i] & 0xff);
+  byte=ReadUTF16Unit(content,i,encoding);
   c=(((c & 0x3ff) << 10) | (byte & 0x3ff))+0x10000;
   return(c);
 }
@@ -1148,8 +1154,7 @@ static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
   extent=(*length);
   for (i=2; i < (ssize_t) (*length-1); i+=2)
   {
-    c=(encoding != 0) ? ((content[i] & 0xff) << 8) | (content[i+1] & 0xff) :
-      ((content[i+1] & 0xff) << 8) | (content[i] & 0xff);
+    c=ReadUTF16Unit(content,i,encoding);
     if ((c >= 0xd800) && (c <= 0xdfff) && ((i+=2) < (ssize_t) (*length-1)))
       {
         c=CombineUTF16Surrogates(content,i,encoding,c);
