@@ -1851,9 +1851,6 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   FeatureMatrixInputs
     matrix;
 
-  TextureFeatureState
-    state;
-
   FeatureStatistics
     **cooccurrence,
     correlation,
@@ -2071,23 +2068,14 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Compute more texture features.
   */
-  state.image=image;
-  state.channel_features=channel_features;
-  state.cooccurrence=cooccurrence;
-  state.density_x=density_x;
-  state.density_xy=density_xy;
-  state.density_y=density_y;
-  state.Q=Q;
-  state.sum=sum;
-  state.number_grays=number_grays;
-  state.correlation=correlation;
-  state.entropy_x=entropy_x;
-  state.entropy_xy=entropy_xy;
-  state.entropy_xy1=entropy_xy1;
-  state.entropy_xy2=entropy_xy2;
-  state.entropy_y=entropy_y;
-  state.mean=mean;
-  ComputeDifferenceAndContrastFeatures(&state,status);
+  {
+    const TextureFeatureState
+      state = { image, channel_features, cooccurrence, density_x, density_xy,
+        density_y, Q, sum, number_grays, correlation, entropy_x, entropy_xy,
+        entropy_xy1, entropy_xy2, entropy_y, mean };
+
+    ComputeDifferenceAndContrastFeatures(&state,status);
+  }
   /*
     Relinquish resources.
   */
