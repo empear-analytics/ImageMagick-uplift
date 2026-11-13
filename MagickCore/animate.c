@@ -239,12 +239,32 @@ typedef enum
 #define ShadowWidth  8
 #define ShadowHeight  8
 
+typedef struct _AnimateCommandTile
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  MagickStatusType
+    *state;
+
+  ExceptionInfo
+    *exception;
+} AnimateCommandTile;
+
 /*
   Forward declarations.
 */
 static Image
-  *XMagickCommand(Display *,XResourceInfo *,XWindows *,const AnimateCommand,
-    Image **,MagickStatusType *,ExceptionInfo *);
+  *XMagickCommand(const AnimateCommandTile *,const AnimateCommand);
 
 static MagickBooleanType
   XSaveImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *);
@@ -345,26 +365,18 @@ MagickExport MagickBooleanType AnimateImages(const ImageInfo *image_info,
 %
 %  The format of the XMagickCommand method is:
 %
-%      Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
-%        XWindows *windows,const AnimateCommand animate_command,Image **image,
-%        MagickStatusType *state,ExceptionInfo *exception)
+%      Image *XMagickCommand(const AnimateCommandTile *tile,
+%        const AnimateCommand animate_command)
 %
 %  A description of each parameter follows:
 %
-%    o display: Specifies a connection to an X server; returned from
-%      XOpenDisplay.
-%
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
-%
-%    o windows: Specifies a pointer to a XWindows structure.
-%
-%    o image: the image;  XMagickCommand
-%      may transform the image and return a new image pointer.
-%
-%    o state: Specifies a MagickStatusType;  XMagickCommand may return a
-%      modified state.
-%
-%    o exception: return any errors or warnings in this structure.
+%    o tile: holds the display (a connection to an X server; returned from
+%      XOpenDisplay), the resource_info (a pointer to a X11 XResourceInfo
+%      structure), the windows (a pointer to a XWindows structure), the image
+%      (XMagickCommand may transform the image and return a new image
+%      pointer), the state (a MagickStatusType;  XMagickCommand may return a
+%      modified state) and the exception (return any errors or warnings in
+%      this structure).
 %
 %
 */
@@ -404,27 +416,6 @@ static void XRemoteBrowseDocumentation(Display *display,XWindows *windows,
     (int) strlen(command));
   XSetCursorState(display,windows,MagickFalse);
 }
-
-typedef struct _AnimateCommandTile
-{
-  Display
-    *display;
-
-  XResourceInfo
-    *resource_info;
-
-  XWindows
-    *windows;
-
-  Image
-    **image;
-
-  MagickStatusType
-    *state;
-
-  ExceptionInfo
-    *exception;
-} AnimateCommandTile;
 
 static void XVersionQuitCommand(const AnimateCommandTile *tile,
   const AnimateCommand animate_command)
@@ -820,18 +811,86 @@ static void XDestroyFailedFileList(const MagickStatusType status,
     }
 }
 
-static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
-  XWindows *windows,const AnimateCommand animate_command,Image **image,
-  MagickStatusType *state,ExceptionInfo *exception)
+static MagickBooleanType XOpenAnimateFiles(const AnimateCommandTile *tile,
+  Image **nexus)
 {
+  Display
+    *const display = tile->display;
+
+  XResourceInfo
+    *const resource_info = tile->resource_info;
+
+  XWindows
+    *const windows = tile->windows;
+
+  MagickStatusType
+    *const state = tile->state;
+
+  char
+    **filelist;
+
   Image
-    *nexus;
+    *images;
+
+  int
+    number_files;
 
   MagickStatusType
     status;
 
-  const AnimateCommandTile
-    tile = { display, resource_info, windows, image, state, exception };
+  static char
+    filenames[MagickPathExtent] = "*";
+
+  if (resource_info->immutable != MagickFalse)
+    return(MagickTrue);
+  /*
+    Request file name from user.
+  */
+  XFileBrowserWidget(display,windows,"Animate",filenames);
+  if (*filenames == '\0')
+    return(MagickFalse);
+  /*
+    Expand the filenames.
+  */
+  filelist=(char **) AcquireMagickMemory(sizeof(char *));
+  if (filelist == (char **) NULL)
+    {
+      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+        filenames);
+      return(MagickFalse);
+    }
+  number_files=1;
+  filelist[0]=filenames;
+  status=ExpandFilenames(&number_files,&filelist);
+  XDestroyFailedFileList(status,filelist,number_files);
+  if (number_files == 0)
+    {
+      ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
+      return(MagickFalse);
+    }
+  if (status == MagickFalse)
+    {
+      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+        filenames);
+      return(MagickFalse);
+    }
+  images=XReadImageFileList(tile,filelist,number_files);
+  if (images == (Image *) NULL)
+    {
+      XSetCursorState(display,windows,MagickFalse);
+      ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
+      return(MagickFalse);
+    }
+  (*nexus)=GetFirstImageInList(images);
+  *state|=ExitState;
+  return(MagickTrue);
+}
+
+static Image *XMagickCommand(const AnimateCommandTile *tile,
+  const AnimateCommand animate_command)
+{
+  Image
+    *nexus;
 
   /*
     Process user command.
@@ -841,65 +900,13 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   {
     case OpenCommand:
     {
-      char
-        **filelist;
-
-      Image
-        *images;
-
-      int
-        number_files;
-
-      static char
-        filenames[MagickPathExtent] = "*";
-
-      if (resource_info->immutable != MagickFalse)
-        break;
-      /*
-        Request file name from user.
-      */
-      XFileBrowserWidget(display,windows,"Animate",filenames);
-      if (*filenames == '\0')
+      if (XOpenAnimateFiles(tile,&nexus) == MagickFalse)
         return((Image *) NULL);
-      /*
-        Expand the filenames.
-      */
-      filelist=(char **) AcquireMagickMemory(sizeof(char *));
-      if (filelist == (char **) NULL)
-        {
-          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-            filenames);
-          return((Image *) NULL);
-        }
-      number_files=1;
-      filelist[0]=filenames;
-      status=ExpandFilenames(&number_files,&filelist);
-      XDestroyFailedFileList(status,filelist,number_files);
-      if (number_files == 0)
-        {
-          ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
-          return((Image *) NULL);
-        }
-      if (status == MagickFalse)
-        {
-          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-            filenames);
-          return((Image *) NULL);
-        }
-      images=XReadImageFileList(&tile,filelist,number_files);
-      if (images == (Image *) NULL)
-        {
-          XSetCursorState(display,windows,MagickFalse);
-          ThrowXWindowException(ImageError,"NoImagesWereLoaded",filenames);
-          return((Image *) NULL);
-        }
-      nexus=GetFirstImageInList(images);
-      *state|=ExitState;
       break;
     }
     default:
     {
-      XPlayCommand(&tile,animate_command);
+      XPlayCommand(tile,animate_command);
       break;
     }
   }
@@ -2018,13 +2025,15 @@ static void XMapAnimateImageWindow(const AnimateImageWindow *image_window,
   ExceptionInfo
     *const exception = image_window->exception;
 
+  const AnimateCommandTile
+    tile = { display, resource_info, windows, image, state, exception };
+
   if (windows->backdrop.id != (Window) NULL)
     (void) XInstallColormap(display,map_info->colormap);
   if (LocaleCompare(image_list[0]->magick,"LOGO") == 0)
     {
       if (LocaleCompare(display_image->filename,"LOGO") == 0)
-        (*nexus)=XMagickCommand(display,resource_info,windows,
-          OpenCommand,&(*image),&(*state),exception);
+        (*nexus)=XMagickCommand(&tile,OpenCommand);
       else
         (*state)|=ExitState;
     }
@@ -3212,6 +3221,9 @@ static void XRunCommandWidget(const AnimateCommandWidget *command_widget,
   AnimateCommand
     animate_command;
 
+  AnimateCommandTile
+    tile;
+
   AnimateMenuSelection
     menu_selection;
 
@@ -3235,9 +3247,15 @@ static void XRunCommandWidget(const AnimateCommandWidget *command_widget,
       &animate_command) == MagickFalse)
     return;
   if (animate_command != NullCommand)
-    (*nexus)=XMagickCommand(command_widget->display,
-      command_widget->resource_info,command_widget->windows,animate_command,
-      &(*image),&(*state),command_widget->exception);
+    {
+      tile.display=command_widget->display;
+      tile.resource_info=command_widget->resource_info;
+      tile.windows=command_widget->windows;
+      tile.image=image;
+      tile.state=state;
+      tile.exception=command_widget->exception;
+      (*nexus)=XMagickCommand(&tile,animate_command);
+    }
 }
 
 static void XHandleConfigureNotify(Display *display,
@@ -3733,6 +3751,9 @@ static void XHandleKeyPress(const AnimateEventContext *event_context,
   Image
     **const nexus = targets->nexus;
 
+  const AnimateCommandTile
+    tile = { display, resource_info, windows, image, state, exception };
+
   AnimateCommand
     animate_command;
 
@@ -3769,8 +3790,7 @@ static void XHandleKeyPress(const AnimateEventContext *event_context,
     }
   }
   if (animate_command != NullCommand)
-    (*nexus)=XMagickCommand(display,resource_info,windows,
-      animate_command,image,state,exception);
+    (*nexus)=XMagickCommand(&tile,animate_command);
 }
 
 static void XLogButtonRelease(XResourceInfo *resource_info,const XEvent event)
@@ -5444,14 +5464,16 @@ static Image *XRunAnimateLoop(const AnimateEventContext *event_context,
     play_targets = { &scene, &iterations, &state, &image, &first_scene,
       event };
 
+  const AnimateCommandTile
+    tile = { display, resource_info, windows, images, (&state), exception };
+
   nexus=NewImageList();
   scene=0;
   first_scene=0;
   iterations=0;
   image=image_list[0];
   state=(MagickStatusType) (ForwardAnimationState | RepeatAnimationState);
-  (void) XMagickCommand(display,resource_info,windows,PlayCommand,images,
-    &state,exception);
+  (void) XMagickCommand(&tile,PlayCommand);
   do
   {
     if (IsAnimationStep(display,state) != MagickFalse)
@@ -5558,32 +5580,164 @@ static void XInitializeMagickWindows(XWindows *windows,
   XClearMagickWindowIds(magick_windows,(*number_windows));
 }
 
-MagickExport Image *XAnimateImages(Display *display,
-  XResourceInfo *resource_info,char **argv,const int argc,Image *images,
-  ExceptionInfo *exception)
+typedef struct _AnimateRunInputs
 {
   Image
-    *display_image,
-    **image_list,
+    **image_list;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    *images,
     *nexus;
+
+  WarningHandler
+    warning_handler;
+
+  char
+    *working_directory;
+
+  XWindowInfo
+    **magick_windows;
+
+  size_t
+    number_windows;
+} AnimateRunInputs;
+
+static Image *XRunAnimateSession(const AnimateWindowSetup *setup,
+  const AnimateRunInputs *inputs)
+{
+  Display
+    *const display = setup->display;
+
+  ExceptionInfo
+    *const exception = inputs->exception;
+
+  Image
+    *images = inputs->images,
+    *nexus = inputs->nexus;
 
   MagickStatusType
     context_mask;
 
-  static char
-    working_directory[MagickPathExtent];
+  WarningHandler
+    warning_handler = inputs->warning_handler;
 
-  static size_t
-    number_windows;
+  XEvent
+    event;
 
-  static XWindowInfo
-    *magick_windows[MaXWindows];
+  XGCValues
+    context_values;
 
-  size_t
-    number_scenes;
+  XResourceInfo
+    *const resource_info = setup->resource_info;
+
+  XWindows
+    *const windows = setup->windows;
+
+  AnimateExitInfo
+    exit_info;
+
+  XCreateContextWindow(setup);
+  XCreateGraphicContexts(setup,images->filename,&context_values,
+    &context_mask);
+  XCreateIconWindow(setup);
+  /*
+    Initialize graphic context for icon window.
+  */
+  XCreateIconContext(setup,images->filename,&context_values);
+  /*
+    Initialize Image window.
+  */
+  XCreateImageWindowInfo(setup,exception);
+  XCreateBackdropWindow(setup);
+  XCreateImageWindow(setup);
+  XCreateInfoWindow(setup);
+  XCreateCommandWindow(setup);
+  /*
+    Initialize Widget window.
+  */
+  XCreatePanelWindows(setup);
+  /*
+    Set out progress and warning handlers.
+  */
+  warning_handler=XSetAnimateWarningHandlers(resource_info,warning_handler);
+  /*
+    Initialize X image structure.
+  */
+  XCreateImagePixmaps(setup,images->filename);
+  XSetCursorState(display,windows,MagickTrue);
+  {
+    const AnimateEventContext
+      event_context = { display, resource_info, windows, setup->visual_info,
+        setup->map_info, inputs->image_list, setup->display_image, exception,
+        setup->icon_resources, setup->icon_visual, setup->icon_map,
+        setup->icon_pixel, CommandMenu, setup->pixel, context_mask,
+        setup->root_window, inputs->magick_windows, inputs->number_windows,
+        setup->number_scenes };
+
+    XCreateSceneWindows(&event_context,images,&event);
+    XSetCursorState(display,windows,MagickFalse);
+    if (windows->command.mapped)
+      (void) XMapRaised(display,windows->command.id);
+    /*
+      Respond to events.
+    */
+    nexus=XRunAnimateLoop(&event_context,&images,&context_values,&event);
+    exit_info.images=images;
+    exit_info.warning_handler=warning_handler;
+    exit_info.working_directory=inputs->working_directory;
+    return(XFinishAnimation(&event_context,setup,&exit_info,nexus));
+  }
+}
+
+typedef struct _AnimateStartInputs
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  char
+    **argv;
+
+  int
+    argc;
+
+  XWindows
+    *windows;
+
+  Image
+    *images;
+
+  ExceptionInfo
+    *exception;
 
   WarningHandler
     warning_handler;
+
+  char
+    *working_directory;
+
+  XWindowInfo
+    **magick_windows;
+
+  size_t
+    number_windows;
+
+  XVisualInfo
+    *visual_info;
+
+  XStandardColormap
+    *map_info;
+
+  XPixelInfo
+    *pixel;
+
+  XFontStruct
+    *font_info;
 
   Window
     root_window;
@@ -5591,14 +5745,131 @@ MagickExport Image *XAnimateImages(Display *display,
   XClassHint
     *class_hints;
 
-  XEvent
-    event;
+  XWMHints
+    *manager_hints;
+
+  XResourceInfo
+    *icon_resources;
+
+  XVisualInfo
+    *icon_visual;
+
+  XStandardColormap
+    *icon_map;
+
+  XPixelInfo
+    *icon_pixel;
+} AnimateStartInputs;
+
+static Image *XStartAnimateSession(const AnimateStartInputs *start)
+{
+  Display
+    *const display = start->display;
+
+  ExceptionInfo
+    *const exception = start->exception;
+
+  Image
+    *display_image,
+    **image_list,
+    *images = start->images,
+    *nexus;
+
+  size_t
+    number_scenes;
+
+  XResourceInfo
+    *const resource_info = start->resource_info;
+
+  AnimateSceneList
+    scene_list;
+
+  images=XCoalesceAnimateImages(images,exception);
+  XRemapColormapMismatch(resource_info,start->visual_info,images,exception);
+  /*
+    Sort images by increasing scene number.
+  */
+  number_scenes=GetImageListLength(images);
+  image_list=XSortAnimateScenes(images,number_scenes,exception);
+  /*
+    Initialize Standard Colormap.
+  */
+  nexus=NewImageList();
+  scene_list.resource_info=resource_info;
+  scene_list.visual_info=start->visual_info;
+  scene_list.image_list=image_list;
+  scene_list.number_scenes=number_scenes;
+  scene_list.exception=exception;
+  display_image=XPrepareSceneImages(&scene_list);
+  XLogDisplayImage(resource_info,display_image);
+  XMakeStandardColormap(display,start->visual_info,resource_info,display_image,
+    start->map_info,start->pixel,exception);
+  {
+    const AnimateWindowSetup
+      setup = { display, resource_info, start->windows, start->visual_info,
+        start->map_info, start->pixel, start->font_info, start->root_window,
+        start->class_hints, start->manager_hints, start->argv, start->argc,
+        start->icon_resources, start->icon_visual, start->icon_map,
+        start->icon_pixel, display_image, number_scenes };
+
+    const AnimateRunInputs
+      inputs = { image_list, exception, images, nexus, start->warning_handler,
+        start->working_directory, start->magick_windows,
+        start->number_windows };
+
+    return(XRunAnimateSession(&setup,&inputs));
+  }
+}
+
+typedef struct _AnimateWindowInputs
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  char
+    **argv;
+
+  int
+    argc;
+
+  XWindows
+    *windows;
+
+  Image
+    *images;
+
+  ExceptionInfo
+    *exception;
+
+  WarningHandler
+    warning_handler;
+
+  char
+    *working_directory;
+
+  XWindowInfo
+    **magick_windows;
+
+  size_t
+    number_windows;
+} AnimateWindowInputs;
+
+static Image *XBindAnimateWindows(const AnimateWindowInputs *window_inputs)
+{
+  Display
+    *const display = window_inputs->display;
+
+  Window
+    root_window;
+
+  XClassHint
+    *class_hints;
 
   XFontStruct
     *font_info;
-
-  XGCValues
-    context_values;
 
   XPixelInfo
     *icon_pixel,
@@ -5616,22 +5887,60 @@ MagickExport Image *XAnimateImages(Display *display,
     *visual_info;
 
   XWindows
-    *windows;
+    *const windows = window_inputs->windows;
 
   XWMHints
     *manager_hints;
 
-  AnimateEventContext
-    event_context;
+  /*
+    Initialize Standard Colormap.
+  */
+  map_info=windows->map_info;
+  icon_map=windows->icon_map;
+  visual_info=windows->visual_info;
+  icon_visual=windows->icon_visual;
+  pixel=windows->pixel_info;
+  icon_pixel=windows->icon_pixel;
+  font_info=windows->font_info;
+  icon_resources=windows->icon_resources;
+  class_hints=windows->class_hints;
+  manager_hints=windows->manager_hints;
+  root_window=XRootWindow(display,visual_info->screen);
+  {
+    const AnimateStartInputs
+      start = { display, window_inputs->resource_info, window_inputs->argv,
+        window_inputs->argc, windows, window_inputs->images,
+        window_inputs->exception, window_inputs->warning_handler,
+        window_inputs->working_directory, window_inputs->magick_windows,
+        window_inputs->number_windows, visual_info, map_info, pixel, font_info,
+        root_window, class_hints, manager_hints, icon_resources, icon_visual,
+        icon_map, icon_pixel };
 
-  AnimateSceneList
-    scene_list;
+    return(XStartAnimateSession(&start));
+  }
+}
 
-  AnimateWindowSetup
-    setup;
+MagickExport Image *XAnimateImages(Display *display,
+  XResourceInfo *resource_info,char **argv,const int argc,Image *images,
+  ExceptionInfo *exception)
+{
+  static char
+    working_directory[MagickPathExtent];
 
-  AnimateExitInfo
-    exit_info;
+  static size_t
+    number_windows;
+
+  static XWindowInfo
+    *magick_windows[MaXWindows];
+
+  WarningHandler
+    warning_handler;
+
+  XWindows
+    *windows;
+
+  AnimateWindowInputs
+    window_inputs;
 
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
@@ -5653,118 +5962,18 @@ MagickExport Image *XAnimateImages(Display *display,
       XInitializeMagickWindows(windows,magick_windows,&number_windows);
     }
   XLoadAnimateFont(display,resource_info,windows);
-  /*
-    Initialize Standard Colormap.
-  */
-  map_info=windows->map_info;
-  icon_map=windows->icon_map;
-  visual_info=windows->visual_info;
-  icon_visual=windows->icon_visual;
-  pixel=windows->pixel_info;
-  icon_pixel=windows->icon_pixel;
-  font_info=windows->font_info;
-  icon_resources=windows->icon_resources;
-  class_hints=windows->class_hints;
-  manager_hints=windows->manager_hints;
-  root_window=XRootWindow(display,visual_info->screen);
-  images=XCoalesceAnimateImages(images,exception);
-  XRemapColormapMismatch(resource_info,visual_info,images,exception);
-  /*
-    Sort images by increasing scene number.
-  */
-  number_scenes=GetImageListLength(images);
-  image_list=XSortAnimateScenes(images,number_scenes,exception);
-  /*
-    Initialize Standard Colormap.
-  */
-  nexus=NewImageList();
-  scene_list.resource_info=resource_info;
-  scene_list.visual_info=visual_info;
-  scene_list.image_list=image_list;
-  scene_list.number_scenes=number_scenes;
-  scene_list.exception=exception;
-  display_image=XPrepareSceneImages(&scene_list);
-  XLogDisplayImage(resource_info,display_image);
-  XMakeStandardColormap(display,visual_info,resource_info,display_image,
-    map_info,pixel,exception);
-  setup.display=display;
-  setup.resource_info=resource_info;
-  setup.windows=windows;
-  setup.visual_info=visual_info;
-  setup.map_info=map_info;
-  setup.pixel=pixel;
-  setup.font_info=font_info;
-  setup.root_window=root_window;
-  setup.class_hints=class_hints;
-  setup.manager_hints=manager_hints;
-  setup.argv=argv;
-  setup.argc=argc;
-  setup.icon_resources=icon_resources;
-  setup.icon_visual=icon_visual;
-  setup.icon_map=icon_map;
-  setup.icon_pixel=icon_pixel;
-  setup.display_image=display_image;
-  setup.number_scenes=number_scenes;
-  XCreateContextWindow(&setup);
-  XCreateGraphicContexts(&setup,images->filename,&context_values,
-    &context_mask);
-  XCreateIconWindow(&setup);
-  /*
-    Initialize graphic context for icon window.
-  */
-  XCreateIconContext(&setup,images->filename,&context_values);
-  /*
-    Initialize Image window.
-  */
-  XCreateImageWindowInfo(&setup,exception);
-  XCreateBackdropWindow(&setup);
-  XCreateImageWindow(&setup);
-  XCreateInfoWindow(&setup);
-  XCreateCommandWindow(&setup);
-  /*
-    Initialize Widget window.
-  */
-  XCreatePanelWindows(&setup);
-  /*
-    Set out progress and warning handlers.
-  */
-  warning_handler=XSetAnimateWarningHandlers(resource_info,warning_handler);
-  /*
-    Initialize X image structure.
-  */
-  XCreateImagePixmaps(&setup,images->filename);
-  XSetCursorState(display,windows,MagickTrue);
-  event_context.display=display;
-  event_context.resource_info=resource_info;
-  event_context.windows=windows;
-  event_context.visual_info=visual_info;
-  event_context.map_info=map_info;
-  event_context.image_list=image_list;
-  event_context.display_image=display_image;
-  event_context.exception=exception;
-  event_context.icon_resources=icon_resources;
-  event_context.icon_visual=icon_visual;
-  event_context.icon_map=icon_map;
-  event_context.icon_pixel=icon_pixel;
-  event_context.CommandMenu=CommandMenu;
-  event_context.pixel=pixel;
-  event_context.context_mask=context_mask;
-  event_context.root_window=root_window;
-  event_context.magick_windows=magick_windows;
-  event_context.number_windows=number_windows;
-  event_context.number_scenes=number_scenes;
-  XCreateSceneWindows(&event_context,images,&event);
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->command.mapped)
-    (void) XMapRaised(display,windows->command.id);
-  /*
-    Respond to events.
-  */
-  nexus=XRunAnimateLoop(&event_context,&images,&context_values,&event);
-  exit_info.images=images;
-  exit_info.warning_handler=warning_handler;
-  exit_info.working_directory=working_directory;
-  return(XFinishAnimation(&event_context,&setup,&exit_info,nexus));
+  window_inputs.display=display;
+  window_inputs.resource_info=resource_info;
+  window_inputs.argv=argv;
+  window_inputs.argc=argc;
+  window_inputs.windows=windows;
+  window_inputs.images=images;
+  window_inputs.exception=exception;
+  window_inputs.warning_handler=warning_handler;
+  window_inputs.working_directory=working_directory;
+  window_inputs.magick_windows=magick_windows;
+  window_inputs.number_windows=number_windows;
+  return(XBindAnimateWindows(&window_inputs));
 }
 
 /*
@@ -5885,12 +6094,46 @@ static MagickBooleanType XFinishSaveImage(Display *display,
   return(status != 0 ? MagickTrue : MagickFalse);
 }
 
-static MagickBooleanType XSaveImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image *image,
-  ExceptionInfo *exception)
+typedef struct _AnimateSaveInputs
 {
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
   char
-    filename[MagickPathExtent];
+    *filename;
+} AnimateSaveInputs;
+
+static MagickBooleanType XSaveImageFile(const AnimateSaveInputs *save)
+{
+  Display
+    *const display = save->display;
+
+  XResourceInfo
+    *const resource_info = save->resource_info;
+
+  XWindows
+    *const windows = save->windows;
+
+  Image
+    *const image = save->image;
+
+  ExceptionInfo
+    *const exception = save->exception;
+
+  char
+    *const filename = save->filename;
 
   ImageInfo
     *image_info;
@@ -5898,29 +6141,6 @@ static MagickBooleanType XSaveImage(Display *display,
   MagickStatusType
     status;
 
-  /*
-    Request file name from user.
-  */
-  if (resource_info->write_filename != (char *) NULL)
-    (void) CopyMagickString(filename,resource_info->write_filename,
-      MagickPathExtent);
-  else
-    XChangeToImageDirectory(image,filename,exception);
-  XFileBrowserWidget(display,windows,"Save",filename);
-  if (*filename == '\0')
-    return(MagickTrue);
-  if (IsPathAccessible(filename) != MagickFalse)
-    {
-      int
-        status;
-
-      /*
-        File exists-- seek user's permission before overwriting.
-      */
-      status=XConfirmWidget(display,windows,"Overwrite",filename);
-      if (status == 0)
-        return(MagickTrue);
-    }
   image_info=CloneImageInfo(resource_info->image_info);
   (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
   (void) SetImageInfo(image_info,1,exception);
@@ -5950,6 +6170,48 @@ static MagickBooleanType XSaveImage(Display *display,
   */
   status=XWriteSavedImages(image_info,image,filename,exception);
   return(XFinishSaveImage(display,windows,image_info,status));
+}
+
+static MagickBooleanType XSaveImage(Display *display,
+  XResourceInfo *resource_info,XWindows *windows,Image *image,
+  ExceptionInfo *exception)
+{
+  AnimateSaveInputs
+    save;
+
+  char
+    filename[MagickPathExtent];
+
+  /*
+    Request file name from user.
+  */
+  if (resource_info->write_filename != (char *) NULL)
+    (void) CopyMagickString(filename,resource_info->write_filename,
+      MagickPathExtent);
+  else
+    XChangeToImageDirectory(image,filename,exception);
+  XFileBrowserWidget(display,windows,"Save",filename);
+  if (*filename == '\0')
+    return(MagickTrue);
+  if (IsPathAccessible(filename) != MagickFalse)
+    {
+      int
+        status;
+
+      /*
+        File exists-- seek user's permission before overwriting.
+      */
+      status=XConfirmWidget(display,windows,"Overwrite",filename);
+      if (status == 0)
+        return(MagickTrue);
+    }
+  save.display=display;
+  save.resource_info=resource_info;
+  save.windows=windows;
+  save.image=image;
+  save.exception=exception;
+  save.filename=filename;
+  return(XSaveImageFile(&save));
 }
 #else
 
