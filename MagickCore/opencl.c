@@ -1063,6 +1063,39 @@ static MagickBooleanType SkipOpenCLBenchmarkMarkup(const char *keyword,
   return(MagickFalse);
 }
 
+static MagickBooleanType ReadOpenCLBenchmarkMarkup(
+  const OpenCLBenchmarkTokens *tokens,const char **q,
+  MagickCLDeviceBenchmark **device_benchmark,MagickBooleanType *broke)
+{
+  char
+    *const keyword = tokens->keyword,
+    *const token = tokens->token;
+
+  const size_t
+    extent = tokens->extent;
+
+  (*broke)=MagickFalse;
+  if (SkipOpenCLBenchmarkMarkup(keyword,extent,token,q) != MagickFalse)
+    return(MagickFalse);
+  if (LocaleCompare(keyword,"<device") == 0)
+    {
+      /*
+        Device element.
+      */
+      (*device_benchmark)=(MagickCLDeviceBenchmark *) AcquireQuantumMemory(1,
+        sizeof(**device_benchmark));
+      if ((*device_benchmark) == (MagickCLDeviceBenchmark *) NULL)
+        {
+          (*broke)=MagickTrue;
+          return(MagickTrue);
+        }
+      (void) memset((*device_benchmark),0,sizeof(**device_benchmark));
+      (*device_benchmark)->score=MAGICKCORE_OPENCL_UNDEFINED_SCORE;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -1071,6 +1104,9 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 
   const char
     *q;
+
+  MagickBooleanType
+    broke = MagickFalse;
 
   MagickCLDeviceBenchmark
     *device_benchmark;
@@ -1095,25 +1131,15 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (SkipOpenCLBenchmarkMarkup(keyword,extent,token,&q) != MagickFalse)
-      continue;
-    if (LocaleCompare(keyword,"<device") == 0)
-      {
-        /*
-          Device element.
-        */
-        device_benchmark=(MagickCLDeviceBenchmark *) AcquireQuantumMemory(1,
-          sizeof(*device_benchmark));
-        if (device_benchmark == (MagickCLDeviceBenchmark *) NULL)
-          break;
-        (void) memset(device_benchmark,0,sizeof(*device_benchmark));
-        device_benchmark->score=MAGICKCORE_OPENCL_UNDEFINED_SCORE;
-        continue;
-      }
     tokens.clEnv=clEnv;
     tokens.keyword=keyword;
     tokens.token=token;
     tokens.extent=extent;
+    if (ReadOpenCLBenchmarkMarkup(&tokens,&q,&device_benchmark,&broke) ==
+        MagickFalse)
+      continue;
+    if (broke != MagickFalse)
+      break;
     ReadOpenCLBenchmarkAttribute(&tokens,&device_benchmark,&q);
   }
   token=(char *) RelinquishMagickMemory(token);
