@@ -177,6 +177,27 @@ typedef struct _ChannelStatisticsReport
 %
 */
 
+static void UpdateLocationExtremum(const StatisticType type,
+  const Quantum *magick_restrict p,const ssize_t i,
+  ChannelStatistics *statistics)
+{
+  switch (type)
+  {
+    default:
+    {
+      if ((double) p[i] > statistics->maxima)
+        statistics->maxima=(double) p[i];
+      break;
+    }
+    case MinimumStatistic:
+    {
+      if ((double) p[i] < statistics->minima)
+        statistics->minima=(double) p[i];
+      break;
+    }
+  }
+}
+
 static void AccumulateLocationExtrema(const Image *image,
   const StatisticType type,const Quantum *magick_restrict p,
   ChannelStatistics *channel_statistics)
@@ -190,21 +211,7 @@ static void AccumulateLocationExtrema(const Image *image,
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     if (traits == UndefinedPixelTrait)
       continue;
-    switch (type)
-    {
-      default:
-      {
-        if ((double) p[i] > channel_statistics[channel].maxima)
-          channel_statistics[channel].maxima=(double) p[i];
-        break;
-      }
-      case MinimumStatistic:
-      {
-        if ((double) p[i] < channel_statistics[channel].minima)
-          channel_statistics[channel].minima=(double) p[i];
-        break;
-      }
-    }
+    UpdateLocationExtremum(type,p,i,&channel_statistics[channel]);
   }
 }
 
