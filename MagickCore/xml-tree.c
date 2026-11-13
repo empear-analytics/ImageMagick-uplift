@@ -1799,12 +1799,85 @@ static void DestroyParsedEntity(char **entities,const ssize_t i,char *v)
     entities[i+1]=DestroyString(entities[i+1]);
 }
 
+typedef struct _EntityValueInput
+{
+  XMLTreeRoot
+    *root;
+
+  char
+    *c,
+    *n,
+    *v,
+    q;
+
+  ExceptionInfo
+    *exception;
+} EntityValueInput;
+
+typedef struct _EntityValueTargets
+{
+  char
+    **xml,
+    ***predefined_entities;
+} EntityValueTargets;
+
+static MagickBooleanType AddEntityDeclaration(const EntityValueInput *input,
+  const EntityValueTargets *targets)
+{
+  char
+    **const xml = targets->xml,
+    ***const predefined_entities = targets->predefined_entities;
+
+  XMLTreeRoot
+    *const root = input->root;
+
+  char
+    *const c = input->c,
+    *const n = input->n,
+    *const v = input->v;
+
+  const char
+    q = input->q;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  char
+    **entities;
+
+  ssize_t
+    i;
+
+  entities=(*c == '%') ? (*predefined_entities) : root->entities;
+  i=CountXMLEntities(entities);
+  entities=(char **) ResizeQuantumMemory(entities,(size_t) (i+3),
+    sizeof(*entities));
+  if (entities == (char **) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  if (*c == '%')
+    (*predefined_entities)=entities;
+  else
+    root->entities=entities;
+  TerminateEntityValue(xml,v,q);
+  entities[i+1]=ParseEntities(v,(*predefined_entities),'%');
+  entities[i+2]=(char *) NULL;
+  if (IsNonCircularEntity(n,entities[i+1],entities) != MagickFalse)
+    entities[i]=n;
+  else
+    {
+      DestroyParsedEntity(entities,i,v);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","circular entity declaration %s",n);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
   char
     *c,
-    **entities,
     *n,
     **predefined_entities,
     q,
@@ -1813,8 +1886,11 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   EntityHeadTargets
     entity_targets;
 
-  ssize_t
-    i;
+  EntityValueInput
+    value_input;
+
+  EntityValueTargets
+    value_targets;
 
   n=(char *) NULL;
   predefined_entities=(char **) AcquireMagickMemory(sizeof(sentinel));
@@ -1847,26 +1923,16 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
             xml=strchr(xml,'>');
             continue;
           }
-        entities=(*c == '%') ? predefined_entities : root->entities;
-        i=CountXMLEntities(entities);
-        entities=(char **) ResizeQuantumMemory(entities,(size_t) (i+3),
-          sizeof(*entities));
-        if (entities == (char **) NULL)
-          ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-        if (*c == '%')
-          predefined_entities=entities;
-        else
-          root->entities=entities;
-        TerminateEntityValue(&xml,v,q);
-        entities[i+1]=ParseEntities(v,predefined_entities,'%');
-        entities[i+2]=(char *) NULL;
-        if (IsNonCircularEntity(n,entities[i+1],entities) != MagickFalse)
-          entities[i]=n;
-        else
+        value_input.root=root;
+        value_input.c=c;
+        value_input.n=n;
+        value_input.v=v;
+        value_input.q=q;
+        value_input.exception=exception;
+        value_targets.xml=(&xml);
+        value_targets.predefined_entities=(&predefined_entities);
+        if (AddEntityDeclaration(&value_input,&value_targets) == MagickFalse)
           {
-            DestroyParsedEntity(entities,i,v);
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              OptionWarning,"ParseError","circular entity declaration %s",n);
             predefined_entities=(char **) RelinquishMagickMemory(
               predefined_entities);
             return(MagickFalse);
