@@ -9431,6 +9431,48 @@ static void XDefineGrayScaleColors(const XColormapContext *context,
   (void) XStoreColors(context->display,(*colormap),(*colors),(int) context->image->colors);
 }
 
+static void XDefineStaticColors(const XColormapContext *context,
+  const XColormapTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  Image
+    *const image = context->image;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  size_t
+    *const number_colors = targets->number_colors;
+
+  XColor
+    **const colors = targets->colors;
+
+  Colormap
+    *const colormap = targets->colormap;
+
+  XStaticColorSource
+    static_source;
+
+  /*
+    Define Standard Colormap for StaticGray or StaticColor visual.
+  */
+  (*number_colors)=image->colors;
+  (*colors)=(XColor *) AcquireQuantumMemory((size_t)
+    visual_info->colormap_size,sizeof(*(*colors)));
+  if ((*colors) == (XColor *) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,
+      "UnableToCreateColormap",image->filename);
+  static_source.display=display;
+  static_source.visual_info=visual_info;
+  static_source.image=image;
+  (*colormap)=XAllocStaticColors(&static_source,(*colormap),pixel,(*colors));
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9496,22 +9538,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
     case StaticGray:
     case StaticColor:
     {
-      XStaticColorSource
-        static_source;
-
-      /*
-        Define Standard Colormap for StaticGray or StaticColor visual.
-      */
-      number_colors=image->colors;
-      colors=(XColor *) AcquireQuantumMemory((size_t)
-        visual_info->colormap_size,sizeof(*colors));
-      if (colors == (XColor *) NULL)
-        ThrowXWindowFatalException(ResourceLimitFatalError,
-          "UnableToCreateColormap",image->filename);
-      static_source.display=display;
-      static_source.visual_info=visual_info;
-      static_source.image=image;
-      colormap=XAllocStaticColors(&static_source,colormap,pixel,colors);
+      XDefineStaticColors(&context,&targets);
       break;
     }
     case GrayScale:
