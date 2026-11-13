@@ -9473,6 +9473,40 @@ static void XDefineStaticColors(const XColormapContext *context,
   (*colormap)=XAllocStaticColors(&static_source,(*colormap),pixel,(*colors));
 }
 
+static void XDefineTrueColors(const XColormapContext *context,
+  const Colormap colormap,const XColormapTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  Image
+    *const image = context->image;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  size_t
+    *const number_colors = targets->number_colors;
+
+  XColor
+    **const colors = targets->colors;
+
+  XTrueColorSource
+    source;
+
+
+  source.display=display;
+  source.visual_info=visual_info;
+  source.colormap=colormap;
+  source.map_info=map_info;
+  source.image=image;
+  XAllocateColorRamp(&source,number_colors,colors);
+  XStoreTrueColors(&source,(*colors),(*number_colors));
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9551,17 +9585,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
     case DirectColor:
     default:
     {
-      XTrueColorSource
-        source;
-
-
-      source.display=display;
-      source.visual_info=visual_info;
-      source.colormap=colormap;
-      source.map_info=map_info;
-      source.image=image;
-      XAllocateColorRamp(&source,&number_colors,&colors);
-      XStoreTrueColors(&source,colors,number_colors);
+      XDefineTrueColors(&context,colormap,&targets);
       break;
     }
   }
