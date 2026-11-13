@@ -1629,6 +1629,38 @@ static void XCreateBackgroundVisual(Display *display,const char *filename,
     }
 }
 
+static Image *XPrepareBackgroundImages(Display *display,Image *images,
+  ExceptionInfo *exception,const AnimateBackgroundEarlyTargets *targets)
+{
+  Image
+    *coalesce_image;
+
+  Window
+    *const root_window = targets->root_window;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  if ((*window_info).id == (*root_window))
+    XDestroyWindowColors(display,(*root_window));
+  coalesce_image=CoalesceImages(images,exception);
+  if (coalesce_image == (Image *) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
+      images->filename);
+  images=coalesce_image;
+  if ((*resources).map_type == (char *) NULL)
+    if (((*visual_info)->klass != TrueColor) &&
+        ((*visual_info)->klass != DirectColor))
+      XRemapBackgroundImages(images,(*visual_info),(*resources),exception);
+  return(images);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1636,7 +1668,6 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     visual_type[MagickPathExtent];
 
   Image
-    *coalesce_image,
     **image_list;
 
   size_t
@@ -1701,17 +1732,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   /*
     Free previous root colors.
   */
-  if (window_info.id == root_window)
-    XDestroyWindowColors(display,root_window);
-  coalesce_image=CoalesceImages(images,exception);
-  if (coalesce_image == (Image *) NULL)
-    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
-      images->filename);
-  images=coalesce_image;
-  if (resources.map_type == (char *) NULL)
-    if ((visual_info->klass != TrueColor) &&
-        (visual_info->klass != DirectColor))
-      XRemapBackgroundImages(images,visual_info,resources,exception);
+  images=XPrepareBackgroundImages(display,images,exception,&early_targets);
   /*
     Sort images by increasing scene number.
   */
