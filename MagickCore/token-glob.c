@@ -196,6 +196,34 @@ static const char *FindGlobBraceEnd(const char *p)
   return(p);
 }
 
+static MagickBooleanType GlobCharacterClass(
+  const char *magick_restrict *expression,const char *magick_restrict *pattern,
+  const int ecode)
+{
+  const char
+    *p = (*pattern)+GetUTFOctets((*pattern)),
+    *q = (*pattern)+GetUTFOctets((*pattern));
+
+  MagickBooleanType
+    matched = MagickFalse;
+
+  if (ecode == 0)
+    return(MagickFalse);
+  while ((GetUTFCode(q) != 0) && (GetUTFCode(q) != ']'))
+    q+=GetUTFOctets(q);
+  if (GetUTFCode(q) == 0)
+    return(MagickFalse);  /* malformed */
+  matched=MatchCharacterClass(p,q,ecode);
+  /*
+    Skip consecutive '*'.
+  */
+  if (matched == MagickFalse)
+    return(MagickFalse);
+  (*pattern)=q+GetUTFOctets(q);  /* skip ']' */
+  (*expression)+=GetUTFOctets((*expression));
+  return(MagickTrue);
+}
+
 static MagickBooleanType GlobExpression_(const char *magick_restrict expression,
   const char *magick_restrict pattern,const MagickBooleanType case_insensitive,
   const size_t depth)
@@ -251,27 +279,8 @@ static MagickBooleanType GlobExpression_(const char *magick_restrict expression,
       }
       case '[':
       {
-        const char
-          *p = pattern+GetUTFOctets(pattern),
-          *q = pattern+GetUTFOctets(pattern);
-
-        MagickBooleanType
-          matched = MagickFalse;
-
-        if (ecode == 0)
+        if (GlobCharacterClass(&expression,&pattern,ecode) == MagickFalse)
           return(MagickFalse);
-        while ((GetUTFCode(q) != 0) && (GetUTFCode(q) != ']'))
-          q+=GetUTFOctets(q);
-        if (GetUTFCode(q) == 0)
-          return(MagickFalse);  /* malformed */
-        matched=MatchCharacterClass(p,q,ecode);
-        /*
-          Skip consecutive '*'.
-        */
-        if (matched == MagickFalse)
-          return(MagickFalse);
-        pattern=q+GetUTFOctets(q);  /* skip ']' */
-        expression+=GetUTFOctets(expression);
         break;
       }
       case '{':
