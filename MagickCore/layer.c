@@ -1459,6 +1459,9 @@ typedef struct _DuplicateFrameTrial
 
   ExceptionInfo
     *exception;
+
+  Image
+    *prev_image;
 } DuplicateFrameTrial;
 
 typedef struct _DuplicateFrameTargets
@@ -1733,6 +1736,62 @@ static MagickBooleanType AreFramesCoalesced(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType TryPreviousDisposal(
+  const DuplicateFrameTrial *trial,MagickBooleanType cleared)
+{
+  const Image
+    *const curr = trial->curr;
+
+  RectangleInfo
+    *const bounds = trial->bounds;
+
+  DisposeType
+    *const disposals = trial->disposals;
+
+  const ssize_t
+    i = trial->i;
+
+  ExceptionInfo
+    *const exception = trial->exception;
+
+  Image
+    *const prev_image = trial->prev_image;
+
+  const FrameBoundsEntry
+    entry = { bounds, i };
+
+  RectangleInfo
+    try_bounds;
+
+  MagickBooleanType
+    try_cleared;
+
+  /*
+    Compare a none disposal against a previous disposal
+  */
+  try_bounds=CompareImagesBounds(prev_image,curr,CompareAnyLayer,exception);
+  try_cleared=IsBoundsCleared(prev_image,curr,&try_bounds,exception);
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr, "test_prev: %.17gx%.17g%+.20g%+.20g%s\n",
+         (double) try_bounds.width,(double) try_bounds.height,
+         (double) try_bounds.x,(double) try_bounds.y,
+         try_cleared?"  (pixels were cleared)":"");
+#endif
+  if (IsBetterFrameBounds(try_cleared,cleared,try_bounds,&entry) !=
+      MagickFalse)
+    {
+      cleared=try_cleared;
+      bounds[i]=try_bounds;
+      disposals[i-1]=PreviousDispose;
+#if DEBUG_OPT_FRAME
+            (void) FormatLocaleFile(stderr,"previous: accepted\n");
+          } else {
+            (void) FormatLocaleFile(stderr,"previous: rejected\n");
+#endif
+    }
+  return(cleared);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1860,34 +1919,10 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     else
       {
         const DuplicateFrameTrial
-          trial = { add_frames, curr, bounds, disposals, i, exception };
+          trial = { add_frames, curr, bounds, disposals, i, exception,
+            prev_image };
 
-        const FrameBoundsEntry
-          entry = { bounds, i };
-
-        /*
-          Compare a none disposal against a previous disposal
-        */
-        try_bounds=CompareImagesBounds(prev_image,curr,CompareAnyLayer,exception);
-        try_cleared=IsBoundsCleared(prev_image,curr,&try_bounds,exception);
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr, "test_prev: %.17gx%.17g%+.20g%+.20g%s\n",
-         (double) try_bounds.width,(double) try_bounds.height,
-         (double) try_bounds.x,(double) try_bounds.y,
-         try_cleared?"  (pixels were cleared)":"");
-#endif
-        if (IsBetterFrameBounds(try_cleared,cleared,try_bounds,&entry) !=
-            MagickFalse)
-          {
-            cleared=try_cleared;
-            bounds[i]=try_bounds;
-            disposals[i-1]=PreviousDispose;
-#if DEBUG_OPT_FRAME
-            (void) FormatLocaleFile(stderr,"previous: accepted\n");
-          } else {
-            (void) FormatLocaleFile(stderr,"previous: rejected\n");
-#endif
-          }
+        cleared=TryPreviousDisposal(&trial,cleared);
 
         /*
           If we are allowed lets try a complex frame duplication.
