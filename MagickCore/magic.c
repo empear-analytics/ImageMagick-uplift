@@ -160,6 +160,21 @@ static MagickBooleanType
 %
 */
 
+static MagickOffsetType GetMagicOffsetDelta(const MagicInfo *ma,
+  const MagicInfo *mb)
+{
+  MagickOffsetType
+    delta;
+
+  /*
+    Offset is near the start? Let's search a bit further in the stream.
+  */
+  delta=ma->offset-mb->offset;
+  if ((ma->offset > mb->offset ? ma->offset : mb->offset) <= 10)
+    delta=mb->offset-ma->offset;
+  return(delta);
+}
+
 static int CompareMagickInfoExtent(const void *a,const void *b)
 {
   MagicInfo
@@ -173,14 +188,7 @@ static int CompareMagickInfoExtent(const void *a,const void *b)
   mb=(MagicInfo *) b;
   delta=(MagickOffsetType) mb->length-(MagickOffsetType) ma->length;
   if (ma->offset != mb->offset)
-    {
-      /*
-        Offset is near the start? Let's search a bit further in the stream.
-      */
-      delta=ma->offset-mb->offset;
-      if ((ma->offset > mb->offset ? ma->offset : mb->offset) <= 10)
-        delta=mb->offset-ma->offset;
-    }
+    delta=GetMagicOffsetDelta(ma,mb);
   return(delta > INT_MAX ? 0 : (int) delta);
 }
 
