@@ -4409,6 +4409,15 @@ typedef struct _ColorEditContext
   char
     *command;
 
+  Cursor
+    cursor;
+
+  PaintMethodTargets
+    method_targets;
+
+  PenColorTargets
+    pen_targets;
+
   ColorBorderTargets
     border_targets;
 } ColorEditContext;
@@ -4495,6 +4504,67 @@ static void XColorEditMenuAction(const ColorEditContext *context,
   }
 }
 
+typedef struct _ColorEditTargets
+{
+  XEvent
+    *event;
+
+  size_t
+    *state;
+} ColorEditTargets;
+
+static void XColorEditCommand(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  EditMenuInput
+    menu_input;
+
+  int
+    id;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(context->display,context->windows,context->ColorEditMenu,
+    targets->event);
+  if (id < 0)
+    {
+      (void) XCheckDefineCursor(context->display,context->windows->image.id,
+        context->cursor);
+      return;
+    }
+  switch (context->ColorEditCommands[id])
+  {
+    case ColorEditMethodCommand:
+    {
+      menu_input.display=context->display;
+      menu_input.windows=context->windows;
+      menu_input.MatteEditMenu=context->ColorEditMenu;
+      menu_input.id=id;
+      menu_input.command=context->command;
+      XSelectPaintMethod(&menu_input,&context->method_targets);
+      break;
+    }
+    case ColorEditColorCommand:
+    {
+      menu_input.display=context->display;
+      menu_input.windows=context->windows;
+      menu_input.MatteEditMenu=context->ColorEditMenu;
+      menu_input.id=id;
+      menu_input.command=context->command;
+      XSelectPenColor(&menu_input,context->resource_info,&context->pen_targets);
+      break;
+    }
+    default:
+    {
+      XColorEditMenuAction(context,id,targets->state);
+      break;
+    }
+  }
+  (void) XCheckDefineCursor(context->display,context->windows->image.id,
+    context->cursor);
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -4516,7 +4586,6 @@ static MagickBooleanType XColorEditImage(Display *display,
     cursor;
 
   int
-    id,
     x,
     x_offset,
     y,
@@ -4546,6 +4615,9 @@ static MagickBooleanType XColorEditImage(Display *display,
 
   const ColorBorderTargets
     border_targets = { &border_color };
+
+  const ColorEditTargets
+    targets = { &event, &state };
 
   /*
     Map Command widget.
@@ -4577,6 +4649,9 @@ static MagickBooleanType XColorEditImage(Display *display,
   context.ColorEditCommands=ColorEditCommands;
   context.ColorEditMenu=ColorEditMenu;
   context.command=command;
+  context.cursor=cursor;
+  context.method_targets=method_targets;
+  context.pen_targets=pen_targets;
   context.border_targets=border_targets;
   do
   {
@@ -4595,47 +4670,7 @@ static MagickBooleanType XColorEditImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     if (event.xany.window == windows->command.id)
       {
-        EditMenuInput
-          menu_input;
-
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,ColorEditMenu,&event);
-        if (id < 0)
-          {
-            (void) XCheckDefineCursor(display,windows->image.id,cursor);
-            continue;
-          }
-        switch (ColorEditCommands[id])
-        {
-          case ColorEditMethodCommand:
-          {
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=ColorEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectPaintMethod(&menu_input,&method_targets);
-            break;
-          }
-          case ColorEditColorCommand:
-          {
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=ColorEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectPenColor(&menu_input,resource_info,&pen_targets);
-            break;
-          }
-          default:
-          {
-            XColorEditMenuAction(&context,id,&state);
-            break;
-          }
-        }
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
+        XColorEditCommand(&context,&targets);
         continue;
       }
     switch (event.type)
