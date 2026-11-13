@@ -1476,6 +1476,37 @@ static void XInitializeBackgroundWindow(const AnimateBackgroundSetup *setup,
     (XFontStruct *) NULL,resources,window_info);
 }
 
+static void XCreateBackgroundScenes(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  Image
+    **const image_list = setup->image_list;
+
+  int
+    scene;
+
+  size_t
+    delay;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  for (scene=1; scene < (int) setup->number_scenes; scene++)
+  {
+    /*
+      Create X image.
+    */
+    XCreateSceneXImage(setup,targets,scene);
+    /*
+      Create the X pixmap.
+    */
+    XCreateScenePixmap(setup,targets,scene);
+    delay=1000*image_list[scene]->delay/(size_t) MagickMax(
+      image_list[scene]->ticks_per_second,1L);
+    XDelay(setup->display,(*resources).delay*(delay == 0 ? 10 : delay));
+  }
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1486,14 +1517,10 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     *coalesce_image,
     **image_list;
 
-  int
-    scene;
-
   MagickStatusType
     status;
 
   size_t
-    delay,
     number_scenes;
 
   static XPixelInfo
@@ -1645,20 +1672,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     Create the X pixmap.
   */
   XCreateBackgroundPixmaps(&setup,&targets);
-  for (scene=1; scene < (int) number_scenes; scene++)
-  {
-    /*
-      Create X image.
-    */
-    XCreateSceneXImage(&setup,&targets,scene);
-    /*
-      Create the X pixmap.
-    */
-    XCreateScenePixmap(&setup,&targets,scene);
-    delay=1000*image_list[scene]->delay/(size_t) MagickMax(
-      image_list[scene]->ticks_per_second,1L);
-    XDelay(display,resources.delay*(delay == 0 ? 10 : delay));
-  }
+  XCreateBackgroundScenes(&setup,&targets);
   window_info.pixel_info=(&pixel);
   /*
     Display pixmap on the window.
