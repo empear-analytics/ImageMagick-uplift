@@ -1127,6 +1127,9 @@ static void FormatEXIFTagIdKey(char *key,const size_t tag_value)
       (void) FormatLocaleString(key,MagickPathExtent,"unknown");
 }
 
+static int
+  tag_bytes[] = {0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1462,9 +1465,6 @@ static void GetEXIFProperty(const Image *image,const char *property,
     level,
     offset,
     tag_offset;
-
-  static int
-    tag_bytes[] = {0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
 
   /*
     If EXIF data exists, then try to parse the request for a tag.
