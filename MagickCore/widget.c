@@ -7853,6 +7853,40 @@ static void InitializeFileBrowserReply(const FileBrowserContext *context,
   (*reply_info).y=(*action_info).y-(int) (*reply_info).height-QuantumMargin;
 }
 
+static void InitializeFileBrowserList(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info,
+    *const list_info = widgets->list_info;
+
+  /*
+    Initialize list information.
+  */
+  XGetWidgetInfo((char *) NULL,list_info);
+  (*list_info).raised=MagickFalse;
+  (*list_info).bevel_width--;
+  (*list_info).width=(unsigned int)
+    ((*scroll_info).x-(*reply_info).x-(int) (QuantumMargin >> 1));
+  (*list_info).height=(*scroll_info).height;
+  (*list_info).x=(*reply_info).x;
+  (*list_info).y=(*scroll_info).y;
+  if (windows->widget.mapped == MagickFalse)
+    (*state)|=JumpListState;
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8091,19 +8125,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         slider_info.y=slider_info.min_y;
         expose_info=scroll_info;
         expose_info.y=slider_info.y;
-        /*
-          Initialize list information.
-        */
-        XGetWidgetInfo((char *) NULL,&list_info);
-        list_info.raised=MagickFalse;
-        list_info.bevel_width--;
-        list_info.width=(unsigned int)
-          (scroll_info.x-reply_info.x-(int) (QuantumMargin >> 1));
-        list_info.height=scroll_info.height;
-        list_info.x=reply_info.x;
-        list_info.y=scroll_info.y;
-        if (windows->widget.mapped == MagickFalse)
-          state|=JumpListState;
+        InitializeFileBrowserList(&file_context,&file_widgets);
         /*
           Initialize text information.
         */
