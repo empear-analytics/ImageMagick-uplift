@@ -1026,12 +1026,12 @@ static MagickBooleanType CopyImageRow(const CopyRow *row,const ssize_t y,
   return(MagickTrue);
 }
 
+#define CopyImageTag  "Copy/Image"
+
 MagickExport MagickBooleanType CopyImagePixels(Image *image,
   const Image *source_image,const RectangleInfo *geometry,
   const OffsetInfo *offset,ExceptionInfo *exception)
 {
-#define CopyImageTag  "Copy/Image"
-
   CacheView
     *image_view,
     *source_view;
