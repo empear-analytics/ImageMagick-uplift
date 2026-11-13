@@ -12367,6 +12367,42 @@ static void ClickListBrowserReply(const ListBrowserContext *context,
     window_info->id,event.xbutton.time);
 }
 
+static void PressListBrowserButtons(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  if (MatteIsActive((*action_info),event.xbutton))
+    {
+      /*
+        User pressed action button.
+      */
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,window_info,action_info);
+      return;
+    }
+  if (MatteIsActive((*cancel_info),event.xbutton))
+    {
+      /*
+        User pressed Cancel button.
+      */
+      (*cancel_info).raised=MagickFalse;
+      XDrawBeveledButton(display,window_info,cancel_info);
+      return;
+    }
+  ClickListBrowserReply(context,event,widgets);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12769,25 +12805,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             SelectListBrowserEntry(&press,&targets);
             break;
           }
-        if (MatteIsActive(action_info,event.xbutton))
-          {
-            /*
-              User pressed action button.
-            */
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,window_info,&action_info);
-            break;
-          }
-        if (MatteIsActive(cancel_info,event.xbutton))
-          {
-            /*
-              User pressed Cancel button.
-            */
-            cancel_info.raised=MagickFalse;
-            XDrawBeveledButton(display,window_info,&cancel_info);
-            break;
-          }
-        ClickListBrowserReply(&list_context,event,&list_widgets);
+        PressListBrowserButtons(&list_context,event,&list_widgets);
         break;
       }
       case ButtonRelease:
