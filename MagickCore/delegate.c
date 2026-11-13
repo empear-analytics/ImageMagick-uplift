@@ -1226,11 +1226,29 @@ static MagickBooleanType DecodeDelegateCharacter(const char **p,char **q)
   return(MagickFalse);
 }
 
+static MagickBooleanType IsEmptyDelegateText(const char *embed_text,
+  const char **p,char **result)
+{
+  if (embed_text == (const char *) NULL)
+    {
+      (*result)=ConstantString("");
+      return(MagickTrue);
+    }
+  (*p)=SkipDelegateSpace(embed_text);
+  if (*(*p) == '\0')
+    {
+      (*result)=ConstantString("");
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
   char
     *interpret_text,
+    *returned,
     *string;
 
   char
@@ -1252,11 +1270,8 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
   else
    if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-image");
-  if (embed_text == (const char *) NULL)
-    return(ConstantString(""));
-  p=SkipDelegateSpace(embed_text);
-  if (*p == '\0')
-    return(ConstantString(""));
+  if (IsEmptyDelegateText(embed_text,&p,&returned) != MagickFalse)
+    return(returned);
   /*
     Translate any embedded format characters.
   */
