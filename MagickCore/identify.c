@@ -1244,6 +1244,13 @@ static void PrintAllChannelLocations(const Image *image,
   }
 }
 
+static void PrintUpdatedChannelLocations(const ChannelLocationsReport *report,
+  const PixelTrait traits,const PixelChannel channel,const char *name)
+{
+  if ((traits & UpdatePixelTrait) != 0)
+    (void) PrintChannelLocations(report,channel,name);
+}
+
 static void PrintColorspaceLocations(const Image *image,
   const ColorspaceType colorspace,ChannelLocationsReport report)
 {
@@ -1252,31 +1259,31 @@ static void PrintColorspaceLocations(const Image *image,
     case RGBColorspace:
     case sRGBColorspace:
     {
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,RedPixelChannel,"Red");
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,GreenPixelChannel,"Green");
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,BluePixelChannel,"Blue");
+      PrintUpdatedChannelLocations(&report,GetPixelRedTraits(image),
+        RedPixelChannel,"Red");
+      PrintUpdatedChannelLocations(&report,GetPixelGreenTraits(image),
+        GreenPixelChannel,"Green");
+      PrintUpdatedChannelLocations(&report,GetPixelBlueTraits(image),
+        BluePixelChannel,"Blue");
       break;
     }
     case CMYKColorspace:
     {
-      if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,CyanPixelChannel,"Cyan");
-      if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,MagentaPixelChannel,"Magenta");
-      if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,YellowPixelChannel,"Yellow");
-      if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,BlackPixelChannel,"Black");
+      PrintUpdatedChannelLocations(&report,GetPixelCyanTraits(image),
+        CyanPixelChannel,"Cyan");
+      PrintUpdatedChannelLocations(&report,GetPixelMagentaTraits(image),
+        MagentaPixelChannel,"Magenta");
+      PrintUpdatedChannelLocations(&report,GetPixelYellowTraits(image),
+        YellowPixelChannel,"Yellow");
+      PrintUpdatedChannelLocations(&report,GetPixelBlackTraits(image),
+        BlackPixelChannel,"Black");
       break;
     }
     case LinearGRAYColorspace:
     case GRAYColorspace:
     {
-      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,GrayPixelChannel,"Gray");
+      PrintUpdatedChannelLocations(&report,GetPixelGrayTraits(image),
+        GrayPixelChannel,"Gray");
       break;
     }
     default:
