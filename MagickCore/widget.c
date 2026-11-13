@@ -13268,6 +13268,19 @@ static MagickBooleanType WaitForListBrowserEvent(
   return(MagickTrue);
 }
 
+static unsigned int GetListBrowserWidth(XFontStruct *font_info,
+  const char *action)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,(char *) action);
+  if (WidgetTextWidth(font_info,CancelButtonText) > width)
+    width=WidgetTextWidth(font_info,CancelButtonText);
+  width+=(unsigned int) QuantumMargin;
+  return(width);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13356,10 +13369,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   font_info=window_info->font_info;
   text_width=WidgetTextWidth(font_info,(char *) query);
   text_width=WidestListBrowserEntry(font_info,list,entries,text_width);
-  width=WidgetTextWidth(font_info,(char *) action);
-  if (WidgetTextWidth(font_info,CancelButtonText) > width)
-    width=WidgetTextWidth(font_info,CancelButtonText);
-  width+=(unsigned int) QuantumMargin;
+  width=GetListBrowserWidth(font_info,action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   /*
     Position List Browser widget.
