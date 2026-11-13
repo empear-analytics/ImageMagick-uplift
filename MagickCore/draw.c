@@ -9139,6 +9139,58 @@ static void TraceArcPointsP(const StrokeArc *arc,const StrokeTargets *targets)
   }
 }
 
+typedef struct _StrokeSubpathInput
+{
+  const DrawInfo
+    *draw_info;
+
+  PrimitiveInfo
+    *polygon_primitive;
+
+  size_t
+    number_vertices;
+
+  MagickBooleanType
+    closed_path;
+} StrokeSubpathInput;
+
+static MagickBooleanType TraceZeroLengthSubpath(
+  const StrokeSubpathInput *subpath,ssize_t *n,PrimitiveInfo **result)
+{
+  const DrawInfo
+    *draw_info = subpath->draw_info;
+
+  PrimitiveInfo
+    *polygon_primitive = subpath->polygon_primitive,
+    *stroke_polygon;
+
+  const size_t
+    number_vertices = subpath->number_vertices;
+
+  const MagickBooleanType
+    closed_path = subpath->closed_path;
+
+  if ((*n) == (ssize_t) number_vertices)
+    {
+      if ((draw_info->linecap != RoundCap) || (closed_path != MagickFalse))
+        {
+          /*
+            Zero length subpath.
+          */
+          stroke_polygon=(PrimitiveInfo *) AcquireCriticalMemory(
+            sizeof(*stroke_polygon));
+          stroke_polygon[0]=polygon_primitive[0];
+          stroke_polygon[0].coordinates=0;
+          polygon_primitive=(PrimitiveInfo *) RelinquishMagickMemory(
+            polygon_primitive);
+          (*result)=stroke_polygon;
+          return(MagickTrue);
+        }
+      (*n)=(ssize_t) number_vertices-1L;
+    }
+  return(MagickFalse);
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -9208,7 +9260,11 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
 
   PrimitiveInfo
     *polygon_primitive,
+    *returned,
     *stroke_polygon;
+
+  StrokeSubpathInput
+    subpath;
 
   ssize_t
     i;
@@ -9274,23 +9330,12 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     if ((fabs(dx.p) >= MagickEpsilon) || (fabs(dy.p) >= MagickEpsilon))
       break;
   }
-  if (n == (ssize_t) number_vertices)
-    {
-      if ((draw_info->linecap != RoundCap) || (closed_path != MagickFalse))
-        {
-          /*
-            Zero length subpath.
-          */
-          stroke_polygon=(PrimitiveInfo *) AcquireCriticalMemory(
-            sizeof(*stroke_polygon));
-          stroke_polygon[0]=polygon_primitive[0];
-          stroke_polygon[0].coordinates=0;
-          polygon_primitive=(PrimitiveInfo *) RelinquishMagickMemory(
-            polygon_primitive);
-          return(stroke_polygon);
-        }
-      n=(ssize_t) number_vertices-1L;
-    }
+  subpath.draw_info=draw_info;
+  subpath.polygon_primitive=polygon_primitive;
+  subpath.number_vertices=number_vertices;
+  subpath.closed_path=closed_path;
+  if (TraceZeroLengthSubpath(&subpath,&n,&returned) != MagickFalse)
+    return(returned);
   extent_p=2*number_vertices;
   extent_q=2*number_vertices;
   stroke_p=(PointInfo *) AcquireQuantumMemory((size_t) extent_p+MaxStrokePad,
