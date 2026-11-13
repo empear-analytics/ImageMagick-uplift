@@ -2301,9 +2301,80 @@ static void PrintImageDetails(FILE *file,Image *image,
   PrintImageRegistry(file,exception);
 }
 
+typedef struct _ImageChannelReports
+{
+  ColorspaceType
+    colorspace;
+
+  ChannelStatistics
+    *channel_statistics;
+
+  ChannelMoments
+    *channel_moments;
+
+  ChannelPerceptualHash
+    *channel_phash;
+
+  ChannelFeatures
+    *channel_features;
+
+  MagickBooleanType
+    ping;
+} ImageChannelReports;
+
+static void PrintImageChannelReports(FILE *file,Image *image,
+  const ImageChannelReports *reports,ExceptionInfo *exception)
+{
+  const ColorspaceType
+    colorspace = reports->colorspace;
+
+  ChannelStatistics
+    *const channel_statistics = reports->channel_statistics;
+
+  ChannelMoments
+    *channel_moments = reports->channel_moments;
+
+  ChannelPerceptualHash
+    *channel_phash = reports->channel_phash;
+
+  ChannelFeatures
+    *const channel_features = reports->channel_features;
+
+  const MagickBooleanType
+    ping = reports->ping;
+
+  if (channel_statistics != (ChannelStatistics *) NULL)
+    {
+      PrintImageChannelStatistics(file,image,colorspace,channel_statistics);
+    }
+  if (channel_moments != (ChannelMoments *) NULL)
+    {
+      PrintChannelMomentsTable(file,image,colorspace,channel_moments);
+      channel_moments=(ChannelMoments *) RelinquishMagickMemory(
+        channel_moments);
+    }
+  if (channel_phash != (ChannelPerceptualHash *) NULL)
+    {
+      (void) PrintChannelPerceptualHash(image,file,channel_phash);
+      channel_phash=(ChannelPerceptualHash *) RelinquishMagickMemory(
+        channel_phash);
+    }
+  if (channel_features != (ChannelFeatures *) NULL)
+    {
+      PrintImageChannelFeatures(file,image,colorspace,channel_features);
+    }
+  if (ping == MagickFalse)
+    {
+      PrintImagePixelSummary(file,image,colorspace,exception);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
+  ImageChannelReports
+    reports;
+
   ChannelFeatures
     *channel_features;
 
@@ -2373,30 +2444,13 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   PrintImageDepth(file,image,depth);
   (void) FormatLocaleFile(file,"  Channels: %g.%g\n",(double)
     image->number_channels,(double) image->number_meta_channels);
-  if (channel_statistics != (ChannelStatistics *) NULL)
-    {
-      PrintImageChannelStatistics(file,image,colorspace,channel_statistics);
-    }
-  if (channel_moments != (ChannelMoments *) NULL)
-    {
-      PrintChannelMomentsTable(file,image,colorspace,channel_moments);
-      channel_moments=(ChannelMoments *) RelinquishMagickMemory(
-        channel_moments);
-    }
-  if (channel_phash != (ChannelPerceptualHash *) NULL)
-    {
-      (void) PrintChannelPerceptualHash(image,file,channel_phash);
-      channel_phash=(ChannelPerceptualHash *) RelinquishMagickMemory(
-        channel_phash);
-    }
-  if (channel_features != (ChannelFeatures *) NULL)
-    {
-      PrintImageChannelFeatures(file,image,colorspace,channel_features);
-    }
-  if (ping == MagickFalse)
-    {
-      PrintImagePixelSummary(file,image,colorspace,exception);
-    }
+  reports.colorspace=colorspace;
+  reports.channel_statistics=channel_statistics;
+  reports.channel_moments=channel_moments;
+  reports.channel_phash=channel_phash;
+  reports.channel_features=channel_features;
+  reports.ping=ping;
+  PrintImageChannelReports(file,image,&reports,exception);
   PrintImageDetails(file,image,exception);
   PrintImageSizes(file,image);
   PrintImageTimes(file,image,elapsed_time,user_time);
