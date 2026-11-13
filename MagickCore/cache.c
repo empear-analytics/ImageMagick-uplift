@@ -2983,6 +2983,235 @@ typedef struct _VirtualPixelRows
     *exception;
 } VirtualPixelRows;
 
+typedef struct _VirtualPixelOffsets
+{
+  ssize_t
+    x_offset,
+    y_offset;
+} VirtualPixelOffsets;
+
+typedef struct _VirtualPixelTargets
+{
+  MagickSizeType
+    *length;
+
+  Quantum
+    *magick_restrict *q;
+
+  unsigned char
+    *magick_restrict *s;
+} VirtualPixelTargets;
+
+static MagickBooleanType TransferVirtualPixel(
+  const VirtualPixelRows *virtual_rows,const VirtualPixelOffsets *offsets,
+  const VirtualPixelTargets *targets,MagickBooleanType *broke)
+{
+  const Image
+    *const image = virtual_rows->image;
+
+  const VirtualPixelMethod
+    virtual_pixel_method = virtual_rows->virtual_pixel_method;
+
+  const ssize_t
+    x_offset = offsets->x_offset,
+    y_offset = offsets->y_offset;
+
+  CacheInfo
+    *const cache_info = virtual_rows->cache_info;
+
+  NexusInfo
+    *const virtual_nexus = virtual_rows->virtual_nexus;
+
+  Quantum
+    *const virtual_pixel = virtual_rows->virtual_pixel;
+
+  void
+    *const virtual_metacontent = virtual_rows->virtual_metacontent;
+
+  ExceptionInfo
+    *const exception = virtual_rows->exception;
+
+  MagickSizeType
+    *const length = targets->length;
+
+  Quantum
+    *magick_restrict *const q = targets->q;
+
+  unsigned char
+    *magick_restrict *const s = targets->s;
+
+  const Quantum
+    *magick_restrict p;
+
+  const void
+    *magick_restrict r;
+
+  (*broke)=MagickFalse;
+  if (IsOffsetOutsideCache(cache_info,x_offset,y_offset,(*length)) !=
+      MagickFalse)
+    {
+      MagickModulo
+        x_modulo,
+        y_modulo;
+
+      /*
+        Transfer a single pixel.
+      */
+      (*length)=(MagickSizeType) 1;
+      switch (virtual_pixel_method)
+      {
+        case EdgeVirtualPixelMethod:
+        default:
+        {
+          p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
+            EdgeX(x_offset,cache_info->columns),
+            EdgeY(y_offset,cache_info->rows),1UL,1UL,virtual_nexus,
+            exception);
+          r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
+          break;
+        }
+        case RandomVirtualPixelMethod:
+        {
+          if (cache_info->random_info == (RandomInfo *) NULL)
+            cache_info->random_info=AcquireRandomInfo();
+          p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
+            RandomX(cache_info->random_info,cache_info->columns),
+            RandomY(cache_info->random_info,cache_info->rows),1UL,1UL,
+            virtual_nexus,exception);
+          r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
+          break;
+        }
+        case DitherVirtualPixelMethod:
+        {
+          p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
+            DitherX(x_offset,cache_info->columns),
+            DitherY(y_offset,cache_info->rows),1UL,1UL,virtual_nexus,
+            exception);
+          r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
+          break;
+        }
+        case TileVirtualPixelMethod:
+        {
+          x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
+          y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
+          p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
+            x_modulo.remainder,y_modulo.remainder,1UL,1UL,virtual_nexus,
+            exception);
+          r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
+          break;
+        }
+        case MirrorVirtualPixelMethod:
+        {
+          x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
+          if ((x_modulo.quotient & 0x01) == 1L)
+            x_modulo.remainder=(ssize_t) cache_info->columns-
+              x_modulo.remainder-1L;
+          y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
+          if ((y_modulo.quotient & 0x01) == 1L)
+            y_modulo.remainder=(ssize_t) cache_info->rows-
+              y_modulo.remainder-1L;
+          p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
+            x_modulo.remainder,y_modulo.remainder,1UL,1UL,virtual_nexus,
+            exception);
+          r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
+          break;
+        }
+        case HorizontalTileEdgeVirtualPixelMethod:
+        {
+          x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
+          p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
+            x_modulo.remainder,EdgeY(y_offset,cache_info->rows),1UL,1UL,
+            virtual_nexus,exception);
+          r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
+          break;
+        }
+        case VerticalTileEdgeVirtualPixelMethod:
+        {
+          y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
+          p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
+            EdgeX(x_offset,cache_info->columns),y_modulo.remainder,1UL,1UL,
+            virtual_nexus,exception);
+          r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
+          break;
+        }
+        case BackgroundVirtualPixelMethod:
+        case BlackVirtualPixelMethod:
+        case GrayVirtualPixelMethod:
+        case TransparentVirtualPixelMethod:
+        case MaskVirtualPixelMethod:
+        case WhiteVirtualPixelMethod:
+        {
+          p=virtual_pixel;
+          r=virtual_metacontent;
+          break;
+        }
+        case CheckerTileVirtualPixelMethod:
+        {
+          x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
+          y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
+          if (((x_modulo.quotient ^ y_modulo.quotient) & 0x01) != 0L)
+            {
+              p=virtual_pixel;
+              r=virtual_metacontent;
+              break;
+            }
+          p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
+            x_modulo.remainder,y_modulo.remainder,1UL,1UL,virtual_nexus,
+            exception);
+          r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
+          break;
+        }
+        case HorizontalTileVirtualPixelMethod:
+        {
+          if ((y_offset < 0) || (y_offset >= (ssize_t) cache_info->rows))
+            {
+              p=virtual_pixel;
+              r=virtual_metacontent;
+              break;
+            }
+          x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
+          y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
+          p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
+            x_modulo.remainder,y_modulo.remainder,1UL,1UL,virtual_nexus,
+            exception);
+          r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
+          break;
+        }
+        case VerticalTileVirtualPixelMethod:
+        {
+          if ((x_offset < 0) || (x_offset >= (ssize_t) cache_info->columns))
+            {
+              p=virtual_pixel;
+              r=virtual_metacontent;
+              break;
+            }
+          x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
+          y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
+          p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
+            x_modulo.remainder,y_modulo.remainder,1UL,1UL,virtual_nexus,
+            exception);
+          r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
+          break;
+        }
+      }
+      if (p == (const Quantum *) NULL)
+        {
+          (*broke)=MagickTrue;
+          return(MagickTrue);
+        }
+      (void) memcpy((*q),p,(size_t) (cache_info->number_channels*(*length)*
+        sizeof(*p)));
+      (*q)+=(ptrdiff_t) cache_info->number_channels;
+      if (((*s) != (void *) NULL) && (r != (const void *) NULL))
+        {
+          (void) memcpy((*s),r,(size_t) cache_info->metacontent_extent);
+          (*s)+=(ptrdiff_t) cache_info->metacontent_extent;
+        }
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static ssize_t GetVirtualPixelRows(const VirtualPixelRows *virtual_rows,
   Quantum *magick_restrict q,unsigned char *magick_restrict s)
 {
@@ -3006,12 +3235,6 @@ static ssize_t GetVirtualPixelRows(const VirtualPixelRows *virtual_rows,
   NexusInfo
     *const virtual_nexus = virtual_rows->virtual_nexus;
 
-  Quantum
-    *const virtual_pixel = virtual_rows->virtual_pixel;
-
-  void
-    *const virtual_metacontent = virtual_rows->virtual_metacontent;
-
   ExceptionInfo
     *const exception = virtual_rows->exception;
 
@@ -3028,6 +3251,12 @@ static ssize_t GetVirtualPixelRows(const VirtualPixelRows *virtual_rows,
     u,
     v;
 
+  const VirtualPixelTargets
+    targets = { &length, &q, &s };
+
+  MagickBooleanType
+    broke = MagickFalse;
+
   for (v=0; v < (ssize_t) rows; v++)
   {
     ssize_t
@@ -3042,168 +3271,19 @@ static ssize_t GetVirtualPixelRows(const VirtualPixelRows *virtual_rows,
       ssize_t
         x_offset;
 
+      VirtualPixelOffsets
+        offsets;
+
       x_offset=x+u;
       length=(MagickSizeType) MagickMin((ssize_t) cache_info->columns-
         x_offset,(ssize_t) columns-u);
-      if (IsOffsetOutsideCache(cache_info,x_offset,y_offset,length) !=
+      offsets.x_offset=x_offset;
+      offsets.y_offset=y_offset;
+      if (TransferVirtualPixel(virtual_rows,&offsets,&targets,&broke) ==
           MagickFalse)
-        {
-          MagickModulo
-            x_modulo,
-            y_modulo;
-
-          /*
-            Transfer a single pixel.
-          */
-          length=(MagickSizeType) 1;
-          switch (virtual_pixel_method)
-          {
-            case EdgeVirtualPixelMethod:
-            default:
-            {
-              p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
-                EdgeX(x_offset,cache_info->columns),
-                EdgeY(y_offset,cache_info->rows),1UL,1UL,virtual_nexus,
-                exception);
-              r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
-              break;
-            }
-            case RandomVirtualPixelMethod:
-            {
-              if (cache_info->random_info == (RandomInfo *) NULL)
-                cache_info->random_info=AcquireRandomInfo();
-              p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
-                RandomX(cache_info->random_info,cache_info->columns),
-                RandomY(cache_info->random_info,cache_info->rows),1UL,1UL,
-                virtual_nexus,exception);
-              r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
-              break;
-            }
-            case DitherVirtualPixelMethod:
-            {
-              p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
-                DitherX(x_offset,cache_info->columns),
-                DitherY(y_offset,cache_info->rows),1UL,1UL,virtual_nexus,
-                exception);
-              r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
-              break;
-            }
-            case TileVirtualPixelMethod:
-            {
-              x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
-              y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
-              p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
-                x_modulo.remainder,y_modulo.remainder,1UL,1UL,virtual_nexus,
-                exception);
-              r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
-              break;
-            }
-            case MirrorVirtualPixelMethod:
-            {
-              x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
-              if ((x_modulo.quotient & 0x01) == 1L)
-                x_modulo.remainder=(ssize_t) cache_info->columns-
-                  x_modulo.remainder-1L;
-              y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
-              if ((y_modulo.quotient & 0x01) == 1L)
-                y_modulo.remainder=(ssize_t) cache_info->rows-
-                  y_modulo.remainder-1L;
-              p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
-                x_modulo.remainder,y_modulo.remainder,1UL,1UL,virtual_nexus,
-                exception);
-              r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
-              break;
-            }
-            case HorizontalTileEdgeVirtualPixelMethod:
-            {
-              x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
-              p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
-                x_modulo.remainder,EdgeY(y_offset,cache_info->rows),1UL,1UL,
-                virtual_nexus,exception);
-              r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
-              break;
-            }
-            case VerticalTileEdgeVirtualPixelMethod:
-            {
-              y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
-              p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
-                EdgeX(x_offset,cache_info->columns),y_modulo.remainder,1UL,1UL,
-                virtual_nexus,exception);
-              r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
-              break;
-            }
-            case BackgroundVirtualPixelMethod:
-            case BlackVirtualPixelMethod:
-            case GrayVirtualPixelMethod:
-            case TransparentVirtualPixelMethod:
-            case MaskVirtualPixelMethod:
-            case WhiteVirtualPixelMethod:
-            {
-              p=virtual_pixel;
-              r=virtual_metacontent;
-              break;
-            }
-            case CheckerTileVirtualPixelMethod:
-            {
-              x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
-              y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
-              if (((x_modulo.quotient ^ y_modulo.quotient) & 0x01) != 0L)
-                {
-                  p=virtual_pixel;
-                  r=virtual_metacontent;
-                  break;
-                }
-              p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
-                x_modulo.remainder,y_modulo.remainder,1UL,1UL,virtual_nexus,
-                exception);
-              r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
-              break;
-            }
-            case HorizontalTileVirtualPixelMethod:
-            {
-              if ((y_offset < 0) || (y_offset >= (ssize_t) cache_info->rows))
-                {
-                  p=virtual_pixel;
-                  r=virtual_metacontent;
-                  break;
-                }
-              x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
-              y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
-              p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
-                x_modulo.remainder,y_modulo.remainder,1UL,1UL,virtual_nexus,
-                exception);
-              r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
-              break;
-            }
-            case VerticalTileVirtualPixelMethod:
-            {
-              if ((x_offset < 0) || (x_offset >= (ssize_t) cache_info->columns))
-                {
-                  p=virtual_pixel;
-                  r=virtual_metacontent;
-                  break;
-                }
-              x_modulo=VirtualPixelModulo(x_offset,cache_info->columns);
-              y_modulo=VirtualPixelModulo(y_offset,cache_info->rows);
-              p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,
-                x_modulo.remainder,y_modulo.remainder,1UL,1UL,virtual_nexus,
-                exception);
-              r=GetVirtualMetacontentFromNexus(cache_info,virtual_nexus);
-              break;
-            }
-          }
-          if (p == (const Quantum *) NULL)
-            break;
-          (void) memcpy(q,p,(size_t) (cache_info->number_channels*length*
-            sizeof(*p)));
-          q+=(ptrdiff_t) cache_info->number_channels;
-          if ((s != (void *) NULL) && (r != (const void *) NULL))
-            {
-              (void) memcpy(s,r,(size_t) cache_info->metacontent_extent);
-              s+=(ptrdiff_t) cache_info->metacontent_extent;
-            }
-          continue;
-        }
+        continue;
+      if (broke != MagickFalse)
+        break;
       /*
         Transfer a run of pixels.
       */
