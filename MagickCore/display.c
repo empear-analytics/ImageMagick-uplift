@@ -4518,6 +4518,16 @@ typedef struct _ColorEditTargets
   int
     *x,
     *y;
+
+  PaintMethod
+    *method;
+
+  unsigned int
+    *pen_id;
+
+  XColor
+    *border_color,
+    *color;
 } ColorEditTargets;
 
 static void XColorEditCommand(const ColorEditContext *context,
@@ -4727,6 +4737,83 @@ static void XColorEditEvent(const ColorEditContext *context,
   }
 }
 
+static MagickBooleanType XColorEditUpdate(const ColorEditContext *context,
+  const ColorEditTargets *targets,int x_offset,int y_offset)
+{
+  PaintMethod
+    *const method = targets->method;
+
+  size_t
+    *const state = targets->state;
+
+  unsigned int
+    *const pen_id = targets->pen_id;
+
+  unsigned int
+    height,
+    width;
+
+  XColor
+    *const border_color = targets->border_color;
+
+  XColor
+    *const color = targets->color;
+
+  if (((*state) & UpdateConfigurationState) != 0)
+    {
+      CacheView
+        *image_view;
+
+      ColorEditPixelInput
+        pixel_input;
+
+      int
+        x,
+        y;
+
+      /*
+        Pixel edit is relative to image configuration.
+      */
+      (void) XClearArea(context->display,context->windows->image.id,x_offset,
+        y_offset,1,1,MagickTrue);
+      (*color)=context->windows->pixel_info->pen_colors[(*pen_id)];
+      XPutPixel(context->windows->image.ximage,x_offset,y_offset,
+        (*color).pixel);
+      width=(unsigned int) (*context->image)->columns;
+      height=(unsigned int) (*context->image)->rows;
+      x=0;
+      y=0;
+      if (context->windows->image.crop_geometry != (char *) NULL)
+        (void) XParseGeometry(context->windows->image.crop_geometry,&x,&y,
+          &width,&height);
+      x_offset=((int) width*(context->windows->image.x+x_offset)/(int)
+        context->windows->image.ximage->width+x);
+      y_offset=((int) height*(context->windows->image.y+y_offset)/(int)
+        context->windows->image.ximage->height+y);
+      if ((x_offset < 0) || (y_offset < 0))
+        return(MagickTrue);
+      if ((x_offset >= (int) (*context->image)->columns) ||
+          (y_offset >= (int) (*context->image)->rows))
+        return(MagickTrue);
+      image_view=AcquireAuthenticCacheView(*context->image,context->exception);
+      pixel_input.image=context->image;
+      pixel_input.image_view=image_view;
+      pixel_input.x_offset=x_offset;
+      pixel_input.y_offset=y_offset;
+      pixel_input.exception=context->exception;
+      pixel_input.resource_info=context->resource_info;
+      pixel_input.method=(*method);
+      pixel_input.color=(*color);
+      pixel_input.border_color=(*border_color);
+      pixel_input.pen_id=(*pen_id);
+      if (XColorEditPixels(&pixel_input) == MagickFalse)
+        return(MagickFalse);
+      image_view=DestroyCacheView(image_view);
+      (*state)&=(~0x0080U);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -4756,10 +4843,6 @@ static MagickBooleanType XColorEditImage(Display *display,
   size_t
     state;
 
-  unsigned int
-    height,
-    width;
-
   XColor
     color;
 
@@ -4779,7 +4862,8 @@ static MagickBooleanType XColorEditImage(Display *display,
     border_targets = { &border_color };
 
   const ColorEditTargets
-    targets = { &event, &state, &x, &y };
+    targets = { &event, &state, &x, &y, &method, &pen_id, &border_color,
+      &color };
 
   /*
     Map Command widget.
@@ -4844,57 +4928,8 @@ static MagickBooleanType XColorEditImage(Display *display,
       }
     x_offset=x;
     y_offset=y;
-    if ((state & UpdateConfigurationState) != 0)
-      {
-        CacheView
-          *image_view;
-
-        ColorEditPixelInput
-          pixel_input;
-
-        int
-          x,
-          y;
-
-        /*
-          Pixel edit is relative to image configuration.
-        */
-        (void) XClearArea(display,windows->image.id,x_offset,y_offset,1,1,
-          MagickTrue);
-        color=windows->pixel_info->pen_colors[pen_id];
-        XPutPixel(windows->image.ximage,x_offset,y_offset,color.pixel);
-        width=(unsigned int) (*image)->columns;
-        height=(unsigned int) (*image)->rows;
-        x=0;
-        y=0;
-        if (windows->image.crop_geometry != (char *) NULL)
-          (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
-            &width,&height);
-        x_offset=((int) width*(windows->image.x+x_offset)/(int)
-          windows->image.ximage->width+x);
-        y_offset=((int) height*(windows->image.y+y_offset)/(int)
-          windows->image.ximage->height+y);
-        if ((x_offset < 0) || (y_offset < 0))
-          continue;
-        if ((x_offset >= (int) (*image)->columns) ||
-            (y_offset >= (int) (*image)->rows))
-          continue;
-        image_view=AcquireAuthenticCacheView(*image,exception);
-        pixel_input.image=image;
-        pixel_input.image_view=image_view;
-        pixel_input.x_offset=x_offset;
-        pixel_input.y_offset=y_offset;
-        pixel_input.exception=exception;
-        pixel_input.resource_info=resource_info;
-        pixel_input.method=method;
-        pixel_input.color=color;
-        pixel_input.border_color=border_color;
-        pixel_input.pen_id=pen_id;
-        if (XColorEditPixels(&pixel_input) == MagickFalse)
-          return(MagickFalse);
-        image_view=DestroyCacheView(image_view);
-        state&=(~0x0080U);
-      }
+    if (XColorEditUpdate(&context,&targets,x_offset,y_offset) == MagickFalse)
+      return(MagickFalse);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
