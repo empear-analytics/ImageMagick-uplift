@@ -727,6 +727,23 @@ MagickExport SplayTreeInfo *DestroySplayTree(SplayTreeInfo *splay_tree)
   return(splay_tree);
 }
 
+static void AdvanceSplayTreeIterator(SplayTreeInfo *splay_tree)
+{
+  NodeInfo
+    *node;
+
+  LockSemaphoreInfo(splay_tree->semaphore);
+  SplaySplayTree(splay_tree,splay_tree->next);
+  splay_tree->next=(void *) NULL;
+  node=splay_tree->root->right;
+  if (node != (NodeInfo *) NULL)
+    {
+      while (node->left != (NodeInfo *) NULL)
+        node=node->left;
+      splay_tree->next=node->key;
+    }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -753,9 +770,6 @@ MagickExport SplayTreeInfo *DestroySplayTree(SplayTreeInfo *splay_tree)
 */
 MagickExport const void *GetNextKeyInSplayTree(SplayTreeInfo *splay_tree)
 {
-  NodeInfo
-    *node;
-
   void
     *key;
 
@@ -766,16 +780,7 @@ MagickExport const void *GetNextKeyInSplayTree(SplayTreeInfo *splay_tree)
   if ((splay_tree->root == (NodeInfo *) NULL) ||
       (splay_tree->next == (void *) NULL))
     return((void *) NULL);
-  LockSemaphoreInfo(splay_tree->semaphore);
-  SplaySplayTree(splay_tree,splay_tree->next);
-  splay_tree->next=(void *) NULL;
-  node=splay_tree->root->right;
-  if (node != (NodeInfo *) NULL)
-    {
-      while (node->left != (NodeInfo *) NULL)
-        node=node->left;
-      splay_tree->next=node->key;
-    }
+  AdvanceSplayTreeIterator(splay_tree);
   key=splay_tree->root->key;
   UnlockSemaphoreInfo(splay_tree->semaphore);
   return(key);
@@ -807,9 +812,6 @@ MagickExport const void *GetNextKeyInSplayTree(SplayTreeInfo *splay_tree)
 */
 MagickExport const void *GetNextValueInSplayTree(SplayTreeInfo *splay_tree)
 {
-  NodeInfo
-    *node;
-
   void
     *value;
 
@@ -820,16 +822,7 @@ MagickExport const void *GetNextValueInSplayTree(SplayTreeInfo *splay_tree)
   if ((splay_tree->root == (NodeInfo *) NULL) ||
       (splay_tree->next == (void *) NULL))
     return((void *) NULL);
-  LockSemaphoreInfo(splay_tree->semaphore);
-  SplaySplayTree(splay_tree,splay_tree->next);
-  splay_tree->next=(void *) NULL;
-  node=splay_tree->root->right;
-  if (node != (NodeInfo *) NULL)
-    {
-      while (node->left != (NodeInfo *) NULL)
-        node=node->left;
-      splay_tree->next=node->key;
-    }
+  AdvanceSplayTreeIterator(splay_tree);
   value=splay_tree->root->value;
   UnlockSemaphoreInfo(splay_tree->semaphore);
   return(value);
