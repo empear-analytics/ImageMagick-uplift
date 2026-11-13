@@ -682,9 +682,6 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
-  Image *image,Image *inject_image,ExceptionInfo *exception)
-{
 #define HuffmanOutputCode(entry)  \
 {  \
   mask=one << (entry->length-1);  \
@@ -713,6 +710,9 @@ RestoreMSCWarning \
     }  \
 }
 
+MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
+  Image *image,Image *inject_image,ExceptionInfo *exception)
+{
   const HuffmanTable
     *entry;
 
