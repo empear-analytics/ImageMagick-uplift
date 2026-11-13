@@ -1182,6 +1182,45 @@ static MagickBooleanType LoadPolicyInclude(const PolicyLoadTarget *target,
   return(status);
 }
 
+typedef struct _PolicyIncludeScan
+{
+  const PolicyLoadTarget
+    *target;
+
+  const char
+    *filename;
+
+  size_t
+    depth,
+    extent;
+
+  char
+    *keyword,
+    *token;
+} PolicyIncludeScan;
+
+static MagickBooleanType LoadPolicyIncludes(const PolicyIncludeScan *scan,
+  const char **q,MagickStatusType *status)
+{
+  while (IsIncludeElementOpen(scan->token,*q) != MagickFalse)
+  {
+    (void) CopyMagickString(scan->keyword,scan->token,MagickPathExtent);
+    (void) GetNextToken(*q,q,scan->extent,scan->token);
+    if (*scan->token != '=')
+      continue;
+    (void) GetNextToken(*q,q,scan->extent,scan->token);
+    if (LocaleCompare(scan->keyword,"file") == 0)
+      {
+        if (scan->depth >= MagickMaxRecursionDepth)
+          return(MagickFalse);
+        else
+          *status&=(MagickStatusType) LoadPolicyInclude(scan->target,
+            scan->filename,scan->token,scan->depth);
+      }
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
   const char *policy,const char *filename,const size_t depth)
 {
@@ -1231,26 +1270,15 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
       continue;
     if (LocaleCompare(keyword,"<include") == 0)
       {
+        const PolicyIncludeScan
+          scan = { target, filename, depth, extent, keyword, token };
+
         /*
           Include element.
         */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          (void) CopyMagickString(keyword,token,MagickPathExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
-            continue;
-          (void) GetNextToken(q,&q,extent,token);
-          if (LocaleCompare(keyword,"file") == 0)
-            {
-              if (depth >= MagickMaxRecursionDepth)
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-              else
-                status&=(MagickStatusType) LoadPolicyInclude(target,filename,
-                  token,depth);
-            }
-        }
+        while (LoadPolicyIncludes(&scan,&q,&status) == MagickFalse)
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
         continue;
       }
     if (LocaleCompare(keyword,"<policy") == 0)
