@@ -337,6 +337,45 @@ static ssize_t ReadRandom(int file,unsigned char *source,size_t length)
   }
   return(offset);
 }
+
+static void GatherTrueRandomEntropy(StringInfo *entropy,StringInfo *chaos)
+{
+  char
+    *filename;
+
+  int
+    file;
+
+  ssize_t
+    count;
+
+  StringInfo
+    *device;
+
+  /*
+    Our best hope for true entropy.
+  */
+  filename=AcquireString("/dev/random");
+  device=StringToStringInfo(filename);
+  device=DestroyStringInfo(device);
+  file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
+  filename=DestroyString(filename);
+  if (file == -1)
+    {
+      filename=AcquireString("/dev/srandom");
+      device=StringToStringInfo(filename);
+      device=DestroyStringInfo(device);
+      file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
+    }
+  if (file != -1)
+    {
+      SetStringInfoLength(chaos,MaxEntropyExtent);
+      count=ReadRandom(file,GetStringInfoDatum(chaos),MaxEntropyExtent);
+      (void) close_utf8(file);
+      SetStringInfoLength(chaos,(size_t) count);
+      ConcatenateStringInfo(entropy,chaos);
+    }
+}
 #endif
 
 static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
@@ -545,31 +584,7 @@ static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
         ConcatenateStringInfo(entropy,chaos);
       }
     if (gather_true_random != MagickFalse)
-      {
-        /*
-          Our best hope for true entropy.
-        */
-        filename=AcquireString("/dev/random");
-        device=StringToStringInfo(filename);
-        device=DestroyStringInfo(device);
-        file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
-        filename=DestroyString(filename);
-        if (file == -1)
-          {
-            filename=AcquireString("/dev/srandom");
-            device=StringToStringInfo(filename);
-            device=DestroyStringInfo(device);
-            file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
-          }
-        if (file != -1)
-          {
-            SetStringInfoLength(chaos,MaxEntropyExtent);
-            count=ReadRandom(file,GetStringInfoDatum(chaos),MaxEntropyExtent);
-            (void) close_utf8(file);
-            SetStringInfoLength(chaos,(size_t) count);
-            ConcatenateStringInfo(entropy,chaos);
-          }
-      }
+      GatherTrueRandomEntropy(entropy,chaos);
   }
 #endif
   chaos=DestroyStringInfo(chaos);
