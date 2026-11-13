@@ -12576,6 +12576,32 @@ static void ExposeListBrowserWindow(const ListBrowserContext *context,
   (*state)|=RedrawWidgetState;
 }
 
+static void ReleaseListBrowserKey(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  size_t
+    *const state = widgets->state;
+
+  static char
+    command[MagickPathExtent];
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key release.
+  */
+  if (event.xkey.window != window_info->id)
+    return;
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  if (key_symbol == XK_Control_L)
+    (*state)&=(unsigned int) (~ControlState);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12962,21 +12988,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
       }
       case KeyRelease:
       {
-        static char
-          command[MagickPathExtent];
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key release.
-        */
-        if (event.xkey.window != window_info->id)
-          break;
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if (key_symbol == XK_Control_L)
-          state&=(unsigned int) (~ControlState);
+        ReleaseListBrowserKey(&list_context,event,&list_widgets);
         break;
       }
       case LeaveNotify:
