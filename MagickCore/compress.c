@@ -763,6 +763,20 @@ static void ThresholdHuffmanRow(const Image *huffman_image,const Quantum *p,
   }
 }
 
+static int CountHuffmanRun(unsigned char **q,ssize_t *n,
+  const MagickBooleanType black)
+{
+  int
+    runlength;
+
+  for (runlength=0; ((*n > 0) && ((**q != 0) == (black != MagickFalse))); (*n)--)
+  {
+    (*q)++;
+    runlength++;
+  }
+  return(runlength);
+}
+
 static inline const HuffmanTable *HuffmanMakeupEntry(
   const HuffmanTable *table,const int runlength)
 {
@@ -884,11 +898,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
       /*
         Output white run.
       */
-      for (runlength=0; ((n > 0) && (*q == 0)); n--)
-      {
-        q++;
-        runlength++;
-      }
+      runlength=CountHuffmanRun(&q,&n,MagickFalse);
       if (runlength >= 64)
         {
           entry=HuffmanMakeupEntry(MWTable,runlength);
@@ -902,11 +912,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
           /*
             Output black run.
           */
-          for (runlength=0; ((*q != 0) && (n > 0)); n--)
-          {
-            q++;
-            runlength++;
-          }
+          runlength=CountHuffmanRun(&q,&n,MagickTrue);
           if (runlength >= 64)
             {
               entry=HuffmanMakeupEntry(MBTable,runlength);
