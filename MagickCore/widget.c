@@ -15669,6 +15669,9 @@ typedef struct _TextViewWidgets
 
   MagickStatusType
     *mask;
+
+  XWidgetInfo
+    *expose_info;
 } TextViewWidgets;
 
 typedef struct _TextViewContext
@@ -15696,6 +15699,9 @@ typedef struct _TextViewContext
 
   XFontStruct
     *font_info;
+
+  XFontStruct
+    *text_info;
 } TextViewContext;
 
 static void ReleaseTextViewScroll(const TextViewContext *context,
@@ -16194,6 +16200,92 @@ static void InitializeTextViewButtons(const TextViewContext *context,
     QuantumMargin;
 }
 
+static void InitializeTextViewScroll(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    lines = context->lines;
+
+  const unsigned int
+    height = context->height;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XFontStruct
+    *const text_info = context->text_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_lines = widgets->visible_lines;
+
+  XWidgetInfo
+    *const expose_info = widgets->expose_info;
+
+  int
+    id;
+
+  /*
+    Initialize scroll information.
+  */
+  XGetWidgetInfo((char *) NULL,scroll_info);
+  (*scroll_info).bevel_width--;
+  (*scroll_info).width=height;
+  (*scroll_info).height=(unsigned int) ((*dismiss_info).y-((5*QuantumMargin) >>
+    1));
+  (*scroll_info).x=(int) windows->widget.width-QuantumMargin-(int)
+    (*scroll_info).width;
+  (*scroll_info).y=(3*QuantumMargin) >> 1;
+  (*scroll_info).raised=MagickFalse;
+  (*scroll_info).trough=MagickTrue;
+  (*north_info)=(*scroll_info);
+  (*north_info).raised=MagickTrue;
+  (*north_info).width-=((*north_info).bevel_width << 1);
+  (*north_info).height=(*north_info).width-1;
+  (*north_info).x+=(int) (*north_info).bevel_width;
+  (*north_info).y+=(int) (*north_info).bevel_width;
+  (*south_info)=(*north_info);
+  (*south_info).y=(*scroll_info).y+(int) (*scroll_info).height-(int)
+    (*scroll_info).bevel_width-(int) (*south_info).height;
+  id=(*slider_info).id;
+  (*slider_info)=(*north_info);
+  (*slider_info).id=id;
+  (*slider_info).width-=2;
+  (*slider_info).min_y=(*north_info).y+(int) (*north_info).height+(int)
+    (*north_info).bevel_width+(int) (*slider_info).bevel_width+2;
+  (*slider_info).height=(unsigned int) ((int) (*scroll_info).height-
+    (((*slider_info).min_y-(*scroll_info).y+1) << 1)+4);
+  (*visible_lines)=(unsigned int) ((*scroll_info).height*MagickSafeReciprocal(
+    (double) text_info->ascent+text_info->descent+((text_info->ascent+
+    text_info->descent) >> 3)));
+  if (lines > (*visible_lines))
+    (*slider_info).height=(unsigned int)
+      ((*visible_lines)*(*slider_info).height)/lines;
+  (*slider_info).max_y=(*south_info).y-(int) (*south_info).bevel_width-(int)
+    (*slider_info).bevel_width-2;
+  (*slider_info).x=(*scroll_info).x+(int) (*slider_info).bevel_width+1;
+  (*slider_info).y=(*slider_info).min_y;
+  (*expose_info)=(*scroll_info);
+  (*expose_info).y=(*slider_info).y;
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16250,7 +16342,7 @@ MagickPrivate void XTextViewWidget(Display *display,
   const TextViewWidgets
     view_widgets = { &north_info, &south_info, &delay, &slider_info,
       &dismiss_info, &state, &scroll_info, &visible_lines, &event, &list_info,
-      &selection_info, &mask };
+      &selection_info, &mask, &expose_info };
 
   TextViewContext
     view_context;
@@ -16344,56 +16436,13 @@ MagickPrivate void XTextViewWidget(Display *display,
   view_context.primary_selection=primary_selection;
   view_context.width=width;
   view_context.font_info=font_info;
+  view_context.text_info=text_info;
   do
   {
     if (state & UpdateConfigurationState)
       {
-        int
-          id;
-
         InitializeTextViewButtons(&view_context,&view_widgets);
-        /*
-          Initialize scroll information.
-        */
-        XGetWidgetInfo((char *) NULL,&scroll_info);
-        scroll_info.bevel_width--;
-        scroll_info.width=height;
-        scroll_info.height=(unsigned int) (dismiss_info.y-((5*QuantumMargin) >>
-          1));
-        scroll_info.x=(int) windows->widget.width-QuantumMargin-(int)
-          scroll_info.width;
-        scroll_info.y=(3*QuantumMargin) >> 1;
-        scroll_info.raised=MagickFalse;
-        scroll_info.trough=MagickTrue;
-        north_info=scroll_info;
-        north_info.raised=MagickTrue;
-        north_info.width-=(north_info.bevel_width << 1);
-        north_info.height=north_info.width-1;
-        north_info.x+=(int) north_info.bevel_width;
-        north_info.y+=(int) north_info.bevel_width;
-        south_info=north_info;
-        south_info.y=scroll_info.y+(int) scroll_info.height-(int)
-          scroll_info.bevel_width-(int) south_info.height;
-        id=slider_info.id;
-        slider_info=north_info;
-        slider_info.id=id;
-        slider_info.width-=2;
-        slider_info.min_y=north_info.y+(int) north_info.height+(int)
-          north_info.bevel_width+(int) slider_info.bevel_width+2;
-        slider_info.height=(unsigned int) ((int) scroll_info.height-
-          ((slider_info.min_y-scroll_info.y+1) << 1)+4);
-        visible_lines=(unsigned int) (scroll_info.height*MagickSafeReciprocal(
-          (double) text_info->ascent+text_info->descent+((text_info->ascent+
-          text_info->descent) >> 3)));
-        if (lines > visible_lines)
-          slider_info.height=(unsigned int) (visible_lines*slider_info.height)/
-            lines;
-        slider_info.max_y=south_info.y-(int) south_info.bevel_width-(int)
-          slider_info.bevel_width-2;
-        slider_info.x=scroll_info.x+(int) slider_info.bevel_width+1;
-        slider_info.y=slider_info.min_y;
-        expose_info=scroll_info;
-        expose_info.y=slider_info.y;
+        InitializeTextViewScroll(&view_context,&view_widgets);
         /*
           Initialize list information.
         */
