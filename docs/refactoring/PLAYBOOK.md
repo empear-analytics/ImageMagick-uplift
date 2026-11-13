@@ -15204,6 +15204,82 @@ Lane: b
 
 ---
 
+## Recipe BF - Drop the Blank Frame Rows of Doc-Comment Banners
+
+**Use when:** CodeScene reports *Code Duplication* between functions of one file whose
+code is not alike, because it counts the `%` banner comment above a function as part of
+the function (the span starts at the banner) and finds the banners' framing near
+identical, as in `locale.c`, where `AcquireCLocale`/`DestroyCLocale` and six other
+functions pair up in *Code Duplication* though their bodies share nothing.
+
+**Not covered by:** Recipe D, which deduplicates code, not comments; every other recipe,
+which changes tokens of the program. The owner allowed banners to be shortened by a
+guard-level recipe (owner, 2026-11-13), on condition that no code token changes, the
+object file stays identical, and what each banner says about the API is kept.
+
+**How:**
+
+1. A banner is a comment that opens `/*`, then a row of 79 `%`, then three rows that are
+   `%`, 77 spaces and `%`, then the name row (`%   N a m e ...  %` or `+   N a m e ...  %`),
+   then three more blank framed rows, then a row of 79 `%`, followed by the description.
+2. Delete the six blank framed rows (`%` + 77 spaces + `%`), nothing else: the `/*`, both
+   rows of `%`, the name row, the description, the format and parameter text and the
+   closing `*/` stay byte for byte. Do it for every banner of the file in one commit (a
+   script with the exact pattern above; a banner that differs in any row is left alone).
+3. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL` (it pins `__LINE__`;
+   the lines removed are inside comments). Run `tools/ci_warnings.sh <file>` and
+   `tools/cxx_warnings.sh <file>`: both `OK`. Check with `git diff` that every removed
+   line matches `^% {77}%$` and that no line was added.
+
+**Before:**
+
+```c
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
++   A c q u i r e C L o c a l e                                               %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  AcquireCLocale() allocates the C locale object, or (locale_t) 0 with
+```
+
+**After:**
+
+```c
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
++   A c q u i r e C L o c a l e                                               %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  AcquireCLocale() allocates the C locale object, or (locale_t) 0 with
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Only comment lines go; the preprocessor replaces a
+  comment by one space, so the token sequence is unchanged, and `obj_identical.sh`
+  confirms the object file. Line numbers of the code below each banner move up; the
+  campaign's extractions move them as well, and the oracle compares runs on that basis.
+- The banner's content (the function's name, its `+` or `%` marker for private or
+  public, the description, format and parameters) is unchanged: only blank framing goes.
+- Do not reword or reflow the description: a reworded banner is another recipe.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` and
+`tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `locale.c` (campaign B, M127 lane b round 5): eight
+functions in *Code Duplication* through their banners; the probe 7.09 to 8.01 with every
+duplication finding gone. Allowed by the owner's ruling (owner, 2026-11-13) that the `%`
+banners may be shortened by a guard-level recipe. Added by Claude Code (Claude Opus 5.5).
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -15557,3 +15633,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | IX | Inline a Constant Extent Local into Its Loop Bound: a local set once from an integer constant expression of `sizeof`s and read only in `for` bounds is replaced by the parenthesised expression; evidence guard (`obj_identical.sh`); Lane: b | `static.c`'s `UnregisterStaticModules` (after Recipe D, *Code Duplication* with `UnregisterStaticModule` left; probe 9.09 to 9.68, object code identical) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | KC | Step 1: a label may be a character constant (type `int`; `key` of type `int`); Lane: b | `string-si.c`'s `GetSiPrefixExponent` (twenty-four letter labels each assigning a `double` exponent, cc 26; probe 8.50 to 9.09) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | AT | Extract a Selection Arm with a Copy of the Return Tail: in a value-returning function ending `if (c) <arm> return(R);`, the arm (returning on some paths, falling through on others) moves to a `static` function of the caller's return type followed by a copy of `return(R);`; the `if` becomes `if (c) return(Helper(...));`; locals the arm writes are read after it only by `R` and go by value; evidence oracle; Lane: b | `string-copy.c`'s `CopyMagickString` (cc 9, two bumps; E step 7 on the whole tail left a five-argument helper, 9.68; this recipe 9.61 to 10.0) | mandate (2026-10-24) |
+| 2026-11-13 | NEW | BF | Drop the Blank Frame Rows of Doc-Comment Banners: the six rows of `%`, 77 spaces and `%` around a banner's name row are deleted in every banner of a file, nothing else; evidence guard (`obj_identical.sh` IDENTICAL); Lane: b | `locale.c`: eight functions in *Code Duplication* through their banners (CodeScene counts the banner into the function's span); probe 7.09 to 8.01, every duplication finding gone | owner |
