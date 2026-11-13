@@ -91,3 +91,43 @@ directly above its users, as CQ step 3 says.
   were committed with `--no-verify` although the gate would have passed. A cheaper probe: stubbing `XMenuWidget`, `XScreenEvent` and `XEditText` together gives 3.17.
 - **No step found:** `paint-floodfill.c` (8.35: the macro hoist alone 7.03; a stack-loop helper reaches 8.74 but `PushSegmentStack` names the loop-written local `s`), `quantize.c`, `distort.c`, plasma and `accelerate.c`
   (lane d did not reach them), `layer.c`'s remaining Complex Method (three failure exits through one helper adds the cases back).
+
+## Round three (2026-11-13 morning)
+
+Four lanes again (two reviewers each), cut from `campaign/W21` 96177c0ce. Gate on the merged tree: whole catalogue 15,955 cases, 0 diverged; wide catalogue 14,200, 0 diverged;
+`ci_linux_warnings.sh --campaign-a` OK on 92 files in seven configurations; `playbook_lint` 0 problems. Sweep: campaign A 92 files, mean **9.08**, 44 at 10.0.
+
+**Merged.** Lane a, `widget.c` 3.15 -> **4.86** (the held 41-commit File-browser chain, then `XListBrowserWidget` 3.08 -> 3.78 and `XTextViewWidget` 3.78 -> 4.86: Recipes H, CT, SD, O, LB, E, Z and
+FI; both functions lose Large Method, Complex Method and Bumpy Road, leaving only their public 7- and 6-argument findings; the chain's first rise is at the 9th List commit, 3.15 is regained at the 13th). The File chain alone ended at 3.08
+(a step-down to 3.01 at the 18th helper and to 2.92 when the function left Complex Method); 4a107150f and 8171d061a, both `--no-verify`, were genuine gate refusals; seven later File commits were also `--no-verify` though the gate would
+have passed. Lane b, `paint-floodfill.c` 8.35 -> **9.09** (new Recipe MF: the `PushSegmentStack` macro, hoisted by H, becomes calls of one helper that keeps the macro text, with `s` copied in and out as Recipe MB does; then Y, I, Y, FB;
+the amendment to N step 2). The first two code commits (H 8.35 -> 7.03, MF 7.03 -> 6.90) were `--no-verify` (a drop of 1.3 to 1.45 points, repaid by the chain's end: 7.71, then 8.37, 8.73, 9.09); only the public 7-argument signature
+and Overall Code Complexity remain. Lane c, `xwindow-visual.c` 7.97 -> **9.68** (`XBestVisualInfo` has no finding: four Y/I extractions, then five flat leaf-helper steps (E) that cut the file's mean complexity; a padding probe with five cc-1
+functions predicted the flip and the fifth commit raised it; only `XDisplayImageInfo`'s six `MagickPrivate` arguments remain) and `opencl.c` 7.72 -> **8.22** (`LoadOpenCLDeviceBenchmark` via OC, LC and new Recipe LX; `BenchmarkOpenCLDevices` by a
+whole-loop-body E).
+
+**Evidence caveats (the reviewers').** `Verified: oracle` on many X11 commits overstates what the oracle ran: the fresh wide casemap shows four File-browser helpers (`ClientFileBrowserMessage`, `SelectFileBrowserReply`,
+`ToggleFileBrowserButtons`, `PressFileBrowserReply`) executed by no case, and several SD and CT helpers run only in part (`HandleFileBrowserSelectionEvent` 19 of 56 lines; the List and TextView chains quote per-block line coverage and
+those quotes held up); the real evidence for them is `obj_modulo.sh` (reviewer reproduced it) and reading. The sentence "stubbing `XFileBrowserWidget` gives 3.23" is in about fourteen File commits and was last true at 4a107150f (it
+reads 3.08 from 77c805738); 4a107150f's promise to reset a failed plan was not kept for the File chain (it ended below 3.15); the net File effect on the file was negative until List and TextView finished. 672e04883's "LoC 458 -> 458"
+is 459 -> 458. Five of lane a's messages were corrected with a filter rewrite of its own unpushed range (trees identical). Lane b's `SegmentStackOverflow` branch and three cache-view-fetch breaks are reached by no case (read only), and the
+overflow exception now names `PushFloodfillSegment` in `GetMagickModule()`. Lane c: four extracted blocks in `XSelectVisualID`/`XGetStandardColormapList` and `ReadOpenCLBenchmarkMarkup`'s allocation-failure path are executed by no case
+despite `Verified: oracle`; some quoted execution counts (882 calls of `XBestVisualInfo`, 347 cases) differ by one to three from a fresh run. A few messages cite re-wrap sentences as "Recipe E/O/CT step 8" (those belong to Recipe Z's notes and a
+note after CT step 8).
+
+**For the owner (round three):**
+- **`xwindow-visual.c`: `#if` lines moved by a Recipe Y extraction.** bb50ad18f moves the `#if !defined(PRE_R4_ICCCM)`/`#endif` lines into the extracted helper (`XSelectVisualID`) and 3a672a962 replaces the body of that branch with a call, saying "nothing of
+  the branch is edited" (it is edited). The branch is compiled by every X11 build and its other side holds no code (nothing in the tree defines `PRE_R4_ICCCM`); the rules name splits, not extractions, and the 2026-11-12 list does not name this file. Confirm, or revert the two
+  (the later `XBestVisualInfo` steps depend on them). 3a672a962 also says `Verified: guard` for Recipe Y, whose evidence level is the oracle (it is reached by many cases).
+- **Recipe SD step 1** reads "no statement of the switch writes e"; `MoveListBrowserPointer` and `MoveTextViewPointer` write the caller's event through the widgets pointer inside their own group (the helper's copy is taken before the write and never read after it).
+- **New recipes MF and LX, the N step 2 amendment** were written under the 2026-11-10 OK (the catalogue rows say `Decided by: owner`; `mandate` fits better). Recipe Y step 3 forbids a by-value variable as a struct member; the floodfill Y commit carries `s` and `start` in
+  by value as N step 2 admits.
+- **The `--no-verify` drops** in `paint-floodfill.c` (1.3 to 1.45 points) go beyond the "small" drops the owner accepted on 2026-10-29; the chain ends higher (9.09).
+- Two `Verified: guard` commits ran tools/case_tail_check.py FAIL on two moved declarations (git aligns the helper's declaration with the caller's removed one); checked by reading and said in the commit.
+
+**Left.** Lane a: `XNoticeWidget` (cc 28, LoC 179, bumps 5) and `XPreferencesWidget` (cc 56, LoC 307, bumps 4) were not started (time); `XMenuWidget`, `XScreenEvent` and `XEditText` still carry findings (stubbing the three gives
+a further +0.09 in an earlier probe); a flat List context FI commit is parked on `w21a3-list-context-fi`. Lane c: `composite.c` stays 3.69 (`BlendDivergentImage` peels cleanly, but Saliency/Seamless cannot be partitioned without a clone pair; best real probe 3.52; the 18 flat commits are on `w21c3-composite-flat-chain`);
+`GetOpenCLCacheDirectory` sits in a Windows `#if`; `EnqueueOpenCLKernel` (10 args) is `MagickPrivate`. Lane d made no commit: `fx.c` `ExecuteRPN` (a switch cut into source-adjacent label runs with eight hot labels kept scores 5.79 against 4.61 in a text probe,
+but costs +0.6% to +6.4% instructions across four expressions, and even a single cold helper behind 17 hot labels costs +2.0% to +3.7%); `quantize.c` (Number of Functions needs 16 fewer functions; one closed family of 122 functions, no twins);
+`compare-similarity.c` (stubbing all eleven `Get*Similarity` gives 3.80, every smaller set is flat, 36 shared statics); `accelerate.c` (the ten wrappers stay flagged as clones even at 12 lines with one shared helper; about 100 steps on the five giant
+Compute functions). `visual-effects-plasma.c` 8.50 (a shared edge helper probed flat) and `distort.c` 7.70 are unchanged.
