@@ -5643,14 +5643,8 @@ MagickExport Image *XAnimateImages(Display *display,
   XWMHints
     *manager_hints;
 
-  AnimateEventContext
-    event_context;
-
   AnimateSceneList
     scene_list;
-
-  AnimateWindowSetup
-    setup;
 
   AnimateExitInfo
     exit_info;
@@ -5709,84 +5703,63 @@ MagickExport Image *XAnimateImages(Display *display,
   XLogDisplayImage(resource_info,display_image);
   XMakeStandardColormap(display,visual_info,resource_info,display_image,
     map_info,pixel,exception);
-  setup.display=display;
-  setup.resource_info=resource_info;
-  setup.windows=windows;
-  setup.visual_info=visual_info;
-  setup.map_info=map_info;
-  setup.pixel=pixel;
-  setup.font_info=font_info;
-  setup.root_window=root_window;
-  setup.class_hints=class_hints;
-  setup.manager_hints=manager_hints;
-  setup.argv=argv;
-  setup.argc=argc;
-  setup.icon_resources=icon_resources;
-  setup.icon_visual=icon_visual;
-  setup.icon_map=icon_map;
-  setup.icon_pixel=icon_pixel;
-  setup.display_image=display_image;
-  setup.number_scenes=number_scenes;
-  XCreateContextWindow(&setup);
-  XCreateGraphicContexts(&setup,images->filename,&context_values,
-    &context_mask);
-  XCreateIconWindow(&setup);
-  /*
-    Initialize graphic context for icon window.
-  */
-  XCreateIconContext(&setup,images->filename,&context_values);
-  /*
-    Initialize Image window.
-  */
-  XCreateImageWindowInfo(&setup,exception);
-  XCreateBackdropWindow(&setup);
-  XCreateImageWindow(&setup);
-  XCreateInfoWindow(&setup);
-  XCreateCommandWindow(&setup);
-  /*
-    Initialize Widget window.
-  */
-  XCreatePanelWindows(&setup);
-  /*
-    Set out progress and warning handlers.
-  */
-  warning_handler=XSetAnimateWarningHandlers(resource_info,warning_handler);
-  /*
-    Initialize X image structure.
-  */
-  XCreateImagePixmaps(&setup,images->filename);
-  XSetCursorState(display,windows,MagickTrue);
-  event_context.display=display;
-  event_context.resource_info=resource_info;
-  event_context.windows=windows;
-  event_context.visual_info=visual_info;
-  event_context.map_info=map_info;
-  event_context.image_list=image_list;
-  event_context.display_image=display_image;
-  event_context.exception=exception;
-  event_context.icon_resources=icon_resources;
-  event_context.icon_visual=icon_visual;
-  event_context.icon_map=icon_map;
-  event_context.icon_pixel=icon_pixel;
-  event_context.CommandMenu=CommandMenu;
-  event_context.pixel=pixel;
-  event_context.context_mask=context_mask;
-  event_context.root_window=root_window;
-  event_context.magick_windows=magick_windows;
-  event_context.number_windows=number_windows;
-  event_context.number_scenes=number_scenes;
-  XCreateSceneWindows(&event_context,images,&event);
-  XSetCursorState(display,windows,MagickFalse);
-  if (windows->command.mapped)
-    (void) XMapRaised(display,windows->command.id);
-  /*
-    Respond to events.
-  */
-  nexus=XRunAnimateLoop(&event_context,&images,&context_values,&event);
-  exit_info.images=images;
-  exit_info.warning_handler=warning_handler;
-  exit_info.working_directory=working_directory;
-  return(XFinishAnimation(&event_context,&setup,&exit_info,nexus));
+  {
+    const AnimateWindowSetup
+      setup = { display, resource_info, windows, visual_info, map_info, pixel,
+        font_info, root_window, class_hints, manager_hints, argv, argc,
+        icon_resources, icon_visual, icon_map, icon_pixel, display_image,
+        number_scenes };
+
+    XCreateContextWindow(&setup);
+    XCreateGraphicContexts(&setup,images->filename,&context_values,
+      &context_mask);
+    XCreateIconWindow(&setup);
+    /*
+      Initialize graphic context for icon window.
+    */
+    XCreateIconContext(&setup,images->filename,&context_values);
+    /*
+      Initialize Image window.
+    */
+    XCreateImageWindowInfo(&setup,exception);
+    XCreateBackdropWindow(&setup);
+    XCreateImageWindow(&setup);
+    XCreateInfoWindow(&setup);
+    XCreateCommandWindow(&setup);
+    /*
+      Initialize Widget window.
+    */
+    XCreatePanelWindows(&setup);
+    /*
+      Set out progress and warning handlers.
+    */
+    warning_handler=XSetAnimateWarningHandlers(resource_info,warning_handler);
+    /*
+      Initialize X image structure.
+    */
+    XCreateImagePixmaps(&setup,images->filename);
+    XSetCursorState(display,windows,MagickTrue);
+    {
+      const AnimateEventContext
+        event_context = { display, resource_info, windows, visual_info,
+          map_info, image_list, display_image, exception, icon_resources,
+          icon_visual, icon_map, icon_pixel, CommandMenu, pixel, context_mask,
+          root_window, magick_windows, number_windows, number_scenes };
+
+      XCreateSceneWindows(&event_context,images,&event);
+      XSetCursorState(display,windows,MagickFalse);
+      if (windows->command.mapped)
+        (void) XMapRaised(display,windows->command.id);
+      /*
+        Respond to events.
+      */
+      nexus=XRunAnimateLoop(&event_context,&images,&context_values,&event);
+      exit_info.images=images;
+      exit_info.warning_handler=warning_handler;
+      exit_info.working_directory=working_directory;
+      return(XFinishAnimation(&event_context,&setup,&exit_info,nexus));
+    }
+  }
 }
 
 /*
