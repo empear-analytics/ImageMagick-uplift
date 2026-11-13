@@ -1904,6 +1904,54 @@ static void SetBlueDitherEntry(const XDitherTables *tables,const int x)
     ((value < 0) ? 0 : (value > 255) ? 255 : value);
 }
 
+static void AcquireDitherMaps(unsigned char *red_map[2][16],
+  unsigned char *green_map[2][16],unsigned char *blue_map[2][16])
+{
+  int
+    i,
+    j;
+
+  for (i=0; i < 2; i++)
+    for (j=0; j < 16; j++)
+    {
+      red_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
+        sizeof(*red_map));
+      green_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
+        sizeof(*green_map));
+      blue_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
+        sizeof(*blue_map));
+    }
+}
+
+static void RelinquishDitherMaps(unsigned char *red_map[2][16],
+  unsigned char *green_map[2][16],unsigned char *blue_map[2][16])
+{
+  int
+    i,
+    j;
+
+  for (i=0; i < 2; i++)
+    for (j=0; j < 16; j++)
+    {
+      green_map[i][j]=(unsigned char *) RelinquishMagickMemory(green_map[i][j]);
+      blue_map[i][j]=(unsigned char *) RelinquishMagickMemory(blue_map[i][j]);
+      red_map[i][j]=(unsigned char *) RelinquishMagickMemory(red_map[i][j]);
+    }
+}
+
+static void SetDitherEntries(const XDitherTables tables)
+{
+  int
+    x;
+
+  for (x=0; x < 256; x++)
+  {
+    SetRedDitherEntry(&tables,x);
+    SetGreenDitherEntry(&tables,x);
+    SetBlueDitherEntry(&tables,x);
+  }
+}
+
 static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
 {
   static const short int
@@ -1958,16 +2006,7 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   /*
     Allocate and initialize dither maps.
   */
-  for (i=0; i < 2; i++)
-    for (j=0; j < 16; j++)
-    {
-      red_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
-        sizeof(*red_map));
-      green_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
-        sizeof(*green_map));
-      blue_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
-        sizeof(*blue_map));
-    }
+  AcquireDitherMaps(red_map,green_map,blue_map);
   /*
     Initialize dither tables.
   */
@@ -1982,12 +2021,7 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
       tables.green_map=green_map;
       tables.dither_blue=dither_blue;
       tables.blue_map=blue_map;
-      for (x=0; x < 256; x++)
-      {
-        SetRedDitherEntry(&tables,x);
-        SetGreenDitherEntry(&tables,x);
-        SetBlueDitherEntry(&tables,x);
-      }
+      SetDitherEntries(tables);
     }
   /*
     Dither image.
@@ -2030,13 +2064,7 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   /*
     Free allocated memory.
   */
-  for (i=0; i < 2; i++)
-    for (j=0; j < 16; j++)
-    {
-      green_map[i][j]=(unsigned char *) RelinquishMagickMemory(green_map[i][j]);
-      blue_map[i][j]=(unsigned char *) RelinquishMagickMemory(blue_map[i][j]);
-      red_map[i][j]=(unsigned char *) RelinquishMagickMemory(red_map[i][j]);
-    }
+  RelinquishDitherMaps(red_map,green_map,blue_map);
 }
 
 /*
@@ -4546,6 +4574,20 @@ static void XTransformWindowImage(const XWindowTransform *transform)
     XResizeWindowImage(transform);
 }
 
+#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
+static void XRemoveSharedSegment(XShmSegmentInfo *segment_info)
+{
+  if (segment_info[1].shmid >= 0)
+    {
+      if (segment_info[1].shmaddr != NULL)
+        (void) shmdt(segment_info[1].shmaddr);
+      (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
+      segment_info[1].shmid=(-1);
+      segment_info[1].shmaddr=(char *) NULL;
+    }
+}
+#endif
+
 static XImage *XAttachSharedXImage(Display *display,XWindowInfo *window,
   XImage *ximage)
 {
@@ -4577,27 +4619,138 @@ static XImage *XAttachSharedXImage(Display *display,XWindowInfo *window,
           ximage->data=NULL;
           XDestroyImage(ximage);
           ximage=(XImage *) NULL;
-          if (segment_info[1].shmid >= 0)
-            {
-              if (segment_info[1].shmaddr != NULL)
-                (void) shmdt(segment_info[1].shmaddr);
-              (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
-              segment_info[1].shmid=(-1);
-              segment_info[1].shmaddr=(char *) NULL;
-            }
+          XRemoveSharedSegment(segment_info);
         }
     }
 #endif
   return(ximage);
 }
 
+static void XAcquireXYBitmapData(XImage *ximage)
+{
+  ximage->data=(char *) AcquireQuantumMemory((size_t)
+    ximage->bytes_per_line,(size_t) (ximage->depth*ximage->height));
+  if (ximage->data != (char *) NULL)
+    (void) memset(ximage->data,0,(size_t)
+      (ximage->bytes_per_line*ximage->depth*ximage->height));
+}
+
+static void XAcquireZPixmapData(XImage *ximage)
+{
+  ximage->data=(char *) AcquireQuantumMemory((size_t)
+    ximage->bytes_per_line,(size_t) ximage->height);
+  if (ximage->data != (char *) NULL)
+    (void) memset(ximage->data,0,(size_t)
+      (ximage->bytes_per_line*ximage->height));
+}
+
+static void XAcquireXImageData(XImage *ximage)
+{
+  if (ximage->format == XYBitmap)
+    XAcquireXYBitmapData(ximage);
+  else
+    XAcquireZPixmapData(ximage);
+}
+
+static inline MagickBooleanType IsShapedImageWindow(const XWindowInfo *window)
+{
+  return(((window->shape != MagickFalse) && (window->image != (Image *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
+#define CheckOverflowException(length,width,height) \
+  (((height) != 0) && ((length)/((size_t) height) != ((size_t) width)))
+
+#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
+static XImage *XDiscardSharedXImage(XImage *ximage,
+  XShmSegmentInfo *segment_info)
+{
+  if (ximage != (XImage *) NULL)
+    XDestroyImage(ximage);
+  ximage=(XImage *) NULL;
+  if (segment_info[1].shmaddr)
+    {
+      (void) shmdt(segment_info[1].shmaddr);
+      segment_info[1].shmaddr=(char *) NULL;
+    }
+  if (segment_info[1].shmid >= 0)
+    {
+      (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
+      segment_info[1].shmid=(-1);
+    }
+  return(ximage);
+}
+
+static XImage *XAllocateSharedSegment(XWindowInfo *window,
+  XShmSegmentInfo *segment_info,XImage *ximage)
+{
+  size_t
+    length;
+
+  length=0;
+  if (ximage == (XImage *) NULL)
+    window->shared_memory=MagickFalse;
+  else
+    {
+      length=(size_t) (ximage->bytes_per_line*ximage->height);
+      if (CheckOverflowException(length,ximage->bytes_per_line,ximage->height))
+        window->shared_memory=MagickFalse;
+    }
+  if (window->shared_memory != MagickFalse)
+    segment_info[1].shmid=shmget(IPC_PRIVATE,length,IPC_CREAT | 0777);
+  if (window->shared_memory != MagickFalse)
+    segment_info[1].shmaddr=(char *) shmat(segment_info[1].shmid,0,0);
+  if (segment_info[1].shmid < 0)
+    window->shared_memory=MagickFalse;
+  if (window->shared_memory != MagickFalse)
+    (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
+  else
+    ximage=XDiscardSharedXImage(ximage,segment_info);
+  return(ximage);
+}
+#endif
+
+static void XReplaceWindowXImage(Display *display,XWindowInfo *window,
+  XImage *ximage)
+{
+  if (window->ximage != (XImage *) NULL)
+    XDestroyWindowXImage(display,window);
+#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
+  if (window->segment_info != (XShmSegmentInfo *) NULL)
+    {
+      XShmSegmentInfo
+        *segment_info;
+
+      segment_info=(XShmSegmentInfo *) window->segment_info;
+      segment_info[0]=segment_info[1];
+    }
+#endif
+  window->ximage=ximage;
+}
+
+static XImage *XReplaceWindowMatteImage(Display *display,XWindowInfo *window,
+  unsigned int width,unsigned int height)
+{
+  XImage
+    *matte_image;
+
+  matte_image=(XImage *) NULL;
+  if ((IsShapedImageWindow(window) != MagickFalse) &&
+      (IsShapeWithinDisplay(display,window,width,height) != MagickFalse))
+    matte_image=XCreateMatteXImage(display,window,width,height);
+  if (window->matte_image != (XImage *) NULL)
+    XDestroyWindowMatteImage(window);
+  window->matte_image=matte_image;
+  if (window->matte_pixmap != (Pixmap) NULL)
+    XFreeWindowMattePixmap(display,window);
+  window->stasis=MagickFalse;
+  return(matte_image);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
 {
-#define CheckOverflowException(length,width,height) \
-  (((height) != 0) && ((length)/((size_t) height) != ((size_t) width)))
-
   int
     depth,
     format;
@@ -4650,9 +4803,6 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
 #if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
   if (window->shared_memory != MagickFalse)
     {
-      size_t
-        length;
-
       XShmSegmentInfo
         *segment_info;
 
@@ -4661,39 +4811,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       segment_info[1].shmaddr=(char *) NULL;
       ximage=XShmCreateImage(display,window->visual,(unsigned int) depth,format,
         (char *) NULL,&segment_info[1],width,height);
-      length=0;
-      if (ximage == (XImage *) NULL)
-        window->shared_memory=MagickFalse;
-      else
-        {
-          length=(size_t) (ximage->bytes_per_line*ximage->height);
-          if (CheckOverflowException(length,ximage->bytes_per_line,ximage->height))
-            window->shared_memory=MagickFalse;
-        }
-      if (window->shared_memory != MagickFalse)
-        segment_info[1].shmid=shmget(IPC_PRIVATE,length,IPC_CREAT | 0777);
-      if (window->shared_memory != MagickFalse)
-        segment_info[1].shmaddr=(char *) shmat(segment_info[1].shmid,0,0);
-      if (segment_info[1].shmid < 0)
-        window->shared_memory=MagickFalse;
-      if (window->shared_memory != MagickFalse)
-        (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
-      else
-        {
-          if (ximage != (XImage *) NULL)
-            XDestroyImage(ximage);
-          ximage=(XImage *) NULL;
-          if (segment_info[1].shmaddr)
-            {
-              (void) shmdt(segment_info[1].shmaddr);
-              segment_info[1].shmaddr=(char *) NULL;
-            }
-          if (segment_info[1].shmid >= 0)
-            {
-              (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
-              segment_info[1].shmid=(-1);
-            }
-        }
+      ximage=XAllocateSharedSegment(window,segment_info,ximage);
     }
 #endif
   ximage=XAttachSharedXImage(display,window,ximage);
@@ -4711,24 +4829,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   if ((GetLogEventMask() & X11Event) != 0)
     XLogXImage(ximage);
   if (window->shared_memory == MagickFalse)
-    {
-      if (ximage->format == XYBitmap)
-        {
-          ximage->data=(char *) AcquireQuantumMemory((size_t)
-            ximage->bytes_per_line,(size_t) (ximage->depth*ximage->height));
-          if (ximage->data != (char *) NULL)
-            (void) memset(ximage->data,0,(size_t)
-              (ximage->bytes_per_line*ximage->depth*ximage->height));
-        }
-      else
-        {
-          ximage->data=(char *) AcquireQuantumMemory((size_t)
-            ximage->bytes_per_line,(size_t) ximage->height);
-          if (ximage->data != (char *) NULL)
-            (void) memset(ximage->data,0,(size_t)
-              (ximage->bytes_per_line*ximage->height));
-        }
-    }
+    XAcquireXImageData(ximage);
   if (ximage->data == (char *) NULL)
     {
       /*
@@ -4739,29 +4840,8 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       (void) XCheckDefineCursor(display,window->id,window->cursor);
       return(MagickFalse);
     }
-  if (window->ximage != (XImage *) NULL)
-    XDestroyWindowXImage(display,window);
-#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
-  if (window->segment_info != (XShmSegmentInfo *) NULL)
-    {
-      XShmSegmentInfo
-        *segment_info;
-
-      segment_info=(XShmSegmentInfo *) window->segment_info;
-      segment_info[0]=segment_info[1];
-    }
-#endif
-  window->ximage=ximage;
-  matte_image=(XImage *) NULL;
-  if ((window->shape != MagickFalse) && (window->image != (Image *) NULL))
-    if (IsShapeWithinDisplay(display,window,width,height) != MagickFalse)
-      matte_image=XCreateMatteXImage(display,window,width,height);
-  if (window->matte_image != (XImage *) NULL)
-    XDestroyWindowMatteImage(window);
-  window->matte_image=matte_image;
-  if (window->matte_pixmap != (Pixmap) NULL)
-    XFreeWindowMattePixmap(display,window);
-  window->stasis=MagickFalse;
+  XReplaceWindowXImage(display,window,ximage);
+  matte_image=XReplaceWindowMatteImage(display,window,width,height);
   /*
     Convert pixels to X image data.
   */
@@ -5751,6 +5831,109 @@ static void XPackMatteRowLSB(const Image *canvas,const Quantum *p,
     *(*q)=byte >> (8-bit);
 }
 
+static Image *XReadTexturePattern(const XResourceInfo *resource_info,
+  const Image *image,ExceptionInfo *exception)
+{
+  char
+    size[MagickPathExtent];
+
+  Image
+    *pattern;
+
+  ImageInfo
+    *image_info;
+
+  image_info=AcquireImageInfo();
+  (void) CopyMagickString(image_info->filename,
+    resource_info->image_info->texture != (char *) NULL ?
+    resource_info->image_info->texture : "pattern:checkerboard",
+    MagickPathExtent);
+  (void) FormatLocaleString(size,MagickPathExtent,"%.17gx%.17g",(double)
+    image->columns,(double) image->rows);
+  image_info->size=ConstantString(size);
+  pattern=ReadImage(image_info,exception);
+  image_info=DestroyImageInfo(image_info);
+  return(pattern);
+}
+
+static unsigned short XBitmapPolarity(const Image *image,const Image *canvas)
+{
+  unsigned short
+    polarity;
+
+  polarity=(unsigned short) ((GetPixelInfoIntensity(image,
+    &canvas->colormap[0])) < ((double) QuantumRange/2.0) ? 1 : 0);
+  if (canvas->colors == 2)
+    polarity=GetPixelInfoIntensity(image,&canvas->colormap[0]) <
+      GetPixelInfoIntensity(image,&canvas->colormap[1]);
+  return(polarity);
+}
+
+static void XPackColormappedLSB(const XImage *ximage,
+  const XImageRowSource row_source,unsigned char *q)
+{
+  switch (ximage->bits_per_pixel)
+  {
+    case 2:
+    {
+      XPackColormapped2BitLSB(&row_source,q);
+      break;
+    }
+    case 4:
+    {
+      XPackColormapped4BitLSB(&row_source,q);
+      break;
+    }
+    case 6:
+    case 8:
+    {
+      XPackColormapped8BitLSB(&row_source,q);
+      break;
+    }
+    default:
+    {
+      XPackColormappedMultiByteLSB(&row_source,q);
+      break;
+    }
+  }
+}
+
+static void XPackContinuousLSB(const XImage *ximage,
+  const XStandardColormap *map_info,const XImageRowSource row_source,
+  unsigned char *q)
+{
+  switch (ximage->bits_per_pixel)
+  {
+    case 2:
+    {
+      XPackContinuous2BitLSB(&row_source,q);
+      break;
+    }
+    case 4:
+    {
+      XPackContinuous4BitLSB(&row_source,q);
+      break;
+    }
+    case 6:
+    case 8:
+    {
+      XPackContinuous8BitLSB(&row_source,q);
+      break;
+    }
+    default:
+    {
+      if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
+        XPackRedHigh32BitLSB(&row_source,q);
+      else
+        if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
+          XPackBlueHigh32BitLSB(&row_source,q);
+        else
+          XPackContinuousMultiByteLSB(&row_source,q);
+      break;
+    }
+  }
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -5801,25 +5984,10 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   canvas=image;
   if (IsMutableAlphaImage(window,image) != MagickFalse)
     {
-      char
-        size[MagickPathExtent];
-
       Image
         *pattern;
 
-      ImageInfo
-        *image_info;
-
-      image_info=AcquireImageInfo();
-      (void) CopyMagickString(image_info->filename,
-        resource_info->image_info->texture != (char *) NULL ?
-        resource_info->image_info->texture : "pattern:checkerboard",
-        MagickPathExtent);
-      (void) FormatLocaleString(size,MagickPathExtent,"%.17gx%.17g",(double)
-        image->columns,(double) image->rows);
-      image_info->size=ConstantString(size);
-      pattern=ReadImage(image_info,exception);
-      image_info=DestroyImageInfo(image_info);
+      pattern=XReadTexturePattern(resource_info,image,exception);
       if (pattern != (Image *) NULL)
         {
           canvas=CloneImage(image,0,0,MagickTrue,exception);
@@ -5866,11 +6034,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
       foreground=(unsigned char)
         (XPixelIntensity(&window->pixel_info->background_color) <
          XPixelIntensity(&window->pixel_info->foreground_color) ? 0x80 : 0x00);
-      polarity=(unsigned short) ((GetPixelInfoIntensity(image,
-        &canvas->colormap[0])) < ((double) QuantumRange/2.0) ? 1 : 0);
-      if (canvas->colors == 2)
-        polarity=GetPixelInfoIntensity(image,&canvas->colormap[0]) <
-          GetPixelInfoIntensity(image,&canvas->colormap[1]);
+      polarity=XBitmapPolarity(image,canvas);
       bitmap.canvas=canvas;
       bitmap.polarity=polarity;
       bitmap.background=background;
@@ -5882,61 +6046,9 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
     }
   else
     if (window->pixel_info->colors != 0)
-      switch (ximage->bits_per_pixel)
-      {
-        case 2:
-        {
-          XPackColormapped2BitLSB(&row_source,q);
-          break;
-        }
-        case 4:
-        {
-          XPackColormapped4BitLSB(&row_source,q);
-          break;
-        }
-        case 6:
-        case 8:
-        {
-          XPackColormapped8BitLSB(&row_source,q);
-          break;
-        }
-        default:
-        {
-          XPackColormappedMultiByteLSB(&row_source,q);
-          break;
-        }
-      }
+      XPackColormappedLSB(ximage,row_source,q);
     else
-      switch (ximage->bits_per_pixel)
-      {
-        case 2:
-        {
-          XPackContinuous2BitLSB(&row_source,q);
-          break;
-        }
-        case 4:
-        {
-          XPackContinuous4BitLSB(&row_source,q);
-          break;
-        }
-        case 6:
-        case 8:
-        {
-          XPackContinuous8BitLSB(&row_source,q);
-          break;
-        }
-        default:
-        {
-          if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-            XPackRedHigh32BitLSB(&row_source,q);
-          else
-            if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
-              XPackBlueHigh32BitLSB(&row_source,q);
-            else
-              XPackContinuousMultiByteLSB(&row_source,q);
-          break;
-        }
-      }
+      XPackContinuousLSB(ximage,map_info,row_source,q);
   if (matte_image != (XImage *) NULL)
     {
       /*
@@ -6853,6 +6965,71 @@ static unsigned char *XPackMatteRowMSB(const Image *canvas,const Quantum *p,
   return(q);
 }
 
+static void XPackColormappedMSB(const XImage *ximage,
+  const XImageRowSource row_source,unsigned char *q)
+{
+  switch (ximage->bits_per_pixel)
+  {
+    case 2:
+    {
+      XPackColormapped2BitMSB(&row_source,q);
+      break;
+    }
+    case 4:
+    {
+      XPackColormapped4BitMSB(&row_source,q);
+      break;
+    }
+    case 6:
+    case 8:
+    {
+      XPackColormapped8BitMSB(&row_source,q);
+      break;
+    }
+    default:
+    {
+      XPackColormappedMultiByteMSB(&row_source,q);
+      break;
+    }
+  }
+}
+
+static void XPackContinuousMSB(const XImage *ximage,
+  const XStandardColormap *map_info,const XImageRowSource row_source,
+  unsigned char *q)
+{
+  switch (ximage->bits_per_pixel)
+  {
+    case 2:
+    {
+      XPackContinuous2BitMSB(&row_source,q);
+      break;
+    }
+    case 4:
+    {
+      XPackContinuous4BitMSB(&row_source,q);
+      break;
+    }
+    case 6:
+    case 8:
+    {
+      XPackContinuous8BitMSB(&row_source,q);
+      break;
+    }
+    default:
+    {
+      if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
+        XPackRedHigh32BitMSB(&row_source,q);
+      else
+        if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
+          XPackBlueHigh32BitMSB(&row_source,q);
+        else
+          XPackContinuousMultiByteMSB(&row_source,q);
+      break;
+    }
+  }
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -6992,61 +7169,9 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
     }
   else
     if (window->pixel_info->colors != 0)
-      switch (ximage->bits_per_pixel)
-      {
-        case 2:
-        {
-          XPackColormapped2BitMSB(&row_source,q);
-          break;
-        }
-        case 4:
-        {
-          XPackColormapped4BitMSB(&row_source,q);
-          break;
-        }
-        case 6:
-        case 8:
-        {
-          XPackColormapped8BitMSB(&row_source,q);
-          break;
-        }
-        default:
-        {
-          XPackColormappedMultiByteMSB(&row_source,q);
-          break;
-        }
-      }
+      XPackColormappedMSB(ximage,row_source,q);
     else
-      switch (ximage->bits_per_pixel)
-      {
-        case 2:
-        {
-          XPackContinuous2BitMSB(&row_source,q);
-          break;
-        }
-        case 4:
-        {
-          XPackContinuous4BitMSB(&row_source,q);
-          break;
-        }
-        case 6:
-        case 8:
-        {
-          XPackContinuous8BitMSB(&row_source,q);
-          break;
-        }
-        default:
-        {
-          if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-            XPackRedHigh32BitMSB(&row_source,q);
-          else
-            if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
-              XPackBlueHigh32BitMSB(&row_source,q);
-            else
-              XPackContinuousMultiByteMSB(&row_source,q);
-          break;
-        }
-      }
+      XPackContinuousMSB(ximage,map_info,row_source,q);
   if (matte_image != (XImage *) NULL)
     {
       /*
