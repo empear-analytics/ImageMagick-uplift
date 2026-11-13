@@ -15343,6 +15343,41 @@ static void XRotateSelectStep(const RotateLoopInput *loop_input,
     (*rotate_info).y2-=32;
 }
 
+static void XRotateDragEvent(const XEvent event,
+  const RotateLineTargets *targets)
+{
+  XSegment
+    *const rotate_info = targets->rotate_info;
+
+  size_t
+    *const state = targets->state;
+
+  switch (event.type)
+  {
+    case ButtonPress:
+      break;
+    case ButtonRelease:
+    {
+      /*
+        User has committed to rotation line.
+      */
+      (*rotate_info).x2=event.xbutton.x;
+      (*rotate_info).y2=event.xbutton.y;
+      (*state)|=ExitState;
+      break;
+    }
+    case Expose:
+      break;
+    case MotionNotify:
+    {
+      (*rotate_info).x2=event.xmotion.x;
+      (*rotate_info).y2=event.xmotion.y;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -15479,30 +15514,7 @@ static MagickBooleanType XRotateImage(Display *display,
         if (distance > 9)
           XHighlightLine(display,windows->image.id,
             windows->image.highlight_context,&rotate_info);
-        switch (event.type)
-        {
-          case ButtonPress:
-            break;
-          case ButtonRelease:
-          {
-            /*
-              User has committed to rotation line.
-            */
-            rotate_info.x2=event.xbutton.x;
-            rotate_info.y2=event.xbutton.y;
-            state|=ExitState;
-            break;
-          }
-          case Expose:
-            break;
-          case MotionNotify:
-          {
-            rotate_info.x2=event.xmotion.x;
-            rotate_info.y2=event.xmotion.y;
-          }
-          default:
-            break;
-        }
+        XRotateDragEvent(event,&line_targets);
         /*
           Check boundary conditions.
         */
