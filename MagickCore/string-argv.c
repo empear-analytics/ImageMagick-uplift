@@ -139,6 +139,24 @@ static void CountArgvArguments(const char *text,int *argc)
 %      list.
 %
 */
+static void ScanArgvToken(const char **p,const char **q)
+{
+  *q=(*p);
+  if (**q == '"')
+    {
+      (*p)++;
+      *q=SkipArgvQuoted(*q,'"');
+    }
+  else
+    if (**q == '\'')
+      {
+        (*p)++;
+        *q=SkipArgvQuoted(*q,'\'');
+      }
+    else
+      *q=SkipArgvWord(*q);
+}
+
 MagickExport char **StringToArgv(const char *text,int *argc)
 {
   char
@@ -170,20 +188,7 @@ MagickExport char **StringToArgv(const char *text,int *argc)
   for (i=1; i < (ssize_t) *argc; i++)
   {
     p=SkipArgvSpaces(p);
-    q=p;
-    if (*q == '"')
-      {
-        p++;
-        q=SkipArgvQuoted(q,'"');
-      }
-    else
-      if (*q == '\'')
-        {
-          p++;
-          q=SkipArgvQuoted(q,'\'');
-        }
-      else
-        q=SkipArgvWord(q);
+    ScanArgvToken(&p,&q);
     argv[i]=(char *) AcquireQuantumMemory((size_t) (q-p)+MagickPathExtent,
       sizeof(**argv));
     if (argv[i] == (char *) NULL)
