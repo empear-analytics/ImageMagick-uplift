@@ -163,6 +163,18 @@ static void AddLZWString(TableType *table,const size_t last_code,
     } \
 }
 
+static void CheckLZWEncodeArguments(const Image *image,
+  const unsigned char *magick_restrict pixels,const ExceptionInfo *exception)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(pixels != (unsigned char *) NULL);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
   unsigned char *magick_restrict pixels,ExceptionInfo *exception)
 {
@@ -185,13 +197,7 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
   /*
     Allocate string table.
   */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(pixels != (unsigned char *) NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckLZWEncodeArguments(image,pixels,exception);
   table=(TableType *) AcquireQuantumMemory(1UL << 12,sizeof(*table));
   if (table == (TableType *) NULL)
     ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed",
