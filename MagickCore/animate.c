@@ -3772,6 +3772,51 @@ static WarningHandler XEnterWorkingDirectory(XResourceInfo *resource_info,
   return(warning_handler);
 }
 
+static const AnimateCommand
+  CommandMenus[]=
+  {
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    InfoCommand,
+    QuitCommand
+  },
+  AnimateCommands[]=
+  {
+    OpenCommand,
+    PlayCommand,
+    StepCommand,
+    RepeatCommand,
+    AutoReverseCommand,
+    SaveCommand
+  },
+  SpeedCommands[]=
+  {
+    FasterCommand,
+    SlowerCommand
+  },
+  DirectionCommands[]=
+  {
+    ForwardCommand,
+    ReverseCommand
+  },
+  HelpCommands[]=
+  {
+    HelpCommand,
+    BrowseDocumentationCommand,
+    VersionCommand
+  };
+
+static const AnimateCommand
+  *Commands[MagickMenus]=
+  {
+    AnimateCommands,
+    SpeedCommands,
+    DirectionCommands,
+    HelpCommands
+  };
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3824,51 +3869,6 @@ MagickExport Image *XAnimateImages(Display *display,
       SpeedMenu,
       DirectionMenu,
       HelpMenu
-    };
-
-  static const AnimateCommand
-    CommandMenus[]=
-    {
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      InfoCommand,
-      QuitCommand
-    },
-    AnimateCommands[]=
-    {
-      OpenCommand,
-      PlayCommand,
-      StepCommand,
-      RepeatCommand,
-      AutoReverseCommand,
-      SaveCommand
-    },
-    SpeedCommands[]=
-    {
-      FasterCommand,
-      SlowerCommand
-    },
-    DirectionCommands[]=
-    {
-      ForwardCommand,
-      ReverseCommand
-    },
-    HelpCommands[]=
-    {
-      HelpCommand,
-      BrowseDocumentationCommand,
-      VersionCommand
-    };
-
-  static const AnimateCommand
-    *Commands[MagickMenus]=
-    {
-      AnimateCommands,
-      SpeedCommands,
-      DirectionCommands,
-      HelpCommands
     };
 
   char
