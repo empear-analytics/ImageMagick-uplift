@@ -16741,9 +16741,6 @@ MagickPrivate void XTextViewWidget(Display *display,
     *font_info,
     *text_info;
 
-  TextViewContext
-    view_context;
-
   /*
     Convert text string to a text list.
   */
@@ -16798,16 +16795,13 @@ MagickPrivate void XTextViewWidget(Display *display,
     Respond to X events.
   */
   height=(unsigned int) (font_info->ascent+font_info->descent);
-  view_context.display=display;
-  view_context.windows=windows;
-  view_context.lines=lines;
-  view_context.textlist=textlist;
-  view_context.height=height;
-  view_context.primary_selection=primary_selection;
-  view_context.width=width;
-  view_context.font_info=font_info;
-  view_context.text_info=text_info;
-  RunTextView(&view_context,&mask);
+  {
+    const TextViewContext
+      view_context = { display, windows, lines, textlist, height,
+        primary_selection, width, font_info, text_info };
+
+    RunTextView(&view_context,&mask);
+  }
   WithdrawTextViewWidget(display,windows,text_info);
 }
 #endif
