@@ -15210,9 +15210,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
         break;
     }
   } while ((state & ExitState) == 0);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
-  XCheckRefreshWindows(display,windows);
+  WithdrawBrowserWidget(display,windows);
   if (apply_info.raised)
     return(MagickFalse);
   /*
