@@ -605,105 +605,82 @@ static MagickBooleanType PushFloodfillSegment(const FloodfillStack *stack,
   return(MagickTrue);
 }
 
-MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
-  const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
-  const ssize_t y_offset,const MagickBooleanType invert,
-  ExceptionInfo *exception)
+typedef struct _FloodfillSegments
 {
+  Image
+    *image,
+    *floodplane_image;
+
   CacheView
     *floodplane_view,
     *image_view;
 
-  Image
-    *floodplane_image;
+  const PixelInfo
+    *target;
 
   MagickBooleanType
-    skip,
-    status;
+    invert;
 
-  FloodfillPlane
-    plane;
-
-  FloodfillStack
-    stack;
+  ExceptionInfo
+    *exception;
 
   MemoryInfo
     *segment_info;
 
-  PixelInfo
-    pixel;
-
   SegmentInfo
+    *segment_stack,
     *s;
 
+  ssize_t
+    start,
+    x_offset,
+    y_offset;
+} FloodfillSegments;
+
+static MagickBooleanType FillFloodplaneSegments(
+  const FloodfillSegments *segments)
+{
+  FloodfillStack
+    stack;
+
+  MagickBooleanType
+    skip;
+
   SegmentInfo
-    *segment_stack;
+    *s = segments->s;
 
   ssize_t
     offset,
-    start,
+    start = segments->start,
     x1,
     x2,
     y;
 
-  /*
-    Check boundary conditions.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(draw_info != (DrawInfo *) NULL);
-  assert(draw_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse) 
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (CheckFloodfillOffsets(image,x_offset,y_offset) == MagickFalse)
-    return(MagickFalse);
-  if (PrepareFloodfillImage(image,draw_info,exception) == MagickFalse)
-    return(MagickFalse);
-  /*
-    Set floodfill state.
-  */
-  if (AcquireFloodplaneImage(image,&floodplane_image,exception) == MagickFalse)
-    return(MagickFalse);
-  segment_info=AcquireVirtualMemory(MaxStacksize,sizeof(*segment_stack));
-  if (segment_info == (MemoryInfo *) NULL)
-    {
-      floodplane_image=DestroyImage(floodplane_image);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
-  segment_stack=(SegmentInfo *) GetVirtualMemoryBlob(segment_info);
-  /*
-    Push initial segment on stack.
-  */
-  status=MagickTrue;
-  start=0;
-  s=segment_stack;
-  GetPixelInfo(image,&pixel);
-  image_view=AcquireVirtualCacheView(image,exception);
-  floodplane_view=AcquireAuthenticCacheView(floodplane_image,exception);
-  stack.image=image;
-  stack.floodplane_image=floodplane_image;
-  stack.floodplane_view=floodplane_view;
-  stack.image_view=image_view;
-  stack.exception=exception;
-  stack.segment_info=segment_info;
-  stack.segment_stack=segment_stack;
+  stack.image=segments->image;
+  stack.floodplane_image=segments->floodplane_image;
+  stack.floodplane_view=segments->floodplane_view;
+  stack.image_view=segments->image_view;
+  stack.exception=segments->exception;
+  stack.segment_info=segments->segment_info;
+  stack.segment_stack=segments->segment_stack;
   stack.top=&s;
   {
     const FloodfillSegment
-      segment = { y_offset, x_offset, x_offset, 1 };
+      segment = { segments->y_offset, segments->x_offset, segments->x_offset,
+        1 };
 
     if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
       return(MagickFalse);
   }
   {
     const FloodfillSegment
-      segment = { y_offset+1, x_offset, x_offset, -1 };
+      segment = { segments->y_offset+1, segments->x_offset,
+        segments->x_offset, -1 };
 
     if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
       return(MagickFalse);
   }
-  while (s > segment_stack)
+  while (s > segments->segment_stack)
   {
     FloodfillRow
       row;
@@ -725,14 +702,14 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     /*
       Recolor neighboring pixels.
     */
-    row.image=image;
-    row.floodplane_image=floodplane_image;
-    row.image_view=image_view;
-    row.floodplane_view=floodplane_view;
-    row.target=target;
-    row.invert=invert;
+    row.image=segments->image;
+    row.floodplane_image=segments->floodplane_image;
+    row.image_view=segments->image_view;
+    row.floodplane_view=segments->floodplane_view;
+    row.target=segments->target;
+    row.invert=segments->invert;
     row.y=y;
-    row.exception=exception;
+    row.exception=segments->exception;
     if (FillFloodplaneLeft(&row,x1,&x) == MagickFalse)
       break;
     skip=x >= x1 ? MagickTrue : MagickFalse;
@@ -774,6 +751,86 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
       if (AdvanceFloodfillRun(&row,x2,&advance) == MagickFalse)
         break;
     } while (x <= x2);
+  }
+  return(MagickTrue);
+}
+
+MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
+  const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
+  const ssize_t y_offset,const MagickBooleanType invert,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *floodplane_view,
+    *image_view;
+
+  Image
+    *floodplane_image;
+
+  MagickBooleanType
+    status;
+
+  FloodfillPlane
+    plane;
+
+  MemoryInfo
+    *segment_info;
+
+  PixelInfo
+    pixel;
+
+  SegmentInfo
+    *s;
+
+  SegmentInfo
+    *segment_stack;
+
+  ssize_t
+    start;
+
+  /*
+    Check boundary conditions.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(draw_info != (DrawInfo *) NULL);
+  assert(draw_info->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse) 
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (CheckFloodfillOffsets(image,x_offset,y_offset) == MagickFalse)
+    return(MagickFalse);
+  if (PrepareFloodfillImage(image,draw_info,exception) == MagickFalse)
+    return(MagickFalse);
+  /*
+    Set floodfill state.
+  */
+  if (AcquireFloodplaneImage(image,&floodplane_image,exception) == MagickFalse)
+    return(MagickFalse);
+  segment_info=AcquireVirtualMemory(MaxStacksize,sizeof(*segment_stack));
+  if (segment_info == (MemoryInfo *) NULL)
+    {
+      floodplane_image=DestroyImage(floodplane_image);
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  segment_stack=(SegmentInfo *) GetVirtualMemoryBlob(segment_info);
+  /*
+    Push initial segment on stack.
+  */
+  status=MagickTrue;
+  start=0;
+  s=segment_stack;
+  GetPixelInfo(image,&pixel);
+  image_view=AcquireVirtualCacheView(image,exception);
+  floodplane_view=AcquireAuthenticCacheView(floodplane_image,exception);
+  {
+    const FloodfillSegments
+      segments = { image, floodplane_image, floodplane_view, image_view,
+        target, invert, exception, segment_info, segment_stack, s, start,
+        x_offset, y_offset };
+
+    if (FillFloodplaneSegments(&segments) == MagickFalse)
+      return(MagickFalse);
   }
   plane.image=image;
   plane.floodplane_image=floodplane_image;
