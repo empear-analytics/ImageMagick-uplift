@@ -298,6 +298,30 @@ static void DestroyXWindowNames(XWindowInfo *window)
     window->icon_name=(char *) RelinquishMagickMemory(window->icon_name);
 }
 
+static void DestroyXWindowImagesAndId(Display *display,XWindowInfo *window)
+{
+  if (window->matte_image != (XImage *) NULL)
+    {
+      XDestroyImage(window->matte_image);
+      window->matte_image=(XImage *) NULL;
+    }
+  if (window->ximage != (XImage *) NULL)
+    {
+      XDestroyImage(window->ximage);
+      window->ximage=(XImage *) NULL;
+    }
+  if (window->pixmap != (Pixmap) NULL)
+    {
+      (void) XFreePixmap(display,window->pixmap);
+      window->pixmap=(Pixmap) NULL;
+    }
+  if (window->id != (Window) NULL)
+    {
+      (void) XDestroyWindow(display,window->id);
+      window->id=(Window) NULL;
+    }
+}
+
 MagickExport void DestroyXResources(void)
 {
   int
@@ -338,26 +362,7 @@ MagickExport void DestroyXResources(void)
       }
     DestroyXWindowNames(magick_windows[i]);
     FreeXWindowCursors(windows->display,magick_windows[i]);
-    if (magick_windows[i]->matte_image != (XImage *) NULL)
-      {
-        XDestroyImage(magick_windows[i]->matte_image);
-        magick_windows[i]->matte_image=(XImage *) NULL;
-      }
-    if (magick_windows[i]->ximage != (XImage *) NULL)
-      {
-        XDestroyImage(magick_windows[i]->ximage);
-        magick_windows[i]->ximage=(XImage *) NULL;
-      }
-    if (magick_windows[i]->pixmap != (Pixmap) NULL)
-      {
-        (void) XFreePixmap(windows->display,magick_windows[i]->pixmap);
-        magick_windows[i]->pixmap=(Pixmap) NULL;
-      }
-    if (magick_windows[i]->id != (Window) NULL)
-      {
-        (void) XDestroyWindow(windows->display,magick_windows[i]->id);
-        magick_windows[i]->id=(Window) NULL;
-      }
+    DestroyXWindowImagesAndId(windows->display,magick_windows[i]);
     if (magick_windows[i]->destroy != MagickFalse)
       {
         if (magick_windows[i]->image != (Image *) NULL)
