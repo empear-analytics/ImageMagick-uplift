@@ -3898,6 +3898,19 @@ static void XLoadAnimateFont(Display *display,XResourceInfo *resource_info,
       resource_info->font);
 }
 
+static Image *XCoalesceAnimateImages(Image *images,ExceptionInfo *exception)
+{
+  Image
+    *coalesce_image;
+
+  coalesce_image=CoalesceImages(images,exception);
+  if (coalesce_image == (Image *) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
+      images->filename);
+  images=coalesce_image;
+  return(images);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3909,7 +3922,6 @@ MagickExport Image *XAnimateImages(Display *display,
     resource_name[MagickPathExtent];
 
   Image
-    *coalesce_image,
     *display_image,
     *image,
     **image_list,
@@ -4042,11 +4054,7 @@ MagickExport Image *XAnimateImages(Display *display,
   class_hints=windows->class_hints;
   manager_hints=windows->manager_hints;
   root_window=XRootWindow(display,visual_info->screen);
-  coalesce_image=CoalesceImages(images,exception);
-  if (coalesce_image == (Image *) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
-      images->filename);
-  images=coalesce_image;
+  images=XCoalesceAnimateImages(images,exception);
   XRemapColormapMismatch(resource_info,visual_info,images,exception);
   /*
     Sort images by increasing scene number.
