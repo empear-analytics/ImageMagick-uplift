@@ -7002,6 +7002,16 @@ typedef struct _FileBrowserWidgets
 
   size_t
     *state;
+
+  XWidgetInfo
+    *scroll_info,
+    *slider_info;
+
+  unsigned int
+    *visible_files;
+
+  size_t
+    *files;
 } FileBrowserWidgets;
 
 typedef struct _FileBrowserContext
@@ -7011,6 +7021,11 @@ typedef struct _FileBrowserContext
 
   XWindows
     *windows;
+
+  char
+    *reply,
+    *glob_pattern,
+    *working_path;
 } FileBrowserContext;
 
 static void ClientFileBrowserMessage(const FileBrowserContext *context,
@@ -7107,6 +7122,85 @@ static void SelectFileBrowserReply(const FileBrowserContext *context,
   (void) XFree((void *) data);
 }
 
+static void PressFileBrowserKey(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const reply = context->reply,
+    *const glob_pattern = context->glob_pattern,
+    *const working_path = context->working_path;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info,
+    *const slider_info = widgets->slider_info;
+
+  unsigned int
+    *const visible_files = widgets->visible_files;
+
+  size_t
+    *const files = widgets->files;
+
+  static char
+    command[MagickPathExtent];
+
+  static int
+    length;
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  length=XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if (AreaIsActive((*scroll_info),event.xkey))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=MoveFontBrowserSlider((*slider_info),key_symbol,
+        (*visible_files),(int) (*files));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      FileBrowserPaths
+        paths;
+
+      paths.glob_pattern=glob_pattern;
+      paths.working_path=working_path;
+      paths.reply=reply;
+      (*state)=ReadFileBrowserPath(&paths,(*reply_info),(*state));
+      return;
+    }
+  if (key_symbol == XK_Control_L)
+    {
+      (*state)|=ControlState;
+      return;
+    }
+  (*reply_info)=ApplyListBrowserControlKey((*reply_info),key_symbol,(*state));
+  XEditText(display,reply_info,key_symbol,command,(*state));
+  XDrawMatteText(display,&windows->widget,reply_info);
+  (*state)|=JumpListState;
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -7193,7 +7287,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     special_targets = { &state, &special_info };
 
   const FileBrowserWidgets
-    file_widgets = { &reply_info, &state };
+    file_widgets = { &reply_info, &state,
+      &scroll_info, &slider_info, &visible_files, &files };
 
   FileBrowserContext
     file_context;
@@ -7296,6 +7391,9 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   state=UpdateConfigurationState;
   file_context.display=display;
   file_context.windows=windows;
+  file_context.reply=reply;
+  file_context.glob_pattern=glob_pattern;
+  file_context.working_path=working_path;
   do
   {
     if (state & UpdateConfigurationState)
@@ -7872,53 +7970,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       case KeyPress:
       {
-        static char
-          command[MagickPathExtent];
-
-        static int
-          length;
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        length=XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (AreaIsActive(scroll_info,event.xkey))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=MoveFontBrowserSlider(slider_info,key_symbol,
-              visible_files,(int) files);
-            state|=RedrawListState;
-            break;
-          }
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            FileBrowserPaths
-              paths;
-
-            paths.glob_pattern=glob_pattern;
-            paths.working_path=working_path;
-            paths.reply=reply;
-            state=ReadFileBrowserPath(&paths,reply_info,state);
-            break;
-          }
-        if (key_symbol == XK_Control_L)
-          {
-            state|=ControlState;
-            break;
-          }
-        reply_info=ApplyListBrowserControlKey(reply_info,key_symbol,state);
-        XEditText(display,&reply_info,key_symbol,command,state);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        state|=JumpListState;
+        PressFileBrowserKey(&file_context,event,&file_widgets);
         break;
       }
       case KeyRelease:
