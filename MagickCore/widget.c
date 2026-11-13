@@ -8870,9 +8870,6 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const FileBrowserRunTargets
     run_targets = { &files, &i, &filelist, &mask };
 
-  FileBrowserLayout
-    layout;
-
   /*
     Read filelist from current directory.
   */
@@ -8907,12 +8904,12 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   /*
     Position File Browser widget.
   */
-  layout.display=display;
-  layout.font_info=font_info;
-  layout.width=width;
-  layout.height=height;
-  layout.text_width=text_width;
-  PositionFileBrowserWidget(windows,&layout);
+  {
+    const FileBrowserLayout
+      layout = { display, font_info, width, height, text_width };
+
+    PositionFileBrowserWidget(windows,&layout);
+  }
   MapFileBrowserWidget(display,windows,mask);
   /*
     Respond to X events.
