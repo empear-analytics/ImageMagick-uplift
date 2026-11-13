@@ -1137,6 +1137,93 @@ static void TransferFileList(const FileListTransfer *transfer,char *filename,
   }
 }
 
+typedef struct _WildcardArgument
+{
+  char
+    *option,
+    *filename,
+    *path,
+    *subimage,
+    *home_directory;
+} WildcardArgument;
+
+static void ListWildcardFiles(const WildcardArgument *wildcard,
+  char ***filelist,size_t *number_files)
+{
+  char
+    *const option = wildcard->option,
+    *const filename = wildcard->filename,
+    *const path = wildcard->path,
+    *const subimage = wildcard->subimage,
+    *const home_directory = wildcard->home_directory;
+
+  /*
+    Generate file list from wildcard filename (e.g. *.jpg).
+  */
+  GetPathComponent(option,HeadPath,path);
+  GetPathComponent(option,SubimagePath,subimage);
+  ExpandFilename(path);
+  if (*home_directory == '\0')
+    getcwd_utf8(home_directory,MagickPathExtent-1);
+  (*filelist)=ListFiles(*path == '\0' ? home_directory : path,filename,
+    number_files);
+}
+
+static MagickBooleanType ListArgumentFiles(const WildcardArgument *wildcard,
+  char ***filelist,size_t *number_files)
+{
+  char
+    *const option = wildcard->option;
+
+  if (*option != '@')
+    ListWildcardFiles(wildcard,filelist,number_files);
+  else
+    {
+      ArgumentFileTargets
+        targets;
+
+      /*
+        Generate file list from file list (e.g. @filelist.txt).
+      */
+      targets.filelist=filelist;
+      targets.number_files=number_files;
+      if (ReadFileList(option,&targets) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType HasFileListFiles(char ***filelist,
+  const size_t number_files)
+{
+  ssize_t
+    j;
+
+  if ((*filelist) == (char **) NULL)
+    return(MagickFalse);
+  j=FindNonDirectory((*filelist),number_files);
+  if (j == (ssize_t) number_files)
+    {
+      (*filelist)=DestroyFileList((*filelist),number_files);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void LogExpandedCommandLine(char **vector,const ssize_t count)
+{
+  if (IsEventLogging() != MagickFalse)
+    {
+      char
+        *command_line;
+
+      command_line=AcquireCommandLine(vector,count);
+      (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
+        "Command line: %s",command_line);
+      command_line=DestroyString(command_line);
+    }
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1145,8 +1232,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     **vector;
 
   ssize_t
-    i,
-    j;
+    i;
 
   size_t
     number_files;
@@ -1187,6 +1273,9 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     MagickBooleanType
       destroy;
 
+    WildcardArgument
+      wildcard;
+
     option=(*arguments)[i];
     *magick='\0';
     *path='\0';
@@ -1209,40 +1298,15 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       }
     if (ParseExpandableArgument(option,filename,magick) == MagickFalse)
       continue;
-    if (*option != '@')
-      {
-        /*
-          Generate file list from wildcard filename (e.g. *.jpg).
-        */
-        GetPathComponent(option,HeadPath,path);
-        GetPathComponent(option,SubimagePath,subimage);
-        ExpandFilename(path);
-        if (*home_directory == '\0')
-          getcwd_utf8(home_directory,MagickPathExtent-1);
-        filelist=ListFiles(*path == '\0' ? home_directory : path,filename,
-          &number_files);
-      }
-    else
-      {
-        ArgumentFileTargets
-          targets;
-
-        /*
-          Generate file list from file list (e.g. @filelist.txt).
-        */
-        targets.filelist=(&filelist);
-        targets.number_files=(&number_files);
-        if (ReadFileList(option,&targets) == MagickFalse)
-          continue;
-      }
-    if (filelist == (char **) NULL)
+    wildcard.option=option;
+    wildcard.filename=filename;
+    wildcard.path=path;
+    wildcard.subimage=subimage;
+    wildcard.home_directory=home_directory;
+    if (ListArgumentFiles(&wildcard,&filelist,&number_files) == MagickFalse)
       continue;
-    j=FindNonDirectory(filelist,number_files);
-    if (j == (ssize_t) number_files)
-      {
-        filelist=DestroyFileList(filelist,number_files);
-        continue;
-      }
+    if (HasFileListFiles(&filelist,number_files) == MagickFalse)
+      continue;
     /*
       Transfer file list to argument vector.
     */
@@ -1263,16 +1327,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     filelist=(char **) RelinquishMagickMemory(filelist);
   }
   vector[count]=(char *) NULL;
-  if (IsEventLogging() != MagickFalse)
-    {
-      char
-        *command_line;
-
-      command_line=AcquireCommandLine(vector,count);
-      (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
-        "Command line: %s",command_line);
-      command_line=DestroyString(command_line);
-    }
+  LogExpandedCommandLine(vector,count);
   *number_arguments=(int) count;
   *arguments=vector;
   return(MagickTrue);
@@ -2264,6 +2319,76 @@ static inline MagickBooleanType IsDotDirectoryEntry(const char *name)
     (LocaleCompare(name,"..") == 0)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _FileListDirectoryTargets
+{
+  DIR
+    **current_directory;
+
+  size_t
+    *max_entries;
+
+  char
+    ***filelist;
+
+  struct dirent
+    **buffer;
+} FileListDirectoryTargets;
+
+static MagickBooleanType OpenFileListDirectory(const char *directory,
+  const FileListDirectoryTargets *targets)
+{
+  DIR
+    **const current_directory = targets->current_directory;
+
+  size_t
+    *const max_entries = targets->max_entries;
+
+  char
+    ***const filelist = targets->filelist;
+
+  struct dirent
+    **const buffer = targets->buffer;
+
+  (*current_directory)=opendir(directory);
+  if ((*current_directory) == (DIR *) NULL)
+    return(MagickFalse);
+  /*
+    Allocate filelist.
+  */
+  (*max_entries)=2048;
+  (*filelist)=(char **) AcquireQuantumMemory((size_t) (*max_entries),
+    sizeof(*(*filelist)));
+  if ((*filelist) == (char **) NULL)
+    {
+      (void) closedir((*current_directory));
+      return(MagickFalse);
+    }
+  /*
+    Save the current and change to the new directory.
+  */
+  (*buffer)=(struct dirent *) AcquireMagickMemory(sizeof(*(*buffer))+
+    FILENAME_MAX+1);
+  if ((*buffer) == (struct dirent *) NULL)
+    {
+      (*filelist)=(char **) RelinquishMagickMemory((*filelist));
+      (void) closedir((*current_directory));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static char **SortFileList(char **filelist,const size_t *number_entries)
+{
+  if (filelist == (char **) NULL)
+    return((char **) NULL);
+  /*
+    Sort filelist in ascending order.
+  */
+  qsort((void *) filelist,(size_t) *number_entries,sizeof(*filelist),
+    FileCompare);
+  return(filelist);
+}
+
 MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   size_t *number_entries)
 {
@@ -2280,6 +2405,9 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   size_t
     max_entries;
 
+  FileListDirectoryTargets
+    directory_targets;
+
   /*
     Open directory.
   */
@@ -2289,30 +2417,12 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",directory);
   *number_entries=0;
-  current_directory=opendir(directory);
-  if (current_directory == (DIR *) NULL)
+  directory_targets.current_directory=(&current_directory);
+  directory_targets.max_entries=(&max_entries);
+  directory_targets.filelist=(&filelist);
+  directory_targets.buffer=(&buffer);
+  if (OpenFileListDirectory(directory,&directory_targets) == MagickFalse)
     return((char **) NULL);
-  /*
-    Allocate filelist.
-  */
-  max_entries=2048;
-  filelist=(char **) AcquireQuantumMemory((size_t) max_entries,
-    sizeof(*filelist));
-  if (filelist == (char **) NULL)
-    {
-      (void) closedir(current_directory);
-      return((char **) NULL);
-    }
-  /*
-    Save the current and change to the new directory.
-  */
-  buffer=(struct dirent *) AcquireMagickMemory(sizeof(*buffer)+FILENAME_MAX+1);
-  if (buffer == (struct dirent *) NULL)
-    {
-      filelist=(char **) RelinquishMagickMemory(filelist);
-      (void) closedir(current_directory);
-      return((char **) NULL);
-    }
   while ((MagickReadDirectory(current_directory,buffer,&entry) == 0) &&
          (entry != (struct dirent *) NULL))
   {
@@ -2351,14 +2461,7 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   }
   buffer=(struct dirent *) RelinquishMagickMemory(buffer);
   (void) closedir(current_directory);
-  if (filelist == (char **) NULL)
-    return((char **) NULL);
-  /*
-    Sort filelist in ascending order.
-  */
-  qsort((void *) filelist,(size_t) *number_entries,sizeof(*filelist),
-    FileCompare);
-  return(filelist);
+  return(SortFileList(filelist,number_entries));
 }
 
 /*

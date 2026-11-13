@@ -100,6 +100,7 @@ $call Make histogram.c
 $call Make identify.c
 $call Make image.c
 $call Make image-settings.c
+$call Make image-append.c
 $call Make image-filename.c
 $call Make image-view.c
 $call Make layer.c
@@ -138,6 +139,7 @@ $call Make prepress.c
 $call Make property.c
 $call Make PreRvIcccm.c
 $call Make profile.c
+$call Make profile-sync.c
 $call Make quantize.c
 $call Make quantize-error.c
 $call Make quantize-info.c

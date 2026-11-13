@@ -1799,12 +1799,85 @@ static void DestroyParsedEntity(char **entities,const ssize_t i,char *v)
     entities[i+1]=DestroyString(entities[i+1]);
 }
 
+typedef struct _EntityValueInput
+{
+  XMLTreeRoot
+    *root;
+
+  char
+    *c,
+    *n,
+    *v,
+    q;
+
+  ExceptionInfo
+    *exception;
+} EntityValueInput;
+
+typedef struct _EntityValueTargets
+{
+  char
+    **xml,
+    ***predefined_entities;
+} EntityValueTargets;
+
+static MagickBooleanType AddEntityDeclaration(const EntityValueInput *input,
+  const EntityValueTargets *targets)
+{
+  char
+    **const xml = targets->xml,
+    ***const predefined_entities = targets->predefined_entities;
+
+  XMLTreeRoot
+    *const root = input->root;
+
+  char
+    *const c = input->c,
+    *const n = input->n,
+    *const v = input->v;
+
+  const char
+    q = input->q;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  char
+    **entities;
+
+  ssize_t
+    i;
+
+  entities=(*c == '%') ? (*predefined_entities) : root->entities;
+  i=CountXMLEntities(entities);
+  entities=(char **) ResizeQuantumMemory(entities,(size_t) (i+3),
+    sizeof(*entities));
+  if (entities == (char **) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  if (*c == '%')
+    (*predefined_entities)=entities;
+  else
+    root->entities=entities;
+  TerminateEntityValue(xml,v,q);
+  entities[i+1]=ParseEntities(v,(*predefined_entities),'%');
+  entities[i+2]=(char *) NULL;
+  if (IsNonCircularEntity(n,entities[i+1],entities) != MagickFalse)
+    entities[i]=n;
+  else
+    {
+      DestroyParsedEntity(entities,i,v);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","circular entity declaration %s",n);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
   char
     *c,
-    **entities,
     *n,
     **predefined_entities,
     q,
@@ -1813,8 +1886,11 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   EntityHeadTargets
     entity_targets;
 
-  ssize_t
-    i;
+  EntityValueInput
+    value_input;
+
+  EntityValueTargets
+    value_targets;
 
   n=(char *) NULL;
   predefined_entities=(char **) AcquireMagickMemory(sizeof(sentinel));
@@ -1847,26 +1923,16 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
             xml=strchr(xml,'>');
             continue;
           }
-        entities=(*c == '%') ? predefined_entities : root->entities;
-        i=CountXMLEntities(entities);
-        entities=(char **) ResizeQuantumMemory(entities,(size_t) (i+3),
-          sizeof(*entities));
-        if (entities == (char **) NULL)
-          ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-        if (*c == '%')
-          predefined_entities=entities;
-        else
-          root->entities=entities;
-        TerminateEntityValue(&xml,v,q);
-        entities[i+1]=ParseEntities(v,predefined_entities,'%');
-        entities[i+2]=(char *) NULL;
-        if (IsNonCircularEntity(n,entities[i+1],entities) != MagickFalse)
-          entities[i]=n;
-        else
+        value_input.root=root;
+        value_input.c=c;
+        value_input.n=n;
+        value_input.v=v;
+        value_input.q=q;
+        value_input.exception=exception;
+        value_targets.xml=(&xml);
+        value_targets.predefined_entities=(&predefined_entities);
+        if (AddEntityDeclaration(&value_input,&value_targets) == MagickFalse)
           {
-            DestroyParsedEntity(entities,i,v);
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              OptionWarning,"ParseError","circular entity declaration %s",n);
             predefined_entities=(char **) RelinquishMagickMemory(
               predefined_entities);
             return(MagickFalse);
@@ -2721,6 +2787,144 @@ static MagickBooleanType SkipToRootTag(char **p,ExceptionInfo *exception)
   return(MagickTrue);
 }
 
+typedef struct _XMLStartTagInput
+{
+  XMLTreeRoot
+    *root;
+
+  char
+    *tag;
+
+  int
+    terminal;
+
+  ExceptionInfo
+    *exception;
+} XMLStartTagInput;
+
+typedef struct _XMLStartTagTargets
+{
+  char
+    ***attribute,
+    ***attributes,
+    **p;
+
+  ssize_t
+    *l;
+
+  size_t
+    *ignore_depth;
+} XMLStartTagTargets;
+
+static MagickBooleanType ParseXMLStartTag(const XMLStartTagInput *input,
+  const XMLStartTagTargets *targets)
+{
+  char
+    ***const attribute = targets->attribute,
+    ***const attributes = targets->attributes,
+    **const p = targets->p;
+
+  ssize_t
+    *const l = targets->l;
+
+  size_t
+    *const ignore_depth = targets->ignore_depth;
+
+  XMLTreeRoot
+    *const root = input->root;
+
+  char
+    *const tag = input->tag;
+
+  const int
+    terminal = input->terminal;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  AttributeSectionInfo
+    section;
+
+  AttributeSectionTargets
+    section_targets;
+
+  StartTagInfo
+    start_tag;
+
+  StartTagTargets
+    start_tag_targets;
+
+  /*
+    Tag.
+  */
+  if (root->node == (XMLTreeInfo *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","root tag missing");
+      return(MagickFalse);
+    }
+  (*p)+=(ptrdiff_t) strcspn((*p),XMLWhitespace "/>");
+  while (isspace((int) ((unsigned char) *(*p))) != 0)
+    *(*p)++='\0';
+  section.root=root;
+  section.tag=tag;
+  section.ignore_depth=(*ignore_depth);
+  section.exception=exception;
+  section_targets.attribute=attribute;
+  section_targets.attributes=attributes;
+  section_targets.p=p;
+  section_targets.l=l;
+  if (ParseStartTagAttributes(&section,&section_targets) == MagickFalse)
+    return(MagickFalse);
+  start_tag.root=root;
+  start_tag.tag=tag;
+  start_tag.attributes=(*attributes);
+  start_tag.l=(*l);
+  start_tag.terminal=terminal;
+  start_tag.exception=exception;
+  start_tag_targets.p=p;
+  start_tag_targets.ignore_depth=ignore_depth;
+  if (EndStartTag(&start_tag,&start_tag_targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+typedef struct _XMLTreeUTF8Targets
+{
+  char
+    **utf8;
+
+  size_t
+    *length;
+} XMLTreeUTF8Targets;
+
+static MagickBooleanType ConvertXMLTreeToUTF8(const char *xml,
+  ExceptionInfo *exception,const XMLTreeUTF8Targets *targets)
+{
+  char
+    **const utf8 = targets->utf8;
+
+  size_t
+    *const length = targets->length;
+
+  *length=strlen(xml);
+  *utf8=ConvertUTF16ToUTF8(xml,length);
+  if (*utf8 == (char *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "ParseError","UTF16 to UTF8 failed");
+      return(MagickFalse);
+    }
+  if (*length == 0)
+    {
+      *utf8=DestroyString(*utf8);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "ParseError","root tag missing");
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2744,6 +2948,9 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
   XMLTreeRoot
     *root;
 
+  XMLTreeUTF8Targets
+    utf8_targets;
+
   /*
     Convert xml-string to UTF8.
   */
@@ -2754,21 +2961,10 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
       return((XMLTreeInfo *) NULL);
     }
   root=(XMLTreeRoot *) NewXMLTreeTag((char *) NULL);
-  length=strlen(xml);
-  utf8=ConvertUTF16ToUTF8(xml,&length);
-  if (utf8 == (char *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "ParseError","UTF16 to UTF8 failed");
-      return((XMLTreeInfo *) NULL);
-    }
-  if (length == 0)
-    {
-      utf8=DestroyString(utf8);
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "ParseError","root tag missing");
-      return((XMLTreeInfo *) NULL);
-    }
+  utf8_targets.utf8=(&utf8);
+  utf8_targets.length=(&length);
+  if (ConvertXMLTreeToUTF8(xml,exception,&utf8_targets) == MagickFalse)
+    return((XMLTreeInfo *) NULL);
   terminal=utf8[length-1];
   utf8[length-1]='\0';
   p=utf8;
@@ -2787,53 +2983,17 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
     c=(*p);
     if (IsXMLNameStart(p,c) != MagickFalse)
       {
-        AttributeSectionInfo
-          section;
+        const XMLStartTagTargets
+          start_targets = { &attribute, &attributes, &p, &l, &ignore_depth };
 
-        AttributeSectionTargets
-          section_targets;
+        XMLStartTagInput
+          start_input;
 
-        StartTagInfo
-          start_tag;
-
-        StartTagTargets
-          start_tag_targets;
-
-        /*
-          Tag.
-        */
-        if (root->node == (XMLTreeInfo *) NULL)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              OptionWarning,"ParseError","root tag missing");
-            utf8=DestroyString(utf8);
-            return(&root->root);
-          }
-        p+=(ptrdiff_t) strcspn(p,XMLWhitespace "/>");
-        while (isspace((int) ((unsigned char) *p)) != 0)
-          *p++='\0';
-        section.root=root;
-        section.tag=tag;
-        section.ignore_depth=ignore_depth;
-        section.exception=exception;
-        section_targets.attribute=(&attribute);
-        section_targets.attributes=(&attributes);
-        section_targets.p=(&p);
-        section_targets.l=(&l);
-        if (ParseStartTagAttributes(&section,&section_targets) == MagickFalse)
-          {
-            utf8=DestroyString(utf8);
-            return(&root->root);
-          }
-        start_tag.root=root;
-        start_tag.tag=tag;
-        start_tag.attributes=attributes;
-        start_tag.l=l;
-        start_tag.terminal=terminal;
-        start_tag.exception=exception;
-        start_tag_targets.p=(&p);
-        start_tag_targets.ignore_depth=(&ignore_depth);
-        if (EndStartTag(&start_tag,&start_tag_targets) == MagickFalse)
+        start_input.root=root;
+        start_input.tag=tag;
+        start_input.terminal=terminal;
+        start_input.exception=exception;
+        if (ParseXMLStartTag(&start_input,&start_targets) == MagickFalse)
           {
             utf8=DestroyString(utf8);
             return(&root->root);
