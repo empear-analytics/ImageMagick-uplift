@@ -1683,10 +1683,24 @@ static void ReplaceIllegalFileNameCharacters(char *ptr)
   }
 }
 
-static MagickBooleanType CompileOpenCLKernel(MagickCLDevice device,
-  const char *kernel,const char *options,size_t signature,
-  ExceptionInfo *exception)
+typedef struct _OpenCLKernelBuild
 {
+  const char
+    *options;
+
+  ExceptionInfo
+    *exception;
+} OpenCLKernelBuild;
+
+static MagickBooleanType CompileOpenCLKernel(MagickCLDevice device,
+  const char *kernel,const OpenCLKernelBuild *build,size_t signature)
+{
+  const char
+    *const options = build->options;
+
+  ExceptionInfo
+    *const exception = build->exception;
+
   char
     deviceName[MagickPathExtent],
     filename[MagickPathExtent],
@@ -2232,6 +2246,9 @@ static MagickBooleanType CompileOpenCLDevices(
   ExceptionInfo
     *const exception = compile->exception;
 
+  const OpenCLKernelBuild
+    build = { options, exception };
+
   MagickBooleanType
     status;
 
@@ -2259,8 +2276,8 @@ static MagickBooleanType CompileOpenCLDevices(
     }
     device_signature=signature;
     device_signature^=StringSignature(device->platform_name);
-    status=CompileOpenCLKernel(device,accelerateKernelsBuffer,options,
-      device_signature,exception);
+    status=CompileOpenCLKernel(device,accelerateKernelsBuffer,&build,
+      device_signature);
     UnlockSemaphoreInfo(device->lock);
     if (status == MagickFalse)
       break;
