@@ -1162,6 +1162,52 @@ static void XEditTextInsertKey(Display *display,XWidgetInfo *text_info,
     }
 }
 
+static void XEditTextCursorLeft(XWidgetInfo *text_info)
+{
+  /*
+    Move cursor one position left.
+  */
+  if (text_info->cursor == text_info->text)
+    return;
+  text_info->cursor--;
+}
+
+static void XEditTextCursorRight(XWidgetInfo *text_info)
+{
+  /*
+    Move cursor one position right.
+  */
+  if (text_info->cursor == (text_info->text+Extent(text_info->text)))
+    return;
+  text_info->cursor++;
+}
+
+static void XEditTextBackspace(XWidgetInfo *text_info)
+{
+  if (text_info->highlight)
+    {
+      /*
+        Erase the entire line of text.
+      */
+      *text_info->text='\0';
+      text_info->cursor=text_info->text;
+      text_info->marker=text_info->text;
+      text_info->highlight=MagickFalse;
+    }
+  /*
+    Erase one character.
+  */
+  if (text_info->cursor != text_info->text)
+    {
+      text_info->cursor--;
+      (void) memmove(text_info->cursor,text_info->cursor+1,
+        strlen(text_info->cursor+1)+1);
+      text_info->highlight=MagickFalse;
+      return;
+    }
+  XEditTextCursorLeft(text_info);
+}
+
 static void XEditText(Display *display,XWidgetInfo *text_info,
   const KeySym key_symbol,char *text,const size_t state)
 {
@@ -1170,49 +1216,19 @@ static void XEditText(Display *display,XWidgetInfo *text_info,
     case XK_BackSpace:
     case XK_Delete:
     {
-      if (text_info->highlight)
-        {
-          /*
-            Erase the entire line of text.
-          */
-          *text_info->text='\0';
-          text_info->cursor=text_info->text;
-          text_info->marker=text_info->text;
-          text_info->highlight=MagickFalse;
-        }
-      /*
-        Erase one character.
-      */
-      if (text_info->cursor != text_info->text)
-        {
-          text_info->cursor--;
-          (void) memmove(text_info->cursor,text_info->cursor+1,
-            strlen(text_info->cursor+1)+1);
-          text_info->highlight=MagickFalse;
-          break;
-        }
-      magick_fallthrough;
+      XEditTextBackspace(text_info);
+      break;
     }
     case XK_Left:
     case XK_KP_Left:
     {
-      /*
-        Move cursor one position left.
-      */
-      if (text_info->cursor == text_info->text)
-        break;
-      text_info->cursor--;
+      XEditTextCursorLeft(text_info);
       break;
     }
     case XK_Right:
     case XK_KP_Right:
     {
-      /*
-        Move cursor one position right.
-      */
-      if (text_info->cursor == (text_info->text+Extent(text_info->text)))
-        break;
-      text_info->cursor++;
+      XEditTextCursorRight(text_info);
       break;
     }
     default:
@@ -1404,6 +1420,22 @@ static void XScreenConvertAltButton(XEvent *event)
     }
 }
 
+static int XScreenInputEvent(const XEvent *event)
+{
+  switch (event->type)
+  {
+    case ButtonRelease:
+    case KeyPress:
+    case KeyRelease:
+    case MotionNotify:
+    case SelectionNotify:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static int XScreenEvent(Display *display,XEvent *event,char *data)
 {
   XWindows
@@ -1442,14 +1474,8 @@ static int XScreenEvent(Display *display,XEvent *event,char *data)
           CurrentTime);
       return(MagickTrue);
     }
-    case ButtonRelease:
-    case KeyPress:
-    case KeyRelease:
-    case MotionNotify:
-    case SelectionNotify:
-      return(MagickTrue);
     default:
-      break;
+      return(XScreenInputEvent(event));
   }
   return(MagickFalse);
 }
@@ -14338,6 +14364,70 @@ static int CloseMenuWidget(const MenuEventContext *context,
   return((*selection_info).id);
 }
 
+static void RespondToMenuEvents(const MenuEventContext *context,
+  const MenuTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = targets->state;
+
+  XEvent
+    event;
+
+  do
+  {
+    UpdateMenuLayout(context,targets);
+    RedrawMenuWidget(context,targets);
+    DrawMenuLine(context,targets);
+    /*
+      Wait for next event.
+    */
+    (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
+    HandleMenuEvent(context,event,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
+static void PlaceMenuWidget(Display *display,XWindows *windows,
+  XFontStruct *font_info,const unsigned int title_height)
+{
+  int
+    x,
+    y;
+
+  windows->widget.min_width=windows->widget.width;
+  windows->widget.min_height=windows->widget.height;
+  XQueryPosition(display,windows->widget.root,&x,&y);
+  windows->widget.x=x-(int) (QuantumMargin >> 1);
+  if (submenu_info.active != 0)
+    {
+      windows->widget.x=windows->command.x+(int) windows->command.width-
+        QuantumMargin;
+      toggle_info.raised=MagickTrue;
+      XDrawTriangleEast(display,&windows->command,&toggle_info);
+    }
+  windows->widget.y=submenu_info.active == 0 ? y-(int) (title_height >> 2) : y;
+  if (submenu_info.active != 0)
+    windows->widget.y=windows->command.y+submenu_info.y;
+  XConstrainWindowPosition(display,&windows->widget);
+}
+
+static Cursor DefineMenuCursor(Display *display,XWindows *windows)
+{
+  Cursor
+    cursor;
+
+  cursor=XCreateFontCursor(display,XC_right_ptr);
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (void) XCheckDefineCursor(display,windows->command.id,cursor);
+  (void) XCheckDefineCursor(display,windows->widget.id,cursor);
+  return(cursor);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -14345,9 +14435,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
     cursor;
 
   int
-    id,
-    x,
-    y;
+    id;
 
   unsigned int
     height,
@@ -14358,9 +14446,6 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
 
   size_t
     state;
-
-  XEvent
-    event;
 
   XFontStruct
     *font_info;
@@ -14408,21 +14493,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
     (menu_info.bevel_width << 1);
   top_offset=title_height+menu_info.bevel_width-1;
   windows->widget.height=top_offset+number_selections*height+4;
-  windows->widget.min_width=windows->widget.width;
-  windows->widget.min_height=windows->widget.height;
-  XQueryPosition(display,windows->widget.root,&x,&y);
-  windows->widget.x=x-(int) (QuantumMargin >> 1);
-  if (submenu_info.active != 0)
-    {
-      windows->widget.x=windows->command.x+(int) windows->command.width-
-        QuantumMargin;
-      toggle_info.raised=MagickTrue;
-      XDrawTriangleEast(display,&windows->command,&toggle_info);
-    }
-  windows->widget.y=submenu_info.active == 0 ? y-(int) (title_height >> 2) : y;
-  if (submenu_info.active != 0)
-    windows->widget.y=windows->command.y+submenu_info.y;
-  XConstrainWindowPosition(display,&windows->widget);
+  PlaceMenuWidget(display,windows,font_info,title_height);
   /*
     Map Menu widget.
   */
@@ -14431,10 +14502,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
     Respond to X events.
   */
   selection_info.height=height;
-  cursor=XCreateFontCursor(display,XC_right_ptr);
-  (void) XCheckDefineCursor(display,windows->image.id,cursor);
-  (void) XCheckDefineCursor(display,windows->command.id,cursor);
-  (void) XCheckDefineCursor(display,windows->widget.id,cursor);
+  cursor=DefineMenuCursor(display,windows);
   state=UpdateConfigurationState;
   event_context.display=display;
   event_context.windows=windows;
@@ -14445,17 +14513,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   event_context.height=height;
   event_context.title=title;
   event_context.title_height=title_height;
-  do
-  {
-    UpdateMenuLayout(&event_context,&targets);
-    RedrawMenuWidget(&event_context,&targets);
-    DrawMenuLine(&event_context,&targets);
-    /*
-      Wait for next event.
-    */
-    (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    HandleMenuEvent(&event_context,event,&targets);
-  } while ((state & ExitState) == 0);
+  RespondToMenuEvents(&event_context,&targets);
   return(CloseMenuWidget(&event_context,&targets,cursor));
 }
 
@@ -14594,67 +14652,32 @@ static void MoveNoticeDismiss(Display *display,XWindows *windows,XEvent event,
     }
 }
 
-MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
-  const char *reason,const char *description)
-{
 #define DismissButtonText  "Dismiss"
 #define Timeout  8
 
+static unsigned int GetNoticeReasonWidth(XFontStruct *font_info,
+  const char *reason)
+{
   const char
     *text;
 
-  int
-    x,
-    y;
-
-  Status
-    status;
-
-  time_t
-    timer;
-
   unsigned int
-    height,
     width;
 
-  size_t
-    state;
-
-  XEvent
-    event;
-
-  XFontStruct
-    *font_info;
-
-  XTextProperty
-    window_name;
-
-  XWidgetInfo
-    dismiss_info;
-
-  XWindowChanges
-    window_changes;
-
-  const NoticeTargets
-    targets = { &dismiss_info, &state };
-
-  /*
-    Determine Notice widget attributes.
-  */
-  assert(display != (Display *) NULL);
-  assert(windows != (XWindows *) NULL);
-  assert(reason != (char *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",reason);
-  XDelay(display,SuspendTime << 3);  /* avoid surprise with delay */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  font_info=windows->widget.font_info;
   width=WidgetTextWidth(font_info,DismissButtonText);
   text=GetLocaleExceptionMessage(XServerError,reason);
   if (text != (char *) NULL)
     if (WidgetTextWidth(font_info,(char *) text) > width)
       width=WidgetTextWidth(font_info,(char *) text);
+  return(width);
+}
+
+static unsigned int GetNoticeDescriptionWidth(XFontStruct *font_info,
+  const char *description,unsigned int width)
+{
+  const char
+    *text;
+
   if (description != (char *) NULL)
     {
       text=GetLocaleExceptionMessage(XServerError,description);
@@ -14662,22 +14685,39 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
         if (WidgetTextWidth(font_info,(char *) text) > width)
           width=WidgetTextWidth(font_info,(char *) text);
     }
-  height=(unsigned int) (font_info->ascent+font_info->descent);
-  /*
-    Position Notice widget.
-  */
+  return(width);
+}
+
+static void PositionNoticeWidth(XWindows *windows,XFontStruct *font_info,
+  const unsigned int width)
+{
   windows->widget.width=width+(unsigned int) (4*QuantumMargin);
   windows->widget.min_width=width+(unsigned int) QuantumMargin;
   if (windows->widget.width < windows->widget.min_width)
     windows->widget.width=windows->widget.min_width;
+}
+
+static void PositionNoticeHeight(Display *display,XWindows *windows,
+  const unsigned int height)
+{
   windows->widget.height=(unsigned int) (12*height);
   windows->widget.min_height=(unsigned int) (7*height);
   if (windows->widget.height < windows->widget.min_height)
     windows->widget.height=windows->widget.min_height;
   XConstrainWindowPosition(display,&windows->widget);
-  /*
-    Map Notice widget.
-  */
+}
+
+static void MapNoticeWidget(Display *display,XWindows *windows)
+{
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
   (void) CopyMagickString(windows->widget.name,"Notice",MagickPathExtent);
   status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
   if (status != False)
@@ -14694,6 +14734,138 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
     (unsigned int) (CWWidth | CWHeight | CWX | CWY),&window_changes);
   (void) XMapRaised(display,windows->widget.id);
   windows->widget.mapped=MagickFalse;
+}
+
+static void InitializeNoticeDismiss(XWindows *windows,XFontStruct *font_info,
+  const unsigned int height,XWidgetInfo *dismiss_info)
+{
+  XGetWidgetInfo(DismissButtonText,dismiss_info);
+  (*dismiss_info).width=(unsigned int) QuantumMargin+
+    WidgetTextWidth(font_info,DismissButtonText);
+  (*dismiss_info).height=(unsigned int) ((3*height) >> 1);
+  (*dismiss_info).x=(int)
+    ((windows->widget.width >> 1)-((*dismiss_info).width >> 1));
+  (*dismiss_info).y=(int)
+    (windows->widget.height-((*dismiss_info).height << 1));
+}
+
+static void ReleaseNoticeWidget(Display *display,XWindows *windows,
+  const XEvent event,const NoticeTargets targets)
+{
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  ReleaseNoticeDismiss(display,windows,event,&targets);
+}
+
+typedef struct _NoticeText
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    height;
+
+  const char
+    *reason,
+    *description;
+} NoticeText;
+
+static void DrawNoticeText(const NoticeText *notice)
+{
+  Display
+    *const display = notice->display;
+
+  XWindows
+    *const windows = notice->windows;
+
+  XFontStruct
+    *const font_info = notice->font_info;
+
+  const unsigned int
+    height = notice->height;
+
+  const char
+    *const reason = notice->reason,
+    *const description = notice->description;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,(char *) reason);
+  x=(int) ((windows->widget.width >> 1)-(width >> 1));
+  y=(int) ((windows->widget.height >> 1)-(height << 1));
+  (void) XDrawString(display,windows->widget.id,
+    windows->widget.annotate_context,x,y,(char *) reason,Extent(reason));
+  if (description != (char *) NULL)
+    {
+      width=WidgetTextWidth(font_info,(char *) description);
+      x=(int) ((windows->widget.width >> 1)-(width >> 1));
+      y+=(int) height;
+      (void) XDrawString(display,windows->widget.id,
+        windows->widget.annotate_context,x,y,(char *) description,
+        Extent(description));
+    }
+}
+
+MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
+  const char *reason,const char *description)
+{
+  time_t
+    timer;
+
+  unsigned int
+    height,
+    width;
+
+  size_t
+    state;
+
+  XEvent
+    event;
+
+  XFontStruct
+    *font_info;
+
+  XWidgetInfo
+    dismiss_info;
+
+  const NoticeTargets
+    targets = { &dismiss_info, &state };
+
+  /*
+    Determine Notice widget attributes.
+  */
+  assert(display != (Display *) NULL);
+  assert(windows != (XWindows *) NULL);
+  assert(reason != (char *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",reason);
+  XDelay(display,SuspendTime << 3);  /* avoid surprise with delay */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  font_info=windows->widget.font_info;
+  width=GetNoticeReasonWidth(font_info,reason);
+  width=GetNoticeDescriptionWidth(font_info,description,width);
+  height=(unsigned int) (font_info->ascent+font_info->descent);
+  /*
+    Position Notice widget.
+  */
+  PositionNoticeWidth(windows,font_info,width);
+  PositionNoticeHeight(display,windows,height);
+  /*
+    Map Notice widget.
+  */
+  MapNoticeWidget(display,windows);
   (void) XBell(display,0);
   /*
     Respond to X events.
@@ -14709,35 +14881,19 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
         /*
           Initialize Dismiss button information.
         */
-        XGetWidgetInfo(DismissButtonText,&dismiss_info);
-        dismiss_info.width=(unsigned int) QuantumMargin+
-          WidgetTextWidth(font_info,DismissButtonText);
-        dismiss_info.height=(unsigned int) ((3*height) >> 1);
-        dismiss_info.x=(int)
-          ((windows->widget.width >> 1)-(dismiss_info.width >> 1));
-        dismiss_info.y=(int)
-          (windows->widget.height-(dismiss_info.height << 1));
+        InitializeNoticeDismiss(windows,font_info,height,&dismiss_info);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
     if (state & RedrawWidgetState)
       {
+        const NoticeText
+          notice = { display, windows, font_info, height, reason,
+            description };
+
         /*
           Redraw Notice widget.
         */
-        width=WidgetTextWidth(font_info,(char *) reason);
-        x=(int) ((windows->widget.width >> 1)-(width >> 1));
-        y=(int) ((windows->widget.height >> 1)-(height << 1));
-        (void) XDrawString(display,windows->widget.id,
-          windows->widget.annotate_context,x,y,(char *) reason,Extent(reason));
-        if (description != (char *) NULL)
-          {
-            width=WidgetTextWidth(font_info,(char *) description);
-            x=(int) ((windows->widget.width >> 1)-(width >> 1));
-            y+=(int) height;
-            (void) XDrawString(display,windows->widget.id,
-              windows->widget.annotate_context,x,y,(char *) description,
-              Extent(description));
-          }
+        DrawNoticeText(&notice);
         XDrawBeveledButton(display,&windows->widget,&dismiss_info);
         XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
         state&=(unsigned int) (~RedrawWidgetState);
@@ -14762,9 +14918,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        ReleaseNoticeDismiss(display,windows,event,&targets);
+        ReleaseNoticeWidget(display,windows,event,targets);
         break;
       }
       case ClientMessage:
@@ -14881,98 +15035,30 @@ static void DoublePreferencesUndoCache(XResourceInfo *resource_info)
     resource_info->undo_cache=1;
 }
 
-MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
-  XResourceInfo *resource_info,XWindows *windows)
+static const char
+  *Preferences[] =
+  {
+    "display image centered on a backdrop",
+    "confirm on program exit",
+    "confirm on image edits",
+    "correct image for display gamma",
+    "display warning messages",
+    "apply Floyd/Steinberg error diffusion to image",
+    "use a shared colormap for colormapped X visuals",
+    "display images as an X server pixmap"
+  };
+
+static void MapPreferencesWidget(Display *display,XWindows *windows)
 {
-  static const char
-    *Preferences[] =
-    {
-      "display image centered on a backdrop",
-      "confirm on program exit",
-      "confirm on image edits",
-      "correct image for display gamma",
-      "display warning messages",
-      "apply Floyd/Steinberg error diffusion to image",
-      "use a shared colormap for colormapped X visuals",
-      "display images as an X server pixmap"
-    };
-
-  char
-    cache[MagickPathExtent];
-
-  int
-    x,
-    y;
-
-  int
-    i;
-
   Status
     status;
-
-  unsigned int
-    height,
-    text_width,
-    width;
-
-  size_t
-    state;
-
-  XEvent
-    event;
-
-  XFontStruct
-    *font_info;
 
   XTextProperty
     window_name;
 
-  XWidgetInfo
-    apply_info,
-    cache_info,
-    cancel_info,
-    preferences_info[NumberPreferences];
-
   XWindowChanges
     window_changes;
 
-  /*
-    Determine Preferences widget attributes.
-  */
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  assert(display != (Display *) NULL);
-  assert(resource_info != (XResourceInfo *) NULL);
-  assert(windows != (XWindows *) NULL);
-  XCheckRefreshWindows(display,windows);
-  font_info=windows->widget.font_info;
-  text_width=WidgetTextWidth(font_info,CacheButtonText);
-  for (i=0; i < NumberPreferences; i++)
-    if (WidgetTextWidth(font_info,(char *) Preferences[i]) > text_width)
-      text_width=WidgetTextWidth(font_info,(char *) Preferences[i]);
-  width=WidgetTextWidth(font_info,ApplyButtonText);
-  if (WidgetTextWidth(font_info,CancelButtonText) > width)
-    width=WidgetTextWidth(font_info,CancelButtonText);
-  width+=(unsigned int) QuantumMargin;
-  height=(unsigned int) (font_info->ascent+font_info->descent);
-  /*
-    Position Preferences widget.
-  */
-  windows->widget.width=(unsigned int) (MagickMax((int) (width << 1),
-    (int) text_width)+6*QuantumMargin);
-  windows->widget.min_width=(width << 1)+(unsigned int) QuantumMargin;
-  if (windows->widget.width < windows->widget.min_width)
-    windows->widget.width=windows->widget.min_width;
-  windows->widget.height=(unsigned int) (7*(int) height+NumberPreferences*
-    ((int) height+(QuantumMargin >> 1)));
-  windows->widget.min_height=(unsigned int) (7*(int) height+NumberPreferences*
-    ((int) height+(QuantumMargin >> 1)));
-  if (windows->widget.height < windows->widget.min_height)
-    windows->widget.height=windows->widget.min_height;
-  XConstrainWindowPosition(display,&windows->widget);
-  /*
-    Map Preferences widget.
-  */
   (void) CopyMagickString(windows->widget.name,"Preferences",MagickPathExtent);
   status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
   if (status != False)
@@ -14989,262 +15075,665 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
     (unsigned int) (CWWidth | CWHeight | CWX | CWY),&window_changes);
   (void) XMapRaised(display,windows->widget.id);
   windows->widget.mapped=MagickFalse;
-  /*
-    Respond to X events.
-  */
-  state=UpdateConfigurationState;
-  XSetCursorState(display,windows,MagickTrue);
-  do
-  {
-    if (state & UpdateConfigurationState)
-      {
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(CancelButtonText,&cancel_info);
-        cancel_info.width=width;
-        cancel_info.height=(unsigned int) (3*height) >> 1;
-        cancel_info.x=(int) windows->widget.width-(int) cancel_info.width-
-          (QuantumMargin << 1);
-        cancel_info.y=(int) windows->widget.height-(int) cancel_info.height-
-          QuantumMargin;
-        XGetWidgetInfo(ApplyButtonText,&apply_info);
-        apply_info.width=width;
-        apply_info.height=(unsigned int) (3*height) >> 1;
-        apply_info.x=QuantumMargin << 1;
-        apply_info.y=cancel_info.y;
-        y=(int) (height << 1);
-        for (i=0; i < NumberPreferences; i++)
-        {
-          XGetWidgetInfo(Preferences[i],&preferences_info[i]);
-          preferences_info[i].bevel_width--;
-          preferences_info[i].width=(unsigned int) QuantumMargin >> 1;
-          preferences_info[i].height=(unsigned int) QuantumMargin >> 1;
-          preferences_info[i].x=QuantumMargin << 1;
-          preferences_info[i].y=y;
-          y+=(int) height+(QuantumMargin >> 1);
-        }
-        preferences_info[0].raised=resource_info->backdrop ==
-          MagickFalse ? MagickTrue : MagickFalse;
-        preferences_info[1].raised=resource_info->confirm_exit ==
-          MagickFalse ? MagickTrue : MagickFalse;
-        preferences_info[2].raised=resource_info->confirm_edit ==
-          MagickFalse ? MagickTrue : MagickFalse;
-        preferences_info[3].raised=resource_info->gamma_correct ==
-          MagickFalse ? MagickTrue : MagickFalse;
-        preferences_info[4].raised=resource_info->display_warnings ==
-          MagickFalse ? MagickTrue : MagickFalse;
-        preferences_info[5].raised=
-          resource_info->quantize_info->dither_method == NoDitherMethod ?
-          MagickTrue : MagickFalse;
-        preferences_info[6].raised=resource_info->colormap !=
-          SharedColormap ? MagickTrue : MagickFalse;
-        preferences_info[7].raised=resource_info->use_pixmap ==
-          MagickFalse ? MagickTrue : MagickFalse;
-        (void) FormatLocaleString(cache,MagickPathExtent,CacheButtonText,
-          (unsigned long) resource_info->undo_cache);
-        XGetWidgetInfo(cache,&cache_info);
-        cache_info.bevel_width--;
-        cache_info.width=(unsigned int) QuantumMargin >> 1;
-        cache_info.height=(unsigned int) QuantumMargin >> 1;
-        cache_info.x=QuantumMargin << 1;
-        cache_info.y=y;
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
-    if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw Preferences widget.
-        */
-        XDrawBeveledButton(display,&windows->widget,&apply_info);
-        XDrawBeveledButton(display,&windows->widget,&cancel_info);
-        for (i=0; i < NumberPreferences; i++)
-          XDrawBeveledButton(display,&windows->widget,&preferences_info[i]);
-        XDrawTriangleEast(display,&windows->widget,&cache_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
-    /*
-      Wait for next event.
-    */
-    (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (MatteIsActive(apply_info,event.xbutton))
-          {
-            /*
-              User pressed Apply button.
-            */
-            apply_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&apply_info);
-            break;
-          }
-        if (MatteIsActive(cancel_info,event.xbutton))
-          {
-            /*
-              User pressed Cancel button.
-            */
-            cancel_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        TogglePreferencesButton(display,windows,event,preferences_info);
-        if (MatteIsActive(cache_info,event.xbutton))
-          {
-            /*
-              User pressed Cache button.
-            */
-            x=cache_info.x+(int) cache_info.width+(int) cache_info.bevel_width+
-              (QuantumMargin >> 1);
-            y=cache_info.y+(int) ((cache_info.height-height) >> 1);
-            width=WidgetTextWidth(font_info,cache);
-            (void) XClearArea(display,windows->widget.id,x,y,width,height,
-              False);
-            DoublePreferencesUndoCache(resource_info);
-            (void) FormatLocaleString(cache,MagickPathExtent,CacheButtonText,
-              (unsigned long) resource_info->undo_cache);
-            cache_info.raised=MagickFalse;
-            XDrawTriangleEast(display,&windows->widget,&cache_info);
-            break;
-          }
-        break;
-      }
-      case ButtonRelease:
-      {
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        if (apply_info.raised == MagickFalse)
-          {
-            state=ReleasePreferencesButton(windows,event,apply_info,state);
-            apply_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&apply_info);
-            apply_info.raised=MagickFalse;
-          }
-        if (cancel_info.raised == MagickFalse)
-          {
-            state=ReleasePreferencesButton(windows,event,cancel_info,state);
-            cancel_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-          }
-        if (cache_info.raised == MagickFalse)
-          {
-            cache_info.raised=MagickTrue;
-            XDrawTriangleEast(display,&windows->widget,&cache_info);
-          }
-        break;
-      }
-      case ClientMessage:
-      {
-        state=ClientWidgetMessage(display,windows,event,state);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
-      case KeyPress:
-      {
-        static char
-          command[MagickPathExtent];
+}
 
-        static KeySym
-          key_symbol;
+static unsigned int GetPreferencesTextWidth(XFontStruct *font_info)
+{
+  int
+    i;
 
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            apply_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&apply_info);
-            state|=ExitState;
-            break;
-          }
-        break;
-      }
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (state & InactiveWidgetState)
-          break;
-        if (apply_info.raised == MatteIsActive(apply_info,event.xmotion))
-          {
-            /*
-              Apply button status changed.
-            */
-            apply_info.raised=
-              apply_info.raised == MagickFalse ? MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&apply_info);
-            break;
-          }
-        if (cancel_info.raised == MatteIsActive(cancel_info,event.xmotion))
-          {
-            /*
-              Cancel button status changed.
-            */
-            cancel_info.raised=
-              cancel_info.raised == MagickFalse ? MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        break;
-      }
-      default:
-        break;
-    }
-  } while ((state & ExitState) == 0);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
-  XCheckRefreshWindows(display,windows);
-  if (apply_info.raised)
-    return(MagickFalse);
+  unsigned int
+    text_width;
+
+  text_width=WidgetTextWidth(font_info,CacheButtonText);
+  for (i=0; i < NumberPreferences; i++)
+    if (WidgetTextWidth(font_info,(char *) Preferences[i]) > text_width)
+      text_width=WidgetTextWidth(font_info,(char *) Preferences[i]);
+  return(text_width);
+}
+
+static unsigned int GetPreferencesButtonWidth(XFontStruct *font_info)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,ApplyButtonText);
+  if (WidgetTextWidth(font_info,CancelButtonText) > width)
+    width=WidgetTextWidth(font_info,CancelButtonText);
+  width+=(unsigned int) QuantumMargin;
+  return(width);
+}
+
+static void PositionPreferencesWidth(XWindows *windows,XFontStruct *font_info,
+  unsigned int width,unsigned int text_width)
+{
+  windows->widget.width=(unsigned int) (MagickMax((int) (width << 1),
+    (int) text_width)+6*QuantumMargin);
+  windows->widget.min_width=(width << 1)+(unsigned int) QuantumMargin;
+  if (windows->widget.width < windows->widget.min_width)
+    windows->widget.width=windows->widget.min_width;
+}
+
+static void PositionPreferencesHeight(XWindows *windows,
+  XFontStruct *font_info,unsigned int height)
+{
+  windows->widget.height=(unsigned int) (7*(int) height+NumberPreferences*
+    ((int) height+(QuantumMargin >> 1)));
+  windows->widget.min_height=(unsigned int) (7*(int) height+NumberPreferences*
+    ((int) height+(QuantumMargin >> 1)));
+  if (windows->widget.height < windows->widget.min_height)
+    windows->widget.height=windows->widget.min_height;
+}
+
+static void SavePreferences(XResourceInfo *resource_info,
+  const XWidgetInfo *preferences_info)
+{
   /*
     Save user preferences to the client configuration file.
   */
-  resource_info->backdrop=
-    preferences_info[0].raised == MagickFalse ? MagickTrue : MagickFalse;
-  resource_info->confirm_exit=
-    preferences_info[1].raised == MagickFalse ? MagickTrue : MagickFalse;
-  resource_info->confirm_edit=
-    preferences_info[2].raised == MagickFalse ? MagickTrue : MagickFalse;
-  resource_info->gamma_correct=
-    preferences_info[3].raised == MagickFalse ? MagickTrue : MagickFalse;
-  resource_info->display_warnings=
-     preferences_info[4].raised == MagickFalse ? MagickTrue : MagickFalse;
+  resource_info->backdrop=preferences_info[0].raised == MagickFalse;
+  resource_info->confirm_exit=preferences_info[1].raised == MagickFalse;
+  resource_info->confirm_edit=preferences_info[2].raised == MagickFalse;
+  resource_info->gamma_correct=preferences_info[3].raised == MagickFalse;
+  resource_info->display_warnings=preferences_info[4].raised == MagickFalse;
   resource_info->quantize_info->dither_method=
     preferences_info[5].raised == MagickFalse ?
     RiemersmaDitherMethod : NoDitherMethod;
   resource_info->colormap=SharedColormap;
   if (preferences_info[6].raised)
     resource_info->colormap=PrivateColormap;
-  resource_info->use_pixmap=
-    preferences_info[7].raised == MagickFalse ? MagickTrue : MagickFalse;
+  resource_info->use_pixmap=preferences_info[7].raised == MagickFalse;
   XUserPreferences(resource_info);
+}
+
+typedef struct _PreferencesWidgets
+{
+  XWidgetInfo
+    *cache_info;
+
+  char
+    *cache;
+  XWidgetInfo
+    *preferences_info;
+  XWidgetInfo
+    *cancel_info;
+
+  XWidgetInfo
+    *apply_info;
+
+  unsigned int
+    *width;
+
+  size_t
+    *state;
+  XEvent
+    *event;
+} PreferencesWidgets;
+
+typedef struct _PreferencesContext
+{
+  XResourceInfo
+    *resource_info;
+
+  XFontStruct
+    *font_info;
+  XWindows
+    *windows;
+
+  unsigned int
+    height;
+  Display
+    *display;
+} PreferencesContext;
+
+static void InitializePreferencesCache(const PreferencesContext *context,
+  const PreferencesWidgets *widgets,int y)
+{
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const cache_info = widgets->cache_info;
+
+  char
+    *const cache = widgets->cache;
+
+  (void) FormatLocaleString(cache,MagickPathExtent,CacheButtonText,
+    (unsigned long) resource_info->undo_cache);
+  XGetWidgetInfo(cache,cache_info);
+  (*cache_info).bevel_width--;
+  (*cache_info).width=(unsigned int) QuantumMargin >> 1;
+  (*cache_info).height=(unsigned int) QuantumMargin >> 1;
+  (*cache_info).x=QuantumMargin << 1;
+  (*cache_info).y=y;
+}
+
+static void SetPreferencesRaised(const PreferencesContext *context,
+  const PreferencesWidgets *widgets)
+{
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWidgetInfo
+    *const preferences_info = widgets->preferences_info;
+
+  preferences_info[0].raised=resource_info->backdrop == MagickFalse;
+  preferences_info[1].raised=resource_info->confirm_exit == MagickFalse;
+  preferences_info[2].raised=resource_info->confirm_edit == MagickFalse;
+  preferences_info[3].raised=resource_info->gamma_correct ==
+    MagickFalse;
+  preferences_info[4].raised=resource_info->display_warnings ==
+    MagickFalse;
+  preferences_info[5].raised=
+    resource_info->quantize_info->dither_method == NoDitherMethod;
+  preferences_info[6].raised=resource_info->colormap != SharedColormap;
+  preferences_info[7].raised=resource_info->use_pixmap == MagickFalse;
+}
+
+static void UpdatePreferencesButtons(const PreferencesContext *context,
+  const PreferencesWidgets *widgets)
+{
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  XWidgetInfo
+    *const preferences_info = widgets->preferences_info;
+
+  unsigned int
+    *const width = widgets->width;
+
+  size_t
+    *const state = widgets->state;
+
+  int
+    i,
+    y;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      /*
+        Initialize button information.
+      */
+      XGetWidgetInfo(CancelButtonText,cancel_info);
+      (*cancel_info).width=(*width);
+      (*cancel_info).height=(unsigned int) (3*height) >> 1;
+      (*cancel_info).x=(int) windows->widget.width-(int) (*cancel_info).width-
+        (QuantumMargin << 1);
+      (*cancel_info).y=(int) windows->widget.height-(int) (*cancel_info).height-
+        QuantumMargin;
+      XGetWidgetInfo(ApplyButtonText,apply_info);
+      (*apply_info).width=(*width);
+      (*apply_info).height=(unsigned int) (3*height) >> 1;
+      (*apply_info).x=QuantumMargin << 1;
+      (*apply_info).y=(*cancel_info).y;
+      y=(int) (height << 1);
+      for (i=0; i < NumberPreferences; i++)
+      {
+        XGetWidgetInfo(Preferences[i],&preferences_info[i]);
+        preferences_info[i].bevel_width--;
+        preferences_info[i].width=(unsigned int) QuantumMargin >> 1;
+        preferences_info[i].height=(unsigned int) QuantumMargin >> 1;
+        preferences_info[i].x=QuantumMargin << 1;
+        preferences_info[i].y=y;
+        y+=(int) height+(QuantumMargin >> 1);
+      }
+      SetPreferencesRaised(context,widgets);
+      InitializePreferencesCache(context,widgets,y);
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+}
+
+static void RedrawPreferencesWidget(const PreferencesContext *context,
+  const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const preferences_info = widgets->preferences_info;
+
+  XWidgetInfo
+    *const cache_info = widgets->cache_info;
+
+  size_t
+    *const state = widgets->state;
+
+  int
+    i;
+
+  if ((*state) & RedrawWidgetState)
+    {
+      /*
+        Redraw Preferences widget.
+      */
+      XDrawBeveledButton(display,&windows->widget,apply_info);
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      for (i=0; i < NumberPreferences; i++)
+        XDrawBeveledButton(display,&windows->widget,&preferences_info[i]);
+      XDrawTriangleEast(display,&windows->widget,cache_info);
+      XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+      (*state)&=(unsigned int) (~RedrawWidgetState);
+    }
+}
+
+static void PressPreferencesButton(const PreferencesContext *context,
+  const XEvent event,const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const preferences_info = widgets->preferences_info;
+
+  XWidgetInfo
+    *const cache_info = widgets->cache_info;
+
+  unsigned int
+    *const width = widgets->width;
+
+  char
+    *const cache = widgets->cache;
+
+  int
+    x,
+    y;
+
+  if (MatteIsActive((*apply_info),event.xbutton))
+    {
+      /*
+        User pressed Apply button.
+      */
+      (*apply_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,apply_info);
+      return;
+    }
+  if (MatteIsActive((*cancel_info),event.xbutton))
+    {
+      /*
+        User pressed Cancel button.
+      */
+      (*cancel_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+  TogglePreferencesButton(display,windows,event,preferences_info);
+  if (MatteIsActive((*cache_info),event.xbutton))
+    {
+      /*
+        User pressed Cache button.
+      */
+      x=(*cache_info).x+(int) (*cache_info).width+
+        (int) (*cache_info).bevel_width+(QuantumMargin >> 1);
+      y=(*cache_info).y+(int) (((*cache_info).height-height) >> 1);
+      (*width)=WidgetTextWidth(font_info,cache);
+      (void) XClearArea(display,windows->widget.id,x,y,(*width),height,
+        False);
+      DoublePreferencesUndoCache(resource_info);
+      (void) FormatLocaleString(cache,MagickPathExtent,CacheButtonText,
+        (unsigned long) resource_info->undo_cache);
+      (*cache_info).raised=MagickFalse;
+      XDrawTriangleEast(display,&windows->widget,cache_info);
+      return;
+    }
+}
+
+static void ReleasePreferencesButtons(const PreferencesContext *context,
+  const XEvent event,const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const cache_info = widgets->cache_info;
+
+  size_t
+    *const state = widgets->state;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  if ((*apply_info).raised == MagickFalse)
+    {
+      (*state)=ReleasePreferencesButton(windows,event,(*apply_info),(*state));
+      (*apply_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,apply_info);
+      (*apply_info).raised=MagickFalse;
+    }
+  if ((*cancel_info).raised == MagickFalse)
+    {
+      (*state)=ReleasePreferencesButton(windows,event,(*cancel_info),(*state));
+      (*cancel_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+    }
+  if ((*cache_info).raised == MagickFalse)
+    {
+      (*cache_info).raised=MagickTrue;
+      XDrawTriangleEast(display,&windows->widget,cache_info);
+    }
+}
+
+static void PressPreferencesKey(const PreferencesContext *context,
+  const XEvent event,const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  static char
+    command[MagickPathExtent];
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      (*apply_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,apply_info);
+      (*state)|=ExitState;
+      return;
+    }
+}
+
+static void MovePreferencesPointer(const PreferencesContext *context,
+  const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
+  if ((*state) & InactiveWidgetState)
+    return;
+  if ((*apply_info).raised == MatteIsActive((*apply_info),(*event).xmotion))
+    {
+      /*
+        Apply button status changed.
+      */
+      (*apply_info).raised=(*apply_info).raised == MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,apply_info);
+      return;
+    }
+  if ((*cancel_info).raised == MatteIsActive((*cancel_info),(*event).xmotion))
+    {
+      /*
+        Cancel button status changed.
+      */
+      (*cancel_info).raised=(*cancel_info).raised == MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+}
+
+static void HandlePreferencesKeyEvent(const PreferencesContext *context,
+  const XEvent event,const PreferencesWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      PressPreferencesKey(context,event,widgets);
+      break;
+    }
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      MovePreferencesPointer(context,widgets);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void HandlePreferencesWindowEvent(const PreferencesContext *context,
+  const XEvent event,const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case ClientMessage:
+    {
+      (*state)=ClientWidgetMessage(display,windows,event,(*state));
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandlePreferencesKeyEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
+static void RespondToPreferencesEvents(const PreferencesContext *context,
+  const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  do
+  {
+    UpdatePreferencesButtons(context,widgets);
+    RedrawPreferencesWidget(context,widgets);
+    /*
+      Wait for next event.
+    */
+    (void) XIfEvent(display,event,XScreenEvent,(char *) windows);
+    switch ((*event).type)
+    {
+      case ButtonPress:
+      {
+        PressPreferencesButton(context,(*event),widgets);
+        break;
+      }
+      case ButtonRelease:
+      {
+        ReleasePreferencesButtons(context,(*event),widgets);
+        break;
+      }
+      default:
+      {
+        HandlePreferencesWindowEvent(context,(*event),widgets);
+        break;
+      }
+    }
+  } while (((*state) & ExitState) == 0);
+}
+
+MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
+  XResourceInfo *resource_info,XWindows *windows)
+{
+  char
+    cache[MagickPathExtent];
+
+  unsigned int
+    height,
+    text_width,
+    width;
+
+  size_t
+    state;
+
+  XEvent
+    event;
+
+  XFontStruct
+    *font_info;
+
+  XWidgetInfo
+    apply_info,
+    cache_info,
+    cancel_info,
+    preferences_info[NumberPreferences];
+
+  const PreferencesWidgets
+    widgets = { &cache_info, cache, preferences_info, &cancel_info,
+      &apply_info, &width, &state, &event };
+
+  PreferencesContext
+    context;
+
+  /*
+    Determine Preferences widget attributes.
+  */
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  assert(display != (Display *) NULL);
+  assert(resource_info != (XResourceInfo *) NULL);
+  assert(windows != (XWindows *) NULL);
+  XCheckRefreshWindows(display,windows);
+  font_info=windows->widget.font_info;
+  text_width=GetPreferencesTextWidth(font_info);
+  width=GetPreferencesButtonWidth(font_info);
+  height=(unsigned int) (font_info->ascent+font_info->descent);
+  /*
+    Position Preferences widget.
+  */
+  PositionPreferencesWidth(windows,font_info,width,text_width);
+  PositionPreferencesHeight(windows,font_info,height);
+  XConstrainWindowPosition(display,&windows->widget);
+  /*
+    Map Preferences widget.
+  */
+  MapPreferencesWidget(display,windows);
+  /*
+    Respond to X events.
+  */
+  state=UpdateConfigurationState;
+  XSetCursorState(display,windows,MagickTrue);
+  context.resource_info=resource_info;
+  context.font_info=font_info;
+  context.windows=windows;
+  context.height=height;
+  context.display=display;
+  RespondToPreferencesEvents(&context,&widgets);
+  WithdrawBrowserWidget(display,windows);
+  if (apply_info.raised)
+    return(MagickFalse);
+  SavePreferences(resource_info,preferences_info);
   return(MagickTrue);
 }
 
