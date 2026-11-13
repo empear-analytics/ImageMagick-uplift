@@ -3867,6 +3867,23 @@ static const AnimateCommand
     HelpCommands
   };
 
+static XWindows *XCreateAnimateWindows(Display *display,
+  XResourceInfo *resource_info,Image *images)
+{
+  XWindows
+    *windows;
+
+  /*
+    Initialize window structure.
+  */
+  XCountSceneColors(images,resource_info);
+  windows=XSetWindows(XInitializeWindows(display,resource_info));
+  if (windows == (XWindows *) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
+      images->filename);
+  return(windows);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -3982,14 +3999,7 @@ MagickExport Image *XAnimateImages(Display *display,
     }
   else
     {
-      /*
-        Initialize window structure.
-      */
-      XCountSceneColors(images,resource_info);
-      windows=XSetWindows(XInitializeWindows(display,resource_info));
-      if (windows == (XWindows *) NULL)
-        ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
-          images->filename);
+      windows=XCreateAnimateWindows(display,resource_info,images);
       /*
         Initialize window id's.
       */
