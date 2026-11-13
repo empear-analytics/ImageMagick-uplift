@@ -1191,6 +1191,19 @@ static MagickBooleanType LoadPolicyInclude(const PolicyLoadTarget *target,
   return(status);
 }
 
+static PolicyInfo *AcquirePolicyElement(const char *filename)
+{
+  PolicyInfo
+    *policy_info;
+
+  policy_info=(PolicyInfo *) AcquireCriticalMemory(sizeof(*policy_info));
+  (void) memset(policy_info,0,sizeof(*policy_info));
+  policy_info->path=AcquirePolicyString(filename,1);
+  policy_info->exempt=MagickFalse;
+  policy_info->signature=MagickCoreSignature;
+  return(policy_info);
+}
+
 typedef struct _PolicyIncludeScan
 {
   const PolicyLoadTarget
@@ -1294,11 +1307,7 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
         /*
           Policy element.
         */
-        policy_info=(PolicyInfo *) AcquireCriticalMemory(sizeof(*policy_info));
-        (void) memset(policy_info,0,sizeof(*policy_info));
-        policy_info->path=AcquirePolicyString(filename,1);
-        policy_info->exempt=MagickFalse;
-        policy_info->signature=MagickCoreSignature;
+        policy_info=AcquirePolicyElement(filename);
         continue;
       }
     if (policy_info == (PolicyInfo *) NULL)
