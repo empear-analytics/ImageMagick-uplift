@@ -678,7 +678,7 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
+static void XWriteColormapInfo(FILE *file,const XResourceInfo *resource_info,
   const XWindows *windows)
 {
   (void) FormatLocaleFile(file,"X\n  visual: %s\n",
@@ -691,6 +691,12 @@ static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
     (void) FormatLocaleFile(file,"  colormap type: Shared\n");
   else
     (void) FormatLocaleFile(file,"  colormap type: Private\n");
+}
+
+static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
+  const XWindows *windows)
+{
+  XWriteColormapInfo(file,resource_info,windows);
   (void) FormatLocaleFile(file,"  geometry: %dx%d\n",
     windows->image.ximage->width,windows->image.ximage->height);
   if (windows->image.crop_geometry != (char *) NULL)
