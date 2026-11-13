@@ -8215,6 +8215,39 @@ static MagickStatusType XDrawElementImage(const DrawEditContext *context,
   return(status);
 }
 
+static MagickBooleanType XFitDrawBounds(
+  const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets,const unsigned int distance)
+{
+  ElementType
+    *const element = pointer_targets->element;
+
+  RectangleInfo
+    *const rectangle_info = shape_targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = shape_targets->coordinate_info;
+
+  int
+    *const number_coordinates = shape_targets->number_coordinates;
+
+  if (IsPolygonElement((*element)) != MagickFalse)
+    {
+      (*rectangle_info)=XDrawPolygonBounds((*coordinate_info),
+        (*number_coordinates),(*rectangle_info));
+    }
+  else
+    if (distance <= 9)
+      return(MagickTrue);
+    else
+      if (IsBoxedElement((*element)) != MagickFalse)
+        {
+          (*rectangle_info).width--;
+          (*rectangle_info).height--;
+        }
+  return(MagickFalse);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8355,20 +8388,8 @@ static MagickBooleanType XDrawEditImage(Display *display,
     distance=0;
     XStartDrawElement(&pointer_targets,&shape_targets);
     XTrackDrawElement(&draw_context,&pointer_targets,&shape_targets,&distance);
-    if (IsPolygonElement(element) != MagickFalse)
-      {
-        rectangle_info=XDrawPolygonBounds(coordinate_info,number_coordinates,
-          rectangle_info);
-      }
-    else
-      if (distance <= 9)
-        continue;
-      else
-        if (IsBoxedElement(element) != MagickFalse)
-          {
-            rectangle_info.width--;
-            rectangle_info.height--;
-          }
+    if (XFitDrawBounds(&pointer_targets,&shape_targets,distance) != MagickFalse)
+      continue;
     /*
       Drawing is relative to image configuration.
     */
