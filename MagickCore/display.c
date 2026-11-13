@@ -13355,6 +13355,9 @@ typedef struct _PasteCommandInput
 
   const ModeType
     *PasteCommands;
+
+  Image
+    *image;
 } PasteCommandInput;
 
 static MagickBooleanType XPasteCommand(const PasteCommandInput *input,
@@ -13546,6 +13549,9 @@ typedef struct _PasteTargets
 
   size_t
     *state;
+
+  RectangleInfo
+    *paste_info;
 } PasteTargets;
 
 static void XPasteKeyPress(const PasteCommandInput *input,XEvent *event,
@@ -13618,6 +13624,67 @@ static void XPasteKeyPress(const PasteCommandInput *input,XEvent *event,
   }
 }
 
+static void XPastePress(const PasteCommandInput *input,const XEvent *event,
+  const Cursor cursor,const PasteTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    *const image = input->image;
+
+  Image
+    **const paste_image = targets->paste_image;
+
+  RectangleInfo
+    *const paste_info = targets->paste_info;
+
+  double
+    scale_factor;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Button Press: 0x%lx %u +%d+%d",(*event).xbutton.window,
+      (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  /*
+    Paste rectangle is relative to image configuration.
+  */
+  width=(unsigned int) image->columns;
+  height=(unsigned int) image->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
+      &width,&height);
+  scale_factor=(double) windows->image.ximage->width/width;
+  (*paste_info).width=(unsigned int) (scale_factor*(*paste_image)->columns+
+    0.5);
+  scale_factor=(double) windows->image.ximage->height/height;
+  (*paste_info).height=(unsigned int) (scale_factor*(*paste_image)->rows+
+    0.5);
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (*paste_info).x=(ssize_t) windows->image.x+(*event).xbutton.x;
+  (*paste_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
+}
+
 static MagickBooleanType XPasteImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -13655,16 +13722,9 @@ static MagickBooleanType XPasteImage(Display *display,
     x,
     y;
 
-  double
-    scale_factor;
-
   RectangleInfo
     highlight_info,
     paste_info;
-
-  unsigned int
-    height,
-    width;
 
   size_t
     state;
@@ -13673,11 +13733,11 @@ static MagickBooleanType XPasteImage(Display *display,
     event;
 
   const PasteTargets
-    paste_targets = { &paste_image, &state };
+    paste_targets = { &paste_image, &state, &paste_info };
 
   const PasteCommandInput
     command_input = { display, resource_info, windows, PasteMenu,
-      PasteCommands };
+      PasteCommands, image };
 
   /*
     Copy image.
@@ -13738,31 +13798,7 @@ static MagickBooleanType XPasteImage(Display *display,
     {
       case ButtonPress:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Press: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          Paste rectangle is relative to image configuration.
-        */
-        width=(unsigned int) image->columns;
-        height=(unsigned int) image->rows;
-        x=0;
-        y=0;
-        if (windows->image.crop_geometry != (char *) NULL)
-          (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
-            &width,&height);
-        scale_factor=(double) windows->image.ximage->width/width;
-        paste_info.width=(unsigned int) (scale_factor*paste_image->columns+0.5);
-        scale_factor=(double) windows->image.ximage->height/height;
-        paste_info.height=(unsigned int) (scale_factor*paste_image->rows+0.5);
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        paste_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-        paste_info.y=(ssize_t) windows->image.y+event.xbutton.y;
+        XPastePress(&command_input,&event,cursor,&paste_targets);
         break;
       }
       case ButtonRelease:
