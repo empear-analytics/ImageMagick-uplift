@@ -5286,6 +5286,47 @@ static void XNextAnimateEvent(Display *display,XWindows *windows,
       MagickTrue : MagickFalse;
 }
 
+static void XHandleAnimateWindowChange(
+  const AnimateEventContext *event_context,XEvent event,const ssize_t scene,
+  const AnimateCommandTargets *command_targets)
+{
+  Display
+    *const display = event_context->display;
+
+  MagickStatusType
+    *const state = command_targets->state;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  switch (event.type)
+  {
+    case ConfigureNotify:
+    {
+      XHandleConfigureNotify(display,resource_info,windows,event);
+      break;
+    }
+    case DestroyNotify:
+    {
+      (*state)=XHandleDestroyNotify(resource_info,windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      XHandleEnterNotify(event_context,event);
+      break;
+    }
+    default:
+    {
+      XHandleAnimateInputEvent(event_context,event,scene,command_targets);
+      break;
+    }
+  }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -5569,24 +5610,9 @@ MagickExport Image *XAnimateImages(Display *display,
         XHandleClientMessage(&event_context,event,&client_targets);
         break;
       }
-      case ConfigureNotify:
-      {
-        XHandleConfigureNotify(display,resource_info,windows,event);
-        break;
-      }
-      case DestroyNotify:
-      {
-        state=XHandleDestroyNotify(resource_info,windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        XHandleEnterNotify(&event_context,event);
-        break;
-      }
       default:
       {
-        XHandleAnimateInputEvent(&event_context,event,scene,&command_targets);
+        XHandleAnimateWindowChange(&event_context,event,scene,&command_targets);
         break;
       }
     }
