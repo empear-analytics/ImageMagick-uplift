@@ -191,6 +191,38 @@ static ssize_t ClampSceneIndex(ssize_t first,const size_t length)
   return(first);
 }
 
+static MagickBooleanType CloneSceneToList(const Image *images,
+  const ssize_t first,Image **clone_images,ExceptionInfo *exception)
+{
+  const Image
+    *next;
+
+  Image
+    *image;
+
+  MagickBooleanType
+    match;
+
+  ssize_t
+    i;
+
+  match=MagickFalse;
+  i=0;
+  for (next=images; next != (Image *) NULL; next=GetNextImageInList(next))
+  {
+    if (i == (ssize_t) first)
+      {
+        image=CloneImage(next,0,0,MagickTrue,exception);
+        if (image == (Image *) NULL)
+          break;
+        AppendImageToList(clone_images,image);
+        match=MagickTrue;
+      }
+    i++;
+  }
+  return(match);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -237,19 +269,14 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
   const char
     *artifact;
 
-  const Image
-    *next;
-
   Image
-    *clone_images,
-    *image;
+    *clone_images;
 
   size_t
     length;
 
   ssize_t
     first,
-    i,
     last,
     offset,
     step;
@@ -290,19 +317,9 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
     step=(ssize_t) (first > last ? -step : step);
     for ( ; step > 0 ? (last-first) >= 0 : (last-first) <= 0; first+=step)
     {
-      i=0;
-      for (next=images; next != (Image *) NULL; next=GetNextImageInList(next))
-      {
-        if (i == (ssize_t) first)
-          {
-            image=CloneImage(next,0,0,MagickTrue,exception);
-            if (image == (Image *) NULL)
-              break;
-            AppendImageToList(&clone_images,image);
-            match=MagickTrue;
-          }
-        i++;
-      }
+      if (CloneSceneToList(images,first,&clone_images,exception) !=
+          MagickFalse)
+        match=MagickTrue;
       if (match == MagickFalse)
         (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
           "InvalidImageIndex","%g `%s'",(double) offset,images->filename);
