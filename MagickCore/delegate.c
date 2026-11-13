@@ -1497,6 +1497,20 @@ static DelegateInfo *AcquireDelegateInfo(const char *filename)
   return(delegate_info);
 }
 
+static MagickStatusType AppendDelegateElement(LinkedListInfo *cache,
+  DelegateInfo *delegate_info,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AppendValueToLinkedList(cache,delegate_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",
+      delegate_info->commands);
+  return(status);
+}
+
 static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1568,11 +1582,7 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
       continue;
     if (IsDelegateEnd(keyword) != MagickFalse)
       {
-        status=AppendValueToLinkedList(cache,delegate_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",
-            delegate_info->commands);
+        status=AppendDelegateElement(cache,delegate_info,exception);
         delegate_info=(DelegateInfo *) NULL;
         continue;
       }
