@@ -3002,6 +3002,34 @@ static void WritePostscriptText(FILE *file,const DrawInfo *draw_info,
   text=DestroyString(text);
 }
 
+static Image *ReadPostscriptImage(const DrawInfo *draw_info,
+  const PointInfo extent,const char *filename,ExceptionInfo *exception)
+{
+  char
+    geometry[MagickPathExtent];
+
+  Image
+    *annotate_image;
+
+  ImageInfo
+    *annotate_info;
+
+  (void) FormatLocaleString(geometry,MagickPathExtent,"%.17gx%.17g+0+0!",
+    floor(extent.x+0.5),floor(extent.y+0.5));
+  annotate_info=AcquireImageInfo();
+  (void) FormatLocaleString(annotate_info->filename,MagickPathExtent,"ps:%s",
+    filename);
+  (void) CloneString(&annotate_info->page,geometry);
+  if (draw_info->density != (char *) NULL)
+    (void) CloneString(&annotate_info->density,draw_info->density);
+  annotate_info->antialias=draw_info->text_antialias;
+  annotate_image=ReadImage(annotate_info,exception);
+  CatchException(exception);
+  annotate_info=DestroyImageInfo(annotate_info);
+  (void) RelinquishUniqueFileResource(filename);
+  return(annotate_image);
+}
+
 static MagickBooleanType RenderPostscript(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -3015,9 +3043,6 @@ static MagickBooleanType RenderPostscript(Image *image,
 
   Image
     *annotate_image;
-
-  ImageInfo
-    *annotate_info;
 
   int
     unique_file;
@@ -3068,19 +3093,7 @@ static MagickBooleanType RenderPostscript(Image *image,
   WritePostscriptText(file,draw_info,identity,exception);
   (void) FormatLocaleFile(file,"showpage\n");
   (void) fclose(file);
-  (void) FormatLocaleString(geometry,MagickPathExtent,"%.17gx%.17g+0+0!",
-    floor(extent.x+0.5),floor(extent.y+0.5));
-  annotate_info=AcquireImageInfo();
-  (void) FormatLocaleString(annotate_info->filename,MagickPathExtent,"ps:%s",
-    filename);
-  (void) CloneString(&annotate_info->page,geometry);
-  if (draw_info->density != (char *) NULL)
-    (void) CloneString(&annotate_info->density,draw_info->density);
-  annotate_info->antialias=draw_info->text_antialias;
-  annotate_image=ReadImage(annotate_info,exception);
-  CatchException(exception);
-  annotate_info=DestroyImageInfo(annotate_info);
-  (void) RelinquishUniqueFileResource(filename);
+  annotate_image=ReadPostscriptImage(draw_info,extent,filename,exception);
   if (annotate_image == (Image *) NULL)
     return(MagickFalse);
   (void) NegateImage(annotate_image,MagickFalse,exception);
