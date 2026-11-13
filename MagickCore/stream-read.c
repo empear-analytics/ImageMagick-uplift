@@ -191,7 +191,7 @@ static void DestroyPixelStream(Image *image)
 %    o image: the image.
 %
 */
-static void *GetAuthenticMetacontentFromStream(const Image *image)
+static CacheInfo *GetStreamCacheInfo(const Image *image)
 {
   CacheInfo
     *cache_info;
@@ -202,6 +202,15 @@ static void *GetAuthenticMetacontentFromStream(const Image *image)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   cache_info=(CacheInfo *) image->cache;
   assert(cache_info->signature == MagickCoreSignature);
+  return(cache_info);
+}
+
+static void *GetAuthenticMetacontentFromStream(const Image *image)
+{
+  CacheInfo
+    *cache_info;
+
+  cache_info=GetStreamCacheInfo(image);
   return(cache_info->metacontent);
 }
 
@@ -280,12 +289,7 @@ static Quantum *GetAuthenticPixelsFromStream(const Image *image)
   CacheInfo
     *cache_info;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  cache_info=(CacheInfo *) image->cache;
-  assert(cache_info->signature == MagickCoreSignature);
+  cache_info=GetStreamCacheInfo(image);
   return(cache_info->pixels);
 }
 
@@ -483,12 +487,7 @@ static const void *GetVirtualMetacontentFromStream(const Image *image)
   CacheInfo
     *cache_info;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  cache_info=(CacheInfo *) image->cache;
-  assert(cache_info->signature == MagickCoreSignature);
+  cache_info=GetStreamCacheInfo(image);
   return(cache_info->metacontent);
 }
 
