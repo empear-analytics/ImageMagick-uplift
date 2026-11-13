@@ -9396,6 +9396,14 @@ MagickPrivate void XQueryPosition(Display *display,const Window window,int *x,
 %      the entire image is refreshed.
 %
 */
+static unsigned int XClipRefreshWidth(const XWindowInfo *window,const int x,
+  unsigned int width)
+{
+  if ((window->ximage->width-(x+window->x)) < (int) width)
+    width=(unsigned int) (window->ximage->width-(x+window->x));
+  return(width);
+}
+
 MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   const XEvent *event)
 {
@@ -9448,8 +9456,7 @@ MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   /*
     Check boundary conditions.
   */
-  if ((window->ximage->width-(x+window->x)) < (int) width)
-    width=(unsigned int) (window->ximage->width-(x+window->x));
+  width=XClipRefreshWidth(window,x,width);
   if ((window->ximage->height-(y+window->y)) < (int) height)
     height=(unsigned int) (window->ximage->height-(y+window->y));
   /*
