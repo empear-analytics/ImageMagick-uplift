@@ -4600,6 +4600,15 @@ static void XAcquireXYBitmapData(XImage *ximage)
       (ximage->bytes_per_line*ximage->depth*ximage->height));
 }
 
+static void XAcquireZPixmapData(XImage *ximage)
+{
+  ximage->data=(char *) AcquireQuantumMemory((size_t)
+    ximage->bytes_per_line,(size_t) ximage->height);
+  if (ximage->data != (char *) NULL)
+    (void) memset(ximage->data,0,(size_t)
+      (ximage->bytes_per_line*ximage->height));
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4724,13 +4733,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       if (ximage->format == XYBitmap)
         XAcquireXYBitmapData(ximage);
       else
-        {
-          ximage->data=(char *) AcquireQuantumMemory((size_t)
-            ximage->bytes_per_line,(size_t) ximage->height);
-          if (ximage->data != (char *) NULL)
-            (void) memset(ximage->data,0,(size_t)
-              (ximage->bytes_per_line*ximage->height));
-        }
+        XAcquireZPixmapData(ximage);
     }
   if (ximage->data == (char *) NULL)
     {
