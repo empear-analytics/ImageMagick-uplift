@@ -1980,6 +1980,23 @@ static MagickBooleanType IsIntegralQuantumPixel(const Image *image,
 }
 #endif
 
+#if defined(MAGICKCORE_HDRI_SUPPORT)
+static MagickBooleanType HasNonIntegralPixel(const Image *image,
+  const Quantum *p)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (IsIntegralQuantumPixel(image,p) == MagickFalse)
+      return(MagickTrue);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(MagickFalse);
+}
+#endif
+
 MagickExport MagickBooleanType IsHighDynamicRangeImage(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2011,22 +2028,13 @@ MagickExport MagickBooleanType IsHighDynamicRangeImage(const Image *image,
     const Quantum
       *p;
 
-    ssize_t
-      x;
-
     if (hdri != MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       continue;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (IsIntegralQuantumPixel(image,p) == MagickFalse)
-        hdri=MagickTrue;
-      if (hdri != MagickFalse)
-        break;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    if (HasNonIntegralPixel(image,p) != MagickFalse)
+      hdri=MagickTrue;
   }
   image_view=DestroyCacheView(image_view);
   return(hdri);
