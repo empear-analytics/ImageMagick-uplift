@@ -15690,6 +15690,12 @@ typedef struct _TextViewContext
 
   char
     *primary_selection;
+
+  unsigned int
+    width;
+
+  XFontStruct
+    *font_info;
 } TextViewContext;
 
 static void ReleaseTextViewScroll(const TextViewContext *context,
@@ -16158,6 +16164,36 @@ static void HandleTextViewWindowEvent(const TextViewContext *context,
   }
 }
 
+static void InitializeTextViewButtons(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height;
+
+  const unsigned int
+    width = context->width;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  /*
+    Initialize button information.
+  */
+  XGetWidgetInfo(DismissButtonText,dismiss_info);
+  (*dismiss_info).width=width;
+  (*dismiss_info).height=(unsigned int) ((3*height) >> 1);
+  (*dismiss_info).x=(int) windows->widget.width-(int) (*dismiss_info).width-
+    QuantumMargin-2;
+  (*dismiss_info).y=(int) windows->widget.height-(int) (*dismiss_info).height-
+    QuantumMargin;
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16306,6 +16342,8 @@ MagickPrivate void XTextViewWidget(Display *display,
   view_context.textlist=textlist;
   view_context.height=height;
   view_context.primary_selection=primary_selection;
+  view_context.width=width;
+  view_context.font_info=font_info;
   do
   {
     if (state & UpdateConfigurationState)
@@ -16313,16 +16351,7 @@ MagickPrivate void XTextViewWidget(Display *display,
         int
           id;
 
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(DismissButtonText,&dismiss_info);
-        dismiss_info.width=width;
-        dismiss_info.height=(unsigned int) ((3*height) >> 1);
-        dismiss_info.x=(int) windows->widget.width-(int) dismiss_info.width-
-          QuantumMargin-2;
-        dismiss_info.y=(int) windows->widget.height-(int) dismiss_info.height-
-          QuantumMargin;
+        InitializeTextViewButtons(&view_context,&view_widgets);
         /*
           Initialize scroll information.
         */
