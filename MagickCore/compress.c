@@ -994,9 +994,6 @@ static void ResetLZWTable(TableType *table)
   }
 }
 
-MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
-  unsigned char *magick_restrict pixels,ExceptionInfo *exception)
-{
 #define LZWClr  256UL  /* Clear Table Marker */
 #define LZWEod  257UL  /* End of Data marker */
 #define OutputCode(code) \
@@ -1011,6 +1008,9 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
     } \
 }
 
+MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
+  unsigned char *magick_restrict pixels,ExceptionInfo *exception)
+{
   ssize_t
     i;
 
