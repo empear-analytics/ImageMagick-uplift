@@ -2700,6 +2700,32 @@ static const ModeType
     TextApplyCommand
   };
 
+typedef struct _AnnotateContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  char
+    *command;
+} AnnotateContext;
+
+static void XSetAnnotateMenuInput(const AnnotateContext *context,const int id,
+  AnnotateMenuInput *annotate_input)
+{
+  (*annotate_input).display=context->display;
+  (*annotate_input).resource_info=context->resource_info;
+  (*annotate_input).windows=context->windows;
+  (*annotate_input).AnnotateMenu=AnnotateMenu;
+  (*annotate_input).id=id;
+  (*annotate_input).command=context->command;
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -2757,6 +2783,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     event,
     text_event;
 
+  AnnotateContext
+    context;
+
   const AnnotateTargets
     targets = { &annotate_info, &p, &x, &y, &text_event, &state };
 
@@ -2790,6 +2819,10 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   cursor=XCreateFontCursor(display,XC_left_side);
   (void) XCheckDefineCursor(display,windows->image.id,cursor);
   state=DefaultState;
+  context.display=display;
+  context.resource_info=resource_info;
+  context.windows=windows;
+  context.command=command;
   do
   {
     if (windows->info.mapped != MagickFalse)
@@ -2821,12 +2854,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
             AnnotateMenuInput
               annotate_input;
 
-            annotate_input.display=display;
-            annotate_input.resource_info=resource_info;
-            annotate_input.windows=windows;
-            annotate_input.AnnotateMenu=AnnotateMenu;
-            annotate_input.id=id;
-            annotate_input.command=command;
+            XSetAnnotateMenuInput(&context,id,&annotate_input);
             XSelectAnnotateFont(&annotate_input,&font_targets);
             break;
           }
