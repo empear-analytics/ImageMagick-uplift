@@ -8536,6 +8536,41 @@ static void HandleFileBrowserWindowEvent(
   }
 }
 
+static void HandleFileBrowserKeyEvent(
+  const FileBrowserContext *context,const XEvent event,
+  const FileBrowserTargets *targets,const FileBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      PressFileBrowserKey(context,event,widgets);
+      break;
+    }
+    case KeyRelease:
+    {
+      (*state)=ReleaseWidgetKey(windows,event,(*state));
+      break;
+    }
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleFileBrowserWindowEvent(context,event,targets,widgets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8734,21 +8769,6 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       continue;
     switch (event.type)
     {
-      case KeyPress:
-      {
-        PressFileBrowserKey(&file_context,event,&file_widgets);
-        break;
-      }
-      case KeyRelease:
-      {
-        state=ReleaseWidgetKey(windows,event,state);
-        break;
-      }
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
       case MapNotify:
       {
         mask&=(unsigned int) (~CWX);
@@ -8757,7 +8777,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       default:
       {
-        HandleFileBrowserWindowEvent(&file_context,event,&targets,&file_widgets);
+        HandleFileBrowserKeyEvent(&file_context,event,&targets,&file_widgets);
         break;
       }
     }
