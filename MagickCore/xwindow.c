@@ -4291,6 +4291,51 @@ static void XTransformWindowImage(const XWindowTransform *transform)
     XResizeWindowImage(transform);
 }
 
+static XImage *XAttachSharedXImage(Display *display,XWindowInfo *window,
+  XImage *ximage)
+{
+  /*
+    Allocate X image pixel data.
+  */
+#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
+  if (window->shared_memory)
+    {
+      Status
+        status;
+
+      XShmSegmentInfo
+        *segment_info;
+
+      (void) XSync(display,MagickFalse);
+      xerror_alert=MagickFalse;
+      segment_info=(XShmSegmentInfo *) window->segment_info;
+      ximage->data=segment_info[1].shmaddr;
+      segment_info[1].readOnly=MagickFalse;
+      status=XShmAttach(display,&segment_info[1]);
+      if (status != False)
+        (void) XSync(display,MagickFalse);
+      if ((status == False) || (xerror_alert != MagickFalse))
+        {
+          window->shared_memory=MagickFalse;
+          if (status != False)
+            XShmDetach(display,&segment_info[1]);
+          ximage->data=NULL;
+          XDestroyImage(ximage);
+          ximage=(XImage *) NULL;
+          if (segment_info[1].shmid >= 0)
+            {
+              if (segment_info[1].shmaddr != NULL)
+                (void) shmdt(segment_info[1].shmaddr);
+              (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
+              segment_info[1].shmid=(-1);
+              segment_info[1].shmaddr=(char *) NULL;
+            }
+        }
+    }
+#endif
+  return(ximage);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4396,45 +4441,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
         }
     }
 #endif
-  /*
-    Allocate X image pixel data.
-  */
-#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
-  if (window->shared_memory)
-    {
-      Status
-        status;
-
-      XShmSegmentInfo
-        *segment_info;
-
-      (void) XSync(display,MagickFalse);
-      xerror_alert=MagickFalse;
-      segment_info=(XShmSegmentInfo *) window->segment_info;
-      ximage->data=segment_info[1].shmaddr;
-      segment_info[1].readOnly=MagickFalse;
-      status=XShmAttach(display,&segment_info[1]);
-      if (status != False)
-        (void) XSync(display,MagickFalse);
-      if ((status == False) || (xerror_alert != MagickFalse))
-        {
-          window->shared_memory=MagickFalse;
-          if (status != False)
-            XShmDetach(display,&segment_info[1]);
-          ximage->data=NULL;
-          XDestroyImage(ximage);
-          ximage=(XImage *) NULL;
-          if (segment_info[1].shmid >= 0)
-            {
-              if (segment_info[1].shmaddr != NULL)
-                (void) shmdt(segment_info[1].shmaddr);
-              (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
-              segment_info[1].shmid=(-1);
-              segment_info[1].shmaddr=(char *) NULL;
-            }
-        }
-    }
-#endif
+  ximage=XAttachSharedXImage(display,window,ximage);
   if (window->shared_memory == MagickFalse)
     ximage=XCreateImage(display,window->visual,(unsigned int) depth,format,0,
       (char *) NULL,width,height,XBitmapPad(display),0);
