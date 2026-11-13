@@ -3393,6 +3393,17 @@ static void ExportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static inline int Get1BitOpaqueSample(const Image *image,
+  const Quantum *magick_restrict p)
+{
+  unsigned char
+    pixel;
+
+  pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
+    0x00 : 0x01);
+  return((int) pixel != 0 ? 0x00 : 0x01);
+}
+
 static void Export1BitGrayAlphaQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
@@ -3413,7 +3424,6 @@ static void Export1BitGrayAlphaQuantum(const Image *image,
 
   unsigned char
     black,
-    pixel,
     white;
 
   ssize_t
@@ -3431,24 +3441,16 @@ static void Export1BitGrayAlphaQuantum(const Image *image,
   {
     *q='\0';
     *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 7;
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-      0x00 : 0x01);
-    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 6);
+    *q|=Get1BitOpaqueSample(image,p) << 6;
     p+=(ptrdiff_t) GetPixelChannels(image);
     *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 5;
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-      0x00 : 0x01);
-    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 4);
+    *q|=Get1BitOpaqueSample(image,p) << 4;
     p+=(ptrdiff_t) GetPixelChannels(image);
     *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 3;
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-      0x00 : 0x01);
-    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 2);
+    *q|=Get1BitOpaqueSample(image,p) << 2;
     p+=(ptrdiff_t) GetPixelChannels(image);
     *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 1;
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-      0x00 : 0x01);
-    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 0);
+    *q|=Get1BitOpaqueSample(image,p) << 0;
     p+=(ptrdiff_t) GetPixelChannels(image);
     q++;
   }
@@ -3459,10 +3461,8 @@ static void Export1BitGrayAlphaQuantum(const Image *image,
       {
         *q|=(GetPixelLuma(image,p) > threshold ? black : white) <<
           (7-bit);
-        pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-          0x00 : 0x01);
-        *q|=(((int) pixel != 0 ? 0x00 : 0x01) << (unsigned char)
-          (7-bit-1));
+        *q|=Get1BitOpaqueSample(image,p) << (unsigned char)
+          (7-bit-1);
         p+=(ptrdiff_t) GetPixelChannels(image);
       }
       q++;
