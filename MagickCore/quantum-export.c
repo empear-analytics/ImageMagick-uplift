@@ -6476,6 +6476,50 @@ static void ExportChannelFamilyQuantum(const Image *image,
   }
 }
 
+static void ExportCMYKFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span,ExceptionInfo *exception)
+{
+  switch (quantum_type)
+  {
+    case BlackQuantum:
+    {
+      ExportBlackQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case CMYKQuantum:
+    {
+      ExportCMYKQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case CMYKAQuantum:
+    {
+      ExportCMYKAQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case MultispectralQuantum:
+    {
+      ExportMultispectralQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case CMYKOQuantum:
+    {
+      ExportCMYKOQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      ExportOpacityQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    default:
+    {
+      ExportChannelFamilyQuantum(image,quantum_info,quantum_type,span);
+      break;
+    }
+  }
+}
+
 MagickExport size_t ExportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,unsigned char *magick_restrict pixels,
@@ -6535,31 +6579,6 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       ExportAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case BlackQuantum:
-    {
-      ExportBlackQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case CMYKQuantum:
-    {
-      ExportCMYKQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case CMYKAQuantum:
-    {
-      ExportCMYKAQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case MultispectralQuantum:
-    {
-      ExportMultispectralQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case CMYKOQuantum:
-    {
-      ExportCMYKOQuantum(image,quantum_info,&span,exception);
-      break;
-    }
     case IndexQuantum:
     {
       ExportIndexQuantum(image,quantum_info,&span,exception);
@@ -6570,14 +6589,9 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       ExportIndexAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case OpacityQuantum:
-    {
-      ExportOpacityQuantum(image,quantum_info,&span,exception);
-      break;
-    }
     default:
     {
-      ExportChannelFamilyQuantum(image,quantum_info,quantum_type,span);
+      ExportCMYKFamilyQuantum(image,quantum_info,quantum_type,span,exception);
       break;
     }
   }
