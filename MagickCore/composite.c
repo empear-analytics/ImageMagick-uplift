@@ -726,134 +726,120 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
   return(FinishBlendImage(sum_image,status));
 }
 
-static Image *BlendDivergentImage(const Image *alpha_image,
-  const Image *beta_image,ExceptionInfo *exception)
+typedef struct _BlendGradientSet
 {
-#define FreeDivergentResources() \
-{ \
-  if (dy_image != (Image *) NULL) \
-    dy_image=DestroyImage(dy_image); \
-  if (dx_image != (Image *) NULL) \
-    dx_image=DestroyImage(dx_image); \
-  if (magnitude_beta != (Image *) NULL) \
-    magnitude_beta=DestroyImage(magnitude_beta); \
-  if (dy_beta != (Image *) NULL) \
-    dy_beta=DestroyImage(dy_beta); \
-  if (dx_beta != (Image *) NULL) \
-    dx_beta=DestroyImage(dx_beta); \
-  if (magnitude_alpha != (Image *) NULL) \
-    magnitude_alpha=DestroyImage(magnitude_alpha); \
-  if (dy_alpha != (Image *) NULL) \
-    dy_alpha=DestroyImage(dy_alpha); \
-  if (dx_alpha != (Image *) NULL) \
-    dx_alpha=DestroyImage(dx_alpha); \
+  Image
+    *dx_image,
+    *dy_image,
+    *magnitude_image;
+} BlendGradientSet;
+
+static MagickBooleanType BlendGradientImages(const Image *image,
+  BlendGradientSet *gradients,ExceptionInfo *exception)
+{
+  /*
+    Create X and Y gradient images and the magnitude.
+  */
+  gradients->dx_image=BlendConvolveImage(image,"3x1:-0.5,0.0,0.5",exception);
+  if (gradients->dx_image == (Image *) NULL)
+    return(MagickFalse);
+  gradients->dy_image=BlendConvolveImage(image,"1x3:-0.5,0.0,0.5",exception);
+  if (gradients->dy_image == (Image *) NULL)
+    return(MagickFalse);
+  gradients->magnitude_image=BlendMagnitudeImage(gradients->dx_image,
+    gradients->dy_image,exception);
+  if (gradients->magnitude_image == (Image *) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
 }
 
-  Image
-    *divergent_image = (Image *) NULL,
-    *dx_alpha = (Image *) NULL,
-    *dx_beta = (Image *) NULL,
-    *dx_divergent = (Image *) NULL,
-    *dx_image = (Image *) NULL,
-    *dy_alpha = (Image *) NULL,
-    *dy_beta = (Image *) NULL,
-    *dy_divergent = (Image *) NULL,
-    *dy_image = (Image *) NULL,
-    *magnitude_alpha = (Image *) NULL,
-    *magnitude_beta = (Image *) NULL;
+static void DestroyBlendGradients(BlendGradientSet *gradients)
+{
+  if (gradients->magnitude_image != (Image *) NULL)
+    gradients->magnitude_image=DestroyImage(gradients->magnitude_image);
+  if (gradients->dy_image != (Image *) NULL)
+    gradients->dy_image=DestroyImage(gradients->dy_image);
+  if (gradients->dx_image != (Image *) NULL)
+    gradients->dx_image=DestroyImage(gradients->dx_image);
+}
 
+static MagickBooleanType SelectBlendGradients(BlendGradientSet *alpha,
+  BlendGradientSet *beta,BlendGradientSet *selected,ExceptionInfo *exception)
+{
   BlendMagnitudePair magnitudes;
+
+  /*
+    Select alpha or beta gradient for larger of two magnitudes.
+  */
+  magnitudes.alpha_image=alpha->magnitude_image;
+  magnitudes.beta_image=beta->magnitude_image;
+  selected->dx_image=BlendMaxMagnitudeImage(&magnitudes,alpha->dx_image,
+    beta->dx_image,exception);
+  if (selected->dx_image == (Image *) NULL)
+    return(MagickFalse);
+  selected->dy_image=BlendMaxMagnitudeImage(&magnitudes,alpha->dy_image,
+    beta->dy_image,exception);
+  if (selected->dy_image == (Image *) NULL)
+    return(MagickFalse);
+  beta->dx_image=DestroyImage(beta->dx_image);
+  alpha->dx_image=DestroyImage(alpha->dx_image);
+  beta->magnitude_image=DestroyImage(beta->magnitude_image);
+  alpha->magnitude_image=DestroyImage(alpha->magnitude_image);
+  return(MagickTrue);
+}
+
+static Image *BlendDivergenceImage(const BlendGradientSet *selected,
+  ExceptionInfo *exception)
+{
+  Image
+    *divergent_image,
+    *dx_divergent,
+    *dy_divergent;
 
   const BlendSumWeights quarter_sum = { 0.25, 1.0 };
 
   /*
-    Create X and Y gradient images for alpha image and the magnitude.
-  */
-  dx_alpha=BlendConvolveImage(alpha_image,"3x1:-0.5,0.0,0.5",exception);
-  if (dx_alpha == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  dy_alpha=BlendConvolveImage(alpha_image,"1x3:-0.5,0.0,0.5",exception);
-  if (dy_alpha == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  magnitude_alpha=BlendMagnitudeImage(dx_alpha,dy_alpha,exception);
-  if (magnitude_alpha == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  /*
-    Create X and Y gradient images for beta and the magnitude.
-  */
-  dx_beta=BlendConvolveImage(beta_image,"3x1:-0.5,0.0,0.5",exception);
-  if (dx_beta == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  dy_beta=BlendConvolveImage(beta_image,"1x3:-0.5,0.0,0.5",exception);
-  if (dy_beta == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  magnitude_beta=BlendMagnitudeImage(dx_beta,dy_beta,exception);
-  if (magnitude_beta == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  /*
-    Select alpha or beta gradient for larger of two magnitudes.
-  */
-  magnitudes.alpha_image=magnitude_alpha;
-  magnitudes.beta_image=magnitude_beta;
-  dx_image=BlendMaxMagnitudeImage(&magnitudes,dx_alpha,dx_beta,exception);
-  if (dx_image == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  dy_image=BlendMaxMagnitudeImage(&magnitudes,dy_alpha,dy_beta,exception);
-  if (dy_image == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  dx_beta=DestroyImage(dx_beta);
-  dx_alpha=DestroyImage(dx_alpha);
-  magnitude_beta=DestroyImage(magnitude_beta);
-  magnitude_alpha=DestroyImage(magnitude_alpha);
-  /*
     Create divergence of gradients dx and dy and divide by 4 as guide image.
   */
-  dx_divergent=BlendConvolveImage(dx_image,"3x1:-0.5,0.0,0.5",exception);
+  dx_divergent=BlendConvolveImage(selected->dx_image,"3x1:-0.5,0.0,0.5",
+    exception);
   if (dx_divergent == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  dy_divergent=BlendConvolveImage(dy_image,"1x3:-0.5,0.0,0.5",exception);
+    return((Image *) NULL);
+  dy_divergent=BlendConvolveImage(selected->dy_image,"1x3:-0.5,0.0,0.5",
+    exception);
   if (dy_divergent == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
+    return((Image *) NULL);
   divergent_image=BlendSumImage(dx_divergent,dy_divergent,&quarter_sum,
     exception);
   dy_divergent=DestroyImage(dy_divergent);
   dx_divergent=DestroyImage(dx_divergent);
-  if (divergent_image == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  FreeDivergentResources();
+  return(divergent_image);
+}
+
+static Image *BlendDivergentImage(const Image *alpha_image,
+  const Image *beta_image,ExceptionInfo *exception)
+{
+  BlendGradientSet
+    alpha = { (Image *) NULL, (Image *) NULL, (Image *) NULL },
+    beta = { (Image *) NULL, (Image *) NULL, (Image *) NULL },
+    selected = { (Image *) NULL, (Image *) NULL, (Image *) NULL };
+
+  Image
+    *divergent_image = (Image *) NULL;
+
+  MagickBooleanType
+    status;
+
+  status=BlendGradientImages(alpha_image,&alpha,exception);
+  if (status != MagickFalse)
+    status=BlendGradientImages(beta_image,&beta,exception);
+  if (status != MagickFalse)
+    status=SelectBlendGradients(&alpha,&beta,&selected,exception);
+  if (status != MagickFalse)
+    divergent_image=BlendDivergenceImage(&selected,exception);
+  DestroyBlendGradients(&selected);
+  DestroyBlendGradients(&beta);
+  DestroyBlendGradients(&alpha);
   return(divergent_image);
 }
 
