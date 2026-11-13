@@ -253,6 +253,72 @@ static MagickBooleanType AcquireResourceCounter(MagickOffsetType *counter,
   return(MagickFalse);
 }
 
+typedef struct _AcquireTargets
+{
+  MagickSizeType
+    *limit;
+
+  MagickBooleanType
+    *status;
+
+  MagickOffsetType
+    *current;
+
+  MagickBooleanType
+    *bi;
+} AcquireTargets;
+
+static void AcquireMagickResourceTail(const ResourceType type,
+  const MagickSizeType size,const MagickOffsetType request,
+  const AcquireTargets *targets)
+{
+  MagickBooleanType
+    *const bi = targets->bi,
+    *const status = targets->status;
+
+  MagickOffsetType
+    *const current = targets->current;
+
+  MagickSizeType
+    *const limit = targets->limit;
+
+  switch (type)
+  {
+    case ThreadResource:
+    {
+      (*limit)=resource_info.thread_limit;
+      (*status)=IsOffsetWithinLimit(resource_info.thread,(*limit));
+      break;
+    }
+    case ThrottleResource:
+    {
+      (*limit)=resource_info.throttle_limit;
+      (*status)=IsOffsetWithinLimit(resource_info.throttle,(*limit));
+      break;
+    }
+    case TimeResource:
+    {
+      (*limit)=resource_info.time_limit;
+      (*status)=AcquireResourceCounter(&resource_info.time,request,(*limit));
+      (*current)=resource_info.time;
+      break;
+    }
+    case WidthResource:
+    {
+      (*bi)=MagickTrue;
+      resource_info.width=request;
+      (*limit)=resource_info.width_limit;
+      (*status)=IsSizeWithinLimit(size,(*limit));
+      break;
+    }
+    default:
+    {
+      (*current)=0;
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
   const MagickSizeType size)
 {
@@ -266,6 +332,9 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
 
   MagickSizeType
     limit;
+
+  const AcquireTargets
+    targets = { &limit, &status, &current, &bi };
 
   request=(MagickOffsetType) size;
   if (request < 0)
@@ -337,36 +406,9 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
       current=resource_info.memory;
       break;
     }
-    case ThreadResource:
-    {
-      limit=resource_info.thread_limit;
-      status=IsOffsetWithinLimit(resource_info.thread,limit);
-      break;
-    }
-    case ThrottleResource:
-    {
-      limit=resource_info.throttle_limit;
-      status=IsOffsetWithinLimit(resource_info.throttle,limit);
-      break;
-    }
-    case TimeResource:
-    {
-      limit=resource_info.time_limit;
-      status=AcquireResourceCounter(&resource_info.time,request,limit);
-      current=resource_info.time;
-      break;
-    }
-    case WidthResource:
-    {
-      bi=MagickTrue;
-      resource_info.width=request;
-      limit=resource_info.width_limit;
-      status=IsSizeWithinLimit(size,limit);
-      break;
-    }
     default:
     {
-      current=0;
+      AcquireMagickResourceTail(type,size,request,&targets);
       break;
     }
   }
