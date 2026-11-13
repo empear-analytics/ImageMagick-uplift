@@ -4591,6 +4591,15 @@ static XImage *XAttachSharedXImage(Display *display,XWindowInfo *window,
   return(ximage);
 }
 
+static void XAcquireXYBitmapData(XImage *ximage)
+{
+  ximage->data=(char *) AcquireQuantumMemory((size_t)
+    ximage->bytes_per_line,(size_t) (ximage->depth*ximage->height));
+  if (ximage->data != (char *) NULL)
+    (void) memset(ximage->data,0,(size_t)
+      (ximage->bytes_per_line*ximage->depth*ximage->height));
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4713,13 +4722,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   if (window->shared_memory == MagickFalse)
     {
       if (ximage->format == XYBitmap)
-        {
-          ximage->data=(char *) AcquireQuantumMemory((size_t)
-            ximage->bytes_per_line,(size_t) (ximage->depth*ximage->height));
-          if (ximage->data != (char *) NULL)
-            (void) memset(ximage->data,0,(size_t)
-              (ximage->bytes_per_line*ximage->depth*ximage->height));
-        }
+        XAcquireXYBitmapData(ximage);
       else
         {
           ximage->data=(char *) AcquireQuantumMemory((size_t)
