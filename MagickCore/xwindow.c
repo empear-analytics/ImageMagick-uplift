@@ -396,6 +396,30 @@ static void DestroyXHints(XWindows *windows)
     }
 }
 
+static void DestroyXColormapAndVisualInfo(XWindows *windows)
+{
+  if (windows->map_info != (XStandardColormap *) NULL)
+    {
+      XFree(windows->map_info);
+      windows->map_info=(XStandardColormap *) NULL;
+    }
+  if (windows->icon_map != (XStandardColormap *) NULL)
+    {
+      XFree(windows->icon_map);
+      windows->icon_map=(XStandardColormap *) NULL;
+    }
+  if (windows->visual_info != (XVisualInfo *) NULL)
+    {
+      XFree(windows->visual_info);
+      windows->visual_info=(XVisualInfo *) NULL;
+    }
+  if (windows->icon_visual != (XVisualInfo *) NULL)
+    {
+      XFree(windows->icon_visual);
+      windows->icon_visual=(XVisualInfo *) NULL;
+    }
+}
+
 MagickExport void DestroyXResources(void)
 {
   int
@@ -456,26 +480,7 @@ MagickExport void DestroyXResources(void)
   DestroyXIconPixelInfo(windows);
   DestroyXPixelInfo(windows);
   DestroyXHints(windows);
-  if (windows->map_info != (XStandardColormap *) NULL)
-    {
-      XFree(windows->map_info);
-      windows->map_info=(XStandardColormap *) NULL;
-    }
-  if (windows->icon_map != (XStandardColormap *) NULL)
-    {
-      XFree(windows->icon_map);
-      windows->icon_map=(XStandardColormap *) NULL;
-    }
-  if (windows->visual_info != (XVisualInfo *) NULL)
-    {
-      XFree(windows->visual_info);
-      windows->visual_info=(XVisualInfo *) NULL;
-    }
-  if (windows->icon_visual != (XVisualInfo *) NULL)
-    {
-      XFree(windows->icon_visual);
-      windows->icon_visual=(XVisualInfo *) NULL;
-    }
+  DestroyXColormapAndVisualInfo(windows);
 }
 
 /*
