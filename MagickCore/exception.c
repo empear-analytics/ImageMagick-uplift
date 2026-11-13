@@ -567,75 +567,91 @@ MagickExport char *GetExceptionMessage(const int error)
 %
 */
 
+typedef struct _ExceptionTag
+{
+  ExceptionType
+    severity;
+
+  const char
+    *tag;
+} ExceptionTag;
+
+static const ExceptionTag
+  ExceptionTags[] =
+  {
+    { ResourceLimitWarning, "Resource/Limit/Warning/" },
+    { TypeWarning, "Type/Warning/" },
+    { OptionWarning, "Option/Warning/" },
+    { DelegateWarning, "Delegate/Warning/" },
+    { MissingDelegateWarning, "Missing/Delegate/Warning/" },
+    { CorruptImageWarning, "Corrupt/Image/Warning/" },
+    { FileOpenWarning, "File/Open/Warning/" },
+    { BlobWarning, "Blob/Warning/" },
+    { StreamWarning, "Stream/Warning/" },
+    { CacheWarning, "Cache/Warning/" },
+    { CoderWarning, "Coder/Warning/" },
+    { FilterWarning, "Filter/Warning/" },
+    { ModuleWarning, "Module/Warning/" },
+    { DrawWarning, "Draw/Warning/" },
+    { ImageWarning, "Image/Warning/" },
+    { WandWarning, "Wand/Warning/" },
+    { XServerWarning, "XServer/Warning/" },
+    { MonitorWarning, "Monitor/Warning/" },
+    { RegistryWarning, "Registry/Warning/" },
+    { ConfigureWarning, "Configure/Warning/" },
+    { PolicyWarning, "Policy/Warning/" },
+    { ResourceLimitError, "Resource/Limit/Error/" },
+    { TypeError, "Type/Error/" },
+    { OptionError, "Option/Error/" },
+    { DelegateError, "Delegate/Error/" },
+    { MissingDelegateError, "Missing/Delegate/Error/" },
+    { CorruptImageError, "Corrupt/Image/Error/" },
+    { FileOpenError, "File/Open/Error/" },
+    { BlobError, "Blob/Error/" },
+    { StreamError, "Stream/Error/" },
+    { CacheError, "Cache/Error/" },
+    { CoderError, "Coder/Error/" },
+    { FilterError, "Filter/Error/" },
+    { ModuleError, "Module/Error/" },
+    { DrawError, "Draw/Error/" },
+    { ImageError, "Image/Error/" },
+    { WandError, "Wand/Error/" },
+    { XServerError, "XServer/Error/" },
+    { MonitorError, "Monitor/Error/" },
+    { RegistryError, "Registry/Error/" },
+    { ConfigureError, "Configure/Error/" },
+    { PolicyError, "Policy/Error/" },
+    { ResourceLimitFatalError, "Resource/Limit/FatalError/" },
+    { TypeFatalError, "Type/FatalError/" },
+    { OptionFatalError, "Option/FatalError/" },
+    { DelegateFatalError, "Delegate/FatalError/" },
+    { MissingDelegateFatalError, "Missing/Delegate/FatalError/" },
+    { CorruptImageFatalError, "Corrupt/Image/FatalError/" },
+    { FileOpenFatalError, "File/Open/FatalError/" },
+    { BlobFatalError, "Blob/FatalError/" },
+    { StreamFatalError, "Stream/FatalError/" },
+    { CacheFatalError, "Cache/FatalError/" },
+    { CoderFatalError, "Coder/FatalError/" },
+    { FilterFatalError, "Filter/FatalError/" },
+    { ModuleFatalError, "Module/FatalError/" },
+    { DrawFatalError, "Draw/FatalError/" },
+    { ImageFatalError, "Image/FatalError/" },
+    { WandFatalError, "Wand/FatalError/" },
+    { XServerFatalError, "XServer/FatalError/" },
+    { MonitorFatalError, "Monitor/FatalError/" },
+    { RegistryFatalError, "Registry/FatalError/" },
+    { ConfigureFatalError, "Configure/FatalError/" },
+    { PolicyFatalError, "Policy/FatalError/" }
+  };
+
 static const char *ExceptionSeverityToTag(const ExceptionType severity)
 {
-  switch (severity)
-  {
-    case ResourceLimitWarning: return("Resource/Limit/Warning/");
-    case TypeWarning: return("Type/Warning/");
-    case OptionWarning: return("Option/Warning/");
-    case DelegateWarning: return("Delegate/Warning/");
-    case MissingDelegateWarning: return("Missing/Delegate/Warning/");
-    case CorruptImageWarning: return("Corrupt/Image/Warning/");
-    case FileOpenWarning: return("File/Open/Warning/");
-    case BlobWarning: return("Blob/Warning/");
-    case StreamWarning: return("Stream/Warning/");
-    case CacheWarning: return("Cache/Warning/");
-    case CoderWarning: return("Coder/Warning/");
-    case FilterWarning: return("Filter/Warning/");
-    case ModuleWarning: return("Module/Warning/");
-    case DrawWarning: return("Draw/Warning/");
-    case ImageWarning: return("Image/Warning/");
-    case WandWarning: return("Wand/Warning/");
-    case XServerWarning: return("XServer/Warning/");
-    case MonitorWarning: return("Monitor/Warning/");
-    case RegistryWarning: return("Registry/Warning/");
-    case ConfigureWarning: return("Configure/Warning/");
-    case PolicyWarning: return("Policy/Warning/");
-    case ResourceLimitError: return("Resource/Limit/Error/");
-    case TypeError: return("Type/Error/");
-    case OptionError: return("Option/Error/");
-    case DelegateError: return("Delegate/Error/");
-    case MissingDelegateError: return("Missing/Delegate/Error/");
-    case CorruptImageError: return("Corrupt/Image/Error/");
-    case FileOpenError: return("File/Open/Error/");
-    case BlobError: return("Blob/Error/");
-    case StreamError: return("Stream/Error/");
-    case CacheError: return("Cache/Error/");
-    case CoderError: return("Coder/Error/");
-    case FilterError: return("Filter/Error/");
-    case ModuleError: return("Module/Error/");
-    case DrawError: return("Draw/Error/");
-    case ImageError: return("Image/Error/");
-    case WandError: return("Wand/Error/");
-    case XServerError: return("XServer/Error/");
-    case MonitorError: return("Monitor/Error/");
-    case RegistryError: return("Registry/Error/");
-    case ConfigureError: return("Configure/Error/");
-    case PolicyError: return("Policy/Error/");
-    case ResourceLimitFatalError: return("Resource/Limit/FatalError/");
-    case TypeFatalError: return("Type/FatalError/");
-    case OptionFatalError: return("Option/FatalError/");
-    case DelegateFatalError: return("Delegate/FatalError/");
-    case MissingDelegateFatalError: return("Missing/Delegate/FatalError/");
-    case CorruptImageFatalError: return("Corrupt/Image/FatalError/");
-    case FileOpenFatalError: return("File/Open/FatalError/");
-    case BlobFatalError: return("Blob/FatalError/");
-    case StreamFatalError: return("Stream/FatalError/");
-    case CacheFatalError: return("Cache/FatalError/");
-    case CoderFatalError: return("Coder/FatalError/");
-    case FilterFatalError: return("Filter/FatalError/");
-    case ModuleFatalError: return("Module/FatalError/");
-    case DrawFatalError: return("Draw/FatalError/");
-    case ImageFatalError: return("Image/FatalError/");
-    case WandFatalError: return("Wand/FatalError/");
-    case XServerFatalError: return("XServer/FatalError/");
-    case MonitorFatalError: return("Monitor/FatalError/");
-    case RegistryFatalError: return("Registry/FatalError/");
-    case ConfigureFatalError: return("Configure/FatalError/");
-    case PolicyFatalError: return("Policy/FatalError/");
-    default: break;
-  }
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(ExceptionTags)/sizeof(*ExceptionTags)); i++)
+    if (ExceptionTags[i].severity == severity)
+      return(ExceptionTags[i].tag);
   return("");
 }
 
