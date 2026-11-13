@@ -767,69 +767,82 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
     }
 }
 
+typedef struct _IPTCTagName
+{
+  long
+    key;
+
+  const char
+    *name;
+} IPTCTagName;
+
+static const IPTCTagName
+  IPTCTagNames[] =
+  {
+    { 5, "Image Name" },
+    { 7, "Edit Status" },
+    { 10, "Priority" },
+    { 15, "Category" },
+    { 20, "Supplemental Category" },
+    { 22, "Fixture Identifier" },
+    { 25, "Keyword" },
+    { 30, "Release Date" },
+    { 35, "Release Time" },
+    { 40, "Special Instructions" },
+    { 45, "Reference Service" },
+    { 47, "Reference Date" },
+    { 50, "Reference Number" },
+    { 55, "Created Date" },
+    { 60, "Created Time" },
+    { 65, "Originating Program" },
+    { 70, "Program Version" },
+    { 75, "Object Cycle" },
+    { 80, "Byline" },
+    { 85, "Byline Title" },
+    { 90, "City" },
+    { 92, "Sub-Location" },
+    { 95, "Province State" },
+    { 100, "Country Code" },
+    { 101, "Country" },
+    { 103, "Original Transmission Reference" },
+    { 105, "Headline" },
+    { 110, "Credit" },
+    { 115, "Src" },
+    { 116, "Copyright String" },
+    { 120, "Caption" },
+    { 121, "Local Caption" },
+    { 122, "Caption Writer" },
+    { 200, "Custom Field 1" },
+    { 201, "Custom Field 2" },
+    { 202, "Custom Field 3" },
+    { 203, "Custom Field 4" },
+    { 204, "Custom Field 5" },
+    { 205, "Custom Field 6" },
+    { 206, "Custom Field 7" },
+    { 207, "Custom Field 8" },
+    { 208, "Custom Field 9" },
+    { 209, "Custom Field 10" },
+    { 210, "Custom Field 11" },
+    { 211, "Custom Field 12" },
+    { 212, "Custom Field 13" },
+    { 213, "Custom Field 14" },
+    { 214, "Custom Field 15" },
+    { 215, "Custom Field 16" },
+    { 216, "Custom Field 17" },
+    { 217, "Custom Field 18" },
+    { 218, "Custom Field 19" },
+    { 219, "Custom Field 20" }
+  };
+
 static const char *GetIPTCTagName(const long record)
 {
-  const char
-    *tag;
+  size_t
+    i;
 
-  switch (record)
-  {
-    case 5: tag="Image Name"; break;
-    case 7: tag="Edit Status"; break;
-    case 10: tag="Priority"; break;
-    case 15: tag="Category"; break;
-    case 20: tag="Supplemental Category"; break;
-    case 22: tag="Fixture Identifier"; break;
-    case 25: tag="Keyword"; break;
-    case 30: tag="Release Date"; break;
-    case 35: tag="Release Time"; break;
-    case 40: tag="Special Instructions"; break;
-    case 45: tag="Reference Service"; break;
-    case 47: tag="Reference Date"; break;
-    case 50: tag="Reference Number"; break;
-    case 55: tag="Created Date"; break;
-    case 60: tag="Created Time"; break;
-    case 65: tag="Originating Program"; break;
-    case 70: tag="Program Version"; break;
-    case 75: tag="Object Cycle"; break;
-    case 80: tag="Byline"; break;
-    case 85: tag="Byline Title"; break;
-    case 90: tag="City"; break;
-    case 92: tag="Sub-Location"; break;
-    case 95: tag="Province State"; break;
-    case 100: tag="Country Code"; break;
-    case 101: tag="Country"; break;
-    case 103: tag="Original Transmission Reference"; break;
-    case 105: tag="Headline"; break;
-    case 110: tag="Credit"; break;
-    case 115: tag="Src"; break;
-    case 116: tag="Copyright String"; break;
-    case 120: tag="Caption"; break;
-    case 121: tag="Local Caption"; break;
-    case 122: tag="Caption Writer"; break;
-    case 200: tag="Custom Field 1"; break;
-    case 201: tag="Custom Field 2"; break;
-    case 202: tag="Custom Field 3"; break;
-    case 203: tag="Custom Field 4"; break;
-    case 204: tag="Custom Field 5"; break;
-    case 205: tag="Custom Field 6"; break;
-    case 206: tag="Custom Field 7"; break;
-    case 207: tag="Custom Field 8"; break;
-    case 208: tag="Custom Field 9"; break;
-    case 209: tag="Custom Field 10"; break;
-    case 210: tag="Custom Field 11"; break;
-    case 211: tag="Custom Field 12"; break;
-    case 212: tag="Custom Field 13"; break;
-    case 213: tag="Custom Field 14"; break;
-    case 214: tag="Custom Field 15"; break;
-    case 215: tag="Custom Field 16"; break;
-    case 216: tag="Custom Field 17"; break;
-    case 217: tag="Custom Field 18"; break;
-    case 218: tag="Custom Field 19"; break;
-    case 219: tag="Custom Field 20"; break;
-    default: tag="unknown"; break;
-  }
-  return(tag);
+  for (i=0; i < (sizeof(IPTCTagNames)/sizeof(*IPTCTagNames)); i++)
+    if (IPTCTagNames[i].key == record)
+      return(IPTCTagNames[i].name);
+  return("unknown");
 }
 
 static void PrintIPTCValue(FILE *file,const StringInfo *profile,
