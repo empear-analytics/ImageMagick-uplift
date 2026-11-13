@@ -15280,6 +15280,98 @@ Lane: b
 
 ---
 
+## Recipe TM - Merge Twin Function Tails Differing in the Member They Read
+
+**Use when:** CodeScene reports *Code Duplication* between two functions of one file whose
+tails (everything after the opening asserts) are the same text except for the member
+designator of one lvalue they read, as `timer.c`'s `GetElapsedTime` and `GetUserTime`:
+both return `0.0` for an undefined timer, stop a running one, and return
+`time_info->elapsed.total` or `time_info->user.total`.
+
+**Not covered by:** Recipe MA, whose copies are blocks of one function and whose new
+function is `void`, updating the member; Recipe D, whose copies differ in variables or one
+value, never a member designator; Recipe TI and MT, which merge whole `static` functions
+through a selector (here the twins are public and stay); Recipe CF, whose copies differ
+in the function called.
+
+**How:**
+
+1. Two functions of one file (either may be public; both stay, with their signatures)
+   end in tails that align by script, whitespace ignored, and differ only in the member
+   `m1`/`m2` of one member access `e.m1.f`/`e.m2.f` (or `e.m1`/`e.m2`), where `e` is a
+   pointer parameter of both, with the same name and type, that neither tail assigns; the
+   two members have one declared type `T`. Every path of the tail ends in `return(...)`
+   (Recipe E step 7), it lies outside every OpenMP region, and it reads the member only,
+   never takes its address or assigns it.
+2. Write one `static` function of the twins' return type directly above the first twin:
+   its parameters are the variables the tail reads (`e` among them) and `const T *value`,
+   at most four; its body is the tail's text with `e->m1` written `(*value)`, nothing else
+   changed.
+3. Replace each twin's tail with `return(Helper(..., &e->mi));`, its own member. The
+   opening block of each twin (its asserts and trace log) stays where it is, so the
+   address is taken only after `e` was checked.
+4. Check by script that substituting `e->mi` for `(*value)` in the new function gives each
+   twin's tail, token for token. Run `tools/ci_warnings.sh` and `tools/cxx_warnings.sh`
+   (`OK`), and the oracle for both twins.
+
+**Before:**
+
+```c
+MagickExport double GetElapsedTime(TimerInfo *time_info)
+{
+  assert(time_info != (TimerInfo *) NULL);
+  assert(time_info->signature == MagickCoreSignature);
+  if (time_info->state == UndefinedTimerState)
+    return(0.0);
+  if (time_info->state == RunningTimerState)
+    StopTimer(time_info);
+  return(time_info->elapsed.total);
+}
+```
+
+**After:**
+
+```c
+static double GetStoppedTimerTotal(TimerInfo *time_info,const Timer *value)
+{
+  if (time_info->state == UndefinedTimerState)
+    return(0.0);
+  if (time_info->state == RunningTimerState)
+    StopTimer(time_info);
+  return((*value).total);
+}
+
+MagickExport double GetElapsedTime(TimerInfo *time_info)
+{
+  assert(time_info != (TimerInfo *) NULL);
+  assert(time_info->signature == MagickCoreSignature);
+  return(GetStoppedTimerTotal(time_info,&time_info->elapsed));
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `value` holds the address of the member of the object
+  `e` points to, computed at the call; `e` is not assigned in the tail (step 1), so the
+  address names the same storage throughout. Each read `(*value)` happens where the tail
+  read `e->mi`, after the same calls: a call that writes the member through `e`
+  (`StopTimer` updating the totals) is seen by the read, because the pointer is to
+  `const` only for this function, not a promise the object does not change, and the
+  compiler reloads it after an opaque call.
+- Taking the address before the tail runs reads no memory; only `(*value)` does.
+- A tail that assigns the member is Recipe MA's shape, not this one.
+
+**Evidence level:** oracle (the cases that reach either twin), with `tools/ci_warnings.sh`
+and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `timer.c`'s `GetElapsedTime` and `GetUserTime` (campaign
+B, M127 lane b round 5): the last *Code Duplication* pair once Recipe BF had removed the
+banners' share; 9.38 to 10.0. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -15634,3 +15726,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | KC | Step 1: a label may be a character constant (type `int`; `key` of type `int`); Lane: b | `string-si.c`'s `GetSiPrefixExponent` (twenty-four letter labels each assigning a `double` exponent, cc 26; probe 8.50 to 9.09) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | AT | Extract a Selection Arm with a Copy of the Return Tail: in a value-returning function ending `if (c) <arm> return(R);`, the arm (returning on some paths, falling through on others) moves to a `static` function of the caller's return type followed by a copy of `return(R);`; the `if` becomes `if (c) return(Helper(...));`; locals the arm writes are read after it only by `R` and go by value; evidence oracle; Lane: b | `string-copy.c`'s `CopyMagickString` (cc 9, two bumps; E step 7 on the whole tail left a five-argument helper, 9.68; this recipe 9.61 to 10.0) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | BF | Drop the Blank Frame Rows of Doc-Comment Banners: the six rows of `%`, 77 spaces and `%` around a banner's name row are deleted in every banner of a file, nothing else; evidence guard (`obj_identical.sh` IDENTICAL); Lane: b | `locale.c`: eight functions in *Code Duplication* through their banners (CodeScene counts the banner into the function's span); probe 7.09 to 8.01, every duplication finding gone | owner |
+| 2026-11-13 | NEW | TM | Merge Twin Function Tails Differing in the Member They Read: two functions of a file whose returning tails differ only in the member of one read `e->m.f` share a `static` function taking `const T *value`; each twin keeps its opening block and returns the call with `&e->m`; evidence oracle; Lane: b | `timer.c`'s `GetElapsedTime` and `GetUserTime` (*Code Duplication*; 9.38 to 10.0) | mandate (2026-10-24) |
