@@ -2237,6 +2237,33 @@ static void XSetDrawRowOpacity(const Image *draw_image,const Image *image,
   }
 }
 
+static int XSetDrawImageOpacity(const Image *draw_image,const Image *image,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *draw_view;
+
+  int
+    y;
+
+  draw_view=AcquireAuthenticCacheView(draw_image,exception);
+  for (y=0; y < (int) draw_image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    q=GetCacheViewAuthenticPixels(draw_view,0,(ssize_t) y,draw_image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      break;
+    XSetDrawRowOpacity(draw_image,image,q);
+    if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
+      break;
+  }
+  draw_view=DestroyCacheView(draw_view);
+  return(y);
+}
+
 MagickPrivate MagickBooleanType XDrawImage(Display *display,
   const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
   ExceptionInfo *exception)
@@ -2394,21 +2421,7 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
   /*
     Composite text onto the image.
   */
-  draw_view=AcquireAuthenticCacheView(draw_image,exception);
-  for (y=0; y < (int) draw_image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    q=GetCacheViewAuthenticPixels(draw_view,0,(ssize_t) y,draw_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      break;
-    XSetDrawRowOpacity(draw_image,image,q);
-    if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
-      break;
-  }
-  draw_view=DestroyCacheView(draw_view);
+  y=XSetDrawImageOpacity(draw_image,image,exception);
   (void) XParseGeometry(draw_info->geometry,&x,&y,&width,&height);
   if (draw_info->stencil == TransparentStencil)
     (void) CompositeImage(image,draw_image,CopyAlphaCompositeOp,MagickTrue,
