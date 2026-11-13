@@ -522,6 +522,25 @@ static unsigned char *AppendPixelChannels(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static unsigned char *AppendSignatureRow(const Image *image,const Quantum *p,
+  unsigned char *q,const SignatureInfo *signature_info)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelReadMask(image,p) <= (QuantumRange/2))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    q=AppendPixelChannels(image,p,q,signature_info);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
 MagickExport MagickBooleanType SignatureImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -562,9 +581,6 @@ MagickExport MagickBooleanType SignatureImage(Image *image,
   image_view=AcquireVirtualCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     unsigned char
       *q;
 
@@ -575,16 +591,7 @@ MagickExport MagickBooleanType SignatureImage(Image *image,
       sizeof(pixel));
     pixels=GetStringInfoDatum(signature);
     q=pixels;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetPixelReadMask(image,p) <= (QuantumRange/2))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          continue;
-        }
-      q=AppendPixelChannels(image,p,q,signature_info);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    q=AppendSignatureRow(image,p,q,signature_info);
     SetStringInfoLength(signature,(size_t) (q-pixels));
     UpdateSignature(signature_info,signature);
   }
