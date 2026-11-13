@@ -334,6 +334,28 @@ static ssize_t PrintChannelFeatures(FILE *file,const PixelChannel channel,
   return(n);
 }
 
+static double GetLocationTarget(const ChannelLocationsReport *report,
+  const PixelChannel channel)
+{
+  double
+    target;
+
+  switch (report->type)
+  {
+    default:
+    {
+      target=report->channel_statistics[channel].maxima;
+      break;
+    }
+    case MinimumStatistic:
+    {
+      target=report->channel_statistics[channel].minima;
+      break;
+    }
+  }
+  return(target);
+}
+
 static ssize_t PrintChannelLocations(const ChannelLocationsReport *report,
   const PixelChannel channel,const char *name)
 {
@@ -353,19 +375,7 @@ static ssize_t PrintChannelLocations(const ChannelLocationsReport *report,
     n,
     y;
 
-  switch (report->type)
-  {
-    default:
-    {
-      target=report->channel_statistics[channel].maxima;
-      break;
-    }
-    case MinimumStatistic:
-    {
-      target=report->channel_statistics[channel].minima;
-      break;
-    }
-  }
+  target=GetLocationTarget(report,channel);
   (void) FormatLocaleFile(file,"  %s: %.*g (%.*g)",name,GetMagickPrecision(),
     target,GetMagickPrecision(),QuantumScale*target);
   exception=AcquireExceptionInfo();
