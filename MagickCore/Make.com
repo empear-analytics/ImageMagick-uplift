@@ -119,6 +119,7 @@ $call Make morphology.c
 $call Make opencl.c
 $call Make opencl-device.c
 $call Make option.c
+$call Make option-image.c
 $call Make paint.c
 $call Make paint-floodfill.c
 $call Make pixel.c

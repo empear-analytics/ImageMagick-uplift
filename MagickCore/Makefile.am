@@ -256,6 +256,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/opencl.h \
   MagickCore/opencl-private.h \
   MagickCore/option.c \
+  MagickCore/option-image.c \
   MagickCore/option.h \
   MagickCore/option-private.h \
   MagickCore/paint.c \
