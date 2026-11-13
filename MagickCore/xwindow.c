@@ -251,6 +251,21 @@ static void
 %  A description of each parameter follows:
 %
 */
+#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
+static void DetachXShmSegment(XShmSegmentInfo *segment_info)
+{
+  if (segment_info != (XShmSegmentInfo *) NULL)
+    if (segment_info[0].shmid >= 0)
+      {
+        if (segment_info[0].shmaddr != NULL)
+          (void) shmdt(segment_info[0].shmaddr);
+        (void) shmctl(segment_info[0].shmid,IPC_RMID,0);
+        segment_info[0].shmaddr=NULL;
+        segment_info[0].shmid=(-1);
+      }
+}
+#endif
+
 MagickExport void DestroyXResources(void)
 {
   int
@@ -357,15 +372,7 @@ MagickExport void DestroyXResources(void)
           *segment_info;
 
         segment_info=(XShmSegmentInfo *) magick_windows[i]->segment_info;
-        if (segment_info != (XShmSegmentInfo *) NULL)
-          if (segment_info[0].shmid >= 0)
-            {
-              if (segment_info[0].shmaddr != NULL)
-                (void) shmdt(segment_info[0].shmaddr);
-              (void) shmctl(segment_info[0].shmid,IPC_RMID,0);
-              segment_info[0].shmaddr=NULL;
-              segment_info[0].shmid=(-1);
-            }
+        DetachXShmSegment(segment_info);
 #endif
         magick_windows[i]->segment_info=(void *)
           RelinquishMagickMemory(magick_windows[i]->segment_info);
