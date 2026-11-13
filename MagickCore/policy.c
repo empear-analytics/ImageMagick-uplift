@@ -641,12 +641,13 @@ static inline MagickBooleanType IsPolicyPathSeparator(const char c)
   if ((c == '/') || (c == '\\'))
     return(MagickTrue);
 #endif
-  return(c == *DirectorySeparator);
+  return((MagickBooleanType) (c == *DirectorySeparator));
 }
 
 static inline MagickBooleanType IsPolicyPathComponentCharacter(const char c)
 {
-  return((c != '\0') && (IsPolicyPathSeparator(c) == MagickFalse));
+  return((MagickBooleanType) ((c != '\0') &&
+    (IsPolicyPathSeparator(c) == MagickFalse)));
 }
 
 static inline MagickBooleanType IsPathContainsSymlink(const char *path)
@@ -737,9 +738,9 @@ MagickExport MagickBooleanType IsPathAuthorized(const PolicyRights rights,
   MagickBooleanType symlink_follow_allowed = IsRightsAuthorizedByName(
     SystemPolicyDomain,"symlink",rights,"follow");
   MagickBooleanType status =
-    (IsRightsAuthorized(PathPolicyDomain,rights,path) != MagickFalse) &&
+    (MagickBooleanType) ((IsRightsAuthorized(PathPolicyDomain,rights,path) != MagickFalse) &&
     ((symlink_follow_allowed != MagickFalse) ||
-     (is_symlink_utf8(path) == MagickFalse));
+     (is_symlink_utf8(path) == MagickFalse)));
   if ((status != MagickFalse) && (symlink_follow_allowed == MagickFalse))
     if ((is_symlink_utf8(path) != MagickFalse) ||
         (IsPathContainsSymlink(path) != MagickFalse))
@@ -784,7 +785,7 @@ static MagickBooleanType IsPolicyCacheInstantiated(ExceptionInfo *exception)
         policy_cache=AcquirePolicyCache(PolicyFilename,exception);
       UnlockSemaphoreInfo(policy_semaphore);
     }
-  return(policy_cache != (LinkedListInfo *) NULL);
+  return((MagickBooleanType) (policy_cache != (LinkedListInfo *) NULL));
 }
 
 /*
@@ -1051,17 +1052,17 @@ MagickExport MagickBooleanType IsRightsAuthorized(const PolicyDomain domain,
 static inline MagickBooleanType IsNewPolicyPath(const char *path,
   const PolicyInfo **policy_info,const ssize_t i)
 {
-  return(((path == (const char *) NULL) ||
+  return((MagickBooleanType) (((path == (const char *) NULL) ||
     (LocaleCompare(path,policy_info[i]->path) != 0)) &&
-    (policy_info[i]->path != (char *) NULL));
+    (policy_info[i]->path != (char *) NULL)));
 }
 
 static inline MagickBooleanType IsLimitPolicyDomain(
   const PolicyInfo **policy_info,const ssize_t i)
 {
-  return((policy_info[i]->domain == CachePolicyDomain) ||
+  return((MagickBooleanType) ((policy_info[i]->domain == CachePolicyDomain) ||
     (policy_info[i]->domain == ResourcePolicyDomain) ||
-    (policy_info[i]->domain == SystemPolicyDomain));
+    (policy_info[i]->domain == SystemPolicyDomain)));
 }
 
 static void ListPolicyLimit(FILE *file,const PolicyInfo **policy_info,
@@ -1402,7 +1403,7 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
     SetPolicyInfoAttribute(policy_info,keyword,token);
   }
   token=(char *) RelinquishMagickMemory(token);
-  return(status != 0);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*

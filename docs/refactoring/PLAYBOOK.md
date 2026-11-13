@@ -12809,14 +12809,20 @@ tests. Neither removes one.
 1. Find `? MagickTrue : MagickFalse` (or `? MagickFalse : MagickTrue`, with the test's
    sense kept as written) whose condition is a comparison (`==`, `!=`, `<`, ...), a `!`
    test, or `&&` / `||` of those, all of which yield `0` or `1` in C.
-2. Delete the ternary and keep the condition: `return(a == b);`, `status = (a != b) &&
-   (c == d);`. A condition that is a bare value (`return(p ? MagickTrue : MagickFalse);`,
-   `x & mask`) is refused: its value is not `0` or `1`.
+2. Delete the ternary and keep the condition inside a cast to the destination's type:
+   `return((MagickBooleanType) (a == b));`, `status=(MagickBooleanType) ((a != b) &&
+   (c == d));`, and the same for an argument passed to a `MagickBooleanType` parameter.
+   The cast is required: the Windows jobs compile MagickCore as C++, where a comparison
+   is `bool` and does not convert to an enum (MSVC C2440, C2664); the bare form passed
+   every check on the Mac and broke main's Windows jobs (2026-11-13). A condition that is
+   a bare value (`return(p ? MagickTrue : MagickFalse);`, `x & mask`) is refused: its
+   value is not `0` or `1`.
 3. `MagickFalse` is `0` and `MagickTrue` is `1` (`MagickCore/magick-type.h`); check it
    once by reading. A `MagickBooleanType` function returning, or a variable of that type
    assigned, an `int` of `0` or `1` is the same value.
 4. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL`; otherwise revert the
-   step. Run `tools/ci_warnings.sh <file>` and keep the step only if it prints `OK`.
+   step. Run `tools/ci_warnings.sh <file>` and `tools/cxx_warnings.sh <file>` and keep the
+   step only if both print `OK`.
 
 **Before:**
 
@@ -12828,8 +12834,8 @@ tests. Neither removes one.
 **After:**
 
 ```c
-  return((policy_info[i]->domain == CachePolicyDomain) ||
-    (policy_info[i]->domain == ResourcePolicyDomain));
+  return((MagickBooleanType) ((policy_info[i]->domain == CachePolicyDomain) ||
+    (policy_info[i]->domain == ResourcePolicyDomain)));
 ```
 
 **Careful:**
@@ -12840,7 +12846,7 @@ tests. Neither removes one.
   the ternary: step 2.
 
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
-`HEAD` and `tools/ci_warnings.sh` printing `OK`.
+`HEAD` and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
 
 **Provenance:** 2026-11-12, from `policy.c` (campaign B, M120): seven ternaries, the
 file 6.21 to 6.38, object code identical. Added by Claude Code (Claude Sonnet 5.5) under
@@ -15530,6 +15536,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | KE | Replace a letter-keyed `switch` that assigns an enumerator (and for some letters tests then exits) by a `static const` table of records and a lookup helper; evidence oracle | `stream.c`'s `StreamImagePixels` map parser (cc 39 to 16, 5.98 to 6.12); KS assigns strings and returns, SR keeps the labels | mandate (2026-10-24) |
 | 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | DT | Step 2 keeps the condition inside a `(MagickBooleanType)` cast, step 4 adds `tools/cxx_warnings.sh`: the bare comparison is `bool` in C++ and broke main's Windows jobs (C2440/C2664 in `policy.c`, `constitute.c`, `stream.c`; the casts fixed them with object code identical) | build fixes on `campaign/M126` | mandate (2026-10-24) |
 | 2026-11-13 | NEW | ME | Merge Mirrored Twins That Leave Through a Constant Return: copies of one block that leave the function through `return(c);` (Recipe Y steps 1 and 2; `c` may differ between copies), in two mirrored sides (Recipe MT step 1's alignment) whose copies differ in one member-access value, become one `static inline MagickBooleanType` function taking the input struct, a constant selector, the value and the written variable by pointer; each copy becomes `if (Helper(...) == MagickFalse) return(c);` with its own constant. *Careful* gives the argument (the conditional evaluates only the copy's run, in its order; the constants stay in the callers) | `visual-effects-plasma.c`'s `PlasmaImageProxy` (campaign A, W21 round four, lane d): four edge-pixel blocks (left/right along a column, bottom/top along a row) that Recipes MT, Y, SV and W refuse; helpers per side cloned (8.15), precomputed coordinates moved `errno`-writing casts; a probe of the chain this recipe opens: 8.50 to 9.09 | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | SD | *Two levels of evidence*, *Unreached functions: Recipe SD*: Recipe SD may be applied to a function no case reaches, `Verified: guard`, with SD steps 1 to 6 and 8 checked by reading (no group that throws through `GetMagickModule()`), `refactor_guard.py` `OK` with `--calls` moving only `+2` for each new function, `tools/switch_split_check.py` printing `OK` (the added functions are the helpers; the rest of the file is the same token stream; one controlling expression; helper bodies only bindings and their `switch`; links pass each parameter by name; the flattened chain has the original's groups label for label, bodies equal after `(*v)` to `v` and `&p` to `p`, kept groups unchanged, no `return`, `continue` or `goto` in a moved group, original order) and `tools/obj_modulo.sh` printing `IDENTICAL` or `MODULO-IDENTICAL`. The new tool and its tests are a commit of their own. The guard-verified sentence, SD's *Evidence level* and AGENTS.md say so (the AGENTS.md line is the agent's addition for the owner's confirmation) | `widget.c`'s `XNoticeWidget` (campaign A, W22 lane a), reached by no case: its ten-label event `switch` keeps *Complex Method* and *Large Method* after nine guard-level helpers, and no guard-level recipe splits a `switch`; a probe of two chained SD helpers and an E step 7 tail helper takes the file from 7.31 to 7.78 and the function out of both findings. Planted errors (a label dropped, a callee changed, a write dropped, transposed link arguments, a kept group edited, a statement added to the caller, a member bound from another) are each refused | owner |
 | 2026-11-13 | AMEND | V | Step 1: a `goto M;` to a second label may stand in the block when the caller's statement directly after the block is `goto M;`; it becomes `return(MagickTrue);` like falling off the end, and Recipes Y and I admit it too (the path returns success and the caller runs only that `goto M;`) | `morphology.c`'s `MorphologyApply`: the direct-method path's `goto exit_cleanup;` kept the stage block (cc 11, the special, direct, reflected-kernel and loop tests) from Recipe I; with it, the function leaves Complex Method (6.90 to 6.93) | mandate (2026-10-24) |

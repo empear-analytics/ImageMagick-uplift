@@ -899,8 +899,8 @@ static MagickBooleanType InterpolateMeshPixelChannel(
     GetPixelLuma(grid->image,p+3*GetPixelChannels(grid->image));
   luminance.y=GetPixelLuma(grid->image,p+GetPixelChannels(grid->image))-(double)
     GetPixelLuma(grid->image,p+2*GetPixelChannels(grid->image));
-  corner=SelectMeshTriangle(&delta,fabs((double) luminance.x) <
-    fabs((double) luminance.y));
+  corner=SelectMeshTriangle(&delta,(MagickBooleanType) (fabs((double)
+    luminance.x) < fabs((double) luminance.y)));
   gamma=MeshInterpolate(&delta,alpha[corner[0]],alpha[corner[1]],
     alpha[corner[2]]);
   gamma=MagickSafeReciprocal(gamma);
@@ -976,8 +976,8 @@ static MagickBooleanType InterpolateBlendPixelChannel(
     pixels);
   delta.x=grid->x-grid->x_offset;
   delta.y=grid->y-grid->y_offset;
-  *pixel=BlendInterpolateSamples(alpha,pixels,&delta,
-    grid->channel != AlphaPixelChannel);
+  *pixel=BlendInterpolateSamples(alpha,pixels,&delta,(MagickBooleanType)
+    (grid->channel != AlphaPixelChannel));
   return(status);
 }
 
@@ -1631,7 +1631,8 @@ static void InterpolateBlendChannel(const ChannelsInterpolation *grid,
   delta.x=grid->x-grid->x_offset;
   delta.y=grid->y-grid->y_offset;
   SetPixelChannel(grid->destination,channel,ClampToQuantum(
-    BlendInterpolateSamples(alpha,pixels,&delta,channel != AlphaPixelChannel)),
+    BlendInterpolateSamples(alpha,pixels,&delta,(MagickBooleanType)
+    (channel != AlphaPixelChannel))),
     pixel);
 }
 
@@ -1685,7 +1686,8 @@ static void InterpolateMeshChannel(const ChannelsInterpolation *grid,
   luminance.y=fabs((double) (GetPixelLuma(grid->source,p+
     GetPixelChannels(grid->source))-GetPixelLuma(grid->source,p+2*
     GetPixelChannels(grid->source))));
-  corner=SelectMeshTriangle(&delta,luminance.x < luminance.y);
+  corner=SelectMeshTriangle(&delta,(MagickBooleanType)
+    (luminance.x < luminance.y));
   gamma=MeshInterpolate(&delta,alpha[corner[0]],alpha[corner[1]],
     alpha[corner[2]]);
   gamma=MagickSafeReciprocal(gamma);
@@ -2004,8 +2006,8 @@ static MagickBooleanType InterpolateMeshPixelInfo(
     alpha+2);
   AlphaBlendPixelInfo(grid->image,p+3*GetPixelChannels(grid->image),pixels+3,
     alpha+3);
-  corner=SelectMeshTriangle(&delta,fabs((double) luminance.x) <
-    fabs((double) luminance.y));
+  corner=SelectMeshTriangle(&delta,(MagickBooleanType) (fabs((double)
+    luminance.x) < fabs((double) luminance.y)));
   gamma=MeshInterpolate(&delta,alpha[corner[0]],alpha[corner[1]],
     alpha[corner[2]]);
   gamma=MagickSafeReciprocal(gamma);
