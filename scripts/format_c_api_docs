@@ -26,6 +26,7 @@ if ( ! GetOptions(
 # Source files to use
 #
 @srcs = ('animate.c',
+	 'animate-window.c',
 	 'annotate.c',
 	 'attribute.c',
 	 'attribute-hull.c',

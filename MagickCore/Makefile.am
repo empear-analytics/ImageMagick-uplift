@@ -78,6 +78,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
   MagickCore/animate.c \
+  MagickCore/animate-window.c \
   MagickCore/animate.h \
   MagickCore/animate-private.h \
   MagickCore/annotate.c \
