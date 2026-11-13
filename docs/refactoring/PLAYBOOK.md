@@ -13389,6 +13389,60 @@ under the mandate of 2026-10-24.
 
 ---
 
+## Recipe DV - Drop a Parameter the Callee Can Read from Another
+
+**Use when:** CodeScene reports *Excess Number of Function Arguments* (five) on a `static`
+function that receives both a pointer `s` and a pointer `s->m` (a member of `*s`), as
+`stream.c`'s `StreamDoublePixels(stream_info,image,quantum_info,...)` whose only caller
+passes `stream_info->quantum_info`.
+
+**Not covered by:** Recipe M, whose callers pass one identifier twice; Recipe B, which
+bundles arguments into a new struct.
+
+**How:**
+
+1. The function is `static`; every call passes exactly `s->m` (same text, `s` the other
+   argument) for the parameter, checked by `grep`.
+2. Delete the parameter. At the top of the body declare a local of the parameter's type
+   and assign it `s->m;` (a plain member read, no call, no side effect). Delete the
+   argument at each call.
+3. If the caller then only set that variable from `s->m` for this call, delete it
+   (`-Wunused-but-set-variable` shows it). Run `tools/ci_warnings.sh <file>` (must print
+   `OK`) and the oracle for the function and its callers.
+
+**Before:**
+
+```c
+static void StreamDoublePixels(const StreamInfo *stream_info,const Image *image,
+  QuantumInfo *quantum_info,QuantumType *quantum_map,size_t length)
+```
+
+**After:**
+
+```c
+static void StreamDoublePixels(const StreamInfo *stream_info,const Image *image,
+  QuantumType *quantum_map,size_t length)
+{
+  QuantumInfo
+    *quantum_info;
+
+  quantum_info=stream_info->quantum_info;
+```
+
+**Careful:**
+
+- The member must not change between the caller's read and the callee's; nothing in the
+  two functions assigns `stream_info->quantum_info` (check by `grep`).
+- The type of the local is the parameter's type, so uses of it compile unchanged.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-13, from `stream.c` (campaign B, M123): `StreamDoublePixels` and
+`StreamFloatPixels`, 6.12 to 6.13. Added by Claude Code (Claude Sonnet 5.5) under the
+mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -13710,3 +13764,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | KR | Replace a keyed `switch` whose groups return string literals by a `static const` key/name table and a lookup loop; evidence oracle | `exception.c` `ExceptionSeverityToTag` (cc 65); KS assigns to a local, TB needs `0..k` labels | mandate (2026-10-24) |
 | 2026-11-13 | NEW | DD | Drop a `case` whose statements repeat the `default:` group; proof `obj_identical.sh` | `stream.c`'s `GetStreamPacketSize` (cc 9 to 8, 5.84 to 5.98, object code identical); DL refuses a label with its own statements | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KE | Replace a letter-keyed `switch` that assigns an enumerator (and for some letters tests then exits) by a `static const` table of records and a lookup helper; evidence oracle | `stream.c`'s `StreamImagePixels` map parser (cc 39 to 16, 5.98 to 6.12); KS assigns strings and returns, SR keeps the labels | mandate (2026-10-24) |
+| 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
