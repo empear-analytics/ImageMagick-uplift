@@ -2934,6 +2934,9 @@ typedef struct _XPixelColorContext
 
   const XResourceInfo
     *resource_info;
+
+  const char
+    **PenColors;
 } XPixelColorContext;
 
 static void XGetInterfaceColors(const XPixelColorContext *context,
@@ -3007,6 +3010,47 @@ static void XGetInterfaceColors(const XPixelColorContext *context,
     }
 }
 
+static void XGetPenColors(const XPixelColorContext *context,
+  XPixelInfo *pixel)
+{
+  Display
+    *const display = context->display;
+
+  const Colormap
+    colormap = context->colormap;
+
+  const XStandardColormap
+    *const map_info = context->map_info;
+
+  const XResourceInfo
+    *const resource_info = context->resource_info;
+
+  const char
+    **const PenColors = context->PenColors;
+
+  ssize_t
+    i;
+
+  Status
+    status;
+
+  /*
+    Set pen color.
+  */
+  for (i=0; i < MaxNumberPens; i++)
+  {
+    (void) XParseColor(display,colormap,(char *) PenColors[i],
+      &pixel->pen_colors[i]);
+    status=XParseColor(display,colormap,resource_info->pen_colors[i],
+      &pixel->pen_colors[i]);
+    if (status == False)
+      ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
+        resource_info->pen_colors[i]);
+    pixel->pen_colors[i].pixel=XStandardPixel(map_info,&pixel->pen_colors[i]);
+    pixel->pen_colors[i].flags=(char) (DoRed | DoGreen | DoBlue);
+  }
+}
+
 MagickPrivate void XGetPixelInfo(Display *display,
   const XVisualInfo *visual_info,const XStandardColormap *map_info,
   const XResourceInfo *resource_info,Image *image,XPixelInfo *pixel)
@@ -3029,12 +3073,6 @@ MagickPrivate void XGetPixelInfo(Display *display,
 
   Colormap
     colormap;
-
-  ssize_t
-    i;
-
-  Status
-    status;
 
   unsigned int
     packets;
@@ -3073,23 +3111,10 @@ MagickPrivate void XGetPixelInfo(Display *display,
   context.colormap=colormap;
   context.map_info=map_info;
   context.resource_info=resource_info;
+  context.PenColors=PenColors;
   XGetInterfaceColors(&context,pixel);
   XGetModulatedColors(map_info,pixel);
-  /*
-    Set pen color.
-  */
-  for (i=0; i < MaxNumberPens; i++)
-  {
-    (void) XParseColor(display,colormap,(char *) PenColors[i],
-      &pixel->pen_colors[i]);
-    status=XParseColor(display,colormap,resource_info->pen_colors[i],
-      &pixel->pen_colors[i]);
-    if (status == False)
-      ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
-        resource_info->pen_colors[i]);
-    pixel->pen_colors[i].pixel=XStandardPixel(map_info,&pixel->pen_colors[i]);
-    pixel->pen_colors[i].flags=(char) (DoRed | DoGreen | DoBlue);
-  }
+  XGetPenColors(&context,pixel);
   pixel->box_color=pixel->background_color;
   pixel->pen_color=pixel->foreground_color;
   pixel->box_index=0;
