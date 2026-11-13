@@ -14971,6 +14971,27 @@ static void PositionPreferencesHeight(XWindows *windows,
     windows->widget.height=windows->widget.min_height;
 }
 
+static void SavePreferences(XResourceInfo *resource_info,
+  const XWidgetInfo *preferences_info)
+{
+  /*
+    Save user preferences to the client configuration file.
+  */
+  resource_info->backdrop=preferences_info[0].raised == MagickFalse;
+  resource_info->confirm_exit=preferences_info[1].raised == MagickFalse;
+  resource_info->confirm_edit=preferences_info[2].raised == MagickFalse;
+  resource_info->gamma_correct=preferences_info[3].raised == MagickFalse;
+  resource_info->display_warnings=preferences_info[4].raised == MagickFalse;
+  resource_info->quantize_info->dither_method=
+    preferences_info[5].raised == MagickFalse ?
+    RiemersmaDitherMethod : NoDitherMethod;
+  resource_info->colormap=SharedColormap;
+  if (preferences_info[6].raised)
+    resource_info->colormap=PrivateColormap;
+  resource_info->use_pixmap=preferences_info[7].raised == MagickFalse;
+  XUserPreferences(resource_info);
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15251,22 +15272,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   WithdrawBrowserWidget(display,windows);
   if (apply_info.raised)
     return(MagickFalse);
-  /*
-    Save user preferences to the client configuration file.
-  */
-  resource_info->backdrop=preferences_info[0].raised == MagickFalse;
-  resource_info->confirm_exit=preferences_info[1].raised == MagickFalse;
-  resource_info->confirm_edit=preferences_info[2].raised == MagickFalse;
-  resource_info->gamma_correct=preferences_info[3].raised == MagickFalse;
-  resource_info->display_warnings=preferences_info[4].raised == MagickFalse;
-  resource_info->quantize_info->dither_method=
-    preferences_info[5].raised == MagickFalse ?
-    RiemersmaDitherMethod : NoDitherMethod;
-  resource_info->colormap=SharedColormap;
-  if (preferences_info[6].raised)
-    resource_info->colormap=PrivateColormap;
-  resource_info->use_pixmap=preferences_info[7].raised == MagickFalse;
-  XUserPreferences(resource_info);
+  SavePreferences(resource_info,preferences_info);
   return(MagickTrue);
 }
 
