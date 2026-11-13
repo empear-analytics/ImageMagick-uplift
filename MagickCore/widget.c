@@ -7030,6 +7030,9 @@ typedef struct _FileBrowserWidgets
     *north_info,
     *south_info,
     *list_info;
+
+  size_t
+    *delay;
 } FileBrowserWidgets;
 
 typedef struct _FileBrowserContext
@@ -7682,6 +7685,54 @@ static void ReleaseFileBrowserButtons(const FileBrowserContext *context,
   ReleaseFileBrowserActions(context,event,widgets);
 }
 
+static void ReleaseFileBrowserScroll(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  if ((*north_info).raised == MagickFalse)
+    {
+      /*
+        User released up button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*north_info).raised=MagickTrue;
+      XDrawTriangleNorth(display,&windows->widget,north_info);
+    }
+  if ((*south_info).raised == MagickFalse)
+    {
+      /*
+        User released down button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*south_info).raised=MagickTrue;
+      XDrawTriangleSouth(display,&windows->widget,south_info);
+    }
+  if ((*slider_info).active)
+    {
+      /*
+        Stop tracking slider.
+      */
+      (*slider_info).active=MagickFalse;
+      return;
+    }
+  ReleaseFileBrowserButtons(context,event,widgets);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -7765,7 +7816,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     file_widgets = { &reply_info, &state,
       &scroll_info, &slider_info, &visible_files, &files, &up_info, &home_info,
       &special_info, &action_info, &cancel_info, &i, &filelist, &north_info,
-      &south_info, &list_info };
+      &south_info, &list_info, &delay };
 
   FileBrowserContext
     file_context;
@@ -8214,35 +8265,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        if (north_info.raised == MagickFalse)
-          {
-            /*
-              User released up button.
-            */
-            delay=SuspendTime << 2;
-            north_info.raised=MagickTrue;
-            XDrawTriangleNorth(display,&windows->widget,&north_info);
-          }
-        if (south_info.raised == MagickFalse)
-          {
-            /*
-              User released down button.
-            */
-            delay=SuspendTime << 2;
-            south_info.raised=MagickTrue;
-            XDrawTriangleSouth(display,&windows->widget,&south_info);
-          }
-        if (slider_info.active)
-          {
-            /*
-              Stop tracking slider.
-            */
-            slider_info.active=MagickFalse;
-            break;
-          }
-        ReleaseFileBrowserButtons(&file_context,event,&file_widgets);
+        ReleaseFileBrowserScroll(&file_context,event,&file_widgets);
         break;
       }
       case ClientMessage:
