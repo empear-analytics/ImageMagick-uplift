@@ -4138,6 +4138,18 @@ static XImage *XCreateMatteXImage(Display *display,
   return(matte_image);
 }
 
+static void XDestroyWindowMatteImage(XWindowInfo *window)
+{
+  /*
+    Free matte image.
+  */
+  if (window->matte_image->data != (char *) NULL)
+    free(window->matte_image->data);
+  window->matte_image->data=(char *) NULL;
+  XDestroyImage(window->matte_image);
+  window->matte_image=(XImage *) NULL;
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4364,16 +4376,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
     if (IsShapeWithinDisplay(display,window,width,height) != MagickFalse)
       matte_image=XCreateMatteXImage(display,window,width,height);
   if (window->matte_image != (XImage *) NULL)
-    {
-      /*
-        Free matte image.
-      */
-      if (window->matte_image->data != (char *) NULL)
-        free(window->matte_image->data);
-      window->matte_image->data=(char *) NULL;
-      XDestroyImage(window->matte_image);
-      window->matte_image=(XImage *) NULL;
-    }
+    XDestroyWindowMatteImage(window);
   window->matte_image=matte_image;
   if (window->matte_pixmap != (Pixmap) NULL)
     {
