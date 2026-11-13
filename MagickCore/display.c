@@ -7732,6 +7732,31 @@ static void XDrawCommand(const DrawEditContext *context,
   (void) XCheckDefineCursor(display,windows->image.id,context->cursor);
 }
 
+static void XDrawShapeEvent(const DrawEditContext *context,
+  const DrawShapeInput *shape,const XEvent event,
+  const DrawShapeTargets *targets)
+{
+  switch (event.type)
+  {
+    case ButtonPress:
+      break;
+    case ButtonRelease:
+    {
+      XDrawButtonRelease(context,shape,event,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case MotionNotify:
+    {
+      XDrawMotion(context,shape,event,targets);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8035,25 +8060,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
       }
       shape_input.element=element;
       shape_input.distance=distance;
-      switch (event.type)
-      {
-        case ButtonPress:
-          break;
-        case ButtonRelease:
-        {
-          XDrawButtonRelease(&draw_context,&shape_input,event,&shape_targets);
-          break;
-        }
-        case Expose:
-          break;
-        case MotionNotify:
-        {
-          XDrawMotion(&draw_context,&shape_input,event,&shape_targets);
-          break;
-        }
-        default:
-          break;
-      }
+      XDrawShapeEvent(&draw_context,&shape_input,event,&shape_targets);
       /*
         Check boundary conditions.
       */
