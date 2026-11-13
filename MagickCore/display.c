@@ -3473,6 +3473,13 @@ typedef struct _ChopEventInput
 
   XWindows
     *windows;
+
+  const char
+    *const *ChopMenu;
+
+  const ModeType
+    *ChopCommands,
+    *DirectionCommands;
 } ChopEventInput;
 
 static size_t XChopKeyPress(const ChopEventInput *input,XEvent *event,
@@ -3584,6 +3591,81 @@ static void XShowChopPointer(Display *display,XWindows *windows,const int x,
     }
 }
 
+static MagickBooleanType XChopCommand(const ChopEventInput *input,XEvent *event,
+  ModeType *direction,size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  const char
+    *const *const ChopMenu = input->ChopMenu;
+
+  const ModeType
+    *const ChopCommands = input->ChopCommands,
+    *const DirectionCommands = input->DirectionCommands;
+
+  int
+    id;
+
+  if ((*event).xany.window == windows->command.id)
+    {
+      /*
+        Select a command from the Command widget.
+      */
+      id=XCommandWidget(display,windows,ChopMenu,event);
+      if (id < 0)
+        return(MagickTrue);
+      switch (ChopCommands[id])
+      {
+        case ChopDirectionCommand:
+        {
+          char
+            command[MagickPathExtent];
+
+          const char
+            *const Directions[] =
+            {
+              "horizontal",
+              "vertical",
+              (char *) NULL,
+            };
+
+          /*
+            Select a command from the pop-up menu.
+          */
+          id=XMenuWidget(display,windows,ChopMenu[id],Directions,command);
+          (*direction)=XSelectChopDirection(id,DirectionCommands,(*direction));
+          break;
+        }
+        case ChopHelpCommand:
+        {
+          XTextViewHelp(display,resource_info,windows,MagickFalse,
+            "Help Viewer - Image Chop",ImageChopHelp);
+          break;
+        }
+        case ChopDismissCommand:
+        {
+          /*
+            Prematurely exit.
+          */
+          (*state)|=EscapeState;
+          (*state)|=ExitState;
+          break;
+        }
+        default:
+          break;
+      }
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3620,7 +3702,6 @@ static MagickBooleanType XChopImage(Display *display,
     *chop_image;
 
   int
-    id,
     x,
     y;
 
@@ -3640,7 +3721,8 @@ static MagickBooleanType XChopImage(Display *display,
     segment_info;
 
   const ChopEventInput
-    input = { display, resource_info, windows };
+    input = { display, resource_info, windows, ChopMenu, ChopCommands,
+      DirectionCommands };
 
   const ChopTargets
     targets = { &segment_info, &state };
@@ -3669,56 +3751,8 @@ static MagickBooleanType XChopImage(Display *display,
       Wait for next event.
     */
     XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,ChopMenu,&event);
-        if (id < 0)
-          continue;
-        switch (ChopCommands[id])
-        {
-          case ChopDirectionCommand:
-          {
-            char
-              command[MagickPathExtent];
-
-            const char
-              *const Directions[] =
-              {
-                "horizontal",
-                "vertical",
-                (char *) NULL,
-              };
-
-            /*
-              Select a command from the pop-up menu.
-            */
-            id=XMenuWidget(display,windows,ChopMenu[id],Directions,command);
-            direction=XSelectChopDirection(id,DirectionCommands,direction);
-            break;
-          }
-          case ChopHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Chop",ImageChopHelp);
-            break;
-          }
-          case ChopDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
-        continue;
-      }
+    if (XChopCommand(&input,&event,&direction,&state) != MagickFalse)
+      continue;
     switch (event.type)
     {
       case ButtonPress:
