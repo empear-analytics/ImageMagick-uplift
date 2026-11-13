@@ -546,6 +546,64 @@ static void GetUpperGravityTextOffset(const GravityTextInfo *gravity,
   }
 }
 
+static void GetCenterGravityTextOffset(const GravityTextInfo *gravity,
+  PointInfo *offset)
+{
+  DrawInfo
+    *const annotate = gravity->annotate,
+    *const annotate_info = gravity->annotate_info;
+
+  const RectangleInfo
+    geometry = gravity->geometry;
+
+  const size_t
+    height = gravity->height;
+
+  const ssize_t
+    i = gravity->i;
+
+  const TypeMetric
+    metrics = gravity->metrics;
+
+  const size_t
+    number_lines = gravity->number_lines;
+
+  switch (annotate->gravity)
+  {
+    default:
+    {
+      GetUpperGravityTextOffset(gravity,offset);
+      break;
+    }
+    case (GravityType) CenterGravity:
+    {
+      (*offset).x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
+        geometry.width/2.0+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width/2.0+annotate_info->affine.ry*
+        (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
+      (*offset).y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
+        geometry.height/2.0+i*annotate_info->affine.sy*height-
+        annotate_info->affine.rx*metrics.width/2.0+annotate_info->affine.sy*
+        (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
+      break;
+    }
+    case (GravityType) EastGravity:
+    {
+      (*offset).x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
+        geometry.width+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width+
+        annotate_info->affine.ry*(metrics.ascent+metrics.descent-
+        (number_lines-1.0)*height)/2.0-1.0;
+      (*offset).y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
+        geometry.height/2.0+i*annotate_info->affine.sy*height-
+        annotate_info->affine.rx*metrics.width+
+        annotate_info->affine.sy*(metrics.ascent+metrics.descent-
+        (number_lines-1.0)*height)/2.0;
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -660,7 +718,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
         gravity.i=i;
         gravity.metrics=metrics;
         gravity.number_lines=number_lines;
-        GetUpperGravityTextOffset(&gravity,&offset);
+        GetCenterGravityTextOffset(&gravity,&offset);
         break;
       }
       case (GravityType) NorthWestGravity:
@@ -671,32 +729,6 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
         offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
           annotate_info->affine.sy*metrics.ascent;
-        break;
-      }
-      case (GravityType) CenterGravity:
-      {
-        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
-          geometry.width/2.0+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width/2.0+annotate_info->affine.ry*
-          (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
-        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
-          geometry.height/2.0+i*annotate_info->affine.sy*height-
-          annotate_info->affine.rx*metrics.width/2.0+annotate_info->affine.sy*
-          (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
-        break;
-      }
-      case (GravityType) EastGravity:
-      {
-        offset.x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
-          geometry.width+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width+
-          annotate_info->affine.ry*(metrics.ascent+metrics.descent-
-          (number_lines-1.0)*height)/2.0-1.0;
-        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
-          geometry.height/2.0+i*annotate_info->affine.sy*height-
-          annotate_info->affine.rx*metrics.width+
-          annotate_info->affine.sy*(metrics.ascent+metrics.descent-
-          (number_lines-1.0)*height)/2.0;
         break;
       }
     }
