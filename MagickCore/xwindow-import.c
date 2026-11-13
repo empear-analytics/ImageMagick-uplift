@@ -1488,6 +1488,42 @@ typedef struct _WindowDescendInput
     *window_info;
 } WindowDescendInput;
 
+typedef struct _WindowCropTargets
+{
+  int
+    *x_offset,
+    *y_offset;
+
+  RectangleInfo
+    *crop_info;
+} WindowCropTargets;
+
+static void XGetWindowCrop(Display *display,const Window window,
+  const XWindowAttributes window_attributes,const WindowCropTargets *targets)
+{
+  int
+    *const x_offset = targets->x_offset,
+    *const y_offset = targets->y_offset;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  Window
+    child,
+    root_window;
+
+  /*
+    Cropping rectangle is relative to root window.
+  */
+  root_window=XRootWindow(display,XDefaultScreen(display));
+  (void) XTranslateCoordinates(display,window,root_window,0,0,x_offset,
+    y_offset,&child);
+  (*crop_info).x=(ssize_t) (*x_offset);
+  (*crop_info).y=(ssize_t) (*y_offset);
+  (*crop_info).width=(size_t) window_attributes.width;
+  (*crop_info).height=(size_t) window_attributes.height;
+}
+
 static void XSetWindowVisual(WindowInfo *window_info,const int id,
   const Window window,const XWindowAttributes window_attributes)
 {
@@ -1608,12 +1644,11 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
   static WindowInfo
     *window_info;
 
-  Window
-    child,
-    root_window;
-
   XWindowAttributes
     window_attributes;
+
+  const WindowCropTargets
+    targets = { &x_offset,&y_offset,&crop_info };
 
   /*
     Verify window is viewable.
@@ -1623,16 +1658,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   if (XGetViewableAttributes(display,window,&window_attributes) == MagickFalse)
     return((Image *) NULL);
-  /*
-    Cropping rectangle is relative to root window.
-  */
-  root_window=XRootWindow(display,XDefaultScreen(display));
-  (void) XTranslateCoordinates(display,window,root_window,0,0,&x_offset,
-    &y_offset,&child);
-  crop_info.x=(ssize_t) x_offset;
-  crop_info.y=(ssize_t) y_offset;
-  crop_info.width=(size_t) window_attributes.width;
-  crop_info.height=(size_t) window_attributes.height;
+  XGetWindowCrop(display,window,window_attributes,&targets);
   XIncludeWindowBorder(&crop_info,borders,window_attributes);
   XCropToRootWindow(display,&crop_info);
   /*
