@@ -1511,6 +1511,68 @@ static MagickStatusType AppendDelegateElement(LinkedListInfo *cache,
   return(status);
 }
 
+typedef struct _DelegateElementInput
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  const char
+    *filename;
+
+  char
+    *keyword,
+    *token;
+
+  size_t
+    extent;
+} DelegateElementInput;
+
+static void ParseDelegateElement(const DelegateElementInput *element,
+  DelegateInfo **delegate_info,MagickStatusType *status,const char **q)
+{
+  LinkedListInfo
+    *const cache = element->cache;
+
+  ExceptionInfo
+    *const exception = element->exception;
+
+  const char
+    *const filename = element->filename;
+
+  char
+    *const keyword = element->keyword,
+    *const token = element->token;
+
+  const size_t
+    extent = element->extent;
+
+  if (LocaleCompare(keyword,"<delegate") == 0)
+    {
+      /*
+        Delegate element.
+      */
+      (*delegate_info)=AcquireDelegateInfo(filename);
+      return;
+    }
+  if ((*delegate_info) == (DelegateInfo *) NULL)
+    return;
+  if (IsDelegateEnd(keyword) != MagickFalse)
+    {
+      (*status)=AppendDelegateElement(cache,(*delegate_info),exception);
+      (*delegate_info)=(DelegateInfo *) NULL;
+      return;
+    }
+  (void) GetNextToken((*q),(const char **) NULL,extent,token);
+  if (*token != '=')
+    return;
+  (void) GetNextToken((*q),q,extent,token);
+  (void) GetNextToken((*q),q,extent,token);
+  SetDelegateInfoAttribute((*delegate_info),keyword,token);
+}
+
 static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1549,6 +1611,9 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
   extent=strlen(token)+MagickPathExtent;
   for (q=(const char *) xml; *q != '\0'; )
   {
+    DelegateElementInput
+      element;
+
     /*
       Interpret XML.
     */
@@ -1570,28 +1635,13 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
         LoadDelegateIncludeElement(&include,&q,&status);
         continue;
       }
-    if (LocaleCompare(keyword,"<delegate") == 0)
-      {
-        /*
-          Delegate element.
-        */
-        delegate_info=AcquireDelegateInfo(filename);
-        continue;
-      }
-    if (delegate_info == (DelegateInfo *) NULL)
-      continue;
-    if (IsDelegateEnd(keyword) != MagickFalse)
-      {
-        status=AppendDelegateElement(cache,delegate_info,exception);
-        delegate_info=(DelegateInfo *) NULL;
-        continue;
-      }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    SetDelegateInfoAttribute(delegate_info,keyword,token);
+    element.cache=cache;
+    element.exception=exception;
+    element.filename=filename;
+    element.keyword=keyword;
+    element.token=token;
+    element.extent=extent;
+    ParseDelegateElement(&element,&delegate_info,&status,&q);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);
