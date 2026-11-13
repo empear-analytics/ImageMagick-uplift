@@ -1074,6 +1074,21 @@ static MagickBooleanType XImportWindowImage(const WindowImageSource *source)
   return(MagickTrue);
 }
 
+static void XIncludeWindowBorder(RectangleInfo *crop_info,
+  const unsigned int borders,const XWindowAttributes window_attributes)
+{
+  if (borders != MagickFalse)
+    {
+      /*
+        Include border in image.
+      */
+      (*crop_info).x-=(ssize_t) window_attributes.border_width;
+      (*crop_info).y-=(ssize_t) window_attributes.border_width;
+      (*crop_info).width+=(size_t) (window_attributes.border_width << 1);
+      (*crop_info).height+=(size_t) (window_attributes.border_width << 1);
+    }
+}
+
 static void XCropToRootWindow(Display *display,RectangleInfo *crop_info)
 {
   int
@@ -1162,16 +1177,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
   crop_info.y=(ssize_t) y_offset;
   crop_info.width=(size_t) window_attributes.width;
   crop_info.height=(size_t) window_attributes.height;
-  if (borders != MagickFalse)
-    {
-      /*
-        Include border in image.
-      */
-      crop_info.x-=(ssize_t) window_attributes.border_width;
-      crop_info.y-=(ssize_t) window_attributes.border_width;
-      crop_info.width+=(size_t) (window_attributes.border_width << 1);
-      crop_info.height+=(size_t) (window_attributes.border_width << 1);
-    }
+  XIncludeWindowBorder(&crop_info,borders,window_attributes);
   XCropToRootWindow(display,&crop_info);
   /*
     Initialize window info attributes.
