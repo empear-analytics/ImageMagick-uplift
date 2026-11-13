@@ -15356,6 +15356,49 @@ static inline MagickBooleanType IsPostscriptFormat(
     MagickFalse);
 }
 
+static void XSelectPageGeometry(Display *display,XWindows *windows,
+  ImageInfo *image_info)
+{
+  if (IsPostscriptFormat(image_info) != MagickFalse)
+    {
+      char
+        geometry[MagickPathExtent];
+
+      const char
+        *const PageSizes[] =
+        {
+          "Letter",
+          "Tabloid",
+          "Ledger",
+          "Legal",
+          "Statement",
+          "Executive",
+          "A3",
+          "A4",
+          "A5",
+          "B4",
+          "B5",
+          "Folio",
+          "Quarto",
+          "10x14",
+          (char *) NULL
+        };
+
+      /*
+        Request page geometry from user.
+      */
+      (void) CopyMagickString(geometry,PSPageGeometry,MagickPathExtent);
+      if (LocaleCompare(image_info->magick,"PDF") == 0)
+        (void) CopyMagickString(geometry,PSPageGeometry,MagickPathExtent);
+      if (image_info->page != (char *) NULL)
+        (void) CopyMagickString(geometry,image_info->page,MagickPathExtent);
+      XListBrowserWidget(display,windows,&windows->widget,PageSizes,"Select",
+        "Select page geometry:",geometry);
+      if (*geometry != '\0')
+        image_info->page=GetPageGeometry(geometry);
+    }
+}
+
 static MagickBooleanType XSaveImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -15436,44 +15479,7 @@ static MagickBooleanType XSaveImage(Display *display,
       image->quality=StringToUnsignedLong(quality);
       image_info->interlace=status != 0 ? NoInterlace : PlaneInterlace;
     }
-  if (IsPostscriptFormat(image_info) != MagickFalse)
-    {
-      char
-        geometry[MagickPathExtent];
-
-      const char
-        *const PageSizes[] =
-        {
-          "Letter",
-          "Tabloid",
-          "Ledger",
-          "Legal",
-          "Statement",
-          "Executive",
-          "A3",
-          "A4",
-          "A5",
-          "B4",
-          "B5",
-          "Folio",
-          "Quarto",
-          "10x14",
-          (char *) NULL
-        };
-
-      /*
-        Request page geometry from user.
-      */
-      (void) CopyMagickString(geometry,PSPageGeometry,MagickPathExtent);
-      if (LocaleCompare(image_info->magick,"PDF") == 0)
-        (void) CopyMagickString(geometry,PSPageGeometry,MagickPathExtent);
-      if (image_info->page != (char *) NULL)
-        (void) CopyMagickString(geometry,image_info->page,MagickPathExtent);
-      XListBrowserWidget(display,windows,&windows->widget,PageSizes,"Select",
-        "Select page geometry:",geometry);
-      if (*geometry != '\0')
-        image_info->page=GetPageGeometry(geometry);
-    }
+  XSelectPageGeometry(display,windows,image_info);
   /*
     Apply image transforms.
   */
