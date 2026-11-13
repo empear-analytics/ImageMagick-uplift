@@ -2277,6 +2277,9 @@ typedef struct _DrawPixels
 
   XDrawInfo
     *draw_info;
+
+  ExceptionInfo
+    *exception;
 } DrawPixels;
 
 static void XSetDrawRow(const DrawPixels *draw_pixels,
@@ -2326,12 +2329,48 @@ static void XSetDrawRow(const DrawPixels *draw_pixels,
   }
 }
 
+static int XTransferDrawPixels(const DrawPixels *draw_pixels)
+{
+  Image
+    *const draw_image = draw_pixels->draw_image;
+
+  XImage
+    *const draw_ximage = draw_pixels->draw_ximage;
+
+  ExceptionInfo
+    *const exception = draw_pixels->exception;
+
+  CacheView
+    *draw_view;
+
+  int
+    y;
+
+  draw_view=AcquireAuthenticCacheView(draw_image,exception);
+  for (y=0; y < (int) draw_image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    q=QueueCacheViewAuthenticPixels(draw_view,0,(ssize_t) y,draw_image->columns,
+      1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    XSetDrawRow(draw_pixels,q,y);
+    if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
+      break;
+  }
+  draw_view=DestroyCacheView(draw_view);
+  XDestroyImage(draw_ximage);
+  return(y);
+}
+
 MagickPrivate MagickBooleanType XDrawImage(Display *display,
   const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
   ExceptionInfo *exception)
 {
-  CacheView
-    *draw_view;
+  DrawPixels
+    draw_pixels;
 
   DrawRotationTargets
     targets;
@@ -2425,29 +2464,12 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
   if (SetImageStorageClass(draw_image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
   draw_image->alpha_trait=BlendPixelTrait;
-  draw_view=AcquireAuthenticCacheView(draw_image,exception);
-  for (y=0; y < (int) draw_image->rows; y++)
-  {
-    DrawPixels
-      draw_pixels;
-
-    Quantum
-      *magick_restrict q;
-
-    q=QueueCacheViewAuthenticPixels(draw_view,0,(ssize_t) y,draw_image->columns,
-      1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    draw_pixels.draw_image=draw_image;
-    draw_pixels.draw_ximage=draw_ximage;
-    draw_pixels.pixel=pixel;
-    draw_pixels.draw_info=draw_info;
-    XSetDrawRow(&draw_pixels,q,y);
-    if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
-      break;
-  }
-  draw_view=DestroyCacheView(draw_view);
-  XDestroyImage(draw_ximage);
+  draw_pixels.draw_image=draw_image;
+  draw_pixels.draw_ximage=draw_ximage;
+  draw_pixels.pixel=pixel;
+  draw_pixels.draw_info=draw_info;
+  draw_pixels.exception=exception;
+  y=XTransferDrawPixels(&draw_pixels);
   /*
     Determine draw geometry.
   */
