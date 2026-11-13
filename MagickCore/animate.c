@@ -1256,6 +1256,61 @@ static void XCreateBackgroundPixmaps(const AnimateBackgroundSetup *setup,
   (*window_info).matte_pixmaps[0]=(*window_info).pixmap;
 }
 
+static void XCreateSceneXImage(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets,const int scene)
+{
+  Image
+    **const image_list = setup->image_list;
+
+  MagickStatusType
+    status;
+
+  unsigned int
+    columns,
+    rows;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XStandardColormap
+    *const map_info = setup->map_info;
+
+  XVisualInfo
+    *const visual_info = setup->visual_info;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*window_info).pixmap=(Pixmap) NULL;
+  (*window_info).matte_pixmap=(Pixmap) NULL;
+  if ((IsTrueColorMap((*resources).map_type,visual_info) != MagickFalse) &&
+      (image_list[scene]->storage_class == PseudoClass))
+    XGetPixelInfo(setup->display,visual_info,map_info,resources,
+      image_list[scene],(*window_info).pixel_info);
+  columns=(unsigned int) image_list[scene]->columns;
+  rows=(unsigned int) image_list[scene]->rows;
+  if ((image_list[scene]->columns != columns) ||
+      (image_list[scene]->rows != rows))
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      image_list[scene]->filename);
+  status=XMakeImage(setup->display,resources,window_info,image_list[scene],
+    columns,rows,setup->exception);
+  if (status == MagickFalse)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      setup->images->filename);
+  if (setup->resource_info->debug != MagickFalse)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "Image: [%.17g] %s %.17gx%.17g ",(double) image_list[scene]->scene,
+        image_list[scene]->filename,(double) columns,(double) rows);
+      if (image_list[scene]->colors != 0)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
+          image_list[scene]->colors);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
+        image_list[scene]->magick);
+    }
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1463,41 +1518,10 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   XCreateBackgroundPixmaps(&setup,&targets);
   for (scene=1; scene < (int) number_scenes; scene++)
   {
-    unsigned int
-      columns,
-      rows;
-
     /*
       Create X image.
     */
-    window_info.pixmap=(Pixmap) NULL;
-    window_info.matte_pixmap=(Pixmap) NULL;
-    if ((IsTrueColorMap(resources.map_type,visual_info) != MagickFalse) &&
-        (image_list[scene]->storage_class == PseudoClass))
-      XGetPixelInfo(display,visual_info,map_info,&resources,
-        image_list[scene],window_info.pixel_info);
-    columns=(unsigned int) image_list[scene]->columns;
-    rows=(unsigned int) image_list[scene]->rows;
-    if ((image_list[scene]->columns != columns) ||
-        (image_list[scene]->rows != rows))
-      ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-        image_list[scene]->filename);
-    status=XMakeImage(display,&resources,&window_info,image_list[scene],
-      columns,rows,exception);
-    if (status == MagickFalse)
-      ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-        images->filename);
-    if (resource_info->debug != MagickFalse)
-      {
-        (void) LogMagickEvent(X11Event,GetMagickModule(),
-          "Image: [%.17g] %s %.17gx%.17g ",(double) image_list[scene]->scene,
-          image_list[scene]->filename,(double) columns,(double) rows);
-        if (image_list[scene]->colors != 0)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
-            image_list[scene]->colors);
-        (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
-          image_list[scene]->magick);
-      }
+    XCreateSceneXImage(&setup,&targets,scene);
     /*
       Create the X pixmap.
     */
