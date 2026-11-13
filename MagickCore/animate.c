@@ -3772,6 +3772,56 @@ static WarningHandler XEnterWorkingDirectory(XResourceInfo *resource_info,
   return(warning_handler);
 }
 
+static const char
+  *const CommandMenu[]=
+  {
+    "Animate",
+    "Speed",
+    "Direction",
+    "Help",
+    "Image Info",
+    "Quit",
+    (char *) NULL
+  },
+  *const AnimateMenu[]=
+  {
+    "Open...",
+    "Play",
+    "Step",
+    "Repeat",
+    "Auto Reverse",
+    "Save...",
+    (char *) NULL
+  },
+  *const SpeedMenu[]=
+  {
+    "Faster",
+    "Slower",
+    (char *) NULL
+  },
+  *const DirectionMenu[]=
+  {
+    "Forward",
+    "Reverse",
+    (char *) NULL
+  },
+  *const HelpMenu[]=
+  {
+    "Overview",
+    "Browse Documentation",
+    "About Animate",
+    (char *) NULL
+  };
+
+static const char
+  *const *Menus[MagickMenus]=
+  {
+    AnimateMenu,
+    SpeedMenu,
+    DirectionMenu,
+    HelpMenu
+  };
+
 static const AnimateCommand
   CommandMenus[]=
   {
@@ -3821,56 +3871,6 @@ MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
 {
-  const char
-    *const CommandMenu[]=
-    {
-      "Animate",
-      "Speed",
-      "Direction",
-      "Help",
-      "Image Info",
-      "Quit",
-      (char *) NULL
-    },
-    *const AnimateMenu[]=
-    {
-      "Open...",
-      "Play",
-      "Step",
-      "Repeat",
-      "Auto Reverse",
-      "Save...",
-      (char *) NULL
-    },
-    *const SpeedMenu[]=
-    {
-      "Faster",
-      "Slower",
-      (char *) NULL
-    },
-    *const DirectionMenu[]=
-    {
-      "Forward",
-      "Reverse",
-      (char *) NULL
-    },
-    *const HelpMenu[]=
-    {
-      "Overview",
-      "Browse Documentation",
-      "About Animate",
-      (char *) NULL
-    };
-
-  const char
-    *const *Menus[MagickMenus]=
-    {
-      AnimateMenu,
-      SpeedMenu,
-      DirectionMenu,
-      HelpMenu
-    };
-
   char
     command[MagickPathExtent],
     *directory,
