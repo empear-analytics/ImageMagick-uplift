@@ -110,6 +110,35 @@ class SplitSource(unittest.TestCase):
         self.assertNotIn("FamilyName", old)
         self.assert_both_compile()
 
+    def test_grouped_forward_declarations_in_an_extern_c_block_split(self):
+        # stream.c's pixel cache interfaces: one `static T` group declares a kept and a moved static, another
+        # wraps its parameter list over two lines, all inside an `extern "C"` block
+        ext_open = "#if defined(__cplusplus) || defined(c_plusplus)\nextern \"C\" {\n#endif\n"
+        ext_close = "#if defined(__cplusplus) || defined(c_plusplus)\n}\n#endif\n"
+        decls = ("\n/*\n  Declare pixel cache interfaces.\n*/\n" + ext_open + "\nstatic int\n  KeptHelper(int),\n  FamilyHelper2(int);\n\n"
+                 "static const char\n  *FamilyName(const int,const int,\n    const int);\n\n" + ext_close)
+        fam = ("\nMagickExport int FamilyRoot(int x)\n{\n  return(FamilyHelper2(x)+(FamilyName(x,x,x)[0] == 0));\n}\n"
+               "\nstatic int FamilyHelper2(int x)\n{\n  return(x+1);\n}\n"
+               "\nstatic const char *FamilyName(const int x,const int y,const int z)\n{\n"
+               "  return(x+y+z == 0 ? \"a\" : \"b\");\n}\n")
+        kept = ("\nMagickExport int KeptRoot(int x)\n{\n  return(KeptHelper(x));\n}\n"
+                "\nstatic int KeptHelper(int x)\n{\n  return(x*2);\n}\n")
+        r = self.split(decls + fam + kept)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        old = open(os.path.join(self.out, "synth.c")).read()
+        self.assertIn("static int\n  KeptHelper(int);\n", old)
+        self.assertNotIn("FamilyHelper2", old)
+        self.assertNotIn("FamilyName", old)
+        self.assertEqual(old.count('extern "C" {'), 1)
+        self.assertIn("static int\n  FamilyHelper2(int);\n", new)
+        self.assertIn("  *FamilyName(const int,const int,\n    const int);\n", new)
+        self.assertEqual(new.count('extern "C" {'), 1)
+        self.assertLess(new.index('extern "C" {'), new.index("FamilyHelper2(int);"))
+        self.assertLess(new.index("const int);"), new.index("\n}\n#endif"))
+        self.assertNotIn("KeptHelper", new)
+        self.assert_both_compile()
+
     def test_stub_of_a_moved_root_moves_under_the_else_line(self):
         stub = "\nMagickExport int FamilyRoot(int x)\n{\n  return(-1);\n}\n"
         r = self.split("#if defined(DELEGATE)\n" + FAMILY + "#else" + stub + "#endif\n" + KEPT)

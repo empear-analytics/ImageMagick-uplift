@@ -15097,6 +15097,136 @@ Lane: b
 
 ---
 
+## Recipe TR - Extract a Loop Whose Throw Resumes It
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it is a `while` loop that reports
+an error with `ThrowMagickException(...GetMagickModule()...)` as one statement of its body
+and then goes on looping, as the include loops of `type.c`'s `LoadTypeCache` and
+`policy.c`'s `LoadPolicyCache` do (`if (depth >= MagickMaxRecursionDepth)
+(void) ThrowMagickException(...,"IncludeNodeNestedTooDeeply",...); else
+status&=(MagickStatusType) LoadTypeInclude(...);`, the last statement of the body).
+
+**Not covered by:** Recipes E, N, O and LC, which would move the throw into the helper,
+where `GetMagickModule()` names the helper, against the rule that a throw stays in the
+function that holds it; Recipe LB, whose `break;` ends the loop, while here the loop goes
+on after the throw; Recipe EX, whose exits leave the block, while the throw is no exit;
+Recipe LT, whose test after the loop repeats its condition.
+
+**How:**
+
+1. The loop is `while (C) B` outside every OpenMP region, with no `#` line in it. `C`
+   has no side effect but through the calls it makes, and `B` contains no `return`,
+   `goto` or `break` that leaves the loop; a `continue;` of the loop stays as it is. The
+   throw is one statement `T;` of `B` whose expression is a call of
+   `ThrowMagickException` with operands that are constants or variables that neither `C`
+   nor `B` writes but through a pointer the helper also holds, and after `T` nothing in
+   `B` runs on its path: it is the last statement of `B`, or the whole branch of an
+   `if`/`else` (or of `if` statements nested so) that is the last statement of `B`,
+   checked by reading.
+2. The variables of the caller that the loop writes and that the caller reads after it,
+   a cursor `q` say, meet Recipe O step 2 and go by pointer, written `(*v)` at every
+   use and `&v` passed on written `v`; an array or a buffer the loop only writes through
+   (`keyword`, `token`) goes as a pointer member of the input struct. What the loop only
+   reads goes in a `const` input struct (Recipe N steps 2 to 6) whose local is declared
+   with an initialiser (Recipe FI step 4) at the top of the block that holds the loop,
+   when every value is fixed there; at most four parameters in all.
+3. Cut the loop into a new `static MagickBooleanType` function directly above the caller.
+   `T;` becomes `return(MagickFalse);`, and the function ends with `return(MagickTrue);`
+   after the loop. Nothing else in the text changes.
+4. Where the loop stood, write `while (Helper(...) == MagickFalse) T;`, `T` unchanged.
+   Check every argument and member against its parameter by reading, and that `T` names
+   only what step 1 allows.
+
+**Before:**
+
+```c
+    if (LocaleCompare(keyword,"<include") == 0)
+      {
+        /*
+          Include element.
+        */
+        while (IsIncludeElementOpen(token,q) != MagickFalse)
+        {
+          if (IsIncludeFileAttribute(&q,extent,keyword,token) == MagickFalse)
+            continue;
+          if (depth >= MagickMaxRecursionDepth)
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
+          else
+            status&=(MagickStatusType) LoadTypeInclude(target,filename,token,
+              depth);
+        }
+        continue;
+      }
+```
+
+**After:**
+
+```c
+static MagickBooleanType LoadTypeIncludes(const TypeIncludeScan *scan,
+  const char **q,MagickStatusType *status)
+{
+  while (IsIncludeElementOpen(scan->token,*q) != MagickFalse)
+  {
+    if (IsIncludeFileAttribute(q,scan->extent,scan->keyword,scan->token) ==
+        MagickFalse)
+      continue;
+    if (scan->depth >= MagickMaxRecursionDepth)
+      return(MagickFalse);
+    else
+      *status&=(MagickStatusType) LoadTypeInclude(scan->target,
+        scan->filename,scan->token,scan->depth);
+  }
+  return(MagickTrue);
+}
+...
+    if (LocaleCompare(keyword,"<include") == 0)
+      {
+        const TypeIncludeScan
+          scan = { target, filename, depth, extent, keyword, token };
+
+        /*
+          Include element.
+        */
+        while (LoadTypeIncludes(&scan,&q,&status) == MagickFalse)
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
+        continue;
+      }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Before, after `T` the iteration ends (step 1), so the
+  next thing the loop does is evaluate `C`. After, the helper returns at the point where
+  `T` stood, having run the same statements; the caller runs `T`, the same call with the
+  same operands (none of them written but through the pointers the caller shares), and
+  calls the helper again, which starts by evaluating `C` on the same state, since every
+  variable the loop carries lives in the caller and travels by pointer. When `C` is
+  false the helper returns `MagickTrue` and the caller's `while` ends, as the loop did.
+  A path that never reaches `T` is the old loop run once.
+- The throw stays in the caller: `GetMagickModule()` names the same function and line
+  range as before, so the exception text is unchanged.
+- The input struct holds copies taken where nothing writes them again before the loop
+  ends (step 2): `keyword` and `token` are pointers whose targets the loop writes through,
+  as it did, and whose values do not change.
+- The number of calls to the helper grows by one per throw; it has no state of its own.
+
+**Evidence level:** oracle (the cases that reach the caller), with steps 1 and 2 checked
+by reading and `refactor_guard.py --calls` (`+2` for the new function: its definition and
+its call). The throw itself is usually reached by no case (a recursion limit): check by
+reading that its text is unchanged.
+
+**Provenance:** 2026-11-13, from `type.c`'s `LoadTypeCache` (campaign B, M127 lane a
+round 3): the include loop's throw was what held the earlier passes (M121: "throw in the
+include loop"); a probe of this step took the function out of *Deep, Nested Complexity*,
+6.90 to 7.39. The same loop stands in `policy.c`'s `LoadPolicyCache`. Added by Claude
+Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: a
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -16494,3 +16624,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | KC | Step 1: a label may be a character constant (type `int`; `key` of type `int`); Lane: b | `string-si.c`'s `GetSiPrefixExponent` (twenty-four letter labels each assigning a `double` exponent, cc 26; probe 8.50 to 9.09) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | RS | Extract a Loop Body of Status-Call Exits, Returning the Calls' Status: a sequential loop's whole body whose exits are `continue;` and `return(c);` after status calls moves as in Recipe CR (b), and in the new function each `if (H(...) == MagickFalse) return(MagickFalse); return(MagickTrue);` pair becomes `return(H(...));` when `H` returns only `MagickTrue` or `MagickFalse`; evidence oracle | `token.c`'s `Tokenizer` (cc 15, three bumps after Recipe Y); CR alone keeps the bumps in the new function | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | B | Existing input struct: when every caller binds the group's arguments as `const` locals from one Recipe N input struct, the group may become that struct's pointer instead of a new struct (members the group lacks are allowed); the callers' bindings left unused are deleted | `token-next.c`'s `AppendTokenChar(token,extent,p,i)`, called only from the `Scan*Token` helpers that bind `token` and `extent` from `NextTokenInput`: *String Heavy Function Arguments* leaves the file, 9.09 to 9.38 in a probe | mandate (2026-10-24) |
+| 2026-11-13 | NEW | TR | Extract a `while` loop whose body reports an error through `ThrowMagickException` and goes on looping: the throw becomes `return(MagickFalse);` in the helper and the caller writes `while (Helper(...) == MagickFalse) T;`, so the throw stays in its function; evidence oracle; Lane: a | `type.c`'s `LoadTypeCache` (include loop; probe 6.90 to 7.39, out of *Deep, Nested Complexity*) and `policy.c`'s `LoadPolicyCache` (the same loop) | mandate (2026-10-24) |

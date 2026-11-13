@@ -232,6 +232,24 @@ static void InitializeLocationExtrema(const StatisticType type,
   }
 }
 
+static void AccumulateRowExtrema(const Image *image,const StatisticType type,
+  const Quantum *magick_restrict p,ChannelStatistics *channel_statistics)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelReadMask(image,p) <= (QuantumRange/2))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    AccumulateLocationExtrema(image,type,p,channel_statistics);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static ChannelStatistics *GetLocationStatistics(const Image *image,
   const StatisticType type,ExceptionInfo *exception)
 {
@@ -261,22 +279,10 @@ static ChannelStatistics *GetLocationStatistics(const Image *image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     p=GetVirtualPixels(image,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetPixelReadMask(image,p) <= (QuantumRange/2))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          continue;
-        }
-      AccumulateLocationExtrema(image,type,p,channel_statistics);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    AccumulateRowExtrema(image,type,p,channel_statistics);
   }
   return(channel_statistics);
 }
@@ -497,14 +503,11 @@ static ssize_t PrintPerceptualHashRows(FILE *file,
   return(n);
 }
 
-static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
+static void PrintPerceptualHashColorspaces(FILE *file,
   const ChannelPerceptualHash *channel_phash)
 {
   ssize_t
     i;
-
-  ssize_t
-    n;
 
   (void) FormatLocaleFile(file,"  Channel perceptual hash: ");
   for (i=0; i < (ssize_t) channel_phash[0].number_colorspaces; i++)
@@ -515,6 +518,18 @@ static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
       (void) FormatLocaleFile(file,", ");
   }
   (void) FormatLocaleFile(file,"\n");
+}
+
+static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
+  const ChannelPerceptualHash *channel_phash)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    n;
+
+  PrintPerceptualHashColorspaces(file,channel_phash);
   n=0;
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
@@ -2177,6 +2192,52 @@ static MagickBooleanType PrintImageSummary(Image *image,FILE *file,
   return(ferror(file) != 0 ? MagickFalse : MagickTrue);
 }
 
+static void PrintImageHeader(FILE *file,const Image *image,
+  ExceptionInfo *exception)
+{
+  struct stat
+    properties;
+
+  (void) FormatLocaleFile(file,"Image:\n  Filename: %s\n",image->filename);
+  PrintImageBaseFilename(file,image);
+  properties=(*GetBlobProperties(image));
+  PrintImagePermissions(file,&properties);
+  PrintImageFormat(file,image,exception);
+}
+
+static void PrintImageClassToEndianness(FILE *file,Image *image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
+  (void) FormatLocaleFile(file,"  Class: %s\n",CommandOptionToMnemonic(
+    MagickClassOptions,(ssize_t) image->storage_class));
+  (void) FormatLocaleFile(file,"  Geometry: %.17gx%.17g%+.20g%+.20g\n",(double)
+    image->columns,(double) image->rows,(double) image->tile_offset.x,(double)
+    image->tile_offset.y);
+  PrintImageBaseGeometryAndResolution(file,image);
+  (void) FormatLocaleFile(file,"  Units: %s\n",CommandOptionToMnemonic(
+    MagickResolutionOptions,(ssize_t) image->units));
+  (void) FormatLocaleFile(file,"  Colorspace: %s\n",CommandOptionToMnemonic(
+    MagickColorspaceOptions,(ssize_t) colorspace));
+  PrintImageType(file,image,exception);
+  (void) FormatLocaleFile(file,"  Endianness: %s\n",CommandOptionToMnemonic(
+    MagickEndianOptions,(ssize_t) image->endian));
+}
+
+static void PrintImageDetails(FILE *file,Image *image,
+  ExceptionInfo *exception)
+{
+  PrintImageColormapEntries(file,image,exception);
+  PrintImageErrorAndRendering(file,image);
+  PrintImageColors(file,image,exception);
+  PrintImageLayout(file,image);
+  PrintImageAnimation(file,image);
+  PrintImageStorageDetails(file,image,exception);
+  PrintImageProfiles(file,image);
+  PrintImageProperties(file,image,exception);
+  PrintImageArtifacts(file,image);
+  PrintImageRegistry(file,exception);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2211,9 +2272,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   size_t
     depth;
 
-  struct stat
-    properties;
-
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
@@ -2247,24 +2305,8 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       GetRequestedMoments(image,&channel_moments,&channel_phash,exception);
       GetRequestedFeatures(image,&channel_features,exception);
     }
-  (void) FormatLocaleFile(file,"Image:\n  Filename: %s\n",image->filename);
-  PrintImageBaseFilename(file,image);
-  properties=(*GetBlobProperties(image));
-  PrintImagePermissions(file,&properties);
-  PrintImageFormat(file,image,exception);
-  (void) FormatLocaleFile(file,"  Class: %s\n",CommandOptionToMnemonic(
-    MagickClassOptions,(ssize_t) image->storage_class));
-  (void) FormatLocaleFile(file,"  Geometry: %.17gx%.17g%+.20g%+.20g\n",(double)
-    image->columns,(double) image->rows,(double) image->tile_offset.x,(double)
-    image->tile_offset.y);
-  PrintImageBaseGeometryAndResolution(file,image);
-  (void) FormatLocaleFile(file,"  Units: %s\n",CommandOptionToMnemonic(
-    MagickResolutionOptions,(ssize_t) image->units));
-  (void) FormatLocaleFile(file,"  Colorspace: %s\n",CommandOptionToMnemonic(
-    MagickColorspaceOptions,(ssize_t) colorspace));
-  PrintImageType(file,image,exception);
-  (void) FormatLocaleFile(file,"  Endianness: %s\n",CommandOptionToMnemonic(
-    MagickEndianOptions,(ssize_t) image->endian));
+  PrintImageHeader(file,image,exception);
+  PrintImageClassToEndianness(file,image,colorspace,exception);
   PrintImageDepth(file,image,depth);
   (void) FormatLocaleFile(file,"  Channels: %g.%g\n",(double)
     image->number_channels,(double) image->number_meta_channels);
@@ -2292,16 +2334,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     {
       PrintImagePixelSummary(file,image,colorspace,exception);
     }
-  PrintImageColormapEntries(file,image,exception);
-  PrintImageErrorAndRendering(file,image);
-  PrintImageColors(file,image,exception);
-  PrintImageLayout(file,image);
-  PrintImageAnimation(file,image);
-  PrintImageStorageDetails(file,image,exception);
-  PrintImageProfiles(file,image);
-  PrintImageProperties(file,image,exception);
-  PrintImageArtifacts(file,image);
-  PrintImageRegistry(file,exception);
+  PrintImageDetails(file,image,exception);
   PrintImageSizes(file,image);
   PrintImageTimes(file,image,elapsed_time,user_time);
   (void) fflush(file);

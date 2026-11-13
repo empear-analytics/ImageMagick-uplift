@@ -60,6 +60,7 @@ $call Make compress-lzw.c
 $call Make configure.c
 $call Make configure-paths.c
 $call Make constitute.c
+$call Make constitute-codec.c
 $call Make constitute-pixels.c
 $call Make decorate.c
 $call Make decorate-raise.c
@@ -132,6 +133,7 @@ $call Make pixel-gamma.c
 $call Make pixel-import.c
 $call Make pixel-export.c
 $call Make policy.c
+$call Make policy-path.c
 $call Make prepress.c
 $call Make property.c
 $call Make PreRvIcccm.c
@@ -168,6 +170,7 @@ $call Make statistic-function.c
 $call Make statistic-moments.c
 $call Make statistic-image.c
 $call Make stream.c
+$call Make stream-read.c
 $call Make string.c
 $call Make string-copy.c
 $call Make string-info.c
@@ -186,6 +189,7 @@ $call Make threshold.c
 $call Make threshold-adaptive.c
 $call Make threshold-auto.c
 $call Make type.c
+$call Make type-list.c
 $call Make utility.c
 $call Make version.c
 $call Make vision.c

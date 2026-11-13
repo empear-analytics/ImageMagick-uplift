@@ -23,8 +23,10 @@ moves with its callers, and one the kept part also calls is shared. --copy-macro
 `#define NAME "literal"` of the kept part again in NEW (Recipe S step 2). A file-scope
 `static const` table between the moved functions moves with them, and a one-line
 `#define` of the original that only the family uses moves to NEW (step 2 as amended
-2026-11-11), each refused when the kept part names it; a two-line forward declaration
-of a moved static at the top of FILE moves to NEW. A trailing run of conditional lines
+2026-11-11), each refused when the kept part names it; a forward declaration
+of a moved static at the top of FILE moves to NEW: a `static T` line and its declarators, each possibly wrapped
+over several lines; a group that also declares a kept static is split, the moved declarators going to NEW under
+a copy of the `static T` line, and a group inside an `extern "C"` block is declared inside one in NEW too. A trailing run of conditional lines
 in FILE's include block that holds every macro the block defines (a delegate's headers)
 is left out of NEW's copy when the family names none of those macros. A quoted `#include` of a header of the same directory that defines objects (a file-scope initialised
 variable, as accelerate-kernels-private.h's `accelerateKernels`) is left out of NEW's copy of the include
@@ -165,14 +167,93 @@ def drop_empty_banner(lines, banner):
     text = re.sub(r"(?m)^/\*\n  %s\n\*/\n[\n\f]*(?=/\*)" % re.escape(banner), "", "\n".join(lines), count=1)
     lines[:] = text.split("\n")
 
+EXTERN_C_OPEN = ["#if defined(__cplusplus) || defined(c_plusplus)", 'extern "C" {', "#endif"]
+EXTERN_C_CLOSE = ["#if defined(__cplusplus) || defined(c_plusplus)", "}", "#endif"]
+
+def in_extern_c(lines, k):
+    """Whether line K of LINES stands inside an `extern "C" {` block written as EXTERN_C_OPEN ... EXTERN_C_CLOSE."""
+    depth = 0
+    for i in range(k):
+        if lines[i:i + 3] == EXTERN_C_OPEN: depth += 1
+        elif lines[i:i + 3] == EXTERN_C_CLOSE: depth -= 1
+    return depth > 0
+
+def declarator_end(lines, e):
+    """The index of the line where the declarator starting at line E closes its parentheses, or None when that
+    line does not end the declarator with `,` or `;`."""
+    depth = 0
+    for k in range(e, len(lines)):
+        depth += lines[k].count("(") - lines[k].count(")")
+        if depth == 0:
+            return k if re.search(r"\)[,;]$", lines[k].rstrip()) else None
+    return None
+
+def declaration_group(lines, k):
+    """The declarators of a forward declaration group `static T` / `  *?Name(...),` ... `  *?Name(...);` starting at
+    line K, as (name, lines) pairs, and the index of the group's last line; None when K starts no such group. A
+    declarator may run over several lines (its parameter list wrapped): it ends on the line where its parentheses
+    close, which must end in `,` or `;`."""
+    if not re.fullmatch(r"static [\w \*]+", lines[k]): return None
+    decls = []; e = k + 1
+    while e < len(lines):
+        m = re.match(r"^  \*?(\w+)\(", lines[e])
+        end = declarator_end(lines, e) if m else None
+        if end is None: return None
+        decls.append((m.group(1), lines[e:end + 1]))
+        if lines[end].rstrip().endswith(";"): return decls, end
+        e = end + 1
+    return None
+
+def group_text(head, decls):
+    """The group HEAD / DECLS as text, its last declarator ending in `;` and the others in `,`."""
+    out = [head]
+    for n, (_, dl) in enumerate(decls):
+        dl = list(dl)
+        dl[-1] = dl[-1].rstrip()[:-1] + (";" if n == len(decls) - 1 else ",")
+        out += dl
+    return "\n".join(out)
+
+def is_blank_around(lines, k, e):
+    """Whether blank lines stand directly before line K and directly after line E."""
+    return 0 < k and e + 1 < len(lines) and lines[k - 1] == "" and lines[e + 1] == ""
+
+def split_group(lines, k, statics, taken):
+    """Take the declarators of STATICS out of the group at line K of LINES into TAKEN; return the next line."""
+    g = declaration_group(lines, k)
+    if g is None: return k + 1
+    decls, e = g
+    moved = [d for d in decls if d[0] in statics]
+    if not moved: return e + 1
+    kept = [d for d in decls if d[0] not in statics]
+    taken.append((group_text(lines[k], moved), in_extern_c(lines, k)))
+    repl = group_text(lines[k], kept).split("\n") if kept else []
+    if not kept and is_blank_around(lines, k, e):
+        e += 1  # the blank line that separated the group from the next one goes with it
+    lines[k:e + 1] = repl
+    return k + len(repl)
+
 def take_forward_declarations(lines, statics):
-    """Remove from LINES the two-line forward declarations `static T` / `  Name(...);` (or `  *Name(...);`) of STATICS; return them."""
-    text = "\n".join(lines)
-    found = re.findall(r"(?m)^(static [\w \*]+\n  \*?(\w+)\(.*\);)\n", text)
-    taken = [decl for decl, name in found if name in statics]
-    for decl in taken: text = text.replace(decl + "\n", "", 1)
-    lines[:] = text.split("\n")
+    """Remove from LINES the forward declarations of STATICS; return them as (text, in_extern_c) pairs.
+
+    A declaration is a group: a `static T` line, then one or more declarators `  Name(...)` (or `  *Name(...)`),
+    each possibly wrapped over several lines, separated by `,` and ended by `;`. A group whose declarators all
+    name STATICS goes whole. A group that also declares a kept static is split: the kept declarators stay under
+    its `static T` line, in their order, and the moved ones form a group of their own under a copy of that line.
+    A group inside an `extern "C"` block (stream.c's pixel cache interfaces) is reported so, for the new file
+    to declare it inside one as well."""
+    taken = []; k = 0
+    while k < len(lines):
+        k = split_group(lines, k, statics, taken)
     return taken
+
+def forward_block(forward):
+    """The new file's *Forward declarations* block for FORWARD, (text, in_extern_c) pairs; the declarations taken
+    from an `extern "C"` block stand in one, written as the original writes it."""
+    items = [t for t, c in forward if not c]
+    wrapped = [t for t, c in forward if c]
+    if wrapped:
+        items.append("\n".join(EXTERN_C_OPEN) + "\n\n" + "\n\n".join(wrapped) + "\n\n" + "\n".join(EXTERN_C_CLOSE))
+    return declaration_block("Forward declarations.", items)
 
 def relocate_declarations(lines, statics, macros):
     """Take the forward declarations of STATICS out of LINES, and the banners the moves leave empty."""
@@ -478,7 +559,7 @@ for k, line in enumerate(list(include_lines)):
 include_lines = [l for l in include_lines if l is not None]
 extra = declaration_block("Typedef declarations.", moved_types, "\n\n") + \
     declaration_block("Define declarations.", moved_macros + macro_lines) + \
-    declaration_block("Forward declarations.", forward)
+    forward_block(forward)
 # the file-level conditionals the family stands in (a delegate's #if around the whole file) go to NEW as well
 runs_in = [enclosing_conditionals(recs, a) for a, b in cuts]
 if any([r["if"] for r, _ in e] != [r["if"] for r, _ in runs_in[0]] for e in runs_in):

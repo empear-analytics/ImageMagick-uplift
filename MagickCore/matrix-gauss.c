@@ -184,24 +184,79 @@ static void CopyBackMatrix(double **matrix,long double **hp_matrix,
   return(MagickFalse); \
 }
 
-static void FindPivot(long double **hp_matrix,const ssize_t *pivots,
-  const size_t rank,long double *max,ssize_t *row,ssize_t *column)
+typedef struct _PivotSearch
 {
+  long double
+    **hp_matrix;
+
+  const ssize_t
+    *pivots;
+
+  size_t
+    rank;
+} PivotSearch;
+
+typedef struct _PivotTargets
+{
+  long double
+    *max;
+
   ssize_t
-    j,
+    *row,
+    *column;
+} PivotTargets;
+
+static void ScanPivotRow(const PivotSearch *search,
+  const PivotTargets *targets,const ssize_t j)
+{
+  long double
+    **const hp_matrix = search->hp_matrix;
+
+  const ssize_t
+    *const pivots = search->pivots;
+
+  const size_t
+    rank = search->rank;
+
+  long double
+    *const max = targets->max;
+
+  ssize_t
+    *const row = targets->row,
+    *const column = targets->column;
+
+  ssize_t
     k;
+
+  for (k=0; k < (ssize_t) rank; k++)
+    if ((pivots[k] == 0) && (fabsl(hp_matrix[j][k]) > *max))
+      {
+        *max=fabsl(hp_matrix[j][k]);
+        *row=j;
+        *column=k;
+      }
+}
+
+static void FindPivot(const PivotSearch *search,long double *max,
+  ssize_t *row,ssize_t *column)
+{
+  const PivotTargets
+    targets = { max, row, column };
+
+  const ssize_t
+    *const pivots = search->pivots;
+
+  const size_t
+    rank = search->rank;
+
+  ssize_t
+    j;
 
   *column=(-1);
   *row=(-1);
   for (j=0; j < (ssize_t) rank; j++)
     if (pivots[j] != 1)
-      for (k=0; k < (ssize_t) rank; k++)
-        if ((pivots[k] == 0) && (fabsl(hp_matrix[j][k]) > *max))
-          {
-            *max=fabsl(hp_matrix[j][k]);
-            *row=j;
-            *column=k;
-          }
+      ScanPivotRow(search,&targets,j);
 }
 
 static void SwapMatrixRows(long double **hp_matrix,const size_t rank,
@@ -224,9 +279,32 @@ static void SwapVectorEntries(double **vectors,const size_t number_vectors,
     GaussJordanSwap(vectors[k][row],vectors[k][column]);
 }
 
-static void EliminateColumn(long double **hp_matrix,double **vectors,
-  const size_t rank,const size_t number_vectors,const ssize_t column)
+typedef struct _GaussJordanSystem
 {
+  long double
+    **hp_matrix;
+
+  double
+    **vectors;
+
+  size_t
+    rank,
+    number_vectors;
+} GaussJordanSystem;
+
+static void EliminateColumn(const GaussJordanSystem *system,
+  const ssize_t column)
+{
+  long double
+    **const hp_matrix = system->hp_matrix;
+
+  double
+    **const vectors = system->vectors;
+
+  const size_t
+    rank = system->rank,
+    number_vectors = system->number_vectors;
+
   long double
     scale;
 
@@ -246,6 +324,53 @@ static void EliminateColumn(long double **hp_matrix,double **vectors,
       }
 }
 
+static void SwapPivotRows(const GaussJordanSystem *system,const ssize_t row,
+  const ssize_t column)
+{
+  long double
+    **const hp_matrix = system->hp_matrix;
+
+  double
+    **const vectors = system->vectors;
+
+  const size_t
+    rank = system->rank,
+    number_vectors = system->number_vectors;
+
+  if (row != column)
+    {
+      SwapMatrixRows(hp_matrix,rank,row,column);
+      SwapVectorEntries(vectors,number_vectors,row,column);
+    }
+}
+
+static void NormalizePivotRow(const GaussJordanSystem *system,
+  const ssize_t column)
+{
+  long double
+    **const hp_matrix = system->hp_matrix;
+
+  double
+    **const vectors = system->vectors;
+
+  const size_t
+    rank = system->rank,
+    number_vectors = system->number_vectors;
+
+  long double
+    scale;
+
+  ssize_t
+    j;
+
+  scale=1.0L/hp_matrix[column][column];
+  hp_matrix[column][column]=1.0;
+  for (j=0; j < (ssize_t) rank; j++)
+    hp_matrix[column][j]*=scale;
+  for (j=0; j < (ssize_t) number_vectors; j++)
+    vectors[j][column]*=(double) scale;
+}
+
 static void UnscrambleColumns(long double **hp_matrix,const size_t rank,
   const ssize_t *columns,const ssize_t *rows)
 {
@@ -259,19 +384,56 @@ static void UnscrambleColumns(long double **hp_matrix,const size_t rank,
         GaussJordanSwapLD(hp_matrix[i][columns[j]],hp_matrix[i][rows[j]]);
 }
 
+static void CopyHPMatrixRow(long double **hp_matrix,double **matrix,
+  const size_t rank,const ssize_t i)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) rank; j++)
+    hp_matrix[i][j]=(long double)matrix[i][j];
+}
+
+static MagickBooleanType AcquireHPMatrixRows(long double **hp_matrix,
+  double **matrix,const size_t rank)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) rank; i++)
+  {
+    hp_matrix[i]=(long double *) AcquireQuantumMemory(rank,
+      sizeof(*hp_matrix[i]));
+    if (hp_matrix[i] == (long double *) NULL)
+      return(MagickFalse);
+    CopyHPMatrixRow(hp_matrix,matrix,rank,i);
+  }
+  return(MagickTrue);
+}
+
+static long double **RelinquishHPMatrix(long double **hp_matrix,
+  const size_t rank)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) rank; i++)
+    hp_matrix[i]=(long double *) RelinquishMagickMemory(hp_matrix[i]);
+  hp_matrix=(long double **) RelinquishMagickMemory(hp_matrix);
+  return(hp_matrix);
+}
+
 MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   double **vectors,const size_t rank,const size_t number_vectors)
 {
 
   long double
-    **hp_matrix = (long double **) NULL,
-    scale;
+    **hp_matrix = (long double **) NULL;
 
   ssize_t
     column,
     *columns = (ssize_t *) NULL,
     i,
-    j,
     *pivots = (ssize_t *) NULL,
     row,
     *rows = (ssize_t *) NULL;
@@ -282,15 +444,8 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   hp_matrix=(long double **) AcquireQuantumMemory(rank,sizeof(*hp_matrix));
   if (hp_matrix == (long double **) NULL)
     return(MagickFalse);
-  for (i=0; i < (ssize_t) rank; i++)
-  {
-    hp_matrix[i]=(long double *) AcquireQuantumMemory(rank,
-      sizeof(*hp_matrix[i]));
-    if (hp_matrix[i] == (long double *) NULL)
-      ThrowGaussJordanException();
-    for (j=0; j < (ssize_t) rank; j++)
-      hp_matrix[i][j]=(long double)matrix[i][j];
-  }
+  if (AcquireHPMatrixRows(hp_matrix,matrix,rank) == MagickFalse)
+    ThrowGaussJordanException();
   columns=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*columns));
   rows=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*rows));
   pivots=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*pivots));
@@ -301,6 +456,12 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   (void) memset(pivots,0,rank*sizeof(*pivots));
   for (i=0; i < (ssize_t) rank; i++)
   {
+    const GaussJordanSystem
+      system = { hp_matrix, vectors, rank, number_vectors };
+
+    const PivotSearch
+      search = { hp_matrix, pivots, rank };
+
     long double
       max = 0.0;
 
@@ -308,26 +469,17 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
       Partial pivoting: find the largest absolute value in the unreduced
       submatrix.
     */
-    FindPivot(hp_matrix,pivots,rank,&max,&row,&column);
+    FindPivot(&search,&max,&row,&column);
     if (IsSingularPivot(column,row,max) != MagickFalse)
       ThrowGaussJordanException();  /* Singular or nearly singular matrix */
     pivots[column]++;
-    if (row != column)
-      {
-        SwapMatrixRows(hp_matrix,rank,row,column);
-        SwapVectorEntries(vectors,number_vectors,row,column);
-      }
+    SwapPivotRows(&system,row,column);
     rows[i]=row;
     columns[i]=column;
     if (fabsl(hp_matrix[column][column]) < LDBL_MIN)
       ThrowGaussJordanException();  /* Singular matrix */
-    scale=1.0L/hp_matrix[column][column];
-    hp_matrix[column][column]=1.0;
-    for (j=0; j < (ssize_t) rank; j++)
-      hp_matrix[column][j]*=scale;
-    for (j=0; j < (ssize_t) number_vectors; j++)
-      vectors[j][column]*=(double) scale;
-    EliminateColumn(hp_matrix,vectors,rank,number_vectors,column);
+    NormalizePivotRow(&system,column);
+    EliminateColumn(&system,column);
   }
   UnscrambleColumns(hp_matrix,rank,columns,rows);
   /*
@@ -337,9 +489,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   /*
     Free resources.
   */
-  for (i=0; i < (ssize_t) rank; i++)
-    hp_matrix[i]=(long double *) RelinquishMagickMemory(hp_matrix[i]);
-  hp_matrix=(long double **) RelinquishMagickMemory(hp_matrix);
+  hp_matrix=RelinquishHPMatrix(hp_matrix,rank);
   pivots=(ssize_t *) RelinquishMagickMemory(pivots);
   rows=(ssize_t *) RelinquishMagickMemory(rows);
   columns=(ssize_t *) RelinquishMagickMemory(columns);
