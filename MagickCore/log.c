@@ -1305,7 +1305,7 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
   token=DestroyString(token);
   if (cache == (LinkedListInfo *) NULL)
     return(MagickFalse);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 #endif
 
