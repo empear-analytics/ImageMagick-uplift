@@ -4317,6 +4317,28 @@ static MagickBooleanType AddMetacontentPacketSize(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType ExhaustPixelCacheResources(CacheInfo *cache_info,
+  const PixelCacheOpenInfo *open_info,CacheInfo source_info)
+{
+  Image
+    *const image = open_info->image;
+
+  const MapMode
+    mode = open_info->mode;
+
+  ExceptionInfo
+    *const exception = open_info->exception;
+
+  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
+    RelinquishPixelCachePixels(&source_info);
+  cache_info->type=UndefinedCache;
+  (void) memset(image->channel_map,0,MaxPixelChannels*
+    sizeof(*image->channel_map));
+  (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
+    "CacheResourcesExhausted","`%s'",image->filename);
+  return(MagickFalse);
+}
+
 static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   ExceptionInfo *exception)
 {
@@ -4497,29 +4519,13 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
             return(CreateDistributedPixelCache(cache_info,&open_info,
               source_info,server_info));
         }
-      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-        RelinquishPixelCachePixels(&source_info);
-      cache_info->type=UndefinedCache;
-      (void) memset(image->channel_map,0,MaxPixelChannels*
-        sizeof(*image->channel_map));
-      (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
-        "CacheResourcesExhausted","`%s'",image->filename);
-      return(MagickFalse);
+      return(ExhaustPixelCacheResources(cache_info,&open_info,source_info));
     }
   /*
     Create pixel cache on disk.
   */
   if (status == MagickFalse)
-    {
-      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-        RelinquishPixelCachePixels(&source_info);
-      cache_info->type=UndefinedCache;
-      (void) memset(image->channel_map,0,MaxPixelChannels*
-        sizeof(*image->channel_map));
-      (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
-        "CacheResourcesExhausted","`%s'",image->filename);
-      return(MagickFalse);
-    }
+    return(ExhaustPixelCacheResources(cache_info,&open_info,source_info));
   if (IsCacheClonePending(source_info,mode,cache_info) != MagickFalse)
     {
       (void) ClosePixelCacheOnDisk(cache_info);
