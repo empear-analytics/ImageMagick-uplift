@@ -737,6 +737,20 @@ RestoreMSCWarning \
     }  \
 }
 
+static void ThresholdHuffmanRow(const Image *huffman_image,const Quantum *p,
+  unsigned char *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) huffman_image->columns; x++)
+  {
+    *q++=(unsigned char) (GetPixelIntensity(huffman_image,p) >=
+      ((double) QuantumRange/2.0) ? 0 : 1);
+    p+=(ptrdiff_t) GetPixelChannels(huffman_image);
+  }
+}
+
 static inline const HuffmanTable *HuffmanMakeupEntry(
   const HuffmanTable *table,const int runlength)
 {
@@ -778,8 +792,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
     proceed;
 
   ssize_t
-    i,
-    x;
+    i;
 
   const Quantum
     *p;
@@ -849,12 +862,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
     p=GetVirtualPixels(huffman_image,0,y,huffman_image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) huffman_image->columns; x++)
-    {
-      *q++=(unsigned char) (GetPixelIntensity(huffman_image,p) >=
-        ((double) QuantumRange/2.0) ? 0 : 1);
-      p+=(ptrdiff_t) GetPixelChannels(huffman_image);
-    }
+    ThresholdHuffmanRow(huffman_image,p,q);
     /*
       Huffman encode scanline.
     */
