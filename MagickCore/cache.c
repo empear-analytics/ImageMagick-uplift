@@ -4287,6 +4287,19 @@ static MagickBooleanType CreateDistributedPixelCache(CacheInfo *cache_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireListLengthResource(const Image *image,
+  MagickSizeType *length,ExceptionInfo *exception)
+{
+  if (GetMagickResourceLimit(ListLengthResource) != MagickResourceInfinity)
+    {
+      *length=GetImageListLength(image);
+      if (AcquireMagickResource(ListLengthResource,*length) == MagickFalse)
+        ThrowBinaryException(ResourceLimitError,"ListLengthExceedsLimit",
+          image->filename);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   ExceptionInfo *exception)
 {
@@ -4358,13 +4371,8 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
         (double) cache_info->width_limit,(double) cache_info->height_limit);
       return(MagickFalse);
     }
-  if (GetMagickResourceLimit(ListLengthResource) != MagickResourceInfinity)
-    {
-      length=GetImageListLength(image);
-      if (AcquireMagickResource(ListLengthResource,length) == MagickFalse)
-        ThrowBinaryException(ResourceLimitError,"ListLengthExceedsLimit",
-          image->filename);
-    }
+  if (AcquireListLengthResource(image,&length,exception) == MagickFalse)
+    return(MagickFalse);
   source_info=(*cache_info);
   source_info.file=(-1);
   (void) FormatLocaleString(cache_info->filename,MagickPathExtent,"%s[%.17g]",
