@@ -14688,6 +14688,15 @@ static unsigned int GetNoticeDescriptionWidth(XFontStruct *font_info,
   return(width);
 }
 
+static void PositionNoticeWidth(XWindows *windows,XFontStruct *font_info,
+  const unsigned int width)
+{
+  windows->widget.width=width+(unsigned int) (4*QuantumMargin);
+  windows->widget.min_width=width+(unsigned int) QuantumMargin;
+  if (windows->widget.width < windows->widget.min_width)
+    windows->widget.width=windows->widget.min_width;
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -14744,10 +14753,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   /*
     Position Notice widget.
   */
-  windows->widget.width=width+(unsigned int) (4*QuantumMargin);
-  windows->widget.min_width=width+(unsigned int) QuantumMargin;
-  if (windows->widget.width < windows->widget.min_width)
-    windows->widget.width=windows->widget.min_width;
+  PositionNoticeWidth(windows,font_info,width);
   windows->widget.height=(unsigned int) (12*height);
   windows->widget.min_height=(unsigned int) (7*height);
   if (windows->widget.height < windows->widget.min_height)
