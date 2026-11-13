@@ -814,6 +814,22 @@ static void FlushHuffmanBits(const ImageInfo *image_info,Image *image,
     }
 }
 
+static MagickBooleanType UpdateHuffmanProgress(Image *huffman_image,
+  const ssize_t y)
+{
+  MagickBooleanType
+    proceed;
+
+  if (GetPreviousImageInList(huffman_image) == (Image *) NULL)
+    {
+      proceed=SetImageProgress(huffman_image,LoadImageTag,
+        (MagickOffsetType) y,huffman_image->rows);
+      if (proceed == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   Image *image,Image *inject_image,ExceptionInfo *exception)
 {
@@ -825,9 +841,6 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
 
   Image
     *huffman_image;
-
-  MagickBooleanType
-    proceed;
 
   ssize_t
     i;
@@ -940,13 +953,8 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
     */
     OutputHuffmanEndOfLine(image_info,image,&byte,&bit);
     q=scanline;
-    if (GetPreviousImageInList(huffman_image) == (Image *) NULL)
-      {
-        proceed=SetImageProgress(huffman_image,LoadImageTag,
-          (MagickOffsetType) y,huffman_image->rows);
-        if (proceed == MagickFalse)
-          break;
-      }
+    if (UpdateHuffmanProgress(huffman_image,y) == MagickFalse)
+      break;
   }
   /*
     End of page.
