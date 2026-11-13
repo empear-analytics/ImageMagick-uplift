@@ -8853,6 +8853,12 @@ typedef struct _XTrueColorSource
 
   Colormap
     colormap;
+
+  XStandardColormap
+    *map_info;
+
+  Image
+    *image;
 } XTrueColorSource;
 
 static void XStoreTrueColors(const XTrueColorSource *source,XColor *colors,
@@ -8878,6 +8884,57 @@ static void XStoreTrueColors(const XTrueColorSource *source,XColor *colors,
       (void) XAllocColor(display,colormap,&colors[i]);
 }
 
+static void XAllocateColorRamp(const XTrueColorSource *source,
+  size_t *number_colors,XColor **colors)
+{
+  XVisualInfo
+    *const visual_info = source->visual_info;
+
+  XStandardColormap
+    *const map_info = source->map_info;
+
+  Image
+    *const image = source->image;
+
+  MagickBooleanType
+    linear_colormap;
+
+  XColor
+    color,
+    *p;
+
+  /*
+    Define Standard Colormap for TrueColor or DirectColor visual.
+  */
+  (*number_colors)=(unsigned int) ((map_info->red_max*map_info->red_mult)+
+    (map_info->green_max*map_info->green_mult)+
+    (map_info->blue_max*map_info->blue_mult)+1);
+  linear_colormap=((*number_colors) > 4096) ||
+    (((int) (map_info->red_max+1) == visual_info->colormap_size) &&
+     ((int) (map_info->green_max+1) == visual_info->colormap_size) &&
+     ((int) (map_info->blue_max+1) == visual_info->colormap_size)) ?
+     MagickTrue : MagickFalse;
+  if (linear_colormap != MagickFalse)
+    (*number_colors)=(size_t) visual_info->colormap_size;
+  /*
+    Allocate color array.
+  */
+  (*colors)=(XColor *) AcquireQuantumMemory((*number_colors),
+    sizeof(*(*colors)));
+  if ((*colors) == (XColor *) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,
+      "UnableToCreateColormap",image->filename);
+  /*
+    Initialize linear color ramp.
+  */
+  p=(*colors);
+  color.flags=(char) (DoRed | DoGreen | DoBlue);
+  if (linear_colormap != MagickFalse)
+    XFillLinearColorRamp(map_info,(*number_colors),color,p);
+  else
+    XFillColorRamp(map_info,(*number_colors),color,p);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -8895,9 +8952,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
     number_colors;
 
   XColor
-    color,
-    *colors,
-    *p;
+    *colors;
 
   assert(display != (Display *) NULL);
   assert(visual_info != (XVisualInfo *) NULL);
@@ -9094,44 +9149,16 @@ MagickPrivate void XMakeStandardColormap(Display *display,
     case DirectColor:
     default:
     {
-      MagickBooleanType
-        linear_colormap;
-
       XTrueColorSource
         source;
 
-      /*
-        Define Standard Colormap for TrueColor or DirectColor visual.
-      */
-      number_colors=(unsigned int) ((map_info->red_max*map_info->red_mult)+
-        (map_info->green_max*map_info->green_mult)+
-        (map_info->blue_max*map_info->blue_mult)+1);
-      linear_colormap=(number_colors > 4096) ||
-        (((int) (map_info->red_max+1) == visual_info->colormap_size) &&
-         ((int) (map_info->green_max+1) == visual_info->colormap_size) &&
-         ((int) (map_info->blue_max+1) == visual_info->colormap_size)) ?
-         MagickTrue : MagickFalse;
-      if (linear_colormap != MagickFalse)
-        number_colors=(size_t) visual_info->colormap_size;
-      /*
-        Allocate color array.
-      */
-      colors=(XColor *) AcquireQuantumMemory(number_colors,sizeof(*colors));
-      if (colors == (XColor *) NULL)
-        ThrowXWindowFatalException(ResourceLimitFatalError,
-          "UnableToCreateColormap",image->filename);
-      /*
-        Initialize linear color ramp.
-      */
-      p=colors;
-      color.flags=(char) (DoRed | DoGreen | DoBlue);
-      if (linear_colormap != MagickFalse)
-        XFillLinearColorRamp(map_info,number_colors,color,p);
-      else
-        XFillColorRamp(map_info,number_colors,color,p);
+
       source.display=display;
       source.visual_info=visual_info;
       source.colormap=colormap;
+      source.map_info=map_info;
+      source.image=image;
+      XAllocateColorRamp(&source,&number_colors,&colors);
       XStoreTrueColors(&source,colors,number_colors);
       break;
     }
