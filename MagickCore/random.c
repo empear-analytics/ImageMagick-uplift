@@ -376,6 +376,55 @@ static void GatherTrueRandomEntropy(StringInfo *entropy,StringInfo *chaos)
       ConcatenateStringInfo(entropy,chaos);
     }
 }
+
+static void GatherDeviceEntropy(StringInfo *entropy,StringInfo *chaos)
+{
+  char
+    *filename;
+
+  int
+    file;
+
+  ssize_t
+    count;
+
+  StringInfo
+    *device;
+
+  /*
+    Not cryptographically strong but better than nothing.
+  */
+  if (environ != (char **) NULL)
+    {
+      ssize_t
+        i;
+
+      /*
+        Squeeze some entropy from the sometimes unpredictable environment.
+      */
+      for (i=0; environ[i] != (char *) NULL; i++)
+      {
+        SetStringInfoLength(chaos,strlen(environ[i]));
+        SetStringInfoDatum(chaos,(unsigned char *) environ[i]);
+        ConcatenateStringInfo(entropy,chaos);
+      }
+    }
+  filename=AcquireString("/dev/urandom");
+  device=StringToStringInfo(filename);
+  device=DestroyStringInfo(device);
+  file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
+  filename=DestroyString(filename);
+  if (file != -1)
+    {
+      SetStringInfoLength(chaos,MaxEntropyExtent);
+      count=ReadRandom(file,GetStringInfoDatum(chaos),MaxEntropyExtent);
+      (void) close_utf8(file);
+      SetStringInfoLength(chaos,(size_t) count);
+      ConcatenateStringInfo(entropy,chaos);
+    }
+  if (gather_true_random != MagickFalse)
+    GatherTrueRandomEntropy(entropy,chaos);
+}
 #endif
 
 static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
@@ -539,53 +588,7 @@ static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
     ConcatenateStringInfo(entropy,chaos);
   }
 #else
-  {
-    char
-      *filename;
-
-    int
-      file;
-
-    ssize_t
-      count;
-
-    StringInfo
-      *device;
-
-    /*
-      Not cryptographically strong but better than nothing.
-    */
-    if (environ != (char **) NULL)
-      {
-        ssize_t
-          i;
-
-        /*
-          Squeeze some entropy from the sometimes unpredictable environment.
-        */
-        for (i=0; environ[i] != (char *) NULL; i++)
-        {
-          SetStringInfoLength(chaos,strlen(environ[i]));
-          SetStringInfoDatum(chaos,(unsigned char *) environ[i]);
-          ConcatenateStringInfo(entropy,chaos);
-        }
-      }
-    filename=AcquireString("/dev/urandom");
-    device=StringToStringInfo(filename);
-    device=DestroyStringInfo(device);
-    file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
-    filename=DestroyString(filename);
-    if (file != -1)
-      {
-        SetStringInfoLength(chaos,MaxEntropyExtent);
-        count=ReadRandom(file,GetStringInfoDatum(chaos),MaxEntropyExtent);
-        (void) close_utf8(file);
-        SetStringInfoLength(chaos,(size_t) count);
-        ConcatenateStringInfo(entropy,chaos);
-      }
-    if (gather_true_random != MagickFalse)
-      GatherTrueRandomEntropy(entropy,chaos);
-  }
+  GatherDeviceEntropy(entropy,chaos);
 #endif
   chaos=DestroyStringInfo(chaos);
   UnlockSemaphoreInfo(random_info->semaphore);
