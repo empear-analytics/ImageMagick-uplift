@@ -1074,6 +1074,24 @@ static MagickBooleanType XImportWindowImage(const WindowImageSource *source)
   return(MagickTrue);
 }
 
+static void XEliminateOrphanedWindow(WindowInfo *window_info,const int id,
+  int *number_windows)
+{
+  int
+    i;
+
+  for (i=0; i < id; i++)
+    if ((IsSameVisualParent(window_info,id,i) != MagickFalse) &&
+        (IsOutsideParentBounds(window_info,id,i) != MagickFalse))
+      {
+        /*
+          Eliminate windows not circumscribed by their parent.
+        */
+        (*number_windows)--;
+        break;
+      }
+}
+
 static void XGrowWindowInfo(const int number_windows,int *max_windows,
   WindowInfo **window_info)
 {
@@ -1230,16 +1248,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
       */
       status=XQueryTree(display,window,&root_window,&window_info[id].parent,
         &children,&number_children);
-      for (i=0; i < id; i++)
-        if ((IsSameVisualParent(window_info,id,i) != MagickFalse) &&
-            (IsOutsideParentBounds(window_info,id,i) != MagickFalse))
-          {
-            /*
-              Eliminate windows not circumscribed by their parent.
-            */
-            number_windows--;
-            break;
-          }
+      XEliminateOrphanedWindow(window_info,id,&number_windows);
       if ((status == True) && (number_children != 0))
         {
           const WindowImageContext
