@@ -16632,6 +16632,36 @@ static void WithdrawTextViewWidget(Display *display,XWindows *windows,
   XCheckRefreshWindows(display,windows);
 }
 
+static void MapTextViewWidget(Display *display,XWindows *windows,
+  const char *title,MagickStatusType mask)
+{
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  (void) CopyMagickString(windows->widget.name,title,MagickPathExtent);
+  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
+  if (status != False)
+    {
+      XSetWMName(display,windows->widget.id,&window_name);
+      XSetWMIconName(display,windows->widget.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  window_changes.width=(int) windows->widget.width;
+  window_changes.height=(int) windows->widget.height;
+  window_changes.x=windows->widget.x;
+  window_changes.y=windows->widget.y;
+  (void) XReconfigureWMWindow(display,windows->widget.id,
+    windows->widget.screen,(unsigned int) mask,&window_changes);
+  (void) XMapRaised(display,windows->widget.id);
+  windows->widget.mapped=MagickFalse;
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16644,9 +16674,6 @@ MagickPrivate void XTextViewWidget(Display *display,
 
   static MagickStatusType
     mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
-
-  Status
-    status;
 
   unsigned int
     height,
@@ -16666,9 +16693,6 @@ MagickPrivate void XTextViewWidget(Display *display,
     *font_info,
     *text_info;
 
-  XTextProperty
-    window_name;
-
   XWidgetInfo
     dismiss_info,
     expose_info,
@@ -16678,9 +16702,6 @@ MagickPrivate void XTextViewWidget(Display *display,
     selection_info,
     slider_info,
     south_info;
-
-  XWindowChanges
-    window_changes;
 
   const TextViewTargets
     targets = { &list_info, &selection_info, &state };
@@ -16746,22 +16767,7 @@ MagickPrivate void XTextViewWidget(Display *display,
   /*
     Map Text View widget.
   */
-  (void) CopyMagickString(windows->widget.name,title,MagickPathExtent);
-  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
-  if (status != False)
-    {
-      XSetWMName(display,windows->widget.id,&window_name);
-      XSetWMIconName(display,windows->widget.id,&window_name);
-      (void) XFree((void *) window_name.value);
-    }
-  window_changes.width=(int) windows->widget.width;
-  window_changes.height=(int) windows->widget.height;
-  window_changes.x=windows->widget.x;
-  window_changes.y=windows->widget.y;
-  (void) XReconfigureWMWindow(display,windows->widget.id,
-    windows->widget.screen,(unsigned int) mask,&window_changes);
-  (void) XMapRaised(display,windows->widget.id);
-  windows->widget.mapped=MagickFalse;
+  MapTextViewWidget(display,windows,title,mask);
   /*
     Respond to X events.
   */
