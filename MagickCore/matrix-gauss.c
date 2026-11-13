@@ -394,6 +394,18 @@ static void CopyHPMatrixRow(long double **hp_matrix,double **matrix,
     hp_matrix[i][j]=(long double)matrix[i][j];
 }
 
+static long double **RelinquishHPMatrix(long double **hp_matrix,
+  const size_t rank)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) rank; i++)
+    hp_matrix[i]=(long double *) RelinquishMagickMemory(hp_matrix[i]);
+  hp_matrix=(long double **) RelinquishMagickMemory(hp_matrix);
+  return(hp_matrix);
+}
+
 MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   double **vectors,const size_t rank,const size_t number_vectors)
 {
@@ -466,9 +478,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   /*
     Free resources.
   */
-  for (i=0; i < (ssize_t) rank; i++)
-    hp_matrix[i]=(long double *) RelinquishMagickMemory(hp_matrix[i]);
-  hp_matrix=(long double **) RelinquishMagickMemory(hp_matrix);
+  hp_matrix=RelinquishHPMatrix(hp_matrix,rank);
   pivots=(ssize_t *) RelinquishMagickMemory(pivots);
   rows=(ssize_t *) RelinquishMagickMemory(rows);
   columns=(ssize_t *) RelinquishMagickMemory(columns);
